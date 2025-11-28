@@ -1,6 +1,6 @@
 # CritterSupply
 
-## 🤔 What is this repository? <a id='1.0'></a>
+## 🤔 What Is This Repository? <a id='1.0'></a>
 
 This repository demonstrates how to build robust, production-ready, event-driven systems using a realistic e-commerce domain.
 
@@ -12,13 +12,13 @@ CritterSupply is a fictional pet supply retailer—the name a playful nod to the
 
 E-commerce was chosen as the domain partly from the maintainer's industry experience, but more importantly because it's a domain most developers intuitively understand. Everyone has placed an order online. That familiarity lets us focus on *how* the system is built rather than getting bogged down explaining *what* it does.
 
-### ️🔎️ Patterns in practice <a id='1.2'></a>
+### ️🔎️ Patterns in Practice <a id='1.2'></a>
 
 Beyond accessibility, e-commerce naturally demands the patterns this repository aims to demonstrate: event sourcing for capturing the full history of orders and inventory movements, stateful Sagas for coordinating multi-step processes like payment authorization and fulfillment, and reservation-based workflows where inventory is held pending confirmation rather than immediately decremented.
 
 This isn't a reference architecture padded with unnecessary layers, abstractions, or onion architecture to appear "enterprise-ready." The patterns here are inspired by real production systems built with the Critter Stack—code that's actually running and handling real business problems, ranging from startups to large enterprises.
 
-### 🤖 AI-assisted development <a id='1.3'></a>
+### 🤖 AI-assisted Development <a id='1.3'></a>
 
 This project is built with Claude as a collaborative coding partner. Beyond just generating code, it's an exercise in teaching AI tools to think in event-driven patterns and leverage the Critter Stack idiomatically—helping to improve the guidance these tools can offer the broader community.
 
@@ -29,7 +29,7 @@ See [CLAUDE.md](./CLAUDE.md) for the project-specific instructions Claude follow
 #### 🚫 Thinking Machines <a id='1.3.1'></a>
 Who knows. Maybe one day we'll ban "thinking machines" and have to build everything ourselves again. 😉 (see: Dune, Warhammer 40k, Battlestar Galactica, Mass Effect, and others)
 
-## 🗺️ Bounded contexts <a id='2.0'></a>
+## 🗺️ Bounded Contexts <a id='2.0'></a>
 
 CritterSupply is organized into seven bounded contexts, each with a focused responsibility:
 
@@ -45,8 +45,15 @@ CritterSupply is organized into seven bounded contexts, each with a focused resp
 
 For detailed responsibilities, interactions, and event flows between contexts, see [CONTEXTS.md](./CONTEXTS.md).
 
-## 🛠️ Local Development <a id='5.0'></a>
+## ⏩ Getting Started <a id='5.0'></a>
 
+This software solution has multiple dependencies that need to be running locally.
+
+- [.NET 10](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
+- [Docker Desktop](https://docs.docker.com/engine/install/)
+
+### 🛠️ Local Development <a id='5.1'></a>
+ 
 To launch Docker with the `all` profile, use this `docker-compose` command:
 
 ```bash
