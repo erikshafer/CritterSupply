@@ -1,0 +1,32 @@
+services:
+  postgres:
+    container_name: crittersupply-postgres
+    image: postgres:latest
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_DATABASE=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    networks:
+      - pg_network
+    profiles: [ all, ci ]
+
+  rabbitmq:
+    container_name: crittersupply-rabbitmq
+    image: "rabbitmq:management"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - rmq_network
+    profiles: [ all, ci ]
+
+networks:
+  pg_network:
+    driver: bridge
+  rmq_network:
+    driver: bridge
+
+volumes:
+  postgres:
