@@ -219,6 +219,12 @@ Skills are documented separately in the `skills/` directory. Each skill provides
 
 **File**: [skills/modern-csharp-coding-standards.md](skills/modern-csharp-coding-standards.md)
 
+### Critter Stack Testing Patterns
+
+**Purpose**: Patterns and practices for writing unit tests and integration tests when using Wolverine and Marten, AKA The Critter Stack. Includes guidance on using the Alba integration testing library.
+
+**File**: [skills/critterstack-testing-patterns.md](skills/critterstack-testing-patterns.md)
+
 ### TestContainers Integration Testing
 
 **Purpose**: Patterns and practices for writing integration tests using TestContainers and xUnit to test bounded contexts with real infrastructure dependencies.
