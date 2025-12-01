@@ -10,4 +10,15 @@
     <File Path="docker-compose.yml" />
     <File Path="README.md" />
   </Folder>
+  <Folder Name="/.SolutionItems/Skills/">
+    <File Path="skills/critterstack-testing-patterns.md" />
+    <File Path="skills/modern-csharp-coding-standards.md" />
+    <File Path="skills/testcontainers-integration-tests.md" />
+  </Folder>
+  <Folder Name="/Order Management/">
+    <Project Path="src/Order Management/Orders.Api/Orders.Api.csproj" />
+    <Project Path="src/Order Management/Orders/Orders.csproj" />
+    <Project Path="tests/Order Management/Orders.Api.IntegrationTests/Orders.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Order Management/Orders.UnitTests/Orders.UnitTests.csproj" />
+  </Folder>
 </Solution>
