@@ -1,314 +1,317 @@
-# Bounded Contexts in CritterSupply
+# CritterSupply Bounded Contexts
 
-This document defines the bounded contexts within the CritterSupply e-commerce system, their responsibilities, invariants, key events, and integration points. Each context has clear ownership and well-defined boundaries. Communication principles, patterns, and technologies are also defined.
+This document defines the bounded contexts within CritterSupply, an e-commerce reference architecture demonstrating event-driven systems using the Critter Stack (Wolverine, Marten, Alba).
 
-This document is meant to be kept up to date as the system evolves. Many segments are marked "To be determined" or "Future" to indicate ongoing design and implementation work.
+## Shopping
 
-## Order Management
+The Shopping context owns the customer's pre-purchase experience—building a cart and converting it to a confirmed order request.
 
-**Purpose**: Orchestrate the entire order lifecycle from placement through delivery and potential returns.
+### Modules
 
-**Current Status**: Developing a **Stateful Saga** pattern using Wolverine's built-in saga features.
+**Cart:**
 
-### Responsibilities
+- Adding/removing items
+- Updating quantities
+- Applying promo codes or coupons
+- Persisting cart state (anonymous or authenticated)
+- Validating item availability (queries Inventory, but doesn't reserve yet)
+- Pulling current prices (queries Pricing/Catalog)
 
-✅ **Owns**:
-- Order creation and lifecycle state (Placed → Confirmed → Paid → Shipped → Delivered)
-- Order line items (products, quantities, pricing at order time)
-- Order status transitions and validation rules
-- Initiating coordination between dependent contexts
-- Saga orchestration for multi-step workflows
+**Checkout:**
 
-❌ **Does Not Own**:
-- Tax/shipping calculation (delegated to yet-to-be-implemented Pricing context)
-- Payment capture/processing (delegated to Payment Processing)
-- Physical inventory management (delegated to Inventory Management)
-- Fulfillment/shipping coordination (delegated to yet-to-be-implemented Fulfillment context)
-- Customer relationship data (delegated to yet-to-be-implemented Customer context)
-- Returns/refunds workflows (initiated by Order, coordinated with Payment Processing and Inventory Management)
+- Collecting shipping address
+- Selecting shipping method
+- Collecting or selecting payment method
+- Final price calculation (subtotal, tax, shipping, discounts)
+- Submitting the order
 
-### Core Invariants
+### What it receives
 
-- **An order cannot transition to "Shipped" unless it is in "Paid" state**
-- **An order cannot proceed without confirmed inventory allocation from Inventory Management**
-- **Idempotency**: The same order event must never be applied twice; event-driven architecture ensures this through event sourcing
-- **An order's line items are immutable** after placement (pricing and products locked at order creation time)
+None from other bounded contexts. Shopping initiates the flow based on customer actions.
 
-### Key Events Published
+### What it publishes
 
-- `OrderPlaced` - Order created by customer (published by Shopping context, received by Order Management)
-- `OrderConfirmed` - Order confirmed after payment/fulfillment validation
-- `OrderPaid` - Payment successfully captured (published by Payment Processing)
-- `OrderShipped` - Order dispatched from warehouse (published by Fulfillment context)
-- `OrderDelivered` - Order received by customer (published by Fulfillment context)
-- `OrderRefundRequested` - Refund initiated (triggers Payment Processing and Inventory Management coordination)
-- `OrderCanceled` - Order canceled by customer or system
-- 
-### External Dependencies & Integration Points
+- `CheckoutCompleted` — contains cart items (SKU, quantity, price-at-purchase), customer ID, shipping address and method, payment method token, applied discounts
 
-| Context | Integration Type | Direction | Purpose |
-|---------|------------------|-----------|---------|
-| **Payment Processing** | Message-driven (async) | Consumes | Receives `PaymentCaptured` to transition to "Paid" state |
-| **Inventory Management** | Message-driven (async) | Bidirectional | Requests inventory allocation; receives `InventoryReserved` confirmation |
-| **Fulfillment** (Future) | Message-driven (async) | Consumes | Receives `OrderShipped` and `OrderDelivered` events |
-| **Pricing** (Future) | Query/gRPC (future) or Sync HTTP | One-way | Fetches tax/shipping costs at order creation |
-| **Customer Service** (Future) | Message-driven (async) | Bidirectional | Coordinates refunds and complaint handling |
+### Core invariants
 
-### Saga Workflow (Current & Future)
+- A cart cannot contain items with zero or negative quantity
+- A cart cannot proceed to checkout with unavailable items (must validate against Inventory)
+- Price-at-checkout must be captured at submission time (protects against price changes mid-checkout)
+- A checkout cannot complete without a valid shipping address and payment method reference
 
-To be determined.
+### What it doesn't own
 
-#### Error Handling in Saga
-
-To be determined.
-
-### Known Considerations
-
-This list will likely grow as development progresses. Ask questions regularly about the business and how the code should behave.
-
-- **Multi-warehouse Fulfillment**: Saga may need to split orders across warehouses (future Fulfillment context concern)
+- Inventory reservation commitment (soft hold only, Orders commits)
+- Payment processing
+- Order lifecycle management
+- Product catalog or pricing rules (queries Catalog/Pricing)
 
 ---
 
-## Payment Processing
+## Orders
 
-**Purpose**: Handle payment authorization, capture, and refunds by delegating to third-party payment gateways while maintaining system consistency and audit trails.
+The Orders context owns the commercial commitment and coordinates the lifecycle from placement through completion or cancellation. Implemented as a stateful saga to handle the variable complexity and duration of order lifecycles.
 
-**Current Status**: Needs to be implemented.  Address the stub implementation, which will mimic real payment gateways (Stripe, PayPal, Square).
+### What it receives
 
-### Responsibilities
+- `CheckoutCompleted` from Shopping — triggers saga creation
+- `PaymentCaptured` from Payments — payment successful
+- `PaymentFailed` from Payments — payment unsuccessful
+- `ReservationCommitted` from Inventory — stock allocated
+- `ReservationFailed` from Inventory — insufficient stock
+- `ShipmentDispatched` from Fulfillment — order shipped
+- `ShipmentDelivered` from Fulfillment — order delivered
+- `ShipmentDeliveryFailed` from Fulfillment — delivery unsuccessful
+- `ReturnApproved` from Returns — return accepted
+- `ReturnCompleted` from Returns — return processed, refund eligible
+- `ReturnRejected` from Returns — return inspection failed
+- `RefundCompleted` from Payments — refund processed
+- `RefundFailed` from Payments — refund unsuccessful
 
-✅ **Owns**:
-- Payment gateway integration and abstraction
-- Payment authorization and capture workflows
-- Refund processing and reconciliation
-- Currency conversion and localization (USD, CAD, EUR)
-- **Idempotency key management** to prevent duplicate charges
-- Payment state tracking and audit logs
-- PCI-DSS compliance concerns (delegating card data storage to payment gateway)
+### Saga states
 
-❌ **Does Not Own**:
-- Customer billing address validation (delegated to Shopping)
-- Tax calculation (delegated to Pricing context)
-- Order lifecycle (delegated to Order Management)
-- Refund approval workflow (initiated by Order Management/Customer Service context)
+- Placed — order created, awaiting payment and inventory confirmation
+- PendingPayment — awaiting async payment confirmation
+- PaymentConfirmed — funds captured successfully
+- PaymentFailed — payment declined (terminal or retry branch)
+- OnHold — flagged for fraud review or inventory issues
+- Fulfilling — handed off to Fulfillment BC
+- Shipped — integration event from Fulfillment
+- Delivered — integration event from Fulfillment
+- Cancelled — compensation triggered (release inventory, refund if paid)
+- ReturnRequested — customer initiated return
+- Closed — terminal state after delivery window passes or return resolved
 
-### Core Invariants
+### What it publishes
 
-- **Payments must be idempotent**: The same payment request with the same idempotency key must always result in the same outcome
-- **A refund cannot exceed the original payment amount**
-- **Payment state transitions are unidirectional**: Authorization → Capture or Authorization → Failed (no rollback to Authorization once Captured)
-- **Currency conversion must be logged**: All conversions from order currency to gateway currency must be auditable
-- **No card data is stored locally**: All sensitive payment data is tokenized and stored with the payment gateway
+- `OrderPlaced` — Inventory and Payments react
+- `PaymentRequested` — Payments processes capture
+- `ReservationCommitRequested` — Inventory confirms hard allocation
+- `ReservationReleaseRequested` — cancellation or failure compensation
+- `FulfillmentRequested` — Fulfillment begins processing
+- `RefundRequested` — Payments processes refund
+- `OrderCancelled` — triggers compensation across contexts
+- `OrderCompleted` — terminal success state reached
 
-### Key Events Published
+### Core invariants
 
-- `PaymentAuthorized` - Payment approved by gateway (not yet captured)
-- `PaymentCaptured` - Payment successfully charged (published to Order Management)
-- `PaymentFailed` - Payment declined or errored
-- `PaymentRefunded` - Refund successfully processed
-- `PaymentRefundFailed` - Refund attempt failed
-- `CurrencyConverted` - Record of currency conversion for audit
-- `IdempotencyKeyUsed` - Logging for duplicate detection
+- An order cannot be placed without committed inventory reservation
+- An order cannot proceed to fulfillment without confirmed payment
+- An order cannot be cancelled after shipment has been dispatched
+- A refund cannot exceed the original captured payment amount
+- State transitions must follow valid paths (no jumping from Placed to Delivered)
 
-### External Dependencies & Integration Points
+### What it doesn't own
 
-| Context/System | Integration Type | Direction | Purpose |
-|---|---|---|---|
-| **Order Management** | Message-driven (async) | Consumes | Receives payment requests; sends `PaymentCaptured` |
-| **Stripe / PayPal / Square** | REST API (sync) | Bidirectional | Gateway integration for authorization, capture, refunds |
-| **Customer Service** (Future) | Message-driven (async) | Receives | Receives refund requests from dispute handling |
-| **Accounting** (Future, if exists) | Event streaming or API | Publishes | Reports payment events for financial reconciliation |
-
-### Payment Flow & Idempotency
-
-To be determined.
-
-
-### Currency Conversion Strategy
-
-- **At order time**: Order total is in customer's preferred currency (USD, CAD, EUR)
-- **At payment time**: Payment Processing converts to gateway's native currency if needed
-- **Logging**: All conversions logged with rate used and timestamp for audit
-- **No rounding surprises**: Conversion logic uses proper decimal handling (avoid floating-point)
-
-### Known Considerations
-
-- **Webhook Handling**: Payment gateways send webhooks (e.g., "payment_intent.succeeded"); Payment Processing must validate and handle these idempotently
-- **Reconciliation**: Future need for periodic reconciliation with payment gateway statements
-- **Chargeback Handling**: Future consideration for dispute/chargeback workflows
-- **Rate Limiting**: Payment gateway API rate limits must be handled gracefully
+- Payment gateway integration (Payments)
+- Stock level management (Inventory)
+- Physical fulfillment operations (Fulfillment)
+- Return eligibility rules or inspection (Returns)
+- Customer notification delivery (Notifications)
 
 ---
 
-## Inventory Management
+## Payments
 
-**Purpose**: Track product availability, manage reservations for pending orders, and coordinate stock allocation across multiple warehouses and fulfillment channels.
+The Payments context owns the financial transaction lifecycle—capturing funds, handling failures, and processing refunds. It knows how to talk to payment providers but doesn't know why a payment is happening.
 
-**Current Status**: Yet to be implemented. Address basic single-warehouse reservation logic first; multi-warehouse and backorder support designed but not yet implemented.
+### What it receives
 
-### Responsibilities
+- `PaymentRequested` from Orders — amount, currency, payment method token, order reference
+- `RefundRequested` from Orders — amount, original transaction reference
 
-✅ **Owns**:
-- Product availability tracking by warehouse
-- Inventory allocation (reserving stock when orders are placed)
-- Inventory depletion (committing stock when orders ship)
-- Inventory release (returning stock to available when orders are cancelled)
-- Multi-warehouse stock management (US, Mexico, Canada, UK warehouses)
-- Backorder and pre-order logic (designed, not yet implemented)
-- Query APIs for real-time stock availability
+### Internal lifecycle
 
-❌ **Does Not Own**:
-- Cost of goods or pricing (delegated to Pricing context)
-- Warehouse operations/logistics (delegated to Fulfillment context)
-- Tax/regulatory compliance for goods movement (delegated to Pricing/Compliance contexts)
-- Returns processing workflow (coordinated with Order Management and Payment Processing)
+**Payment:**
 
-### Core Invariants
+- Pending — request received, awaiting provider response
+- Authorized — funds held but not captured (if using auth/capture split)
+- Captured — funds successfully collected
+- Failed — declined, insufficient funds, fraud block, etc.
 
-- **Reserved stock cannot exceed available stock** at time of reservation
-- **Stock quantities are never negative** (invariant enforced at application level)
-- **Reservations are temporary**: Must eventually transition to either "Committed" (shipped) or "Released" (cancelled)
-- **A product cannot have reserved stock after it's fully committed or released**
-- **Warehouse stock is fungible**: All units of a product in a warehouse are interchangeable
+**Refund:**
 
-### Key Events Published
+- RefundPending — refund request received
+- RefundCompleted — funds returned
+- RefundFailed — refund unsuccessful
 
-- `InventoryAdded` - New stock added to warehouse (replenishment)
-- `InventoryReserved` - Stock allocated for an order (order is pending fulfillment)
-- `InventoryCommitted` - Reserved stock confirmed as shipped (order shipped)
-- `InventoryReleased` - Reserved stock returned to available (order cancelled)
-- `InventoryDepleted` - Product marked as out of stock and will not be restocked (end-of-life product)
-- `BackorderCreated` - Allocation requested but stock unavailable (future)
-- `BackorderFulfilled` - Backorder fulfilled when stock arrives (future)
+### What it publishes
 
-### External Dependencies & Integration Points
+- `PaymentAuthorized` — funds held (if using auth/capture flow)
+- `PaymentCaptured` — funds secured, Orders can proceed
+- `PaymentFailed` — includes reason code, Orders decides retry or cancel
+- `RefundCompleted` — funds returned
+- `RefundFailed` — may need manual intervention
 
-| Context | Integration Type | Direction | Purpose |
-|---------|------------------|-----------|---------|
-| **Order Management** | Message-driven (async) + Query (future gRPC) | Bidirectional | Receives allocation requests; publishes `InventoryReserved`; receives commit/release requests |
-| **Fulfillment** (Future) | Message-driven (async) | Consumes | Receives `OrderShipped` notification to commit inventory |
-| **Pricing** (Future) | Query only | One-way | May query historical cost data if needed for analytics |
-| **Warehouse Management** (Future) | Sync HTTP or gRPC | Bidirectional | Physical warehouse systems for picking/packing validation |
+### Core invariants
 
-### Reservation State Machine
+- A payment cannot be captured without a valid authorization (if using auth/capture)
+- A refund cannot exceed the original captured amount
+- A payment can only be in one terminal state (Captured, Failed, or Refunded)
+- Payment method tokens must be valid and unexpired at capture time
 
-To be determined.
+### What it doesn't own
 
-
-### Multi-Warehouse Allocation Strategy
-
-**Single Warehouse (Future)**:
-- All products have one inventory stream
-- Reservations are straightforward
-
-**Multi-Warehouse (Future)**:
-- Each warehouse has its own ProductInventory stream (or nested structure)
-- Allocation logic must decide which warehouse fulfills the order:
-    1. Warehouse selection by proximity to customer
-    2. Warehouse with sufficient stock
-    3. Fallback to backorder if no warehouse has stock
-    4. Split orders across warehouses if needed
-
-### Query APIs (Future)
-
-**Current Queries** (HTTP endpoint):
-- `GET /api/products/{productId}/inventory` → Current stock levels
-
-**Future Queries** (gRPC for performance-critical paths):
-- `CheckStockAvailability(productId, quantity)` → Boolean
-- `GetInventoryByWarehouse(productId)` → Warehouse-level details
-- `GetBackorderStatus(orderId)` → Backorder status and ETA
-
-### Backorder/Pre-order Design
-
-To be determined.
-
-### Known Considerations
-
-This list is in development.
-
-- **Reservation Timeout**: Reservations older than X days (configurable) should auto-release if order not confirmed
-- **Warehouse Rebalancing**: Future need to move stock between warehouses to optimize fulfillment
-- **Cycle Counting**: Reconciliation between event-sourced inventory and physical warehouse counts
-- **Returns Reintegration**: When a return is processed, inventory must be added back (separate workflow, not yet implemented)
-- **Dead Stock**: Products that never sell; inventory tracking should help identify these for deprecation
-
+- Deciding whether to retry a failed payment (Orders saga logic)
+- Knowing what the payment is for beyond a reference ID
+- Customer payment method storage (Customers or Wallet context)
+- Refund eligibility determination (Orders/Returns)
 
 ---
 
-## Future Contexts (Planned)
+## Inventory
 
-These contexts are identified but not yet implemented. They are mentioned here for architectural awareness.
+The Inventory context owns stock levels and availability. It answers "do we have it?" and manages the reservation flow that prevents overselling. Stock is tracked per warehouse/fulfillment center.
 
-### Pricing
-- Tax calculation by jurisdiction
-- Shipping cost calculation
-- Discount/coupon application
-- Currency localization
+### What it receives
 
-### Fulfillment
-- Warehouse operations (picking, packing)
-- Shipping carrier integration
-- Delivery tracking
-- Return logistics coordination
+- `ReservationRequested` from Shopping — soft hold during checkout
+- `ReservationCommitRequested` from Orders — convert soft hold to committed allocation
+- `ReservationReleaseRequested` from Orders — cancellation or payment failure
+- `InventoryReceived` from warehouse/purchasing systems — replenishment
+- `ReturnCompleted` (restockable) from Returns — items to restock
 
-### Shopping (formerly Cart & Checkout)
-- Shopping cart management
-- Promo code validation
-- Checkout flow orchestration
-- Triggers `OrderPlaced` event to Order Management
+### Internal lifecycle (per reservation)
 
-### Customer (Name TBD)
-- Customer profiles and preferences
-- Address management
-- Contact information
-- Wishlist/saved items
-- Customer Service workflows (complaints, disputes)
+- Reserved — stock earmarked (soft hold), not yet committed
+- Committed — order confirmed, stock allocated for fulfillment
+- Released — reservation cancelled, stock returned to available pool
 
-### Pricing (Name TBD)
-- Historical pricing records
-- Cost tracking for analytics
-- Revenue recognition
-- Financial reporting
+### What it publishes
 
----
+- `ReservationConfirmed` — stock successfully held
+- `ReservationFailed` — insufficient stock
+- `ReservationCommitted` — hard allocation complete
+- `ReservationReleased` — stock back in pool
+- `InventoryLow` — alerting or reorder triggers
+- `InventoryAvailabilityChanged` — Catalog/Shopping can update displayed availability
 
-## Context Communication Patterns
+### Core invariants
 
-### Message-Driven (Async)
+- Available stock cannot go negative at any warehouse
+- A reservation cannot exceed available stock at the target warehouse
+- A committed reservation cannot be released (only cancellation via Orders can trigger release before commit)
+- Stock levels must be tracked per warehouse, not just globally
+- Soft holds expire after a defined window if not committed
 
-Used for non-blocking, eventual consistency workflows:
-- Order Management → Inventory Management: "Reserve inventory"
-- Inventory Management → Order Management: "Inventory reserved"
-- Order Management → Payment Processing: "Capture payment"
-- Payment Processing → Order Management: "Payment captured"
+### What it doesn't own
 
-**Tools**: Wolverine (command execution + event publishing), RabbitMQ (AMQP message broker)
-
-### Query APIs (Sync)
-
-Used for immediate consistency or performance-critical reads:
-- Shopping context → Inventory Management: "Check stock availability"
-- Order Management → Pricing context: "Get tax/shipping costs"
-
-**Current Tools**: HTTP REST  
-**Future Tools**: gRPC for high-throughput queries
-
-### Event Streams (Async Subscribe & Replay)
-
-Used for projections, analytics, and event sourcing:
-- All contexts publish domain events to Marten event store
-- Sagas and projections consume and react to events
-- Idempotency ensures events can be replayed safely
+- Pricing or product details (Catalog)
+- Deciding what to do when stock is insufficient (Orders/Shopping handles UX)
+- Physical warehouse location or bin assignments (Fulfillment)
+- Purchasing or reorder decisions (Procurement/Supply Chain context)
+- Forecasting and demand planning (future consideration)
 
 ---
 
-## Integration Principles
+## Fulfillment
 
-1. **Prefer Async Over Sync**: Use message-driven communication to decouple contexts
-2. **Idempotency First**: All event handlers must be idempotent (safe to replay)
-3. **Event Sourcing as Source of Truth**: Marten event store is the authoritative record
-4. **Sagas for Long-Running Workflows**: Use Wolverine sagas to orchestrate multi-step processes
-5. **Clear Boundaries**: Each context owns its data model; no shared databases
-6. **Versioning**: API contracts and event schemas must support evolution without breaking other contexts
+The Fulfillment context owns the physical execution of getting items from warehouse to customer. It takes over once Orders has secured payment and committed inventory.
+
+### What it receives
+
+- `FulfillmentRequested` from Orders — order reference, line items, committed inventory allocations, shipping address, shipping method
+- `ReturnShipmentReceived` from carrier integration — items arriving back at warehouse
+
+### Internal lifecycle
+
+- Pending — fulfillment request received, awaiting assignment
+- Assigned — routed to a specific warehouse/FC
+- Picking — items being pulled from bins
+- Packing — items boxed, shipping label generated
+- Shipped — handed to carrier, tracking number assigned
+- InTransit — carrier updates (optional granularity)
+- OutForDelivery — final mile
+- Delivered — carrier confirmed delivery
+- DeliveryFailed — attempted but unsuccessful
+
+### What it publishes
+
+- `ShipmentAssigned` — includes which FC is handling it
+- `ShipmentPacked` — ready for carrier pickup
+- `ShipmentDispatched` — tracking number available
+- `ShipmentInTransit` — optional, for detailed tracking
+- `ShipmentOutForDelivery` — optional
+- `ShipmentDelivered` — delivery confirmed
+- `ShipmentDeliveryFailed` — delivery unsuccessful
+
+### Core invariants
+
+- A shipment cannot be created without committed inventory allocation
+- A shipment cannot be assigned to a warehouse without sufficient committed stock at that location
+- Tracking number must exist before marking as Shipped
+- Delivery confirmation requires carrier verification
+- A shipment can only be delivered once
+
+### What it doesn't own
+
+- Inventory levels (consumes committed allocations from Inventory)
+- Payment status or order validity (Orders has already confirmed)
+- Carrier contract negotiation or rate shopping (Shipping/Logistics context)
+- Return eligibility or refund decisions (Returns and Orders)
+- Customer communication (Notifications)
+
+### Notes
+
+Warehouse/FC selection uses routing logic to select the optimal location—nearest to shipping address with available committed stock. More sophisticated rules can be added later.
+
+---
+
+## Returns
+
+The Returns context owns the reverse logistics flow—handling customer return requests, validating eligibility, receiving items back, and determining disposition. It picks up after delivery when a customer wants to send something back.
+
+### What it receives
+
+- `ReturnInitiated` from customer-facing UI — order reference, line items to return, reason
+- `ShipmentDelivered` from Fulfillment (via Orders) — establishes return eligibility window
+- `ReturnShipmentReceived` from Fulfillment or warehouse systems — physical items arrived
+
+### Internal lifecycle
+
+- Requested — customer initiated, awaiting validation
+- Approved — eligible for return, return label generated
+- Denied — outside window, non-returnable item, etc.
+- InTransit — customer shipped it back
+- Received — items arrived at warehouse/FC
+- Inspecting — verifying condition
+- Completed — inspection passed, ready for refund/exchange (includes restockable disposition)
+- Rejected — inspection failed (damaged, wrong item, etc.)
+
+### What it publishes
+
+- `ReturnApproved` — includes return label, instructions
+- `ReturnDenied` — reason code
+- `ReturnReceived` — items physically at FC
+- `ReturnCompleted` — inspection passed, includes restockable flag for Inventory
+- `ReturnRejected` — inspection failed
+
+### Core invariants
+
+- A return cannot be approved outside the eligibility window
+- A return cannot be approved for non-returnable items
+- A return cannot be marked completed without physical receipt and inspection
+- A return cannot be processed for an order that was never delivered
+- Restockable disposition requires inspection completion
+
+### What it doesn't own
+
+- Refund processing (Payments, triggered by Orders)
+- Deciding refund amount or restocking fees (Orders or policy service)
+- Inventory restocking (publishes completion with disposition, Inventory reacts)
+- Customer communication (Notifications)
+- Original order state management (Orders saga tracks return status)
+
+---
+
+## Future Considerations
+
+The following contexts are acknowledged but not yet defined:
+
+- **Catalog** — product information, categorization, search
+- **Pricing** — price rules, promotions, discounts
+- **Customers** — customer profiles, addresses, payment methods
+- **Notifications** — email, SMS, push notifications
+- **Procurement/Supply Chain** — purchasing, vendor management, forecasting
+- **Shipping/Logistics** — carrier management, rate shopping
