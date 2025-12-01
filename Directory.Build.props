@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+    <PropertyGroup>
+        <LangVersion>14</LangVersion>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <WolverineVersion>5.4.0</WolverineVersion>
+        <MartenVersion>8.16.1</MartenVersion>
+        <AlbaVersion>8.4.0</AlbaVersion>
+        <SwashbuckleAspNetCoreVersion>10.0.1</SwashbuckleAspNetCoreVersion>
+        <Authors>Erik Shafer</Authors>
+        <RepositoryUrl>https://github.com/erikshafer/crittersupply</RepositoryUrl>
+        <PackageProjectUrl>https://event-sourcing.dev/</PackageProjectUrl>
+    </PropertyGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="$(AssemblyName).IntegrationTests" />
+    </ItemGroup>
+</Project>
