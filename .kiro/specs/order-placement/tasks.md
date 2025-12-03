@@ -49,13 +49,18 @@
     - Set Status to Placed and record PlacedAt timestamp
     - Return tuple of (Order saga, OrderPlaced event)
     - _Requirements: 1.1, 1.4, 1.5, 2.1_
-  - [ ]* 2.3 Write property test for saga creation
+  - [x]* 2.3 Write property test for saga creation
+
+
     - **Property 1: Saga creation produces valid Order with Placed status**
     - **Validates: Requirements 1.1, 1.4, 1.5**
+
   - [ ]* 2.4 Write property test for data preservation
     - **Property 2: Order saga preserves all CheckoutCompleted data**
     - **Validates: Requirements 1.2, 1.3**
-  - [ ]* 2.5 Write property test for OrderPlaced event completeness
+
+  - [x]* 2.5 Write property test for OrderPlaced event completeness
+
     - **Property 3: OrderPlaced event contains complete order data**
     - **Validates: Requirements 2.1, 2.2, 2.3**
 
