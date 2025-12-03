@@ -31,7 +31,9 @@ Who knows. Maybe one day we'll ban "thinking machines" and have to build everyth
 
 ## 🗺️ Bounded Contexts <a id='2.0'></a>
 
-CritterSupply is organized into seven bounded contexts, each with a focused responsibility:
+CritterSupply is organized into bounded contexts. As described in Domain-Driven Design, bounded contexts help lower the cost of consensus. If one is unfamiliar with the concept, a crude yet simple way of picturing it is that each context could have its own team in an organization. That's not a rule by any means, but hopefully that helps you paint a picture of how CritterSupply is divided up logically and physically in this repo.
+
+Below is a table of each contexts' focused responsibilities, along with their current implementation status:
 
 | Context            | Responsibility                  | Status         |
 |--------------------|---------------------------------|----------------|
