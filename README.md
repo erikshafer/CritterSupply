@@ -33,15 +33,15 @@ Who knows. Maybe one day we'll ban "thinking machines" and have to build everyth
 
 CritterSupply is organized into seven bounded contexts, each with a focused responsibility:
 
-| Context | Responsibility |
-|---------|----------------|
-| 📦 **Catalog** | Product definitions and pricing |
-| 🛒 **Shopping** | Cart management and checkout |
-| 📨 **Orders** | Order lifecycle and history |
-| 📊 **Inventory** | Stock levels and reservations |
-| 💳 **Payments** | Authorization, capture, refunds |
-| 🚚 **Fulfillment** | Picking, packing, shipping |
-| 👤 **Customers** | Profiles and preferences |
+| Context            | Responsibility                  | Status         |
+|--------------------|---------------------------------|----------------|
+| 📨 **Orders**      | Order lifecycle and history     | 🛠️ Scaffolded |
+| 🛒 **Shopping**    | Cart management and checkout    | 🔜 Planned     |
+| 📊 **Inventory**   | Stock levels and reservations   | 🔜 Planned     |
+| 📦 **Catalog**     | Product definitions and pricing | 🔜 Planned     |
+| 💳 **Payments**    | Authorization, capture, refunds | 🔜 Planned     |
+| 🚚 **Fulfillment** | Picking, packing, shipping      | 🔜 Planned     |
+| 👤 **Customers**   | Profiles and preferences        | 🔜 Planned     |
 
 For detailed responsibilities, interactions, and event flows between contexts, see [CONTEXTS.md](./CONTEXTS.md).
 
