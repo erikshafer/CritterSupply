@@ -8,6 +8,7 @@ using Marten;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Orders;
+using Orders.Placement;
 using Weasel.Core;
 using Wolverine;
 using Wolverine.ErrorHandling;
@@ -30,6 +31,11 @@ builder.Services.AddMarten(opts =>
 
         opts.DatabaseSchemaName = Constants.Orders;
         opts.DisableNpgsqlLogging = true;
+
+        // Configure Order saga document storage
+        opts.Schema.For<Order>()
+            .Identity(x => x.Id)
+            .UseNumericRevisions(true);
 
         // projections here
     })
