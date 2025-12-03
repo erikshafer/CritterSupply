@@ -13,7 +13,8 @@ namespace Orders.Api.IntegrationTests.Placement;
 /// <summary>
 /// Property-based tests for Order query endpoint.
 /// </summary>
-public class OrderQueryPropertyTests : IClassFixture<TestFixture>
+[Collection(IntegrationTestCollection.Name)]
+public class OrderQueryPropertyTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;
 
@@ -21,6 +22,10 @@ public class OrderQueryPropertyTests : IClassFixture<TestFixture>
     {
         _fixture = fixture;
     }
+
+    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     /// <summary>
     /// **Feature: order-placement, Property 7: Order query returns existing orders**

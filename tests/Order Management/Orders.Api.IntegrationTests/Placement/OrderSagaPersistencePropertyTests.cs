@@ -10,7 +10,8 @@ namespace Orders.Api.IntegrationTests.Placement;
 /// <summary>
 /// Property-based tests for Order saga persistence with Marten.
 /// </summary>
-public class OrderSagaPersistencePropertyTests : IClassFixture<TestFixture>
+[Collection(IntegrationTestCollection.Name)]
+public class OrderSagaPersistencePropertyTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;
 
@@ -18,6 +19,10 @@ public class OrderSagaPersistencePropertyTests : IClassFixture<TestFixture>
     {
         _fixture = fixture;
     }
+
+    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     /// <summary>
     /// **Feature: order-placement, Property 5: Saga is persisted and retrievable**

@@ -12,7 +12,8 @@ namespace Orders.Api.IntegrationTests.Placement;
 /// Integration tests for the full order placement flow.
 /// Tests the complete flow from CheckoutCompleted message to queryable order.
 /// </summary>
-public class OrderPlacementFlowTests : IClassFixture<TestFixture>
+[Collection(IntegrationTestCollection.Name)]
+public class OrderPlacementFlowTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;
 
@@ -20,6 +21,10 @@ public class OrderPlacementFlowTests : IClassFixture<TestFixture>
     {
         _fixture = fixture;
     }
+
+    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     /// <summary>
     /// Tests the full order placement flow:
@@ -53,11 +58,8 @@ public class OrderPlacementFlowTests : IClassFixture<TestFixture>
             AppliedDiscounts: null,
             CompletedAt: DateTimeOffset.UtcNow);
 
-        // Act: Send the CheckoutCompleted message through Wolverine
-        // Use a scope since IMessageBus is a scoped service
-        using var scope = _fixture.Host.Services.CreateScope();
-        var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-        await bus.InvokeAsync(checkout);
+        // Act: Send the CheckoutCompleted message through Wolverine and wait for all side effects
+        await _fixture.ExecuteAndWaitAsync(checkout);
 
         // Assert: Verify saga was created and persisted
         await using var session = _fixture.GetDocumentSession();
