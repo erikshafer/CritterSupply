@@ -411,3 +411,6 @@ obj/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
+
+# VS Code
+.vscode/
