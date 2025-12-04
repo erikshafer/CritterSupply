@@ -21,21 +21,34 @@
     - Add test dependencies (xUnit, FsCheck, Shouldly, Alba, TestContainers)
     - _Requirements: 7.3_
 
-- [ ] 2. Create core data models and value objects
-  - [ ] 2.1 Create PaymentRequested and RefundRequested command records
+- [x] 2. Create core data models and value objects
+
+
+
+
+
+  - [x] 2.1 Create PaymentRequested and RefundRequested command records
+
+
     - PaymentRequested: OrderId, CustomerId, Amount, Currency, PaymentMethodToken
     - RefundRequested: PaymentId, OrderId, Amount
     - Place in `Processing/` folder
     - _Requirements: 1.2, 5.2_
-  - [ ] 2.2 Create domain event records
+  - [x] 2.2 Create domain event records
+
+
     - PaymentInitiated, PaymentCapturedEvent, PaymentFailedEvent
     - Include all required fields per design
     - _Requirements: 6.1, 6.2, 6.3_
-  - [ ] 2.3 Create integration event records
+  - [x] 2.3 Create integration event records
+
+
     - PaymentCaptured, PaymentFailed for Orders context
     - RefundCompleted, RefundFailed for Orders context
     - _Requirements: 2.5, 3.4, 5.4, 5.5_
-  - [ ] 2.4 Create PaymentStatus enum and GatewayResult record
+  - [x] 2.4 Create PaymentStatus enum and GatewayResult record
+
+
     - PaymentStatus: Pending, Captured, Failed, Refunded
     - GatewayResult: Success, TransactionId, FailureReason, IsRetriable
     - _Requirements: 1.1, 2.2, 3.1_
