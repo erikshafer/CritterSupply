@@ -1,88 +1,52 @@
 # Implementation Plan
 
 - [x] 1. Scaffold Payments bounded context projects
-
-
-
-
-
-
   - [x] 1.1 Create Payments project structure
-
     - Create `src/Payment Processing/Payments/` project with Wolverine, Marten, FluentValidation dependencies
     - Create `src/Payment Processing/Payments.Api/` project with API configuration
     - Add project references to solution
     - _Requirements: 7.1_
 
   - [x] 1.2 Create test project structure
-
     - Create `tests/Payment Processing/Payments.UnitTests/` project
     - Create `tests/Payment Processing/Payments.Api.IntegrationTests/` project
     - Add test dependencies (xUnit, FsCheck, Shouldly, Alba, TestContainers)
     - _Requirements: 7.3_
 
 - [x] 2. Create core data models and value objects
-
-
-
-
-
   - [x] 2.1 Create PaymentRequested and RefundRequested command records
-
-
     - PaymentRequested: OrderId, CustomerId, Amount, Currency, PaymentMethodToken
     - RefundRequested: PaymentId, OrderId, Amount
     - Place in `Processing/` folder
     - _Requirements: 1.2, 5.2_
   - [x] 2.2 Create domain event records
-
-
     - PaymentInitiated, PaymentCapturedEvent, PaymentFailedEvent
     - Include all required fields per design
     - _Requirements: 6.1, 6.2, 6.3_
   - [x] 2.3 Create integration event records
-
-
     - PaymentCaptured, PaymentFailed for Orders context
     - RefundCompleted, RefundFailed for Orders context
     - _Requirements: 2.5, 3.4, 5.4, 5.5_
   - [x] 2.4 Create PaymentStatus enum and GatewayResult record
-
-
     - PaymentStatus: Pending, Captured, Failed, Refunded
     - GatewayResult: Success, TransactionId, FailureReason, IsRetriable
     - _Requirements: 1.1, 2.2, 3.1_
 
 - [x] 3. Implement Payment gateway abstraction
-
-
-
-
-
   - [x] 3.1 Create IPaymentGateway interface
-
-
     - CaptureAsync method with amount, currency, token
     - RefundAsync method with transactionId, amount
     - _Requirements: 7.1, 7.2_
   - [x] 3.2 Create StubPaymentGateway implementation
-
-
     - Token pattern matching for success/decline/timeout
     - Deterministic behavior for testing
     - _Requirements: 7.3_
 
 - [x] 4. Implement Payment aggregate
-
-
-
   - [x] 4.1 Create Payment record with event sourcing support
-
-
     - Properties: Id, OrderId, CustomerId, Amount, Currency, PaymentMethodToken, Status, TransactionId, FailureReason, IsRetriable, InitiatedAt, ProcessedAt
     - PendingEvents collection for uncommitted events
     - _Requirements: 1.1, 1.2, 1.3, 1.4_
-
   - [x] 4.2 Implement static Create factory method
     - Generate unique ID with Guid.CreateVersion7()
     - Set status to Pending, record timestamp
@@ -103,14 +67,9 @@
     - Apply PaymentCapturedEvent, PaymentFailedEvent
     - _Requirements: 6.4_
   - [x] 4.6 Write property test for payment creation
-
-
     - **Property 1: Payment creation produces valid Payment with Pending status**
     - **Validates: Requirements 1.1, 1.3, 1.4**
   - [x] 4.7 Write property test for data preservation
-
-
-
     - **Property 2: Payment preserves all PaymentRequested data**
     - **Validates: Requirements 1.2**
 
@@ -131,14 +90,7 @@
     - _Requirements: 4.2, 4.3, 4.4_
 
 - [x] 6. Implement message handler
-
-
-
-
-
   - [x] 6.1 Create PaymentRequestedHandler
-
-
     - Create Payment from command
     - Call gateway CaptureAsync
     - Apply Capture or Fail based on result
@@ -146,27 +98,28 @@
     - Return integration event for Orders
     - _Requirements: 1.1, 2.1, 2.5, 3.4_
   - [x] 6.2 Write property test for successful capture
-
-
     - **Property 3: Successful capture updates Payment and publishes event**
     - **Validates: Requirements 2.2, 2.3, 2.4, 2.5**
   - [x] 6.3 Write property test for failed capture
-
-
     - **Property 4: Failed capture updates Payment and publishes event with reason**
     - **Validates: Requirements 3.1, 3.2, 3.3, 3.4**
 
-- [ ] 7. Configure Payments.Api
-  - [ ] 7.1 Configure Program.cs with Marten and Wolverine
+- [x] 7. Configure Payments.Api
+  - [x] 7.1 Configure Program.cs with Marten and Wolverine
     - Register Payment aggregate for event sourcing
     - Register IPaymentGateway with StubPaymentGateway (dev) or real gateway (prod)
     - Configure FluentValidation
     - _Requirements: 6.1, 7.1_
-  - [ ] 7.2 Write property test for event sourcing reconstruction
+  - [x] 7.2 Write property test for event sourcing reconstruction
     - **Property 8: Event sourcing state reconstruction**
     - **Validates: Requirements 6.4**
 
-- [ ] 8. Checkpoint - Ensure all tests pass
+- [x] 8. Checkpoint - Ensure all tests pass
+
+
+
+
+
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 9. Implement query endpoint

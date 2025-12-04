@@ -5,8 +5,10 @@ using JasperFx.Core;
 using JasperFx.Events.Daemon;
 using JasperFx.Resources;
 using Marten;
+using Marten.Events.Projections;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Payments.Processing;
 using Weasel.Core;
 using Wolverine;
 using Wolverine.ErrorHandling;
@@ -30,7 +32,8 @@ builder.Services.AddMarten(opts =>
         opts.DatabaseSchemaName = "payments";
         opts.DisableNpgsqlLogging = true;
 
-        // projections here
+        // Register Payment aggregate for event sourcing
+        opts.Projections.Snapshot<Payment>(SnapshotLifecycle.Inline);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()
@@ -65,6 +68,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddHealthChecks().AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
+
+// Register IPaymentGateway - StubPaymentGateway for development, real gateway for production
+builder.Services.AddSingleton<IPaymentGateway, StubPaymentGateway>();
 
 builder.Services.AddWolverineHttp();
 
