@@ -18,6 +18,20 @@ Beyond accessibility, e-commerce naturally demands the patterns this repository 
 
 This isn't a reference architecture padded with unnecessary layers, abstractions, or onion architecture to appear "enterprise-ready." The patterns here are inspired by real production systems built with the Critter Stack—code that's actually running and handling real business problems, ranging from startups to large enterprises.
 
+#### Short-List of Patterns, Paradigms, and Principles<a id='1.2.1'></a>
+
+A non-exhaustive list of the patterns, paradigms, and principles demonstrated in this codebase, in no particular order:
+
+- Event Sourcing
+- Command Query Responsibility Segregation (CQRS)
+- Stateful Sagas
+- Inbox Pattern
+- Outbox Pattern
+- Reservation-based Workflows
+- Vertical Slice Architecture (VSA)
+- Behavior-Driven Development (BDD)
+- Domain-Driven Design (DDD)
+
 ### 🤖 AI-assisted Development <a id='1.3'></a>
 
 This project is built with Claude as a collaborative coding partner. Beyond just generating code, it's an exercise in teaching AI tools to think in event-driven patterns and leverage the Critter Stack idiomatically—helping to improve the guidance these tools can offer the broader community.
