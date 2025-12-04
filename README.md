@@ -61,20 +61,51 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 
 For detailed responsibilities, interactions, and event flows between contexts, see [CONTEXTS.md](./CONTEXTS.md).
 
-## ⏩ Getting Started <a id='5.0'></a>
+## ⏩ How to Run <a id='5.0'></a>
+
+### Requirements <a id='5.2'></a>
 
 This software solution has multiple dependencies that need to be running locally.
 
 - [.NET 10](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
 - [Docker Desktop](https://docs.docker.com/engine/install/)
 
-### 🛠️ Local Development <a id='5.1'></a>
- 
+### 🛠️ Local Development <a id='5.3'></a>
+
+To run the solution locally, you have multiple options. Either run with Docker Compose and `dotnet` commands to run specific or all modules, or have everything orchestrated and launched with [Aspire](https://aspire.dev/).
+
+#### 🐋 Run with Docker Compose
+
 To launch Docker with the `all` profile, use this `docker-compose` command:
 
 ```bash
 docker-compose --profile all up -d
 ```
+
+#### 🏗️ Build
+
+To `build` the entire solution, run this command in the root of the project:
+
+```bash
+dotnet build
+```
+
+#### 🏃🏻 Run
+
+To be written. Modules are still being scaffolded out.
+
+#### 🧪 Test
+
+To `test` the entire solution, run this command in the root of the project:
+
+```bash
+dotnet test
+```
+
+#### 💡 Run with Aspire <a id='5.3'></a>
+
+To be implemented. It is on the roadmap.
+
 
 ## 🏫 Resources <a id='9.0'></a>
 
