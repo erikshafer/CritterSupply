@@ -38,10 +38,10 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 | Context            | Responsibility                  | Status         |
 |--------------------|---------------------------------|----------------|
 | 📨 **Orders**      | Order lifecycle and history     | 🛠️ Scaffolded |
+| 💳 **Payments**    | Authorization, capture, refunds | 🛠️ Scaffolded |
 | 🛒 **Shopping**    | Cart management and checkout    | 🔜 Planned     |
 | 📊 **Inventory**   | Stock levels and reservations   | 🔜 Planned     |
 | 📦 **Catalog**     | Product definitions and pricing | 🔜 Planned     |
-| 💳 **Payments**    | Authorization, capture, refunds | 🔜 Planned     |
 | 🚚 **Fulfillment** | Picking, packing, shipping      | 🔜 Planned     |
 | 👤 **Customers**   | Profiles and preferences        | 🔜 Planned     |
 
