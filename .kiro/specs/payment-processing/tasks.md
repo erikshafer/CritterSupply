@@ -130,13 +130,22 @@
 
 
     - _Requirements: 4.1, 4.2, 4.3, 4.4_
-  - [ ] 5.2 Write property test for amount validation
+  - [x] 5.2 Write property test for amount validation
+
+
+
+
+
     - **Property 5: Validation rejects invalid payment amounts**
     - **Validates: Requirements 4.1**
   - [ ] 5.3 Write unit tests for edge case validations
     - Test missing order identifier (Requirement 4.2)
     - Test missing payment method token (Requirement 4.3)
+
+
     - Test missing currency (Requirement 4.4)
+
+
     - _Requirements: 4.2, 4.3, 4.4_
 
 - [ ] 6. Implement message handler
