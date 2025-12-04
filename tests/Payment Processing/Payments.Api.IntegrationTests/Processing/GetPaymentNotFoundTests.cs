@@ -6,7 +6,7 @@ namespace Payments.Api.IntegrationTests.Processing;
 /// Unit tests for payment query not-found scenarios.
 /// </summary>
 [Collection("Integration")]
-public class GetPaymentNotFoundTests
+public class GetPaymentNotFoundTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;
 
@@ -14,6 +14,9 @@ public class GetPaymentNotFoundTests
     {
         _fixture = fixture;
     }
+
+    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     /// <summary>
     /// Test querying non-existent payment returns 404.

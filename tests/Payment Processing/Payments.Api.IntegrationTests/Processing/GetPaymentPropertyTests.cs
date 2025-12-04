@@ -12,7 +12,7 @@ namespace Payments.Api.IntegrationTests.Processing;
 /// Property-based tests for payment query endpoint.
 /// </summary>
 [Collection("Integration")]
-public class GetPaymentPropertyTests
+public class GetPaymentPropertyTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;
 
@@ -20,6 +20,9 @@ public class GetPaymentPropertyTests
     {
         _fixture = fixture;
     }
+
+    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     /// <summary>
     /// **Feature: payment-processing, Property 9: Payment query returns existing payments**

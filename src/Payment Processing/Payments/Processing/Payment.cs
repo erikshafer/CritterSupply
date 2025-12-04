@@ -15,7 +15,8 @@ public sealed record Payment(
     string? FailureReason,
     bool IsRetriable,
     DateTimeOffset InitiatedAt,
-    DateTimeOffset? ProcessedAt)
+    DateTimeOffset? ProcessedAt,
+    decimal TotalRefunded = 0m)
 {
     /// <summary>
     /// Collection of uncommitted events for this aggregate.
@@ -43,7 +44,8 @@ public sealed record Payment(
             null,
             false,
             initiatedAt,
-            null);
+            null,
+            0m);
 
         payment.PendingEvents.Add(new PaymentInitiated(
             paymentId,
@@ -100,6 +102,35 @@ public sealed record Payment(
         return (updated, integrationMessage);
     }
 
+    /// <summary>
+    /// Gets the remaining amount available for refund.
+    /// </summary>
+    public decimal RefundableAmount => Amount - TotalRefunded;
+
+    /// <summary>
+    /// Processes a refund against this payment.
+    /// Updates total refunded and returns integration message for Orders context.
+    /// </summary>
+    public (Payment, PaymentRefunded, RefundCompleted) Refund(decimal refundAmount, string refundTransactionId, DateTimeOffset refundedAt)
+    {
+        var newTotalRefunded = TotalRefunded + refundAmount;
+        var newStatus = newTotalRefunded >= Amount ? PaymentStatus.Refunded : Status;
+
+        var updated = this with
+        {
+            Status = newStatus,
+            TotalRefunded = newTotalRefunded
+        };
+
+        var domainEvent = new PaymentRefunded(Id, refundAmount, newTotalRefunded, refundTransactionId, refundedAt);
+        updated.PendingEvents.AddRange(PendingEvents);
+        updated.PendingEvents.Add(domainEvent);
+
+        var integrationMessage = new RefundCompleted(Id, OrderId, refundAmount, refundTransactionId, refundedAt);
+
+        return (updated, domainEvent, integrationMessage);
+    }
+
     #region Marten Event Sourcing
 
     /// <summary>
@@ -118,7 +149,8 @@ public sealed record Payment(
             null,
             false,
             @event.InitiatedAt,
-            null);
+            null,
+            0m);
 
     /// <summary>
     /// Applies a PaymentCaptured event to update state (Marten event sourcing).
@@ -141,6 +173,16 @@ public sealed record Payment(
             FailureReason = @event.FailureReason,
             IsRetriable = @event.IsRetriable,
             ProcessedAt = @event.FailedAt
+        };
+
+    /// <summary>
+    /// Applies a PaymentRefunded event to update state (Marten event sourcing).
+    /// </summary>
+    public Payment Apply(PaymentRefunded @event) =>
+        this with
+        {
+            Status = @event.TotalRefunded >= Amount ? PaymentStatus.Refunded : Status,
+            TotalRefunded = @event.TotalRefunded
         };
 
     #endregion

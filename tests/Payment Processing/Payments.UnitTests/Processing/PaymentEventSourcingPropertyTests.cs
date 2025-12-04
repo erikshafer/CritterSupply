@@ -67,6 +67,7 @@ public class PaymentEventSourcingPropertyTests
                 PaymentInitiated initiated => Payment.Create(initiated),
                 PaymentCaptured captured when reconstructedPayment != null => reconstructedPayment.Apply(captured),
                 PaymentFailed failed when reconstructedPayment != null => reconstructedPayment.Apply(failed),
+                PaymentRefunded refunded when reconstructedPayment != null => reconstructedPayment.Apply(refunded),
                 _ => reconstructedPayment
             };
         }
@@ -88,6 +89,7 @@ public class PaymentEventSourcingPropertyTests
         var isRetriableMatches = reconstructedPayment.IsRetriable == finalPayment.IsRetriable;
         var initiatedAtMatches = reconstructedPayment.InitiatedAt == finalPayment.InitiatedAt;
         var processedAtMatches = reconstructedPayment.ProcessedAt == finalPayment.ProcessedAt;
+        var totalRefundedMatches = reconstructedPayment.TotalRefunded == finalPayment.TotalRefunded;
 
         return idMatches
             && orderIdMatches
@@ -100,7 +102,8 @@ public class PaymentEventSourcingPropertyTests
             && failureReasonMatches
             && isRetriableMatches
             && initiatedAtMatches
-            && processedAtMatches;
+            && processedAtMatches
+            && totalRefundedMatches;
     }
 }
 

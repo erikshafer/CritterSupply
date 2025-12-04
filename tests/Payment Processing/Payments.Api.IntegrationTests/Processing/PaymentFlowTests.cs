@@ -8,7 +8,7 @@ namespace Payments.Api.IntegrationTests.Processing;
 /// Tests the complete flow from PaymentRequested command through gateway to persisted state.
 /// </summary>
 [Collection("Integration")]
-public class PaymentFlowTests
+public class PaymentFlowTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;
 
@@ -16,6 +16,9 @@ public class PaymentFlowTests
     {
         _fixture = fixture;
     }
+
+    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     /// <summary>
     /// Integration test for successful payment flow.

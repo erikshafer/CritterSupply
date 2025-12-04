@@ -44,13 +44,13 @@ public static class RefundRequestedHandler
                 DateTimeOffset.UtcNow);
         }
 
-        // Requirement 5.3: Validate refund amount does not exceed captured amount
-        if (command.Amount > payment.Amount)
+        // Requirement 5.3: Validate refund amount does not exceed remaining refundable amount
+        if (command.Amount > payment.RefundableAmount)
         {
             return new RefundFailed(
                 command.PaymentId,
                 command.OrderId,
-                $"Refund amount ({command.Amount}) exceeds captured amount ({payment.Amount})",
+                $"Refund amount ({command.Amount}) exceeds refundable amount ({payment.RefundableAmount})",
                 DateTimeOffset.UtcNow);
         }
 
@@ -65,12 +65,16 @@ public static class RefundRequestedHandler
         // Requirement 5.4 & 5.5: Publish RefundCompleted or RefundFailed
         if (result.Success)
         {
-            return new RefundCompleted(
-                command.PaymentId,
-                command.OrderId,
+            // Apply refund to payment and persist events
+            var (updatedPayment, _, integrationMessage) = payment.Refund(
                 command.Amount,
                 result.TransactionId!,
                 refundedAt);
+
+            // Persist refund event to Marten event store
+            session.Events.Append(payment.Id, updatedPayment.PendingEvents.ToArray());
+
+            return integrationMessage;
         }
 
         return new RefundFailed(

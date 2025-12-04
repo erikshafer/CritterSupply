@@ -20,6 +20,11 @@ public sealed class PaymentRequestedValidator : AbstractValidator<PaymentRequest
             .NotEmpty()
             .WithMessage("Order identifier is required");
 
+        // Missing customer identifier
+        RuleFor(x => x.CustomerId)
+            .NotEmpty()
+            .WithMessage("Customer identifier is required");
+
         // Requirement 4.3: Missing payment method token
         RuleFor(x => x.PaymentMethodToken)
             .NotEmpty()

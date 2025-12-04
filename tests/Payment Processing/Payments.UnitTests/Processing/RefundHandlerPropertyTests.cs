@@ -183,7 +183,8 @@ public static class ValidRefundScenarioArbitrary
                                             null,
                                             false,
                                             DateTimeOffset.UtcNow.AddMinutes(-5),
-                                            DateTimeOffset.UtcNow.AddMinutes(-1));
+                                            DateTimeOffset.UtcNow.AddMinutes(-1),
+                                            0m); // TotalRefunded
 
                                         var command = new RefundRequested(paymentId, orderId, refundAmount);
 
@@ -246,7 +247,8 @@ public static class ExcessiveRefundAmountArbitrary
                                             null,
                                             false,
                                             DateTimeOffset.UtcNow.AddMinutes(-5),
-                                            DateTimeOffset.UtcNow.AddMinutes(-1));
+                                            DateTimeOffset.UtcNow.AddMinutes(-1),
+                                            0m); // TotalRefunded
 
                                         var command = new RefundRequested(paymentId, orderId, refundAmount);
 
