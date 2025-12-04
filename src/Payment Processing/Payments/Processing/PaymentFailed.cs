@@ -1,12 +1,11 @@
 namespace Payments.Processing;
 
 /// <summary>
-/// Integration event published when payment fails.
-/// Orders saga decides retry or cancellation.
+/// Domain event when payment capture fails.
+/// Persisted to the Marten event store.
 /// </summary>
 public sealed record PaymentFailed(
     Guid PaymentId,
-    Guid OrderId,
     string FailureReason,
     bool IsRetriable,
     DateTimeOffset FailedAt);

@@ -1,12 +1,10 @@
 namespace Payments.Processing;
 
 /// <summary>
-/// Integration event published when payment is captured.
-/// Orders saga transitions to PaymentConfirmed.
+/// Domain event when payment is successfully captured.
+/// Persisted to the Marten event store.
 /// </summary>
 public sealed record PaymentCaptured(
     Guid PaymentId,
-    Guid OrderId,
-    decimal Amount,
     string TransactionId,
     DateTimeOffset CapturedAt);

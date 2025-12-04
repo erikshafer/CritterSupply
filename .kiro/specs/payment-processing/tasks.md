@@ -72,34 +72,45 @@
     - Deterministic behavior for testing
     - _Requirements: 7.3_
 
-- [ ] 4. Implement Payment aggregate
-  - [ ] 4.1 Create Payment record with event sourcing support
+- [x] 4. Implement Payment aggregate
+
+
+
+  - [x] 4.1 Create Payment record with event sourcing support
+
+
     - Properties: Id, OrderId, CustomerId, Amount, Currency, PaymentMethodToken, Status, TransactionId, FailureReason, IsRetriable, InitiatedAt, ProcessedAt
     - PendingEvents collection for uncommitted events
     - _Requirements: 1.1, 1.2, 1.3, 1.4_
-  - [ ] 4.2 Implement static Create factory method
+
+  - [x] 4.2 Implement static Create factory method
     - Generate unique ID with Guid.CreateVersion7()
     - Set status to Pending, record timestamp
     - Add PaymentInitiated to pending events
     - _Requirements: 1.1, 1.3, 1.4, 6.1_
-  - [ ] 4.3 Implement Capture method
+  - [x] 4.3 Implement Capture method
     - Update status to Captured, record transaction ID and timestamp
     - Add PaymentCapturedEvent to pending events
     - Return PaymentCaptured integration event
     - _Requirements: 2.2, 2.3, 2.4, 2.5, 6.2_
-  - [ ] 4.4 Implement Fail method
+  - [x] 4.4 Implement Fail method
     - Update status to Failed, record reason and retriable flag
     - Add PaymentFailedEvent to pending events
     - Return PaymentFailed integration event
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 6.3_
-  - [ ] 4.5 Implement Marten Apply methods for event sourcing
+  - [x] 4.5 Implement Marten Apply methods for event sourcing
     - Create from PaymentInitiated event
     - Apply PaymentCapturedEvent, PaymentFailedEvent
     - _Requirements: 6.4_
-  - [ ] 4.6 Write property test for payment creation
+  - [x] 4.6 Write property test for payment creation
+
+
     - **Property 1: Payment creation produces valid Payment with Pending status**
     - **Validates: Requirements 1.1, 1.3, 1.4**
-  - [ ] 4.7 Write property test for data preservation
+  - [x] 4.7 Write property test for data preservation
+
+
+
     - **Property 2: Payment preserves all PaymentRequested data**
     - **Validates: Requirements 1.2**
 
