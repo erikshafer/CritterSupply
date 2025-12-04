@@ -2,9 +2,7 @@ using FsCheck;
 using FsCheck.Fluent;
 using FsCheck.Xunit;
 using Marten;
-using NSubstitute;
 using Payments.Processing;
-using Shouldly;
 
 namespace Payments.UnitTests.Processing;
 
@@ -15,10 +13,10 @@ public class RefundHandlerPropertyTests
 {
     /// <summary>
     /// **Feature: payment-processing, Property 7: Successful refund publishes RefundCompleted event**
-    /// 
+    ///
     /// *For any* valid refund request where the gateway returns success,
     /// a RefundCompleted event SHALL be published.
-    /// 
+    ///
     /// **Validates: Requirements 5.4**
     /// </summary>
     [Property(MaxTest = 100, Arbitrary = [typeof(ValidRefundScenarioArbitrary)])]

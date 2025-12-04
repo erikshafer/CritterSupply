@@ -18,6 +18,20 @@ Beyond accessibility, e-commerce naturally demands the patterns this repository 
 
 This isn't a reference architecture padded with unnecessary layers, abstractions, or onion architecture to appear "enterprise-ready." The patterns here are inspired by real production systems built with the Critter Stack—code that's actually running and handling real business problems, ranging from startups to large enterprises.
 
+#### Short-List of Patterns, Paradigms, and Principles<a id='1.2.1'></a>
+
+A non-exhaustive list of the patterns, paradigms, and principles demonstrated in this codebase, in no particular order:
+
+- Event Sourcing
+- Command Query Responsibility Segregation (CQRS)
+- Stateful Sagas
+- Inbox Pattern
+- Outbox Pattern
+- Reservation-based Workflows
+- Vertical Slice Architecture (VSA)
+- Behavior-Driven Development (BDD)
+- Domain-Driven Design (DDD)
+
 ### 🤖 AI-assisted Development <a id='1.3'></a>
 
 This project is built with Claude as a collaborative coding partner. Beyond just generating code, it's an exercise in teaching AI tools to think in event-driven patterns and leverage the Critter Stack idiomatically—helping to improve the guidance these tools can offer the broader community.
@@ -47,20 +61,51 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 
 For detailed responsibilities, interactions, and event flows between contexts, see [CONTEXTS.md](./CONTEXTS.md).
 
-## ⏩ Getting Started <a id='5.0'></a>
+## ⏩ How to Run <a id='5.0'></a>
+
+### Requirements <a id='5.2'></a>
 
 This software solution has multiple dependencies that need to be running locally.
 
 - [.NET 10](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
 - [Docker Desktop](https://docs.docker.com/engine/install/)
 
-### 🛠️ Local Development <a id='5.1'></a>
- 
+### 🛠️ Local Development <a id='5.3'></a>
+
+To run the solution locally, you have multiple options. Either run with Docker Compose and `dotnet` commands to run specific or all modules, or have everything orchestrated and launched with [Aspire](https://aspire.dev/).
+
+#### 🐋 Run with Docker Compose
+
 To launch Docker with the `all` profile, use this `docker-compose` command:
 
 ```bash
 docker-compose --profile all up -d
 ```
+
+#### 🏗️ Build
+
+To `build` the entire solution, run this command in the root of the project:
+
+```bash
+dotnet build
+```
+
+#### 🏃🏻 Run
+
+To be written. Modules are still being scaffolded out.
+
+#### 🧪 Test
+
+To `test` the entire solution, run this command in the root of the project:
+
+```bash
+dotnet test
+```
+
+#### 💡 Run with Aspire <a id='5.3'></a>
+
+To be implemented. It is on the roadmap.
+
 
 ## 🏫 Resources <a id='9.0'></a>
 

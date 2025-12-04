@@ -2,18 +2,17 @@
 
     <PropertyGroup>
         <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="$(SwashbuckleAspNetCoreVersion)" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+        <PackageReference Include="Swashbuckle.AspNetCore" />
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="WolverineFx.Http.FluentValidation" Version="$(WolverineVersion)" />
-        <PackageReference Include="WolverineFx.Http.Marten" Version="$(WolverineVersion)" />
-        <PackageReference Include="WolverineFx.RabbitMQ" Version="$(WolverineVersion)" />
+        <PackageReference Include="WolverineFx.Http.FluentValidation" />
+        <PackageReference Include="WolverineFx.Http.Marten" />
+        <PackageReference Include="WolverineFx.RabbitMQ" />
     </ItemGroup>
 
 </Project>

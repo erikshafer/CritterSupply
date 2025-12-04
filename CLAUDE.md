@@ -187,6 +187,183 @@ public sealed record Payment(
 
 While most of this system uses event sourcing, there may be cases where "traditional" models are used to persist data in a relational table. In these cases, like with our event sourcing models, we prefer immutability unless dependencies and behaviors are executed to produce a new instance of said model. If the ORM known as EF Core is being used, additional configuration may be needed to promote these behaviors.
 
+## Wolverine Idioms
+
+### Message Handlers
+
+Prefer single responsibility message handlers. Each handler should do one thing and do it well. If a handler is getting too large or complex, consider breaking it down into smaller handlers or using helper classes.
+
+### Compound Handlers
+
+It's frequently beneficial to split message handling for a single message up into methods that load any necessary data and the business logic that
+transforms the current state or decides to take other actions.
+
+Wolverine allows you to use the conventional middleware naming conventions on each handler to do exactly this. The goal here is to use separate methods for different concerns like loading data or validating data so that the "main" message handler (or HTTP endpoint method) can be a pure function that is completely focused on domain logic or business workflow logic for easy reasoning and effective unit testing.
+
+#### Background Info:
+> Wolverine's "compound handler" feature where handlers can be built from multiple methods that are called one at a time
+by Wolverine was heavily inspired by Jim Shore's writing on the "A-Frame Architecture". See Jeremy's post [A-Frame Architecture with Wolverine](https://jeremydmiller.com/2023/07/19/a-frame-architecture-with-wolverine/)
+for more background on the goals and philosophy behind this approach.
+
+#### Naming Conventions
+
+Message handlers should be named with the suffix "Handler" to clearly indicate their purpose. For example, a handler for processing orders might be named `ProcessOrderHandler`.
+
+To separate handlers, one can use `Before`, `After`, `Validate`, `Load`, and `Finally` methods to separate concerns within a handler. The conventions are as follows:
+
+| Lifecycle                                                | Method Names                |
+|----------------------------------------------------------|-----------------------------|
+| Before the Handler(s)                                    | `Before`, `BeforeAsync`, `Load`, `LoadAsync`, `Validate`, `ValidateAsync` |
+| After the Handler(s)                                     | `After`, `AfterAsync`, `PostProcess`, `PostProcessAsync` |
+| In `finally` blocks after the Handlers & "After" methods | `Finally`, `FinallyAsync`   |
+
+The exact name has no impact on functionality, but the idiom is that `Load/LoadAsync` is used to load input data for
+the main handler method.
+
+#### Example 1
+
+A message (command) handler with validation on the command, business logic in the pure function, and said pure function starting a new event stream in Marten for event sourcing usage.
+
+```csharp
+// Good - A command that promotes immutability and uses FluentValidation for validation
+public sealed record PlaceOrder(
+    Guid CustomerId,
+    IEnumerable<OrderLine> Lines)
+{
+    public class PlaceOrderValidator : AbstractValidator<PlaceOrder>
+    {
+        public PlaceOrderValidator()
+        {
+            RuleFor(x => x.CustomerId).NotEmpty();
+            RuleFor(x => x.Lines).NotEmpty();
+        }
+    }
+}
+
+// Good - Levaring Wolverine's CreationResponse helper for consistent API responses
+public sealed record PlaceOrderResponse(Guid Id)
+    : CreationResponse($"/api/orders/{Id}");
+
+// Good - A pure function handler, isolated from side effects and infrastructure concerns, which
+// handles a command (AKA a type of message to Wolverine) and is beginning a new event stream in Marten.
+public static class PlaceOrderHandler
+{
+    [WolverinePost("/api/orders")]
+    public static (PlaceOrderResponse, IStartStream) Handle(PlaceOrder command)
+    {
+        var now = DateTimeProvider.UtcNow;
+        var placed = new OrderPlaced(command.CustomerId, command.Lines, now);
+        var orderId = Guid.CreateVersion7();
+        var start = MartenOps.StartStream<OrderPlaced>(orderId, placed);
+
+        return (new PlaceOrderResponse(start.StreamId), start);
+    }
+}
+```
+
+#### Example 2: 
+
+A similar message handler as example 1, but here the stream already exists. By returning the event and outgoing messages, Wolverine will handle the persistence of the event to the stream and the sending of any outgoing messages. Wolverine knows the associated stream because the command contains the `OrderId`, which is the same as the stream identifier.
+
+```csharp
+// Good - A command that promotes immutability and uses FluentValidation for validation
+public sealed record ProcessPayment(
+    Guid OrderId,
+    Guid CustomerId,
+    decimal Amount)
+{
+    public class ProcessPaymentValidator : AbstractValidator<ProcessPayment>
+    {
+        public ProcessPaymentValidator()
+        {
+            RuleFor(x => x.OrderId).NotEmpty();
+            RuleFor(x => x.CustomerId).NotEmpty();
+            RuleFor(x => x.Amount).NotEmpty().GreaterThan(0m);
+        }
+    }
+}
+
+// Good - A pure function message handler that processes a payment command. It returns an event,
+// which will be persisted to the associated event stream, and outgoing messages to be sent to
+// other bounded contexts or systems. In short, all that matters here is the business logic.
+public static class ProcessPaymentHandler
+{
+    public static (PaymentProcessingStarted, OutgoingMessages) Handle(ProcessPayment command)
+    {
+        var paymentId = Guid.CreateVersion7();
+        var @event = new PaymentProcessingStarted(
+            command.OrderId,
+            command.CustomerId,
+            command.Amount,
+            DateTimeProvider.UtcNow);
+
+        var messages = new OutgoingMessages();
+        messages.Add(new ChargePaymentProcessor(paymentId, command.Amount, command.OrderId));
+
+        return (@event, messages);
+    }
+}
+```
+
+#### Example 3
+
+This message handler demonstrates the use of a `Before()` method to pre-load the necessary aggregate from the event store before executing the main business logic in the `Handle()` method. The `Before()` method checks for preconditions and returns a `ProblemDetails` object if any issues are found, allowing for clean separation of concerns. Note that the handle method uses the newer `[WriteAggregate]` attribute to indicate that the `ProductInventory` aggregate should be loaded for writing specifically. If only reading was being done, we may want to use `[ReadAggregate]` instead, as it's optimized for that use case.
+
+```csharp
+public sealed record ReleaseInventory(
+    Guid ProductInventoryId,
+    Guid OrderId,
+    string Reason)
+{
+    public class ReleaseInventoryValidator : AbstractValidator<ReleaseInventory>
+    {
+        public ReleaseInventoryValidator()
+        {
+            RuleFor(x => x.ProductInventoryId).NotEmpty();
+            RuleFor(x => x.OrderId).NotEmpty();
+            RuleFor(x => x.Reason).NotEmpty().MaximumLength(128);
+        }
+    }
+}
+
+public static class ReleaseInventoryHandler
+{
+    public static ProblemDetails Before(
+        ReleaseInventory command,
+        ProductInventory? inventory)
+    {
+        if (inventory is null)
+            return new ProblemDetails { Detail = "Product inventory not found", Status = 404 };
+
+        if (!inventory.Reservations.ContainsKey(command.OrderId))
+            return new ProblemDetails
+            {
+                Detail = $"No reservation found for order {command.OrderId}",
+                Status = 404
+            };
+
+        return WolverineContinue.NoProblems;
+    }
+
+    public static InventoryReleased Handle(
+        ReleaseInventory command,
+        [WriteAggregate] ProductInventory inventory)
+    {
+        var quantity = inventory.Reservations[command.OrderId];
+
+        return new InventoryReleased(
+            command.OrderId,
+            quantity,
+            command.Reason,
+            DateTimeProvider.UtcNow);
+    }
+}
+```
+
+For more examples and documentation for Wolverine idioms surrounding its message handlers, check out the official [Wolverine Message Handlers documentation](https://wolverine.net/docs/messages/handlers/).
+
+As this software solution heavily leverages Wolverine's integration with Marten, for additional information about it such as stream verification in a message handler, check out the the [Wolverine document on Aggregate Handlers and Event Sourcing](https://wolverine.netlify.app/guide/durability/marten/event-sourcing.html#validation-on-stream-existence).
+
 ## Testing Principles
 
 In general, prefer integration tests over unit tests. The latter have their place and importance, but we want to leverage tools like Alba and TestContainers to go through the use cases our vertical slices are built to fulfill.
