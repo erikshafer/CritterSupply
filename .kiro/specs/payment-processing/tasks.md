@@ -53,12 +53,21 @@
     - GatewayResult: Success, TransactionId, FailureReason, IsRetriable
     - _Requirements: 1.1, 2.2, 3.1_
 
-- [ ] 3. Implement Payment gateway abstraction
-  - [ ] 3.1 Create IPaymentGateway interface
+- [x] 3. Implement Payment gateway abstraction
+
+
+
+
+
+  - [x] 3.1 Create IPaymentGateway interface
+
+
     - CaptureAsync method with amount, currency, token
     - RefundAsync method with transactionId, amount
     - _Requirements: 7.1, 7.2_
-  - [ ] 3.2 Create StubPaymentGateway implementation
+  - [x] 3.2 Create StubPaymentGateway implementation
+
+
     - Token pattern matching for success/decline/timeout
     - Deterministic behavior for testing
     - _Requirements: 7.3_
