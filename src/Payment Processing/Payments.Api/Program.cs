@@ -52,6 +52,9 @@ builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(opts =>
 
 builder.Host.UseWolverine(opts =>
 {
+    // Discover handlers from the Payments assembly
+    opts.Discovery.IncludeAssembly(typeof(Payment).Assembly);
+
     opts.Policies.AutoApplyTransactions();
     opts.Policies.UseDurableLocalQueues();
     opts.Policies.UseDurableOutboxOnAllSendingEndpoints();

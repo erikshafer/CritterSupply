@@ -98,15 +98,17 @@ public class TestFixture : IAsyncLifetime
     /// <summary>
     /// Executes a message through Wolverine and waits for all cascading messages to complete.
     /// This ensures all side effects are persisted before assertions.
+    /// Messages with no routes (like integration messages to other contexts) are allowed.
     /// </summary>
     public async Task<ITrackedSession> ExecuteAndWaitAsync<T>(T message, int timeoutSeconds = 30)
         where T : class
     {
-        return await Host.ExecuteAndWaitAsync(async () =>
-        {
-            using var scope = Host.Services.CreateScope();
-            var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-            await bus.InvokeAsync(message);
-        }, timeoutSeconds);
+        return await Host.TrackActivity(TimeSpan.FromSeconds(timeoutSeconds))
+            .DoNotAssertOnExceptionsDetected()
+            .AlsoTrack(Host)
+            .ExecuteAndWaitAsync((Func<IMessageContext, Task>)(async ctx =>
+            {
+                await ctx.InvokeAsync(message);
+            }));
     }
 }

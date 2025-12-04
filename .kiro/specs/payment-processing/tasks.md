@@ -134,34 +134,57 @@
     - Test querying non-existent payment returns 404
     - _Requirements: 8.2_
 
-- [ ] 10. Implement refund handling
-  - [ ] 10.1 Create RefundRequestedValidator
+- [x] 10. Implement refund handling
+
+
+
+
+
+
+  - [x] 10.1 Create RefundRequestedValidator
+
     - Validate PaymentId not empty
     - Validate Amount > 0
     - _Requirements: 5.1, 5.3_
-  - [ ] 10.2 Create RefundRequestedHandler
+
+  - [x] 10.2 Create RefundRequestedHandler
+
     - Load original payment, validate captured status
     - Validate refund amount <= captured amount
     - Call gateway RefundAsync
     - Publish RefundCompleted or RefundFailed
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
-  - [ ] 10.3 Write property test for refund validation
+  - [x] 10.3 Write property test for refund validation
+
+
     - **Property 6: Refund validation rejects invalid requests**
     - **Validates: Requirements 5.1, 5.3**
-  - [ ] 10.4 Write property test for successful refund
+
+  - [x] 10.4 Write property test for successful refund
+
     - **Property 7: Successful refund publishes RefundCompleted event**
     - **Validates: Requirements 5.4**
 
-- [ ] 11. Set up integration test infrastructure
-  - [ ] 11.1 Create TestFixture with TestContainers for PostgreSQL
+- [x] 11. Set up integration test infrastructure
+
+
+
+
+
+  - [x] 11.1 Create TestFixture with TestContainers for PostgreSQL
+
+
     - Configure Alba host with Marten connection to test container
     - Register StubPaymentGateway for testing
     - Disable external Wolverine transports
     - _Requirements: 6.1, 8.1_
-  - [ ] 11.2 Write integration test for successful payment flow
+
+  - [x] 11.2 Write integration test for successful payment flow
+
     - Send PaymentRequested with success token, verify captured
     - _Requirements: 1.1, 2.2, 2.5_
-  - [ ] 11.3 Write integration test for failed payment flow
+  - [x] 11.3 Write integration test for failed payment flow
+
     - Send PaymentRequested with decline token, verify failed
     - _Requirements: 3.1, 3.4_
 
