@@ -120,7 +120,12 @@
 
 
 
-  - [ ] 5.1 Create PaymentRequestedValidator using FluentValidation
+  - [x] 5.1 Create PaymentRequestedValidator using FluentValidation
+
+
+
+
+
     - Validate Amount > 0
     - Validate OrderId not empty
     - Validate PaymentMethodToken not empty
@@ -138,7 +143,12 @@
 
     - **Property 5: Validation rejects invalid payment amounts**
     - **Validates: Requirements 4.1**
-  - [ ] 5.3 Write unit tests for edge case validations
+  - [x] 5.3 Write unit tests for edge case validations
+
+
+
+
+
     - Test missing order identifier (Requirement 4.2)
     - Test missing payment method token (Requirement 4.3)
 
