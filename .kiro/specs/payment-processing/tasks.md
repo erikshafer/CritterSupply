@@ -115,27 +115,22 @@
     - **Validates: Requirements 6.4**
 
 - [x] 8. Checkpoint - Ensure all tests pass
-
-
-
-
-
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 9. Implement query endpoint
-  - [ ] 9.1 Create PaymentResponse DTO record
+- [x] 9. Implement query endpoint
+  - [x] 9.1 Create PaymentResponse DTO record
     - Map from Payment aggregate to response
     - Include PaymentId, OrderId, Amount, Currency, Status, TransactionId, FailureReason, Timestamps
     - _Requirements: 8.1, 8.3_
-  - [ ] 9.2 Create GetPaymentEndpoint using Wolverine HTTP
+  - [x] 9.2 Create GetPaymentEndpoint using Wolverine HTTP
     - Implement GET /api/payments/{paymentId} endpoint
     - Use Marten AggregateStreamAsync to rebuild Payment from events
     - Return 404 if not found, 200 with PaymentResponse if found
     - _Requirements: 8.1, 8.2, 8.3_
-  - [ ] 9.3 Write property test for payment query
+  - [x] 9.3 Write property test for payment query
     - **Property 9: Payment query returns existing payments**
     - **Validates: Requirements 8.1**
-  - [ ] 9.4 Write unit test for not-found response
+  - [x] 9.4 Write unit test for not-found response
     - Test querying non-existent payment returns 404
     - _Requirements: 8.2_
 
