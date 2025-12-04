@@ -21,4 +21,10 @@
     <Project Path="tests/Order Management/Orders.Api.IntegrationTests/Orders.Api.IntegrationTests.csproj" />
     <Project Path="tests/Order Management/Orders.UnitTests/Orders.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/Payment Processing/">
+    <Project Path="src/Payment Processing/Payments.Api/Payments.Api.csproj" />
+    <Project Path="src/Payment Processing/Payments/Payments.csproj" />
+    <Project Path="tests/Payment Processing/Payments.Api.IntegrationTests/Payments.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Payment Processing/Payments.UnitTests/Payments.UnitTests.csproj" />
+  </Folder>
 </Solution>
