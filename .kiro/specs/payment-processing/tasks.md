@@ -115,61 +115,44 @@
     - **Validates: Requirements 1.2**
 
 - [x] 5. Implement validation
-
-
-
-
-
   - [x] 5.1 Create PaymentRequestedValidator using FluentValidation
-
-
-
-
-
     - Validate Amount > 0
     - Validate OrderId not empty
     - Validate PaymentMethodToken not empty
-
-
     - Validate Currency not empty
-
-
     - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - [x] 5.2 Write property test for amount validation
-
-
-
-
-
     - **Property 5: Validation rejects invalid payment amounts**
     - **Validates: Requirements 4.1**
   - [x] 5.3 Write unit tests for edge case validations
-
-
-
-
-
     - Test missing order identifier (Requirement 4.2)
     - Test missing payment method token (Requirement 4.3)
-
-
     - Test missing currency (Requirement 4.4)
-
-
     - _Requirements: 4.2, 4.3, 4.4_
 
-- [ ] 6. Implement message handler
-  - [ ] 6.1 Create PaymentRequestedHandler
+- [x] 6. Implement message handler
+
+
+
+
+
+  - [x] 6.1 Create PaymentRequestedHandler
+
+
     - Create Payment from command
     - Call gateway CaptureAsync
     - Apply Capture or Fail based on result
     - Persist events to Marten
     - Return integration event for Orders
     - _Requirements: 1.1, 2.1, 2.5, 3.4_
-  - [ ] 6.2 Write property test for successful capture
+  - [x] 6.2 Write property test for successful capture
+
+
     - **Property 3: Successful capture updates Payment and publishes event**
     - **Validates: Requirements 2.2, 2.3, 2.4, 2.5**
-  - [ ] 6.3 Write property test for failed capture
+  - [x] 6.3 Write property test for failed capture
+
+
     - **Property 4: Failed capture updates Payment and publishes event with reason**
     - **Validates: Requirements 3.1, 3.2, 3.3, 3.4**
 
