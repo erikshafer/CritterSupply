@@ -12,19 +12,27 @@ This repository demonstrates how to build robust, production-ready, event-driven
 
 It also serves as a reference architecture for idiomatically leveraging the "Critter Stack"—[Wolverine](https://github.com/JasperFx/wolverine) and [Marten](https://github.com/JasperFx/marten)—to supercharge your .NET development. These tools just get out of your way so you can focus on the actual business problems at hand.
 
-### 🛒 Ecommerce
+### Ecommerce
 
 CritterSupply is a fictional pet supply retailer—the name a playful nod to the Critter Stack powering it, with the tagline "Stocked for every season."
 
 E-commerce was chosen as the domain partly from the maintainer's industry experience, but more importantly because it's a domain most developers intuitively understand. Everyone has placed an order online. That familiarity lets us focus on *how* the system is built rather than getting bogged down explaining *what* it does.
 
-### Domain & Architecture Overview
+#### Bounded Contexts, Value-Aligned Work, and Integration
+
+The CritterSupply system is composed of multiple bounded contexts ("BC"), sometimes called subdomains in other organizations, each responsible for a specific area of business functionality. These contexts communicate via asynchronous messaging to maintain loose coupling and high cohesion. You can think of each BC as a different department or team of people, all working together to run the overall business. These value-aligned teams:
+- Own their domain/context end-to-end
+- Minimize handoffs
+- Maximize flow
+- Have a narrow, well-defined cognitive load
+
+**Why mention these concepts from Domain-Driven Design and Team Topologies?** Because the architecture and code patterns in this repository are designed to support these principles. The goal is to show how to build systems that align with modern software development practices, not just how to write code.
 
 For details on the specific bounded contexts, their responsibilities, invariants, and integration patterns within CritterSupply, see **[CONTEXTS.md](CONTEXTS.md)**. That document provides the domain-level architecture and business workflow definitions that drive the technical implementations described in this file.
 
 ## What This Repository Provides
 
-This repository provides a reference architecture and code examples, focus on:
+This repository provides a reference architecture and code examples, focusing on concepts, principles, and idioms such as:
 
 - **Event-Driven Architecture (EDA)** patterns (language-agnostic principles)
 - **Event Sourcing** data persistence techniques (demonstrated with the Marten library and Postgres)
@@ -55,9 +63,9 @@ A list of tools, technologies, techniques, and other details to help define how 
 
 ### Prefer Pure Functions for Business Logic
 
-As much as possible, use "pure functions" for any business logic. In the world of C#, that means a static class with a static method that does one operate and does it well.
+Use "pure functions" whenever possible. That goes for the write models that constitute aggregates which write events. That goes for the message handlers, AKA the "deciders", for any business logic.
 
-Using the Wolverine framework, there may also be a `Validate()` or `Before()` method before the primary method is invoked, as we want to avoid the primary method ("function") to do tasks such as making sure an entity exists or an incoming object (parameter) isn't null.
+More details and examples are provided in the sections below.
 
 #### Recommended Reading
 
@@ -125,8 +133,6 @@ public sealed record AddressDetails(
 
 By default commands, queries, requests, and responses should be `sealed`. Sadly, C# does not have an option built-in to make all classes and records `sealed` automatically like the programming language Kotlin does. To prevent these types from being used with a handler outside its specified one, make them `sealed`.
 
-Likewise, for domain models, aggregates, write models, and similar types have `sealed` automatically applied. Nothing else should be inheriting them unless there is an explicit use case that has been designated.
-
 ```csharp
 // Good - This query is meant for one handler and one handler only, typically
 // the same name appended with "Handler" (such as GetCustomerAddressHandler)
@@ -135,12 +141,39 @@ public sealed record GetCustomerAddress(
 );
 ```
 
-#### Write Models, AKA Aggregates and Domain Models
+Likewise, our models should also have the `sealed` keyboard always applied and should be a `record` instead of a `class` unless an explicit use case has been designated.
+
+```csharp
+public sealed record CustomerShippingAddress(
+    Guid Id,
+    Guid CustomerId,
+    string AddressNickname,
+    string AddressLine1,
+    string? AddressLine2,
+    string City,
+    string Postcode,
+    string Country)
+{
+    // Inner code removed for brevity
+}
+```
+
+### Event Sourcing, Functional Programming Inspired, and the Decider Pattern
+
+When building event sourced models with Marten, prefer immutability and pure functions to apply events to the model.
+
+When building event-driven applications with Wolverine, prefer pure functions to encapsulate and insulate decisions made by the business logic.
+
+When building event-driven solutions with the "Critter Stack" that employee event sourcing, prefer using Wolverine's "Aggregate Handler Workflow" which is the Critter Stack's flavor of the "Decider" pattern.
 
 Use `sealed` and `record` by default for types considered write models, such as aggregates, projections, and domain models. Follow Marten's event sourcing patterns for creating and applying events to these models.
 
+#### Event Sourced Domain Models are Write Models
+
+These immutable, functional programming-inspired models (sometimes called "aggregates" or "write models") have no behavior methods that decide if an event should be written or not, as that is for our decider functions to handle. There is no base class or interface for these models to inherit from, such as an abstract `Aggregate` class or `IEntity` interface one may see with typical object-oriented rich domain models.
+
 ```csharp
-// Good - A model promoting immutability with no inheritance
+// Good - A model promoting immutability and pure functions to apply events.
 public sealed record Payment(
     Guid Id,
     Guid OrderId,
@@ -183,11 +216,184 @@ public sealed record Payment(
 }
 ```
 
-#### Traditional Relational Data Models
+There's nothing "wrong" with this traditional approach, but it not the preferred way to build event sourced models in this system! We want to separate the decision-making logic from the model itself to promote better testability, maintainability, and separation of concerns by employing the Decider pattern through Wolverine's Aggregate Handler Workflow.
+
+```csharp
+// Bad - A traditional object-oriented aggregate model with behavior methods to make decisions
+public class Payment : Aggregate
+{
+    // Properties removed for brevity
+    
+    public Payment(){}
+    
+    public static Payment Begin(Guid paymentId, Guid orderId, decimal amount) => new(paymentId, orderId, amount);
+
+    private Payment(Guid paymentId, Guid orderId, decimal amount)
+    {
+        var @event = new PaymentRequested(paymentId, orderId, amount);
+
+        Enqueue(@event);
+        Apply(@event);
+    }
+    
+    public void Apply(PaymentRequested @event)
+    {
+        Id = @event.PaymentId;
+        OrderId = @event.OrderId;
+        Amount = @event.Amount;
+    }
+    
+    public void Complete()
+    {
+        if(Status != PaymentStatus.Pending)
+            throw new InvalidOperationException($"Cannot complete a payment that is in {Status} status.");
+
+        var @event = new PaymentCompleted(Id, DateTime.UtcNow);
+
+        Enqueue(@event);
+        Apply(@event);
+    }
+
+    public void Apply(PaymentCompleted @event)
+    {
+        Status = PaymentStatus.Completed;
+    }
+
+    // Additional behavior methods and apply methods removed for brevity
+}
+```
+
+#### Recommended Reading
+
+- Wolverine Aggregate Handlers and Event Sourcing documentation: https://wolverinefx.net/guide/durability/marten/event-sourcing.html#aggregate-handlers-and-event-sourcing
+- Wolverine Handler Workflow documentation: https://wolverinefx.net/guide/http/marten.html#marten-aggregate-workflow
+- Original functional programming blog article on the Decider Pattern using F#: https://thinkbeforecoding.com/post/2021/12/17/functional-event-sourcing-decider
+
+### Traditional Relational Data Models
 
 While most of this system uses event sourcing, there may be cases where "traditional" models are used to persist data in a relational table. In these cases, like with our event sourcing models, we prefer immutability unless dependencies and behaviors are executed to produce a new instance of said model. If the ORM known as EF Core is being used, additional configuration may be needed to promote these behaviors.
 
-## Wolverine Idioms
+In modern C#, `record` allows for value-based equality and init-only mutation patterns.
+
+```csharp
+// Good - An immutable relational data model using EF Core capable principles.
+public sealed record Payment
+{
+    // Required by EF Core
+    private Payment() { }
+
+    public Payment(
+        Guid id,
+        Guid orderId,
+        decimal amount,
+        string currency,
+        DateTimeOffset createdAt,
+        PaymentStatus status,
+        string? provider = null,
+        string? providerReference = null)
+    {
+        Id = id;
+        OrderId = orderId;
+        Amount = amount;
+        Currency = currency;
+        CreatedAt = createdAt;
+        Status = status;
+        Provider = provider;
+        ProviderReference = providerReference;
+    }
+
+    public Guid Id { get; init; }
+
+    public Guid OrderId { get; init; }
+    public Order? Order { get; init; } // nav property (still supported)
+
+    public decimal Amount { get; init; }
+    public string Currency { get; init; } = null!;
+
+    public DateTimeOffset CreatedAt { get; init; }
+
+    public PaymentStatus Status { get; init; }
+
+    public string? Provider { get; init; }
+    public string? ProviderReference { get; init; } // e.g., Stripe charge ID
+
+    // Instead of mutating state, we return a new instance.
+    public Payment MarkAsCompleted(string provider, string providerReference) =>
+        this with
+        {
+            Status = PaymentStatus.Completed,
+            Provider = provider,
+            ProviderReference = providerReference
+        };
+
+    public Payment MarkAsFailed() =>
+        this with { Status = PaymentStatus.Failed };
+}
+```
+
+Below we have a more traditional `class` based relational data model that allows for mutation of its properties. This is not the preferred way to build models in this system, but it is acceptable *if* and only if the use case demands it.
+
+```csharp
+// Bad - A mutable relational data model
+public class Payment
+{
+    // EF Core requires a parameterless constructor
+    private Payment() { }
+
+    public Payment(
+        Guid id,
+        Guid orderId,
+        decimal amount,
+        string currency,
+        DateTimeOffset createdAt,
+        PaymentStatus status)
+    {
+        Id = id;
+        OrderId = orderId;
+        Amount = amount;
+        Currency = currency;
+        CreatedAt = createdAt;
+        Status = status;
+    }
+
+    public Guid Id { get; private set; }
+
+    public Guid OrderId { get; private set; }
+    public Order? Order { get; private set; }   // Navigation property
+
+    public decimal Amount { get; private set; }
+    public string Currency { get; private set; } = null!;
+
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    public PaymentStatus Status { get; private set; }
+
+    public string? Provider { get; private set; }
+    public string? ProviderReference { get; private set; } // e.g., Stripe charge ID
+
+    // Example behavior for OO-style rich domain model
+    public void MarkAsCompleted(string provider, string providerReference)
+    {
+        if (Status == PaymentStatus.Completed)
+            return;
+
+        Status = PaymentStatus.Completed;
+        Provider = provider;
+        ProviderReference = providerReference;
+    }
+
+    public void MarkAsFailed()
+    {
+        if (Status == PaymentStatus.Completed)
+            throw new InvalidOperationException(
+                "Cannot mark a completed payment as failed.");
+
+        Status = PaymentStatus.Failed;
+    }
+}
+```
+
+## Wolverine Messaging Idioms
 
 ### Message Handlers
 
@@ -195,10 +401,11 @@ Prefer single responsibility message handlers. Each handler should do one thing 
 
 ### Compound Handlers
 
-It's frequently beneficial to split message handling for a single message up into methods that load any necessary data and the business logic that
-transforms the current state or decides to take other actions.
+It's frequently beneficial to split message handling for a single message up into methods that load any necessary data and the business logic that transforms the current state or decides to take other actions.
 
 Wolverine allows you to use the conventional middleware naming conventions on each handler to do exactly this. The goal here is to use separate methods for different concerns like loading data or validating data so that the "main" message handler (or HTTP endpoint method) can be a pure function that is completely focused on domain logic or business workflow logic for easy reasoning and effective unit testing.
+
+As such, `Validate()` and `Before()` methods are invokved before the primary `Handle()` method is invokved. We do not want that handle method to do tasks such as making sure an entity/aggregate exists, pre-loading an entity, that said entity is in the expected status/state, or reaching out to another service. Those are not the concerns of the main handler method, those are not part of the business logic.
 
 #### Background Info:
 > Wolverine's "compound handler" feature where handlers can be built from multiple methods that are called one at a time
@@ -356,6 +563,36 @@ public static class ReleaseInventoryHandler
             quantity,
             command.Reason,
             DateTimeProvider.UtcNow);
+    }
+}
+```
+
+#### Example 4
+
+This is the more "traditional" way of writing a Wolverine message handler, with the `[AggregateHandler]` on the `Handle()` method, before the more-optimized `[WriteAggregate]` and `[ReadAggregate]` attributes were introduced. This example is provided for context and comparison to the preferred approach shown in Example 1, 2, and 3 above.
+
+```csharp
+[AggregateHandler]
+public static IEnumerable<object> Handle(MarkItemReady command, Order order)
+{
+    if (order.Items.TryGetValue(command.ItemName, out var item))
+    {
+        // Not doing this in a purist way here, but just trying to illustrate the Wolverine mechanics
+        item.Ready = true;
+
+        // Mark that the this item is ready
+        yield return new ItemReady(command.ItemName);
+    }
+    else
+    {
+        // Some crude validation
+        throw new InvalidOperationException($"Item {command.ItemName} does not exist in this order");
+    }
+
+    // If the order is ready to ship, also emit an OrderReady event
+    if (order.IsReadyToShip())
+    {
+        yield return new OrderReady();
     }
 }
 ```
