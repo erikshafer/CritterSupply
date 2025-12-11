@@ -12,6 +12,8 @@ public sealed record Payment(
     string PaymentMethodToken,
     PaymentStatus Status,
     string? TransactionId,
+    string? AuthorizationId,
+    DateTimeOffset? AuthorizationExpiresAt,
     string? FailureReason,
     bool IsRetriable,
     DateTimeOffset InitiatedAt,
@@ -42,6 +44,8 @@ public sealed record Payment(
             PaymentStatus.Pending,
             null,
             null,
+            null,
+            null,
             false,
             initiatedAt,
             null,
@@ -60,10 +64,59 @@ public sealed record Payment(
     }
 
     /// <summary>
+    /// Authorizes the payment (holds funds without capturing).
+    /// Updates status to Authorized and returns integration message for Orders context.
+    /// </summary>
+    public (Payment, PaymentAuthorizedIntegration) Authorize(string authorizationId, DateTimeOffset authorizedAt, DateTimeOffset expiresAt)
+    {
+        var updated = this with
+        {
+            Status = PaymentStatus.Authorized,
+            AuthorizationId = authorizationId,
+            AuthorizationExpiresAt = expiresAt,
+            ProcessedAt = authorizedAt
+        };
+
+        updated.PendingEvents.AddRange(PendingEvents);
+        updated.PendingEvents.Add(new PaymentAuthorized(Id, authorizationId, authorizedAt));
+
+        var integrationMessage = new PaymentAuthorizedIntegration(
+            Id,
+            OrderId,
+            Amount,
+            authorizationId,
+            authorizedAt,
+            expiresAt);
+
+        return (updated, integrationMessage);
+    }
+
+    /// <summary>
     /// Captures the payment with the given transaction ID.
     /// Updates status to Captured and returns integration message for Orders context.
     /// </summary>
     public (Payment, PaymentCapturedIntegration) Capture(string transactionId, DateTimeOffset capturedAt)
+    {
+        var updated = this with
+        {
+            Status = PaymentStatus.Captured,
+            TransactionId = transactionId,
+            ProcessedAt = capturedAt
+        };
+
+        updated.PendingEvents.AddRange(PendingEvents);
+        updated.PendingEvents.Add(new PaymentCaptured(Id, transactionId, capturedAt));
+
+        var integrationMessage = new PaymentCapturedIntegration(Id, OrderId, Amount, transactionId, capturedAt);
+
+        return (updated, integrationMessage);
+    }
+
+    /// <summary>
+    /// Captures a previously authorized payment.
+    /// Updates status to Captured and returns integration message for Orders context.
+    /// </summary>
+    public (Payment, PaymentCapturedIntegration) CaptureAuthorized(string transactionId, DateTimeOffset capturedAt)
     {
         var updated = this with
         {
@@ -147,10 +200,24 @@ public sealed record Payment(
             PaymentStatus.Pending,
             null,
             null,
+            null,
+            null,
             false,
             @event.InitiatedAt,
             null,
             0m);
+
+    /// <summary>
+    /// Applies a PaymentAuthorized event to update state (Marten event sourcing).
+    /// </summary>
+    public Payment Apply(PaymentAuthorized @event) =>
+        this with
+        {
+            Status = PaymentStatus.Authorized,
+            AuthorizationId = @event.AuthorizationId,
+            AuthorizationExpiresAt = @event.AuthorizedAt.AddDays(7), // 7-day expiration
+            ProcessedAt = @event.AuthorizedAt
+        };
 
     /// <summary>
     /// Applies a PaymentCaptured event to update state (Marten event sourcing).

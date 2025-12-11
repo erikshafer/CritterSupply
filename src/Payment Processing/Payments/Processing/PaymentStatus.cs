@@ -6,6 +6,7 @@ namespace Payments.Processing;
 public enum PaymentStatus
 {
     Pending,
+    Authorized,
     Captured,
     Failed,
     Refunded
