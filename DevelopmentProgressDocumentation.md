@@ -16,35 +16,47 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 
 **Cycle 1: Payments Context (Completed - 2025-12-11)**
 - **BC Work**: Full two-phase auth/capture flow, refund processing, comprehensive test coverage
-  - Immediate capture: `PaymentRequested` → `PaymentCaptured`
-  - Two-phase auth/capture: `AuthorizePayment` → `CapturePayment`
-  - Refunds: `RefundRequested` → `RefundCompleted`/`RefundFailed`
-  - Property-based testing with FsCheck
-  - **Status**: ✅ 20/20 integration tests passing
-  - **Files**: `/src/Payment Processing/Payments/` and `/tests/Payment Processing/Payments.Api.IntegrationTests/`
-  - **Key Learnings**:
-    - Integration tests verify aggregate state, not message tracking (no routes in test environment)
-    - Pure function handlers return cascading messages naturally
-    - `TestFixture` with `ExecuteAndWaitAsync()` is powerful for integration testing
+    - Immediate capture: `PaymentRequested` → `PaymentCaptured`
+    - Two-phase auth/capture: `AuthorizePayment` → `CapturePayment`
+    - Refunds: `RefundRequested` → `RefundCompleted`/`RefundFailed`
+    - Property-based testing with FsCheck
+    - **Status**: ✅ 20/20 integration tests passing
+    - **Files**: `/src/Payment Processing/Payments/` and `/tests/Payment Processing/Payments.Api.IntegrationTests/`
+    - **Key Learnings**:
+        - Integration tests verify aggregate state, not message tracking (no routes in test environment)
+        - Pure function handlers return cascading messages naturally
+        - `TestFixture` with `ExecuteAndWaitAsync()` is powerful for integration testing
 
-- **Orders Integration**: *(Next - in progress)*
-  - Add handlers for: `PaymentCaptured`, `PaymentFailed`, `RefundCompleted`, `RefundFailed`
-  - Integrate saga state transitions with payment lifecycle
+- **Orders Integration**: ✅ COMPLETED (2025-12-11)
+    - ✅ Handler 1: `Handle(PaymentCaptured)` - Transitions to PaymentConfirmed
+    - ✅ Handler 2: `Handle(PaymentFailed)` - Transitions to PaymentFailed
+    - ✅ Handler 3: `Handle(PaymentAuthorized)` - Transitions to PendingPayment
+    - ✅ Handler 4: `Handle(RefundCompleted)` - Maintains current state (financial operation)
+    - ✅ Handler 5: `Handle(RefundFailed)` - Maintains current state (failure tracking)
+    - **Integration Test Results**: ✅ All 5 payment integration tests passing
+    - **Key Achievement**: Orders saga now fully orchestrates payment lifecycle
+
+- **Shared Contracts Refactoring**: ✅ COMPLETED (2025-12-11)
+    - ✅ Created `src/Messages.Contracts/` project for cross-context communication
+    - ✅ Moved 5 integration messages from Payments.Processing to Messages.Contracts.Payments
+    - ✅ Improved naming: Removed "Integration" suffix (e.g., `PaymentCapturedIntegration` → `PaymentCaptured`)
+    - ✅ Updated Orders to reference Messages.Contracts instead of Payments directly
+    - ✅ Removed Orders → Payments project dependency (true bounded context separation)
+    - ✅ Fixed 3 failing Payments unit tests (namespace updates)
+    - **Final Result**: All 74 tests passing (23 unit + 20 Orders integration + 20 Payments integration + 11 Orders unit)
+    - **Architectural Benefit**: Proper separation of concerns; no direct cross-context project references
 
 #### 🔄 In Progress
 
-**Cycle 2: Payments → Orders Integration (Starting)**
-- Orders saga will consume Payments integration messages
-- Update Order saga state machine to handle payment events
-- Add Orders integration tests for payment coordination
+None - Cycle 1 complete!
 
 #### 🔜 Planned
 
-**Cycle 3: Inventory Context**
+**Cycle 2: Inventory Context**
 - Build reservation-based inventory management
 - Integrate with Orders saga
 
-**Cycle 4: Fulfillment Context**
+**Cycle 3: Fulfillment Context**
 - Build shipment and tracking workflows
 - Integrate with Orders saga
 
@@ -56,6 +68,7 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 4. **State Verification Over Message Tracking**: Integration tests verify domain model state changes, not infrastructure concerns
 5. **Pure Functions First**: Business logic isolated in pure functions, handlers delegate to them
 6. **Cascading Messages**: Handlers return messages; Wolverine handles persistence and routing automatically
+7. **Shared Contracts**: Integration messages live in neutral `Messages.Contracts` project; no direct cross-context references
 
 ## Testing Strategy
 
@@ -63,6 +76,7 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 - **Property-Based Tests**: FsCheck for invariant validation (e.g., refund calculations)
 - **No Message Mocking**: Real Marten event store; integration messages without routes are acceptable in tests
 - **State-Focused Assertions**: Verify final aggregate state, not infrastructure side effects
+- **Full Test Suite After Refactoring**: Run all tests when adding/removing project references or moving code between contexts
 
 ## Local Development Setup
 
@@ -126,3 +140,15 @@ RabbitMQ runs in Docker via `docker-compose`:
 # Access Management UI: http://localhost:15672
 # Default credentials: guest / guest
 ```
+
+## File Structure Reference
+
+- **Messages.Contracts**: `src/Messages.Contracts/` - Shared integration messages (neutral location, no direct BC dependencies)
+- **Payments BC**: `src/Payment Processing/Payments/` (Production) + `tests/Payment Processing/Payments.Api.IntegrationTests/` (Tests)
+- **Orders BC**: `src/Order Management/Orders/` (Saga) + `tests/Order Management/Orders.Api.IntegrationTests/` (Tests)
+
+---
+
+**Last Updated**: 2025-12-11  
+**Current Developer(s)**: Erik Shafer / Claude AI Assistant  
+**Development Status**: Cycle 1 Complete → Ready for Cycle 2 (Inventory Context)

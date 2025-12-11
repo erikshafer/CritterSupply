@@ -623,6 +623,52 @@ All test code must follow the same C# standards as production code.
 
 Prefer BDD-style testing for integration tests, focusing on the behavior of the system from an outside-in perspective. Use Alba to help with this style of testing.
 
+## Cross-Context Refactoring
+
+When performing refactoring that affects multiple bounded contexts, such as moving code between projects or updating namespaces, we want to make sure the behavior of the system remains unchanged.
+
+### Testing Checklist
+
+After any of the following changes, **always run the full test suite** before committing:
+
+### When to Run All Tests
+- **Adding/removing project references** between bounded contexts
+- **Moving code between projects** (e.g., integration messages to shared contracts)
+- **Updating namespaces** across multiple files
+- **Refactoring handlers or sagas** that coordinate contexts
+- **Modifying shared infrastructure** (e.g., Messages.Contracts)
+
+### Test Execution Steps
+
+1. Build the entire solution (catches compile errors early)
+   ```bash
+   dotnet build
+   ```
+2. Run all unit tests
+   ```bash
+   dotnet test --filter "Category=Unit"
+   ```
+3. Run all integration tests
+   ```bash
+   dotnet test --filter "Category=Integration"
+   ```
+4. Or run everything at once
+   ```bash
+   dotnet test
+   ```
+5. Verify the result
+
+### Why This Matters
+- Integration messages crossing context boundaries must be correctly referenced
+- Project dependencies can create unintended coupling
+- Namespace changes can break type resolution
+
+### Exit Criteria
+- ✅ Solution builds with 0 errors
+- ✅ All unit tests pass
+- ✅ All integration tests pass
+- ✅ No unused project references remain
+
 ## Available Skills
 
 Skills are documented separately in the `skills/` directory. Each skill provides patterns, templates, and practices for a specific aspect of building CritterSupply.
