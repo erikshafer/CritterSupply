@@ -1,3 +1,5 @@
+using IntegrationMessages = Messages.Contracts.Payments;
+
 namespace Payments.Processing;
 
 /// <summary>
@@ -67,7 +69,7 @@ public sealed record Payment(
     /// Authorizes the payment (holds funds without capturing).
     /// Updates status to Authorized and returns integration message for Orders context.
     /// </summary>
-    public (Payment, PaymentAuthorizedIntegration) Authorize(string authorizationId, DateTimeOffset authorizedAt, DateTimeOffset expiresAt)
+    public (Payment, IntegrationMessages.PaymentAuthorized) Authorize(string authorizationId, DateTimeOffset authorizedAt, DateTimeOffset expiresAt)
     {
         var updated = this with
         {
@@ -80,7 +82,7 @@ public sealed record Payment(
         updated.PendingEvents.AddRange(PendingEvents);
         updated.PendingEvents.Add(new PaymentAuthorized(Id, authorizationId, authorizedAt));
 
-        var integrationMessage = new PaymentAuthorizedIntegration(
+        var integrationMessage = new IntegrationMessages.PaymentAuthorized(
             Id,
             OrderId,
             Amount,
@@ -95,7 +97,7 @@ public sealed record Payment(
     /// Captures the payment with the given transaction ID.
     /// Updates status to Captured and returns integration message for Orders context.
     /// </summary>
-    public (Payment, PaymentCapturedIntegration) Capture(string transactionId, DateTimeOffset capturedAt)
+    public (Payment, IntegrationMessages.PaymentCaptured) Capture(string transactionId, DateTimeOffset capturedAt)
     {
         var updated = this with
         {
@@ -107,7 +109,7 @@ public sealed record Payment(
         updated.PendingEvents.AddRange(PendingEvents);
         updated.PendingEvents.Add(new PaymentCaptured(Id, transactionId, capturedAt));
 
-        var integrationMessage = new PaymentCapturedIntegration(Id, OrderId, Amount, transactionId, capturedAt);
+        var integrationMessage = new IntegrationMessages.PaymentCaptured(Id, OrderId, Amount, transactionId, capturedAt);
 
         return (updated, integrationMessage);
     }
@@ -116,7 +118,7 @@ public sealed record Payment(
     /// Captures a previously authorized payment.
     /// Updates status to Captured and returns integration message for Orders context.
     /// </summary>
-    public (Payment, PaymentCapturedIntegration) CaptureAuthorized(string transactionId, DateTimeOffset capturedAt)
+    public (Payment, IntegrationMessages.PaymentCaptured) CaptureAuthorized(string transactionId, DateTimeOffset capturedAt)
     {
         var updated = this with
         {
@@ -128,7 +130,7 @@ public sealed record Payment(
         updated.PendingEvents.AddRange(PendingEvents);
         updated.PendingEvents.Add(new PaymentCaptured(Id, transactionId, capturedAt));
 
-        var integrationMessage = new PaymentCapturedIntegration(Id, OrderId, Amount, transactionId, capturedAt);
+        var integrationMessage = new IntegrationMessages.PaymentCaptured(Id, OrderId, Amount, transactionId, capturedAt);
 
         return (updated, integrationMessage);
     }
@@ -137,7 +139,7 @@ public sealed record Payment(
     /// Fails the payment with the given reason.
     /// Updates status to Failed and returns integration message for Orders context.
     /// </summary>
-    public (Payment, PaymentFailedIntegration) Fail(string reason, bool isRetriable, DateTimeOffset failedAt)
+    public (Payment, IntegrationMessages.PaymentFailed) Fail(string reason, bool isRetriable, DateTimeOffset failedAt)
     {
         var updated = this with
         {
@@ -150,7 +152,7 @@ public sealed record Payment(
         updated.PendingEvents.AddRange(PendingEvents);
         updated.PendingEvents.Add(new PaymentFailed(Id, reason, isRetriable, failedAt));
 
-        var integrationMessage = new PaymentFailedIntegration(Id, OrderId, reason, isRetriable, failedAt);
+        var integrationMessage = new IntegrationMessages.PaymentFailed(Id, OrderId, reason, isRetriable, failedAt);
 
         return (updated, integrationMessage);
     }
@@ -164,7 +166,7 @@ public sealed record Payment(
     /// Processes a refund against this payment.
     /// Updates total refunded and returns integration message for Orders context.
     /// </summary>
-    public (Payment, PaymentRefunded, RefundCompleted) Refund(decimal refundAmount, string refundTransactionId, DateTimeOffset refundedAt)
+    public (Payment, PaymentRefunded, IntegrationMessages.RefundCompleted) Refund(decimal refundAmount, string refundTransactionId, DateTimeOffset refundedAt)
     {
         var newTotalRefunded = TotalRefunded + refundAmount;
         var newStatus = newTotalRefunded >= Amount ? PaymentStatus.Refunded : Status;
@@ -179,7 +181,7 @@ public sealed record Payment(
         updated.PendingEvents.AddRange(PendingEvents);
         updated.PendingEvents.Add(domainEvent);
 
-        var integrationMessage = new RefundCompleted(Id, OrderId, refundAmount, refundTransactionId, refundedAt);
+        var integrationMessage = new IntegrationMessages.RefundCompleted(Id, OrderId, refundAmount, refundTransactionId, refundedAt);
 
         return (updated, domainEvent, integrationMessage);
     }

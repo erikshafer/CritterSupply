@@ -6,6 +6,7 @@
     <File Path=".gitignore" />
     <File Path="CLAUDE.md" />
     <File Path="CONTEXTS.md" />
+    <File Path="DevelopmentProgressDocumentation.md" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
     <File Path="docker-compose.yml" />
@@ -27,5 +28,8 @@
     <Project Path="src/Payment Processing/Payments/Payments.csproj" />
     <Project Path="tests/Payment Processing/Payments.Api.IntegrationTests/Payments.Api.IntegrationTests.csproj" />
     <Project Path="tests/Payment Processing/Payments.UnitTests/Payments.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Messages.Contracts/Messages.Contracts.csproj" />
   </Folder>
 </Solution>

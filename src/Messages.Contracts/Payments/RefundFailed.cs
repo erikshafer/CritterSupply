@@ -1,4 +1,4 @@
-namespace Payments.Processing;
+namespace Messages.Contracts.Payments;
 
 /// <summary>
 /// Integration event published when refund processing fails.

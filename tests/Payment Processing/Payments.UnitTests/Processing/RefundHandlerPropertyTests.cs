@@ -2,6 +2,7 @@ using FsCheck;
 using FsCheck.Fluent;
 using FsCheck.Xunit;
 using Marten;
+using Messages.Contracts.Payments;
 using Payments.Processing;
 
 namespace Payments.UnitTests.Processing;

@@ -16,4 +16,8 @@
         <PackageReference Include="WolverineFx.RabbitMQ" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\..\Messages.Contracts\Messages.Contracts.csproj" />
+    </ItemGroup>
+
 </Project>
