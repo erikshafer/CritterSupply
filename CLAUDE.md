@@ -644,3 +644,9 @@ Skills are documented separately in the `skills/` directory. Each skill provides
 **Purpose**: Patterns and practices for writing integration tests using TestContainers and xUnit to test bounded contexts with real infrastructure dependencies.
 
 **File**: [skills/testcontainers-integration-tests.md](skills/testcontainers-integration-tests.md)
+
+## Development Progress Documentation
+
+The development style, current development cycle, completion status, in progress, planned work, and related details can be be found in the following document:
+
+**File**: [Development Progress Documentation](https://example.com/development-progress)
