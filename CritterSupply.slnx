@@ -28,4 +28,7 @@
     <Project Path="tests/Payment Processing/Payments.Api.IntegrationTests/Payments.Api.IntegrationTests.csproj" />
     <Project Path="tests/Payment Processing/Payments.UnitTests/Payments.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Messages.Contracts/Messages.Contracts.csproj" />
+  </Folder>
 </Solution>
