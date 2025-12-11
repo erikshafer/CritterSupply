@@ -1,3 +1,4 @@
+using Payments.Processing;
 using Wolverine;
 
 namespace Orders.Placement;
@@ -100,9 +101,66 @@ public sealed class Order : Saga
         return (saga, @event);
     }
 
+    /// <summary>
+    /// Saga handler for successful payment capture.
+    /// Transitions order to PaymentConfirmed status.
+    /// **Validates: Requirement 1.2 - Order proceeds after payment confirmation**
+    /// </summary>
+    /// <param name="message">Payment captured integration message from Payments BC.</param>
+    public void Handle(PaymentCapturedIntegration message)
+    {
+        Status = OrderStatus.PaymentConfirmed;
+    }
+
+    /// <summary>
+    /// Saga handler for payment failure.
+    /// Transitions order to PaymentFailed status.
+    /// **Validates: Requirement 1.3 - Order fails when payment cannot be processed**
+    /// </summary>
+    /// <param name="message">Payment failed integration message from Payments BC.</param>
+    public void Handle(PaymentFailedIntegration message)
+    {
+        Status = OrderStatus.PaymentFailed;
+    }
+
+    /// <summary>
+    /// Saga handler for payment authorization (two-phase flow).
+    /// Transitions order to PendingPayment status (waiting for capture).
+    /// **Validates: Requirement 1.4 - Order can wait for deferred payment capture**
+    /// </summary>
+    /// <param name="message">Payment authorized integration message from Payments BC.</param>
+    public void Handle(PaymentAuthorizedIntegration message)
+    {
+        Status = OrderStatus.PendingPayment;
+    }
+
+    /// <summary>
+    /// Saga handler for successful refund completion.
+    /// Refunds are a financial operation and don't necessarily change the order's fulfillment status.
+    /// The order remains in its current state (e.g., Shipped, Delivered, Closed).
+    /// **Validates: Requirement 1.5 - Order tracks refund completion for financial reconciliation**
+    /// </summary>
+    /// <param name="message">Refund completed integration message from Payments BC.</param>
+    public void Handle(RefundCompleted message)
+    {
+        // No status change - refunds are financial operations that don't affect fulfillment state.
+        // Future enhancement: Track refund amount or add RefundedAmount property.
+    }
+
+    /// <summary>
+    /// Saga handler for failed refund processing.
+    /// Refund failures are logged but don't change the order's fulfillment status.
+    /// The order remains in its current state (e.g., Shipped, Delivered, Closed).
+    /// **Validates: Requirement 1.6 - Order tracks refund failures for investigation and retry**
+    /// </summary>
+    /// <param name="message">Refund failed integration message from Payments BC.</param>
+    public void Handle(RefundFailed message)
+    {
+        // No status change - refund failures are financial issues that don't affect fulfillment state.
+        // Future enhancement: Track failed refund attempts or add FailedRefundReason property.
+    }
+
     // Future saga handlers for other events will be added here:
-    // Handle(PaymentCaptured) -> transition to PaymentConfirmed
-    // Handle(PaymentFailed) -> transition to PaymentFailed or retry
     // Handle(ReservationCommitted) -> proceed to fulfillment
     // etc.
 }

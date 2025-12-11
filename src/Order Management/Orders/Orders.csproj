@@ -16,4 +16,8 @@
         <PackageReference Include="WolverineFx.RabbitMQ" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\..\Payment Processing\Payments\Payments.csproj" />
+    </ItemGroup>
+
 </Project>
