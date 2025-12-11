@@ -7,7 +7,7 @@ namespace Payments.Api.IntegrationTests.Processing;
 /// Integration tests for refund processing flows.
 /// Tests the complete flow from RefundRequested command through gateway to persisted state.
 /// </summary>
-[Collection("Integration")]
+[Collection(IntegrationTestCollection.Name)]
 public class RefundFlowTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;

@@ -7,7 +7,7 @@ namespace Payments.Api.IntegrationTests.Processing;
 /// Integration tests for authorization and capture flows.
 /// Tests the complete two-phase auth/capture flow from commands through gateway to persisted state.
 /// </summary>
-[Collection("Integration")]
+[Collection(IntegrationTestCollection.Name)]
 public class AuthorizationFlowTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;
