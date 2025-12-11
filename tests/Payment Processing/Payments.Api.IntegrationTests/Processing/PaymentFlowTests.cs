@@ -7,7 +7,7 @@ namespace Payments.Api.IntegrationTests.Processing;
 /// Integration tests for payment processing flows.
 /// Tests the complete flow from PaymentRequested command through gateway to persisted state.
 /// </summary>
-[Collection("Integration")]
+[Collection(IntegrationTestCollection.Name)]
 public class PaymentFlowTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;

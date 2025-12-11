@@ -5,7 +5,7 @@ namespace Payments.Api.IntegrationTests.Processing;
 /// <summary>
 /// Unit tests for payment query not-found scenarios.
 /// </summary>
-[Collection("Integration")]
+[Collection(IntegrationTestCollection.Name)]
 public class GetPaymentNotFoundTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;

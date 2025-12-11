@@ -7,5 +7,5 @@ namespace Orders.Api.IntegrationTests;
 [CollectionDefinition(Name)]
 public class IntegrationTestCollection : ICollectionFixture<TestFixture>
 {
-    public const string Name = "Integration Tests";
+    public const string Name = "orders-integration";
 }
