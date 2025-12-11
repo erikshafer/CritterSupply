@@ -1,4 +1,4 @@
-using Payments.Processing;
+using Messages.Contracts.Payments;
 using Wolverine;
 
 namespace Orders.Placement;
@@ -107,7 +107,7 @@ public sealed class Order : Saga
     /// **Validates: Requirement 1.2 - Order proceeds after payment confirmation**
     /// </summary>
     /// <param name="message">Payment captured integration message from Payments BC.</param>
-    public void Handle(PaymentCapturedIntegration message)
+    public void Handle(PaymentCaptured message)
     {
         Status = OrderStatus.PaymentConfirmed;
     }
@@ -118,7 +118,7 @@ public sealed class Order : Saga
     /// **Validates: Requirement 1.3 - Order fails when payment cannot be processed**
     /// </summary>
     /// <param name="message">Payment failed integration message from Payments BC.</param>
-    public void Handle(PaymentFailedIntegration message)
+    public void Handle(PaymentFailed message)
     {
         Status = OrderStatus.PaymentFailed;
     }
@@ -129,7 +129,7 @@ public sealed class Order : Saga
     /// **Validates: Requirement 1.4 - Order can wait for deferred payment capture**
     /// </summary>
     /// <param name="message">Payment authorized integration message from Payments BC.</param>
-    public void Handle(PaymentAuthorizedIntegration message)
+    public void Handle(PaymentAuthorized message)
     {
         Status = OrderStatus.PendingPayment;
     }

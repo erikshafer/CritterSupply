@@ -1,3 +1,4 @@
+using IntegrationMessages = Messages.Contracts.Payments;
 using Marten;
 
 namespace Payments.Processing;
@@ -28,7 +29,7 @@ public static class CapturePaymentHandler
 
         if (payment is null)
         {
-            return new PaymentFailedIntegration(
+            return new IntegrationMessages.PaymentFailed(
                 command.PaymentId,
                 command.OrderId,
                 "Payment not found",
@@ -39,7 +40,7 @@ public static class CapturePaymentHandler
         // Requirement 4.2: Validate payment is in Authorized status
         if (payment.Status != PaymentStatus.Authorized)
         {
-            return new PaymentFailedIntegration(
+            return new IntegrationMessages.PaymentFailed(
                 command.PaymentId,
                 command.OrderId,
                 $"Payment is not in authorized status. Current status: {payment.Status}",
@@ -68,7 +69,7 @@ public static class CapturePaymentHandler
         // Requirement 4.4: Validate capture amount does not exceed authorized amount
         if (amountToCapture > payment.Amount)
         {
-            return new PaymentFailedIntegration(
+            return new IntegrationMessages.PaymentFailed(
                 command.PaymentId,
                 command.OrderId,
                 $"Capture amount ({amountToCapture}) exceeds authorized amount ({payment.Amount})",

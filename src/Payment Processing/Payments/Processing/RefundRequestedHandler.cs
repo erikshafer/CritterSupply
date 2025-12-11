@@ -1,3 +1,4 @@
+using IntegrationMessages = Messages.Contracts.Payments;
 using Marten;
 
 namespace Payments.Processing;
@@ -28,7 +29,7 @@ public static class RefundRequestedHandler
 
         if (payment is null)
         {
-            return new RefundFailed(
+            return new IntegrationMessages.RefundFailed(
                 command.PaymentId,
                 command.OrderId,
                 "Payment not found",
@@ -37,7 +38,7 @@ public static class RefundRequestedHandler
 
         if (payment.Status != PaymentStatus.Captured)
         {
-            return new RefundFailed(
+            return new IntegrationMessages.RefundFailed(
                 command.PaymentId,
                 command.OrderId,
                 $"Payment is not in captured status. Current status: {payment.Status}",
@@ -47,7 +48,7 @@ public static class RefundRequestedHandler
         // Requirement 5.3: Validate refund amount does not exceed remaining refundable amount
         if (command.Amount > payment.RefundableAmount)
         {
-            return new RefundFailed(
+            return new IntegrationMessages.RefundFailed(
                 command.PaymentId,
                 command.OrderId,
                 $"Refund amount ({command.Amount}) exceeds refundable amount ({payment.RefundableAmount})",
@@ -77,7 +78,7 @@ public static class RefundRequestedHandler
             return integrationMessage;
         }
 
-        return new RefundFailed(
+        return new IntegrationMessages.RefundFailed(
             command.PaymentId,
             command.OrderId,
             result.FailureReason ?? "Unknown refund failure",

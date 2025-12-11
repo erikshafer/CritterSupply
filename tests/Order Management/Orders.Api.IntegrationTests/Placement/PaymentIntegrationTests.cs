@@ -1,6 +1,6 @@
 using Marten;
+using Messages.Contracts.Payments;
 using Orders.Placement;
-using Payments.Processing;
 
 namespace Orders.Api.IntegrationTests.Placement;
 
@@ -63,8 +63,8 @@ public class PaymentIntegrationTests : IAsyncLifetime
 
         order.Status.ShouldBe(OrderStatus.Placed);
 
-        // Act: Send PaymentCapturedIntegration message
-        var paymentCaptured = new PaymentCapturedIntegration(
+        // Act: Send PaymentCaptured message
+        var paymentCaptured = new PaymentCaptured(
             Guid.NewGuid(),
             order.Id,
             order.TotalAmount,
@@ -125,8 +125,8 @@ public class PaymentIntegrationTests : IAsyncLifetime
 
         order.Status.ShouldBe(OrderStatus.Placed);
 
-        // Act: Send PaymentFailedIntegration message
-        var paymentFailed = new PaymentFailedIntegration(
+        // Act: Send PaymentFailed message
+        var paymentFailed = new PaymentFailed(
             Guid.NewGuid(),
             order.Id,
             "card_declined",
@@ -187,8 +187,8 @@ public class PaymentIntegrationTests : IAsyncLifetime
 
         order.Status.ShouldBe(OrderStatus.Placed);
 
-        // Act: Send PaymentAuthorizedIntegration message
-        var paymentAuthorized = new PaymentAuthorizedIntegration(
+        // Act: Send PaymentAuthorized message
+        var paymentAuthorized = new PaymentAuthorized(
             Guid.NewGuid(),
             order.Id,
             order.TotalAmount,
@@ -252,7 +252,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
         order.Status.ShouldBe(OrderStatus.Placed);
 
         // Transition to PaymentConfirmed
-        var paymentCaptured = new PaymentCapturedIntegration(
+        var paymentCaptured = new PaymentCaptured(
             Guid.NewGuid(),
             order.Id,
             order.TotalAmount,
@@ -330,7 +330,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
         order.Status.ShouldBe(OrderStatus.Placed);
 
         // Transition to PaymentConfirmed
-        var paymentCaptured = new PaymentCapturedIntegration(
+        var paymentCaptured = new PaymentCaptured(
             Guid.NewGuid(),
             order.Id,
             order.TotalAmount,
