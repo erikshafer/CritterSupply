@@ -16,7 +16,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\Messages.Contracts\Messages.Contracts.csproj" />
+      <ProjectReference Include="..\..\Shared\Messages.Contracts\Messages.Contracts.csproj" />
     </ItemGroup>
 
 </Project>
