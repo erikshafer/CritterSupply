@@ -691,8 +691,8 @@ Skills are documented separately in the `skills/` directory. Each skill provides
 
 **File**: [skills/testcontainers-integration-tests.md](skills/testcontainers-integration-tests.md)
 
-## Development Progress Documentation
+## Development Progress
 
 The development style, current development cycle, completion status, in progress, planned work, and related details can be be found in the following document:
 
-**File**: [Development Progress Documentation](https://example.com/development-progress)
+**File**: [Dev Progress](./DEVPROGRESS.md)

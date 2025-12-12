@@ -1,5 +1,7 @@
 # CritterSupply Development Progress
 
+Notes about the current "dev status" or "dev progress" of the CritterSupply project. Highlighting the development style, current cycle, completed work, and next steps without implementation details.
+
 ## Development Style: Ping-Pong Integration Pattern
 
 This project follows a **"ping-pong" development approach** where work alternates between polishing a bounded context and integrating it back with the Orders saga (the "integration hub").
