@@ -1,4 +1,4 @@
-using Alba;
+using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
@@ -14,7 +14,8 @@ namespace Orders.Api.IntegrationTests;
 public class TestFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:17-alpine")
+        .WithImage("postgres:18-alpine")
+        .WithDatabase("orders_test_db")
         .WithName($"orders-postgres-test-{Guid.NewGuid():N}")
         .WithCleanUp(true)
         .Build();
@@ -28,6 +29,11 @@ public class TestFixture : IAsyncLifetime
         await _postgres.StartAsync();
 
         _connectionString = _postgres.GetConnectionString();
+
+        // Necessary for WebApplicationFactory usage with Alba for integration testing, as
+        // well as when using JasperFx command line processing. Introducing this without such
+        // does not (seem) to have any negative or unintended side effects.
+        JasperFxEnvironment.AutoStartHost = true;
 
         Host = await AlbaHost.For<Program>(builder =>
         {
@@ -99,7 +105,7 @@ public class TestFixture : IAsyncLifetime
     /// Executes a message through Wolverine and waits for all cascading messages to complete.
     /// This ensures all side effects are persisted before assertions.
     /// </summary>
-    public async Task<ITrackedSession> ExecuteAndWaitAsync<T>(T message, int timeoutSeconds = 30)
+    public async Task<ITrackedSession> ExecuteAndWaitAsync<T>(T message, int timeoutSeconds = 15)
         where T : class
     {
         return await Host.ExecuteAndWaitAsync(async () =>
@@ -108,5 +114,23 @@ public class TestFixture : IAsyncLifetime
             var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
             await bus.InvokeAsync(message);
         }, timeoutSeconds);
+    }
+
+    /// <summary>
+    /// This method allows us to make HTTP calls into our system in memory with Alba while
+    /// leveraging Wolverine's test support for message tracking to both record outgoing messages.
+    /// This ensures that any cascaded work spawned by the initial command is completed before
+    /// passing control back to the calling test.
+    /// </summary>
+    protected async Task<(ITrackedSession, IScenarioResult)> TrackedHttpCall(Action<Scenario> configuration)
+    {
+        IScenarioResult result = null!;
+
+        var tracked = await Host.ExecuteAndWaitAsync(async () =>
+        {
+            result = await Host.Scenario(configuration);
+        });
+
+        return (tracked, result);
     }
 }
