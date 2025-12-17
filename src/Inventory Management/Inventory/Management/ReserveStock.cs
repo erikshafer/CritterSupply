@@ -4,6 +4,7 @@ namespace Inventory.Management;
 /// Command from Shopping or Orders context requesting a soft stock reservation.
 /// </summary>
 public sealed record ReserveStock(
+    Guid OrderId,
     string SKU,
     string WarehouseId,
     Guid ReservationId,

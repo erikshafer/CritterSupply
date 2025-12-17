@@ -110,9 +110,13 @@ public class OrderSagaCreationPropertyTests
         // 2.1: Customer identifier
         var customerIdMatches = orderPlaced.CustomerId == checkout.CustomerId;
         
-        // 2.1: Line items match
+        // 2.1: Line items match (compare values since types differ)
         var lineItemsMatch = orderPlaced.LineItems.Count == saga.LineItems.Count
-            && orderPlaced.LineItems.Zip(saga.LineItems).All(pair => pair.First == pair.Second);
+            && orderPlaced.LineItems.Zip(saga.LineItems).All(pair =>
+                pair.First.Sku == pair.Second.Sku
+                && pair.First.Quantity == pair.Second.Quantity
+                && pair.First.UnitPrice == pair.Second.UnitPrice
+                && pair.First.LineTotal == pair.Second.LineTotal);
         
         // 2.1: Total amount matches calculated total
         var expectedTotal = saga.LineItems.Sum(x => x.LineTotal);
@@ -126,8 +130,13 @@ public class OrderSagaCreationPropertyTests
         var hasInventoryInfo = orderPlaced.LineItems.All(item => 
             !string.IsNullOrEmpty(item.Sku) && item.Quantity > 0);
         
-        // Shipping info
-        var hasShippingInfo = orderPlaced.ShippingAddress == checkout.ShippingAddress
+        // Shipping info (compare values since types differ)
+        var hasShippingInfo = orderPlaced.ShippingAddress.Street == checkout.ShippingAddress.Street
+            && orderPlaced.ShippingAddress.Street2 == checkout.ShippingAddress.Street2
+            && orderPlaced.ShippingAddress.City == checkout.ShippingAddress.City
+            && orderPlaced.ShippingAddress.State == checkout.ShippingAddress.State
+            && orderPlaced.ShippingAddress.PostalCode == checkout.ShippingAddress.PostalCode
+            && orderPlaced.ShippingAddress.Country == checkout.ShippingAddress.Country
             && orderPlaced.ShippingMethod == checkout.ShippingMethod;
         
         // Timestamp
