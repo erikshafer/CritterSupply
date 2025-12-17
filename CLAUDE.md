@@ -30,6 +30,17 @@ The CritterSupply system is composed of multiple bounded contexts ("BC"), someti
 
 For details on the specific bounded contexts, their responsibilities, invariants, and integration patterns within CritterSupply, see **[CONTEXTS.md](CONTEXTS.md)**. That document provides the domain-level architecture and business workflow definitions that drive the technical implementations described in this file.
 
+### CONTEXTS.md as Architectural North Star
+
+**IMPORTANT:** `CONTEXTS.md` is the **architectural source of truth** for this system. When implementing integrations between bounded contexts:
+
+1. **Always consult CONTEXTS.md first** - It defines what messages each BC receives and publishes
+2. **Implementation follows specification** - Code should match the integration contracts defined in CONTEXTS.md
+3. **Orchestration vs. Choreography** - CONTEXTS.md specifies which pattern to use (e.g., Orders orchestrates, other BCs react)
+4. **Update CONTEXTS.md when architecture changes** - Keep it current; it's living documentation, not a one-time artifact
+
+If there's a discrepancy between code and CONTEXTS.md, **CONTEXTS.md wins** unless there's a deliberate architectural decision to update the specification.
+
 ## What This Repository Provides
 
 This repository provides a reference architecture and code examples, focusing on concepts, principles, and idioms such as:

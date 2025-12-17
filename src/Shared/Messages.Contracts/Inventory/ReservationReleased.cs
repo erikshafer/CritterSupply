@@ -5,6 +5,7 @@ namespace Messages.Contracts.Inventory;
 /// Consumed by Orders BC for tracking purposes.
 /// </summary>
 public sealed record ReservationReleased(
+    Guid OrderId,
     Guid InventoryId,
     Guid ReservationId,
     string SKU,

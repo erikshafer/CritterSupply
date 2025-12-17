@@ -13,6 +13,8 @@ public sealed record ProductInventory(
     int AvailableQuantity,
     Dictionary<Guid, int> Reservations,
     Dictionary<Guid, int> CommittedAllocations,
+    // map ReservationId -> OrderId
+    Dictionary<Guid, Guid> ReservationOrderIds,
     DateTimeOffset InitializedAt)
 {
     /// <summary>
@@ -50,6 +52,7 @@ public sealed record ProductInventory(
             initialQuantity,
             new Dictionary<Guid, int>(),
             new Dictionary<Guid, int>(),
+            new Dictionary<Guid, Guid>(),
             initializedAt);
 
         inventory.PendingEvents.Add(new InventoryInitialized(
@@ -66,6 +69,7 @@ public sealed record ProductInventory(
     /// Returns updated inventory and integration message.
     /// </summary>
     public (ProductInventory, StockReserved, IntegrationMessages.ReservationConfirmed) Reserve(
+        Guid orderId,
         Guid reservationId,
         int quantity)
     {
@@ -76,17 +80,24 @@ public sealed record ProductInventory(
             [reservationId] = quantity
         };
 
+        var newReservationOrderIds = new Dictionary<Guid, Guid>(ReservationOrderIds)
+        {
+            [reservationId] = orderId
+        };
+
         var updated = this with
         {
             AvailableQuantity = AvailableQuantity - quantity,
-            Reservations = newReservations
+            Reservations = newReservations,
+            ReservationOrderIds = newReservationOrderIds
         };
 
-        var domainEvent = new StockReserved(reservationId, quantity, reservedAt);
+        var domainEvent = new StockReserved(orderId, reservationId, quantity, reservedAt);
         updated.PendingEvents.AddRange(PendingEvents);
         updated.PendingEvents.Add(domainEvent);
 
         var integrationMessage = new IntegrationMessages.ReservationConfirmed(
+            orderId,
             Id,
             reservationId,
             SKU,
@@ -111,6 +122,11 @@ public sealed record ProductInventory(
             throw new InvalidOperationException($"Reservation {reservationId} not found");
         }
 
+        if (!ReservationOrderIds.TryGetValue(reservationId, out var orderId))
+        {
+            throw new InvalidOperationException($"OrderId for reservation {reservationId} not found");
+        }
+
         var newReservations = new Dictionary<Guid, int>(Reservations);
         newReservations.Remove(reservationId);
 
@@ -130,6 +146,7 @@ public sealed record ProductInventory(
         updated.PendingEvents.Add(domainEvent);
 
         var integrationMessage = new IntegrationMessages.ReservationCommitted(
+            orderId,
             Id,
             reservationId,
             SKU,
@@ -155,6 +172,11 @@ public sealed record ProductInventory(
             throw new InvalidOperationException($"Reservation {reservationId} not found");
         }
 
+        if (!ReservationOrderIds.TryGetValue(reservationId, out var orderId))
+        {
+            throw new InvalidOperationException($"OrderId for reservation {reservationId} not found");
+        }
+
         var newReservations = new Dictionary<Guid, int>(Reservations);
         newReservations.Remove(reservationId);
 
@@ -169,6 +191,7 @@ public sealed record ProductInventory(
         updated.PendingEvents.Add(domainEvent);
 
         var integrationMessage = new IntegrationMessages.ReservationReleased(
+            orderId,
             Id,
             reservationId,
             SKU,
@@ -233,6 +256,7 @@ public sealed record ProductInventory(
             @event.InitialQuantity,
             new Dictionary<Guid, int>(),
             new Dictionary<Guid, int>(),
+            new Dictionary<Guid, Guid>(),
             @event.InitializedAt);
 
     /// <summary>
@@ -256,10 +280,16 @@ public sealed record ProductInventory(
             [@event.ReservationId] = @event.Quantity
         };
 
+        var newReservationOrderIds = new Dictionary<Guid, Guid>(ReservationOrderIds)
+        {
+            [@event.ReservationId] = @event.OrderId
+        };
+
         return this with
         {
             AvailableQuantity = AvailableQuantity - @event.Quantity,
-            Reservations = newReservations
+            Reservations = newReservations,
+            ReservationOrderIds = newReservationOrderIds
         };
     }
 

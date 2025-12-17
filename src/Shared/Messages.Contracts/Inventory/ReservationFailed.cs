@@ -5,6 +5,7 @@ namespace Messages.Contracts.Inventory;
 /// Consumed by Shopping and Orders BCs.
 /// </summary>
 public sealed record ReservationFailed(
+    Guid OrderId,
     Guid ReservationId,
     string SKU,
     string WarehouseId,

@@ -39,7 +39,8 @@ public class CommitReleaseFlowTests : IAsyncLifetime
         var inventory = await session.Query<ProductInventory>()
             .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
 
-        await _fixture.ExecuteAndWaitAsync(new ReserveStock(sku, warehouseId, reservationId, 25));
+        var orderId = Guid.NewGuid();
+        await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, reservationId, 25));
 
         // Act: Commit reservation
         var commitCommand = new CommitReservation(inventory.Id, reservationId);
@@ -77,7 +78,8 @@ public class CommitReleaseFlowTests : IAsyncLifetime
         var inventory = await session.Query<ProductInventory>()
             .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
 
-        await _fixture.ExecuteAndWaitAsync(new ReserveStock(sku, warehouseId, reservationId, 30));
+        var orderId = Guid.NewGuid();
+        await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, reservationId, 30));
 
         // Verify reservation exists
         await using var verifySession = _fixture.GetDocumentSession();
@@ -123,9 +125,10 @@ public class CommitReleaseFlowTests : IAsyncLifetime
         var reservation2 = Guid.NewGuid();
         var reservation3 = Guid.NewGuid();
 
-        await _fixture.ExecuteAndWaitAsync(new ReserveStock(sku, warehouseId, reservation1, 10));
-        await _fixture.ExecuteAndWaitAsync(new ReserveStock(sku, warehouseId, reservation2, 20));
-        await _fixture.ExecuteAndWaitAsync(new ReserveStock(sku, warehouseId, reservation3, 30));
+        var orderId = Guid.NewGuid();
+        await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, reservation1, 10));
+        await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, reservation2, 20));
+        await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, reservation3, 30));
 
         // Act: Commit reservation1, release reservation2, leave reservation3 as-is
         await _fixture.ExecuteAndWaitAsync(new CommitReservation(inventory.Id, reservation1));

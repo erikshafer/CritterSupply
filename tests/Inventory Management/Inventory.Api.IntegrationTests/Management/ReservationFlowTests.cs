@@ -44,7 +44,8 @@ public class ReservationFlowTests : IAsyncLifetime
 
         // Act: Reserve stock
         var reservationId = Guid.NewGuid();
-        var reserveCommand = new ReserveStock(sku, warehouseId, reservationId, 25);
+        var orderId = Guid.NewGuid();
+        var reserveCommand = new ReserveStock(orderId, sku, warehouseId, reservationId, 25);
         await _fixture.ExecuteAndWaitAsync(reserveCommand);
 
         // Assert: Verify reservation succeeded
@@ -75,7 +76,8 @@ public class ReservationFlowTests : IAsyncLifetime
 
         // Act: Attempt to reserve more than available
         var reservationId = Guid.NewGuid();
-        var reserveCommand = new ReserveStock(sku, warehouseId, reservationId, 50);
+        var orderId = Guid.NewGuid();
+        var reserveCommand = new ReserveStock(orderId, sku, warehouseId, reservationId, 50);
 
         // The handler will fail validation in Before() method, but ExecuteAndWaitAsync doesn't throw
         // We need to verify the inventory state hasn't changed
@@ -111,9 +113,10 @@ public class ReservationFlowTests : IAsyncLifetime
         var reservation2 = Guid.NewGuid();
         var reservation3 = Guid.NewGuid();
 
-        await _fixture.ExecuteAndWaitAsync(new ReserveStock(sku, warehouseId, reservation1, 10));
-        await _fixture.ExecuteAndWaitAsync(new ReserveStock(sku, warehouseId, reservation2, 20));
-        await _fixture.ExecuteAndWaitAsync(new ReserveStock(sku, warehouseId, reservation3, 30));
+        var orderId = Guid.NewGuid();
+        await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, reservation1, 10));
+        await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, reservation2, 20));
+        await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, reservation3, 30));
 
         // Assert: Verify all reservations succeeded
         await using var querySession = _fixture.GetDocumentSession();
@@ -145,7 +148,8 @@ public class ReservationFlowTests : IAsyncLifetime
 
         // Act: Reserve exact available quantity
         var reservationId = Guid.NewGuid();
-        var reserveCommand = new ReserveStock(sku, warehouseId, reservationId, 50);
+        var orderId = Guid.NewGuid();
+        var reserveCommand = new ReserveStock(orderId, sku, warehouseId, reservationId, 50);
         await _fixture.ExecuteAndWaitAsync(reserveCommand);
 
         // Assert: Verify reservation succeeded and available = 0

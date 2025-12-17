@@ -16,10 +16,19 @@ public enum OrderStatus
     
     /// <summary>Payment declined (terminal or retry branch).</summary>
     PaymentFailed,
-    
+
+    /// <summary>Inventory reservation confirmed.</summary>
+    InventoryReserved,
+
+    /// <summary>Inventory reservation failed (insufficient stock).</summary>
+    InventoryFailed,
+
+    /// <summary>Inventory committed (hard allocation).</summary>
+    InventoryCommitted,
+
     /// <summary>Flagged for fraud review or inventory issues.</summary>
     OnHold,
-    
+
     /// <summary>Handed off to Fulfillment BC.</summary>
     Fulfilling,
     

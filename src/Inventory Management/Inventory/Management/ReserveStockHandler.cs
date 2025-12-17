@@ -57,6 +57,7 @@ public static class ReserveStockHandler
 
         // Reserve stock (pure function)
         var (updatedInventory, domainEvent, integrationMessage) = inventory.Reserve(
+            command.OrderId,
             command.ReservationId,
             command.Quantity);
 

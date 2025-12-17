@@ -39,11 +39,12 @@ public class InvariantValidationTests : IAsyncLifetime
             .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
 
         // Reserve 90 units
-        await _fixture.ExecuteAndWaitAsync(new ReserveStock(sku, warehouseId, Guid.NewGuid(), 90));
+        var orderId = Guid.NewGuid();
+        await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, Guid.NewGuid(), 90));
 
         // Act: Attempt to reserve 20 more (would exceed available 10)
         var reservationId = Guid.NewGuid();
-        await _fixture.ExecuteAndWaitAsync(new ReserveStock(sku, warehouseId, reservationId, 20));
+        await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, reservationId, 20));
 
         // Assert: Verify reservation did NOT occur
         await using var querySession = _fixture.GetDocumentSession();
@@ -79,7 +80,8 @@ public class InvariantValidationTests : IAsyncLifetime
 
         // Step 2: Reserve 30
         var reservation1 = Guid.NewGuid();
-        await _fixture.ExecuteAndWaitAsync(new ReserveStock(sku, warehouseId, reservation1, 30));
+        var orderId = Guid.NewGuid();
+        await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, reservation1, 30));
 
         await using var session2 = _fixture.GetDocumentSession();
         var inventory2 = await session2.LoadAsync<ProductInventory>(inventory.Id);
@@ -96,7 +98,7 @@ public class InvariantValidationTests : IAsyncLifetime
 
         // Step 4: Reserve 20 more
         var reservation2 = Guid.NewGuid();
-        await _fixture.ExecuteAndWaitAsync(new ReserveStock(sku, warehouseId, reservation2, 20));
+        await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, reservation2, 20));
 
         await using var session4 = _fixture.GetDocumentSession();
         var inventory4 = await session4.LoadAsync<ProductInventory>(inventory.Id);

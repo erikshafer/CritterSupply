@@ -110,6 +110,47 @@ The Orders context owns the commercial commitment and coordinates the lifecycle 
 - Return eligibility rules or inspection (Returns)
 - Customer notification delivery (Notifications)
 
+### Integration Flows
+
+**Saga Coordination: Order Lifecycle**
+```
+CheckoutCompleted (from Shopping)
+  └─> Order.Start() [Saga Created]
+      └─> OrderPlaced → Inventory + Payments
+
+[Inventory responds]
+ReservationConfirmed (from Inventory)
+  └─> Order.Handle() → Status: InventoryReserved
+
+ReservationFailed (from Inventory)
+  └─> Order.Handle() → Status: InventoryFailed
+
+[Payments responds]
+PaymentCaptured (from Payments)
+  └─> Order.Handle() → Status: PaymentConfirmed
+
+PaymentFailed (from Payments)
+  └─> Order.Handle() → Status: PaymentFailed
+
+PaymentAuthorized (from Payments)
+  └─> Order.Handle() → Status: PendingPayment
+
+[Inventory commitment]
+ReservationCommitted (from Inventory)
+  └─> Order.Handle() → Status: InventoryCommitted
+      └─> [Future: Trigger FulfillmentRequested]
+
+[Compensation flows]
+ReservationReleased (from Inventory)
+  └─> Order.Handle() → [No status change, compensation tracking]
+
+RefundCompleted (from Payments)
+  └─> Order.Handle() → [No status change, financial tracking]
+
+RefundFailed (from Payments)
+  └─> Order.Handle() → [No status change, failure tracking]
+```
+
 ---
 
 ## Payments
@@ -158,6 +199,27 @@ The Payments context owns the financial transaction lifecycle—capturing funds,
 - Customer payment method storage (Customers or Wallet context)
 - Refund eligibility determination (Orders/Returns)
 
+### Integration Flows
+
+**Choreography: Payment Processing**
+```
+PaymentRequested (from Orders)
+  └─> ProcessPaymentHandler
+      ├─> PaymentCaptured → Orders
+      ├─> PaymentFailed → Orders
+      └─> PaymentAuthorized → Orders (two-phase flow)
+
+CapturePayment (from Orders, after authorization)
+  └─> CapturePaymentHandler
+      ├─> PaymentCaptured → Orders
+      └─> PaymentFailed → Orders
+
+RefundRequested (from Orders)
+  └─> RefundPaymentHandler
+      ├─> RefundCompleted → Orders
+      └─> RefundFailed → Orders
+```
+
 ---
 
 ## Inventory
@@ -202,6 +264,26 @@ The Inventory context owns stock levels and availability. It answers "do we have
 - Physical warehouse location or bin assignments (Fulfillment)
 - Purchasing or reorder decisions (Procurement/Supply Chain context)
 - Forecasting and demand planning (future consideration)
+
+### Integration Flows
+
+**Choreography: Order Placement → Inventory Reservation**
+```
+OrderPlaced (from Orders)
+  └─> OrderPlacedHandler
+      └─> ReserveStock (internal command)
+          └─> ReserveStockHandler
+              ├─> ReservationConfirmed → Orders
+              └─> ReservationFailed → Orders
+
+ReservationCommitRequested (from Orders)
+  └─> CommitReservationHandler
+      └─> ReservationCommitted → Orders
+
+ReservationReleaseRequested (from Orders)
+  └─> ReleaseReservationHandler
+      └─> ReservationReleased → Orders
+```
 
 ---
 

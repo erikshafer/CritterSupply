@@ -1,5 +1,7 @@
+using Messages.Contracts.Inventory;
 using Messages.Contracts.Payments;
 using Wolverine;
+using IntegrationMessages = Messages.Contracts.Orders;
 
 namespace Orders.Placement;
 
@@ -55,12 +57,28 @@ public sealed class Order : Saga
     public DateTimeOffset PlacedAt { get; set; }
 
     /// <summary>
+    /// Tracks reservation IDs for this order (for orchestrating commit/release).
+    /// Key: ReservationId, Value: SKU
+    /// </summary>
+    public Dictionary<Guid, string> ReservationIds { get; set; } = new();
+
+    /// <summary>
+    /// Tracks whether inventory has been reserved (for orchestration logic).
+    /// </summary>
+    public bool IsInventoryReserved { get; set; }
+
+    /// <summary>
+    /// Tracks whether payment has been captured (for orchestration logic).
+    /// </summary>
+    public bool IsPaymentCaptured { get; set; }
+
+    /// <summary>
     /// Saga start handler - creates the saga from CheckoutCompleted.
     /// Validation happens in Wolverine middleware via FluentValidation.
     /// </summary>
     /// <param name="command">The checkout completed event from Shopping context.</param>
     /// <returns>A tuple of the new Order saga and the OrderPlaced event to publish.</returns>
-    public static (Order, OrderPlaced) Start(CheckoutCompleted command)
+    public static (Order, IntegrationMessages.OrderPlaced) Start(CheckoutCompleted command)
     {
         var orderId = Guid.CreateVersion7();
         var placedAt = DateTimeOffset.UtcNow;
@@ -88,11 +106,21 @@ public sealed class Order : Saga
             PlacedAt = placedAt
         };
 
-        var @event = new OrderPlaced(
+        var @event = new IntegrationMessages.OrderPlaced(
             orderId,
             command.CustomerId,
-            lineItems,
-            command.ShippingAddress,
+            lineItems.Select(li => new IntegrationMessages.OrderLineItem(
+                li.Sku,
+                li.Quantity,
+                li.UnitPrice,
+                li.LineTotal)).ToList(),
+            new IntegrationMessages.ShippingAddress(
+                command.ShippingAddress.Street,
+                command.ShippingAddress.Street2,
+                command.ShippingAddress.City,
+                command.ShippingAddress.State,
+                command.ShippingAddress.PostalCode,
+                command.ShippingAddress.Country),
             command.ShippingMethod,
             command.PaymentMethodToken,
             totalAmount,
@@ -103,24 +131,60 @@ public sealed class Order : Saga
 
     /// <summary>
     /// Saga handler for successful payment capture.
-    /// Transitions order to PaymentConfirmed status.
+    /// Transitions order to PaymentConfirmed status and orchestrates inventory commitment if ready.
     /// **Validates: Requirement 1.2 - Order proceeds after payment confirmation**
     /// </summary>
     /// <param name="message">Payment captured integration message from Payments BC.</param>
-    public void Handle(PaymentCaptured message)
+    /// <returns>Orchestration messages if inventory is reserved and ready to commit.</returns>
+    public OutgoingMessages Handle(PaymentCaptured message)
     {
         Status = OrderStatus.PaymentConfirmed;
+        IsPaymentCaptured = true;
+
+        var messages = new OutgoingMessages();
+
+        // Orchestration: If inventory is already reserved, tell Inventory to commit all reservations
+        if (IsInventoryReserved)
+        {
+            foreach (var reservationId in ReservationIds.Keys)
+            {
+                messages.Add(new IntegrationMessages.ReservationCommitRequested(
+                    Id,
+                    reservationId,
+                    DateTimeOffset.UtcNow));
+            }
+        }
+
+        return messages;
     }
 
     /// <summary>
     /// Saga handler for payment failure.
-    /// Transitions order to PaymentFailed status.
+    /// Transitions order to PaymentFailed status and triggers compensation (release inventory).
     /// **Validates: Requirement 1.3 - Order fails when payment cannot be processed**
     /// </summary>
     /// <param name="message">Payment failed integration message from Payments BC.</param>
-    public void Handle(PaymentFailed message)
+    /// <returns>Compensation messages to release any reserved inventory.</returns>
+    public OutgoingMessages Handle(PaymentFailed message)
     {
         Status = OrderStatus.PaymentFailed;
+
+        var messages = new OutgoingMessages();
+
+        // Compensation: Release any reserved inventory
+        if (IsInventoryReserved)
+        {
+            foreach (var reservationId in ReservationIds.Keys)
+            {
+                messages.Add(new IntegrationMessages.ReservationReleaseRequested(
+                    Id,
+                    reservationId,
+                    $"Payment failed: {message.FailureReason}",
+                    DateTimeOffset.UtcNow));
+            }
+        }
+
+        return messages;
     }
 
     /// <summary>
@@ -160,7 +224,65 @@ public sealed class Order : Saga
         // Future enhancement: Track failed refund attempts or add FailedRefundReason property.
     }
 
-    // Future saga handlers for other events will be added here:
-    // Handle(ReservationCommitted) -> proceed to fulfillment
-    // etc.
+    /// <summary>
+    /// Saga handler for successful inventory reservation.
+    /// Transitions order to InventoryReserved status and tracks reservation for future orchestration.
+    /// **Validates: Requirement 2.1 - Order tracks inventory reservation confirmation**
+    /// </summary>
+    /// <param name="message">Reservation confirmed integration message from Inventory BC.</param>
+    /// <returns>Orchestration message if payment is already captured and ready to commit.</returns>
+    public IntegrationMessages.ReservationCommitRequested? Handle(ReservationConfirmed message)
+    {
+        Status = OrderStatus.InventoryReserved;
+        IsInventoryReserved = true;
+        ReservationIds[message.ReservationId] = message.SKU;
+
+        // Orchestration: If payment is already captured, tell Inventory to commit this reservation
+        if (IsPaymentCaptured)
+        {
+            return new IntegrationMessages.ReservationCommitRequested(
+                Id,
+                message.ReservationId,
+                DateTimeOffset.UtcNow);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Saga handler for inventory reservation failure.
+    /// Transitions order to InventoryFailed status (insufficient stock).
+    /// **Validates: Requirement 2.2 - Order fails when inventory cannot be reserved**
+    /// </summary>
+    /// <param name="message">Reservation failed integration message from Inventory BC.</param>
+    public void Handle(ReservationFailed message)
+    {
+        Status = OrderStatus.InventoryFailed;
+        // TODO: Future enhancement - trigger compensation (release payment, cancel order)
+    }
+
+    /// <summary>
+    /// Saga handler for inventory commitment (hard allocation).
+    /// Transitions order to InventoryCommitted status.
+    /// **Validates: Requirement 2.3 - Order proceeds after inventory is committed**
+    /// </summary>
+    /// <param name="message">Reservation committed integration message from Inventory BC.</param>
+    public void Handle(ReservationCommitted message)
+    {
+        Status = OrderStatus.InventoryCommitted;
+        // TODO: Future enhancement - proceed to fulfillment once payment + inventory both confirmed
+    }
+
+    /// <summary>
+    /// Saga handler for inventory reservation release.
+    /// Tracks that inventory has been returned to available pool (compensation).
+    /// **Validates: Requirement 2.4 - Order tracks inventory release for compensation**
+    /// </summary>
+    /// <param name="message">Reservation released integration message from Inventory BC.</param>
+    public void Handle(ReservationReleased message)
+    {
+        // No status change - reservation release is a compensation operation.
+        // The order remains in its current failed state (PaymentFailed, InventoryFailed, Cancelled).
+        // Future enhancement: Track release timestamp or add ReleasedInventoryAt property.
+    }
 }
