@@ -48,15 +48,47 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
     - **Final Result**: All 74 tests passing (23 unit + 20 Orders integration + 20 Payments integration + 11 Orders unit)
     - **Architectural Benefit**: Proper separation of concerns; no direct cross-context project references
 
+**Cycle 2: Inventory Context (Completed - 2025-12-18)**
+- **BC Work**: Reservation-based inventory with commit/release flows, event-sourced aggregates
+    - Reservation flow: `ReserveStock` → `ReservationConfirmed`/`ReservationFailed`
+    - Commitment: `CommitReservation` → `ReservationCommitted`
+    - Release/Compensation: `ReleaseReservation` → `ReservationReleased`
+    - Event-sourced `ProductInventory` aggregate with pure functions
+    - **Status**: ✅ 16/16 integration tests passing (13 BC + 3 OrderPlaced choreography)
+    - **Files**: `/src/Inventory Management/Inventory/` and `/tests/Inventory Management/Inventory.Api.IntegrationTests/`
+    - **Key Learnings**:
+        - Choreography for initiation: Inventory reacts to `OrderPlaced` autonomously
+        - Event-sourced aggregates with `PendingEvents` pattern work well with Wolverine
+        - Grouping line items by SKU prevents duplicate reservations
+
+- **Orders Integration**: ✅ COMPLETED (2025-12-18)
+    - ✅ Choreography: `OrderPlaced` → Inventory creates reservations automatically
+    - ✅ Handler 1: `Handle(ReservationConfirmed)` - Transitions to InventoryReserved, tracks reservation IDs
+    - ✅ Handler 2: `Handle(ReservationFailed)` - Transitions to InventoryFailed
+    - ✅ Handler 3: `Handle(ReservationCommitted)` - Transitions to InventoryCommitted
+    - ✅ Handler 4: `Handle(ReservationReleased)` - Tracks compensation (no state change)
+    - ✅ Orchestration: `PaymentCaptured` → publishes `ReservationCommitRequested` when inventory reserved
+    - ✅ Compensation: `PaymentFailed` → publishes `ReservationReleaseRequested` to release inventory
+    - **Integration Test Results**: ✅ All 5 inventory integration tests passing in Orders
+    - **Key Achievement**: Orders saga orchestrates commit/release timing; Inventory reacts to initiation
+
+- **Shared Contracts Expansion**: ✅ COMPLETED (2025-12-18)
+    - ✅ Created `Messages.Contracts.Orders` namespace for `OrderPlaced`, `OrderLineItem`, `ShippingAddress`
+    - ✅ Added `Messages.Contracts.Inventory` with 4 response messages
+    - ✅ Added orchestration messages: `ReservationCommitRequested`, `ReservationReleaseRequested`
+    - **Final Result**: All 95 tests passing (11 Orders unit + 23 Payments unit + 16 Inventory integration + 20 Payments integration + 25 Orders integration)
+    - **Architectural Benefit**: Full bidirectional orchestration; Orders controls timing, Inventory executes
+
+- **Documentation**: ✅ COMPLETED (2025-12-18)
+    - ✅ Added "CONTEXTS.md as Architectural North Star" principle to CLAUDE.md
+    - ✅ Added integration flows for Orders, Payments, and Inventory to CONTEXTS.md
+    - Text-based flow diagrams document choreography vs orchestration patterns
+
 #### 🔄 In Progress
 
-None - Cycle 1 complete!
+None - Cycle 2 complete!
 
 #### 🔜 Planned
-
-**Cycle 2: Inventory Context**
-- Build reservation-based inventory management
-- Integrate with Orders saga
 
 **Cycle 3: Fulfillment Context**
 - Build shipment and tracking workflows
@@ -147,10 +179,11 @@ RabbitMQ runs in Docker via `docker-compose`:
 
 - **Messages.Contracts**: `src/Messages.Contracts/` - Shared integration messages (neutral location, no direct BC dependencies)
 - **Payments BC**: `src/Payment Processing/Payments/` (Production) + `tests/Payment Processing/Payments.Api.IntegrationTests/` (Tests)
+- **Inventory BC**: `src/Inventory Management/Inventory/` (Production) + `tests/Inventory Management/Inventory.Api.IntegrationTests/` (Tests)
 - **Orders BC**: `src/Order Management/Orders/` (Saga) + `tests/Order Management/Orders.Api.IntegrationTests/` (Tests)
 
 ---
 
-**Last Updated**: 2025-12-11  
-**Current Developer(s)**: Erik Shafer / Claude AI Assistant  
-**Development Status**: Cycle 1 Complete → Ready for Cycle 2 (Inventory Context)
+**Last Updated**: 2025-12-18
+**Current Developer(s)**: Erik Shafer / Claude AI Assistant
+**Development Status**: Cycle 2 Complete → Ready for Cycle 3 (Fulfillment Context)

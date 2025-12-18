@@ -228,7 +228,7 @@ The Inventory context owns stock levels and availability. It answers "do we have
 
 ### What it receives
 
-- `ReservationRequested` from Shopping — soft hold during checkout
+- `OrderPlaced` from Orders — triggers inventory reservation (choreography pattern)
 - `ReservationCommitRequested` from Orders — convert soft hold to committed allocation
 - `ReservationReleaseRequested` from Orders — cancellation or payment failure
 - `InventoryReceived` from warehouse/purchasing systems — replenishment
