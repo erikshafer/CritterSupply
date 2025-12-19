@@ -29,7 +29,7 @@ builder.Services.AddMarten(opts =>
         opts.AutoCreateSchemaObjects = AutoCreate.All;
         opts.UseSystemTextJsonForSerialization(EnumStorage.AsString);
 
-        opts.DatabaseSchemaName = Constants.Orders;
+        opts.DatabaseSchemaName = Constants.Orders.ToLowerInvariant();
         opts.DisableNpgsqlLogging = true;
 
         // Configure Order saga document storage

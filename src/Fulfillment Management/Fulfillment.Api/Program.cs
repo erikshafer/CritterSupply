@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
+using Fulfillment;
 using Fulfillment.Shipments;
 using JasperFx;
 using JasperFx.Core;
@@ -29,7 +30,7 @@ builder.Services.AddMarten(opts =>
         opts.AutoCreateSchemaObjects = AutoCreate.All;
         opts.UseSystemTextJsonForSerialization(EnumStorage.AsString);
 
-        opts.DatabaseSchemaName = "fulfillment";
+        opts.DatabaseSchemaName = Constants.Fulfillment.ToLowerInvariant();
         opts.DisableNpgsqlLogging = true;
 
         // Register Shipment aggregate for event sourcing

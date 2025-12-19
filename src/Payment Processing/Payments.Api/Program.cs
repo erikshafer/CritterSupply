@@ -8,6 +8,7 @@ using Marten;
 using Marten.Events.Projections;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Payments;
 using Payments.Processing;
 using Weasel.Core;
 using Wolverine;
@@ -29,7 +30,7 @@ builder.Services.AddMarten(opts =>
         opts.AutoCreateSchemaObjects = AutoCreate.All;
         opts.UseSystemTextJsonForSerialization(EnumStorage.AsString);
 
-        opts.DatabaseSchemaName = "payments";
+        opts.DatabaseSchemaName = Constants.Payments.ToLowerInvariant();
         opts.DisableNpgsqlLogging = true;
 
         // Register Payment aggregate for event sourcing
