@@ -2,6 +2,7 @@ using Messages.Contracts.Inventory;
 using Messages.Contracts.Payments;
 using Wolverine;
 using IntegrationMessages = Messages.Contracts.Orders;
+using FulfillmentMessages = Messages.Contracts.Fulfillment;
 
 namespace Orders.Placement;
 
@@ -153,6 +154,10 @@ public sealed class Order : Saga
                     reservationId,
                     DateTimeOffset.UtcNow));
             }
+
+            // Note: We don't request fulfillment here even if inventory is committed,
+            // because the commit confirmation will come async via ReservationCommitted handler,
+            // which will then trigger fulfillment. This avoids race conditions.
         }
 
         return messages;
@@ -263,14 +268,43 @@ public sealed class Order : Saga
 
     /// <summary>
     /// Saga handler for inventory commitment (hard allocation).
-    /// Transitions order to InventoryCommitted status.
+    /// Transitions order to InventoryCommitted status and proceeds to fulfillment if payment is captured.
     /// **Validates: Requirement 2.3 - Order proceeds after inventory is committed**
+    /// **Validates: Requirement 3.1 - Order cannot proceed to fulfillment without confirmed payment**
     /// </summary>
     /// <param name="message">Reservation committed integration message from Inventory BC.</param>
-    public void Handle(ReservationCommitted message)
+    /// <returns>Orchestration message to start fulfillment if both payment and inventory are confirmed.</returns>
+    public OutgoingMessages Handle(ReservationCommitted message)
     {
         Status = OrderStatus.InventoryCommitted;
-        // TODO: Future enhancement - proceed to fulfillment once payment + inventory both confirmed
+
+        var messages = new OutgoingMessages();
+
+        // Orchestration: If payment is already captured, request fulfillment
+        if (IsPaymentCaptured)
+        {
+            Status = OrderStatus.Fulfilling;
+
+            var fulfillmentRequest = new FulfillmentMessages.FulfillmentRequested(
+                Id,
+                CustomerId,
+                new FulfillmentMessages.ShippingAddress(
+                    ShippingAddress.Street,
+                    ShippingAddress.Street2,
+                    ShippingAddress.City,
+                    ShippingAddress.State,
+                    ShippingAddress.PostalCode,
+                    ShippingAddress.Country),
+                LineItems.Select(li => new FulfillmentMessages.FulfillmentLineItem(
+                    li.Sku,
+                    li.Quantity)).ToList(),
+                ShippingMethod,
+                DateTimeOffset.UtcNow);
+
+            messages.Add(fulfillmentRequest);
+        }
+
+        return messages;
     }
 
     /// <summary>
@@ -284,5 +318,43 @@ public sealed class Order : Saga
         // No status change - reservation release is a compensation operation.
         // The order remains in its current failed state (PaymentFailed, InventoryFailed, Cancelled).
         // Future enhancement: Track release timestamp or add ReleasedInventoryAt property.
+    }
+
+    /// <summary>
+    /// Saga handler for shipment dispatch from Fulfillment BC.
+    /// Transitions order to Shipped status when carrier takes possession.
+    /// **Validates: Requirement 3.2 - Order status reflects shipment progress**
+    /// </summary>
+    /// <param name="message">Shipment dispatched integration message from Fulfillment BC.</param>
+    public void Handle(FulfillmentMessages.ShipmentDispatched message)
+    {
+        Status = OrderStatus.Shipped;
+        // Future enhancement: Store tracking info (message.Carrier, message.TrackingNumber)
+    }
+
+    /// <summary>
+    /// Saga handler for successful delivery from Fulfillment BC.
+    /// Transitions order to Delivered status - terminal success state.
+    /// **Validates: Requirement 3.3 - Order completes when delivery confirmed**
+    /// </summary>
+    /// <param name="message">Shipment delivered integration message from Fulfillment BC.</param>
+    public void Handle(FulfillmentMessages.ShipmentDelivered message)
+    {
+        Status = OrderStatus.Delivered;
+        // Mark saga as complete - no further processing needed
+        MarkCompleted();
+    }
+
+    /// <summary>
+    /// Saga handler for delivery failure from Fulfillment BC.
+    /// Tracks delivery issues - may require customer service intervention.
+    /// **Validates: Requirement 3.4 - Order tracks delivery failures**
+    /// </summary>
+    /// <param name="message">Shipment delivery failed integration message from Fulfillment BC.</param>
+    public void Handle(FulfillmentMessages.ShipmentDeliveryFailed message)
+    {
+        // Status remains Shipped - delivery failure doesn't move order backwards
+        // Future enhancement: Add DeliveryFailedAt timestamp, failure reason tracking
+        // Future enhancement: Trigger customer service notification workflow
     }
 }
