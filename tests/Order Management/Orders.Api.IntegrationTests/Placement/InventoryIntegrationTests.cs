@@ -391,13 +391,14 @@ public class InventoryIntegrationTests : IAsyncLifetime
             5,
             DateTimeOffset.UtcNow));
 
-        // Assert: Verify final state
+        // Assert: Verify final state - now transitions to Fulfilling after both payment and inventory confirmed
         await using var querySession = _fixture.GetDocumentSession();
         var finalOrder = await querySession.LoadAsync<Order>(order.Id);
 
         finalOrder.ShouldNotBeNull();
-        finalOrder.Status.ShouldBe(OrderStatus.InventoryCommitted);
+        finalOrder.Status.ShouldBe(OrderStatus.Fulfilling); // Orchestration complete - ready for fulfillment
         finalOrder.TotalAmount.ShouldBe(79.95m);
-        // Future: Once orchestration is fully implemented, this would transition to Fulfilling
+        finalOrder.IsPaymentCaptured.ShouldBeTrue();
+        finalOrder.IsInventoryReserved.ShouldBeTrue();
     }
 }

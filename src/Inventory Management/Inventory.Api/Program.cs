@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
+using Inventory;
 using Inventory.Management;
 using JasperFx;
 using JasperFx.Core;
@@ -29,7 +30,7 @@ builder.Services.AddMarten(opts =>
         opts.AutoCreateSchemaObjects = AutoCreate.All;
         opts.UseSystemTextJsonForSerialization(EnumStorage.AsString);
 
-        opts.DatabaseSchemaName = "inventory";
+        opts.DatabaseSchemaName = Constants.Inventory.ToLowerInvariant();
         opts.DisableNpgsqlLogging = true;
 
         // Register ProductInventory aggregate for event sourcing

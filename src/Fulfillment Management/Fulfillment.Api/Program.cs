@@ -1,14 +1,15 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
+using Fulfillment;
+using Fulfillment.Shipments;
 using JasperFx;
 using JasperFx.Core;
 using JasperFx.Events.Daemon;
 using JasperFx.Resources;
 using Marten;
+using Marten.Events.Projections;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Orders;
-using Orders.Placement;
 using Weasel.Core;
 using Wolverine;
 using Wolverine.ErrorHandling;
@@ -29,15 +30,11 @@ builder.Services.AddMarten(opts =>
         opts.AutoCreateSchemaObjects = AutoCreate.All;
         opts.UseSystemTextJsonForSerialization(EnumStorage.AsString);
 
-        opts.DatabaseSchemaName = Constants.Orders.ToLowerInvariant();
+        opts.DatabaseSchemaName = Constants.Fulfillment.ToLowerInvariant();
         opts.DisableNpgsqlLogging = true;
 
-        // Configure Order saga document storage
-        opts.Schema.For<Order>()
-            .Identity(x => x.Id)
-            .UseNumericRevisions(true);
-
-        // projections here
+        // Register Shipment aggregate for event sourcing
+        opts.Projections.Snapshot<Shipment>(SnapshotLifecycle.Inline);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()
@@ -56,11 +53,11 @@ builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(opts =>
 
 builder.Host.UseWolverine(opts =>
 {
-    // This is almost an automatic default to have Wolverine apply transactional
-    // middleware to any endpoint or handler that uses persistence services
+    // Discover handlers from the Fulfillment assembly
+    opts.Discovery.IncludeAssembly(typeof(Fulfillment.Shipments.ShipmentStatus).Assembly);
+
     opts.Policies.AutoApplyTransactions();
     opts.Policies.UseDurableLocalQueues();
-    // Opt into the transactional inbox/outbox on all messaging endpoints
     opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
 
     opts.OnException<ConcurrencyException>()
@@ -90,7 +87,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(opts =>
     {
         opts.RoutePrefix = "api";
-        opts.SwaggerEndpoint("/api/v1/swagger.json", "Orders API");
+        opts.SwaggerEndpoint("/api/v1/swagger.json", "Fulfillment API");
     });
 }
 
