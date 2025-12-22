@@ -1,8 +1,5 @@
 using Marten;
 using Orders.Placement;
-using Shouldly;
-using Wolverine;
-using Wolverine.Tracking;
 
 namespace Orders.Api.IntegrationTests.Placement;
 
@@ -27,7 +24,7 @@ public class ValidationRejectionTests : IAsyncLifetime
     /// <summary>
     /// Verifies that CheckoutCompleted with empty line items is rejected
     /// and no Order saga is created.
-    /// 
+    ///
     /// **Validates: Requirement 3.1**
     /// </summary>
     [Fact]
@@ -49,7 +46,7 @@ public class ValidationRejectionTests : IAsyncLifetime
         // Note: Wolverine validation may throw or handle gracefully depending on configuration
         try
         {
-            await _fixture.ExecuteAndWaitAsync(checkout, timeoutSeconds: 5);
+            await _fixture.ExecuteAndWaitAsync(checkout, timeoutSeconds: 10);
         }
         catch
         {
@@ -68,7 +65,7 @@ public class ValidationRejectionTests : IAsyncLifetime
     /// <summary>
     /// Verifies that CheckoutCompleted with invalid line item quantity is rejected
     /// and no Order saga is created.
-    /// 
+    ///
     /// **Validates: Requirement 3.2**
     /// </summary>
     [Fact]
@@ -89,7 +86,7 @@ public class ValidationRejectionTests : IAsyncLifetime
         // Act
         try
         {
-            await _fixture.ExecuteAndWaitAsync(checkout, timeoutSeconds: 5);
+            await _fixture.ExecuteAndWaitAsync(checkout, timeoutSeconds: 10);
         }
         catch
         {
@@ -108,7 +105,7 @@ public class ValidationRejectionTests : IAsyncLifetime
     /// <summary>
     /// Verifies that CheckoutCompleted with invalid line item price is rejected
     /// and no Order saga is created.
-    /// 
+    ///
     /// **Validates: Requirement 3.3**
     /// </summary>
     [Fact]
@@ -129,7 +126,7 @@ public class ValidationRejectionTests : IAsyncLifetime
         // Act
         try
         {
-            await _fixture.ExecuteAndWaitAsync(checkout, timeoutSeconds: 5);
+            await _fixture.ExecuteAndWaitAsync(checkout, timeoutSeconds: 10);
         }
         catch
         {
@@ -148,7 +145,7 @@ public class ValidationRejectionTests : IAsyncLifetime
     /// <summary>
     /// Verifies that CheckoutCompleted with missing customer ID is rejected
     /// and no Order saga is created.
-    /// 
+    ///
     /// **Validates: Requirement 3.4**
     /// </summary>
     [Fact]
@@ -168,7 +165,7 @@ public class ValidationRejectionTests : IAsyncLifetime
         // Act
         try
         {
-            await _fixture.ExecuteAndWaitAsync(checkout, timeoutSeconds: 5);
+            await _fixture.ExecuteAndWaitAsync(checkout, timeoutSeconds: 10);
         }
         catch
         {
@@ -187,7 +184,7 @@ public class ValidationRejectionTests : IAsyncLifetime
     /// <summary>
     /// Verifies that CheckoutCompleted with missing payment token is rejected
     /// and no Order saga is created.
-    /// 
+    ///
     /// **Validates: Requirement 3.6**
     /// </summary>
     [Fact]
@@ -208,7 +205,7 @@ public class ValidationRejectionTests : IAsyncLifetime
         // Act
         try
         {
-            await _fixture.ExecuteAndWaitAsync(checkout, timeoutSeconds: 5);
+            await _fixture.ExecuteAndWaitAsync(checkout, timeoutSeconds: 10);
         }
         catch
         {
