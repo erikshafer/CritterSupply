@@ -34,13 +34,14 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         var customerId = Guid.NewGuid();
         var cartId = Guid.NewGuid();
         var checkout = new CheckoutCompleted(
-            cartId,
+            Guid.CreateVersion7(), // OrderId
+            Guid.CreateVersion7(), // CheckoutId
             customerId,
             [new CheckoutLineItem("SKU-FUL-001", 2, 15.99m)],
             new OrdersShippingAddress("123 Main St", null, "Seattle", "WA", "98101", "USA"),
             "Standard",
+            5.99m, // ShippingCost
             "tok_visa",
-            null,
             DateTimeOffset.UtcNow);
 
         await _fixture.ExecuteAndWaitAsync(checkout);
@@ -86,6 +87,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         var fulfillingOrder = await session.LoadAsync<Order>(order.Id);
         fulfillingOrder.ShouldNotBeNull();
         fulfillingOrder.Status.ShouldBe(OrderStatus.Fulfilling);
+        fulfillingOrder.TotalAmount.ShouldBe(37.97m); // 31.98 + 5.99 shipping
         fulfillingOrder.IsPaymentCaptured.ShouldBeTrue();
         fulfillingOrder.IsInventoryReserved.ShouldBeTrue();
     }
@@ -100,13 +102,14 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         var customerId = Guid.NewGuid();
         var cartId = Guid.NewGuid();
         var checkout = new CheckoutCompleted(
-            cartId,
+            Guid.CreateVersion7(), // OrderId
+            Guid.CreateVersion7(), // CheckoutId
             customerId,
             [new CheckoutLineItem("SKU-FUL-002", 1, 24.99m)],
             new OrdersShippingAddress("456 Elm St", null, "Portland", "OR", "97201", "USA"),
             "Express",
+            5.99m, // ShippingCost
             "tok_visa",
-            null,
             DateTimeOffset.UtcNow);
 
         await _fixture.ExecuteAndWaitAsync(checkout);
@@ -141,6 +144,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         await using var session = _fixture.GetDocumentSession();
         var shippedOrder = await session.LoadAsync<Order>(order.Id);
         shippedOrder.Status.ShouldBe(OrderStatus.Shipped);
+        shippedOrder.TotalAmount.ShouldBe(30.98m); // 24.99 + 5.99 shipping
     }
 
     /// <summary>
@@ -153,13 +157,14 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         var customerId = Guid.NewGuid();
         var cartId = Guid.NewGuid();
         var checkout = new CheckoutCompleted(
-            cartId,
+            Guid.CreateVersion7(), // OrderId
+            Guid.CreateVersion7(), // CheckoutId
             customerId,
             [new CheckoutLineItem("SKU-FUL-003", 3, 9.99m)],
             new OrdersShippingAddress("789 Oak Ave", null, "Denver", "CO", "80202", "USA"),
             "Standard",
+            5.99m, // ShippingCost
             "tok_visa",
-            null,
             DateTimeOffset.UtcNow);
 
         await _fixture.ExecuteAndWaitAsync(checkout);
@@ -207,6 +212,8 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         await using var session = _fixture.GetDocumentSession();
         var deliveredOrder = await session.LoadAsync<Order>(order.Id);
         deliveredOrder.ShouldBeNull(); // Saga is deleted after MarkCompleted() is called
+
+        // Note: TotalAmount would have been 35.96m (29.97 + 5.99 shipping) if saga still existed
     }
 
     /// <summary>
@@ -220,13 +227,14 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         var customerId = Guid.NewGuid();
         var cartId = Guid.NewGuid();
         var checkout = new CheckoutCompleted(
-            cartId,
+            Guid.CreateVersion7(), // OrderId
+            Guid.CreateVersion7(), // CheckoutId
             customerId,
             [new CheckoutLineItem("SKU-FUL-004", 1, 49.99m)],
             new OrdersShippingAddress("321 Pine St", "Apt 5B", "Austin", "TX", "78701", "USA"),
             "Express",
+            5.99m, // ShippingCost
             "tok_visa",
-            null,
             DateTimeOffset.UtcNow);
 
         await _fixture.ExecuteAndWaitAsync(checkout);
@@ -263,6 +271,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         await using var session = _fixture.GetDocumentSession();
         var shippedOrder = await session.LoadAsync<Order>(order.Id);
         shippedOrder.Status.ShouldBe(OrderStatus.Shipped);
+        shippedOrder.TotalAmount.ShouldBe(55.98m); // 49.99 + 5.99 shipping
 
         // Future enhancement: Verify delivery failure metadata is tracked
     }

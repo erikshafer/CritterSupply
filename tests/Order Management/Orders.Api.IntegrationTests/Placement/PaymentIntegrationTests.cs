@@ -44,13 +44,14 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "US");
 
         var checkoutCommand = new CheckoutCompleted(
-            Guid.NewGuid(), // CartId
+            Guid.CreateVersion7(), // OrderId
+            Guid.CreateVersion7(), // CheckoutId
             customerId,
             lineItems,
             shippingAddress,
             "Standard",
+            5.99m, // ShippingCost
             "tok_test_payment",
-            null, // AppliedDiscounts
             DateTimeOffset.UtcNow);
 
         await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 10);
@@ -80,7 +81,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
         updatedOrder.ShouldNotBeNull();
         updatedOrder.Status.ShouldBe(OrderStatus.PaymentConfirmed);
         updatedOrder.CustomerId.ShouldBe(customerId);
-        updatedOrder.TotalAmount.ShouldBe(39.98m);
+        updatedOrder.TotalAmount.ShouldBe(45.97m); // 39.98 + 5.99 shipping
     }
 
     /// <summary>
@@ -106,13 +107,14 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "US");
 
         var checkoutCommand = new CheckoutCompleted(
-            Guid.NewGuid(), // CartId
+            Guid.CreateVersion7(), // OrderId
+            Guid.CreateVersion7(), // CheckoutId
             customerId,
             lineItems,
             shippingAddress,
             "Express",
+            5.99m, // ShippingCost
             "tok_test_payment",
-            null, // AppliedDiscounts
             DateTimeOffset.UtcNow);
 
         await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 20);
@@ -142,7 +144,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
         updatedOrder.ShouldNotBeNull();
         updatedOrder.Status.ShouldBe(OrderStatus.PaymentFailed);
         updatedOrder.CustomerId.ShouldBe(customerId);
-        updatedOrder.TotalAmount.ShouldBe(49.99m);
+        updatedOrder.TotalAmount.ShouldBe(55.98m); // 49.99 + 5.99 shipping
     }
 
     /// <summary>
@@ -168,13 +170,14 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "US");
 
         var checkoutCommand = new CheckoutCompleted(
-            Guid.NewGuid(), // CartId
+            Guid.CreateVersion7(), // OrderId
+            Guid.CreateVersion7(), // CheckoutId
             customerId,
             lineItems,
             shippingAddress,
             "Standard",
+            5.99m, // ShippingCost
             "tok_test_payment",
-            null, // AppliedDiscounts
             DateTimeOffset.UtcNow);
 
         await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 10);
@@ -205,7 +208,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
         updatedOrder.ShouldNotBeNull();
         updatedOrder.Status.ShouldBe(OrderStatus.PendingPayment);
         updatedOrder.CustomerId.ShouldBe(customerId);
-        updatedOrder.TotalAmount.ShouldBe(89.97m);
+        updatedOrder.TotalAmount.ShouldBe(95.96m); // (3*29.99) + 5.99 shipping
     }
 
     /// <summary>
@@ -232,13 +235,14 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "US");
 
         var checkoutCommand = new CheckoutCompleted(
-            Guid.NewGuid(), // CartId
+            Guid.CreateVersion7(), // OrderId
+            Guid.CreateVersion7(), // CheckoutId
             customerId,
             lineItems,
             shippingAddress,
             "Express",
+            5.99m, // ShippingCost
             "tok_test_payment",
-            null, // AppliedDiscounts
             DateTimeOffset.UtcNow);
 
         await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 10);
@@ -283,7 +287,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
         updatedOrder.ShouldNotBeNull();
         updatedOrder.Status.ShouldBe(OrderStatus.PaymentConfirmed);
         updatedOrder.CustomerId.ShouldBe(customerId);
-        updatedOrder.TotalAmount.ShouldBe(99.99m);
+        updatedOrder.TotalAmount.ShouldBe(105.98m); // 99.99 + 5.99 shipping
     }
 
     /// <summary>
@@ -310,13 +314,14 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "US");
 
         var checkoutCommand = new CheckoutCompleted(
-            Guid.NewGuid(), // CartId
+            Guid.CreateVersion7(), // OrderId
+            Guid.CreateVersion7(), // CheckoutId
             customerId,
             lineItems,
             shippingAddress,
             "Standard",
+            5.99m, // ShippingCost
             "tok_test_payment",
-            null, // AppliedDiscounts
             DateTimeOffset.UtcNow);
 
         await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 10);
@@ -360,6 +365,6 @@ public class PaymentIntegrationTests : IAsyncLifetime
         updatedOrder.ShouldNotBeNull();
         updatedOrder.Status.ShouldBe(OrderStatus.PaymentConfirmed);
         updatedOrder.CustomerId.ShouldBe(customerId);
-        updatedOrder.TotalAmount.ShouldBe(49.98m);
+        updatedOrder.TotalAmount.ShouldBe(55.97m); // 49.98 + 5.99 shipping
     }
 }

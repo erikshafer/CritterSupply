@@ -36,7 +36,7 @@ public class OrderSagaPersistencePropertyTests : IAsyncLifetime
     public async Task Saga_Is_Persisted_And_Retrievable_By_Id(CheckoutCompleted checkout)
     {
         // Arrange: Create saga from valid checkout
-        var (saga, _) = Order.Start(checkout);
+        var (saga, _) = CheckoutCompletedHandler.Handle(checkout);
 
         // Act: Persist the saga
         await using var session = _fixture.GetDocumentSession();
@@ -106,15 +106,17 @@ public static class ValidCheckoutCompletedArbitrary
                     .SelectMany(lineItems => shippingAddressGen
                         .SelectMany(shippingAddress => Gen.Elements("Standard", "Express", "Overnight")
                             .SelectMany(shippingMethod => Gen.Elements("tok_visa", "tok_mastercard", "tok_amex")
-                                .Select(paymentToken => new Orders.Placement.CheckoutCompleted(
-                                    cartId,
-                                    customerId,
-                                    lineItems,
-                                    shippingAddress,
-                                    shippingMethod,
-                                    paymentToken,
-                                    null,
-                                    DateTimeOffset.UtcNow)))))));
+                                .SelectMany(paymentToken => Gen.Choose(500, 2500)
+                                    .Select(shippingCost => new Orders.Placement.CheckoutCompleted(
+                                        Guid.CreateVersion7(), // OrderId
+                                        Guid.CreateVersion7(), // CheckoutId
+                                        customerId,
+                                        lineItems,
+                                        shippingAddress,
+                                        shippingMethod,
+                                        (decimal)shippingCost / 100, // ShippingCost in dollars
+                                        paymentToken,
+                                        DateTimeOffset.UtcNow))))))));
 
         return checkoutGen.ToArbitrary();
     }

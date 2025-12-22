@@ -39,7 +39,7 @@ public class OrderQueryPropertyTests : IAsyncLifetime
     public async Task Order_Query_Returns_Existing_Orders(CheckoutCompleted checkout)
     {
         // Arrange: Create and persist saga from valid checkout
-        var (saga, _) = Order.Start(checkout);
+        var (saga, _) = CheckoutCompletedHandler.Handle(checkout);
 
         await using var session = _fixture.GetDocumentSession();
         session.Store(saga);
