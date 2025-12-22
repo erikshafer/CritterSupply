@@ -4,26 +4,54 @@ This document defines the bounded contexts within CritterSupply, an e-commerce r
 
 ## Shopping
 
-The Shopping context owns the customer's pre-purchase experience—building a cart and converting it to a confirmed order request.
+The Shopping context owns the customer's pre-purchase experience—building a cart and converting it to a confirmed order request. Composed of two distinct aggregates: **Cart** (item management) and **Checkout** (order finalization).
 
-### Modules
+### Aggregates
 
-**Cart:**
+**Cart Aggregate:**
 
-- Adding/removing items
-- Updating quantities
-- Applying promo codes or coupons
-- Persisting cart state (anonymous or authenticated)
-- Validating item availability (queries Inventory, but doesn't reserve yet)
-- Pulling current prices (queries Pricing/Catalog)
+The Cart aggregate manages the customer's shopping session from initialization through checkout handoff. Each cart is an event-sourced stream tracking all item modifications.
 
-**Checkout:**
+**Lifecycle Events (Phase 1):**
+- `CartInitialized` — cart created (captures CustomerId or SessionId for anonymous, timestamp)
+- `ItemAdded` — item added to cart (SKU, quantity, unit price at add time)
+- `ItemRemoved` — item removed from cart
+- `ItemQuantityChanged` — item quantity updated (old/new quantity)
+- `CartCleared` — all items removed (explicit user action, optional reason)
+- `CartAbandoned` — cart expired (anonymous only, system timeout for cleanup/analytics)
+- `CheckoutInitiated` — **terminal event**, handoff to Checkout aggregate
 
-- Collecting shipping address
-- Selecting shipping method
-- Collecting or selecting payment method
-- Final price calculation (subtotal, tax, shipping, discounts)
-- Submitting the order
+**Future Events (Phase 2+):**
+- `CouponApplied` / `CouponRemoved` — requires Promotions BC
+- `PriceRefreshed` — handles price drift during long sessions, requires Catalog BC
+- `PromotionApplied` / `PromotionRemoved` — auto-applied promotions, requires Promotions BC
+- `CartAssignedToCustomer` — anonymous cart merged after login, requires Customers BC
+- `ShippingEstimateRequested` — zip/postal for shipping preview (may belong in Checkout)
+
+**Checkout Aggregate:**
+
+The Checkout aggregate owns the final steps of order submission—collecting shipping, payment, and completing the transaction. Created when the Cart aggregate emits `CheckoutInitiated`.
+
+**Lifecycle Events:**
+- `CheckoutStarted` — checkout stream begins (contains snapshot of cart items from checkout initiation)
+- `ShippingAddressProvided` — shipping address collected
+- `ShippingMethodSelected` — shipping method chosen
+- `PaymentMethodProvided` — payment method token collected
+- `CheckoutCompleted` — **terminal event**, publishes `CheckoutCompleted` integration message to Orders
+
+**Cart → Checkout Handoff:**
+
+The Cart aggregate's lifecycle ends with `CheckoutInitiated`, which triggers creation of a new Checkout aggregate stream. The Checkout stream begins with `CheckoutStarted` and contains a snapshot of cart items at checkout initiation time. This ensures **price-at-checkout immutability**—even if cart prices change, the checkout reflects the state when the user clicked "Proceed to Checkout."
+
+```
+Cart Stream (terminal states):
+  CartInitialized → ... → CheckoutInitiated (happy path)
+                        → CartAbandoned (timeout, anonymous only)
+                        → CartCleared (explicit user action)
+
+Checkout Stream:
+  CheckoutStarted → ... → CheckoutCompleted (terminal)
+```
 
 ### What it receives
 
@@ -35,10 +63,19 @@ None from other bounded contexts. Shopping initiates the flow based on customer 
 
 ### Core invariants
 
+**Cart Invariants:**
 - A cart cannot contain items with zero or negative quantity
-- A cart cannot proceed to checkout with unavailable items (must validate against Inventory)
+- A cart cannot transition to checkout if empty
+- Unit prices captured at ItemAdded time (allows price drift detection)
+- Anonymous carts expire after defined TTL (CartAbandoned event)
+- Authenticated customer carts persist indefinitely (no abandonment)
+
+**Checkout Invariants:**
+- Checkout cannot start from an empty cart
+- Checkout cannot complete without valid shipping address
+- Checkout cannot complete without payment method reference
 - Price-at-checkout must be captured at submission time (protects against price changes mid-checkout)
-- A checkout cannot complete without a valid shipping address and payment method reference
+- Checkout items are immutable snapshot from cart at CheckoutInitiated time
 
 ### What it doesn't own
 
@@ -46,6 +83,61 @@ None from other bounded contexts. Shopping initiates the flow based on customer 
 - Payment processing
 - Order lifecycle management
 - Product catalog or pricing rules (queries Catalog/Pricing)
+
+### Integration Flows
+
+**Cart Lifecycle:**
+```
+InitializeCart (command)
+  └─> InitializeCartHandler
+      └─> CartInitialized
+
+AddItemToCart (command)
+  └─> AddItemToCartHandler
+      └─> ItemAdded
+
+RemoveItemFromCart (command)
+  └─> RemoveItemFromCartHandler
+      └─> ItemRemoved
+
+ChangeItemQuantity (command)
+  └─> ChangeItemQuantityHandler
+      └─> ItemQuantityChanged
+
+ClearCart (command)
+  └─> ClearCartHandler
+      └─> CartCleared (terminal)
+
+[System timeout for anonymous carts]
+  └─> CartAbandoned (terminal)
+
+InitiateCheckout (command)
+  └─> InitiateCheckoutHandler
+      ├─> CheckoutInitiated (terminal, appended to Cart stream)
+      └─> Start new Checkout stream with CheckoutStarted
+```
+
+**Checkout Lifecycle:**
+```
+CheckoutStarted (stream begins, contains cart snapshot)
+
+ProvideShippingAddress (command)
+  └─> ProvideShippingAddressHandler
+      └─> ShippingAddressProvided
+
+SelectShippingMethod (command)
+  └─> SelectShippingMethodHandler
+      └─> ShippingMethodSelected
+
+ProvidePaymentMethod (command)
+  └─> ProvidePaymentMethodHandler
+      └─> PaymentMethodProvided
+
+CompleteCheckout (command)
+  └─> CompleteCheckoutHandler
+      ├─> CheckoutCompleted (terminal)
+      └─> Publish CheckoutCompleted → Orders (triggers saga)
+```
 
 ---
 
