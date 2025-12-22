@@ -375,6 +375,65 @@ public class Payment : Aggregate
 }
 ```
 
+#### Use Status Enums for Aggregate State
+
+Prefer using an expressive `Status` enum property to represent aggregate lifecycle state instead of multiple boolean flags. While not a hard rule, this pattern proves necessary sooner rather than later as handlers and business logic need to evaluate aggregate state.
+
+**Benefits of Status Enums:**
+
+1. **Single Source of Truth**: One `Status` property eliminates possibility of invalid state combinations (e.g., both `IsCompleted` and `IsCancelled` being true)
+2. **Explicit State Machine**: The enum makes the aggregate lifecycle self-documenting and easier to reason about
+3. **Better Expressiveness**: `Status == CartStatus.CheckedOut` is more readable than `CheckoutInitiated == true`
+4. **Extensibility**: Adding new states doesn't require new boolean properties
+5. **Consistency**: Aligns aggregates across the system with a common pattern
+
+```csharp
+// Good - Using Status enum
+public sealed record Cart(
+    Guid Id,
+    Guid? CustomerId,
+    Dictionary<string, CartLineItem> Items,
+    CartStatus Status)  // Single enum property
+{
+    public bool IsTerminal => Status != CartStatus.Active;
+
+    public Cart Apply(CartCleared @event) =>
+        this with { Status = CartStatus.Cleared };
+
+    public Cart Apply(CheckoutInitiated @event) =>
+        this with { Status = CartStatus.CheckedOut };
+}
+
+public enum CartStatus
+{
+    Active,      // Cart can be modified
+    Abandoned,   // Terminal state
+    Cleared,     // Terminal state
+    CheckedOut   // Terminal state
+}
+```
+
+```csharp
+// Bad - Using multiple boolean flags
+public sealed record Cart(
+    Guid Id,
+    Guid? CustomerId,
+    Dictionary<string, CartLineItem> Items,
+    bool IsAbandoned,        // Multiple booleans create ambiguity
+    bool IsCleared,          // What if multiple are true?
+    bool CheckoutInitiated)  // Unclear state machine
+{
+    public bool IsTerminal => IsAbandoned || IsCleared || CheckoutInitiated;
+}
+```
+
+**When to Use Status Enums:**
+
+- Aggregates with lifecycle states (Orders, Payments, Shipments, Carts, etc.)
+- Any entity where handlers need to check "what state is this in?"
+- When state transitions need to be explicit and validated
+- When terminal states need to be identified
+
 #### Recommended Reading
 
 - Wolverine Aggregate Handlers and Event Sourcing documentation: https://wolverinefx.net/guide/durability/marten/event-sourcing.html#aggregate-handlers-and-event-sourcing
