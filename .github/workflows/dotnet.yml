@@ -7,12 +7,14 @@ on:
       - "README.md"
       - "CLAUDE.md"
       - "CONTEXTS.md"
+      - "DEVPROGRESS.md"
   pull_request:
     branches: [ "main"]
     paths-ignore:
       - "README.md"
       - "CLAUDE.md"
       - "CONTEXTS.md"
+      - "DEVPROGRESS.md"
 
 jobs:
   build:
