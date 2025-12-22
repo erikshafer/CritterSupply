@@ -110,6 +110,107 @@ Inside our projects, we want to avoid creating folders (directories) based on te
 
 If there is a folder based on a technical feature, treat it as temporary and that its contents will be moved to a better-fitting namespace soon.
 
+#### File Organization for Commands, Queries, and Handlers
+
+In CQRS + Event Sourcing systems, commands and queries have a **1:1 relationship** with their handlers by design. To improve code comprehension and reduce cognitive load, **colocate commands/queries with their handlers in the same file**.
+
+##### Commands and Command Handlers
+
+Commands and their handlers should be in the same file. This creates a single location for understanding a complete vertical slice/workflow.
+
+```csharp
+// File: AddItemToCart.cs
+using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
+using Wolverine;
+using Wolverine.Http;
+using Wolverine.Marten;
+
+namespace Shopping.Cart;
+
+// Command definition
+public sealed record AddItemToCart(
+    Guid CartId,
+    string Sku,
+    int Quantity,
+    decimal UnitPrice)
+{
+    public class AddItemToCartValidator : AbstractValidator<AddItemToCart>
+    {
+        public AddItemToCartValidator()
+        {
+            RuleFor(x => x.CartId).NotEmpty();
+            RuleFor(x => x.Sku).NotEmpty().MaximumLength(50);
+            RuleFor(x => x.Quantity).GreaterThan(0);
+            RuleFor(x => x.UnitPrice).GreaterThanOrEqualTo(0);
+        }
+    }
+}
+
+// Handler for the command above
+public static class AddItemToCartHandler
+{
+    public static ProblemDetails Before(
+        AddItemToCart command,
+        Cart? cart)
+    {
+        if (cart is null)
+            return new ProblemDetails { Detail = "Cart not found", Status = 404 };
+
+        if (cart.IsTerminal)
+            return new ProblemDetails
+            {
+                Detail = "Cannot modify a cart that has been abandoned, cleared, or checked out",
+                Status = 400
+            };
+
+        return WolverineContinue.NoProblems;
+    }
+
+    [WolverinePost("/api/carts/{cartId}/items")]
+    public static ItemAdded Handle(
+        AddItemToCart command,
+        [WriteAggregate] Cart cart)
+    {
+        return new ItemAdded(
+            command.Sku,
+            command.Quantity,
+            command.UnitPrice,
+            DateTimeOffset.UtcNow);
+    }
+}
+```
+
+##### Events
+
+Events should remain in separate files **unless** they have associated handlers (such as Marten event subscriptions). If an event has a subscription handler, include it in the same file as the event.
+
+```csharp
+// File: ItemAdded.cs - Event only, no handler
+namespace Shopping.Cart;
+
+public sealed record ItemAdded(
+    string Sku,
+    int Quantity,
+    decimal UnitPrice,
+    DateTimeOffset AddedAt);
+```
+
+##### Benefits of This Approach
+
+1. **Single Location for Comprehension**: Developers can see the complete workflow (command → validation → preconditions → business logic → result) without hunting through multiple files
+2. **Tight Coupling Made Explicit**: Commands and handlers are tightly coupled by design (1:1 relationship), so colocating them makes this coupling obvious and intentional
+3. **Reduced File Hopping**: No need to navigate between `AddItemToCart.cs` and `AddItemToCartHandler.cs` to understand the complete picture
+4. **Onboarding Efficiency**: New developers can quickly understand "what happens" when a command is issued
+
+##### File Naming Convention
+
+- **Commands**: `{CommandName}.cs` (e.g., `AddItemToCart.cs`)
+- **Queries**: `{QueryName}.cs` (e.g., `GetCartById.cs`)
+- **Events**: `{EventName}.cs` (e.g., `ItemAdded.cs`)
+
+The handler class name follows the convention `{MessageName}Handler` (e.g., `AddItemToCartHandler`, `GetCartByIdHandler`).
+
 ### C# Language Features
 
 #### Records and Immutability
