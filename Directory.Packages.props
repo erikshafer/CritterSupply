@@ -5,6 +5,7 @@
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.1.0" />
+    <PackageVersion Include="Marten" Version="8.16.4" />
     <PackageVersion Include="WolverineFx.Http.FluentValidation" Version="5.9.1" />
     <PackageVersion Include="WolverineFx.Http.Marten" Version="5.9.1" />
     <PackageVersion Include="WolverineFx.RabbitMQ" Version="5.9.1" />

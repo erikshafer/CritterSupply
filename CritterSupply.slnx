@@ -37,6 +37,11 @@
     <Project Path="tests/Inventory Management/Inventory.Api.IntegrationTests/Inventory.Api.IntegrationTests.csproj" />
     <Project Path="tests/Inventory Management/Inventory.UnitTests/Inventory.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/Shopping Management/">
+    <Project Path="src/Shopping Management/Shopping.Api/Shopping.Api.csproj" />
+    <Project Path="src/Shopping Management/Shopping/Shopping.csproj" />
+    <Project Path="tests/Shopping Management/Shopping.Api.IntegrationTests/Shopping.Api.IntegrationTests.csproj" />
+  </Folder>
   <Folder Name="/Shared/">
     <Project Path="src/Shared/Messages.Contracts/Messages.Contracts.csproj" />
   </Folder>

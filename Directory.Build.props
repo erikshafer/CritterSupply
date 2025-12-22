@@ -21,5 +21,10 @@
     </PropertyGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="$(AssemblyName).IntegrationTests" />
+        <InternalsVisibleTo Include="$(AssemblyName).Api.IntegrationTests" />
+        <InternalsVisibleTo Include="$(AssemblyName).UnitTests" />
     </ItemGroup>
+    <PropertyGroup>
+        <NoWarn>$(NoWarn);NU1507</NoWarn>
+    </PropertyGroup>
 </Project>

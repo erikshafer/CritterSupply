@@ -53,7 +53,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             null, // AppliedDiscounts
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand);
+        await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 10);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -71,7 +71,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "txn_12345",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(paymentCaptured);
+        await _fixture.ExecuteAndWaitAsync(paymentCaptured, timeoutSeconds: 10);
 
         // Assert: Verify order transitioned to PaymentConfirmed
         await using var querySession = _fixture.GetDocumentSession();
@@ -115,7 +115,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             null, // AppliedDiscounts
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand);
+        await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 20);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -133,7 +133,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             false,
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(paymentFailed);
+        await _fixture.ExecuteAndWaitAsync(paymentFailed, timeoutSeconds: 20);
 
         // Assert: Verify order transitioned to PaymentFailed
         await using var querySession = _fixture.GetDocumentSession();
@@ -177,7 +177,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             null, // AppliedDiscounts
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand);
+        await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 10);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -196,7 +196,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow.AddDays(7));
 
-        await _fixture.ExecuteAndWaitAsync(paymentAuthorized);
+        await _fixture.ExecuteAndWaitAsync(paymentAuthorized, timeoutSeconds: 10);
 
         // Assert: Verify order transitioned to PendingPayment
         await using var querySession = _fixture.GetDocumentSession();
@@ -241,7 +241,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             null, // AppliedDiscounts
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand);
+        await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 10);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -259,7 +259,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "txn_67890",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(paymentCaptured);
+        await _fixture.ExecuteAndWaitAsync(paymentCaptured, timeoutSeconds: 10);
 
         // Verify payment confirmed
         await using var confirmedSession = _fixture.GetDocumentSession();
@@ -274,7 +274,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "ref_12345",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(refundCompleted);
+        await _fixture.ExecuteAndWaitAsync(refundCompleted, timeoutSeconds: 10);
 
         // Assert: Verify order status remains PaymentConfirmed (refunds don't change fulfillment status)
         await using var querySession = _fixture.GetDocumentSession();
@@ -319,7 +319,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             null, // AppliedDiscounts
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand);
+        await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 10);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -337,7 +337,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "txn_99999",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(paymentCaptured);
+        await _fixture.ExecuteAndWaitAsync(paymentCaptured, timeoutSeconds: 10);
 
         // Verify payment confirmed
         await using var confirmedSession = _fixture.GetDocumentSession();
