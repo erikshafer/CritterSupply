@@ -112,9 +112,36 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
     - **Final Result**: All 105 tests passing (11 Orders unit + 23 Payments unit + 6 Fulfillment integration + 16 Inventory integration + 29 Orders integration + 20 Payments integration)
     - **Architectural Benefit**: Complete order-to-delivery orchestration with proper saga lifecycle
 
+**Cycle 4: Shopping Context (Completed - 2025-12-22)**
+- **BC Work**: Cart and Checkout aggregates with event-sourced lifecycle management
+    - Cart flow: `CartInitialized` → `ItemAdded`/`ItemRemoved`/`ItemQuantityChanged` → `CheckoutInitiated` (terminal)
+    - Checkout flow: `CheckoutStarted` → `ShippingAddressProvided` → `ShippingMethodSelected` → `PaymentMethodProvided` → `CheckoutCompleted` (terminal)
+    - Single terminal event pattern for Cart → Checkout handoff
+    - Event-sourced aggregates using modern Critter Stack idiom (pure write models with `[WriteAggregate]`)
+    - **Status**: ✅ 15/15 integration tests passing (9 Cart + 6 Checkout)
+    - **Files**: `/src/Shopping Management/Shopping/` and `/tests/Shopping Management/Shopping.Api.IntegrationTests/`
+    - **Key Learnings**:
+        - Commands and handlers colocated in same file (1:1 relationship made explicit)
+        - `Status` enum preferred over boolean flags for aggregate state (single source of truth)
+        - Pure function handlers with `Before()` for validation, `Handle()` for business logic
+        - Modern Wolverine idiom: `[WriteAggregate]` instead of manual `IDocumentSession` usage
+        - Integration tests verify aggregate state only, not outgoing messages (external transports disabled)
+
+- **Shared Contracts Expansion**: ✅ COMPLETED (2025-12-22)
+    - ✅ Created `Messages.Contracts.Shopping` namespace
+    - ✅ Added integration message: `CheckoutCompleted` (published to Orders saga)
+    - ✅ Added shared value objects: `CheckoutLineItem`, `ShippingAddress`
+    - **Final Result**: All 120 tests passing (15 Shopping integration + previous 105)
+    - **Architectural Benefit**: Shopping initiates Orders saga via `CheckoutCompleted` message
+
+- **Documentation Updates**: ✅ COMPLETED (2025-12-22)
+    - ✅ Added "File Organization for Commands, Queries, and Handlers" section to CLAUDE.md
+    - ✅ Added "Use Status Enums for Aggregate State" section to CLAUDE.md
+    - ✅ Shopping BC already documented in CONTEXTS.md with Cart/Checkout specifications
+
 #### 🔄 In Progress
 
-None - Cycle 3 complete!
+None - Cycle 4 complete!
 
 #### 🔜 Planned
 
@@ -207,6 +234,7 @@ RabbitMQ runs in Docker via `docker-compose`:
 ## File Structure Reference
 
 - **Messages.Contracts**: `src/Shared/Messages.Contracts/` - Shared integration messages (neutral location, no direct BC dependencies)
+- **Shopping BC**: `src/Shopping Management/Shopping/` (Production) + `tests/Shopping Management/Shopping.Api.IntegrationTests/` (Tests)
 - **Payments BC**: `src/Payment Processing/Payments/` (Production) + `tests/Payment Processing/Payments.Api.IntegrationTests/` (Tests)
 - **Inventory BC**: `src/Inventory Management/Inventory/` (Production) + `tests/Inventory Management/Inventory.Api.IntegrationTests/` (Tests)
 - **Fulfillment BC**: `src/Fulfillment Management/Fulfillment/` (Production) + `tests/Fulfillment Management/Fulfillment.Api.IntegrationTests/` (Tests)
@@ -214,6 +242,6 @@ RabbitMQ runs in Docker via `docker-compose`:
 
 ---
 
-**Last Updated**: 2025-12-18
+**Last Updated**: 2025-12-22
 **Current Developer(s)**: Erik Shafer / Claude AI Assistant
-**Development Status**: Cycle 3 Complete → All Core BCs Integrated (Payments, Inventory, Fulfillment)
+**Development Status**: Cycle 4 Complete → Shopping BC Implemented (Cart + Checkout)
