@@ -8,11 +8,9 @@ public sealed record Cart(
     string? SessionId,
     DateTimeOffset InitializedAt,
     Dictionary<string, CartLineItem> Items,
-    bool IsAbandoned,
-    bool IsCleared,
-    bool CheckoutInitiated)
+    CartStatus Status)
 {
-    public bool IsTerminal => IsAbandoned || IsCleared || CheckoutInitiated;
+    public bool IsTerminal => Status != CartStatus.Active;
 
     public static Cart Create(IEvent<CartInitialized> @event) =>
         new(@event.StreamId,
@@ -20,9 +18,7 @@ public sealed record Cart(
             @event.Data.SessionId,
             @event.Data.InitializedAt,
             new Dictionary<string, CartLineItem>(),
-            false,
-            false,
-            false);
+            CartStatus.Active);
 
     public Cart Apply(ItemAdded @event)
     {
@@ -67,12 +63,12 @@ public sealed record Cart(
         this with
         {
             Items = new Dictionary<string, CartLineItem>(),
-            IsCleared = true
+            Status = CartStatus.Cleared
         };
 
     public Cart Apply(CartAbandoned @event) =>
-        this with { IsAbandoned = true };
+        this with { Status = CartStatus.Abandoned };
 
     public Cart Apply(CheckoutInitiated @event) =>
-        this with { CheckoutInitiated = true };
+        this with { Status = CartStatus.CheckedOut };
 }

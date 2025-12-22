@@ -35,9 +35,7 @@ public class CartLifecycleTests : IAsyncLifetime
         cart.CustomerId.ShouldBe(customerId);
         cart.SessionId.ShouldBeNull();
         cart.Items.ShouldBeEmpty();
-        cart.IsAbandoned.ShouldBeFalse();
-        cart.IsCleared.ShouldBeFalse();
-        cart.CheckoutInitiated.ShouldBeFalse();
+        cart.Status.ShouldBe(CartStatus.Active);
     }
 
     [Fact]
@@ -178,7 +176,7 @@ public class CartLifecycleTests : IAsyncLifetime
         var updatedCart = await session.Events.AggregateStreamAsync<Shopping.Cart.Cart>(cart.Id);
         updatedCart.ShouldNotBeNull();
         updatedCart.Items.ShouldBeEmpty();
-        updatedCart.IsCleared.ShouldBeTrue();
+        updatedCart.Status.ShouldBe(CartStatus.Cleared);
         updatedCart.IsTerminal.ShouldBeTrue();
     }
 
@@ -203,9 +201,9 @@ public class CartLifecycleTests : IAsyncLifetime
         // Assert
         var updatedCart = await session.Events.AggregateStreamAsync<Shopping.Cart.Cart>(cart.Id);
         updatedCart.ShouldNotBeNull();
-        updatedCart.CheckoutInitiated.ShouldBeTrue();
+        updatedCart.Status.ShouldBe(CartStatus.CheckedOut);
         updatedCart.IsTerminal.ShouldBeTrue();
-        
+
         // Verify checkout stream was created
         var checkouts = await session.Query<Shopping.Checkout.Checkout>().ToListAsync();
         var checkout = checkouts.ShouldHaveSingleItem();
