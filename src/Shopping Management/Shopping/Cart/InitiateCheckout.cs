@@ -1,8 +1,6 @@
 using FluentValidation;
-using Marten;
 using Microsoft.AspNetCore.Mvc;
 using Shopping.Checkout;
-using Wolverine;
 using Wolverine.Http;
 using Wolverine.Marten;
 

@@ -12,6 +12,8 @@ public sealed record Cart(
     bool IsCleared,
     bool CheckoutInitiated)
 {
+    public bool IsTerminal => IsAbandoned || IsCleared || CheckoutInitiated;
+
     public static Cart Create(IEvent<CartInitialized> @event) =>
         new(@event.StreamId,
             @event.Data.CustomerId,
@@ -26,12 +28,11 @@ public sealed record Cart(
     {
         var updatedItems = new Dictionary<string, CartLineItem>(Items);
 
-        if (updatedItems.ContainsKey(@event.Sku))
+        if (updatedItems.TryGetValue(@event.Sku, out var existingItem))
         {
-            var existing = updatedItems[@event.Sku];
-            updatedItems[@event.Sku] = existing with
+            updatedItems[@event.Sku] = existingItem with
             {
-                Quantity = existing.Quantity + @event.Quantity
+                Quantity = existingItem.Quantity + @event.Quantity
             };
         }
         else
@@ -56,11 +57,8 @@ public sealed record Cart(
     {
         var updatedItems = new Dictionary<string, CartLineItem>(Items);
 
-        if (updatedItems.ContainsKey(@event.Sku))
-        {
-            var existing = updatedItems[@event.Sku];
-            updatedItems[@event.Sku] = existing with { Quantity = @event.NewQuantity };
-        }
+        if (updatedItems.TryGetValue(@event.Sku, out var existingItem))
+            updatedItems[@event.Sku] = existingItem with { Quantity = @event.NewQuantity };
 
         return this with { Items = updatedItems };
     }
@@ -77,6 +75,4 @@ public sealed record Cart(
 
     public Cart Apply(CheckoutInitiated @event) =>
         this with { CheckoutInitiated = true };
-
-    public bool IsTerminal => IsAbandoned || IsCleared || CheckoutInitiated;
 }
