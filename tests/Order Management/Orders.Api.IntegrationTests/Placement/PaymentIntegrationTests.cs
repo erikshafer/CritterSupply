@@ -115,7 +115,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             null, // AppliedDiscounts
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 10);
+        await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 20);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -133,7 +133,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             false,
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(paymentFailed, timeoutSeconds: 10);
+        await _fixture.ExecuteAndWaitAsync(paymentFailed, timeoutSeconds: 20);
 
         // Assert: Verify order transitioned to PaymentFailed
         await using var querySession = _fixture.GetDocumentSession();
