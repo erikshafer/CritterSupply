@@ -115,7 +115,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             null, // AppliedDiscounts
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand);
+        await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 5);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
