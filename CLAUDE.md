@@ -772,6 +772,248 @@ For more examples and documentation for Wolverine idioms surrounding its message
 
 As this software solution heavily leverages Wolverine's integration with Marten, for additional information about it such as stream verification in a message handler, check out the the [Wolverine document on Aggregate Handlers and Event Sourcing](https://wolverine.netlify.app/guide/durability/marten/event-sourcing.html#validation-on-stream-existence).
 
+### Handler Return Patterns for Event Sourcing
+
+When building event-sourced handlers with Wolverine and Marten, the return type of your handler communicates intent and determines how events are persisted and messages are published. This section clarifies the established patterns for maximum readability and developer comprehension.
+
+#### Pattern 1: Handlers with `[WriteAggregate]` - Existing Streams
+
+For handlers that operate on existing aggregates (loaded via `[WriteAggregate]` or `[ReadAggregate]`), return a tuple of `(Events, OutgoingMessages)`:
+
+- **`Events`**: Domain events to append to the aggregate's event stream
+- **`OutgoingMessages`**: Integration messages to publish to other bounded contexts
+
+```csharp
+public static class CapturePaymentHandler
+{
+    public static ProblemDetails Before(
+        CapturePayment command,
+        Payment? payment)
+    {
+        if (payment is null)
+            return new ProblemDetails { Detail = "Payment not found", Status = 404 };
+
+        if (payment.Status != PaymentStatus.Authorized)
+            return new ProblemDetails
+            {
+                Detail = $"Payment is not in authorized status. Current status: {payment.Status}",
+                Status = 400
+            };
+
+        return WolverineContinue.NoProblems;
+    }
+
+    public static async Task<(Events, OutgoingMessages)> Handle(
+        CapturePayment command,
+        [WriteAggregate] Payment payment,
+        IPaymentGateway gateway,
+        CancellationToken cancellationToken)
+    {
+        var result = await gateway.CaptureAuthorizedAsync(
+            payment.AuthorizationId!,
+            command.AmountToCapture ?? payment.Amount,
+            cancellationToken);
+
+        var capturedAt = DateTimeOffset.UtcNow;
+
+        var events = new Events();
+        var outgoing = new OutgoingMessages();
+
+        if (!result.Success)
+        {
+            var failedEvent = new PaymentFailed(
+                payment.Id,
+                result.FailureReason ?? "Unknown capture failure",
+                result.IsRetriable,
+                capturedAt);
+
+            events.Add(failedEvent);
+
+            outgoing.Add(new IntegrationMessages.PaymentFailed(
+                payment.Id,
+                payment.OrderId,
+                result.FailureReason ?? "Unknown capture failure",
+                result.IsRetriable,
+                capturedAt));
+
+            return (events, outgoing);
+        }
+
+        var domainEvent = new PaymentCaptured(
+            payment.Id,
+            result.TransactionId!,
+            capturedAt);
+
+        events.Add(domainEvent);
+
+        outgoing.Add(new IntegrationMessages.PaymentCaptured(
+            payment.Id,
+            payment.OrderId,
+            payment.Amount,
+            result.TransactionId!,
+            capturedAt));
+
+        return (events, outgoing);
+    }
+}
+```
+
+**Key Points:**
+- Use `[WriteAggregate]` to load the aggregate for modification
+- Return `(Events, OutgoingMessages)` - both collections are explicit and readable
+- Add domain events to `Events` - these append to the aggregate's stream
+- Add integration messages to `OutgoingMessages` - these publish to other contexts
+- If no domain events needed (e.g., on failure), return empty `Events` collection
+
+#### Pattern 2: Handlers Starting New Streams - Message Handlers
+
+For message handlers (not HTTP endpoints) that start new event streams, use `IDocumentSession.Events.StartStream()` directly and return `OutgoingMessages`:
+
+```csharp
+public static class AuthorizePaymentHandler
+{
+    public static async Task<OutgoingMessages> Handle(
+        AuthorizePayment command,
+        IPaymentGateway gateway,
+        IDocumentSession session,
+        CancellationToken cancellationToken)
+    {
+        var paymentId = Guid.CreateVersion7();
+        var initiatedAt = DateTimeOffset.UtcNow;
+
+        var initiated = new PaymentInitiated(
+            paymentId,
+            command.OrderId,
+            command.CustomerId,
+            command.Amount,
+            command.Currency,
+            command.PaymentMethodToken,
+            initiatedAt);
+
+        var result = await gateway.AuthorizeAsync(
+            command.Amount,
+            command.Currency,
+            command.PaymentMethodToken,
+            cancellationToken);
+
+        var processedAt = DateTimeOffset.UtcNow;
+        var outgoing = new OutgoingMessages();
+
+        if (!result.Success)
+        {
+            var failedEvent = new PaymentFailed(
+                paymentId,
+                result.FailureReason ?? "Unknown authorization failure",
+                result.IsRetriable,
+                processedAt);
+
+            session.Events.StartStream<Payment>(paymentId, initiated, failedEvent);
+
+            outgoing.Add(new IntegrationMessages.PaymentFailed(
+                paymentId,
+                command.OrderId,
+                result.FailureReason ?? "Unknown authorization failure",
+                result.IsRetriable,
+                processedAt));
+
+            return outgoing;
+        }
+
+        var authorizedEvent = new PaymentAuthorized(
+            paymentId,
+            result.TransactionId!,
+            processedAt);
+
+        session.Events.StartStream<Payment>(paymentId, initiated, authorizedEvent);
+
+        outgoing.Add(new IntegrationMessages.PaymentAuthorized(
+            paymentId,
+            command.OrderId,
+            command.Amount,
+            result.TransactionId!,
+            processedAt,
+            processedAt.AddDays(7)));
+
+        return outgoing;
+    }
+}
+```
+
+**Key Points:**
+- Inject `IDocumentSession session` to access event store
+- Use `session.Events.StartStream<T>(streamId, ...events)` to create new stream
+- Return `OutgoingMessages` for integration events
+- Pass multiple events to `StartStream()` to initialize the stream
+
+#### Pattern 3: HTTP Endpoints Starting New Streams
+
+For HTTP endpoints that start new streams, use `MartenOps.StartStream()` which returns `IStartStream` for Wolverine's HTTP workflow:
+
+```csharp
+public static class InitializeCartHandler
+{
+    [WolverinePost("/api/carts")]
+    public static (IStartStream, CreationResponse) Handle(InitializeCart command)
+    {
+        var cartId = Guid.CreateVersion7();
+        var @event = new CartInitialized(
+            command.CustomerId,
+            command.SessionId,
+            DateTimeOffset.UtcNow);
+
+        var stream = MartenOps.StartStream<Cart>(cartId, @event);
+
+        return (stream, new CreationResponse($"/api/carts/{cartId}"));
+    }
+}
+```
+
+**Key Points:**
+- Use `[WolverinePost]` or other HTTP attributes to mark as HTTP endpoint
+- Use `MartenOps.StartStream<T>()` which returns `IStartStream`
+- Return tuple with `IStartStream` and HTTP response (e.g., `CreationResponse`)
+- Wolverine's HTTP workflow handles stream persistence and response
+
+#### Why Not Return Raw Tuples or `object`?
+
+**❌ Avoid:**
+```csharp
+// BAD - Unclear what this returns
+public static async Task<object> Handle(...)
+{
+    return (domainEvent, integrationEvent);  // Wolverine may treat tuple as single event!
+}
+```
+
+**✅ Prefer:**
+```csharp
+// GOOD - Explicit and clear intent
+public static async Task<(Events, OutgoingMessages)> Handle(...)
+{
+    var events = new Events();
+    var outgoing = new OutgoingMessages();
+
+    events.Add(domainEvent);
+    outgoing.Add(integrationEvent);
+
+    return (events, outgoing);
+}
+```
+
+**Reasons:**
+- **Clarity**: `(Events, OutgoingMessages)` is self-documenting - developers immediately understand the intent
+- **Type Safety**: Wolverine knows how to handle `Events` and `OutgoingMessages` correctly
+- **Avoids Bugs**: Raw tuples like `(event, event)` can be misinterpreted by Marten/Wolverine as a single tuple event
+- **Consistency**: Establishes a clear pattern across all handlers in the codebase
+
+#### Summary Table
+
+| Scenario | Handler Type | Return Type | Stream Creation |
+|----------|-------------|-------------|-----------------|
+| Update existing aggregate | Message Handler | `(Events, OutgoingMessages)` | N/A - uses `[WriteAggregate]` |
+| Start new stream | Message Handler | `OutgoingMessages` | `session.Events.StartStream<T>()` |
+| Start new stream | HTTP Endpoint | `(IStartStream, HttpResponse)` | `MartenOps.StartStream<T>()` |
+
 ## Testing Principles
 
 In general, prefer integration tests over unit tests. The latter have their place and importance, but we want to leverage tools like Alba and TestContainers to go through the use cases our vertical slices are built to fulfill.

@@ -11,14 +11,14 @@ namespace Payments.UnitTests.Processing;
 /// </summary>
 public class RefundRequestedValidatorPropertyTests
 {
-    private readonly RefundRequestedValidator _validator = new();
+    private readonly RefundRequested.RefundRequestedValidator _validator = new();
 
     /// <summary>
     /// **Feature: payment-processing, Property 6: Refund validation rejects invalid requests**
-    /// 
+    ///
     /// *For any* RefundRequested command where the PaymentId is empty or the amount is less than
     /// or equal to zero, the refund SHALL be rejected.
-    /// 
+    ///
     /// **Validates: Requirements 5.1, 5.3**
     /// </summary>
     [Property(MaxTest = 100, Arbitrary = [typeof(InvalidRefundRequestArbitrary)])]
