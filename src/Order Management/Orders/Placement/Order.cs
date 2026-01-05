@@ -82,8 +82,8 @@ public sealed class Order : Saga
     /// <returns>A tuple of the new Order saga and the OrderPlaced event to publish.</returns>
     public static (Order, IntegrationMessages.OrderPlaced) Start(CheckoutCompleted command)
     {
-        // Delegate to pure Decider function
-        return OrderDecider.Start(command);
+        // Delegate to pure Decider function (pass current timestamp)
+        return OrderDecider.Start(command, DateTimeOffset.UtcNow);
     }
 
     /// <summary>
@@ -95,28 +95,16 @@ public sealed class Order : Saga
     /// <returns>Orchestration messages if inventory is reserved and ready to commit.</returns>
     public OutgoingMessages Handle(PaymentCaptured message)
     {
-        Status = OrderStatus.PaymentConfirmed;
-        IsPaymentCaptured = true;
+        var decision = OrderDecider.HandlePaymentCaptured(this, message, DateTimeOffset.UtcNow);
 
-        var messages = new OutgoingMessages();
+        // Apply state changes from decision
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+        if (decision.IsPaymentCaptured.HasValue) IsPaymentCaptured = decision.IsPaymentCaptured.Value;
 
-        // Orchestration: If inventory is already reserved, tell Inventory to commit all reservations
-        if (IsInventoryReserved)
-        {
-            foreach (var reservationId in ReservationIds.Keys)
-            {
-                messages.Add(new IntegrationMessages.ReservationCommitRequested(
-                    Id,
-                    reservationId,
-                    DateTimeOffset.UtcNow));
-            }
-
-            // Note: We don't request fulfillment here even if inventory is committed,
-            // because the commit confirmation will come async via ReservationCommitted handler,
-            // which will then trigger fulfillment. This avoids race conditions.
-        }
-
-        return messages;
+        // Return outgoing messages
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+        return outgoing;
     }
 
     /// <summary>
@@ -128,24 +116,15 @@ public sealed class Order : Saga
     /// <returns>Compensation messages to release any reserved inventory.</returns>
     public OutgoingMessages Handle(PaymentFailed message)
     {
-        Status = OrderStatus.PaymentFailed;
+        var decision = OrderDecider.HandlePaymentFailed(this, message, DateTimeOffset.UtcNow);
 
-        var messages = new OutgoingMessages();
+        // Apply state changes from decision
+        if (decision.Status.HasValue) Status = decision.Status.Value;
 
-        // Compensation: Release any reserved inventory
-        if (IsInventoryReserved)
-        {
-            foreach (var reservationId in ReservationIds.Keys)
-            {
-                messages.Add(new IntegrationMessages.ReservationReleaseRequested(
-                    Id,
-                    reservationId,
-                    $"Payment failed: {message.FailureReason}",
-                    DateTimeOffset.UtcNow));
-            }
-        }
-
-        return messages;
+        // Return outgoing messages
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+        return outgoing;
     }
 
     /// <summary>
@@ -156,7 +135,10 @@ public sealed class Order : Saga
     /// <param name="message">Payment authorized integration message from Payments BC.</param>
     public void Handle(PaymentAuthorized message)
     {
-        Status = OrderStatus.PendingPayment;
+        var decision = OrderDecider.HandlePaymentAuthorized(this, message);
+
+        // Apply state changes from decision
+        if (decision.Status.HasValue) Status = decision.Status.Value;
     }
 
     /// <summary>
@@ -168,8 +150,10 @@ public sealed class Order : Saga
     /// <param name="message">Refund completed integration message from Payments BC.</param>
     public void Handle(RefundCompleted message)
     {
-        // No status change - refunds are financial operations that don't affect fulfillment state.
-        // Future enhancement: Track refund amount or add RefundedAmount property.
+        var decision = OrderDecider.HandleRefundCompleted(this, message);
+
+        // Apply state changes from decision (none expected for refunds)
+        if (decision.Status.HasValue) Status = decision.Status.Value;
     }
 
     /// <summary>
@@ -181,8 +165,10 @@ public sealed class Order : Saga
     /// <param name="message">Refund failed integration message from Payments BC.</param>
     public void Handle(RefundFailed message)
     {
-        // No status change - refund failures are financial issues that don't affect fulfillment state.
-        // Future enhancement: Track failed refund attempts or add FailedRefundReason property.
+        var decision = OrderDecider.HandleRefundFailed(this, message);
+
+        // Apply state changes from decision (none expected for refund failures)
+        if (decision.Status.HasValue) Status = decision.Status.Value;
     }
 
     /// <summary>
@@ -194,20 +180,15 @@ public sealed class Order : Saga
     /// <returns>Orchestration message if payment is already captured and ready to commit.</returns>
     public IntegrationMessages.ReservationCommitRequested? Handle(ReservationConfirmed message)
     {
-        Status = OrderStatus.InventoryReserved;
-        IsInventoryReserved = true;
-        ReservationIds[message.ReservationId] = message.SKU;
+        var decision = OrderDecider.HandleReservationConfirmed(this, message, DateTimeOffset.UtcNow);
 
-        // Orchestration: If payment is already captured, tell Inventory to commit this reservation
-        if (IsPaymentCaptured)
-        {
-            return new IntegrationMessages.ReservationCommitRequested(
-                Id,
-                message.ReservationId,
-                DateTimeOffset.UtcNow);
-        }
+        // Apply state changes from decision
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+        if (decision.IsInventoryReserved.HasValue) IsInventoryReserved = decision.IsInventoryReserved.Value;
+        if (decision.ReservationIds != null) ReservationIds = decision.ReservationIds;
 
-        return null;
+        // Return single orchestration message (if any)
+        return decision.Messages.FirstOrDefault() as IntegrationMessages.ReservationCommitRequested;
     }
 
     /// <summary>
@@ -218,8 +199,10 @@ public sealed class Order : Saga
     /// <param name="message">Reservation failed integration message from Inventory BC.</param>
     public void Handle(ReservationFailed message)
     {
-        Status = OrderStatus.InventoryFailed;
-        // TODO: Future enhancement - trigger compensation (release payment, cancel order)
+        var decision = OrderDecider.HandleReservationFailed(this, message);
+
+        // Apply state changes from decision
+        if (decision.Status.HasValue) Status = decision.Status.Value;
     }
 
     /// <summary>
@@ -232,35 +215,15 @@ public sealed class Order : Saga
     /// <returns>Orchestration message to start fulfillment if both payment and inventory are confirmed.</returns>
     public OutgoingMessages Handle(ReservationCommitted message)
     {
-        Status = OrderStatus.InventoryCommitted;
+        var decision = OrderDecider.HandleReservationCommitted(this, message, DateTimeOffset.UtcNow);
 
-        var messages = new OutgoingMessages();
+        // Apply state changes from decision
+        if (decision.Status.HasValue) Status = decision.Status.Value;
 
-        // Orchestration: If payment is already captured, request fulfillment
-        if (IsPaymentCaptured)
-        {
-            Status = OrderStatus.Fulfilling;
-
-            var fulfillmentRequest = new FulfillmentMessages.FulfillmentRequested(
-                Id,
-                CustomerId,
-                new FulfillmentMessages.ShippingAddress(
-                    ShippingAddress.Street,
-                    ShippingAddress.Street2,
-                    ShippingAddress.City,
-                    ShippingAddress.State,
-                    ShippingAddress.PostalCode,
-                    ShippingAddress.Country),
-                LineItems.Select(li => new FulfillmentMessages.FulfillmentLineItem(
-                    li.Sku,
-                    li.Quantity)).ToList(),
-                ShippingMethod,
-                DateTimeOffset.UtcNow);
-
-            messages.Add(fulfillmentRequest);
-        }
-
-        return messages;
+        // Return outgoing messages
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+        return outgoing;
     }
 
     /// <summary>
@@ -271,9 +234,10 @@ public sealed class Order : Saga
     /// <param name="message">Reservation released integration message from Inventory BC.</param>
     public void Handle(ReservationReleased message)
     {
-        // No status change - reservation release is a compensation operation.
-        // The order remains in its current failed state (PaymentFailed, InventoryFailed, Cancelled).
-        // Future enhancement: Track release timestamp or add ReleasedInventoryAt property.
+        var decision = OrderDecider.HandleReservationReleased(this, message);
+
+        // Apply state changes from decision (none expected for compensation)
+        if (decision.Status.HasValue) Status = decision.Status.Value;
     }
 
     /// <summary>
@@ -284,8 +248,10 @@ public sealed class Order : Saga
     /// <param name="message">Shipment dispatched integration message from Fulfillment BC.</param>
     public void Handle(FulfillmentMessages.ShipmentDispatched message)
     {
-        Status = OrderStatus.Shipped;
-        // Future enhancement: Store tracking info (message.Carrier, message.TrackingNumber)
+        var decision = OrderDecider.HandleShipmentDispatched(this, message);
+
+        // Apply state changes from decision
+        if (decision.Status.HasValue) Status = decision.Status.Value;
     }
 
     /// <summary>
@@ -296,9 +262,13 @@ public sealed class Order : Saga
     /// <param name="message">Shipment delivered integration message from Fulfillment BC.</param>
     public void Handle(FulfillmentMessages.ShipmentDelivered message)
     {
-        Status = OrderStatus.Delivered;
-        // Mark saga as complete - no further processing needed
-        MarkCompleted();
+        var decision = OrderDecider.HandleShipmentDelivered(this, message);
+
+        // Apply state changes from decision
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+
+        // Mark saga as complete if decider signals completion
+        if (decision.ShouldComplete) MarkCompleted();
     }
 
     /// <summary>
@@ -309,8 +279,9 @@ public sealed class Order : Saga
     /// <param name="message">Shipment delivery failed integration message from Fulfillment BC.</param>
     public void Handle(FulfillmentMessages.ShipmentDeliveryFailed message)
     {
-        // Status remains Shipped - delivery failure doesn't move order backwards
-        // Future enhancement: Add DeliveryFailedAt timestamp, failure reason tracking
-        // Future enhancement: Trigger customer service notification workflow
+        var decision = OrderDecider.HandleShipmentDeliveryFailed(this, message);
+
+        // Apply state changes from decision (none expected - remains Shipped)
+        if (decision.Status.HasValue) Status = decision.Status.Value;
     }
 }
