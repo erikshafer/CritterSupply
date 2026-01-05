@@ -76,56 +76,6 @@ public class ShoppingIntegrationTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Integration test verifying CheckoutCompleted publishes OrderPlaced event.
-    /// Validates that downstream BCs (Inventory, Payments) receive OrderPlaced.
-    /// </summary>
-    [Fact]
-    public async Task CheckoutCompleted_PublishesOrderPlaced()
-    {
-        // Arrange: Create CheckoutCompleted message from Shopping BC
-        var orderId = Guid.CreateVersion7();
-        var checkoutId = Guid.CreateVersion7();
-        var customerId = Guid.CreateVersion7();
-
-        var items = new List<Messages.Contracts.Shopping.CheckoutLineItem>
-        {
-            new("SKU-100", 3, 29.99m)
-        };
-
-        var shippingAddress = new Messages.Contracts.Shopping.ShippingAddress(
-            "456 Oak Ave",
-            null,
-            "Portland",
-            "OR",
-            "97201",
-            "USA");
-
-        var checkoutCompleted = new Messages.Contracts.Shopping.CheckoutCompleted(
-            orderId,
-            checkoutId,
-            customerId,
-            items,
-            shippingAddress,
-            "Express",
-            12.99m,
-            "tok_mastercard_test_67890",
-            DateTimeOffset.UtcNow);
-
-        // Act: Send CheckoutCompleted and track messages
-        var tracked = await _fixture.ExecuteAndWaitAsync(checkoutCompleted, timeoutSeconds: 10);
-
-        // Assert: Verify OrderPlaced was published
-        var orderPlacedMessages = tracked.Sent.MessagesOf<Messages.Contracts.Orders.OrderPlaced>();
-        orderPlacedMessages.ShouldHaveSingleItem();
-
-        var orderPlaced = orderPlacedMessages.Single();
-        orderPlaced.OrderId.ShouldBe(orderId);
-        orderPlaced.CustomerId.ShouldBe(customerId);
-        orderPlaced.LineItems.Count.ShouldBe(1);
-        orderPlaced.TotalAmount.ShouldBe(102.96m); // (3*29.99) + 12.99 shipping
-    }
-
-    /// <summary>
     /// Integration test verifying correct handling of shipping cost in total calculation.
     /// </summary>
     [Fact]

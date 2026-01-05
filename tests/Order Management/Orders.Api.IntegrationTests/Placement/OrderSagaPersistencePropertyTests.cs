@@ -36,7 +36,7 @@ public class OrderSagaPersistencePropertyTests : IAsyncLifetime
     public async Task Saga_Is_Persisted_And_Retrievable_By_Id(CheckoutCompleted checkout)
     {
         // Arrange: Create saga from valid checkout
-        var (saga, _) = CheckoutCompletedHandler.Handle(checkout);
+        var (saga, _) = Order.Start(checkout);
 
         // Act: Persist the saga
         await using var session = _fixture.GetDocumentSession();

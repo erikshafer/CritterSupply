@@ -1,19 +1,21 @@
 using ShoppingContracts = Messages.Contracts.Shopping;
+using IntegrationMessages = Messages.Contracts.Orders;
 
 namespace Orders.Placement;
 
 /// <summary>
 /// Handler for integration messages from Shopping bounded context.
-/// Maps external integration contracts to internal saga commands.
+/// Maps external integration contracts to internal saga commands and starts the Order saga.
 /// </summary>
 public static class ShoppingIntegrationHandler
 {
     /// <summary>
-    /// Receives CheckoutCompleted from Shopping BC and maps to local CheckoutCompleted for saga creation.
+    /// Receives CheckoutCompleted from Shopping BC, maps it to local command, and starts Order saga.
+    /// Returns the saga for persistence and OrderPlaced message for publication.
     /// </summary>
     /// <param name="message">Integration message from Shopping BC.</param>
-    /// <returns>Local CheckoutCompleted command that will start the Order saga.</returns>
-    public static CheckoutCompleted Handle(ShoppingContracts.CheckoutCompleted message)
+    /// <returns>Tuple of Order saga and OrderPlaced event.</returns>
+    public static (Order, IntegrationMessages.OrderPlaced) Handle(ShoppingContracts.CheckoutCompleted message)
     {
         // Map Shopping's CheckoutLineItem to Orders' CheckoutLineItem
         var lineItems = message.Items
@@ -32,7 +34,8 @@ public static class ShoppingIntegrationHandler
             message.ShippingAddress.PostalCode,
             message.ShippingAddress.Country);
 
-        return new CheckoutCompleted(
+        // Create local CheckoutCompleted command
+        var checkoutCompleted = new CheckoutCompleted(
             message.OrderId,
             message.CheckoutId,
             message.CustomerId,
@@ -42,5 +45,8 @@ public static class ShoppingIntegrationHandler
             message.ShippingCost,
             message.PaymentMethodToken,
             message.CompletedAt);
+
+        // Start the Order saga (delegates to OrderDecider)
+        return Order.Start(checkoutCompleted);
     }
 }

@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
+using Wolverine.Attributes;
 
-[assembly: InternalsVisibleTo("Fulfillment.UnitTests")]
-[assembly: InternalsVisibleTo("Fulfillment.Api.IntegrationTests")]
+[assembly: WolverineModule]

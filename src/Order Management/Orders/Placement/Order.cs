@@ -74,6 +74,19 @@ public sealed class Order : Saga
     public bool IsPaymentCaptured { get; set; }
 
     /// <summary>
+    /// Saga start handler - creates the saga from CheckoutCompleted.
+    /// Thin wrapper that delegates to OrderDecider for pure business logic.
+    /// Wolverine convention: static Start() method on saga class.
+    /// </summary>
+    /// <param name="command">The checkout completed event from Shopping context.</param>
+    /// <returns>A tuple of the new Order saga and the OrderPlaced event to publish.</returns>
+    public static (Order, IntegrationMessages.OrderPlaced) Start(CheckoutCompleted command)
+    {
+        // Delegate to pure Decider function
+        return OrderDecider.Start(command);
+    }
+
+    /// <summary>
     /// Saga handler for successful payment capture.
     /// Transitions order to PaymentConfirmed status and orchestrates inventory commitment if ready.
     /// **Validates: Requirement 1.2 - Order proceeds after payment confirmation**
