@@ -8,7 +8,7 @@ namespace Payments.UnitTests.Processing;
 /// </summary>
 public class PaymentRequestedValidatorTests
 {
-    private readonly PaymentRequestedValidator _validator = new();
+    private readonly PaymentRequested.PaymentRequestedValidator _validator = new();
 
     /// <summary>
     /// Requirement 4.2: Missing order identifier should fail validation.

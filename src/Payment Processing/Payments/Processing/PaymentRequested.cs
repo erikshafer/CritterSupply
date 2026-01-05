@@ -1,62 +1,95 @@
+using FluentValidation;
 using Marten;
+using Wolverine;
+using Wolverine.Marten;
+using IntegrationMessages = Messages.Contracts.Payments;
 
 namespace Payments.Processing;
 
-/// <summary>
-/// Command from Orders context requesting payment capture.
-/// </summary>
 public sealed record PaymentRequested(
     Guid OrderId,
     Guid CustomerId,
     decimal Amount,
     string Currency,
-    string PaymentMethodToken);
+    string PaymentMethodToken)
+{
+    public class PaymentRequestedValidator : AbstractValidator<PaymentRequested>
+    {
+        public PaymentRequestedValidator()
+        {
+            RuleFor(x => x.Amount).GreaterThan(0);
+            RuleFor(x => x.OrderId).NotEmpty();
+            RuleFor(x => x.CustomerId).NotEmpty();
+            RuleFor(x => x.PaymentMethodToken).NotEmpty();
+            RuleFor(x => x.Currency).NotEmpty().MaximumLength(3);
+        }
+    }
+}
 
-/// <summary>
-/// Wolverine handler for PaymentRequested commands.
-/// Creates a Payment, calls the gateway, and publishes the result.
-/// </summary>
 public static class PaymentRequestedHandler
 {
-    /// <summary>
-    /// Handles the PaymentRequested command by creating a Payment,
-    /// calling the payment gateway, and returning the integration message.
-    /// </summary>
-    public static async Task<object> Handle(
+    public static async Task<OutgoingMessages> Handle(
         PaymentRequested command,
         IPaymentGateway gateway,
         IDocumentSession session,
         CancellationToken cancellationToken)
     {
-        // Create payment aggregate
-        var payment = Payment.Create(command);
+        var paymentId = Guid.CreateVersion7();
+        var initiatedAt = DateTimeOffset.UtcNow;
 
-        // Call gateway to capture funds
+        var initiated = new PaymentInitiated(
+            paymentId,
+            command.OrderId,
+            command.CustomerId,
+            command.Amount,
+            command.Currency,
+            command.PaymentMethodToken,
+            initiatedAt);
+
         var result = await gateway.CaptureAsync(
             command.Amount,
             command.Currency,
             command.PaymentMethodToken,
             cancellationToken);
 
-        // Apply result to payment and get integration message
-        object integrationMessage;
-        Payment updatedPayment;
+        var processedAt = DateTimeOffset.UtcNow;
 
-        if (result.Success)
+        var outgoing = new OutgoingMessages();
+
+        if (!result.Success)
         {
-            (updatedPayment, var captured) = payment.Capture(result.TransactionId!, DateTimeOffset.UtcNow);
-            integrationMessage = captured;
-        }
-        else
-        {
-            (updatedPayment, var failed) = payment.Fail(result.FailureReason!, result.IsRetriable, DateTimeOffset.UtcNow);
-            integrationMessage = failed;
+            var failedEvent = new PaymentFailed(
+                paymentId,
+                result.FailureReason ?? "Unknown capture failure",
+                result.IsRetriable,
+                processedAt);
+
+            session.Events.StartStream<Payment>(paymentId, initiated, failedEvent);
+
+            outgoing.Add(new IntegrationMessages.PaymentFailed(
+                paymentId,
+                command.OrderId,
+                result.FailureReason ?? "Unknown capture failure",
+                result.IsRetriable,
+                processedAt));
+
+            return outgoing;
         }
 
-        // Persist events to Marten event store
-        session.Events.StartStream<Payment>(updatedPayment.Id, updatedPayment.PendingEvents);
+        var capturedEvent = new PaymentCaptured(
+            paymentId,
+            result.TransactionId!,
+            processedAt);
 
-        // Return integration message for Orders context (cascaded by Wolverine)
-        return integrationMessage;
+        session.Events.StartStream<Payment>(paymentId, initiated, capturedEvent);
+
+        outgoing.Add(new IntegrationMessages.PaymentCaptured(
+            paymentId,
+            command.OrderId,
+            command.Amount,
+            result.TransactionId!,
+            processedAt));
+
+        return outgoing;
     }
 }

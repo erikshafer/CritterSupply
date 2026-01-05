@@ -11,14 +11,14 @@ namespace Payments.UnitTests.Processing;
 /// </summary>
 public class PaymentRequestedValidatorPropertyTests
 {
-    private readonly PaymentRequestedValidator _validator = new();
+    private readonly PaymentRequested.PaymentRequestedValidator _validator = new();
 
     /// <summary>
     /// **Feature: payment-processing, Property 5: Validation rejects invalid payment amounts**
-    /// 
+    ///
     /// *For any* PaymentRequested command with amount less than or equal to zero,
     /// validation SHALL fail and payment processing SHALL be rejected.
-    /// 
+    ///
     /// **Validates: Requirements 4.1**
     /// </summary>
     [Property(MaxTest = 100, Arbitrary = [typeof(InvalidAmountArbitrary)])]
@@ -29,7 +29,7 @@ public class PaymentRequestedValidatorPropertyTests
 
         // Assert: Validation should fail with amount error
         var isInvalid = !result.IsValid;
-        var hasAmountError = result.Errors.Any(e => 
+        var hasAmountError = result.Errors.Any(e =>
             e.PropertyName == nameof(PaymentRequested.Amount));
 
         return isInvalid && hasAmountError;

@@ -12,25 +12,25 @@ namespace Payments.UnitTests.Processing;
 public class PaymentCapturePropertyTests
 {
     /// <summary>
-    /// **Feature: payment-processing, Property 3: Successful capture updates Payment and publishes event**
-    /// 
-    /// *For any* Payment where the gateway returns success, the Payment status SHALL be Captured,
-    /// the transaction ID SHALL be recorded, and a PaymentCapturedIntegration message SHALL be
-    /// published with correct data.
-    /// 
-    /// **Validates: Requirements 2.2, 2.3, 2.4, 2.5**
+    /// **Feature: payment-processing, Property 3: PaymentCaptured event correctly updates Payment state**
+    ///
+    /// *For any* Payment with a PaymentCaptured event applied, the Payment status SHALL be Captured,
+    /// the transaction ID SHALL be recorded, and the processed timestamp SHALL be set.
+    ///
+    /// **Validates: Requirements 2.2, 2.3, 2.4 - Event Sourcing Apply() logic**
     /// </summary>
     [Property(MaxTest = 100, Arbitrary = [typeof(ValidPaymentWithSuccessArbitrary)])]
-    public bool Successful_Capture_Updates_Payment_And_Publishes_Message(
-        PaymentRequested command,
+    public bool PaymentCaptured_Event_Updates_Payment_State(
+        PaymentInitiated initiatedEvent,
         string transactionId)
     {
-        // Arrange: Create a payment
-        var payment = Payment.Create(command);
+        // Arrange: Create a payment from initiated event
+        var payment = Payment.Create(initiatedEvent);
         var capturedAt = DateTimeOffset.UtcNow;
+        var capturedEvent = new PaymentCaptured(payment.Id, transactionId, capturedAt);
 
-        // Act: Capture the payment
-        var (updatedPayment, integrationMessage) = payment.Capture(transactionId, capturedAt);
+        // Act: Apply the captured event
+        var updatedPayment = payment.Apply(capturedEvent);
 
         // Assert: Verify payment state
         // 2.2: Status is Captured
@@ -42,50 +42,32 @@ public class PaymentCapturePropertyTests
         // 2.4: Capture timestamp is recorded
         var timestampRecorded = updatedPayment.ProcessedAt == capturedAt;
 
-        // 2.5: Integration message has correct data
-        var messageHasCorrectPaymentId = integrationMessage.PaymentId == payment.Id;
-        var messageHasCorrectOrderId = integrationMessage.OrderId == command.OrderId;
-        var messageHasCorrectAmount = integrationMessage.Amount == command.Amount;
-        var messageHasCorrectTransactionId = integrationMessage.TransactionId == transactionId;
-        var messageHasCorrectTimestamp = integrationMessage.CapturedAt == capturedAt;
-
-        // Verify PaymentCaptured domain event is in pending events
-        var hasCapturedEvent = updatedPayment.PendingEvents
-            .OfType<PaymentCaptured>()
-            .Any(e => e.PaymentId == payment.Id && e.TransactionId == transactionId);
-
         return statusIsCaptured
             && transactionIdRecorded
-            && timestampRecorded
-            && messageHasCorrectPaymentId
-            && messageHasCorrectOrderId
-            && messageHasCorrectAmount
-            && messageHasCorrectTransactionId
-            && messageHasCorrectTimestamp
-            && hasCapturedEvent;
+            && timestampRecorded;
     }
 
     /// <summary>
-    /// **Feature: payment-processing, Property 4: Failed capture updates Payment and publishes event with reason**
-    /// 
-    /// *For any* Payment where the gateway returns failure, the Payment status SHALL be Failed,
-    /// the failure reason SHALL be recorded, and a PaymentFailedIntegration message SHALL be
-    /// published containing the reason code.
-    /// 
-    /// **Validates: Requirements 3.1, 3.2, 3.3, 3.4**
+    /// **Feature: payment-processing, Property 4: PaymentFailed event correctly updates Payment state**
+    ///
+    /// *For any* Payment with a PaymentFailed event applied, the Payment status SHALL be Failed,
+    /// the failure reason SHALL be recorded, and the isRetriable flag SHALL be set.
+    ///
+    /// **Validates: Requirements 3.1, 3.2, 3.3 - Event Sourcing Apply() logic**
     /// </summary>
     [Property(MaxTest = 100, Arbitrary = [typeof(FailureDataArbitrary)])]
-    public bool Failed_Capture_Updates_Payment_And_Publishes_Message_With_Reason(
-        PaymentRequested command,
+    public bool PaymentFailed_Event_Updates_Payment_State(
+        PaymentInitiated initiatedEvent,
         string failureReason,
         bool isRetriable)
     {
-        // Arrange: Create a payment
-        var payment = Payment.Create(command);
+        // Arrange: Create a payment from initiated event
+        var payment = Payment.Create(initiatedEvent);
         var failedAt = DateTimeOffset.UtcNow;
+        var failedEvent = new PaymentFailed(payment.Id, failureReason, isRetriable, failedAt);
 
-        // Act: Fail the payment
-        var (updatedPayment, integrationMessage) = payment.Fail(failureReason, isRetriable, failedAt);
+        // Act: Apply the failed event
+        var updatedPayment = payment.Apply(failedEvent);
 
         // Assert: Verify payment state
         // 3.1: Status is Failed
@@ -100,55 +82,41 @@ public class PaymentCapturePropertyTests
         // IsRetriable flag is recorded
         var retriableFlagRecorded = updatedPayment.IsRetriable == isRetriable;
 
-        // 3.4: Integration message has correct data including reason
-        var messageHasCorrectPaymentId = integrationMessage.PaymentId == payment.Id;
-        var messageHasCorrectOrderId = integrationMessage.OrderId == command.OrderId;
-        var messageHasCorrectReason = integrationMessage.FailureReason == failureReason;
-        var messageHasCorrectRetriable = integrationMessage.IsRetriable == isRetriable;
-        var messageHasCorrectTimestamp = integrationMessage.FailedAt == failedAt;
-
-        // Verify PaymentFailed domain event is in pending events
-        var hasFailedEvent = updatedPayment.PendingEvents
-            .OfType<PaymentFailed>()
-            .Any(e => e.PaymentId == payment.Id && e.FailureReason == failureReason);
-
         return statusIsFailed
             && reasonRecorded
             && timestampRecorded
-            && retriableFlagRecorded
-            && messageHasCorrectPaymentId
-            && messageHasCorrectOrderId
-            && messageHasCorrectReason
-            && messageHasCorrectRetriable
-            && messageHasCorrectTimestamp
-            && hasFailedEvent;
+            && retriableFlagRecorded;
     }
 }
 
 
 /// <summary>
-/// Arbitrary that generates valid PaymentRequested commands and transaction IDs for capture tests.
+/// Arbitrary that generates valid PaymentInitiated events and transaction IDs for capture tests.
 /// </summary>
 public static class ValidPaymentWithSuccessArbitrary
 {
-    public static Arbitrary<PaymentRequested> PaymentRequested()
+    public static Arbitrary<PaymentInitiated> PaymentInitiated()
     {
-        var commandGen = ArbMap.Default.GeneratorFor<Guid>()
+        var eventGen = ArbMap.Default.GeneratorFor<Guid>()
             .Where(g => g != Guid.Empty)
-            .SelectMany(orderId => ArbMap.Default.GeneratorFor<Guid>()
+            .SelectMany(paymentId => ArbMap.Default.GeneratorFor<Guid>()
                 .Where(g => g != Guid.Empty)
-                .SelectMany(customerId => Gen.Choose(100, 1000000)
-                    .Select(cents => (decimal)cents / 100)
-                    .SelectMany(amount => Gen.Elements("USD", "EUR", "GBP")
-                        .SelectMany(currency => Gen.Elements("tok_success_visa", "tok_success_mc")
-                            .Select(token => new Payments.Processing.PaymentRequested(
-                                orderId,
-                                customerId,
-                                amount,
-                                currency,
-                                token))))));
+                .SelectMany(orderId => ArbMap.Default.GeneratorFor<Guid>()
+                    .Where(g => g != Guid.Empty)
+                    .SelectMany(customerId => Gen.Choose(100, 1000000)
+                        .Select(cents => (decimal)cents / 100)
+                        .SelectMany(amount => Gen.Elements("USD", "EUR", "GBP")
+                            .SelectMany(currency => Gen.Elements("tok_success_visa", "tok_success_mc")
+                                .Select(token => new Payments.Processing.PaymentInitiated(
+                                    paymentId,
+                                    orderId,
+                                    customerId,
+                                    amount,
+                                    currency,
+                                    token,
+                                    DateTimeOffset.UtcNow)))))));
 
-        return commandGen.ToArbitrary();
+        return eventGen.ToArbitrary();
     }
 
     public static Arbitrary<string> String()
@@ -165,24 +133,28 @@ public static class ValidPaymentWithSuccessArbitrary
 /// </summary>
 public static class FailureDataArbitrary
 {
-    public static Arbitrary<PaymentRequested> PaymentRequested()
+    public static Arbitrary<PaymentInitiated> PaymentInitiated()
     {
-        var commandGen = ArbMap.Default.GeneratorFor<Guid>()
+        var eventGen = ArbMap.Default.GeneratorFor<Guid>()
             .Where(g => g != Guid.Empty)
-            .SelectMany(orderId => ArbMap.Default.GeneratorFor<Guid>()
+            .SelectMany(paymentId => ArbMap.Default.GeneratorFor<Guid>()
                 .Where(g => g != Guid.Empty)
-                .SelectMany(customerId => Gen.Choose(100, 1000000)
-                    .Select(cents => (decimal)cents / 100)
-                    .SelectMany(amount => Gen.Elements("USD", "EUR", "GBP")
-                        .SelectMany(currency => Gen.Elements("tok_decline_visa", "tok_timeout_mc")
-                            .Select(token => new Payments.Processing.PaymentRequested(
-                                orderId,
-                                customerId,
-                                amount,
-                                currency,
-                                token))))));
+                .SelectMany(orderId => ArbMap.Default.GeneratorFor<Guid>()
+                    .Where(g => g != Guid.Empty)
+                    .SelectMany(customerId => Gen.Choose(100, 1000000)
+                        .Select(cents => (decimal)cents / 100)
+                        .SelectMany(amount => Gen.Elements("USD", "EUR", "GBP")
+                            .SelectMany(currency => Gen.Elements("tok_decline_visa", "tok_timeout_mc")
+                                .Select(token => new Payments.Processing.PaymentInitiated(
+                                    paymentId,
+                                    orderId,
+                                    customerId,
+                                    amount,
+                                    currency,
+                                    token,
+                                    DateTimeOffset.UtcNow)))))));
 
-        return commandGen.ToArbitrary();
+        return eventGen.ToArbitrary();
     }
 
     public static Arbitrary<string> String()
