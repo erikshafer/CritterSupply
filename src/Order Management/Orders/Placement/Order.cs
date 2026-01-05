@@ -75,59 +75,15 @@ public sealed class Order : Saga
 
     /// <summary>
     /// Saga start handler - creates the saga from CheckoutCompleted.
-    /// Validation happens in Wolverine middleware via FluentValidation.
+    /// Thin wrapper that delegates to OrderDecider for pure business logic.
+    /// Wolverine convention: static Start() method on saga class.
     /// </summary>
     /// <param name="command">The checkout completed event from Shopping context.</param>
     /// <returns>A tuple of the new Order saga and the OrderPlaced event to publish.</returns>
     public static (Order, IntegrationMessages.OrderPlaced) Start(CheckoutCompleted command)
     {
-        var orderId = Guid.CreateVersion7();
-        var placedAt = DateTimeOffset.UtcNow;
-
-        var lineItems = command.LineItems
-            .Select(item => new OrderLineItem(
-                item.Sku,
-                item.Quantity,
-                item.PriceAtPurchase,
-                item.Quantity * item.PriceAtPurchase))
-            .ToList();
-
-        var totalAmount = lineItems.Sum(x => x.LineTotal);
-
-        var saga = new Order
-        {
-            Id = orderId,
-            CustomerId = command.CustomerId,
-            LineItems = lineItems,
-            ShippingAddress = command.ShippingAddress,
-            ShippingMethod = command.ShippingMethod,
-            PaymentMethodToken = command.PaymentMethodToken,
-            TotalAmount = totalAmount,
-            Status = OrderStatus.Placed,
-            PlacedAt = placedAt
-        };
-
-        var @event = new IntegrationMessages.OrderPlaced(
-            orderId,
-            command.CustomerId,
-            lineItems.Select(li => new IntegrationMessages.OrderLineItem(
-                li.Sku,
-                li.Quantity,
-                li.UnitPrice,
-                li.LineTotal)).ToList(),
-            new IntegrationMessages.ShippingAddress(
-                command.ShippingAddress.Street,
-                command.ShippingAddress.Street2,
-                command.ShippingAddress.City,
-                command.ShippingAddress.State,
-                command.ShippingAddress.PostalCode,
-                command.ShippingAddress.Country),
-            command.ShippingMethod,
-            command.PaymentMethodToken,
-            totalAmount,
-            placedAt);
-
-        return (saga, @event);
+        // Delegate to pure Decider function
+        return OrderDecider.Start(command);
     }
 
     /// <summary>

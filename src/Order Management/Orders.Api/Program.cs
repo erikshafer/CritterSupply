@@ -69,6 +69,9 @@ builder.Host.UseWolverine(opts =>
         .Then.Discard();
 
     opts.UseFluentValidation();
+
+    // Explicitly include the Order saga for handler discovery
+    opts.Discovery.IncludeType<Order>();
 });
 
 builder.Services.AddEndpointsApiExplorer();

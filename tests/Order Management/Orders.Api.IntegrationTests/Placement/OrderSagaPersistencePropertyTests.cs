@@ -106,15 +106,17 @@ public static class ValidCheckoutCompletedArbitrary
                     .SelectMany(lineItems => shippingAddressGen
                         .SelectMany(shippingAddress => Gen.Elements("Standard", "Express", "Overnight")
                             .SelectMany(shippingMethod => Gen.Elements("tok_visa", "tok_mastercard", "tok_amex")
-                                .Select(paymentToken => new Orders.Placement.CheckoutCompleted(
-                                    cartId,
-                                    customerId,
-                                    lineItems,
-                                    shippingAddress,
-                                    shippingMethod,
-                                    paymentToken,
-                                    null,
-                                    DateTimeOffset.UtcNow)))))));
+                                .SelectMany(paymentToken => Gen.Choose(500, 2500)
+                                    .Select(shippingCost => new Orders.Placement.CheckoutCompleted(
+                                        Guid.CreateVersion7(), // OrderId
+                                        Guid.CreateVersion7(), // CheckoutId
+                                        customerId,
+                                        lineItems,
+                                        shippingAddress,
+                                        shippingMethod,
+                                        (decimal)shippingCost / 100, // ShippingCost in dollars
+                                        paymentToken,
+                                        DateTimeOffset.UtcNow))))))));
 
         return checkoutGen.ToArbitrary();
     }

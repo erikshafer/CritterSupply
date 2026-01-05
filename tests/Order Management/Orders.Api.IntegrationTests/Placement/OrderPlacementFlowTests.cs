@@ -39,7 +39,8 @@ public class OrderPlacementFlowTests : IAsyncLifetime
     {
         // Arrange: Create a valid CheckoutCompleted event
         var checkout = new CheckoutCompleted(
-            CartId: Guid.NewGuid(),
+            OrderId: Guid.CreateVersion7(),
+            CheckoutId: Guid.CreateVersion7(),
             CustomerId: Guid.NewGuid(),
             LineItems: new List<CheckoutLineItem>
             {
@@ -54,8 +55,8 @@ public class OrderPlacementFlowTests : IAsyncLifetime
                 "98101",
                 "USA"),
             ShippingMethod: "Standard",
+            ShippingCost: 5.99m,
             PaymentMethodToken: "tok_visa_test",
-            AppliedDiscounts: null,
             CompletedAt: DateTimeOffset.UtcNow);
 
         // Act: Send the CheckoutCompleted message through Wolverine and wait for all side effects
@@ -74,7 +75,7 @@ public class OrderPlacementFlowTests : IAsyncLifetime
 
         // Verify order properties match checkout data
         order.Status.ShouldBe(OrderStatus.Placed);
-        order.CustomerId.ShouldBe(checkout.CustomerId);
+        order.CustomerId.ShouldBe(checkout.CustomerId!.Value);
         order.ShippingMethod.ShouldBe(checkout.ShippingMethod);
         order.PaymentMethodToken.ShouldBe(checkout.PaymentMethodToken);
         order.LineItems.Count.ShouldBe(checkout.LineItems.Count);
@@ -92,7 +93,7 @@ public class OrderPlacementFlowTests : IAsyncLifetime
         order.LineItems[1].LineTotal.ShouldBe(49.99m);
 
         // Verify total amount
-        order.TotalAmount.ShouldBe(89.97m);
+        order.TotalAmount.ShouldBe(95.96m); // 89.97 + 5.99 shipping
 
         // Verify shipping address
         order.ShippingAddress.Street.ShouldBe("123 Main St");

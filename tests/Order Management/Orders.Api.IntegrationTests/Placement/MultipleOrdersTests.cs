@@ -79,7 +79,8 @@ public class MultipleOrdersTests : IAsyncLifetime
             .ToList();
 
         var checkout = CreateValidCheckout(customerId, lineItems);
-        var expectedTotal = lineItems.Sum(li => li.Quantity * li.PriceAtPurchase);
+        var lineItemsTotal = lineItems.Sum(li => li.Quantity * li.PriceAtPurchase);
+        var expectedTotal = lineItemsTotal + checkout.ShippingCost;
 
         // Act
         await _fixture.ExecuteAndWaitAsync(checkout);
@@ -92,7 +93,7 @@ public class MultipleOrdersTests : IAsyncLifetime
 
         orders.Count.ShouldBe(1);
         var order = orders.First();
-        
+
         order.LineItems.Count.ShouldBe(lineItemCount);
         order.TotalAmount.ShouldBe(expectedTotal);
         order.Status.ShouldBe(OrderStatus.Placed);
@@ -116,8 +117,9 @@ public class MultipleOrdersTests : IAsyncLifetime
     [Property(MaxTest = 25, Arbitrary = [typeof(ValidCheckoutForTotalArbitrary)])]
     public async Task Order_Total_Is_Calculated_Correctly(CheckoutCompleted checkout)
     {
-        // Calculate expected total
-        var expectedTotal = checkout.LineItems.Sum(li => li.Quantity * li.PriceAtPurchase);
+        // Calculate expected total (line items + shipping)
+        var lineItemsTotal = checkout.LineItems.Sum(li => li.Quantity * li.PriceAtPurchase);
+        var expectedTotal = lineItemsTotal + checkout.ShippingCost;
 
         // Act
         await _fixture.ExecuteAndWaitAsync(checkout);
@@ -129,7 +131,7 @@ public class MultipleOrdersTests : IAsyncLifetime
             .FirstOrDefaultAsync();
 
         order.ShouldNotBeNull();
-        order.TotalAmount.ShouldBe(expectedTotal, $"Total should be {expectedTotal} but was {order.TotalAmount}");
+        order.TotalAmount.ShouldBe(expectedTotal, $"Total should be {expectedTotal} (line items: {lineItemsTotal} + shipping: {checkout.ShippingCost}) but was {order.TotalAmount}");
 
         // Verify each line total
         for (var i = 0; i < checkout.LineItems.Count; i++)
@@ -157,23 +159,25 @@ public class MultipleOrdersTests : IAsyncLifetime
         var lineItems = new List<CheckoutLineItem> { new("SKU-001", 2, 19.99m) };
         
         var checkout1 = new CheckoutCompleted(
-            Guid.NewGuid(), // Different cart ID
+            Guid.CreateVersion7(), // OrderId
+            Guid.CreateVersion7(), // CheckoutId
             customerId,
             lineItems,
             new ShippingAddress("123 Main St", null, "Seattle", "WA", "98101", "USA"),
             "Standard",
+            5.99m, // ShippingCost
             "tok_visa",
-            null,
             DateTimeOffset.UtcNow);
 
         var checkout2 = new CheckoutCompleted(
-            Guid.NewGuid(), // Different cart ID
+            Guid.CreateVersion7(), // OrderId
+            Guid.CreateVersion7(), // CheckoutId
             customerId,
             lineItems, // Same content
             new ShippingAddress("123 Main St", null, "Seattle", "WA", "98101", "USA"),
             "Standard",
+            5.99m, // ShippingCost
             "tok_visa",
-            null,
             DateTimeOffset.UtcNow);
 
         // Act
@@ -192,13 +196,14 @@ public class MultipleOrdersTests : IAsyncLifetime
 
     private static CheckoutCompleted CreateValidCheckout(Guid customerId, IReadOnlyList<CheckoutLineItem> lineItems) =>
         new(
-            CartId: Guid.NewGuid(),
+            OrderId: Guid.CreateVersion7(),
+            CheckoutId: Guid.CreateVersion7(),
             CustomerId: customerId,
             LineItems: lineItems,
             ShippingAddress: new ShippingAddress("123 Main St", null, "Seattle", "WA", "98101", "USA"),
             ShippingMethod: "Standard",
+            ShippingCost: 5.99m,
             PaymentMethodToken: "tok_visa",
-            AppliedDiscounts: null,
             CompletedAt: DateTimeOffset.UtcNow);
 }
 
@@ -224,13 +229,14 @@ public static class ValidCheckoutForTotalArbitrary
 
         var checkoutGen = lineItemsGen
             .Select(lineItems => new Orders.Placement.CheckoutCompleted(
-                Guid.NewGuid(),
+                Guid.CreateVersion7(), // OrderId
+                Guid.CreateVersion7(), // CheckoutId
                 Guid.NewGuid(), // Unique customer ID per test
                 lineItems,
                 new ShippingAddress("123 Test St", null, "TestCity", "TS", "12345", "USA"),
                 "Standard",
+                5.99m, // ShippingCost
                 "tok_test",
-                null,
                 DateTimeOffset.UtcNow));
 
         return checkoutGen.ToArbitrary();

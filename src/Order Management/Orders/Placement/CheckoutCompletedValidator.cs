@@ -10,8 +10,19 @@ public sealed class CheckoutCompletedValidator : AbstractValidator<CheckoutCompl
 {
     public CheckoutCompletedValidator()
     {
+        // Requirement: Order ID must be provided
+        RuleFor(x => x.OrderId)
+            .NotEmpty()
+            .WithMessage("Order identifier is required");
+
+        // Requirement: Checkout ID must be provided
+        RuleFor(x => x.CheckoutId)
+            .NotEmpty()
+            .WithMessage("Checkout identifier is required");
+
         // Requirement 3.4: Missing customer identifier
         RuleFor(x => x.CustomerId)
+            .NotNull()
             .NotEmpty()
             .WithMessage("Customer identifier is required");
 
@@ -37,6 +48,16 @@ public sealed class CheckoutCompletedValidator : AbstractValidator<CheckoutCompl
         RuleFor(x => x.ShippingAddress)
             .NotNull()
             .WithMessage("Shipping address is required");
+
+        // Requirement: Shipping method must be provided
+        RuleFor(x => x.ShippingMethod)
+            .NotEmpty()
+            .WithMessage("Shipping method is required");
+
+        // Requirement: Shipping cost must be non-negative
+        RuleFor(x => x.ShippingCost)
+            .GreaterThanOrEqualTo(0)
+            .WithMessage("Shipping cost must be non-negative");
 
         // Requirement 3.6: Missing payment method token
         RuleFor(x => x.PaymentMethodToken)

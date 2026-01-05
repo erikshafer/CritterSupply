@@ -33,13 +33,14 @@ public class ValidationRejectionTests : IAsyncLifetime
         // Arrange: Create checkout with empty line items
         var customerId = Guid.NewGuid();
         var checkout = new CheckoutCompleted(
-            CartId: Guid.NewGuid(),
+            OrderId: Guid.CreateVersion7(),
+            CheckoutId: Guid.CreateVersion7(),
             CustomerId: customerId,
             LineItems: [], // Empty - should be rejected
             ShippingAddress: new ShippingAddress("123 Main St", null, "Seattle", "WA", "98101", "USA"),
             ShippingMethod: "Standard",
+            ShippingCost: 5.99m,
             PaymentMethodToken: "tok_visa",
-            AppliedDiscounts: null,
             CompletedAt: DateTimeOffset.UtcNow);
 
         // Act: Try to process the invalid checkout
@@ -74,13 +75,14 @@ public class ValidationRejectionTests : IAsyncLifetime
         // Arrange: Create checkout with zero quantity line item
         var customerId = Guid.NewGuid();
         var checkout = new CheckoutCompleted(
-            CartId: Guid.NewGuid(),
+            OrderId: Guid.CreateVersion7(),
+            CheckoutId: Guid.CreateVersion7(),
             CustomerId: customerId,
             LineItems: [new CheckoutLineItem("SKU-001", 0, 19.99m)], // Zero quantity - invalid
             ShippingAddress: new ShippingAddress("123 Main St", null, "Seattle", "WA", "98101", "USA"),
             ShippingMethod: "Standard",
+            ShippingCost: 5.99m,
             PaymentMethodToken: "tok_visa",
-            AppliedDiscounts: null,
             CompletedAt: DateTimeOffset.UtcNow);
 
         // Act
@@ -114,13 +116,14 @@ public class ValidationRejectionTests : IAsyncLifetime
         // Arrange: Create checkout with negative price line item
         var customerId = Guid.NewGuid();
         var checkout = new CheckoutCompleted(
-            CartId: Guid.NewGuid(),
+            OrderId: Guid.CreateVersion7(),
+            CheckoutId: Guid.CreateVersion7(),
             CustomerId: customerId,
             LineItems: [new CheckoutLineItem("SKU-001", 2, -5.00m)], // Negative price - invalid
             ShippingAddress: new ShippingAddress("123 Main St", null, "Seattle", "WA", "98101", "USA"),
             ShippingMethod: "Standard",
+            ShippingCost: 5.99m,
             PaymentMethodToken: "tok_visa",
-            AppliedDiscounts: null,
             CompletedAt: DateTimeOffset.UtcNow);
 
         // Act
@@ -151,15 +154,16 @@ public class ValidationRejectionTests : IAsyncLifetime
     [Fact]
     public async Task Missing_CustomerId_Does_Not_Create_Order()
     {
-        // Arrange: Create checkout with empty customer ID
+        // Arrange: Create checkout with null customer ID
         var checkout = new CheckoutCompleted(
-            CartId: Guid.NewGuid(),
-            CustomerId: Guid.Empty, // Empty - invalid
+            OrderId: Guid.CreateVersion7(),
+            CheckoutId: Guid.CreateVersion7(),
+            CustomerId: null, // Null - invalid
             LineItems: [new CheckoutLineItem("SKU-001", 2, 19.99m)],
             ShippingAddress: new ShippingAddress("123 Main St", null, "Seattle", "WA", "98101", "USA"),
             ShippingMethod: "Standard",
+            ShippingCost: 5.99m,
             PaymentMethodToken: "tok_visa",
-            AppliedDiscounts: null,
             CompletedAt: DateTimeOffset.UtcNow);
 
         // Act
@@ -172,13 +176,11 @@ public class ValidationRejectionTests : IAsyncLifetime
             // Expected - validation should reject this
         }
 
-        // Assert: No order should have been created with empty customer ID
+        // Assert: No order should have been created
         await using var session = _fixture.GetDocumentSession();
-        var orders = await session.Query<Order>()
-            .Where(o => o.CustomerId == Guid.Empty)
-            .ToListAsync();
+        var order = await session.LoadAsync<Order>(checkout.OrderId);
 
-        orders.ShouldBeEmpty("No order should be created when customer ID is missing");
+        order.ShouldBeNull("No order should be created when customer ID is missing");
     }
 
     /// <summary>
@@ -193,13 +195,14 @@ public class ValidationRejectionTests : IAsyncLifetime
         // Arrange: Create checkout with empty payment token
         var customerId = Guid.NewGuid();
         var checkout = new CheckoutCompleted(
-            CartId: Guid.NewGuid(),
+            OrderId: Guid.CreateVersion7(),
+            CheckoutId: Guid.CreateVersion7(),
             CustomerId: customerId,
             LineItems: [new CheckoutLineItem("SKU-001", 2, 19.99m)],
             ShippingAddress: new ShippingAddress("123 Main St", null, "Seattle", "WA", "98101", "USA"),
             ShippingMethod: "Standard",
+            ShippingCost: 5.99m,
             PaymentMethodToken: "", // Empty - invalid
-            AppliedDiscounts: null,
             CompletedAt: DateTimeOffset.UtcNow);
 
         // Act

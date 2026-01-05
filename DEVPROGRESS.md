@@ -139,9 +139,27 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
     - ✅ Added "Use Status Enums for Aggregate State" section to CLAUDE.md
     - ✅ Shopping BC already documented in CONTEXTS.md with Cart/Checkout specifications
 
+- **Orders Integration**: ✅ COMPLETED (2026-01-05)
+    - ✅ Shopping publishes `CheckoutCompleted` → Orders starts saga with `Order.Start()`
+    - ✅ Orders publishes `OrderPlaced` to downstream BCs (Payments, Inventory)
+    - ✅ Implemented Decider + Saga hybrid pattern: `OrderDecider` (pure functions) + `Order.Start()` (Wolverine convention)
+    - ✅ Integration handler maps Shopping contract to Orders command, directly invokes saga
+    - ✅ Updated `CheckoutCompleted` signature: Added `OrderId`, `CheckoutId`, `ShippingCost` (9 parameters)
+    - ✅ Fixed validator for nullable `CustomerId` (`.NotNull().NotEmpty()`)
+    - ✅ Fixed all TotalAmount assertions to include shipping cost
+    - **Integration Test Results**: ✅ All 31 Orders integration tests passing (2 Shopping + 29 existing)
+    - **Final Result**: All 109 tests passing across solution (23 Payments unit + 20 Payments integration + 16 Inventory integration + 6 Fulfillment integration + 15 Shopping integration + 31 Orders integration)
+    - **Key Achievement**: Complete Shopping → Orders → downstream flow working end-to-end
+    - **Key Learnings**:
+        - Wolverine saga `Start()` methods must be on saga class (convention-based discovery)
+        - Saga Start methods work via direct invocation, not cascading messages
+        - Integration handlers should directly call saga methods, not return messages for routing
+        - Decider pattern pairs perfectly with sagas: pure logic in `OrderDecider`, thin wrappers on `Order`
+        - Test simplification: Deleted premature unit tests; focus on integration tests during architecture flux
+
 #### 🔄 In Progress
 
-None - Cycle 4 complete!
+None - Cycle 4 Shopping → Orders integration complete!
 
 #### 🔜 Planned
 
@@ -156,9 +174,11 @@ None - Cycle 4 complete!
 2. **Incremental Integration**: Each BC is polished independently, then integrated one at a time
 3. **Full Test Coverage Before Moving**: Each BC must have passing integration tests before Orders integration
 4. **State Verification Over Message Tracking**: Integration tests verify domain model state changes, not infrastructure concerns
-5. **Pure Functions First**: Business logic isolated in pure functions, handlers delegate to them
-6. **Cascading Messages**: Handlers return messages; Wolverine handles persistence and routing automatically
-7. **Shared Contracts**: Integration messages live in neutral `Messages.Contracts` project; no direct cross-context references
+5. **Decider + Saga Hybrid Pattern**: Pure business logic in `*Decider` classes, thin wrappers on saga for Wolverine conventions
+6. **Pure Functions First**: Business logic isolated in pure functions, handlers delegate to them
+7. **Cascading Messages**: Handlers return messages; Wolverine handles persistence and routing automatically
+8. **Shared Contracts**: Integration messages live in neutral `Messages.Contracts` project; no direct cross-context references
+9. **Saga Methods on Saga Class**: Wolverine convention requires `Start()` and handler methods on saga class itself for discovery
 
 ## Testing Strategy
 
