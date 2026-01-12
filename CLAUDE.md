@@ -1014,6 +1014,204 @@ public static async Task<(Events, OutgoingMessages)> Handle(...)
 | Start new stream | Message Handler | `OutgoingMessages` | `session.Events.StartStream<T>()` |
 | Start new stream | HTTP Endpoint | `(IStartStream, HttpResponse)` | `MartenOps.StartStream<T>()` |
 
+### When to Use `[WriteAggregate]` vs `Load()` Pattern
+
+Wolverine's `[WriteAggregate]` attribute provides automatic aggregate loading and event persistence, but it requires the aggregate ID to be **directly resolvable** from the command properties. Understanding when to use each pattern is crucial for building reliable handlers.
+
+#### Use `[WriteAggregate]` Pattern When:
+
+1. **Command has aggregate ID as a direct property** that Wolverine can auto-resolve
+2. **Aggregate ID doesn't need computation or querying**
+3. **You want Wolverine to handle event persistence automatically**
+
+**Example (Payments BC):**
+```csharp
+public sealed record CapturePayment(
+    Guid PaymentId,  // Direct property - Wolverine can auto-resolve
+    decimal? AmountToCapture);
+
+public static class CapturePaymentHandler
+{
+    public static ProblemDetails Before(
+        CapturePayment command,
+        Payment? payment)  // Wolverine loads by PaymentId
+    {
+        if (payment is null)
+            return new ProblemDetails { Detail = "Payment not found", Status = 404 };
+
+        return WolverineContinue.NoProblems;
+    }
+
+    public static (Events, OutgoingMessages) Handle(
+        CapturePayment command,
+        [WriteAggregate] Payment payment)  // Wolverine handles persistence
+    {
+        var events = new Events();
+        events.Add(new PaymentCaptured(...));
+
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new IntegrationMessages.PaymentCaptured(...));
+
+        return (events, outgoing);  // Wolverine persists events automatically
+    }
+}
+```
+
+#### Use `Load()` Pattern When:
+
+1. **Aggregate ID must be computed** (e.g., derived from multiple properties)
+2. **Aggregate must be discovered via query** (e.g., by non-ID properties)
+3. **Wolverine cannot auto-resolve the aggregate ID**
+4. **You need custom loading logic**
+
+**Example (Inventory BC with computed ID):**
+```csharp
+public sealed record ReserveStock(
+    Guid OrderId,
+    string SKU,
+    string WarehouseId,  // ID computed from SKU + WarehouseId
+    Guid ReservationId,
+    int Quantity)
+{
+    // Computed property - Wolverine cannot auto-resolve this
+    public Guid InventoryId => ProductInventory.CombinedGuid(SKU, WarehouseId);
+}
+
+public static class ReserveStockHandler
+{
+    // Manual loading with custom logic
+    public static async Task<ProductInventory?> Load(
+        ReserveStock command,
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        var inventoryId = command.InventoryId;  // Compute ID
+        return await session.LoadAsync<ProductInventory>(inventoryId, ct);
+    }
+
+    public static ProblemDetails Before(
+        ReserveStock command,
+        ProductInventory? inventory)
+    {
+        if (inventory is null)
+            return new ProblemDetails { Detail = "Inventory not found", Status = 404 };
+
+        return WolverineContinue.NoProblems;
+    }
+
+    // Manual event persistence
+    public static OutgoingMessages Handle(
+        ReserveStock command,
+        ProductInventory inventory,
+        IDocumentSession session)
+    {
+        var domainEvent = new StockReserved(...);
+
+        // Manual append - NOT using [WriteAggregate]
+        session.Events.Append(inventory.Id, domainEvent);
+
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new IntegrationMessages.ReservationConfirmed(...));
+
+        return outgoing;  // Return ONLY OutgoingMessages, not (Events, OutgoingMessages)
+    }
+}
+```
+
+**Example (Querying by non-ID property):**
+```csharp
+public sealed record ReservationCommitRequested(
+    Guid OrderId,
+    Guid ReservationId);  // Need to find inventory by ReservationId, not InventoryId
+
+public static class ReservationCommitRequestedHandler
+{
+    // Query to discover which aggregate to load
+    public static async Task<ProductInventory?> Load(
+        ReservationCommitRequested message,
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        return await session.Query<ProductInventory>()
+            .FirstOrDefaultAsync(i => i.Reservations.ContainsKey(message.ReservationId), ct);
+    }
+
+    public static ProblemDetails Before(
+        ReservationCommitRequested message,
+        ProductInventory? inventory)
+    {
+        if (inventory is null)
+            return new ProblemDetails { Detail = "Inventory not found", Status = 404 };
+
+        return WolverineContinue.NoProblems;
+    }
+
+    public static OutgoingMessages Handle(
+        ReservationCommitRequested message,
+        ProductInventory inventory,
+        IDocumentSession session)
+    {
+        var domainEvent = new ReservationCommitted(...);
+
+        session.Events.Append(inventory.Id, domainEvent);
+
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new IntegrationMessages.ReservationCommitted(...));
+
+        return outgoing;
+    }
+}
+```
+
+#### Key Differences
+
+| Aspect | `[WriteAggregate]` Pattern | `Load()` Pattern |
+|--------|---------------------------|------------------|
+| **Aggregate Loading** | Automatic by Wolverine | Manual via `Load()` method |
+| **ID Resolution** | Must be direct command property | Can be computed or queried |
+| **Event Persistence** | Automatic via return tuple | Manual via `session.Events.Append()` |
+| **Return Type** | `(Events, OutgoingMessages)` | `OutgoingMessages` only |
+| **Use `IDocumentSession` in `Handle()`** | No - Wolverine handles it | Yes - for manual persistence |
+
+#### When in Doubt
+
+**Prefer `[WriteAggregate]`** when possible - it's simpler and leverages Wolverine's automatic event persistence. Only fall back to `Load()` when:
+- Wolverine gives an error: "Unable to determine an aggregate id"
+- Your command doesn't have the aggregate ID as a direct property
+- You need custom querying or ID computation logic
+
+#### Common Pitfall: Double Event Persistence
+
+When using `Load()` pattern, **never** return both events via `session.Events.Append()` AND in the `Events` collection - this will persist events twice:
+
+```csharp
+// BAD - Double persistence!
+public static (Events, OutgoingMessages) Handle(...)
+{
+    var domainEvent = new SomeEvent(...);
+
+    session.Events.Append(inventory.Id, domainEvent);  // Persisted here
+
+    var events = new Events();
+    events.Add(domainEvent);  // Also persisted here - WRONG!
+
+    return (events, outgoing);
+}
+
+// GOOD - Single persistence with Load() pattern
+public static OutgoingMessages Handle(...)
+{
+    var domainEvent = new SomeEvent(...);
+
+    session.Events.Append(inventory.Id, domainEvent);  // Persisted only here
+
+    var outgoing = new OutgoingMessages();
+    outgoing.Add(new IntegrationMessage(...));
+
+    return outgoing;  // No Events collection
+}
+```
+
 ## Testing Principles
 
 In general, prefer integration tests over unit tests. The latter have their place and importance, but we want to leverage tools like Alba and TestContainers to go through the use cases our vertical slices are built to fulfill.

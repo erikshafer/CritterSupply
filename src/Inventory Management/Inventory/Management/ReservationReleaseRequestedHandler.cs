@@ -3,6 +3,7 @@ using Messages.Contracts.Orders;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
+using IntegrationMessages = Messages.Contracts.Inventory;
 
 namespace Inventory.Management;
 
@@ -12,50 +13,53 @@ namespace Inventory.Management;
 /// </summary>
 public static class ReservationReleaseRequestedHandler
 {
-    /// <summary>
-    /// Validates that the reservation exists and can be released.
-    /// </summary>
-    public static async Task<ProblemDetails> Before(
+    public static async Task<ProductInventory?> Load(
         ReservationReleaseRequested message,
         IDocumentSession session,
-        CancellationToken cancellationToken)
+        CancellationToken ct)
     {
-        // Find inventory by reservation (we need to query for it since we don't have InventoryId)
-        var inventory = await session.Query<ProductInventory>()
-            .FirstOrDefaultAsync(i => i.Reservations.ContainsKey(message.ReservationId), cancellationToken);
+        return await session.Query<ProductInventory>()
+            .FirstOrDefaultAsync(i => i.Reservations.ContainsKey(message.ReservationId), ct);
+    }
 
+    public static ProblemDetails Before(
+        ReservationReleaseRequested message,
+        ProductInventory? inventory)
+    {
         if (inventory is null)
-        {
             return new ProblemDetails
             {
                 Detail = $"No inventory found with reservation {message.ReservationId}",
                 Status = 404
             };
-        }
 
         return WolverineContinue.NoProblems;
     }
 
-    /// <summary>
-    /// Handles a ReservationReleaseRequested message by releasing the reservation.
-    /// </summary>
-    public static async Task<object> Handle(
+    public static OutgoingMessages Handle(
         ReservationReleaseRequested message,
-        IDocumentSession session,
-        CancellationToken cancellationToken)
+        ProductInventory inventory,
+        IDocumentSession session)
     {
-        // Load the inventory aggregate
-        var inventory = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.Reservations.ContainsKey(message.ReservationId), cancellationToken);
+        var releasedAt = DateTimeOffset.UtcNow;
 
-        // Release reservation (pure function)
-        var (updatedInventory, domainEvent, integrationMessage) = inventory.Release(
+        var quantity = inventory.Reservations[message.ReservationId];
+
+        var domainEvent = new ReservationReleased(message.ReservationId, quantity, message.Reason, releasedAt);
+
+        session.Events.Append(inventory.Id, domainEvent);
+
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new IntegrationMessages.ReservationReleased(
+            message.OrderId,
+            inventory.Id,
             message.ReservationId,
-            message.Reason);
+            inventory.Sku,
+            inventory.WarehouseId,
+            quantity,
+            message.Reason,
+            releasedAt));
 
-        // Persist events to Marten event store
-        session.Events.Append(inventory.Id, updatedInventory.PendingEvents.ToArray());
-
-        return integrationMessage;
+        return outgoing;
     }
 }

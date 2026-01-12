@@ -63,7 +63,7 @@ public class OrderPlacedFlowTests : IAsyncLifetime
         // Assert: Verify inventory was reserved
         await using var session = _fixture.GetDocumentSession();
         var inventory = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         inventory.AvailableQuantity.ShouldBe(95); // 100 - 5
         inventory.ReservedQuantity.ShouldBe(5);
@@ -117,7 +117,7 @@ public class OrderPlacedFlowTests : IAsyncLifetime
         // Assert: Verify single reservation with aggregated quantity
         await using var session = _fixture.GetDocumentSession();
         var inventory = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         inventory.AvailableQuantity.ShouldBe(90); // 100 - (3 + 7)
         inventory.ReservedQuantity.ShouldBe(10);
@@ -170,9 +170,9 @@ public class OrderPlacedFlowTests : IAsyncLifetime
         // Assert: Verify separate reservations
         await using var session = _fixture.GetDocumentSession();
         var inventory1 = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku1 && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku1 && i.WarehouseId == warehouseId);
         var inventory2 = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku2 && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku2 && i.WarehouseId == warehouseId);
 
         // Verify first SKU
         inventory1.AvailableQuantity.ShouldBe(95);
