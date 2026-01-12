@@ -1,9 +1,36 @@
+using FluentValidation;
+using Wolverine.Marten;
+
 namespace Inventory.Management;
 
-/// <summary>
-/// Command to create initial inventory tracking for a SKU at a warehouse.
-/// </summary>
 public sealed record InitializeInventory(
-    string SKU,
+    string Sku,
     string WarehouseId,
-    int InitialQuantity);
+    int InitialQuantity)
+{
+    public class InitializeInventoryValidator : AbstractValidator<InitializeInventory>
+    {
+        public InitializeInventoryValidator()
+        {
+            RuleFor(x => x.Sku).NotEmpty().MaximumLength(50);
+            RuleFor(x => x.WarehouseId).NotEmpty().MaximumLength(50);
+            RuleFor(x => x.InitialQuantity).GreaterThanOrEqualTo(0);
+        }
+    }
+}
+
+public static class InitializeInventoryHandler
+{
+    public static IStartStream Handle(InitializeInventory command)
+    {
+        var @event = new InventoryInitialized(
+            command.Sku,
+            command.WarehouseId,
+            command.InitialQuantity,
+            DateTimeOffset.UtcNow);
+
+        var inventoryId = ProductInventory.CombinedGuid(command.Sku, command.WarehouseId);
+
+        return MartenOps.StartStream<ProductInventory>(inventoryId, @event);
+    }
+}

@@ -38,7 +38,7 @@ public class ReservationFlowTests : IAsyncLifetime
         // Verify inventory created
         await using var session = _fixture.GetDocumentSession();
         var inventory = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         inventory.AvailableQuantity.ShouldBe(initialQuantity);
 
@@ -86,7 +86,7 @@ public class ReservationFlowTests : IAsyncLifetime
         // Assert: Verify reservation did NOT occur
         await using var querySession = _fixture.GetDocumentSession();
         var inventory = await querySession.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         inventory.AvailableQuantity.ShouldBe(initialQuantity); // Unchanged
         inventory.ReservedQuantity.ShouldBe(0); // No reservation
@@ -121,7 +121,7 @@ public class ReservationFlowTests : IAsyncLifetime
         // Assert: Verify all reservations succeeded
         await using var querySession = _fixture.GetDocumentSession();
         var inventory = await querySession.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         inventory.AvailableQuantity.ShouldBe(40); // 100 - 10 - 20 - 30
         inventory.ReservedQuantity.ShouldBe(60); // 10 + 20 + 30
@@ -155,7 +155,7 @@ public class ReservationFlowTests : IAsyncLifetime
         // Assert: Verify reservation succeeded and available = 0
         await using var querySession = _fixture.GetDocumentSession();
         var inventory = await querySession.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         inventory.AvailableQuantity.ShouldBe(0);
         inventory.ReservedQuantity.ShouldBe(50);

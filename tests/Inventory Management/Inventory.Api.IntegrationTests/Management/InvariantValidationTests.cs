@@ -36,7 +36,7 @@ public class InvariantValidationTests : IAsyncLifetime
 
         await using var session = _fixture.GetDocumentSession();
         var inventory = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         // Reserve 90 units
         var orderId = Guid.NewGuid();
@@ -72,7 +72,7 @@ public class InvariantValidationTests : IAsyncLifetime
 
         await using var session = _fixture.GetDocumentSession();
         var inventory = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         // Step 1: Initial state
         inventory.TotalOnHand.ShouldBe(100);
@@ -135,7 +135,7 @@ public class InvariantValidationTests : IAsyncLifetime
 
         await using var session = _fixture.GetDocumentSession();
         var inventory = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         // The command with quantity=0 would fail validation
         // We verify inventory state hasn't changed
@@ -159,7 +159,7 @@ public class InvariantValidationTests : IAsyncLifetime
 
         await using var session = _fixture.GetDocumentSession();
         var inventory = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         // Act: Attempt to commit reservation that doesn't exist
         var fakeReservationId = Guid.NewGuid();
@@ -191,7 +191,7 @@ public class InvariantValidationTests : IAsyncLifetime
 
         await using var session = _fixture.GetDocumentSession();
         var inventory = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         // Act: Attempt to release reservation that doesn't exist
         var fakeReservationId = Guid.NewGuid();

@@ -37,7 +37,7 @@ public class CommitReleaseFlowTests : IAsyncLifetime
 
         await using var session = _fixture.GetDocumentSession();
         var inventory = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         var orderId = Guid.NewGuid();
         await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, reservationId, 25));
@@ -76,7 +76,7 @@ public class CommitReleaseFlowTests : IAsyncLifetime
 
         await using var session = _fixture.GetDocumentSession();
         var inventory = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         var orderId = Guid.NewGuid();
         await _fixture.ExecuteAndWaitAsync(new ReserveStock(orderId, sku, warehouseId, reservationId, 30));
@@ -118,7 +118,7 @@ public class CommitReleaseFlowTests : IAsyncLifetime
 
         await using var session = _fixture.GetDocumentSession();
         var inventory = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         // Reserve three times
         var reservation1 = Guid.NewGuid();
@@ -167,7 +167,7 @@ public class CommitReleaseFlowTests : IAsyncLifetime
 
         await using var session = _fixture.GetDocumentSession();
         var inventory = await session.Query<ProductInventory>()
-            .FirstAsync(i => i.SKU == sku && i.WarehouseId == warehouseId);
+            .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         // Act: Receive new stock
         var receiveCommand = new ReceiveStock(inventory.Id, 100, "Supplier ABC");
