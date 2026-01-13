@@ -1,13 +1,13 @@
 using JasperFx.Events;
-using Shopping.Cart;
+using ShoppingContracts = Messages.Contracts.Shopping;
 
-namespace Shopping.Checkout;
+namespace Orders.Checkout;
 
 public sealed record Checkout(
     Guid Id,
     Guid CartId,
     Guid? CustomerId,
-    IReadOnlyList<CartLineItem> Items,
+    IReadOnlyList<ShoppingContracts.CheckoutLineItem> Items,
     DateTimeOffset StartedAt,
     ShippingAddress? ShippingAddress,
     string? ShippingMethod,

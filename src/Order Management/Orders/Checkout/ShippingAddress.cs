@@ -1,4 +1,4 @@
-namespace Shopping.Checkout;
+namespace Orders.Checkout;
 
 public sealed record ShippingAddress(
     string AddressLine1,

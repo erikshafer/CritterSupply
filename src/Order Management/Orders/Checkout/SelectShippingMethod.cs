@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Wolverine.Http;
 using Wolverine.Marten;
 
-namespace Shopping.Checkout;
+namespace Orders.Checkout;
 
 public sealed record SelectShippingMethod(
     Guid CheckoutId,

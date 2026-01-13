@@ -3,8 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
 using Wolverine.Marten;
+using ShoppingContracts = Messages.Contracts.Shopping;
 
-namespace Shopping.Checkout;
+namespace Orders.Checkout;
 
 public sealed record CompleteCheckout(
     Guid CheckoutId)
@@ -71,15 +72,15 @@ public static class CompleteCheckoutHandler
 
         // Prepare integration message to Orders
         var messages = new OutgoingMessages();
-        messages.Add(new Messages.Contracts.Shopping.CheckoutCompleted(
+        messages.Add(new ShoppingContracts.CheckoutCompleted(
             orderId,
             checkout.Id,
             checkout.CustomerId,
-            checkout.Items.Select(i => new Messages.Contracts.Shopping.CheckoutLineItem(
+            checkout.Items.Select(i => new ShoppingContracts.CheckoutLineItem(
                 i.Sku,
                 i.Quantity,
                 i.UnitPrice)).ToList(),
-            new Messages.Contracts.Shopping.ShippingAddress(
+            new ShoppingContracts.ShippingAddress(
                 checkout.ShippingAddress!.AddressLine1,
                 checkout.ShippingAddress.AddressLine2,
                 checkout.ShippingAddress.City,

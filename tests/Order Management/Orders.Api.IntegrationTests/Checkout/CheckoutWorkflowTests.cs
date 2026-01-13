@@ -1,10 +1,10 @@
 using Marten;
-using Shopping.Cart;
-using Shopping.Checkout;
+using Orders.Checkout;
+using ShoppingContracts = Messages.Contracts.Shopping;
 
-namespace Shopping.Api.IntegrationTests.Checkout;
+namespace Orders.Api.IntegrationTests.Checkout;
 
-[Collection(nameof(IntegrationTestCollection))]
+[Collection(IntegrationTestCollection.Name)]
 public class CheckoutWorkflowTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;
@@ -18,31 +18,33 @@ public class CheckoutWorkflowTests : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task InitiateCheckout_FromCart_CreatesCheckoutStream()
+    public async Task CheckoutInitiated_FromShopping_CreatesCheckoutStream()
     {
-        // Arrange - Create cart with items
+        // Arrange - Simulate Shopping BC publishing CheckoutInitiated
+        var checkoutId = Guid.CreateVersion7();
+        var cartId = Guid.CreateVersion7();
         var customerId = Guid.CreateVersion7();
-        var initCart = new InitializeCart(customerId, null);
-        await _fixture.ExecuteAndWaitAsync(initCart);
+        var items = new List<ShoppingContracts.CheckoutLineItem>
+        {
+            new("SKU-001", 2, 19.99m)
+        };
 
-        using var session = _fixture.GetDocumentSession();
-        var cart = await session.Query<Shopping.Cart.Cart>()
-            .Where(c => c.CustomerId == customerId)
-            .SingleAsync();
+        var message = new ShoppingContracts.CheckoutInitiated(
+            checkoutId,
+            cartId,
+            customerId,
+            items,
+            DateTimeOffset.UtcNow);
 
-        var addItem = new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m);
-        await _fixture.ExecuteAndWaitAsync(addItem);
-
-        // Act - Initiate checkout
-        var initiateCheckout = new InitiateCheckout(cart.Id);
-        await _fixture.ExecuteAndWaitAsync(initiateCheckout);
+        // Act - Handle integration message
+        await _fixture.ExecuteAndWaitAsync(message);
 
         // Assert - Verify checkout stream created
-        var checkout = await session.Query<Shopping.Checkout.Checkout>()
-            .Where(c => c.CartId == cart.Id)
-            .SingleAsync();
+        using var session = _fixture.GetDocumentSession();
+        var checkout = await session.LoadAsync<Orders.Checkout.Checkout>(checkoutId);
 
-        checkout.CartId.ShouldBe(cart.Id);
+        checkout.ShouldNotBeNull();
+        checkout.CartId.ShouldBe(cartId);
         checkout.CustomerId.ShouldBe(customerId);
         checkout.Items.ShouldNotBeEmpty();
         checkout.Items.Count.ShouldBe(1);
@@ -70,7 +72,7 @@ public class CheckoutWorkflowTests : IAsyncLifetime
 
         // Assert - Verify address stored
         using var session = _fixture.GetDocumentSession();
-        var checkout = await session.LoadAsync<Shopping.Checkout.Checkout>(checkoutId);
+        var checkout = await session.LoadAsync<Orders.Checkout.Checkout>(checkoutId);
 
         checkout.ShouldNotBeNull();
         checkout.ShippingAddress.ShouldNotBeNull();
@@ -93,7 +95,7 @@ public class CheckoutWorkflowTests : IAsyncLifetime
 
         // Assert - Verify shipping method stored
         using var session = _fixture.GetDocumentSession();
-        var checkout = await session.LoadAsync<Shopping.Checkout.Checkout>(checkoutId);
+        var checkout = await session.LoadAsync<Orders.Checkout.Checkout>(checkoutId);
 
         checkout.ShouldNotBeNull();
         checkout.ShippingMethod.ShouldBe("Standard Ground");
@@ -113,7 +115,7 @@ public class CheckoutWorkflowTests : IAsyncLifetime
 
         // Assert - Verify payment token stored
         using var session = _fixture.GetDocumentSession();
-        var checkout = await session.LoadAsync<Shopping.Checkout.Checkout>(checkoutId);
+        var checkout = await session.LoadAsync<Orders.Checkout.Checkout>(checkoutId);
 
         checkout.ShouldNotBeNull();
         checkout.PaymentMethodToken.ShouldBe("tok_visa_4242");
@@ -136,7 +138,7 @@ public class CheckoutWorkflowTests : IAsyncLifetime
 
         // Assert - Verify checkout completed
         using var session = _fixture.GetDocumentSession();
-        var checkout = await session.LoadAsync<Shopping.Checkout.Checkout>(checkoutId);
+        var checkout = await session.LoadAsync<Orders.Checkout.Checkout>(checkoutId);
 
         checkout.ShouldNotBeNull();
         checkout.IsCompleted.ShouldBeTrue();
@@ -158,11 +160,11 @@ public class CheckoutWorkflowTests : IAsyncLifetime
         await _fixture.ExecuteAndWaitAsync(command);
 
         // Assert - Verify checkout is marked complete with all required data
-        // Note: Integration message (CheckoutCompleted) is published to Orders BC but we don't
+        // Note: Integration message (CheckoutCompleted) is published back to Shopping BC but we don't
         // verify outgoing messages in integration tests since DisableAllExternalWolverineTransports()
-        // prevents actual message routing. Message handling is verified in Orders BC integration tests.
+        // prevents actual message routing. Message handling would be verified in a full system integration test.
         using var session = _fixture.GetDocumentSession();
-        var checkout = await session.LoadAsync<Shopping.Checkout.Checkout>(checkoutId);
+        var checkout = await session.LoadAsync<Orders.Checkout.Checkout>(checkoutId);
 
         checkout.ShouldNotBeNull();
         checkout.IsCompleted.ShouldBeTrue();
@@ -176,25 +178,23 @@ public class CheckoutWorkflowTests : IAsyncLifetime
 
     private async Task<Guid> CreateCheckoutWithItems()
     {
+        var checkoutId = Guid.CreateVersion7();
+        var cartId = Guid.CreateVersion7();
         var customerId = Guid.CreateVersion7();
-        var initCart = new InitializeCart(customerId, null);
-        await _fixture.ExecuteAndWaitAsync(initCart);
+        var items = new List<ShoppingContracts.CheckoutLineItem>
+        {
+            new("SKU-001", 2, 19.99m)
+        };
 
-        using var session = _fixture.GetDocumentSession();
-        var cart = await session.Query<Shopping.Cart.Cart>()
-            .Where(c => c.CustomerId == customerId)
-            .SingleAsync();
+        var message = new ShoppingContracts.CheckoutInitiated(
+            checkoutId,
+            cartId,
+            customerId,
+            items,
+            DateTimeOffset.UtcNow);
 
-        var addItem = new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m);
-        await _fixture.ExecuteAndWaitAsync(addItem);
+        await _fixture.ExecuteAndWaitAsync(message);
 
-        var initiateCheckout = new InitiateCheckout(cart.Id);
-        await _fixture.ExecuteAndWaitAsync(initiateCheckout);
-
-        var checkout = await session.Query<Shopping.Checkout.Checkout>()
-            .Where(c => c.CartId == cart.Id)
-            .SingleAsync();
-
-        return checkout.Id;
+        return checkoutId;
     }
 }

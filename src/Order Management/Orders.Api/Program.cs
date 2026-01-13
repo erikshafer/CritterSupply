@@ -5,9 +5,11 @@ using JasperFx.Core;
 using JasperFx.Events.Daemon;
 using JasperFx.Resources;
 using Marten;
+using Marten.Events.Projections;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Orders;
+using Orders.Checkout;
 using Orders.Placement;
 using Weasel.Core;
 using Wolverine;
@@ -36,6 +38,9 @@ builder.Services.AddMarten(opts =>
         opts.Schema.For<Order>()
             .Identity(x => x.Id)
             .UseNumericRevisions(true);
+
+        // Configure Checkout aggregate as an event sourced stream
+        opts.Projections.Snapshot<Checkout>(SnapshotLifecycle.Inline);
 
         // projections here
     })
@@ -70,8 +75,9 @@ builder.Host.UseWolverine(opts =>
 
     opts.UseFluentValidation();
 
-    // Explicitly include the Order saga for handler discovery
+    // Explicitly include the Order saga and Checkout namespace for handler discovery
     opts.Discovery.IncludeType<Order>();
+    opts.Discovery.IncludeType<Checkout>();
 });
 
 builder.Services.AddEndpointsApiExplorer();

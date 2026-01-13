@@ -33,9 +33,8 @@ builder.Services.AddMarten(opts =>
         opts.DatabaseSchemaName = Constants.Shopping.ToLowerInvariant();
         opts.DisableNpgsqlLogging = true;
 
-        // Register Cart and Checkout aggregates for event sourcing
+        // Register Cart aggregate for event sourcing
         opts.Projections.Snapshot<Cart>(SnapshotLifecycle.Inline);
-        opts.Projections.Snapshot<Shopping.Checkout.Checkout>(SnapshotLifecycle.Inline);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()

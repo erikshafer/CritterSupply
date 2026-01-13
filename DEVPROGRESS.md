@@ -223,7 +223,7 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
         - Only needed: remove `PendingEvents` and colocate handlers with commands
         - `[WriteAggregate]` works perfectly when command has direct `ShipmentId` property
 
-**Cycle 8: Checkout Migration - Moving to Orders BC (In Progress - 2026-01-13)**
+**Cycle 8: Checkout Migration - Moving to Orders BC (Completed - 2026-01-13)**
 - **Objective**: Migrate Checkout aggregate from Shopping BC to Orders BC to establish clearer bounded context boundaries
 - **Strategy**: Option A - Move only Checkout aggregate; Cart remains in Shopping BC
 - **Rationale**:
@@ -234,16 +234,17 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 - **Integration Pattern**: `Shopping.CheckoutInitiated` (published by Cart) → `Orders.CheckoutStarted` (handled by Orders)
 - **HTTP Endpoints**: Checkout endpoints remain at `/api/checkouts/*` (flat, resource-centric pattern)
 - **Migration Phases**:
-    1. Create `Shopping.CheckoutInitiated` integration message
-    2. Move Checkout aggregate, commands, handlers, events to Orders BC
-    3. Move `/api/checkouts/*` HTTP endpoints to Orders.Api
-    4. Move checkout integration tests to Orders.Api.IntegrationTests
-    5. Cleanup: delete checkout files from Shopping BC, update documentation
-- **Status**: Planning complete, ready to execute
+    1. ✅ Create `Shopping.CheckoutInitiated` integration message
+    2. ✅ Move Checkout aggregate, commands, handlers, events to Orders BC
+    3. ✅ Move `/api/checkouts/*` HTTP endpoints to Orders.Api
+    4. ✅ Move checkout integration tests to Orders.Api.IntegrationTests
+    5. ✅ Cleanup: delete checkout files from Shopping BC, update documentation
+- **Status**: Complete - All 6 checkout tests passing in Orders BC
+- **Key Learning**: Domain events must include aggregate ID as first parameter for Marten inline projections to work correctly
 
 #### 🔄 In Progress
 
-Cycle 8 - Checkout Migration to Orders BC
+None - Ready for next cycle
 
 #### 🔜 Planned
 
@@ -348,4 +349,4 @@ RabbitMQ runs in Docker via `docker-compose`:
 
 **Last Updated**: 2026-01-13
 **Current Developer(s)**: Erik Shafer / Claude AI Assistant
-**Development Status**: Cycle 7 Complete → Fulfillment BC Refactored (Modern Critter Stack Patterns)
+**Development Status**: Cycle 8 Complete → Checkout Migrated to Orders BC

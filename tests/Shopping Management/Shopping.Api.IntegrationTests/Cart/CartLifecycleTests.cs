@@ -198,19 +198,12 @@ public class CartLifecycleTests : IAsyncLifetime
         // Act
         await _fixture.ExecuteAndWaitAsync(initiateCommand);
 
-        // Assert
+        // Assert - Shopping BC only verifies cart transitions to terminal state
+        // Checkout creation is now verified in Orders.Api.IntegrationTests
         var updatedCart = await session.Events.AggregateStreamAsync<Shopping.Cart.Cart>(cart.Id);
         updatedCart.ShouldNotBeNull();
         updatedCart.Status.ShouldBe(CartStatus.CheckedOut);
         updatedCart.IsTerminal.ShouldBeTrue();
-
-        // Verify checkout stream was created
-        var checkouts = await session.Query<Shopping.Checkout.Checkout>().ToListAsync();
-        var checkout = checkouts.ShouldHaveSingleItem();
-        checkout.CartId.ShouldBe(cart.Id);
-        checkout.CustomerId.ShouldBe(customerId);
-        checkout.Items.Count.ShouldBe(1);
-        checkout.Items[0].Sku.ShouldBe("SKU-001");
     }
 
     [Fact]
