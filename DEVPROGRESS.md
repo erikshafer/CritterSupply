@@ -185,9 +185,47 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
     - ✅ Summary table for quick pattern reference
     - **Final Result**: All 98 tests passing across solution (11 Payments unit + 19 Payments integration + 16 Inventory integration + 6 Fulfillment integration + 31 Orders integration + 15 Shopping integration)
 
+**Cycle 6: Inventory BC Refactoring - Modern Critter Stack Patterns (Completed - 2026-01-13)**
+- **BC Refactoring**: Applied modern Critter Stack idioms to existing Inventory BC
+    - Refactored to write-only aggregates (removed `PendingEvents`, kept only `Create()` and `Apply()`)
+    - Colocated commands, validators, and handlers in single files (1:1 relationship pattern)
+    - Applied `Load()` pattern for handlers with computed aggregate IDs (e.g., `CombinedGuid(Sku, WarehouseId)`)
+    - Used manual `session.Events.Append()` for event persistence when Wolverine can't auto-resolve IDs
+    - Renamed `SKU` to `Sku` following .NET naming conventions (only two-letter abbreviations capitalized)
+    - **Status**: ✅ 16/16 integration tests passing
+    - **Test Breakdown**: 16 Inventory integration tests
+    - **Files**: `/src/Inventory Management/Inventory/Management/` (all handlers refactored)
+    - **Key Learnings**:
+        - `Load()` pattern required when aggregate ID is computed property, not direct command parameter
+        - When using `Load()`, return `OutgoingMessages` only (not `(Events, OutgoingMessages)`)
+        - Never use `Load()` + `[WriteAggregate]` together - causes double database hits
+        - `[WriteAggregate]` is ALWAYS preferred when Wolverine can auto-resolve the aggregate ID
+
+- **Documentation Updates**: ✅ COMPLETED (2026-01-13)
+    - ✅ Added "Preference Hierarchy" section to CLAUDE.md explaining when to use `[WriteAggregate]` vs `Load()` pattern
+    - ✅ Added decision table: direct ID property → `[WriteAggregate]`, computed ID → `Load()`, query needed → `Load()`
+    - ✅ Clarified that `[WriteAggregate]` is the cleanest, most efficient, and idiomatic pattern
+    - ✅ Added warning about double database hits when mixing `Load()` + `[WriteAggregate]`
+    - **Final Result**: All 98 tests passing across solution
+
+**Cycle 7: Fulfillment BC Refactoring - Modern Critter Stack Patterns (Completed - 2026-01-13)**
+- **BC Refactoring**: Applied modern Critter Stack idioms to existing Fulfillment BC
+    - Removed `PendingEvents` collection from `Shipment` aggregate (already write-only model)
+    - Colocated commands, validators, and handlers in single files:
+        - `RequestFulfillment.cs`, `AssignWarehouse.cs`, `DispatchShipment.cs`, `ConfirmDelivery.cs`
+    - Handlers already using `[WriteAggregate]` pattern correctly (no changes needed)
+    - Deleted old separated handler files (colocation complete)
+    - **Status**: ✅ 6/6 integration tests passing
+    - **Test Breakdown**: 6 Fulfillment integration tests
+    - **Files**: `/src/Fulfillment Management/Fulfillment/Shipments/` (handlers colocated)
+    - **Key Learnings**:
+        - Fulfillment BC was already following modern patterns (minimal refactoring needed)
+        - Only needed: remove `PendingEvents` and colocate handlers with commands
+        - `[WriteAggregate]` works perfectly when command has direct `ShipmentId` property
+
 #### 🔄 In Progress
 
-None - Cycle 5 Payments BC refactoring complete!
+None - Cycle 7 Fulfillment BC refactoring complete!
 
 #### 🔜 Planned
 
@@ -290,6 +328,6 @@ RabbitMQ runs in Docker via `docker-compose`:
 
 ---
 
-**Last Updated**: 2026-01-06
+**Last Updated**: 2026-01-13
 **Current Developer(s)**: Erik Shafer / Claude AI Assistant
-**Development Status**: Cycle 5 Complete → Payments BC Refactored (Modern Critter Stack Patterns)
+**Development Status**: Cycle 7 Complete → Fulfillment BC Refactored (Modern Critter Stack Patterns)

@@ -1018,6 +1018,18 @@ public static async Task<(Events, OutgoingMessages)> Handle(...)
 
 Wolverine's `[WriteAggregate]` attribute provides automatic aggregate loading and event persistence, but it requires the aggregate ID to be **directly resolvable** from the command properties. Understanding when to use each pattern is crucial for building reliable handlers.
 
+#### Preference Hierarchy
+
+**ALWAYS prefer `[WriteAggregate]` as your first choice.** It is the cleanest, most efficient, and most idiomatic pattern for Wolverine handlers. Only fall back to the `Load()` pattern when you encounter specific use cases that prevent Wolverine from auto-resolving the aggregate ID.
+
+| Scenario | Use This Pattern | Why |
+|----------|-----------------|-----|
+| **Aggregate ID is a direct command property** (e.g., `PaymentId`, `OrderId`) | ✅ `[WriteAggregate]` | Wolverine auto-loads and auto-persists - clean and efficient |
+| **Aggregate ID must be computed** (e.g., `CombinedGuid(Sku, WarehouseId)`) | ⚠️ `Load()` method | Wolverine can't resolve computed properties - manual loading required |
+| **Aggregate must be discovered via query** (e.g., find by `ReservationId`, not `InventoryId`) | ⚠️ `Load()` method | Wolverine needs a direct ID - queries require manual loading |
+
+**Key Principle:** If Wolverine can auto-resolve the aggregate ID from the command properties, use `[WriteAggregate]`. This gives you automatic loading, validation, and event persistence with minimal ceremony.
+
 #### Use `[WriteAggregate]` Pattern When:
 
 1. **Command has aggregate ID as a direct property** that Wolverine can auto-resolve
@@ -1068,13 +1080,13 @@ public static class CapturePaymentHandler
 ```csharp
 public sealed record ReserveStock(
     Guid OrderId,
-    string SKU,
-    string WarehouseId,  // ID computed from SKU + WarehouseId
+    string Sku,
+    string WarehouseId,  // ID computed from Sku + WarehouseId
     Guid ReservationId,
     int Quantity)
 {
     // Computed property - Wolverine cannot auto-resolve this
-    public Guid InventoryId => ProductInventory.CombinedGuid(SKU, WarehouseId);
+    public Guid InventoryId => ProductInventory.CombinedGuid(Sku, WarehouseId);
 }
 
 public static class ReserveStockHandler
@@ -1094,15 +1106,19 @@ public static class ReserveStockHandler
         ProductInventory? inventory)
     {
         if (inventory is null)
-            return new ProblemDetails { Detail = "Inventory not found", Status = 404 };
+            return new ProblemDetails
+            {
+                Detail = $"No inventory found for SKU {command.Sku} at warehouse {command.WarehouseId}",
+                Status = 404
+            };
 
         return WolverineContinue.NoProblems;
     }
 
-    // Manual event persistence
+    // Manual event persistence - aggregate parameter has NO [WriteAggregate]
     public static OutgoingMessages Handle(
         ReserveStock command,
-        ProductInventory inventory,
+        ProductInventory inventory,  // NO [WriteAggregate] - already loaded by Load()
         IDocumentSession session)
     {
         var domainEvent = new StockReserved(...);
@@ -1175,10 +1191,14 @@ public static class ReservationCommitRequestedHandler
 
 #### When in Doubt
 
-**Prefer `[WriteAggregate]`** when possible - it's simpler and leverages Wolverine's automatic event persistence. Only fall back to `Load()` when:
-- Wolverine gives an error: "Unable to determine an aggregate id"
-- Your command doesn't have the aggregate ID as a direct property
-- You need custom querying or ID computation logic
+**ALWAYS start with `[WriteAggregate]`** - it's the cleanest, most efficient, and idiomatic pattern. It leverages Wolverine's automatic aggregate loading and event persistence, minimizing ceremony and reducing the chance of errors.
+
+Only fall back to `Load()` when you encounter one of these specific situations:
+- **Wolverine gives an error:** "Unable to determine an aggregate id"
+- **Command doesn't have a direct ID property:** The aggregate ID must be computed from multiple properties (e.g., `CombinedGuid(Sku, WarehouseId)`)
+- **Aggregate must be discovered:** You need to query by a non-ID property (e.g., find inventory by `ReservationId` instead of `InventoryId`)
+
+**Important:** Never use `Load()` + `[WriteAggregate]` together - this would hit the database twice. When using `Load()`, the aggregate parameter should **not** have `[WriteAggregate]` attribute, and you must manually persist events via `session.Events.Append()`.
 
 #### Common Pitfall: Double Event Persistence
 
