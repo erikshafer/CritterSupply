@@ -39,7 +39,7 @@ builder.Services.AddMarten(opts =>
             .Identity(x => x.Id)
             .UseNumericRevisions(true);
 
-        // Configure Checkout aggregate as event sourced stream
+        // Configure Checkout aggregate as an event sourced stream
         opts.Projections.Snapshot<Checkout>(SnapshotLifecycle.Inline);
 
         // projections here
@@ -75,8 +75,9 @@ builder.Host.UseWolverine(opts =>
 
     opts.UseFluentValidation();
 
-    // Explicitly include the Order saga for handler discovery
+    // Explicitly include the Order saga and Checkout namespace for handler discovery
     opts.Discovery.IncludeType<Order>();
+    opts.Discovery.IncludeType<Checkout>();
 });
 
 builder.Services.AddEndpointsApiExplorer();
