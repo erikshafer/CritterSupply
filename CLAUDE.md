@@ -375,6 +375,83 @@ public class Payment : Aggregate
 }
 ```
 
+#### Domain Event Structure and Identity
+
+Domain events are the persisted records of state changes in event-sourced aggregates. When designing events for Marten's event store, follow these guidelines to ensure proper projection and aggregate reconstruction.
+
+**Include Aggregate IDs in Event Data**
+
+Even though the stream ID identifies which aggregate an event belongs to, **always include the aggregate ID as the first parameter in your event record**. This serves multiple purposes:
+
+1. **Marten Projection Conventions**: Marten's inline projections and snapshot aggregates rely on event data structure for proper reconstruction
+2. **Event Clarity**: Makes events self-documenting when viewed in isolation (e.g., in logs, debugging, or event replays)
+3. **Cross-Reference**: Enables easier correlation between events and aggregates in queries and diagnostics
+
+**Example - Correct Event Structure:**
+
+```csharp
+// Good - Includes CheckoutId even though it's also the stream ID
+public sealed record CheckoutStarted(
+    Guid CheckoutId,    // Always include the aggregate ID first
+    Guid CartId,
+    Guid? CustomerId,
+    IReadOnlyList<CheckoutLineItem> Items,
+    DateTimeOffset StartedAt);
+
+// Handler starting the stream
+public static class CheckoutInitiatedHandler
+{
+    public static void Handle(
+        Shopping.CheckoutInitiated message,
+        IDocumentSession session)
+    {
+        var startedEvent = new CheckoutStarted(
+            message.CheckoutId,  // Pass the ID explicitly
+            message.CartId,
+            message.CustomerId,
+            message.Items,
+            message.InitiatedAt);
+
+        // Stream ID matches the CheckoutId in the event
+        session.Events.StartStream<Checkout>(message.CheckoutId, startedEvent);
+    }
+}
+
+// Aggregate Create method expects the ID in the event
+public sealed record Checkout(...)
+{
+    public static Checkout Create(IEvent<CheckoutStarted> @event) =>
+        new(@event.StreamId,           // Stream ID from Marten
+            @event.Data.CartId,        // Event data
+            @event.Data.CustomerId,
+            @event.Data.Items,
+            @event.Data.StartedAt,
+            ...);
+}
+```
+
+**Example - Incorrect Event Structure:**
+
+```csharp
+// Bad - Omitting the aggregate ID breaks Marten conventions
+public sealed record CheckoutStarted(
+    // Missing CheckoutId - this will cause projection issues
+    Guid CartId,
+    Guid? CustomerId,
+    IReadOnlyList<CheckoutLineItem> Items,
+    DateTimeOffset StartedAt);
+```
+
+**Why This Matters:**
+
+When Marten applies inline projections using `opts.Projections.Snapshot<T>(SnapshotLifecycle.Inline)`, it expects event data to follow certain conventions for aggregate identity. Omitting the aggregate ID from event data can cause:
+
+- `NullReferenceException` during projection application
+- Failed aggregate reconstruction from event streams
+- Timeout errors in integration tests (events not being applied correctly)
+
+**General Rule:** If you're migrating event-sourced aggregates between bounded contexts or refactoring event structures, **preserve the original event parameter order and always include the aggregate ID as the first parameter**.
+
 #### Use Status Enums for Aggregate State
 
 Prefer using an expressive `Status` enum property to represent aggregate lifecycle state instead of multiple boolean flags. While not a hard rule, this pattern proves necessary sooner rather than later as handlers and business logic need to evaluate aggregate state.
