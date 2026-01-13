@@ -8,7 +8,7 @@ public sealed record ReservationReleased(
     Guid OrderId,
     Guid InventoryId,
     Guid ReservationId,
-    string SKU,
+    string Sku,
     string WarehouseId,
     int Quantity,
     string Reason,

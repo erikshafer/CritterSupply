@@ -7,7 +7,7 @@ namespace Messages.Contracts.Inventory;
 public sealed record ReservationFailed(
     Guid OrderId,
     Guid ReservationId,
-    string SKU,
+    string Sku,
     string WarehouseId,
     int RequestedQuantity,
     int AvailableQuantity,
