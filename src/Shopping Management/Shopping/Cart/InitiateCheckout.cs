@@ -1,8 +1,9 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
-using Shopping.Checkout;
+using Wolverine;
 using Wolverine.Http;
 using Wolverine.Marten;
+using IntegrationMessages = Messages.Contracts.Shopping;
 
 namespace Shopping.Cart;
 
@@ -45,7 +46,7 @@ public static class InitiateCheckoutHandler
     }
 
     [WolverinePost("/api/carts/{cartId}/checkout")]
-    public static (CheckoutInitiated, IStartStream, CreationResponse) Handle(
+    public static (CheckoutInitiated, OutgoingMessages, CreationResponse) Handle(
         InitiateCheckout command,
         [WriteAggregate] Cart cart)
     {
@@ -60,16 +61,24 @@ public static class InitiateCheckoutHandler
             cart.Items.Values.ToList(),
             now);
 
-        // Start new Checkout stream
-        var checkoutEvent = new CheckoutStarted(
+        // Publish integration message to Orders BC
+        var lineItems = cart.Items.Values
+            .Select(item => new IntegrationMessages.CheckoutLineItem(
+                item.Sku,
+                item.Quantity,
+                item.UnitPrice))
+            .ToList();
+
+        var integrationMessage = new IntegrationMessages.CheckoutInitiated(
             checkoutId,
             cart.Id,
             cart.CustomerId,
-            cart.Items.Values.ToList(),
+            lineItems,
             now);
 
-        var startCheckout = MartenOps.StartStream<Checkout.Checkout>(checkoutId, checkoutEvent);
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(integrationMessage);
 
-        return (cartEvent, startCheckout, new CreationResponse($"/api/checkouts/{checkoutId}"));
+        return (cartEvent, outgoing, new CreationResponse($"/api/checkouts/{checkoutId}"));
     }
 }
