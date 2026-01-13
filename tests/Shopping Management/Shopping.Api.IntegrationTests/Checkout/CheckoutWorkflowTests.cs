@@ -1,9 +1,6 @@
-using Alba;
 using Marten;
-using Shouldly;
 using Shopping.Cart;
 using Shopping.Checkout;
-using Xunit;
 
 namespace Shopping.Api.IntegrationTests.Checkout;
 

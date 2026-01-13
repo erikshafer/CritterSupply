@@ -1,5 +1,3 @@
-using JasperFx.Events;
-
 namespace Payments.Processing;
 
 /// <summary>

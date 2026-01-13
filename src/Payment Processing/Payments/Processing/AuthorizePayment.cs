@@ -1,7 +1,6 @@
 using FluentValidation;
 using Marten;
 using Wolverine;
-using Wolverine.Marten;
 using IntegrationMessages = Messages.Contracts.Payments;
 
 namespace Payments.Processing;

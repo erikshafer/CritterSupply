@@ -1,9 +1,7 @@
 using FsCheck;
 using FsCheck.Fluent;
 using FsCheck.Xunit;
-using Marten;
 using Orders.Placement;
-using Shouldly;
 
 namespace Orders.Api.IntegrationTests.Placement;
 

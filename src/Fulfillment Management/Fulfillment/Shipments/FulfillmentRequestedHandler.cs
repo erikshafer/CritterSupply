@@ -1,5 +1,4 @@
 using Marten;
-using Messages.Contracts.Fulfillment;
 using IntegrationMessages = Messages.Contracts.Fulfillment;
 
 namespace Fulfillment.Shipments;

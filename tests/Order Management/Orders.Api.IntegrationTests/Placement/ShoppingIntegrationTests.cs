@@ -1,5 +1,3 @@
-using Marten;
-using Messages.Contracts.Shopping;
 using Orders.Placement;
 
 namespace Orders.Api.IntegrationTests.Placement;

@@ -1,10 +1,6 @@
 using System.Net;
-using Alba;
 using Marten;
-using Microsoft.Extensions.DependencyInjection;
 using Orders.Placement;
-using Shouldly;
-using Wolverine;
 
 namespace Orders.Api.IntegrationTests.Placement;
 

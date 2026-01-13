@@ -1,6 +1,5 @@
 using Messages.Contracts.Inventory;
 using Messages.Contracts.Payments;
-using Wolverine;
 using IntegrationMessages = Messages.Contracts.Orders;
 using FulfillmentMessages = Messages.Contracts.Fulfillment;
 

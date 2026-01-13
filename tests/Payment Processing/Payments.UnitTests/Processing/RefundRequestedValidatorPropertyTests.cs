@@ -2,7 +2,6 @@ using FsCheck;
 using FsCheck.Fluent;
 using FsCheck.Xunit;
 using Payments.Processing;
-using Shouldly;
 
 namespace Payments.UnitTests.Processing;
 
