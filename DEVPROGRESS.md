@@ -223,9 +223,27 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
         - Only needed: remove `PendingEvents` and colocate handlers with commands
         - `[WriteAggregate]` works perfectly when command has direct `ShipmentId` property
 
+**Cycle 8: Checkout Migration - Moving to Orders BC (In Progress - 2026-01-13)**
+- **Objective**: Migrate Checkout aggregate from Shopping BC to Orders BC to establish clearer bounded context boundaries
+- **Strategy**: Option A - Move only Checkout aggregate; Cart remains in Shopping BC
+- **Rationale**:
+    - Shopping BC focuses on pre-purchase experience (browsing, cart management, future: product search, wishlists)
+    - Orders BC owns order lifecycle from checkout through delivery
+    - Natural workflow split: Cart (exploratory) vs Checkout (transactional)
+    - Future-proof: Shopping BC can grow with browsing features without affecting Orders BC
+- **Integration Pattern**: `Shopping.CheckoutInitiated` (published by Cart) → `Orders.CheckoutStarted` (handled by Orders)
+- **HTTP Endpoints**: Checkout endpoints remain at `/api/checkouts/*` (flat, resource-centric pattern)
+- **Migration Phases**:
+    1. Create `Shopping.CheckoutInitiated` integration message
+    2. Move Checkout aggregate, commands, handlers, events to Orders BC
+    3. Move `/api/checkouts/*` HTTP endpoints to Orders.Api
+    4. Move checkout integration tests to Orders.Api.IntegrationTests
+    5. Cleanup: delete checkout files from Shopping BC, update documentation
+- **Status**: Planning complete, ready to execute
+
 #### 🔄 In Progress
 
-None - Cycle 7 Fulfillment BC refactoring complete!
+Cycle 8 - Checkout Migration to Orders BC
 
 #### 🔜 Planned
 

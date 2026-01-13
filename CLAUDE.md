@@ -1232,6 +1232,71 @@ public static OutgoingMessages Handle(...)
 }
 ```
 
+## HTTP Endpoint Naming Conventions
+
+CritterSupply follows **flat, resource-centric** HTTP endpoint patterns that align with RESTful best practices and provide consistency across all bounded contexts.
+
+### Standard Pattern: `/api/{resource}/*`
+
+**All HTTP endpoints follow this convention:**
+- Resources are top-level paths (not nested under bounded context names)
+- Resource names are plural nouns
+- BC ownership is an internal implementation detail, not exposed in URLs
+
+**Examples from our codebase:**
+```
+Shopping BC:     /api/carts/{cartId}
+Orders BC:       /api/orders/{orderId}
+                 /api/checkouts/{checkoutId}
+Payments BC:     /api/payments/{paymentId}
+Inventory BC:    /api/inventory/products/{productId}
+Fulfillment BC:  /api/fulfillment/shipments/{shipmentId}
+```
+
+### Why Flat Over Nested?
+
+**❌ Avoid nested paths like `/api/orders/{orderId}/checkouts/{checkoutId}`:**
+- Implies Checkout is subordinate to Order (but Checkout *creates* the Order)
+- Longer, more complex URLs
+- Tight coupling between resources in the URL structure
+- Violates REST principle of treating resources independently
+
+**✅ Prefer flat paths:**
+- Shorter, cleaner URLs
+- Resources are independent (better DX for frontend developers)
+- BC boundaries remain internal concerns (HTTP clients don't need to know which BC owns which resource)
+- Aligns with ASP.NET Core conventions and Microsoft's API design guidance
+
+### Resource Lifecycle Independence
+
+Checkout comes **before** Order in the workflow, so they should be independent resources:
+
+```csharp
+// Checkout process (no Order exists yet)
+POST   /api/checkouts                    // Start checkout
+PUT    /api/checkouts/{checkoutId}/shipping
+PUT    /api/checkouts/{checkoutId}/payment
+POST   /api/checkouts/{checkoutId}/complete  // Creates Order
+
+// Order tracking (after checkout completes)
+GET    /api/orders/{orderId}             // Track order
+GET    /api/orders/{orderId}/status
+```
+
+### When to Deviate
+
+**One level of nesting is acceptable when:**
+- A sub-resource is truly subordinate and cannot exist independently
+- Example: `/api/fulfillment/shipments/*` (shipments are fulfillment-specific)
+
+**Avoid deeper nesting:**
+- `/api/orders/123/items/456/details` ❌ Too deep
+- `/api/orders/123/items` ✅ Better: `/api/order-items?orderId=123`
+
+### Consistency Over Perfection
+
+If you're unsure, **choose the pattern that matches existing endpoints**. Consistency across the codebase is more valuable than theoretical purity. If we need to adjust our naming schema later, it's a straightforward search-and-replace operation.
+
 ## Testing Principles
 
 In general, prefer integration tests over unit tests. The latter have their place and importance, but we want to leverage tools like Alba and TestContainers to go through the use cases our vertical slices are built to fulfill.
