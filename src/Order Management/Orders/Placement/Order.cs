@@ -59,7 +59,7 @@ public sealed class Order : Saga
 
     /// <summary>
     /// Tracks reservation IDs for this order (for orchestrating commit/release).
-    /// Key: ReservationId, Value: SKU
+    /// Key: ReservationId, Value: Sku
     /// </summary>
     public Dictionary<Guid, string> ReservationIds { get; set; } = new();
 

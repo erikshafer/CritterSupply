@@ -8,7 +8,7 @@ public sealed record ReservationConfirmed(
     Guid OrderId,
     Guid InventoryId,
     Guid ReservationId,
-    string SKU,
+    string Sku,
     string WarehouseId,
     int Quantity,
     DateTimeOffset ReservedAt);

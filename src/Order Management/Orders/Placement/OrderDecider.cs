@@ -183,7 +183,7 @@ public static class OrderDecider
     {
         var newReservations = new Dictionary<Guid, string>(current.ReservationIds)
         {
-            [message.ReservationId] = message.SKU
+            [message.ReservationId] = message.Sku
         };
 
         var decision = new OrderDecision
