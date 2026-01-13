@@ -22,11 +22,6 @@ public sealed record Shipment(
     string? FailureReason)
 {
     /// <summary>
-    /// Collection of uncommitted events for this aggregate.
-    /// </summary>
-    internal List<object> PendingEvents { get; } = [];
-
-    /// <summary>
     /// Create initial state from FulfillmentRequested event.
     /// This is used by Marten to create the aggregate from the first event in the stream.
     /// </summary>

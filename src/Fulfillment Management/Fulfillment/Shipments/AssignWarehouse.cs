@@ -1,10 +1,10 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
+using Wolverine.Http;
+using Wolverine.Marten;
 
 namespace Fulfillment.Shipments;
 
-/// <summary>
-/// Command to assign a warehouse to fulfill a shipment.
-/// </summary>
 public sealed record AssignWarehouse(
     Guid ShipmentId,
     string WarehouseId)
@@ -16,5 +16,35 @@ public sealed record AssignWarehouse(
             RuleFor(x => x.ShipmentId).NotEmpty();
             RuleFor(x => x.WarehouseId).NotEmpty().MaximumLength(50);
         }
+    }
+}
+
+public static class AssignWarehouseHandler
+{
+    public static ProblemDetails Before(
+        AssignWarehouse command,
+        Shipment? shipment)
+    {
+        if (shipment is null)
+            return new ProblemDetails { Detail = "Shipment not found", Status = 404 };
+
+        if (shipment.Status != ShipmentStatus.Pending)
+            return new ProblemDetails
+            {
+                Detail = $"Cannot assign warehouse to shipment in {shipment.Status} status",
+                Status = 400
+            };
+
+        return WolverineContinue.NoProblems;
+    }
+
+    [WolverinePost("/api/fulfillment/shipments/{shipmentId}/assign")]
+    public static WarehouseAssigned Handle(
+        AssignWarehouse command,
+        [WriteAggregate] Shipment shipment)
+    {
+        return new WarehouseAssigned(
+            command.WarehouseId,
+            DateTimeOffset.UtcNow);
     }
 }
