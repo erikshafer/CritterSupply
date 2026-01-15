@@ -268,7 +268,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
         // Verify payment confirmed
         await using var confirmedSession = _fixture.GetDocumentSession();
         var confirmedOrder = await confirmedSession.LoadAsync<Order>(order.Id);
-        confirmedOrder.Status.ShouldBe(OrderStatus.PaymentConfirmed);
+        confirmedOrder!.Status.ShouldBe(OrderStatus.PaymentConfirmed);
 
         // Act: Send RefundCompleted message
         var refundCompleted = new RefundCompleted(
@@ -347,7 +347,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
         // Verify payment confirmed
         await using var confirmedSession = _fixture.GetDocumentSession();
         var confirmedOrder = await confirmedSession.LoadAsync<Order>(order.Id);
-        confirmedOrder.Status.ShouldBe(OrderStatus.PaymentConfirmed);
+        confirmedOrder!.Status.ShouldBe(OrderStatus.PaymentConfirmed);
 
         // Act: Send RefundFailed message
         var refundFailed = new RefundFailed(
