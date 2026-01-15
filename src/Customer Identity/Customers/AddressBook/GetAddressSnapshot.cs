@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Marten;
+using Messages.Contracts.CustomerIdentity;
 using Wolverine.Http;
 
 namespace Customers.AddressBook;
