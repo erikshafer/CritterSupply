@@ -11,6 +11,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Shopping;
 using Shopping.Cart;
 using Weasel.Core;
+using CheckoutAggregate = Shopping.Checkout.Checkout;
 using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.FluentValidation;
@@ -33,8 +34,9 @@ builder.Services.AddMarten(opts =>
         opts.DatabaseSchemaName = Constants.Shopping.ToLowerInvariant();
         opts.DisableNpgsqlLogging = true;
 
-        // Register Cart aggregate for event sourcing
+        // Register aggregates for event sourcing
         opts.Projections.Snapshot<Cart>(SnapshotLifecycle.Inline);
+        opts.Projections.Snapshot<CheckoutAggregate>(SnapshotLifecycle.Inline);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()
@@ -70,6 +72,15 @@ builder.Host.UseWolverine(opts =>
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Configure HttpClient for Customer Identity BC integration
+builder.Services.AddHttpClient("CustomerIdentity", client =>
+{
+    var customerIdentityBaseUrl = builder.Configuration.GetValue<string>("CustomerIdentity:BaseUrl")
+                                  ?? "http://localhost:5002";
+    client.BaseAddress = new Uri(customerIdentityBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 builder.Services.AddHealthChecks().AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
 
