@@ -138,8 +138,8 @@ public class TestFixture : IAsyncLifetime
 
     /// <summary>
     /// Helper method to create a Shopping BC CheckoutCompleted integration message.
-    /// This is the ONLY way to start an Order saga - tests should use this instead of
-    /// creating Orders.Placement.CheckoutCompleted directly.
+    /// This is the ONLY way to start an Order saga in tests.
+    /// Maps from Orders domain types to Shopping integration contract types.
     /// </summary>
     public static Messages.Contracts.Shopping.CheckoutCompleted CreateCheckoutCompletedMessage(
         Guid orderId,

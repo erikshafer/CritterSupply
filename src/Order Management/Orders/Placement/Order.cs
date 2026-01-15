@@ -76,15 +76,15 @@ public sealed class Order : Saga
     /// <summary>
     /// Saga start handler - creates the saga from CheckoutCompleted integration message.
     /// This is the ONLY way to start an Order saga in production.
-    /// Maps Shopping BC's CheckoutCompleted to Orders domain's CheckoutCompleted command.
+    /// Maps Shopping BC's CheckoutCompleted integration message to Orders domain's PlaceOrder command.
     /// Wolverine convention: static Start() method on saga class.
     /// </summary>
     /// <param name="message">The checkout completed integration message from Shopping BC.</param>
     /// <returns>A tuple of the new Order saga and the OrderPlaced event to publish.</returns>
     public static (Order, IntegrationMessages.OrderPlaced) Start(Messages.Contracts.Shopping.CheckoutCompleted message)
     {
-        // Map integration message to local command
-        var command = new CheckoutCompleted(
+        // Map integration message to local domain command
+        var command = new PlaceOrder(
             message.OrderId,
             message.CheckoutId,
             message.CustomerId,
