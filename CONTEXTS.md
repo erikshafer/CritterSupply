@@ -25,7 +25,7 @@ The Cart aggregate manages the customer's shopping session from initialization t
 - `CouponApplied` / `CouponRemoved` — requires Promotions BC
 - `PriceRefreshed` — handles price drift during long sessions, requires Catalog BC
 - `PromotionApplied` / `PromotionRemoved` — auto-applied promotions, requires Promotions BC
-- `CartAssignedToCustomer` — anonymous cart merged after login, requires Customers BC
+- `CartAssignedToCustomer` — anonymous cart merged after login, requires Customer Identity BC
 - `ShippingEstimateRequested` — zip/postal for shipping preview (may belong in Checkout)
 
 **Checkout Aggregate:**
@@ -479,9 +479,9 @@ The Returns context owns the reverse logistics flow—handling customer return r
 
 ---
 
-## Customers
+## Customer Identity
 
-The Customers context owns customer identity, profiles, and persistent data like addresses and saved payment method tokens. It provides the foundation for personalized shopping experiences by maintaining customer preferences and frequently-used information across the system.
+The Customer Identity context owns customer identity, profiles, and persistent data like addresses and saved payment method tokens. It provides the foundation for personalized shopping experiences by maintaining customer preferences and frequently-used information across the system.
 
 ### Subdomains
 
@@ -510,7 +510,7 @@ Manages customer shipping and billing addresses with support for multiple saved 
 
 ### What it publishes
 
-None currently. Customers BC is primarily query-driven (other BCs query for address data).
+None currently. Customer Identity BC is primarily query-driven (other BCs query for address data).
 
 ### Core invariants
 
@@ -580,34 +580,34 @@ OrderPlaced (integration message from Orders)
 
 **Why snapshots instead of references?**
 
-When Shopping BC completes checkout, it doesn't pass an `AddressId` to Orders BC. Instead, it requests an `AddressSnapshot` from Customers BC and embeds that snapshot in the `CheckoutCompleted` message.
+When Shopping BC completes checkout, it doesn't pass an `AddressId` to Orders BC. Instead, it requests an `AddressSnapshot` from Customer Identity BC and embeds that snapshot in the `CheckoutCompleted` message.
 
 **Rationale:**
 - **Temporal Consistency**: Orders/Fulfillment need the address *as it was* when the order was placed, not the current state
-- **BC Autonomy**: Orders BC doesn't need to query Customers BC during fulfillment (might be days/weeks later)
+- **BC Autonomy**: Orders BC doesn't need to query Customer Identity BC during fulfillment (might be days/weeks later)
 - **Auditability**: If customer updates their "Home" address, historical orders still show the original address
-- **Resilience**: Orders can fulfill even if Customers BC is temporarily unavailable
+- **Resilience**: Orders can fulfill even if Customer Identity BC is temporarily unavailable
 
 **Flow:**
 ```
 1. Customer selects "Home" address (id: abc-123) during checkout
-2. Shopping BC → Customers BC: GetAddressSnapshot(abc-123)
-3. Customers BC returns immutable AddressSnapshot with all fields
+2. Shopping BC → Customer Identity BC: GetAddressSnapshot(abc-123)
+3. Customer Identity BC returns immutable AddressSnapshot with all fields
 4. Shopping BC embeds snapshot in CheckoutCompleted integration message
-5. Orders BC persists snapshot as part of Order saga (no reference to Customers BC)
+5. Orders BC persists snapshot as part of Order saga (no reference to Customer Identity BC)
 ```
 
 ### Privacy and Compliance Considerations
 
 **Billing Address:**
-- Full billing address stored in Customers BC only
+- Full billing address stored in Customer Identity BC only
 - Orders BC receives minimal billing info (City, State/Province, Country) for regional analytics
 - Actual payment processing (card data) handled by 3rd party (Stripe, PayPal) — never stored in our system
 
 **Data Deletion (GDPR/CCPA):**
-- Customers BC owns customer data deletion workflows
+- Customer Identity BC owns customer data deletion workflows
 - When customer requests deletion:
-  - Personal data deleted from Customers BC
+  - Personal data deleted from Customer Identity BC
   - Order snapshots retain address data (legitimate interest: legal compliance, tax records)
   - Analytics aggregated data remains (no PII)
 

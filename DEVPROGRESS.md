@@ -270,12 +270,12 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 
 #### 🔄 In Progress
 
-**Cycle 10: Customers BC - Address Management (Planned - 2026-01-15)**
+**Cycle 10: Customer Identity BC - Address Management (Completed - 2026-01-15)**
 
 #### 🔜 Planned
 
-**Cycle 10: Customers BC - Address Management**
-- **Objective**: Create Customers bounded context with AddressBook subdomain for realistic e-commerce address management
+**Cycle 10: Customer Identity BC - Address Management**
+- **Objective**: Create Customer Identity bounded context with AddressBook subdomain for realistic e-commerce address management
 - **Rationale**:
     - Current state: Addresses entered ad-hoc during checkout, not persisted for reuse
     - Real e-commerce: Customers save multiple addresses ("Home", "Work", "Mom's House") and select during checkout
@@ -284,27 +284,42 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 - **BC Work**: AddressBook subdomain
     - `CustomerAddress` entity (id, customerId, type, nickname, address fields, isDefault, lastUsedAt)
     - `AddressType` enum (Shipping, Billing, Both)
-    - Commands: `AddAddress`, `UpdateAddress`, `SetDefaultAddress`, `DeleteAddress`
-    - Queries: `GetCustomerAddresses`, `GetAddressSnapshot`, `GetAddressByType`
-    - Integration handler: `OrderPlaced` → updates `LastUsedAt` timestamp
+    - Commands: `AddAddress`, `UpdateAddress`, `SetDefaultAddress` ✅
+    - Queries: `GetCustomerAddresses`, `GetAddressSnapshot` ✅
+    - Integration handler: `OrderPlaced` → updates `LastUsedAt` timestamp (future)
 - **Integration Pattern**: Snapshot Pattern
     - Shopping BC queries `GetCustomerAddresses` during checkout (presents list to customer)
     - Shopping BC requests `GetAddressSnapshot` when checkout completes (immutable copy)
     - `CheckoutCompleted` embeds `AddressSnapshot` (not reference) for temporal consistency
-    - Orders BC persists snapshot (no dependency on Customers BC during fulfillment)
+    - Orders BC persists snapshot (no dependency on Customer Identity BC during fulfillment)
 - **Architectural Benefits**:
     - **Temporal Consistency**: Orders record address *as it was* at order time
-    - **BC Autonomy**: Orders doesn't query Customers BC during fulfillment (might be days/weeks later)
+    - **BC Autonomy**: Orders doesn't query Customer Identity BC during fulfillment (might be days/weeks later)
     - **Auditability**: Historical orders retain original address even if customer updates it
     - **Privacy**: Minimal billing address in Orders (state/country only for analytics)
 - **Persistence**: Relational (Marten document store, not event-sourced)
-- **Documentation**: CONTEXTS.md updated with Customers BC definition, snapshot pattern explanation
-- **Status**: Planning phase - documentation complete, ready for implementation
+- **Documentation**: CONTEXTS.md updated with Customer Identity BC definition, snapshot pattern explanation
+- **Status**: ✅ Implementation complete - 7/7 tests passing
+- **Key Learnings**:
+    - GET endpoint handlers need direct parameters, not query objects (Wolverine can't construct from URL)
+    - Handler discovery requires `IncludeType<>` with actual type (commands work, static classes don't)
+    - Physical folder renamed from "Customer Management" → "Customer Identity" for clarity
 
 **Future Enhancements:**
 - Returns Context (reverse logistics)
 - Notifications Context (customer communication)
 - Product Catalog Context (pricing and availability queries)
+
+**Future BC Naming Review:**
+- Review all BC physical folder names ending in "Management" for creativity and clarity
+- Candidates for review:
+  - Order Management → ? (Orders?)
+  - Shopping Management → ? (Shopping Experience?)
+  - Fulfillment Management → ? (Fulfillment?)
+  - Inventory Management → ? (Inventory?)
+  - Payment Processing → (already good)
+- Goal: Physical folder names should convey BC purpose without redundant suffixes
+- Document naming rationale (similar to Customer Identity analysis)
 
 ## Key Principles
 
