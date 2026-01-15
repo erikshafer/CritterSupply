@@ -74,14 +74,33 @@ public sealed class Order : Saga
     public bool IsPaymentCaptured { get; set; }
 
     /// <summary>
-    /// Saga start handler - creates the saga from CheckoutCompleted.
-    /// Thin wrapper that delegates to OrderDecider for pure business logic.
+    /// Saga start handler - creates the saga from CheckoutCompleted integration message.
+    /// This is the ONLY way to start an Order saga in production.
+    /// Maps Shopping BC's CheckoutCompleted to Orders domain's CheckoutCompleted command.
     /// Wolverine convention: static Start() method on saga class.
     /// </summary>
-    /// <param name="command">The checkout completed event from Shopping context.</param>
+    /// <param name="message">The checkout completed integration message from Shopping BC.</param>
     /// <returns>A tuple of the new Order saga and the OrderPlaced event to publish.</returns>
-    public static (Order, IntegrationMessages.OrderPlaced) Start(CheckoutCompleted command)
+    public static (Order, IntegrationMessages.OrderPlaced) Start(Messages.Contracts.Shopping.CheckoutCompleted message)
     {
+        // Map integration message to local command
+        var command = new CheckoutCompleted(
+            message.OrderId,
+            message.CheckoutId,
+            message.CustomerId,
+            message.Items.Select(i => new CheckoutLineItem(i.Sku, i.Quantity, i.UnitPrice)).ToList(),
+            new ShippingAddress(
+                message.ShippingAddress.AddressLine1,
+                message.ShippingAddress.AddressLine2,
+                message.ShippingAddress.City,
+                message.ShippingAddress.StateOrProvince,
+                message.ShippingAddress.PostalCode,
+                message.ShippingAddress.Country),
+            message.ShippingMethod,
+            message.ShippingCost,
+            message.PaymentMethodToken,
+            message.CompletedAt);
+
         // Delegate to pure Decider function (pass current timestamp)
         return OrderDecider.Start(command, DateTimeOffset.UtcNow);
     }

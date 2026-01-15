@@ -43,7 +43,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
             "98101",
             "US");
 
-        var checkoutCommand = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -54,7 +54,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
             "tok_test_payment",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -110,7 +110,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
             "97201",
             "US");
 
-        var checkoutCommand = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -121,7 +121,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
             "tok_test_payment",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -177,7 +177,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
             "80201",
             "US");
 
-        var checkoutCommand = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -188,7 +188,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
             "tok_test_payment",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -262,7 +262,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
             "73301",
             "US");
 
-        var checkoutCommand = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -273,7 +273,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
             "tok_test_payment",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -347,7 +347,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
             "94102",
             "US");
 
-        var checkoutCommand = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -358,7 +358,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
             "tok_test_payment",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();

@@ -135,4 +135,45 @@ public class TestFixture : IAsyncLifetime
 
         return (tracked, result);
     }
+
+    /// <summary>
+    /// Helper method to create a Shopping BC CheckoutCompleted integration message.
+    /// This is the ONLY way to start an Order saga - tests should use this instead of
+    /// creating Orders.Placement.CheckoutCompleted directly.
+    /// </summary>
+    public static Messages.Contracts.Shopping.CheckoutCompleted CreateCheckoutCompletedMessage(
+        Guid orderId,
+        Guid checkoutId,
+        Guid? customerId,
+        IReadOnlyList<Orders.Placement.CheckoutLineItem> lineItems,
+        Orders.Placement.ShippingAddress shippingAddress,
+        string shippingMethod,
+        decimal shippingCost,
+        string paymentMethodToken,
+        DateTimeOffset completedAt)
+    {
+        // Map Orders domain types to Shopping integration contract types
+        var items = lineItems.Select(item =>
+            new Messages.Contracts.Shopping.CheckoutLineItem(item.Sku, item.Quantity, item.PriceAtPurchase))
+            .ToList();
+
+        var address = new Messages.Contracts.Shopping.ShippingAddress(
+            shippingAddress.Street,
+            shippingAddress.Street2,
+            shippingAddress.City,
+            shippingAddress.State,
+            shippingAddress.PostalCode,
+            shippingAddress.Country);
+
+        return new Messages.Contracts.Shopping.CheckoutCompleted(
+            orderId,
+            checkoutId,
+            customerId,
+            items,
+            address,
+            shippingMethod,
+            shippingCost,
+            paymentMethodToken,
+            completedAt);
+    }
 }

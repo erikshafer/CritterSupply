@@ -43,7 +43,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "62701",
             "US");
 
-        var checkoutCommand = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -54,7 +54,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "tok_test_payment",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 10);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted, timeoutSeconds: 10);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -106,7 +106,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "97201",
             "US");
 
-        var checkoutCommand = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -117,7 +117,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "tok_test_payment",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 20);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted, timeoutSeconds: 20);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -169,7 +169,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "98101",
             "US");
 
-        var checkoutCommand = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -180,7 +180,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "tok_test_payment",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 10);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted, timeoutSeconds: 10);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -234,7 +234,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "80201",
             "US");
 
-        var checkoutCommand = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -245,7 +245,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "tok_test_payment",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 10);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted, timeoutSeconds: 10);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();
@@ -313,7 +313,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "73301",
             "US");
 
-        var checkoutCommand = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -324,7 +324,7 @@ public class PaymentIntegrationTests : IAsyncLifetime
             "tok_test_payment",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkoutCommand, timeoutSeconds: 10);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted, timeoutSeconds: 10);
 
         // Get the created order
         await using var session = _fixture.GetDocumentSession();

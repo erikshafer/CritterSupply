@@ -34,36 +34,36 @@ public class OrderPlacementFlowTests : IAsyncLifetime
     public async Task Full_Order_Placement_Flow_Creates_Queryable_Order()
     {
         // Arrange: Create a valid CheckoutCompleted event
-        var checkout = new CheckoutCompleted(
-            OrderId: Guid.CreateVersion7(),
-            CheckoutId: Guid.CreateVersion7(),
-            CustomerId: Guid.NewGuid(),
-            LineItems: new List<CheckoutLineItem>
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
+            Guid.CreateVersion7(), // OrderId
+            Guid.CreateVersion7(), // CheckoutId
+            Guid.NewGuid(), // CustomerId
+            new List<CheckoutLineItem>
             {
                 new("SKU-001", 2, 19.99m),
                 new("SKU-002", 1, 49.99m)
             },
-            ShippingAddress: new ShippingAddress(
+            new ShippingAddress(
                 "123 Main St",
                 null,
                 "Seattle",
                 "WA",
                 "98101",
                 "USA"),
-            ShippingMethod: "Standard",
-            ShippingCost: 5.99m,
-            PaymentMethodToken: "tok_visa_test",
-            CompletedAt: DateTimeOffset.UtcNow);
+            "Standard",
+            5.99m,
+            "tok_visa_test",
+            DateTimeOffset.UtcNow);
 
         // Act: Send the CheckoutCompleted message through Wolverine and wait for all side effects
-        await _fixture.ExecuteAndWaitAsync(checkout);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
 
         // Assert: Verify saga was created and persisted
         await using var session = _fixture.GetDocumentSession();
         
         // Query for orders by customer ID to find the created order
         var orders = await session.Query<Order>()
-            .Where(o => o.CustomerId == checkout.CustomerId)
+            .Where(o => o.CustomerId == checkoutCompleted.CustomerId)
             .ToListAsync();
 
         orders.ShouldNotBeEmpty();
@@ -71,10 +71,10 @@ public class OrderPlacementFlowTests : IAsyncLifetime
 
         // Verify order properties match checkout data
         order.Status.ShouldBe(OrderStatus.Placed);
-        order.CustomerId.ShouldBe(checkout.CustomerId!.Value);
-        order.ShippingMethod.ShouldBe(checkout.ShippingMethod);
-        order.PaymentMethodToken.ShouldBe(checkout.PaymentMethodToken);
-        order.LineItems.Count.ShouldBe(checkout.LineItems.Count);
+        order.CustomerId.ShouldBe(checkoutCompleted.CustomerId!.Value);
+        order.ShippingMethod.ShouldBe(checkoutCompleted.ShippingMethod);
+        order.PaymentMethodToken.ShouldBe(checkoutCompleted.PaymentMethodToken);
+        order.LineItems.Count.ShouldBe(checkoutCompleted.Items.Count);
         order.PlacedAt.ShouldNotBe(default);
 
         // Verify line items

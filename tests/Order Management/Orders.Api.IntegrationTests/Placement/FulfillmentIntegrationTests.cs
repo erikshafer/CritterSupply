@@ -32,7 +32,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         // Arrange: Create an order
         var customerId = Guid.NewGuid();
         var cartId = Guid.NewGuid();
-        var checkout = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -43,7 +43,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
             "tok_visa",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkout);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
 
         // Get the created order
         await using var getSession = _fixture.GetDocumentSession();
@@ -100,7 +100,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         // Arrange: Create order
         var customerId = Guid.NewGuid();
         var cartId = Guid.NewGuid();
-        var checkout = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -111,7 +111,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
             "tok_visa",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkout);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
 
         await using var getSession = _fixture.GetDocumentSession();
         var order = (await getSession.Query<Order>()
@@ -155,7 +155,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         // Arrange: Create order and get it to Shipped status
         var customerId = Guid.NewGuid();
         var cartId = Guid.NewGuid();
-        var checkout = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -166,7 +166,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
             "tok_visa",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkout);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
 
         Order order;
         await using (var getSession = _fixture.GetDocumentSession())
@@ -225,7 +225,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         // Arrange: Create order and get it to Shipped status
         var customerId = Guid.NewGuid();
         var cartId = Guid.NewGuid();
-        var checkout = new CheckoutCompleted(
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(), // OrderId
             Guid.CreateVersion7(), // CheckoutId
             customerId,
@@ -236,7 +236,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
             "tok_visa",
             DateTimeOffset.UtcNow);
 
-        await _fixture.ExecuteAndWaitAsync(checkout);
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
 
         await using var getSession = _fixture.GetDocumentSession();
         var order = (await getSession.Query<Order>()
