@@ -242,11 +242,64 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 - **Status**: Complete - All 6 checkout tests passing in Orders BC
 - **Key Learning**: Domain events must include aggregate ID as first parameter for Marten inline projections to work correctly
 
+**Cycle 9: Checkout-to-Orders Integration (Completed - 2026-01-15)**
+- **Objective**: Complete the integration between Shopping BC's checkout completion and Orders BC saga initialization
+- **BC Work**: Established single entry point pattern and naming conventions
+    - Removed dual `Start()` overloads (integration message + local command) - kept ONLY integration message entry point
+    - Renamed local command from `CheckoutCompleted` (past tense) to `PlaceOrder` (imperative) to clarify X → Y transformation
+    - Clear flow: `Shopping.CheckoutCompleted` (integration) → `Orders.PlaceOrder` (command) → `OrderPlaced` (event)
+    - Colocated `PlaceOrderValidator` with command following established pattern
+    - Updated CLAUDE.md to explicitly document validator colocation requirement
+    - **Status**: ✅ 25/25 integration tests passing (27→25 after removing implementation-detail tests)
+    - **Test Strategy**: Deleted property-based tests and validation tests that tested local command (no longer exists)
+    - **Helper Method**: Added `TestFixture.CreateCheckoutCompletedMessage()` to create integration messages from test data
+- **Orders Integration**: ✅ COMPLETED (2026-01-15)
+    - ✅ `Order.Start(Shopping.CheckoutCompleted)` - Single entry point, maps to `PlaceOrder` command
+    - ✅ Integration tests verify complete data mapping (line items, addresses, payment tokens)
+    - **Key Achievement**: Orders saga now starts exclusively from Shopping BC's checkout completion
+- **Architectural Decisions**:
+    - **Single Entry Point Principle**: Aggregates have `Create()`, Sagas have `Start()` - ONE method only
+    - **Clear Naming Convention**: Integration messages (past tense) map to domain commands (imperative verbs)
+    - **Behavior-First Testing**: Removed unit tests testing implementation details; kept integration tests verifying actual system behavior
+    - **Validator Colocation**: Commands, validators, and handlers all in same file (1:1:1 relationship)
+- **Key Learnings**:
+    - Having multiple `Start()` overloads creates confusion about "the right way" to initialize sagas
+    - Past-tense command names (`CheckoutCompleted`) were misleading - commands should be imperative (`PlaceOrder`)
+    - Property-based tests and validation tests became obsolete when local command entry point removed
+    - CLAUDE.md documentation must explicitly call out all colocation requirements (not just imply via examples)
+
 #### 🔄 In Progress
 
-None - Ready for next cycle
+**Cycle 10: Customers BC - Address Management (Planned - 2026-01-15)**
 
 #### 🔜 Planned
+
+**Cycle 10: Customers BC - Address Management**
+- **Objective**: Create Customers bounded context with AddressBook subdomain for realistic e-commerce address management
+- **Rationale**:
+    - Current state: Addresses entered ad-hoc during checkout, not persisted for reuse
+    - Real e-commerce: Customers save multiple addresses ("Home", "Work", "Mom's House") and select during checkout
+    - Enables richer UX: address selection instead of re-entry every order
+    - Foundation for future customer features (profiles, saved payment methods, preferences)
+- **BC Work**: AddressBook subdomain
+    - `CustomerAddress` entity (id, customerId, type, nickname, address fields, isDefault, lastUsedAt)
+    - `AddressType` enum (Shipping, Billing, Both)
+    - Commands: `AddAddress`, `UpdateAddress`, `SetDefaultAddress`, `DeleteAddress`
+    - Queries: `GetCustomerAddresses`, `GetAddressSnapshot`, `GetAddressByType`
+    - Integration handler: `OrderPlaced` → updates `LastUsedAt` timestamp
+- **Integration Pattern**: Snapshot Pattern
+    - Shopping BC queries `GetCustomerAddresses` during checkout (presents list to customer)
+    - Shopping BC requests `GetAddressSnapshot` when checkout completes (immutable copy)
+    - `CheckoutCompleted` embeds `AddressSnapshot` (not reference) for temporal consistency
+    - Orders BC persists snapshot (no dependency on Customers BC during fulfillment)
+- **Architectural Benefits**:
+    - **Temporal Consistency**: Orders record address *as it was* at order time
+    - **BC Autonomy**: Orders doesn't query Customers BC during fulfillment (might be days/weeks later)
+    - **Auditability**: Historical orders retain original address even if customer updates it
+    - **Privacy**: Minimal billing address in Orders (state/country only for analytics)
+- **Persistence**: Relational (Marten document store, not event-sourced)
+- **Documentation**: CONTEXTS.md updated with Customers BC definition, snapshot pattern explanation
+- **Status**: Planning phase - documentation complete, ready for implementation
 
 **Future Enhancements:**
 - Returns Context (reverse logistics)
@@ -347,6 +400,6 @@ RabbitMQ runs in Docker via `docker-compose`:
 
 ---
 
-**Last Updated**: 2026-01-13
+**Last Updated**: 2026-01-15
 **Current Developer(s)**: Erik Shafer / Claude AI Assistant
-**Development Status**: Cycle 8 Complete → Checkout Migrated to Orders BC
+**Development Status**: Cycle 9 Complete → Beginning Cycle 10 (Customers BC - Address Management)

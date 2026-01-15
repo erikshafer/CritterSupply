@@ -479,13 +479,146 @@ The Returns context owns the reverse logistics flow—handling customer return r
 
 ---
 
+## Customers
+
+The Customers context owns customer identity, profiles, and persistent data like addresses and saved payment method tokens. It provides the foundation for personalized shopping experiences by maintaining customer preferences and frequently-used information across the system.
+
+### Subdomains
+
+**AddressBook:**
+
+Manages customer shipping and billing addresses with support for multiple saved addresses, nicknames, defaults, and address verification. Provides both the master address records (for CRUD operations) and immutable snapshots (for order/shipment records).
+
+**Entities:**
+- `CustomerAddress` — persisted address with metadata (nickname, type, default status, last used timestamp)
+- `AddressSnapshot` — immutable point-in-time copy for integration messages
+- `AddressType` — enum (Shipping, Billing, Both)
+
+**Profile** (future):
+- Customer personal info (name, email, phone)
+- Authentication/identity integration
+- Preferences and settings
+
+**PaymentMethods** (future):
+- Saved payment method tokens (Stripe, PayPal, etc.)
+- Default payment method selection
+- PCI-compliant token storage (not actual card data)
+
+### What it receives
+
+- `OrderPlaced` — from Orders BC, updates `LastUsedAt` timestamp on addresses used in order
+
+### What it publishes
+
+None currently. Customers BC is primarily query-driven (other BCs query for address data).
+
+### Core invariants
+
+**AddressBook Invariants:**
+- A customer can have multiple addresses of each type (Shipping, Billing, Both)
+- Each address type can have at most one default per customer
+- Address nicknames must be unique per customer
+- Addresses must have valid country codes (ISO 3166-1 alpha-2)
+- State/province codes must be valid for the country (US states, Canadian provinces, etc.)
+- Setting a new default automatically unsets the previous default for that type
+
+**Future Profile Invariants:**
+- Email addresses must be unique across all customers
+- Phone numbers must be in E.164 format
+- Customer IDs are immutable once created
+
+### What it doesn't own
+
+- Order history (Orders BC)
+- Shopping cart state (Shopping BC)
+- Authentication/authorization logic (Identity BC or external IdP)
+- Payment processing (Payments BC)
+- Address validation services (integrates with 3rd party, doesn't own validation logic)
+
+### Integration Flows
+
+**Address Management:**
+```
+AddAddress (command)
+  └─> AddAddressHandler
+      └─> CustomerAddress persisted (no event published)
+
+UpdateAddress (command)
+  └─> UpdateAddressHandler
+      └─> CustomerAddress updated (no event published)
+
+SetDefaultAddress (command)
+  └─> SetDefaultAddressHandler
+      └─> Previous default cleared, new default set
+
+DeleteAddress (command)
+  └─> DeleteAddressHandler
+      └─> CustomerAddress soft-deleted (preserves history)
+```
+
+**Query Patterns:**
+```
+GetCustomerAddresses (query) ← Shopping BC during checkout
+  └─> Returns list of AddressSummary (id, nickname, display line)
+
+GetAddressSnapshot (query) ← Shopping BC when checkout completes
+  └─> Returns AddressSnapshot (immutable copy for order record)
+
+GetAddressByType (query) ← Returns BC for return shipping labels
+  └─> Returns addresses filtered by type (Shipping, Billing, Both)
+```
+
+**Integration Message Handling:**
+```
+OrderPlaced (integration message from Orders)
+  └─> UpdateAddressLastUsed handler
+      └─> Updates LastUsedAt timestamp on shipping address
+      └─> Used for analytics (most-used addresses)
+```
+
+### Address Snapshot Pattern
+
+**Why snapshots instead of references?**
+
+When Shopping BC completes checkout, it doesn't pass an `AddressId` to Orders BC. Instead, it requests an `AddressSnapshot` from Customers BC and embeds that snapshot in the `CheckoutCompleted` message.
+
+**Rationale:**
+- **Temporal Consistency**: Orders/Fulfillment need the address *as it was* when the order was placed, not the current state
+- **BC Autonomy**: Orders BC doesn't need to query Customers BC during fulfillment (might be days/weeks later)
+- **Auditability**: If customer updates their "Home" address, historical orders still show the original address
+- **Resilience**: Orders can fulfill even if Customers BC is temporarily unavailable
+
+**Flow:**
+```
+1. Customer selects "Home" address (id: abc-123) during checkout
+2. Shopping BC → Customers BC: GetAddressSnapshot(abc-123)
+3. Customers BC returns immutable AddressSnapshot with all fields
+4. Shopping BC embeds snapshot in CheckoutCompleted integration message
+5. Orders BC persists snapshot as part of Order saga (no reference to Customers BC)
+```
+
+### Privacy and Compliance Considerations
+
+**Billing Address:**
+- Full billing address stored in Customers BC only
+- Orders BC receives minimal billing info (City, State/Province, Country) for regional analytics
+- Actual payment processing (card data) handled by 3rd party (Stripe, PayPal) — never stored in our system
+
+**Data Deletion (GDPR/CCPA):**
+- Customers BC owns customer data deletion workflows
+- When customer requests deletion:
+  - Personal data deleted from Customers BC
+  - Order snapshots retain address data (legitimate interest: legal compliance, tax records)
+  - Analytics aggregated data remains (no PII)
+
+---
+
 ## Future Considerations
 
 The following contexts are acknowledged but not yet defined:
 
 - **Catalog** — product information, categorization, search
 - **Pricing** — price rules, promotions, discounts
-- **Customers** — customer profiles, addresses, payment methods
 - **Notifications** — email, SMS, push notifications
 - **Procurement/Supply Chain** — purchasing, vendor management, forecasting
 - **Shipping/Logistics** — carrier management, rate shopping
