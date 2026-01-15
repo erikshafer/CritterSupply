@@ -142,7 +142,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         // Assert: Verify order transitioned to Shipped
         await using var session = _fixture.GetDocumentSession();
         var shippedOrder = await session.LoadAsync<Order>(order.Id);
-        shippedOrder.Status.ShouldBe(OrderStatus.Shipped);
+        shippedOrder!.Status.ShouldBe(OrderStatus.Shipped);
         shippedOrder.TotalAmount.ShouldBe(30.98m); // 24.99 + 5.99 shipping
     }
 
@@ -269,7 +269,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         // Assert: Verify order remains in Shipped status
         await using var session = _fixture.GetDocumentSession();
         var shippedOrder = await session.LoadAsync<Order>(order.Id);
-        shippedOrder.Status.ShouldBe(OrderStatus.Shipped);
+        shippedOrder!.Status.ShouldBe(OrderStatus.Shipped);
         shippedOrder.TotalAmount.ShouldBe(55.98m); // 49.99 + 5.99 shipping
 
         // Future enhancement: Verify delivery failure metadata is tracked
