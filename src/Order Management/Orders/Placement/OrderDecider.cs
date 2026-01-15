@@ -13,14 +13,14 @@ namespace Orders.Placement;
 public static class OrderDecider
 {
     /// <summary>
-    /// Decides to create a new Order saga from CheckoutCompleted.
+    /// Decides to create a new Order saga from PlaceOrder command.
     /// Pure function - accepts time as parameter for true purity.
     /// </summary>
-    /// <param name="command">The checkout completed event from Shopping context.</param>
+    /// <param name="command">The place order command (mapped from Shopping BC's CheckoutCompleted).</param>
     /// <param name="timestamp">Current timestamp for event timestamping.</param>
     /// <returns>A tuple of the new Order saga and the OrderPlaced event to publish.</returns>
     public static (Order, IntegrationMessages.OrderPlaced) Start(
-        CheckoutCompleted command,
+        PlaceOrder command,
         DateTimeOffset timestamp)
     {
         var orderId = command.OrderId;

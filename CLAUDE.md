@@ -112,11 +112,11 @@ If there is a folder based on a technical feature, treat it as temporary and tha
 
 #### File Organization for Commands, Queries, and Handlers
 
-In CQRS + Event Sourcing systems, commands and queries have a **1:1 relationship** with their handlers by design. To improve code comprehension and reduce cognitive load, **colocate commands/queries with their handlers in the same file**.
+In CQRS + Event Sourcing systems, commands and queries have a **1:1 relationship** with their handlers by design. To improve code comprehension and reduce cognitive load, **colocate commands/queries with their handlers AND validators in the same file**.
 
 ##### Commands and Command Handlers
 
-Commands and their handlers should be in the same file. This creates a single location for understanding a complete vertical slice/workflow.
+Commands, their validators, and their handlers should all be in the same file. This creates a single location for understanding a complete vertical slice/workflow - from validation to execution to result.
 
 ```csharp
 // File: AddItemToCart.cs
@@ -199,9 +199,9 @@ public sealed record ItemAdded(
 ##### Benefits of This Approach
 
 1. **Single Location for Comprehension**: Developers can see the complete workflow (command → validation → preconditions → business logic → result) without hunting through multiple files
-2. **Tight Coupling Made Explicit**: Commands and handlers are tightly coupled by design (1:1 relationship), so colocating them makes this coupling obvious and intentional
-3. **Reduced File Hopping**: No need to navigate between `AddItemToCart.cs` and `AddItemToCartHandler.cs` to understand the complete picture
-4. **Onboarding Efficiency**: New developers can quickly understand "what happens" when a command is issued
+2. **Tight Coupling Made Explicit**: Commands, validators, and handlers are tightly coupled by design (1:1:1 relationship), so colocating them makes this coupling obvious and intentional
+3. **Reduced File Hopping**: No need to navigate between `AddItemToCart.cs`, `AddItemToCartValidator.cs`, and `AddItemToCartHandler.cs` to understand the complete picture
+4. **Onboarding Efficiency**: New developers can quickly understand "what happens" when a command is issued - from validation rules to execution logic
 
 ##### File Naming Convention
 
@@ -209,7 +209,9 @@ public sealed record ItemAdded(
 - **Queries**: `{QueryName}.cs` (e.g., `GetCartById.cs`)
 - **Events**: `{EventName}.cs` (e.g., `ItemAdded.cs`)
 
-The handler class name follows the convention `{MessageName}Handler` (e.g., `AddItemToCartHandler`, `GetCartByIdHandler`).
+**Nested class naming conventions:**
+- **Validators**: `{MessageName}Validator` as a nested class (e.g., `AddItemToCartValidator`)
+- **Handlers**: `{MessageName}Handler` as a static class (e.g., `AddItemToCartHandler`)
 
 ### C# Language Features
 
