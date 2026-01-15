@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
 using Wolverine.Marten;
+using Messages.Contracts.CustomerIdentity;
 using ShoppingContracts = Messages.Contracts.Shopping;
 
 namespace Orders.Checkout;
@@ -80,7 +81,7 @@ public static class CompleteCheckoutHandler
                 i.Sku,
                 i.Quantity,
                 i.UnitPrice)).ToList(),
-            new ShoppingContracts.ShippingAddress(
+            new AddressSnapshot(
                 checkout.ShippingAddress!.AddressLine1,
                 checkout.ShippingAddress.AddressLine2,
                 checkout.ShippingAddress.City,

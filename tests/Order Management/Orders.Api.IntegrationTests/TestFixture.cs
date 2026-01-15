@@ -157,7 +157,7 @@ public class TestFixture : IAsyncLifetime
             new Messages.Contracts.Shopping.CheckoutLineItem(item.Sku, item.Quantity, item.PriceAtPurchase))
             .ToList();
 
-        var address = new Messages.Contracts.Shopping.ShippingAddress(
+        var address = new Messages.Contracts.CustomerIdentity.AddressSnapshot(
             shippingAddress.Street,
             shippingAddress.Street2,
             shippingAddress.City,

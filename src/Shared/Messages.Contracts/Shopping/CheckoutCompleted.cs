@@ -1,3 +1,5 @@
+using Messages.Contracts.CustomerIdentity;
+
 namespace Messages.Contracts.Shopping;
 
 public sealed record CheckoutCompleted(
@@ -5,7 +7,7 @@ public sealed record CheckoutCompleted(
     Guid CheckoutId,
     Guid? CustomerId,
     IReadOnlyList<CheckoutLineItem> Items,
-    ShippingAddress ShippingAddress,
+    AddressSnapshot ShippingAddress,
     string ShippingMethod,
     decimal ShippingCost,
     string PaymentMethodToken,

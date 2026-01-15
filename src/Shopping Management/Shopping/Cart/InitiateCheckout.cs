@@ -1,4 +1,5 @@
 using FluentValidation;
+using Marten;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -48,7 +49,8 @@ public static class InitiateCheckoutHandler
     [WolverinePost("/api/carts/{cartId}/checkout")]
     public static (CheckoutInitiated, OutgoingMessages, CreationResponse) Handle(
         InitiateCheckout command,
-        [WriteAggregate] Cart cart)
+        [WriteAggregate] Cart cart,
+        IDocumentSession session)
     {
         var checkoutId = Guid.CreateVersion7();
         var now = DateTimeOffset.UtcNow;
@@ -61,8 +63,25 @@ public static class InitiateCheckoutHandler
             cart.Items.Values.ToList(),
             now);
 
+        // Start Checkout stream in Shopping BC
+        var checkoutLineItems = cart.Items.Values
+            .Select(item => new Checkout.CheckoutLineItem(
+                item.Sku,
+                item.Quantity,
+                item.UnitPrice))
+            .ToList();
+
+        var checkoutStarted = new Checkout.CheckoutStarted(
+            checkoutId,
+            cart.Id,
+            cart.CustomerId,
+            checkoutLineItems,
+            now);
+
+        session.Events.StartStream<Checkout.Checkout>(checkoutId, checkoutStarted);
+
         // Publish integration message to Orders BC
-        var lineItems = cart.Items.Values
+        var integrationLineItems = cart.Items.Values
             .Select(item => new IntegrationMessages.CheckoutLineItem(
                 item.Sku,
                 item.Quantity,
@@ -73,7 +92,7 @@ public static class InitiateCheckoutHandler
             checkoutId,
             cart.Id,
             cart.CustomerId,
-            lineItems,
+            integrationLineItems,
             now);
 
         var outgoing = new OutgoingMessages();
