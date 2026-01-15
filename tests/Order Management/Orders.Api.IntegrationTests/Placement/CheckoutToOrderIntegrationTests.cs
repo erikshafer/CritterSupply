@@ -1,4 +1,5 @@
 using Orders.Placement;
+using Messages.Contracts.CustomerIdentity;
 using ShoppingContracts = Messages.Contracts.Shopping;
 
 namespace Orders.Api.IntegrationTests.Placement;
@@ -30,7 +31,7 @@ public class CheckoutToOrderIntegrationTests : IAsyncLifetime
             new("SKU-002", 1, 39.99m)
         };
 
-        var shippingAddress = new ShoppingContracts.ShippingAddress(
+        var shippingAddress = new AddressSnapshot(
             "123 Main St",
             "Apt 4B",
             "Seattle",
@@ -87,7 +88,7 @@ public class CheckoutToOrderIntegrationTests : IAsyncLifetime
             new("SKU-002", 3, 9.99m)
         };
 
-        var shippingAddress = new ShoppingContracts.ShippingAddress(
+        var shippingAddress = new AddressSnapshot(
             "456 Oak Ave",
             "Suite 200",
             "Portland",
