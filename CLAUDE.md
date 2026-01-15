@@ -90,18 +90,116 @@ On the note of using Wolverine, the framework and its accompanying libraries (su
 
 ## C# and .NET Guidelines
 
-### Project Structure
+### Solution and Project Organization
+
+This repository follows a **bounded context aligned** organization strategy where physical folder structure, .NET solution structure, and domain boundaries are deliberately aligned.
+
+#### Physical Folder Structure
 
 ```
 src/
-  Context/                            # This is a folder that contains the projects that belong to a particular context, value stream, or bounded context. This could be something like Order Management, Product Catalog, or Payment Processing.
-    YourApp/                          # The core project with not just value objects and other primitives, but the core application logic for use cases, domain models, events, commands, queries, and the like. Minimal dependencies unless it achieves the previously mentioned core pieces for the module, such as Wolverine and Marten.
-    YourApp.Api/                      # The API project that leverages the module domain logic from YourApp. The configuration for the web api, web sockets, messaging, and grpc is located here.
-    YourApp.BackgroundWorker/         # The BackgroundWorker project is separate as it needs to run independently from a synchronous API. This may be used for something like a message consuming with Kafka or an independent Marten projection handler that is has additional IO operations.
+  <Bounded Context Name>/             # Physical folder named after the bounded context (e.g., "Customer Identity", "Payment Processing")
+    <ProjectName>/                    # The core project containing domain logic, handlers, events, commands, queries
+                                      # Uses Microsoft.NET.Sdk.Web for self-contained BCs with HTTP endpoints
+    <ProjectName>.Api/                # [Optional] Separate API project if BC has complex hosting requirements
+                                      # Most BCs combine API and domain logic in a single project
 tests/
-  Context/                            # This mirrors the same context that are in the /src/ directory, but for their respective test projects.
-    YourApp.Api.Tests/                # Most the tests. Tests concerning API, application logic, domain model, etc.
-    YourApp.Tests/                    # Tests for ensuring the value objects and other low-level primitives function exactly as expected.
+  <Bounded Context Name>/             # Mirrors the src/ structure for test organization
+    <ProjectName>.IntegrationTests/   # Integration tests using Alba, Testcontainers, xUnit
+    <ProjectName>.UnitTests/          # [Optional] Unit tests for complex domain logic
+```
+
+**Real Examples from CritterSupply:**
+
+```
+src/
+  Customer Identity/
+    Customers/                        # Single project (Web SDK) with domain + HTTP endpoints
+  Order Management/
+    Orders/                           # Core domain logic
+    Orders.Api/                       # HTTP hosting (this BC uses separate projects)
+  Payment Processing/
+    Payments/
+    Payments.Api/
+  Shared/
+    Messages.Contracts/               # Shared integration message contracts
+
+tests/
+  Customer Identity/
+    Customers.Api.IntegrationTests/
+  Order Management/
+    Orders.Api.IntegrationTests/
+    Orders.UnitTests/
+```
+
+#### .NET Solution File Organization (`.slnx`)
+
+The solution file uses **solution folders** to mirror the physical folder structure and bounded context boundaries. This provides IDE organization that matches the filesystem and domain model.
+
+**Structure:**
+- Each bounded context gets its own solution folder (e.g., `/Customer Identity/`, `/Payment Processing/`)
+- Solution folders contain all projects for that BC (domain, API, tests)
+- Shared projects live in a `/Shared/` solution folder
+- Solution items (docs, config) live in `/.SolutionItems/`
+
+**Example from CritterSupply.slnx:**
+
+```xml
+<Solution>
+  <Folder Name="/.SolutionItems/">
+    <File Path="CLAUDE.md" />
+    <File Path="CONTEXTS.md" />
+    <File Path="DEVPROGRESS.md" />
+  </Folder>
+
+  <Folder Name="/Customer Identity/">
+    <Project Path="src/Customer Identity/Customers/Customers.csproj" />
+    <Project Path="tests/Customer Identity/Customers.Api.IntegrationTests/Customers.Api.IntegrationTests.csproj" />
+  </Folder>
+
+  <Folder Name="/Order Management/">
+    <Project Path="src/Order Management/Orders/Orders.csproj" />
+    <Project Path="src/Order Management/Orders.Api/Orders.Api.csproj" />
+    <Project Path="tests/Order Management/Orders.Api.IntegrationTests/Orders.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Order Management/Orders.UnitTests/Orders.UnitTests.csproj" />
+  </Folder>
+
+  <Folder Name="/Shared/">
+    <Project Path="src/Shared/Messages.Contracts/Messages.Contracts.csproj" />
+  </Folder>
+</Solution>
+```
+
+**Key Benefits:**
+
+1. **Bounded Context Visibility**: IDE tree structure makes BC boundaries explicit
+2. **Team Alignment**: Each BC folder represents a potential team's ownership area
+3. **Discoverability**: New developers can see the system's bounded contexts immediately
+4. **Consistency**: Physical folders, solution folders, and domain concepts all align
+
+**When Adding a New Bounded Context:**
+
+1. Create physical folder in `src/<BC Name>/` and `tests/<BC Name>/`
+2. Create projects following established naming patterns
+3. Add solution folder in `CritterSupply.slnx` matching the physical folder name
+4. Add all BC projects to the solution folder
+5. Document the BC in `CONTEXTS.md`
+
+**Note on Naming:**
+- Prefer descriptive BC names that convey purpose (e.g., "Customer Identity" over "Customer Management")
+- Avoid redundant suffixes like "Management" unless they add clarity
+- Physical folder names, solution folder names, and CONTEXTS.md section headings should match
+
+### Project Structure (Within a Bounded Context)
+
+```
+src/
+  <BC Name>/
+    <ProjectName>/                    # Single project approach (preferred for most BCs)
+      Program.cs                      # Hosting configuration (Wolverine, Marten, HTTP)
+      <Subdomain>/                    # Organize by subdomain or feature area
+        <Feature>.cs                  # Commands, queries, handlers, validators colocated
+        <Entity>.cs                   # Domain models
 ```
 
 #### Avoid Having Folders Based on Technical Features

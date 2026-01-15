@@ -34,10 +34,15 @@ The Checkout aggregate owns the final steps of order submission—collecting shi
 
 **Lifecycle Events:**
 - `CheckoutStarted` — checkout stream begins (contains snapshot of cart items from checkout initiation)
-- `ShippingAddressProvided` — shipping address collected
+- `ShippingAddressSelected` — customer selects saved address from Customer Identity BC (stores AddressId)
 - `ShippingMethodSelected` — shipping method chosen
 - `PaymentMethodProvided` — payment method token collected
 - `CheckoutCompleted` — **terminal event**, publishes `CheckoutCompleted` integration message to Orders
+
+**Note on Address Handling:**
+- Phase 1 (Current): Checkout accepts inline address fields via `ShippingAddressProvided` event
+- Phase 2 (Cycle 11): Checkout will reference saved addresses via `ShippingAddressSelected` event, storing only `AddressId`
+- When completing checkout, Shopping BC queries Customer Identity BC for `AddressSnapshot` and embeds it in `CheckoutCompleted` message
 
 **Cart → Checkout Handoff:**
 
@@ -57,9 +62,15 @@ Checkout Stream:
 
 None from other bounded contexts. Shopping initiates the flow based on customer actions.
 
+**Queries to Other BCs:**
+- Customer Identity BC: `GetCustomerAddresses` — retrieves saved addresses for customer selection (Cycle 11)
+- Customer Identity BC: `GetAddressSnapshot` — creates immutable address snapshot for order placement (Cycle 11)
+
 ### What it publishes
 
-- `CheckoutCompleted` — contains cart items (SKU, quantity, price-at-purchase), customer ID, shipping address and method, payment method token, applied discounts
+- `CheckoutCompleted` — contains cart items (SKU, quantity, price-at-purchase), customer ID, **address snapshot**, shipping method, payment method token, applied discounts
+  - **Phase 1 (Current)**: Inline shipping address fields
+  - **Phase 2 (Cycle 11)**: Embedded `AddressSnapshot` from Customer Identity BC
 
 ### Core invariants
 
@@ -506,11 +517,21 @@ Manages customer shipping and billing addresses with support for multiple saved 
 
 ### What it receives
 
-- `OrderPlaced` — from Orders BC, updates `LastUsedAt` timestamp on addresses used in order
+- `OrderPlaced` — from Orders BC, updates `LastUsedAt` timestamp on addresses used in order (future - Cycle 12+)
 
 ### What it publishes
 
-None currently. Customer Identity BC is primarily query-driven (other BCs query for address data).
+None. Customer Identity BC is primarily query-driven (other BCs query for address data).
+
+**Query Endpoints (HTTP):**
+- `GET /api/customers/{customerId}/addresses` — returns all addresses for customer (optionally filtered by type)
+- `GET /api/addresses/{addressId}/snapshot` — returns immutable `AddressSnapshot` for integration (updates `LastUsedAt`)
+
+**Integration Flow (Cycle 11):**
+1. Shopping BC queries `GetCustomerAddresses` during checkout → presents address list to customer
+2. Customer selects address → Shopping BC stores `AddressId` in Checkout aggregate
+3. On checkout completion → Shopping BC queries `GetAddressSnapshot` → receives immutable snapshot
+4. Shopping BC publishes `CheckoutCompleted` with embedded `AddressSnapshot` → Orders BC receives and persists
 
 ### Core invariants
 

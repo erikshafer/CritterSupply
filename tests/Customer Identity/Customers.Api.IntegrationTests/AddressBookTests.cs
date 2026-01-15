@@ -1,7 +1,6 @@
 using Alba;
 using Customers.AddressBook;
 using Marten;
-using Messages.Contracts.CustomerIdentity;
 using Shouldly;
 
 namespace Customers.Api.IntegrationTests;
