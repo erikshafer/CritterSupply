@@ -270,81 +270,58 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 
 #### 🔄 In Progress
 
-None - awaiting PR merge for Cycle 10
+None - ready for namespace refactoring (Task 2)
 
 #### ✅ Completed
 
 **Cycle 10: Customer Identity BC - Address Management (Completed - 2026-01-15)**
-
-#### 🔜 Planned
-
-**Cycle 10: Customer Identity BC - Address Management**
 - **Objective**: Create Customer Identity bounded context with AddressBook subdomain for realistic e-commerce address management
-- **Rationale**:
-    - Current state: Addresses entered ad-hoc during checkout, not persisted for reuse
-    - Real e-commerce: Customers save multiple addresses ("Home", "Work", "Mom's House") and select during checkout
-    - Enables richer UX: address selection instead of re-entry every order
-    - Foundation for future customer features (profiles, saved payment methods, preferences)
 - **BC Work**: AddressBook subdomain
     - `CustomerAddress` entity (id, customerId, type, nickname, address fields, isDefault, lastUsedAt)
     - `AddressType` enum (Shipping, Billing, Both)
-    - Commands: `AddAddress`, `UpdateAddress`, `SetDefaultAddress` ✅
-    - Queries: `GetCustomerAddresses`, `GetAddressSnapshot` ✅
-    - Integration handler: `OrderPlaced` → updates `LastUsedAt` timestamp (future)
-- **Integration Pattern**: Snapshot Pattern
-    - Shopping BC queries `GetCustomerAddresses` during checkout (presents list to customer)
-    - Shopping BC requests `GetAddressSnapshot` when checkout completes (immutable copy)
-    - `CheckoutCompleted` embeds `AddressSnapshot` (not reference) for temporal consistency
-    - Orders BC persists snapshot (no dependency on Customer Identity BC during fulfillment)
-- **Architectural Benefits**:
-    - **Temporal Consistency**: Orders record address *as it was* at order time
-    - **BC Autonomy**: Orders doesn't query Customer Identity BC during fulfillment (might be days/weeks later)
-    - **Auditability**: Historical orders retain original address even if customer updates it
-    - **Privacy**: Minimal billing address in Orders (state/country only for analytics)
+    - Commands: `AddAddress`, `UpdateAddress`, `SetDefaultAddress`
+    - Queries: `GetCustomerAddresses`, `GetAddressSnapshot`
+    - HTTP endpoints with Alba integration tests
 - **Persistence**: Relational (Marten document store, not event-sourced)
-- **Documentation**: CONTEXTS.md updated with Customer Identity BC definition, snapshot pattern explanation
 - **Status**: ✅ Implementation complete - 7/7 tests passing
 - **Key Learnings**:
     - GET endpoint handlers need direct parameters, not query objects (Wolverine can't construct from URL)
     - Handler discovery requires `IncludeType<>` with actual type (commands work, static classes don't)
     - Physical folder renamed from "Customer Management" → "Customer Identity" for clarity
 
-**Cycle 11: Shopping ↔ Customer Identity Integration (Planned - 2026-01-15)**
+**Cycle 11: Shopping ↔ Customer Identity Integration (Completed - 2026-01-15)**
 - **Objective**: Wire Customer Identity BC into the checkout flow so customers can select saved addresses instead of entering them manually
-- **Rationale**:
-    - Customer Identity BC is built but not yet integrated into the shopping experience
-    - Currently: Customers still enter addresses inline during checkout
-    - Target: Customers select from saved addresses, creating seamless UX
-    - Completes the address management feature end-to-end
-- **Shopping BC Changes**:
-    - Add query to Customer Identity BC: `GetCustomerAddresses` to retrieve address list
-    - Update Checkout aggregate to store selected `AddressId` instead of inline address fields
-    - Call `GetAddressSnapshot` when checkout completes to create immutable snapshot
-    - Update `CheckoutCompleted` integration message to embed `AddressSnapshot`
-    - Add new commands: `SelectShippingAddress`, `SelectBillingAddress` (or combined)
-    - Update Checkout event stream to track address selection
-- **Orders BC Changes**:
-    - Update `Messages.Contracts.Shopping.CheckoutCompleted` to include `AddressSnapshot`
-    - Update `PlaceOrder` command to accept `AddressSnapshot` instead of inline `ShippingAddress` record
-    - Update `OrderDecider.Start()` to map from `AddressSnapshot` to Order's `ShippingAddress`
-    - Update Order saga tests to use new snapshot-based contract
-- **Integration Contract Changes** (Messages.Contracts):
-    - Add `AddressSnapshot` record (matching Customer Identity BC's version)
-    - Update `CheckoutCompleted` message signature
-    - Ensure backward compatibility if needed (or coordinate breaking change)
-- **Testing Strategy**:
-    - Unit tests: Checkout aggregate handles address selection correctly
-    - Integration tests:
-        - Shopping BC can query Customer Identity BC for addresses
-        - Shopping BC can request address snapshot
-        - CheckoutCompleted message contains snapshot
-        - Orders BC correctly receives and persists snapshot
-    - End-to-end test: Create address → Select during checkout → Order created with snapshot
-- **Key Integration Points**:
-    1. Shopping BC → Customer Identity BC: Query for addresses (HTTP GET)
-    2. Shopping BC → Customer Identity BC: Request snapshot (HTTP GET)
-    3. Shopping BC → Orders BC: Publish `CheckoutCompleted` with embedded snapshot (message)
-- **Status**: Planning phase - awaiting Cycle 10 PR merge
+- **Implementation Summary**:
+    - **Shopping BC**: Created Checkout aggregate with `ShippingAddressSelected` event storing `AddressId`
+    - **Shopping BC**: `SelectShippingAddress` command/handler for address selection
+    - **Shopping BC**: `CompleteCheckout` handler queries Customer Identity BC via HTTP for `AddressSnapshot`
+    - **Shopping BC**: Configured HttpClient for Customer Identity BC integration
+    - **Customer Identity BC**: Moved `AddressSnapshot` to shared `Messages.Contracts.CustomerIdentity`
+    - **Orders BC**: Updated to receive `CheckoutCompleted` with embedded `AddressSnapshot`
+    - **Orders BC**: Saga `Start()` method maps `AddressSnapshot` to internal `ShippingAddress`
+    - **Integration Contracts**: Created `Messages.Contracts.CustomerIdentity.AddressSnapshot`
+    - **Integration Contracts**: Updated `CheckoutCompleted` to embed `AddressSnapshot` instead of inline fields
+    - **Test Updates**: Fixed CheckoutToOrderIntegrationTests and ShoppingIntegrationTests to use `AddressSnapshot`
+    - **Cleanup**: Removed obsolete `Messages.Contracts.Shopping.ShippingAddress`
+- **Integration Flow**:
+    1. Shopping BC → Customer Identity BC: HTTP GET `/api/addresses/{addressId}/snapshot`
+    2. Customer Identity BC returns immutable `AddressSnapshot`
+    3. Shopping BC → Orders BC: Publishes `CheckoutCompleted` with embedded `AddressSnapshot`
+    4. Orders BC persists snapshot (temporal consistency preserved)
+- **Status**: ✅ Implementation complete - All 86 tests passing
+    - Customer Identity: 7/7
+    - Orders: 25/25
+    - Shopping: 9/9
+    - Payments: 30/30
+    - Inventory: 16/16
+    - Fulfillment: 6/6
+- **Key Learnings**:
+    - HTTP integration between BCs via `IHttpClientFactory` works cleanly with Wolverine handlers
+    - Snapshot pattern ensures temporal consistency (orders preserve address as it was at checkout time)
+    - `[WriteAggregate]` pattern is preferred over manual `Load()` when aggregate ID is directly resolvable
+    - Integration contracts must be truly shared (no BC-specific types in Messages.Contracts)
+
+#### 🔜 Planned
 
 **Future Enhancements:**
 - Returns Context (reverse logistics)

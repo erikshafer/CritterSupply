@@ -39,10 +39,11 @@ The Checkout aggregate owns the final steps of order submission—collecting shi
 - `PaymentMethodProvided` — payment method token collected
 - `CheckoutCompleted` — **terminal event**, publishes `CheckoutCompleted` integration message to Orders
 
-**Note on Address Handling:**
-- Phase 1 (Current): Checkout accepts inline address fields via `ShippingAddressProvided` event
-- Phase 2 (Cycle 11): Checkout will reference saved addresses via `ShippingAddressSelected` event, storing only `AddressId`
-- When completing checkout, Shopping BC queries Customer Identity BC for `AddressSnapshot` and embeds it in `CheckoutCompleted` message
+**Address Handling (Cycle 11 - Completed):**
+- Checkout stores selected `AddressId` via `ShippingAddressSelected` event (not inline address fields)
+- When completing checkout, Shopping BC queries Customer Identity BC for immutable `AddressSnapshot`
+- `CheckoutCompleted` integration message embeds the `AddressSnapshot` for Orders BC
+- This ensures temporal consistency - orders preserve address as it existed at checkout time
 
 **Cart → Checkout Handoff:**
 
@@ -68,9 +69,7 @@ None from other bounded contexts. Shopping initiates the flow based on customer 
 
 ### What it publishes
 
-- `CheckoutCompleted` — contains cart items (SKU, quantity, price-at-purchase), customer ID, **address snapshot**, shipping method, payment method token, applied discounts
-  - **Phase 1 (Current)**: Inline shipping address fields
-  - **Phase 2 (Cycle 11)**: Embedded `AddressSnapshot` from Customer Identity BC
+- `CheckoutCompleted` — contains cart items (SKU, quantity, price-at-purchase), customer ID, embedded `AddressSnapshot` (immutable point-in-time copy from Customer Identity BC), shipping method, shipping cost, payment method token
 
 ### Core invariants
 
