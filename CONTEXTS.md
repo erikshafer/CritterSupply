@@ -698,12 +698,962 @@ When Shopping BC completes checkout, it doesn't pass an `AddressId` to Orders BC
 
 ---
 
+## Customer Experience
+
+The Customer Experience context owns the customer-facing frontend orchestration using the Backend-for-Frontend (BFF) pattern. This BC composes data from multiple domain BCs to optimize UI performance and provide a cohesive customer experience across web and future mobile channels.
+
+**Status**: Planned (not yet implemented)
+
+### Architecture Pattern: Backend-for-Frontend (BFF)
+
+**Why BFF?**
+- **Composition**: Aggregates data from multiple BCs for optimized frontend views
+- **Real-Time**: Natural location for SignalR hub (cart updates, order notifications)
+- **UI Orchestration**: Keeps frontend-specific logic separate from domain BCs
+- **Independent Scaling**: Frontend concerns don't impact domain BC performance
+- **Multiple Clients**: Easy to add mobile BFF later with different composition needs
+
+### Subdomains
+
+**Storefront (Web):**
+
+Customer-facing web store built with Blazor Server, demonstrating full-stack C# development with real-time updates via SignalR and Wolverine integration.
+
+**Key Pages (Minimal Implementation):**
+- Product listing page (queries Catalog BC)
+- Shopping cart view (queries Shopping BC, real-time updates via SignalR)
+- Checkout flow (queries Orders + Customer Identity BCs, multi-step wizard)
+- Order history (queries Orders BC)
+- Account/address management (queries Customer Identity BC)
+
+**Technology Stack:**
+- **Blazor Server** - C# full-stack, component model, easier SignalR integration than WASM
+- **SignalR** - Real-time cart/order updates pushed from domain BCs
+- **Wolverine HTTP** - BFF endpoints for view composition
+- **Alba** - Integration testing for BFF composition endpoints
+
+**Future Expansion:**
+- Mobile BFF (different composition needs than web)
+- Progressive Web App (PWA) support
+- Customer notification preferences UI
+
+### What it receives
+
+**Integration Messages (for real-time UI updates):**
+- `ItemAdded` from Shopping — push cart updates to connected clients
+- `ItemRemoved` from Shopping — push cart updates to connected clients
+- `OrderPlaced` from Orders — notify customer of successful order placement
+- `PaymentCaptured` from Payments — update order status UI in real-time
+- `ShipmentDispatched` from Fulfillment — notify customer with tracking number
+- `ShipmentDelivered` from Fulfillment — notify customer of delivery
+
+### What it queries (HTTP/gRPC)
+
+**Shopping BC:**
+- `GET /api/carts/{cartId}` — retrieve cart state for display
+
+**Orders BC:**
+- `GET /api/checkouts/{checkoutId}` — retrieve checkout state for wizard UI
+- `GET /api/orders/{orderId}` — retrieve order details for tracking page
+- `GET /api/orders?customerId={customerId}` — retrieve order history
+
+**Customer Identity BC:**
+- `GET /api/customers/{customerId}/addresses` — retrieve saved addresses for checkout
+- `GET /api/addresses/{addressId}/snapshot` — get address snapshot when needed
+
+**Catalog BC (future):**
+- `GET /api/products` — retrieve product listing with filters/pagination
+- `GET /api/products/{sku}` — retrieve product details page data
+- `GET /api/products/search?q={query}` — search products
+
+**Inventory BC:**
+- `GET /api/inventory/availability?skus={skus}` — check stock levels for product display
+
+### What it publishes
+
+**Commands (mutations via Wolverine):**
+- `AddItemToCart` → Shopping BC
+- `RemoveItemFromCart` → Shopping BC
+- `InitiateCheckout` → Shopping BC
+- `SelectShippingAddress` → Orders BC
+- `ProvidePaymentMethod` → Orders BC
+- `CompleteCheckout` → Orders BC
+- `AddAddress` → Customer Identity BC
+- `UpdateAddress` → Customer Identity BC
+
+**SignalR Messages (to connected clients):**
+- `CartUpdated` — cart state changed (item added/removed/quantity changed)
+- `OrderStatusChanged` — order progressed through lifecycle
+- `InventoryAlert` — low stock warning for items in cart
+- `CheckoutStepCompleted` — wizard progression feedback
+
+### Core Invariants
+
+**BFF Composition Invariants:**
+- View models are optimized for frontend consumption, not domain purity
+- BFF does NOT contain domain business logic (delegates to domain BCs)
+- BFF does NOT maintain state (queries/commands only)
+- SignalR notifications reflect domain events, don't replace them
+
+**Real-Time Notification Invariants:**
+- Only authenticated users receive notifications for their data
+- SignalR connections scoped to customer ID (security boundary)
+- Domain BCs publish integration messages; BFF transforms to SignalR messages
+- Failed SignalR delivery does NOT fail domain operations (fire-and-forget)
+
+### What it doesn't own
+
+- Shopping cart domain logic (Shopping BC)
+- Checkout/order domain logic (Orders BC)
+- Product catalog data (Catalog BC)
+- Customer profile/address master data (Customer Identity BC)
+- Payment processing (Payments BC)
+- Inventory levels (Inventory BC)
+
+### Integration Flows
+
+**View Composition Example (Checkout Page):**
+```
+GetCheckoutView (BFF query)
+  └─> GetCheckoutViewHandler
+      ├─> HTTP GET → Orders BC: /api/checkouts/{checkoutId}
+      ├─> HTTP GET → Customer Identity BC: /api/customers/{customerId}/addresses
+      └─> Compose CheckoutView (ViewModel)
+          ├─> CheckoutSummary (from Orders)
+          ├─> AddressList (from Customer Identity)
+          └─> Return optimized view for Blazor component
+```
+
+**Real-Time Update Flow (Cart Item Added):**
+```
+[Shopping BC domain logic]
+AddItemToCart (command)
+  └─> AddItemToCartHandler
+      ├─> ItemAdded (domain event, persisted)
+      └─> Publish Shopping.ItemAdded (integration message) → RabbitMQ
+
+[Customer Experience BFF]
+Shopping.ItemAdded (integration message from RabbitMQ)
+  └─> ItemAddedNotificationHandler
+      ├─> Query Shopping BC for updated cart state
+      ├─> Compose CartSummaryView
+      └─> SignalR push to connected client
+          └─> StorefrontHub.Clients.Group($"cart:{cartId}")
+              └─> SendAsync("CartUpdated", cartSummary)
+
+[Blazor Frontend]
+StorefrontHub.On("CartUpdated")
+  └─> Update UI component (cart icon badge, cart page refresh)
+```
+
+**Command Flow (Customer Adds Item to Cart):**
+```
+[Blazor Component]
+<button @onclick="AddToCart">Add to Cart</button>
+
+[Blazor Code-Behind]
+async Task AddToCart()
+  └─> HTTP POST → BFF: /api/storefront/cart/{cartId}/items
+      └─> StorefrontController.AddItemToCart
+          └─> Wolverine: Send AddItemToCart command → Shopping BC
+              └─> [Shopping BC handles, publishes integration event]
+                  └─> [BFF receives event, pushes SignalR update - see above]
+```
+
+### Project Structure (Planned)
+
+```
+src/
+  Customer Experience/
+    Storefront/                       # BFF domain (view composition, SignalR hub)
+      Composition/                    # View model composition from multiple BCs
+        CheckoutView.cs
+        ProductListingView.cs
+        OrderHistoryView.cs
+      Notifications/                  # SignalR hub + integration message handlers
+        StorefrontHub.cs
+        CartUpdateNotifier.cs
+        OrderStatusNotifier.cs
+      Queries/                        # BFF query handlers (composition)
+        GetCheckoutView.cs
+        GetProductListing.cs
+        GetOrderHistory.cs
+      Commands/                       # BFF command handlers (delegation to domain BCs)
+        AddItemToCartCommand.cs
+        CompleteCheckoutCommand.cs
+      Clients/                        # HTTP clients for domain BC queries
+        IShoppingClient.cs
+        IOrdersClient.cs
+        ICustomerIdentityClient.cs
+        ICatalogClient.cs
+    Storefront.Web/                   # Blazor Server app
+      Pages/
+        Index.razor                   # Product catalog landing
+        Cart.razor                    # Shopping cart view
+        Checkout.razor                # Checkout wizard
+        OrderHistory.razor            # Customer order list
+        OrderDetails.razor            # Order tracking page
+        Account/
+          Addresses.razor             # Address management
+      Components/
+        ProductCard.razor
+        CartSummary.razor
+        CheckoutProgress.razor
+        AddressSelector.razor
+      Shared/
+        MainLayout.razor
+        NavMenu.razor
+      wwwroot/                        # Static assets (CSS, images)
+      Program.cs                      # Blazor + SignalR + Wolverine setup
+
+tests/
+  Customer Experience/
+    Storefront.IntegrationTests/      # Alba tests for BFF composition
+      CheckoutViewCompositionTests.cs
+      RealTimeNotificationTests.cs
+```
+
+### Implementation Notes
+
+**SignalR + Wolverine Integration:**
+```csharp
+// Storefront/Notifications/StorefrontHub.cs
+public class StorefrontHub : Hub
+{
+    public async Task SubscribeToCart(Guid cartId)
+    {
+        // Add connection to cart-specific group
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"cart:{cartId}");
+    }
+
+    public async Task SubscribeToOrderUpdates(Guid customerId)
+    {
+        // Add connection to customer-specific group
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"customer:{customerId}");
+    }
+}
+
+// Storefront/Notifications/CartUpdateNotifier.cs
+public static class CartUpdateNotifier
+{
+    public static async Task Handle(
+        Shopping.ItemAdded message,
+        IHubContext<StorefrontHub> hubContext,
+        IShoppingClient shoppingClient,
+        CancellationToken ct)
+    {
+        // Query Shopping BC for updated cart state
+        var cart = await shoppingClient.GetCartAsync(message.CartId, ct);
+
+        // Compose view model
+        var cartSummary = new CartSummaryView(
+            cart.Id,
+            cart.Items.Count,
+            cart.Items.Sum(i => i.Quantity * i.UnitPrice));
+
+        // Push to connected clients in this cart's group
+        await hubContext.Clients
+            .Group($"cart:{message.CartId}")
+            .SendAsync("CartUpdated", cartSummary, ct);
+    }
+}
+```
+
+**Blazor Component with Real-Time Updates:**
+```razor
+@* Storefront.Web/Pages/Cart.razor *@
+@page "/cart/{cartId:guid}"
+@inject IStorefrontClient StorefrontClient
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<h1>Shopping Cart</h1>
+
+@if (cart is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <CartSummary Cart="@cart" />
+
+    @foreach (var item in cart.Items)
+    {
+        <CartLineItem
+            Item="@item"
+            OnRemove="@(() => RemoveItem(item.Sku))" />
+    }
+
+    <button @onclick="Checkout">Proceed to Checkout</button>
+}
+
+@code {
+    [Parameter] public Guid CartId { get; set; }
+
+    private HubConnection? hubConnection;
+    private CartView? cart;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initial cart load
+        cart = await StorefrontClient.GetCartViewAsync(CartId);
+
+        // Connect to SignalR hub
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/storefronthub"))
+            .Build();
+
+        // Subscribe to cart updates
+        hubConnection.On<CartSummaryView>("CartUpdated", async (updatedCart) =>
+        {
+            // Refresh cart state from server
+            cart = await StorefrontClient.GetCartViewAsync(CartId);
+            StateHasChanged(); // Re-render component
+        });
+
+        await hubConnection.StartAsync();
+        await hubConnection.InvokeAsync("SubscribeToCart", CartId);
+    }
+
+    private async Task RemoveItem(string sku)
+    {
+        await StorefrontClient.RemoveItemFromCartAsync(CartId, sku);
+        // SignalR notification will trigger UI update
+    }
+}
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+            await hubConnection.DisposeAsync();
+    }
+}
+```
+
+### Testing Strategy
+
+**Integration Tests (Alba):**
+- BFF composition endpoints return correct view models
+- SignalR hub receives integration messages and pushes to correct groups
+- HTTP client delegation to domain BCs works correctly
+
+**UI Tests (bUnit - optional):**
+- Blazor components render correctly with mocked data
+- SignalR updates trigger component re-renders
+- Form submissions send correct commands to BFF
+
+**No Unit Tests:**
+- BFF is composition/orchestration only (no domain logic to unit test)
+- Integration tests provide sufficient coverage
+
+### Dependencies
+
+**Required BCs (for initial implementation):**
+- Shopping BC (cart queries/commands)
+- Orders BC (checkout queries/commands)
+- Customer Identity BC (address queries)
+
+**Future Dependencies:**
+- Catalog BC (product listing/search)
+- Inventory BC (availability checks)
+
+### Open Questions for Implementation
+
+1. **Authentication**: Use ASP.NET Core Identity or external IdP (Auth0, Azure AD B2C)?
+2. **Caching Strategy**: Redis for BFF view model caching? TTL policies?
+3. **Error Handling**: How to display domain BC errors to customers (friendly messages vs technical details)?
+4. **Offline Support**: PWA capabilities for cart persistence when offline?
+5. **Mobile BFF**: Separate project or shared composition logic with different endpoints?
+
+---
+
+## Product Catalog
+
+The Product Catalog context owns the master product data—SKUs, descriptions, images, categorization, and searchability. This BC is the source of truth for "what we sell" but does NOT own pricing, inventory levels, or promotional rules (those are separate concerns).
+
+**Status**: Planned (not yet implemented)
+
+### Architecture: Read-Heavy, Query-Optimized
+
+Product Catalog is a **read-heavy** BC with very different access patterns than transactional BCs like Orders or Payments:
+- **90%+ reads** - Product listing pages, search, detail pages
+- **Rare writes** - Product data changes infrequently (merchandising team updates)
+- **High traffic** - Every customer browsing session hits catalog repeatedly
+- **Query complexity** - Full-text search, faceted filtering, categorization
+
+**Persistence Strategy:**
+- **NOT Event Sourced** - Product Catalog uses Marten as a document database (like MongoDB), NOT an event store
+- **Why not event sourcing?** - Products are master data with infrequent changes; current state matters more than historical changes; read-heavy workload benefits from direct document queries
+- **Document Store** - Marten stores Product documents directly; CRUD operations update documents in-place
+- **Integration Events** - Publish integration messages (ProductAdded, ProductUpdated) to notify other BCs, but don't persist as domain events
+- **Future Search Index** - Consider Elasticsearch/Meilisearch for advanced search features (fuzzy matching, faceted navigation)
+
+### Entities
+
+**Product (Aggregate Root):**
+- `Sku` (string) - Primary identifier, human-readable (e.g., "CBOWL-CER-LG-BLU")
+- `Name` (string) - Display name (e.g., "Ceramic Dog Bowl - Large - Blue")
+- `Description` (string) - Marketing copy
+- `LongDescription` (string) - Full product details
+- `Category` (ProductCategory) - Primary category (e.g., "Bowls & Feeders")
+- `Subcategory` (string) - Optional subcategory (e.g., "Ceramic Bowls")
+- `Brand` (string) - Manufacturer/brand name (e.g., "PetSupreme")
+- `Tags` (List<string>) - Searchable tags (e.g., ["dishwasher-safe", "non-slip", "large-breed"])
+- `Images` (List<ProductImage>) - Product photos (primary + additional angles)
+- `Dimensions` (ProductDimensions) - Physical size/weight for shipping calculations
+- `Status` (ProductStatus) - Active, Discontinued, ComingSoon, OutOfSeason
+- `AddedAt` (DateTimeOffset) - When product was added to catalog
+- `UpdatedAt` (DateTimeOffset) - Last modification timestamp
+
+**ProductCategory (Value Object):**
+- Hierarchical structure (e.g., "Dogs > Bowls & Feeders > Ceramic Bowls")
+- Used for navigation menus and breadcrumbs
+- Examples: Dogs, Cats, Birds, Fish, Reptiles, Small Animals
+
+**ProductImage (Value Object):**
+- `Url` (string) - CDN path to image
+- `AltText` (string) - Accessibility description
+- `SortOrder` (int) - Display order (0 = primary image)
+
+**ProductDimensions (Value Object):**
+- `Length`, `Width`, `Height` (decimal) - In inches
+- `Weight` (decimal) - In pounds
+- Used by Fulfillment BC for shipping cost calculations
+
+**ProductStatus (Enum):**
+- `Active` - Currently available for sale
+- `Discontinued` - No longer sold (but still in system for historical orders)
+- `ComingSoon` - Announced but not yet available
+- `OutOfSeason` - Seasonal items (e.g., holiday-themed products)
+
+### What it receives
+
+**Integration Messages (rare updates):**
+- `InventoryDepleted` from Inventory — may trigger automatic status change to OutOfStock (future feature)
+- `ProductRestocked` from Inventory — reverse of above (future feature)
+
+**Commands (from merchandising team or admin UI):**
+- `AddProduct` - Create new product in catalog
+- `UpdateProduct` - Modify product details
+- `UpdateProductImages` - Add/remove/reorder images
+- `ChangeProductStatus` - Activate, discontinue, or mark as coming soon
+- `CategorizeProduct` - Assign to category/subcategory
+- `TagProduct` - Add/remove searchable tags
+
+### What it publishes
+
+**Integration Messages:**
+- `ProductAdded` - New product available in catalog (Inventory may create stock record)
+- `ProductUpdated` - Product details changed (Customer Experience may invalidate cached listings)
+- `ProductDiscontinued` - Product no longer available (Orders may prevent new purchases)
+
+**Note on Domain Events:**
+Product Catalog does NOT use event sourcing, so there are no persisted domain events. Changes to products are direct document updates. Only integration messages (listed above) are published to notify other BCs.
+
+### What it queries (future dependencies)
+
+**Pricing BC (future):**
+- `GET /api/pricing/products/{sku}` - Retrieve current price for product
+- `GET /api/pricing/products?skus={skus}` - Bulk price lookup for listing pages
+
+**Inventory BC:**
+- `GET /api/inventory/availability?sku={sku}` - Check if product is in stock at any warehouse
+- `GET /api/inventory/availability?skus={skus}` - Bulk availability check for listing pages
+
+**Promotions BC (future):**
+- `GET /api/promotions/products/{sku}` - Check for active promotions on product
+- `GET /api/promotions/products?skus={skus}` - Bulk promotion lookup
+
+### Core Invariants
+
+**Product Invariants:**
+- SKU must be unique across all products
+- SKU cannot be changed once assigned (immutable identifier)
+- Product name must not be empty
+- At least one image is required for Active products
+- Discontinued products cannot be reactivated (one-way transition)
+- Products cannot be deleted (soft delete only, preserve for historical orders)
+
+**Category Invariants:**
+- Category hierarchy must be valid (no orphaned subcategories)
+- Category names must be unique within their parent category
+- Products must have at least one category assignment
+
+**Image Invariants:**
+- Image URLs must be valid CDN paths
+- SortOrder 0 is reserved for primary image (only one primary)
+- Alt text required for accessibility compliance
+
+### What it doesn't own
+
+- **Pricing** - Current price, promotional pricing, regional pricing (Pricing BC)
+- **Inventory levels** - Available stock quantity, warehouse locations (Inventory BC)
+- **Product reviews/ratings** - Customer feedback (Reviews BC - future)
+- **Promotional rules** - Buy-one-get-one, discounts, etc. (Promotions BC - future)
+- **Purchase history** - Sales data, trending products (Analytics BC - future)
+
+### Integration Flows
+
+**Product Lifecycle (Merchandising Team):**
+```
+AddProduct (command from admin UI)
+  └─> AddProductHandler
+      ├─> Validate SKU uniqueness
+      ├─> ProductCreated (domain event)
+      └─> Publish ProductAdded → Inventory BC (may create stock record)
+
+UpdateProduct (command from admin UI)
+  └─> UpdateProductHandler
+      ├─> ProductDetailsUpdated (domain event)
+      └─> Publish ProductUpdated → Customer Experience BC (invalidate cache)
+
+ChangeProductStatus (command from admin UI)
+  └─> ChangeProductStatusHandler
+      ├─> Validate status transition (cannot reactivate discontinued)
+      ├─> ProductStatusChanged (domain event)
+      └─> [If discontinued] Publish ProductDiscontinued → Orders BC
+```
+
+**Query Patterns (Customer Experience BFF):**
+```
+GetProductListing (query from Storefront)
+  └─> GetProductListingHandler
+      ├─> Query Catalog BC: GET /api/products?category={category}&page={page}
+      ├─> Query Inventory BC: GET /api/inventory/availability?skus={skus}
+      ├─> [Future] Query Pricing BC: GET /api/pricing/products?skus={skus}
+      └─> Compose ProductListingView
+          ├─> Product details (from Catalog)
+          ├─> In-stock status (from Inventory)
+          └─> Price (from Pricing, or hardcoded for now)
+
+GetProductDetail (query from Storefront)
+  └─> GetProductDetailHandler
+      ├─> Query Catalog BC: GET /api/products/{sku}
+      ├─> Query Inventory BC: GET /api/inventory/availability?sku={sku}
+      ├─> [Future] Query Pricing BC: GET /api/pricing/products/{sku}
+      ├─> [Future] Query Reviews BC: GET /api/reviews/products/{sku}
+      └─> Compose ProductDetailView
+          ├─> Full product details + images (from Catalog)
+          ├─> In-stock status (from Inventory)
+          ├─> Price (from Pricing)
+          └─> Average rating (from Reviews)
+```
+
+**Search Flow (Customer Experience):**
+```
+SearchProducts (query from Storefront)
+  └─> SearchProductsHandler
+      ├─> Query Catalog BC: GET /api/products/search?q={query}&category={category}
+      ├─> [Future] Elasticsearch query for advanced full-text search
+      └─> Return ProductSearchResults
+          ├─> Matching products (SKU, name, thumbnail)
+          ├─> Facets (categories, brands, tags for filtering)
+          └─> Total result count for pagination
+```
+
+### HTTP Endpoints (Query-Centric)
+
+**Product Queries:**
+- `GET /api/products` - List products (paginated, filterable by category/brand/status)
+- `GET /api/products/{sku}` - Get product details by SKU
+- `GET /api/products/search?q={query}` - Full-text search products
+- `GET /api/products/category/{category}` - Products in specific category
+- `GET /api/products/tags/{tag}` - Products with specific tag
+
+**Admin Commands (merchandising team):**
+- `POST /api/admin/products` - Add new product
+- `PUT /api/admin/products/{sku}` - Update product details
+- `PUT /api/admin/products/{sku}/images` - Update product images
+- `PUT /api/admin/products/{sku}/status` - Change product status
+- `DELETE /api/admin/products/{sku}` - Soft delete (mark as discontinued)
+
+**Category Queries:**
+- `GET /api/categories` - List all categories (hierarchical tree)
+- `GET /api/categories/{category}/products` - Products in category
+
+### Project Structure (Planned)
+
+```
+src/
+  Product Catalog/
+    Catalog/                          # Domain logic
+      Products/                       # Product aggregate + handlers
+        Product.cs                    # Aggregate root (write model)
+        ProductStatus.cs              # Enum
+        ProductImage.cs               # Value object
+        ProductDimensions.cs          # Value object
+        AddProduct.cs                 # Command + handler + validator
+        UpdateProduct.cs              # Command + handler + validator
+        ChangeProductStatus.cs        # Command + handler + validator
+      Categories/                     # Category management
+        ProductCategory.cs            # Value object
+        CategoryHierarchy.cs          # Category tree structure
+      Search/                         # Search optimization
+        ProductSearchIndex.cs         # Denormalized read model
+        RebuildSearchIndex.cs         # Command to rebuild search index
+    Catalog.Api/                      # HTTP hosting
+      Program.cs                      # Wolverine + Marten setup
+      AdminEndpoints/                 # Admin-only endpoints (require auth)
+        ProductAdminEndpoints.cs
+
+tests/
+  Product Catalog/
+    Catalog.IntegrationTests/         # Alba tests for query/command endpoints
+      ProductQueryTests.cs
+      ProductSearchTests.cs
+      ProductAdminTests.cs
+    Catalog.UnitTests/                # Unit tests for domain logic
+      ProductValidationTests.cs
+      SkuGenerationTests.cs
+```
+
+### Implementation Notes
+
+**1. SKU Generation Strategy**
+
+SKUs are human-readable identifiers, not auto-generated GUIDs. Follow a consistent pattern:
+
+```
+{CATEGORY}-{BRAND}-{SIZE}-{COLOR}
+Example: CBOWL-CER-LG-BLU (Ceramic Bowl - Large - Blue)
+```
+
+**Implementation:**
+```csharp
+public static class SkuGenerator
+{
+    public static string Generate(
+        string categoryCode,    // CBOWL (Ceramic Bowl)
+        string brandCode,       // CER (Ceramic brand abbreviation)
+        string sizeCode,        // LG (Large)
+        string? colorCode)      // BLU (Blue, optional)
+    {
+        var parts = new[] { categoryCode, brandCode, sizeCode, colorCode }
+            .Where(p => !string.IsNullOrEmpty(p));
+
+        return string.Join("-", parts).ToUpperInvariant();
+    }
+}
+```
+
+**2. Document CRUD Pattern (NOT Event Sourced)**
+
+Product Catalog uses Marten as a document database. Store and query Product documents directly:
+
+```csharp
+// AddProduct.cs - Create new product document
+public static class AddProductHandler
+{
+    public static ProblemDetails Before(
+        AddProduct command,
+        IDocumentSession session)
+    {
+        // Check SKU uniqueness
+        var existing = session.Query<Product>()
+            .FirstOrDefault(p => p.Sku == command.Sku);
+
+        if (existing is not null)
+            return new ProblemDetails
+            {
+                Detail = $"Product with SKU {command.Sku} already exists",
+                Status = 409
+            };
+
+        return WolverineContinue.NoProblems;
+    }
+}
+
+    [WolverinePost("/api/admin/products")]
+    public static async Task<(CreationResponse, OutgoingMessages)> Handle(
+        AddProduct command,
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        var product = new Product
+        {
+            Sku = command.Sku,
+            Name = command.Name,
+            Description = command.Description,
+            Category = command.Category,
+            Brand = command.Brand,
+            Tags = command.Tags,
+            Images = command.Images,
+            Price = command.Price,  // Hardcoded for v1
+            Status = ProductStatus.Active,
+            AddedAt = now,
+            UpdatedAt = now
+        };
+
+        // Store document (NOT event sourcing)
+        session.Store(product);
+        await session.SaveChangesAsync(ct);
+
+        // Publish integration event (notify other BCs)
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new Messages.Contracts.Catalog.ProductAdded(
+            product.Sku,
+            product.Name,
+            product.Category,
+            now));
+
+        return (new CreationResponse($"/api/products/{product.Sku}"), outgoing);
+    }
+}
+
+// UpdateProduct.cs - Update product document
+public static class UpdateProductHandler
+{
+    [WolverinePut("/api/admin/products/{sku}")]
+    public static async Task Handle(
+        string sku,
+        UpdateProduct command,
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        var product = await session.LoadAsync<Product>(sku, ct);
+
+        if (product is null)
+            throw new InvalidOperationException($"Product {sku} not found");
+
+        // Update document (immutable pattern with 'with' expression)
+        var updated = product with
+        {
+            Name = command.Name ?? product.Name,
+            Description = command.Description ?? product.Description,
+            Price = command.Price ?? product.Price,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        session.Store(updated);
+        await session.SaveChangesAsync(ct);
+    }
+}
+
+// GetProducts.cs - Query documents directly
+public static class GetProductsHandler
+{
+    [WolverineGet("/api/products")]
+    public static async Task<PagedResult<ProductSummary>> Handle(
+        string? category,
+        int page = 1,
+        int pageSize = 20,
+        IDocumentSession session,
+        CancellationToken ct = default)
+    {
+        var query = session.Query<Product>()
+            .Where(p => p.Status == ProductStatus.Active);
+
+        if (!string.IsNullOrEmpty(category))
+            query = query.Where(p => p.Category == category);
+
+        var total = await query.CountAsync(ct);
+
+        var products = await query
+            .OrderBy(p => p.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(p => new ProductSummary(p.Sku, p.Name, p.Price, p.Images.First().Url))
+            .ToListAsync(ct);
+
+        return new PagedResult<ProductSummary>(products, total, page, pageSize);
+    }
+}
+```
+
+**3. Category Hierarchy**
+
+Use adjacency list pattern for category tree:
+
+```csharp
+public sealed record ProductCategory(
+    string Name,
+    string Slug,              // URL-friendly (e.g., "bowls-and-feeders")
+    string? ParentSlug,       // null for root categories
+    int SortOrder)
+{
+    public static ProductCategory Root(string name, string slug, int sortOrder) =>
+        new(name, slug, null, sortOrder);
+
+    public static ProductCategory Subcategory(string name, string slug, string parentSlug, int sortOrder) =>
+        new(name, slug, parentSlug, sortOrder);
+}
+
+// Query example - get all categories with parent relationships
+public static async Task<List<CategoryNode>> GetCategoryTree(IDocumentSession session)
+{
+    var categories = await session.Query<ProductCategory>().ToListAsync();
+
+    var roots = categories.Where(c => c.ParentSlug == null)
+        .OrderBy(c => c.SortOrder)
+        .Select(c => new CategoryNode(c, BuildChildren(c.Slug, categories)))
+        .ToList();
+
+    return roots;
+}
+```
+
+**4. Image Storage Strategy**
+
+Products don't store raw image bytes - only CDN URLs:
+
+```csharp
+public sealed record ProductImage(
+    string Url,           // https://cdn.crittersupply.com/products/cbowl-cer-lg-blu-01.jpg
+    string AltText,       // "Blue ceramic dog bowl - front view"
+    int SortOrder)        // 0 = primary image
+{
+    public bool IsPrimary => SortOrder == 0;
+}
+```
+
+**Admin UI uploads images** → CDN → **Catalog BC stores URL only**.
+
+**5. Query Performance Considerations**
+
+Product listings are high-traffic, high-concurrency queries:
+
+```csharp
+// Good - Paginated, indexed query
+public static async Task<PagedResult<ProductSummary>> GetProducts(
+    IDocumentSession session,
+    string? category,
+    int page,
+    int pageSize,
+    CancellationToken ct)
+{
+    var query = session.Query<Product>()
+        .Where(p => p.Status == ProductStatus.Active);
+
+    if (!string.IsNullOrEmpty(category))
+        query = query.Where(p => p.Category == category);
+
+    var total = await query.CountAsync(ct);
+
+    var products = await query
+        .OrderBy(p => p.Name)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .Select(p => new ProductSummary(p.Sku, p.Name, p.PrimaryImageUrl))
+        .ToListAsync(ct);
+
+    return new PagedResult<ProductSummary>(products, total, page, pageSize);
+}
+```
+
+**Consider caching** frequently-accessed data:
+- Homepage featured products (Redis, 1-hour TTL)
+- Category trees (Redis, 24-hour TTL, invalidate on category changes)
+- Product detail pages (CDN edge caching for anonymous users)
+
+### Testing Strategy
+
+**Integration Tests (Alba):**
+- Product CRUD operations via admin endpoints
+- Product listing queries with filters
+- Search queries return correct results
+- Category hierarchy queries
+
+**Unit Tests:**
+- SKU generation logic
+- Product validation rules
+- Status transition validation (cannot reactivate discontinued)
+- Category hierarchy building
+
+**Performance Tests (future):**
+- Load test product listing pages (simulate 1000+ concurrent users)
+- Search query performance under load
+- Cache hit rates for frequently-accessed products
+
+### Dependencies
+
+**Required BCs (for initial implementation):**
+- None - Catalog BC is self-contained for initial version
+
+**Future Dependencies:**
+- Inventory BC (availability checks, denormalized into product listings)
+- Pricing BC (product prices, promotional pricing)
+- Promotions BC (active deals, badges on product cards)
+- Reviews BC (customer ratings, average score)
+
+### Seed Data Strategy
+
+For development and demo purposes, seed realistic product data:
+
+```csharp
+// Catalog/SeedData/ProductSeeder.cs
+public static class ProductSeeder
+{
+    public static async Task SeedProducts(IDocumentSession session)
+    {
+        var products = new[]
+        {
+            new Product
+            {
+                Sku = "CBOWL-CER-LG-BLU",
+                Name = "Ceramic Dog Bowl - Large - Blue",
+                Description = "Dishwasher-safe ceramic bowl for large breeds",
+                Category = "Dogs > Bowls & Feeders",
+                Brand = "PetSupreme",
+                Tags = new[] { "dishwasher-safe", "non-slip", "large-breed" },
+                Images = new[]
+                {
+                    new ProductImage("https://via.placeholder.com/400x400?text=Blue+Bowl", "Blue ceramic bowl - front", 0),
+                    new ProductImage("https://via.placeholder.com/400x400?text=Blue+Bowl+Side", "Blue ceramic bowl - side", 1)
+                },
+                Status = ProductStatus.Active
+            },
+            // Add 20-30 realistic products across different categories
+        };
+
+        session.Store(products);
+        await session.SaveChangesAsync();
+    }
+}
+```
+
+### Open Questions for Implementation
+
+1. **Search Technology**: Use Marten's built-in search or integrate Elasticsearch/Meilisearch for advanced features (fuzzy search, typo tolerance, faceted navigation)?
+2. **Image CDN**: Use Azure Blob Storage, AWS S3, Cloudflare Images, or local storage for development?
+3. **Pricing Strategy**: Hardcode prices in Catalog for v1, or wait for separate Pricing BC?
+4. **Admin UI**: Build simple Blazor admin pages in Catalog.Api, or assume external CMS/PIM system?
+5. **Product Variants**: Should "Blue Bowl" and "Red Bowl" be separate products or variants of a parent product? (Impacts SKU strategy)
+
+### Recommended Implementation Order
+
+1. **Phase 1 - Core Product CRUD** (Cycle 13 candidate)
+   - Product aggregate with basic fields (SKU, name, description, images, category, status)
+   - Admin endpoints for adding/updating products
+   - Query endpoints for product listing and detail
+   - Seed data with 20-30 realistic products
+   - Integration tests for CRUD operations
+
+2. **Phase 2 - Category Management** (Cycle 14 candidate)
+   - Category hierarchy structure
+   - Category-based navigation
+   - Breadcrumbs for product detail pages
+
+3. **Phase 3 - Search** (Cycle 15 candidate)
+   - Simple text search across product names/descriptions
+   - Search result ranking
+   - Faceted filtering (by category, brand, tags)
+
+4. **Phase 4 - Customer Experience Integration** (After Cycle 15)
+   - BFF queries Catalog BC for product listings
+   - Product detail pages in Storefront.Web
+   - Add to cart from product pages
+
+---
+
 ## Future Considerations
 
 The following contexts are acknowledged but not yet defined:
 
-- **Catalog** — product information, categorization, search
-- **Pricing** — price rules, promotions, discounts
-- **Notifications** — email, SMS, push notifications
+- **Pricing** — price rules, promotional pricing, regional pricing
+- **Promotions** — buy-one-get-one, percentage discounts, coupon codes
+- **Reviews** — customer product reviews, ratings, moderation
+- **Notifications** — email, SMS, push notifications (may move to Customer Experience)
 - **Procurement/Supply Chain** — purchasing, vendor management, forecasting
 - **Shipping/Logistics** — carrier management, rate shopping

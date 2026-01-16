@@ -1703,6 +1703,810 @@ GET    /api/orders/{orderId}/status
 
 If you're unsure, **choose the pattern that matches existing endpoints**. Consistency across the codebase is more valuable than theoretical purity. If we need to adjust our naming schema later, it's a straightforward search-and-replace operation.
 
+## Backend-for-Frontend (BFF) Pattern
+
+When building customer-facing frontends (web, mobile) that interact with multiple bounded contexts, use the **Backend-for-Frontend (BFF)** pattern to keep UI orchestration concerns separate from domain logic.
+
+### What is a BFF?
+
+A BFF is an intermediate layer between the frontend and domain BCs that:
+- **Composes** data from multiple BCs into frontend-optimized view models
+- **Orchestrates** queries and commands across BCs for UI workflows
+- **Aggregates** domain events into real-time notifications for connected clients
+- **Does NOT contain domain logic** - it delegates to domain BCs
+
+### Customer Experience BC (Storefront BFF)
+
+CritterSupply's customer-facing web store is implemented as a separate BC using the BFF pattern. See `CONTEXTS.md` for complete specification.
+
+**Project Structure:**
+```
+src/
+  Customer Experience/
+    Storefront/                 # BFF domain (view composition, SignalR hub)
+      Composition/              # View model composition from multiple BCs
+      Notifications/            # SignalR hub + integration message handlers
+      Queries/                  # BFF query handlers
+      Commands/                 # BFF command handlers (delegation)
+      Clients/                  # HTTP clients for domain BC queries
+    Storefront.Web/             # Blazor Server app
+      Pages/                    # Razor pages
+      Components/               # Reusable Blazor components
+```
+
+### BFF Principles
+
+**1. Composition Over Domain Logic**
+
+BFFs compose data from domain BCs - they do NOT contain business rules.
+
+```csharp
+// Good - BFF composes view from multiple BCs
+public static class GetCheckoutViewHandler
+{
+    [WolverineGet("/api/storefront/checkout/{checkoutId}")]
+    public static async Task<CheckoutView> Handle(
+        GetCheckoutView query,
+        IOrdersClient ordersClient,
+        ICustomerIdentityClient identityClient,
+        CancellationToken ct)
+    {
+        // Query Orders BC
+        var checkout = await ordersClient.GetCheckoutAsync(query.CheckoutId, ct);
+
+        // Query Customer Identity BC
+        var addresses = await identityClient.GetCustomerAddressesAsync(
+            checkout.CustomerId,
+            AddressType.Shipping,
+            ct);
+
+        // Compose view model optimized for frontend
+        return new CheckoutView(
+            checkout.CheckoutId,
+            checkout.Items,
+            addresses);
+    }
+}
+```
+
+```csharp
+// Bad - BFF contains domain logic (belongs in Orders BC)
+public static class CompleteCheckoutHandler
+{
+    public static async Task Handle(CompleteCheckout command, ...)
+    {
+        // BAD - Validation logic should be in Orders BC
+        if (command.Items.Count == 0)
+            throw new InvalidOperationException("Cannot checkout empty cart");
+
+        // BAD - Domain rule enforcement should be in Orders BC
+        if (command.TotalAmount < 0)
+            throw new InvalidOperationException("Total cannot be negative");
+
+        // Good - Delegation to domain BC
+        await ordersClient.CompleteCheckoutAsync(command);
+    }
+}
+```
+
+**2. Real-Time Updates with SignalR**
+
+BFFs subscribe to integration messages from domain BCs and push real-time updates to connected clients via SignalR.
+
+```csharp
+// Storefront/Notifications/CartUpdateNotifier.cs
+public static class CartUpdateNotifier
+{
+    // Handler for Shopping BC integration message
+    public static async Task Handle(
+        Shopping.ItemAdded message,
+        IHubContext<StorefrontHub> hubContext,
+        IShoppingClient shoppingClient,
+        CancellationToken ct)
+    {
+        // Query Shopping BC for updated cart state
+        var cart = await shoppingClient.GetCartAsync(message.CartId, ct);
+
+        // Compose view model
+        var cartSummary = new CartSummaryView(
+            cart.Id,
+            cart.Items.Count,
+            cart.TotalAmount);
+
+        // Push to connected clients via SignalR
+        await hubContext.Clients
+            .Group($"cart:{message.CartId}")
+            .SendAsync("CartUpdated", cartSummary, ct);
+    }
+}
+```
+
+**3. View Models are UI-Optimized, Not Domain-Pure**
+
+BFF view models prioritize frontend performance and usability over domain model purity.
+
+```csharp
+// Good - View model optimized for checkout wizard UI
+public sealed record CheckoutView(
+    Guid CheckoutId,
+    Guid CustomerId,
+    CheckoutStatus Status,
+    List<LineItemSummary> Items,        // Flattened for display
+    decimal TotalAmount,                 // Pre-calculated
+    List<AddressSummary> Addresses,     // Display strings ready
+    bool CanComplete);                   // UI state flag
+
+// Good - Display-optimized nested type
+public sealed record LineItemSummary(
+    string Sku,
+    string ProductName,                  // Joined from Catalog BC
+    int Quantity,
+    decimal UnitPrice,
+    decimal LineTotal,                   // Pre-calculated
+    bool IsInStock);                     // From Inventory BC
+```
+
+### Blazor + Wolverine Integration
+
+**Dependency Injection:**
+
+Wolverine handlers can inject `IHubContext<T>` for SignalR notifications.
+
+```csharp
+// Program.cs - Storefront.Web
+builder.Services.AddSignalR();
+
+builder.Host.UseWolverine(opts =>
+{
+    // Wolverine can inject IHubContext<StorefrontHub>
+    opts.Services.AddSingleton<IHubContext<StorefrontHub>>();
+
+    // Subscribe to integration messages from domain BCs
+    opts.ListenToRabbitQueue("storefront-notifications");
+});
+
+app.MapHub<StorefrontHub>("/storefronthub");
+```
+
+**Blazor Component with Real-Time Updates:**
+
+```razor
+@page "/cart/{cartId:guid}"
+@inject IStorefrontClient StorefrontClient
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<h1>Shopping Cart</h1>
+
+@if (cart is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <CartSummary Cart="@cart" />
+    <button @onclick="Checkout">Proceed to Checkout</button>
+}
+
+@code {
+    [Parameter] public Guid CartId { get; set; }
+
+    private HubConnection? hubConnection;
+    private CartView? cart;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initial load from BFF
+        cart = await StorefrontClient.GetCartViewAsync(CartId);
+
+        // Connect to SignalR hub
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/storefronthub"))
+            .Build();
+
+        // Subscribe to real-time updates
+        hubConnection.On<CartSummaryView>("CartUpdated", async (updatedCart) =>
+        {
+            cart = await StorefrontClient.GetCartViewAsync(CartId);
+            StateHasChanged(); // Trigger re-render
+        });
+
+        await hubConnection.StartAsync();
+        await hubConnection.InvokeAsync("SubscribeToCart", CartId);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+            await hubConnection.DisposeAsync();
+    }
+}
+```
+
+### When NOT to Use BFF
+
+**Avoid BFF for:**
+- Internal admin tools (direct BC access acceptable)
+- Simple CRUD apps with single BC (unnecessary complexity)
+- APIs consumed by other backend services (use direct BC-to-BC communication)
+
+**Use BFF for:**
+- Customer-facing web/mobile apps querying multiple BCs
+- Real-time notification requirements (SignalR, WebSockets)
+- Different client types with different composition needs (web vs mobile)
+
+### BFF Testing Strategy
+
+**Integration Tests Only:**
+
+BFFs don't contain domain logic, so unit tests provide little value. Focus on integration tests using Alba.
+
+```csharp
+[Fact]
+public async Task GetCheckoutView_ComposesFromMultipleBCs()
+{
+    // Arrange
+    var checkoutId = Guid.NewGuid();
+    var customerId = Guid.NewGuid();
+
+    // Seed Orders BC with checkout data
+    await _ordersClient.CreateCheckoutAsync(checkoutId, customerId, ...);
+
+    // Seed Customer Identity BC with addresses
+    await _identityClient.AddAddressAsync(customerId, ...);
+
+    // Act - Query BFF composition endpoint
+    var result = await _host.Scenario(s =>
+    {
+        s.Get.Url($"/api/storefront/checkout/{checkoutId}");
+        s.StatusCodeShouldBe(200);
+    });
+
+    var view = result.ReadAsJson<CheckoutView>();
+
+    // Assert - View model contains composed data
+    view.CheckoutId.ShouldBe(checkoutId);
+    view.Items.ShouldNotBeEmpty();          // From Orders BC
+    view.Addresses.ShouldNotBeEmpty();      // From Customer Identity BC
+}
+```
+
+## Entity Framework Core + Wolverine Integration
+
+While most of CritterSupply uses Marten (event sourcing + document store), **Customer Identity BC uses Entity Framework Core** to demonstrate relational modeling and showcase Wolverine's EF Core integration. This section documents patterns for using EF Core with Wolverine.
+
+### When to Use EF Core vs Marten
+
+**Use EF Core when:**
+- Traditional relational model fits naturally (Customer → Addresses with foreign keys)
+- Navigation properties simplify queries (joins, includes)
+- Foreign key constraints enforce referential integrity
+- Schema evolution via migrations
+- Team is more familiar with EF Core patterns
+
+**Use Marten when:**
+- Event sourcing is beneficial (Orders, Payments, Inventory, Fulfillment)
+- Document model fits (flexible schema, JSON storage)
+- High-performance queries with JSONB indexes
+- No complex relational joins needed
+- Projection-based read models
+
+### Customer Identity BC: EF Core Example
+
+Customer Identity is the reference implementation for EF Core + Wolverine patterns in CritterSupply.
+
+**Entity Model:**
+```csharp
+// Customer.cs - Aggregate root
+public sealed class Customer
+{
+    public Guid Id { get; private set; }
+    public string Email { get; private set; } = string.Empty;
+    public string FirstName { get; private set; } = string.Empty;
+    public string LastName { get; private set; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    // Navigation property (EF Core one-to-many)
+    public ICollection<CustomerAddress> Addresses { get; private set; } = new List<CustomerAddress>();
+
+    // Required by EF Core
+    private Customer() { }
+
+    public static Customer Create(string email, string firstName, string lastName)
+    {
+        return new Customer
+        {
+            Id = Guid.CreateVersion7(),
+            Email = email,
+            FirstName = firstName,
+            LastName = lastName,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    public CustomerAddress AddAddress(
+        AddressType type,
+        string nickname,
+        string addressLine1,
+        string city,
+        string postcode,
+        string country)
+    {
+        var address = CustomerAddress.Create(Id, type, nickname, addressLine1, city, postcode, country);
+        Addresses.Add(address);
+        return address;
+    }
+}
+
+// CustomerAddress.cs - Entity with foreign key
+public sealed class CustomerAddress
+{
+    public Guid Id { get; private set; }
+    public Guid CustomerId { get; private set; }  // Foreign key
+    public AddressType Type { get; private set; }
+    public string Nickname { get; private set; } = string.Empty;
+    public string AddressLine1 { get; private set; } = string.Empty;
+    public string? AddressLine2 { get; private set; }
+    public string City { get; private set; } = string.Empty;
+    public string Postcode { get; private set; } = string.Empty;
+    public string Country { get; private set; } = string.Empty;
+    public bool IsDefault { get; private set; }
+    public bool IsVerified { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    // Navigation property (back to Customer)
+    public Customer Customer { get; private set; } = null!;
+
+    // Required by EF Core
+    private CustomerAddress() { }
+
+    internal static CustomerAddress Create(
+        Guid customerId,
+        AddressType type,
+        string nickname,
+        string addressLine1,
+        string city,
+        string postcode,
+        string country)
+    {
+        return new CustomerAddress
+        {
+            Id = Guid.CreateVersion7(),
+            CustomerId = customerId,
+            Type = type,
+            Nickname = nickname,
+            AddressLine1 = addressLine1,
+            City = city,
+            Postcode = postcode,
+            Country = country,
+            IsDefault = false,
+            IsVerified = false,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    public void MarkAsVerified()
+    {
+        IsVerified = true;
+    }
+
+    public void SetAsDefault()
+    {
+        IsDefault = true;
+    }
+}
+```
+
+**DbContext Configuration:**
+```csharp
+// CustomerIdentityDbContext.cs
+public class CustomerIdentityDbContext : DbContext
+{
+    public CustomerIdentityDbContext(DbContextOptions<CustomerIdentityDbContext> options)
+        : base(options)
+    {
+    }
+
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<CustomerAddress> Addresses => Set<CustomerAddress>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Customer>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+
+            entity.Property(c => c.Email)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.HasIndex(c => c.Email)
+                .IsUnique();
+
+            entity.Property(c => c.FirstName)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(c => c.LastName)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            // One-to-many relationship
+            entity.HasMany(c => c.Addresses)
+                .WithOne(a => a.Customer)
+                .HasForeignKey(a => a.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CustomerAddress>(entity =>
+        {
+            entity.HasKey(a => a.Id);
+
+            entity.Property(a => a.Nickname)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(a => a.AddressLine1)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            entity.Property(a => a.City)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(a => a.Postcode)
+                .IsRequired()
+                .HasMaxLength(20);
+
+            entity.Property(a => a.Country)
+                .IsRequired()
+                .HasMaxLength(2);  // ISO 3166-1 alpha-2
+
+            // Unique constraint (customer can't have duplicate nicknames)
+            entity.HasIndex(a => new { a.CustomerId, a.Nickname })
+                .IsUnique();
+        });
+    }
+}
+```
+
+**Program.cs Configuration:**
+```csharp
+// Configure EF Core with Postgres
+builder.Services.AddDbContext<CustomerIdentityDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("CustomerIdentity")));
+
+// Wolverine can inject DbContext into handlers
+builder.Host.UseWolverine(opts =>
+{
+    // EF Core transactional middleware (optional - auto-saves changes)
+    opts.Policies.AutoApplyTransactions();
+
+    // Wolverine discovers handlers in assembly
+    opts.Discovery.IncludeAssembly(typeof(CustomerIdentityDbContext).Assembly);
+});
+```
+
+**Wolverine Handler with EF Core:**
+```csharp
+// AddAddress.cs
+public sealed record AddAddress(
+    Guid CustomerId,
+    AddressType Type,
+    string Nickname,
+    string AddressLine1,
+    string? AddressLine2,
+    string City,
+    string Postcode,
+    string Country,
+    bool IsDefault)
+{
+    public class AddAddressValidator : AbstractValidator<AddAddress>
+    {
+        public AddAddressValidator()
+        {
+            RuleFor(x => x.CustomerId).NotEmpty();
+            RuleFor(x => x.Nickname).NotEmpty().MaximumLength(50);
+            RuleFor(x => x.AddressLine1).NotEmpty().MaximumLength(200);
+            RuleFor(x => x.City).NotEmpty().MaximumLength(100);
+            RuleFor(x => x.Postcode).NotEmpty().MaximumLength(20);
+            RuleFor(x => x.Country).NotEmpty().Length(2);
+        }
+    }
+}
+
+public static class AddAddressHandler
+{
+    // Wolverine injects DbContext (same pattern as IDocumentSession)
+    public static async Task<ProblemDetails> Before(
+        AddAddress command,
+        CustomerIdentityDbContext dbContext,
+        CancellationToken ct)
+    {
+        // Load customer with addresses (Include for navigation property)
+        var customer = await dbContext.Customers
+            .Include(c => c.Addresses)
+            .FirstOrDefaultAsync(c => c.Id == command.CustomerId, ct);
+
+        if (customer is null)
+            return new ProblemDetails
+            {
+                Detail = "Customer not found",
+                Status = 404
+            };
+
+        // Check nickname uniqueness
+        if (customer.Addresses.Any(a => a.Nickname == command.Nickname))
+            return new ProblemDetails
+            {
+                Detail = $"Address with nickname '{command.Nickname}' already exists",
+                Status = 409
+            };
+
+        return WolverineContinue.NoProblems;
+    }
+
+    [WolverinePost("/api/customers/{customerId}/addresses")]
+    public static async Task<CreationResponse> Handle(
+        AddAddress command,
+        CustomerIdentityDbContext dbContext,
+        IAddressVerificationService verificationService,
+        CancellationToken ct)
+    {
+        // Load customer (already validated in Before)
+        var customer = await dbContext.Customers
+            .Include(c => c.Addresses)
+            .FirstAsync(c => c.Id == command.CustomerId, ct);
+
+        // Verify address
+        var verificationResult = await verificationService.VerifyAsync(
+            command.AddressLine1,
+            command.AddressLine2,
+            command.City,
+            command.Postcode,
+            command.Country,
+            ct);
+
+        // Add address to customer (navigation property)
+        var address = customer.AddAddress(
+            command.Type,
+            command.Nickname,
+            verificationResult.SuggestedAddress?.AddressLine1 ?? command.AddressLine1,
+            command.City,
+            command.Postcode,
+            command.Country);
+
+        if (verificationResult.Status is VerificationStatus.Verified or VerificationStatus.Corrected)
+        {
+            address.MarkAsVerified();
+        }
+
+        // If IsDefault, unset other defaults
+        if (command.IsDefault)
+        {
+            foreach (var addr in customer.Addresses.Where(a => a.Type == command.Type && a.Id != address.Id))
+            {
+                // EF Core tracks changes automatically
+                addr.SetAsDefault(false);
+            }
+            address.SetAsDefault();
+        }
+
+        // SaveChanges persists all changes (Customer + Addresses)
+        await dbContext.SaveChangesAsync(ct);
+
+        return new CreationResponse($"/api/customers/{command.CustomerId}/addresses/{address.Id}");
+    }
+}
+```
+
+**Query with Navigation Properties:**
+```csharp
+// GetCustomerAddresses.cs
+public sealed record GetCustomerAddresses(
+    Guid CustomerId,
+    AddressType? Type = null);
+
+public static class GetCustomerAddressesHandler
+{
+    [WolverineGet("/api/customers/{customerId}/addresses")]
+    public static async Task<List<AddressSummary>> Handle(
+        Guid customerId,
+        AddressType? type,
+        CustomerIdentityDbContext dbContext,
+        CancellationToken ct)
+    {
+        // Query with Include (navigation property)
+        var query = dbContext.Addresses
+            .Where(a => a.CustomerId == customerId);
+
+        if (type.HasValue)
+            query = query.Where(a => a.Type == type.Value);
+
+        var addresses = await query
+            .OrderByDescending(a => a.IsDefault)
+            .ThenBy(a => a.Nickname)
+            .Select(a => new AddressSummary(
+                a.Id,
+                a.Nickname,
+                $"{a.AddressLine1}, {a.City}, {a.Postcode}",
+                a.IsDefault,
+                a.IsVerified))
+            .ToListAsync(ct);
+
+        return addresses;
+    }
+}
+```
+
+### EF Core Migrations
+
+Use EF Core migrations for schema evolution:
+
+```bash
+# Create initial migration
+dotnet ef migrations add InitialCreate --project src/Customer\ Identity/Customers
+
+# Apply migrations
+dotnet ef database update --project src/Customer\ Identity/Customers
+
+# Add new migration when schema changes
+dotnet ef migrations add AddLastUsedAtColumn --project src/Customer\ Identity/Customers
+```
+
+**Migration Example:**
+```csharp
+public partial class InitialCreate : Migration
+{
+    protected override void Up(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.CreateTable(
+            name: "Customers",
+            columns: table => new
+            {
+                Id = table.Column<Guid>(nullable: false),
+                Email = table.Column<string>(maxLength: 256, nullable: false),
+                FirstName = table.Column<string>(maxLength: 100, nullable: false),
+                LastName = table.Column<string>(maxLength: 100, nullable: false),
+                CreatedAt = table.Column<DateTimeOffset>(nullable: false)
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_Customers", x => x.Id);
+            });
+
+        migrationBuilder.CreateTable(
+            name: "Addresses",
+            columns: table => new
+            {
+                Id = table.Column<Guid>(nullable: false),
+                CustomerId = table.Column<Guid>(nullable: false),
+                Type = table.Column<int>(nullable: false),
+                Nickname = table.Column<string>(maxLength: 50, nullable: false),
+                AddressLine1 = table.Column<string>(maxLength: 200, nullable: false),
+                // ... more columns
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_Addresses", x => x.Id);
+                table.ForeignKey(
+                    name: "FK_Addresses_Customers_CustomerId",
+                    column: x => x.CustomerId,
+                    principalTable: "Customers",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.Cascade);
+            });
+
+        migrationBuilder.CreateIndex(
+            name: "IX_Customers_Email",
+            table: "Customers",
+            column: "Email",
+            unique: true);
+
+        migrationBuilder.CreateIndex(
+            name: "IX_Addresses_CustomerId_Nickname",
+            table: "Addresses",
+            columns: new[] { "CustomerId", "Nickname" },
+            unique: true);
+    }
+}
+```
+
+### EF Core Testing with Alba + TestContainers
+
+Integration tests work seamlessly with EF Core:
+
+```csharp
+// CustomerIdentityTestFixture.cs
+public class CustomerIdentityTestFixture : IAsyncLifetime
+{
+    private IAlbaHost _host = null!;
+    private PostgreSqlContainer _postgres = null!;
+
+    public async Task InitializeAsync()
+    {
+        // Start Postgres container
+        _postgres = new PostgreSqlBuilder()
+            .WithImage("postgres:16")
+            .Build();
+
+        await _postgres.StartAsync();
+
+        // Configure Alba with EF Core
+        _host = await AlbaHost.For<Program>(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                // Replace connection string with TestContainers connection
+                services.RemoveAll<DbContextOptions<CustomerIdentityDbContext>>();
+                services.AddDbContext<CustomerIdentityDbContext>(options =>
+                    options.UseNpgsql(_postgres.GetConnectionString()));
+            });
+        });
+
+        // Run migrations
+        using var scope = _host.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<CustomerIdentityDbContext>();
+        await dbContext.Database.MigrateAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _host.DisposeAsync();
+        await _postgres.DisposeAsync();
+    }
+}
+
+// Integration test
+public class AddAddressTests : IClassFixture<CustomerIdentityTestFixture>
+{
+    [Fact]
+    public async Task AddAddress_CreatesAddress()
+    {
+        var customerId = Guid.NewGuid();
+
+        // Seed customer
+        using (var scope = _host.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<CustomerIdentityDbContext>();
+            var customer = Customer.Create("test@example.com", "John", "Doe");
+            dbContext.Customers.Add(customer);
+            await dbContext.SaveChangesAsync();
+        }
+
+        // Execute command
+        var command = new AddAddress(customerId, AddressType.Shipping, "Home", ...);
+
+        var response = await _host.Scenario(s =>
+        {
+            s.Post.Json(command).ToUrl($"/api/customers/{customerId}/addresses");
+            s.StatusCodeShouldBe(201);
+        });
+
+        // Verify in database
+        using (var scope = _host.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<CustomerIdentityDbContext>();
+            var addresses = await dbContext.Addresses
+                .Where(a => a.CustomerId == customerId)
+                .ToListAsync();
+
+            addresses.Count.ShouldBe(1);
+            addresses.First().Nickname.ShouldBe("Home");
+        }
+    }
+}
+```
+
+### Key Takeaways: EF Core + Wolverine
+
+1. **DbContext Injection** - Wolverine injects `DbContext` into handlers like any other dependency
+2. **Navigation Properties** - Use `Include()` for eager loading, simplifies queries
+3. **Change Tracking** - EF Core automatically tracks entity changes, call `SaveChangesAsync()`
+4. **Migrations** - Use EF Core migrations for schema evolution (versioned, repeatable)
+5. **Foreign Keys** - Database-level referential integrity (cascade deletes)
+6. **Testing** - Alba + TestContainers work seamlessly with EF Core
+
 ## Testing Principles
 
 In general, prefer integration tests over unit tests. The latter have their place and importance, but we want to leverage tools like Alba and TestContainers to go through the use cases our vertical slices are built to fulfill.

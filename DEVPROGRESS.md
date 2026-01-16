@@ -343,10 +343,162 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 
 #### 🔜 Planned
 
-**Future Enhancements:**
+**Next Priority (Cycle 13): Customer Identity BC - EF Core Migration**
+
+**Objective**: Refactor Customer Identity BC from Marten document store to Entity Framework Core to demonstrate relational modeling and EF Core + Wolverine integration
+
+**Why Now:**
+- Customer Identity is perfect relational use case (Customer → Addresses with foreign keys)
+- Demonstrates when to use EF Core vs Marten in same system
+- EF Core is dominant .NET ORM (important to showcase Wolverine integration)
+- Existing tests validate behavior is preserved during migration
+- Small BC scope makes migration manageable (7 integration tests, 5 unit tests)
+
+**Key Deliverables:**
+- `Customer` aggregate root with navigation properties to `CustomerAddress` entities
+- `CustomerIdentityDbContext` with EF Core configuration (fluent API)
+- EF Core migrations for schema evolution
+- Refactor handlers to use `DbContext` instead of `IDocumentSession`
+- Preserve all existing functionality (add/update/delete addresses, address verification)
+- Update integration tests to use EF Core TestContainers
+- Update unit tests (no changes needed - pure functions remain pure)
+
+**Migration Scope:**
+- ✅ AddressBook subdomain (all existing functionality)
+- ✅ Address verification service integration (no changes needed)
+- ⚠️ Customer Profile subdomain (future - not yet implemented)
+- ⚠️ Payment Methods subdomain (future - not yet implemented)
+
+**Technical Details:**
+- **Database**: Continue using Postgres (EF Core Npgsql provider)
+- **Relationships**: One-to-many (Customer → Addresses) with cascade delete
+- **Indexes**: Unique constraint on (CustomerId, Nickname), unique index on Customer.Email
+- **Migrations**: Use EF Core migrations for schema changes
+- **Wolverine Integration**: Inject `CustomerIdentityDbContext` into handlers (same pattern as `IDocumentSession`)
+
+**Testing Strategy:**
+- All 7 existing integration tests must pass (behavior unchanged)
+- Alba + TestContainers still used (EF Core works seamlessly)
+- Unit tests for address verification remain unchanged
+- Add new test: Verify foreign key constraints work correctly
+- Add new test: Verify cascade delete removes addresses when customer deleted
+
+**Why EF Core for Customer Identity:**
+1. **Relational Model Fits Naturally** - Customer/Address is classic relational use case
+2. **Navigation Properties** - `Customer.Addresses` collection simplifies queries
+3. **Foreign Keys** - Enforces referential integrity at database level
+4. **Migrations** - Schema evolution with versioned migrations
+5. **Industry Standard** - Most .NET developers familiar with EF Core patterns
+
+**Why NOT Marten for Customer Identity:**
+- Document store doesn't add value (no flexible schema needed)
+- No event sourcing needed (current state is all that matters)
+- Relational queries more natural (join customer with addresses)
+
+**Implementation Notes:**
+- See CONTEXTS.md "Customer Identity" section for EF Core relational model specification
+- See CLAUDE.md "Entity Framework Core + Wolverine" section for integration patterns
+- Preserve immutability patterns (`private set`, `record` where applicable)
+- Keep command/handler colocation pattern
+- Keep FluentValidation for command validation
+- Wolverine still handles command execution and HTTP endpoints
+
+**Migration Steps (Documented for Implementation):**
+1. Add EF Core packages (Microsoft.EntityFrameworkCore, Npgsql.EntityFrameworkCore.PostgreSQL)
+2. Create `CustomerIdentityDbContext` with `Customer` and `CustomerAddress` entities
+3. Configure relationships and constraints in `OnModelCreating`
+4. Create initial migration (`Add-Migration InitialCreate`)
+5. Refactor handlers to use `DbContext` instead of `IDocumentSession`
+6. Update `Program.cs` to configure EF Core instead of Marten for this BC
+7. Run integration tests (should pass with no changes)
+8. Update seed data to use EF Core
+9. Verify all endpoints work via manual testing
+
+**Dependencies:**
+- None - self-contained refactoring
+
+**Post-Migration:**
+- Customer Identity demonstrates EF Core + Wolverine
+- Product Catalog (next cycle) demonstrates Marten document store
+- System now showcases both persistence strategies
+
+---
+
+**Second Priority (Cycle 14): Product Catalog BC (Phase 1 - Core CRUD)**
+
+**Note**: Product Catalog was previously planned as Cycle 13, but Customer Identity EF Core migration takes priority to showcase EF Core + Wolverine integration before building new BCs.
+
+**Objective**: Build product catalog with CRUD operations and query endpoints for Customer Experience BC integration
+
+**Why Second:**
+- Required dependency for Customer Experience BC (product listings, search)
+- Self-contained BC (no dependencies on other BCs for Phase 1)
+- Demonstrates read-heavy, query-optimized architecture patterns
+- Seed data enables realistic Customer Experience demos
+
+**Key Deliverables:**
+- Product aggregate (SKU, name, description, images, category, brand, tags, status)
+- Admin endpoints for merchandising team (add/update/status change)
+- Query endpoints for product listing and detail (paginated, filterable)
+- Seed data with 20-30 realistic products across multiple categories
+- Integration tests for CRUD and query operations
+
+**Dependencies:**
+- None for Phase 1 (self-contained)
+- Future phases integrate with Inventory BC (availability), Pricing BC (prices)
+
+**Implementation Phases:**
+1. **Phase 1 (Cycle 13)** - Core Product CRUD + query endpoints
+2. **Phase 2 (Cycle 14)** - Category hierarchy management
+3. **Phase 3 (Cycle 15)** - Product search functionality
+4. **Phase 4 (Post Cycle 15)** - Customer Experience integration
+
+**Implementation Notes:**
+- See CONTEXTS.md "Product Catalog" section for complete specification
+- Use relational persistence (Marten document store) for write model
+- Create denormalized read model projections for query optimization
+- Human-readable SKUs (e.g., "CBOWL-CER-LG-BLU"), not GUIDs
+- Use placeholder images (via.placeholder.com) for seed data
+- Hardcode prices in Product entity for v1 (defer Pricing BC to later)
+
+---
+
+**Third Priority (Cycle 15+): Customer Experience BC (Storefront BFF)**
+
+**Objective**: Build customer-facing web store using Backend-for-Frontend pattern with Blazor Server and SignalR
+
+**Why Third:**
+- Depends on Product Catalog BC (product listings, search)
+- Demonstrates complete end-to-end flow (Shopping → Orders → Fulfillment with UI)
+- Showcases Blazor + SignalR + Wolverine integration (real-time cart/order updates)
+- BFF pattern shows proper UI composition over multiple BCs
+
+**Key Deliverables:**
+- Storefront BFF project (view composition, SignalR hub)
+- Blazor Server web app (Cart, Checkout, Order History pages)
+- Real-time notifications (cart updates, order status changes)
+- Integration tests for BFF composition endpoints
+
+**Dependencies:**
+- ✅ Shopping BC (cart queries/commands) - complete
+- ✅ Orders BC (checkout + order lifecycle) - complete
+- ✅ Customer Identity BC (address queries) - complete with EF Core (Cycle 13)
+- ✅ Product Catalog BC (product listing) - complete after Cycle 14
+
+**Implementation Notes:**
+- See CONTEXTS.md "Customer Experience" section for complete specification
+- Focus on 3-4 key pages (product listing, cart, checkout, order history)
+- SignalR hub receives integration messages from domain BCs, pushes to connected clients
+- BFF does NOT contain domain logic (composition/orchestration only)
+
+---
+
+**Future Enhancements (Lower Priority):**
+- Pricing BC (price rules, promotional pricing, regional pricing)
 - Returns Context (reverse logistics)
-- Notifications Context (customer communication)
-- Product Catalog Context (pricing and availability queries)
+- Notifications Context (email, SMS, push notifications - may move to Customer Experience)
+- Mobile BFF (Customer Experience expansion)
+- Reviews BC (customer product reviews, ratings)
 
 **Future BC Naming Review:**
 - Review all BC physical folder names ending in "Management" for creativity and clarity
