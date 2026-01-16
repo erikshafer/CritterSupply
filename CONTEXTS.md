@@ -2,9 +2,18 @@
 
 This document defines the bounded contexts within CritterSupply, an e-commerce reference architecture demonstrating event-driven systems using the Critter Stack (Wolverine, Marten, Alba).
 
+## Important Note: Checkout Migration (Cycle 8)
+
+**Checkout aggregate was migrated from Shopping BC to Orders BC** to establish clearer bounded context boundaries:
+- **Shopping BC** now focuses on pre-purchase exploration (cart management, future: product browsing, wishlists)
+- **Orders BC** owns the transactional commitment phase (checkout + order lifecycle)
+- Integration: Shopping publishes `CheckoutInitiated` → Orders handles and creates Checkout aggregate
+
+This architectural decision ensures each BC has a well-defined purpose and reduces cognitive load for developers working in either context.
+
 ## Shopping
 
-The Shopping context owns the customer's pre-purchase experience—building a cart and converting it to a confirmed order request. Composed of two distinct aggregates: **Cart** (item management) and **Checkout** (order finalization).
+The Shopping context owns the customer's pre-purchase experience—building a cart prior to order commitment. This BC focuses on the exploratory phase of shopping, before the customer commits to purchase. Checkout was migrated to Orders BC in Cycle 8 to establish clearer bounded context boundaries.
 
 ### Aggregates
 
@@ -28,50 +37,28 @@ The Cart aggregate manages the customer's shopping session from initialization t
 - `CartAssignedToCustomer` — anonymous cart merged after login, requires Customer Identity BC
 - `ShippingEstimateRequested` — zip/postal for shipping preview (may belong in Checkout)
 
-**Checkout Aggregate:**
+**Cart → Orders Handoff:**
 
-The Checkout aggregate owns the final steps of order submission—collecting shipping, payment, and completing the transaction. Created when the Cart aggregate emits `CheckoutInitiated`.
-
-**Lifecycle Events:**
-- `CheckoutStarted` — checkout stream begins (contains snapshot of cart items from checkout initiation)
-- `ShippingAddressSelected` — customer selects saved address from Customer Identity BC (stores AddressId)
-- `ShippingMethodSelected` — shipping method chosen
-- `PaymentMethodProvided` — payment method token collected
-- `CheckoutCompleted` — **terminal event**, publishes `CheckoutCompleted` integration message to Orders
-
-**Address Handling (Cycle 11 - Completed):**
-- Checkout stores selected `AddressId` via `ShippingAddressSelected` event (not inline address fields)
-- When completing checkout, Shopping BC queries Customer Identity BC for immutable `AddressSnapshot`
-- `CheckoutCompleted` integration message embeds the `AddressSnapshot` for Orders BC
-- This ensures temporal consistency - orders preserve address as it existed at checkout time
-
-**Cart → Checkout Handoff:**
-
-The Cart aggregate's lifecycle ends with `CheckoutInitiated`, which triggers creation of a new Checkout aggregate stream. The Checkout stream begins with `CheckoutStarted` and contains a snapshot of cart items at checkout initiation time. This ensures **price-at-checkout immutability**—even if cart prices change, the checkout reflects the state when the user clicked "Proceed to Checkout."
+The Cart aggregate's lifecycle ends with `CheckoutInitiated`, which triggers the handoff to Orders BC. Shopping BC publishes `CheckoutInitiated` integration message, which Orders BC handles to start the Checkout aggregate. This ensures **price-at-checkout immutability**—even if cart prices change, the checkout reflects the state when the user clicked "Proceed to Checkout."
 
 ```
 Cart Stream (terminal states):
-  CartInitialized → ... → CheckoutInitiated (happy path)
+  CartInitialized → ... → CheckoutInitiated (happy path, integration message published)
                         → CartAbandoned (timeout, anonymous only)
                         → CartCleared (explicit user action)
 
-Checkout Stream:
-  CheckoutStarted → ... → CheckoutCompleted (terminal)
+[Orders BC handles CheckoutInitiated → creates Checkout aggregate]
 ```
 
 ### What it receives
 
 None from other bounded contexts. Shopping initiates the flow based on customer actions.
 
-**Queries to Other BCs:**
-- Customer Identity BC: `GetCustomerAddresses` — retrieves saved addresses for customer selection (Cycle 11)
-- Customer Identity BC: `GetAddressSnapshot` — creates immutable address snapshot for order placement (Cycle 11)
-
 ### What it publishes
 
-- `CheckoutCompleted` — contains cart items (SKU, quantity, price-at-purchase), customer ID, embedded `AddressSnapshot` (immutable point-in-time copy from Customer Identity BC), shipping method, shipping cost, payment method token
+- `CheckoutInitiated` — signals cart is ready for checkout; Orders BC handles to create Checkout aggregate
 
-### Core invariants
+### Core Invariants
 
 **Cart Invariants:**
 - A cart cannot contain items with zero or negative quantity
@@ -80,19 +67,14 @@ None from other bounded contexts. Shopping initiates the flow based on customer 
 - Anonymous carts expire after defined TTL (CartAbandoned event)
 - Authenticated customer carts persist indefinitely (no abandonment)
 
-**Checkout Invariants:**
-- Checkout cannot start from an empty cart
-- Checkout cannot complete without valid shipping address
-- Checkout cannot complete without payment method reference
-- Price-at-checkout must be captured at submission time (protects against price changes mid-checkout)
-- Checkout items are immutable snapshot from cart at CheckoutInitiated time
 
 ### What it doesn't own
 
-- Inventory reservation commitment (soft hold only, Orders commits)
+- Checkout process (moved to Orders BC in Cycle 8)
 - Payment processing
 - Order lifecycle management
-- Product catalog or pricing rules (queries Catalog/Pricing)
+- Inventory reservation or commitment
+- Product catalog or pricing rules (queries Catalog/Pricing in future phases)
 
 ### Integration Flows
 
@@ -124,40 +106,50 @@ ClearCart (command)
 InitiateCheckout (command)
   └─> InitiateCheckoutHandler
       ├─> CheckoutInitiated (terminal, appended to Cart stream)
-      └─> Start new Checkout stream with CheckoutStarted
-```
-
-**Checkout Lifecycle:**
-```
-CheckoutStarted (stream begins, contains cart snapshot)
-
-ProvideShippingAddress (command)
-  └─> ProvideShippingAddressHandler
-      └─> ShippingAddressProvided
-
-SelectShippingMethod (command)
-  └─> SelectShippingMethodHandler
-      └─> ShippingMethodSelected
-
-ProvidePaymentMethod (command)
-  └─> ProvidePaymentMethodHandler
-      └─> PaymentMethodProvided
-
-CompleteCheckout (command)
-  └─> CompleteCheckoutHandler
-      ├─> CheckoutCompleted (terminal)
-      └─> Publish CheckoutCompleted → Orders (triggers saga)
+      └─> Publish CheckoutInitiated → Orders BC (triggers Checkout aggregate creation)
 ```
 
 ---
 
 ## Orders
 
-The Orders context owns the commercial commitment and coordinates the lifecycle from placement through completion or cancellation. Implemented as a stateful saga to handle the variable complexity and duration of order lifecycles.
+The Orders context owns the commercial commitment and coordinates the lifecycle from checkout through delivery or cancellation. This BC contains two key aggregates: **Checkout** (order finalization) and **Order** (order lifecycle saga). Checkout was migrated from Shopping BC in Cycle 8 to establish clearer bounded context boundaries—Shopping focuses on exploration, Orders focuses on transaction commitment.
+
+### Aggregates
+
+**Checkout Aggregate:**
+
+The Checkout aggregate owns the final steps of order submission—collecting shipping address, payment method, and completing the transaction. Created when Shopping BC publishes `CheckoutInitiated` integration message.
+
+**Lifecycle Events:**
+- `CheckoutStarted` — checkout stream begins (contains snapshot of cart items from checkout initiation)
+- `ShippingAddressSelected` — customer selects saved address from Customer Identity BC (stores AddressId)
+- `ShippingMethodSelected` — shipping method chosen
+- `PaymentMethodProvided` — payment method token collected
+- `CheckoutCompleted` — **terminal event**, publishes `CheckoutCompleted` integration message to start Order saga
+
+**Address Handling (Cycle 11):**
+- Checkout stores selected `AddressId` via `ShippingAddressSelected` event (not inline address fields)
+- When completing checkout, Orders BC queries Customer Identity BC for immutable `AddressSnapshot`
+- `CheckoutCompleted` integration message embeds the `AddressSnapshot` for Order saga
+- This ensures temporal consistency - orders preserve address as it existed at checkout time
+
+**Order Saga:**
+
+The Order saga coordinates the order lifecycle across multiple bounded contexts (Payments, Inventory, Fulfillment). Implemented using Wolverine's saga pattern with the Decider pattern for pure business logic.
+
+**Architecture (Cycle 9):**
+- `OrderDecider` — pure functions for business logic (no side effects, easily testable)
+- `Order` saga class — thin wrappers that delegate to Decider, handles Wolverine conventions
+- Single entry point: `Order.Start(Shopping.CheckoutCompleted)` — maps integration message to domain command
+
+**Saga States:**
+See "Saga states" section below for complete state machine.
 
 ### What it receives
 
-- `CheckoutCompleted` from Shopping — triggers saga creation
+- `CheckoutInitiated` from Shopping — triggers Checkout aggregate creation
+- `CheckoutCompleted` (internal) — triggers Order saga creation
 - `PaymentCaptured` from Payments — payment successful
 - `PaymentFailed` from Payments — payment unsuccessful
 - `ReservationCommitted` from Inventory — stock allocated
@@ -196,13 +188,6 @@ The Orders context owns the commercial commitment and coordinates the lifecycle 
 - `OrderCancelled` — triggers compensation across contexts
 - `OrderCompleted` — terminal success state reached
 
-### Core invariants
-
-- An order cannot be placed without committed inventory reservation
-- An order cannot proceed to fulfillment without confirmed payment
-- An order cannot be cancelled after shipment has been dispatched
-- A refund cannot exceed the original captured payment amount
-- State transitions must follow valid paths (no jumping from Placed to Delivered)
 
 ### What it doesn't own
 
@@ -212,12 +197,54 @@ The Orders context owns the commercial commitment and coordinates the lifecycle 
 - Return eligibility rules or inspection (Returns)
 - Customer notification delivery (Notifications)
 
+### Core Invariants
+
+**Checkout Invariants:**
+- Checkout cannot start from an empty cart
+- Checkout cannot complete without valid shipping address
+- Checkout cannot complete without payment method reference
+- Price-at-checkout must be captured at submission time (protects against price changes mid-checkout)
+- Checkout items are immutable snapshot from cart at CheckoutInitiated time
+
+**Order Saga Invariants:**
+- An order cannot be placed without all checkout prerequisites (address, payment method)
+- An order cannot proceed to fulfillment without confirmed payment
+- An order cannot be cancelled after shipment has been dispatched
+- A refund cannot exceed the original captured payment amount
+- State transitions must follow valid paths (no jumping from Placed to Delivered)
+
 ### Integration Flows
 
-**Saga Coordination: Order Lifecycle**
+**Checkout Lifecycle:**
 ```
-CheckoutCompleted (from Shopping)
-  └─> Order.Start() [Saga Created]
+CheckoutInitiated (from Shopping)
+  └─> CheckoutInitiatedHandler (Orders BC)
+      └─> CheckoutStarted (new Checkout stream)
+
+SelectShippingAddress (command)
+  └─> SelectShippingAddressHandler
+      └─> ShippingAddressSelected
+
+SelectShippingMethod (command)
+  └─> SelectShippingMethodHandler
+      └─> ShippingMethodSelected
+
+ProvidePaymentMethod (command)
+  └─> ProvidePaymentMethodHandler
+      └─> PaymentMethodProvided
+
+CompleteCheckout (command)
+  └─> CompleteCheckoutHandler
+      ├─> Queries Customer Identity BC for AddressSnapshot
+      ├─> CheckoutCompleted (terminal)
+      └─> Publish CheckoutCompleted → Order.Start() (internal)
+```
+
+**Order Saga Coordination:**
+```
+CheckoutCompleted (internal from Checkout aggregate)
+  └─> Order.Start() [Saga Created via OrderDecider.Start()]
+      ├─> Maps Shopping.CheckoutCompleted → PlaceOrder command
       └─> OrderPlaced → Inventory + Payments
 
 [Inventory responds]
@@ -287,7 +314,7 @@ The Payments context owns the financial transaction lifecycle—capturing funds,
 - `RefundCompleted` — funds returned
 - `RefundFailed` — may need manual intervention
 
-### Core invariants
+### Core Invariants
 
 - A payment cannot be captured without a valid authorization (if using auth/capture)
 - A refund cannot exceed the original captured amount
@@ -351,7 +378,7 @@ The Inventory context owns stock levels and availability. It answers "do we have
 - `InventoryLow` — alerting or reorder triggers
 - `InventoryAvailabilityChanged` — Catalog/Shopping can update displayed availability
 
-### Core invariants
+### Core Invariants
 
 - Available stock cannot go negative at any warehouse
 - A reservation cannot exceed available stock at the target warehouse
@@ -420,7 +447,7 @@ The Fulfillment context owns the physical execution of getting items from wareho
 - `ShipmentDelivered` — delivery confirmed
 - `ShipmentDeliveryFailed` — delivery unsuccessful
 
-### Core invariants
+### Core Invariants
 
 - A shipment cannot be created without committed inventory allocation
 - A shipment cannot be assigned to a warehouse without sufficient committed stock at that location
@@ -435,6 +462,34 @@ The Fulfillment context owns the physical execution of getting items from wareho
 - Carrier contract negotiation or rate shopping (Shipping/Logistics context)
 - Return eligibility or refund decisions (Returns and Orders)
 - Customer communication (Notifications)
+
+### Integration Flows
+
+**Choreography: Fulfillment Processing**
+```
+FulfillmentRequested (from Orders)
+  └─> FulfillmentRequestedHandler
+      └─> RequestFulfillment (internal command)
+          └─> RequestFulfillmentHandler
+              └─> ShipmentStarted (Shipment stream created)
+
+AssignWarehouse (command)
+  └─> AssignWarehouseHandler
+      └─> WarehouseAssigned
+
+DispatchShipment (command)
+  └─> DispatchShipmentHandler
+      ├─> ShipmentDispatched → Orders
+      └─> [Carrier integration for tracking]
+
+ConfirmDelivery (command)
+  └─> ConfirmDeliveryHandler
+      ├─> ShipmentDelivered → Orders
+      └─> [Carrier confirmed delivery]
+
+[Delivery failure scenario]
+  └─> ShipmentDeliveryFailed → Orders
+```
 
 ### Notes
 
@@ -471,7 +526,7 @@ The Returns context owns the reverse logistics flow—handling customer return r
 - `ReturnCompleted` — inspection passed, includes restockable flag for Inventory
 - `ReturnRejected` — inspection failed
 
-### Core invariants
+### Core Invariants
 
 - A return cannot be approved outside the eligibility window
 - A return cannot be approved for non-returnable items
@@ -502,6 +557,7 @@ Manages customer shipping and billing addresses with support for multiple saved 
 **Entities:**
 - `CustomerAddress` — persisted address with metadata (nickname, type, default status, last used timestamp, verification status)
 - `AddressSnapshot` — immutable point-in-time copy for integration messages
+- `CorrectedAddress` — address with corrections from verification service (part of `AddressVerificationResult`)
 - `AddressType` — enum (Shipping, Billing, Both)
 - `VerificationStatus` — enum (Unverified, Verified, Corrected, Invalid, PartiallyValid)
 
@@ -541,7 +597,7 @@ None. Customer Identity BC is primarily query-driven (other BCs query for addres
 3. On checkout completion → Shopping BC queries `GetAddressSnapshot` → receives immutable snapshot
 4. Shopping BC publishes `CheckoutCompleted` with embedded `AddressSnapshot` → Orders BC receives and persists
 
-### Core invariants
+### Core Invariants
 
 **AddressBook Invariants:**
 - A customer can have multiple addresses of each type (Shipping, Billing, Both)
