@@ -1,4 +1,4 @@
-namespace Customers.AddressBook;
+namespace CustomerIdentity.AddressBook;
 
 /// <summary>
 /// Defines the type of address for customer use.

@@ -1,4 +1,4 @@
-namespace Customers.AddressBook;
+namespace CustomerIdentity.AddressBook;
 
 /// <summary>
 /// Represents a customer's saved address for shipping or billing purposes.

@@ -43,8 +43,8 @@
     <Project Path="tests/Shopping Management/Shopping.Api.IntegrationTests/Shopping.Api.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Customer Identity/">
-    <Project Path="src/Customer Identity/Customers/Customers.csproj" />
-    <Project Path="tests/Customer Identity/Customers.Api.IntegrationTests/Customers.Api.IntegrationTests.csproj" />
+    <Project Path="src/Customer Identity/Customers/CustomerIdentity.csproj" />
+    <Project Path="tests/Customer Identity/CustomerIdentity.IntegrationTests/CustomerIdentity.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Shared/">
     <Project Path="src/Shared/Messages.Contracts/Messages.Contracts.csproj" />

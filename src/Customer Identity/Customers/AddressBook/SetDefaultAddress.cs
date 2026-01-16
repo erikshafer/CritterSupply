@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Marten;
 using Wolverine.Http;
 
-namespace Customers.AddressBook;
+namespace CustomerIdentity.AddressBook;
 
 /// <summary>
 /// Command to set an address as the default for its type.

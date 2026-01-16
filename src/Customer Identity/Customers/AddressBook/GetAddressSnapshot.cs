@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Marten;
 using Wolverine.Http;
 
-namespace Customers.AddressBook;
+namespace CustomerIdentity.AddressBook;
 
 /// <summary>
 /// Query to retrieve an address snapshot for integration with other BCs.

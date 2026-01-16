@@ -3,6 +3,8 @@
     <PropertyGroup>
         <ImplicitUsings>enable</ImplicitUsings>
         <IsPackable>false</IsPackable>
+        <AssemblyName>CustomerIdentity.IntegrationTests</AssemblyName>
+        <RootNamespace>CustomerIdentity.IntegrationTests</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
@@ -23,7 +25,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\..\src/Customer Identity\Customers\Customers.csproj" />
+        <ProjectReference Include="..\..\..\src/Customer Identity\Customers\CustomerIdentity.csproj" />
     </ItemGroup>
 
 </Project>

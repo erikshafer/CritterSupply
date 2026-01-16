@@ -1,7 +1,7 @@
 using Marten;
 using Wolverine.Http;
 
-namespace Customers.AddressBook;
+namespace CustomerIdentity.AddressBook;
 
 /// <summary>
 /// Query to retrieve all addresses for a customer.

@@ -1,9 +1,9 @@
 using Alba;
-using Customers.AddressBook;
+using CustomerIdentity.AddressBook;
 using Marten;
 using Shouldly;
 
-namespace Customers.Api.IntegrationTests;
+namespace CustomerIdentity.Api.IntegrationTests;
 
 public class AddressBookTests : IClassFixture<CustomersApiFixture>
 {

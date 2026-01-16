@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
-using Customers.AddressBook;
+using CustomerIdentity.AddressBook;
 using JasperFx;
 using JasperFx.Resources;
 using Marten;

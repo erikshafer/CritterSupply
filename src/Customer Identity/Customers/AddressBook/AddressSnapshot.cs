@@ -1,4 +1,4 @@
-namespace Customers.AddressBook;
+namespace CustomerIdentity.AddressBook;
 
 /// <summary>
 /// Immutable snapshot of an address at a point in time.
