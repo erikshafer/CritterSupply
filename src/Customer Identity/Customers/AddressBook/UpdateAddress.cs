@@ -102,18 +102,39 @@ public static class UpdateAddressHandler
         UpdateAddress command,
         CustomerAddress address,
         IDocumentSession session,
+        IAddressVerificationService verificationService,
         CancellationToken ct)
     {
+        // Verify address before updating
+        var verificationResult = await verificationService.VerifyAsync(
+            command.AddressLine1,
+            command.AddressLine2,
+            command.City,
+            command.StateOrProvince,
+            command.PostalCode,
+            command.Country,
+            ct);
+
+        // Use corrected address if verification succeeded, otherwise use original
+        var finalAddress = verificationResult.SuggestedAddress ?? new CorrectedAddress(
+            command.AddressLine1,
+            command.AddressLine2,
+            command.City,
+            command.StateOrProvince,
+            command.PostalCode,
+            command.Country);
+
         var updated = address with
         {
             Type = command.Type,
             Nickname = command.Nickname,
-            AddressLine1 = command.AddressLine1,
-            AddressLine2 = command.AddressLine2,
-            City = command.City,
-            StateOrProvince = command.StateOrProvince,
-            PostalCode = command.PostalCode,
-            Country = command.Country
+            AddressLine1 = finalAddress.AddressLine1,
+            AddressLine2 = finalAddress.AddressLine2,
+            City = finalAddress.City,
+            StateOrProvince = finalAddress.StateOrProvince,
+            PostalCode = finalAddress.PostalCode,
+            Country = finalAddress.Country,
+            IsVerified = verificationResult.Status is VerificationStatus.Verified or VerificationStatus.Corrected
         };
 
         session.Store(updated);

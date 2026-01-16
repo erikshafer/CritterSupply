@@ -57,6 +57,9 @@ builder.Host.UseWolverine(opts =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Register address verification service (stub for development)
+builder.Services.AddSingleton<IAddressVerificationService, StubAddressVerificationService>();
+
 builder.Services.AddWolverineHttp();
 
 var app = builder.Build();

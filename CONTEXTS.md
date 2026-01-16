@@ -500,9 +500,18 @@ The Customer Identity context owns customer identity, profiles, and persistent d
 Manages customer shipping and billing addresses with support for multiple saved addresses, nicknames, defaults, and address verification. Provides both the master address records (for CRUD operations) and immutable snapshots (for order/shipment records).
 
 **Entities:**
-- `CustomerAddress` — persisted address with metadata (nickname, type, default status, last used timestamp)
+- `CustomerAddress` — persisted address with metadata (nickname, type, default status, last used timestamp, verification status)
 - `AddressSnapshot` — immutable point-in-time copy for integration messages
 - `AddressType` — enum (Shipping, Billing, Both)
+- `VerificationStatus` — enum (Unverified, Verified, Corrected, Invalid, PartiallyValid)
+
+**Address Verification (Cycle 12):**
+- Addresses are automatically verified against postal service databases when added or updated
+- `IAddressVerificationService` interface allows pluggable verification providers (SmartyStreets, Google Address Validation, etc.)
+- Development uses `StubAddressVerificationService` (always returns verified status)
+- Verification results include suggested corrections and confidence scores
+- If verification service is unavailable, addresses are saved as unverified (doesn't block customer flow)
+- `IsVerified` boolean tracks whether address has been validated
 
 **Profile** (future):
 - Customer personal info (name, email, phone)

@@ -84,9 +84,29 @@ public static class AddAddressHandler
     public static async Task<CreationResponse> Handle(
         AddAddress command,
         IDocumentSession session,
+        IAddressVerificationService verificationService,
         CancellationToken ct)
     {
         var addressId = Guid.CreateVersion7();
+
+        // Verify address before saving
+        var verificationResult = await verificationService.VerifyAsync(
+            command.AddressLine1,
+            command.AddressLine2,
+            command.City,
+            command.StateOrProvince,
+            command.PostalCode,
+            command.Country,
+            ct);
+
+        // Use corrected address if verification succeeded, otherwise use original
+        var finalAddress = verificationResult.SuggestedAddress ?? new CorrectedAddress(
+            command.AddressLine1,
+            command.AddressLine2,
+            command.City,
+            command.StateOrProvince,
+            command.PostalCode,
+            command.Country);
 
         // If this address is being set as default, unset any existing defaults for this type
         if (command.IsDefault)
@@ -108,14 +128,14 @@ public static class AddAddressHandler
             command.CustomerId,
             command.Type,
             command.Nickname,
-            command.AddressLine1,
-            command.AddressLine2,
-            command.City,
-            command.StateOrProvince,
-            command.PostalCode,
-            command.Country,
+            finalAddress.AddressLine1,
+            finalAddress.AddressLine2,
+            finalAddress.City,
+            finalAddress.StateOrProvince,
+            finalAddress.PostalCode,
+            finalAddress.Country,
             command.IsDefault,
-            IsVerified: false, // Address verification can be added later
+            IsVerified: verificationResult.Status is VerificationStatus.Verified or VerificationStatus.Corrected,
             DateTimeOffset.UtcNow,
             LastUsedAt: null);
 

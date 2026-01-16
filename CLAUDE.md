@@ -153,8 +153,9 @@ The solution file uses **solution folders** to mirror the physical folder struct
   </Folder>
 
   <Folder Name="/Customer Identity/">
-    <Project Path="src/Customer Identity/Customers/Customers.csproj" />
-    <Project Path="tests/Customer Identity/Customers.Api.IntegrationTests/Customers.Api.IntegrationTests.csproj" />
+    <Project Path="src/Customer Identity/CustomerIdentity.Api/CustomerIdentity.Api.csproj" />
+    <Project Path="src/Customer Identity/Customers/CustomerIdentity.csproj" />
+    <Project Path="tests/Customer Identity/CustomerIdentity.Api.IntegrationTests/CustomerIdentity.Api.IntegrationTests.csproj" />
   </Folder>
 
   <Folder Name="/Order Management/">
@@ -1408,6 +1409,234 @@ public static OutgoingMessages Handle(...)
     return outgoing;  // No Events collection
 }
 ```
+
+## External Service Integration Patterns
+
+When integrating with external services (address verification, payment gateways, shipping providers, etc.), follow these patterns to maintain testability, configurability, and separation of concerns.
+
+### Strategy Pattern with Dependency Injection
+
+**Use Case:** Integrating with third-party APIs that require different implementations for development (stub) vs production (real service).
+
+**Pattern:** Define an interface, provide multiple implementations, and register the appropriate one via dependency injection.
+
+**Example: Address Verification Service**
+
+```csharp
+// 1. Define the interface (in domain project)
+public interface IAddressVerificationService
+{
+    Task<AddressVerificationResult> VerifyAsync(
+        string addressLine1,
+        string? addressLine2,
+        string city,
+        string stateOrProvince,
+        string postalCode,
+        string country,
+        CancellationToken ct);
+}
+
+// 2. Stub implementation for development/testing
+public sealed class StubAddressVerificationService : IAddressVerificationService
+{
+    public Task<AddressVerificationResult> VerifyAsync(...)
+    {
+        // Always return verified - no external calls
+        var result = new AddressVerificationResult(
+            VerificationStatus.Verified,
+            ErrorMessage: null,
+            SuggestedAddress: corrected,
+            ConfidenceScore: 1.0);
+
+        return Task.FromResult(result);
+    }
+}
+
+// 3. Production implementation (e.g., SmartyStreets)
+public sealed class SmartyStreetsAddressVerificationService : IAddressVerificationService
+{
+    private readonly HttpClient _httpClient;
+    private readonly string _authId;
+    private readonly string _authToken;
+
+    public SmartyStreetsAddressVerificationService(
+        HttpClient httpClient,
+        IConfiguration configuration)
+    {
+        _httpClient = httpClient;
+        _authId = configuration["SmartyStreets:AuthId"]
+                  ?? throw new InvalidOperationException("SmartyStreets AuthId not configured");
+        _authToken = configuration["SmartyStreets:AuthToken"]
+                     ?? throw new InvalidOperationException("SmartyStreets AuthToken not configured");
+    }
+
+    public async Task<AddressVerificationResult> VerifyAsync(...)
+    {
+        // Real API call to SmartyStreets
+        var response = await _httpClient.PostAsJsonAsync(...);
+        // Parse and return result
+    }
+}
+
+// 4. Register in Program.cs (API project)
+// Development:
+builder.Services.AddSingleton<IAddressVerificationService, StubAddressVerificationService>();
+
+// Production:
+builder.Services.AddHttpClient<IAddressVerificationService, SmartyStreetsAddressVerificationService>();
+```
+
+### Handlers with External Service Dependencies
+
+Wolverine's dependency injection works seamlessly with external services - just add the interface as a handler parameter.
+
+```csharp
+public static class AddAddressHandler
+{
+    [WolverinePost("/api/customers/{customerId}/addresses")]
+    public static async Task<CreationResponse> Handle(
+        AddAddress command,
+        IDocumentSession session,
+        IAddressVerificationService verificationService, // <-- DI injected
+        CancellationToken ct)
+    {
+        // Call external service
+        var verificationResult = await verificationService.VerifyAsync(
+            command.AddressLine1,
+            command.AddressLine2,
+            command.City,
+            command.StateOrProvince,
+            command.PostalCode,
+            command.Country,
+            ct);
+
+        // Use corrected address if available
+        var finalAddress = verificationResult.SuggestedAddress ?? new CorrectedAddress(...);
+
+        // Save with verification status
+        var address = new CustomerAddress(
+            addressId,
+            command.CustomerId,
+            command.Type,
+            command.Nickname,
+            finalAddress.AddressLine1,
+            finalAddress.AddressLine2,
+            finalAddress.City,
+            finalAddress.StateOrProvince,
+            finalAddress.PostalCode,
+            finalAddress.Country,
+            command.IsDefault,
+            IsVerified: verificationResult.Status is VerificationStatus.Verified or VerificationStatus.Corrected,
+            DateTimeOffset.UtcNow,
+            LastUsedAt: null);
+
+        session.Store(address);
+        await session.SaveChangesAsync(ct);
+
+        return new CreationResponse($"/api/customers/{command.CustomerId}/addresses/{addressId}");
+    }
+}
+```
+
+### Graceful Degradation
+
+**Never let external service failures block critical customer workflows.** Implement fallback strategies:
+
+```csharp
+public async Task<AddressVerificationResult> VerifyAsync(...)
+{
+    try
+    {
+        var response = await _httpClient.PostAsJsonAsync(...);
+        response.EnsureSuccessStatusCode();
+
+        // Parse and return successful verification
+        return new AddressVerificationResult(...);
+    }
+    catch (HttpRequestException ex)
+    {
+        // Service unavailable - fallback to unverified
+        return new AddressVerificationResult(
+            VerificationStatus.Unverified,
+            $"Verification service unavailable: {ex.Message}",
+            SuggestedAddress: null,
+            ConfidenceScore: null);
+    }
+}
+```
+
+**In handlers:**
+```csharp
+// If verification fails, still save the address as unverified
+IsVerified: verificationResult.Status is VerificationStatus.Verified or VerificationStatus.Corrected
+```
+
+### Configuration Management
+
+Store API keys and service URLs in `appsettings.json`, not in code:
+
+**appsettings.json (production):**
+```json
+{
+  "SmartyStreets": {
+    "AuthId": "your-auth-id",
+    "AuthToken": "your-auth-token",
+    "BaseUrl": "https://us-street.api.smartystreets.com"
+  }
+}
+```
+
+**appsettings.Development.json:**
+```json
+{
+  "UseStubServices": true
+}
+```
+
+### Testing External Services
+
+**Unit Tests:** Test stub implementations to verify contracts:
+```csharp
+[Fact]
+public async Task StubService_AlwaysReturnsVerified()
+{
+    var service = new StubAddressVerificationService();
+
+    var result = await service.VerifyAsync(...);
+
+    result.Status.ShouldBe(VerificationStatus.Verified);
+    result.ConfidenceScore.ShouldBe(1.0);
+}
+```
+
+**Integration Tests:** Use stub services by default - tests shouldn't depend on external APIs:
+```csharp
+// Test fixture registers stub
+builder.Services.AddSingleton<IAddressVerificationService, StubAddressVerificationService>();
+
+[Fact]
+public async Task AddAddress_WithValidAddress_MarksAsVerified()
+{
+    var command = new AddAddress(...);
+
+    var response = await _host.Scenario(s =>
+    {
+        s.Post.Json(command).ToUrl($"/api/customers/{customerId}/addresses");
+        s.StatusCodeShouldBe(201);
+    });
+
+    var saved = await _session.LoadAsync<CustomerAddress>(addressId);
+    saved.IsVerified.ShouldBeTrue(); // Stub returns verified
+}
+```
+
+### Key Benefits
+
+1. **Testability**: Stub services eliminate external dependencies in tests
+2. **Configurability**: Swap implementations without code changes (DI registration)
+3. **Resilience**: Graceful degradation prevents service outages from blocking customers
+4. **Separation of Concerns**: Domain logic remains pure; external calls are isolated
+5. **Development Speed**: Stub services work offline without API keys
 
 ## HTTP Endpoint Naming Conventions
 

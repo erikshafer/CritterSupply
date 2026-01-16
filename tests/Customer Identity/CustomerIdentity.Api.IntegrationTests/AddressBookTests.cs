@@ -49,6 +49,7 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
         addresses.Count.ShouldBe(1);
         addresses[0].Nickname.ShouldBe("Home");
         addresses[0].IsDefault.ShouldBeTrue();
+        addresses[0].IsVerified.ShouldBeTrue(); // Stub service always returns verified
     }
 
     [Fact]
@@ -104,6 +105,9 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
         var defaults = addresses.Where(a => a.IsDefault).ToList();
         defaults.Count.ShouldBe(1);
         defaults[0].Nickname.ShouldBe("Work");
+
+        // Both addresses should be verified by stub service
+        addresses.All(a => a.IsVerified).ShouldBeTrue();
     }
 
     [Fact]
@@ -161,6 +165,7 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
         updated.AddressLine1.ShouldBe("789 New St");
         updated.City.ShouldBe("Tacoma");
         updated.Type.ShouldBe(AddressType.Both);
+        updated.IsVerified.ShouldBeTrue(); // Re-verified on update
     }
 
     [Fact]
