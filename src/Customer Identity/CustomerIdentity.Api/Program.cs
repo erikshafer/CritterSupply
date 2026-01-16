@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
-using Customers.AddressBook;
+using CustomerIdentity.AddressBook;
 using JasperFx;
 using JasperFx.Resources;
 using Marten;
@@ -44,14 +44,14 @@ builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(opts =>
 
 builder.Host.UseWolverine(opts =>
 {
+    // Discover handlers from the CustomerIdentity assembly
+    opts.Discovery.IncludeAssembly(typeof(CustomerAddress).Assembly);
+
     opts.Policies.AutoApplyTransactions();
     opts.Policies.UseDurableLocalQueues();
     opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
 
     opts.UseFluentValidation();
-
-    // Explicitly include the Customers.AddressBook namespace for handler discovery
-    opts.Discovery.IncludeType<AddAddress>();
 });
 
 builder.Services.AddEndpointsApiExplorer();

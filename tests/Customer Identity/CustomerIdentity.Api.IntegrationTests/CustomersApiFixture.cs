@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 using Wolverine;
 
-namespace Customers.Api.IntegrationTests;
+namespace CustomerIdentity.Api.IntegrationTests;
 
 public class CustomersApiFixture : IAsyncLifetime
 {
