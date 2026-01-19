@@ -22,15 +22,21 @@ This isn't a reference architecture padded with unnecessary layers, abstractions
 
 A non-exhaustive list of the patterns, paradigms, and principles demonstrated in this codebase, in no particular order:
 
-- Event Sourcing
+- Event Sourcing (Orders, Payments, Inventory, Fulfillment)
 - Command Query Responsibility Segregation (CQRS)
-- Stateful Sagas
-- Inbox Pattern
-- Outbox Pattern
-- Reservation-based Workflows
+- Stateful Sagas (Order orchestration)
+- Inbox Pattern (guaranteed message processing)
+- Outbox Pattern (reliable message publishing)
+- Reservation-based Workflows (inventory management)
+- Choreography vs Orchestration (BC integration patterns)
+- Snapshot Pattern (temporal consistency for addresses)
+- Backend-for-Frontend (BFF) Pattern (Customer Experience)
 - Vertical Slice Architecture (VSA)
 - Behavior-Driven Development (BDD)
 - Domain-Driven Design (DDD)
+- Traditional DDD with EF Core (Customer Identity)
+- A-Frame Architecture (pure business logic)
+- Railway-Oriented Programming (Wolverine middleware)
 
 ### 🤖 AI-assisted Development <a id='1.3'></a>
 
@@ -43,21 +49,50 @@ See [CLAUDE.md](./CLAUDE.md) for the project-specific instructions Claude follow
 #### 🚫 Thinking Machines <a id='1.3.1'></a>
 Who knows. Maybe one day we'll ban "thinking machines" and have to build everything ourselves again. 😉 (see: Dune, Warhammer 40k, Battlestar Galactica, Mass Effect, and others)
 
+### 🛠️ Technology Stack <a id='1.4'></a>
+
+**Language & Runtime:**
+- C# 14+ (.NET 10+)
+
+**Core Frameworks:**
+- [Wolverine](https://wolverine.netlify.app/) - Command/message handling, HTTP endpoints, sagas
+- [Marten](https://martendb.io/) - Event sourcing and document store (Orders, Payments, Inventory, Fulfillment)
+- [Entity Framework Core](https://learn.microsoft.com/en-us/ef/core/) - Traditional relational persistence (Customer Identity)
+
+**Infrastructure:**
+- PostgreSQL - Database for both Marten (document store and event store) and EF Core (traditional relational store)
+- RabbitMQ - Message broker for cross-BC communication
+- Docker - Containerization and local development
+
+**Testing:**
+- [Alba](https://jasperfx.github.io/alba/) - Integration testing with HTTP scenarios
+- [Testcontainers](https://dotnet.testcontainers.org/) - Disposable database instances for tests
+- xUnit - Test framework
+- Shouldly - Assertion library
+- FluentValidation - Command validation
+
+**Future:**
+- Blazor Server - Customer-facing UI (Customer Experience BC)
+- SignalR - Real-time notifications
+- .NET Aspire - Orchestration (planned)
+
 ## 🗺️ Bounded Contexts <a id='2.0'></a>
 
 CritterSupply is organized into bounded contexts. As described in Domain-Driven Design, bounded contexts help lower the cost of consensus. If one is unfamiliar with the concept, a crude yet simple way of picturing it is that each context could have its own team in an organization. That's not a rule by any means, but hopefully that helps you paint a picture of how CritterSupply is divided up logically and physically in this repo.
 
 Below is a table of each contexts' focused responsibilities, along with their current implementation status:
 
-| Context            | Responsibility                  | Status         |
-|--------------------|---------------------------------|----------------|
-| 📨 **Orders**      | Order lifecycle and history     | 🛠️ Scaffolded |
-| 💳 **Payments**    | Authorization, capture, refunds | 🛠️ Scaffolded |
-| 🛒 **Shopping**    | Cart management and checkout    | 🔜 Planned     |
-| 📊 **Inventory**   | Stock levels and reservations   | 🔜 Planned     |
-| 📦 **Catalog**     | Product definitions and pricing | 🔜 Planned     |
-| 🚚 **Fulfillment** | Picking, packing, shipping      | 🔜 Planned     |
-| 👤 **Customers**   | Profiles and preferences        | 🔜 Planned     |
+| Context                    | Responsibility                      | Status     |
+|----------------------------|-------------------------------------|------------|
+| 📨 **Orders**              | Order lifecycle and checkout        | ✅ Complete |
+| 💳 **Payments**            | Authorization, capture, refunds     | ✅ Complete |
+| 🛒 **Shopping**            | Cart management                     | ✅ Complete |
+| 📊 **Inventory**           | Stock levels and reservations       | ✅ Complete |
+| 🚚 **Fulfillment**         | Picking, packing, shipping          | ✅ Complete |
+| 👤 **Customer Identity**   | Addresses and saved payment methods | ✅ Complete |
+| 🎁 **Customer Experience** | Storefront BFF (Blazor + SignalR)   | 🔜 Planned |
+| 📦 **Product Catalog**     | Product definitions and pricing     | 🔜 Planned |
+| 🔄 **Returns**             | Return authorization and processing | 🔜 Planned |
 
 For detailed responsibilities, interactions, and event flows between contexts, see [CONTEXTS.md](./CONTEXTS.md).
 
@@ -90,9 +125,31 @@ To `build` the entire solution, run this command in the root of the project:
 dotnet build
 ```
 
-#### 🏃🏻 Run
+#### 🏃🏻 Run Individual Bounded Contexts
 
-To be written. Modules are still being scaffolded out.
+Want to run a specific part of the business? Each bounded context can be run independently as a self-hosted API using the `dotnet run` command. Here are examples for each context:
+
+```bash
+# Run Orders BC
+dotnet run --project "src/Order Management/Orders.Api/Orders.Api.csproj"
+
+# Run Payments BC
+dotnet run --project "src/Payment Processing/Payments.Api/Payments.Api.csproj"
+
+# Run Shopping BC
+dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
+
+# Run Inventory BC
+dotnet run --project "src/Inventory Management/Inventory.Api/Inventory.Api.csproj"
+
+# Run Fulfillment BC
+dotnet run --project "src/Fulfillment Management/Fulfillment.Api/Fulfillment.Api.csproj"
+
+# Run Customer Identity BC
+dotnet run --project "src/Customer Identity/CustomerIdentity.Api/CustomerIdentity.Api.csproj"
+```
+
+Each BC exposes a Swagger UI at `/api` (e.g., `http://localhost:5000/api`).
 
 #### 🧪 Test
 
