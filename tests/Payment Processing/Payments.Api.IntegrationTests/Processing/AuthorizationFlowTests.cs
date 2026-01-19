@@ -249,6 +249,7 @@ public class AuthorizationFlowTests : IAsyncLifetime
         // Assert: Verify payment remains in Captured status (no state change)
         await using var querySession = _fixture.GetDocumentSession();
         var unchangedPayment = await querySession.Events.AggregateStreamAsync<Payment>(payment.Id);
+        unchangedPayment.ShouldNotBeNull();
         unchangedPayment.Status.ShouldBe(PaymentStatus.Captured);
     }
 
@@ -289,6 +290,7 @@ public class AuthorizationFlowTests : IAsyncLifetime
         // Assert: Verify payment remains authorized (no capture applied)
         await using var querySession = _fixture.GetDocumentSession();
         var unchangedPayment = await querySession.Events.AggregateStreamAsync<Payment>(authorizedPayment.Id);
+        unchangedPayment.ShouldNotBeNull();
         unchangedPayment.Status.ShouldBe(PaymentStatus.Authorized);
         unchangedPayment.TransactionId.ShouldBeNull(); // Not captured
     }

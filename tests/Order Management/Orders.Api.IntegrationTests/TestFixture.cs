@@ -13,8 +13,7 @@ namespace Orders.Api.IntegrationTests;
 /// </summary>
 public class TestFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:18-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("orders_test_db")
         .WithName($"orders-postgres-test-{Guid.NewGuid():N}")
         .WithCleanUp(true)

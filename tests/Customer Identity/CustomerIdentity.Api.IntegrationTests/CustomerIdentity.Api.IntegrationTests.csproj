@@ -2,6 +2,8 @@
 
     <PropertyGroup>
         <ImplicitUsings>enable</ImplicitUsings>
+        <!-- Suppress CodeAnalysis version mismatch warnings from EF Core Design tools -->
+        <NoWarn>$(NoWarn);NU1608</NoWarn>
         <IsPackable>false</IsPackable>
         <AssemblyName>CustomerIdentity.Api.IntegrationTests</AssemblyName>
         <RootNamespace>CustomerIdentity.Api.IntegrationTests</RootNamespace>

@@ -172,6 +172,7 @@ public class RefundFlowTests : IAsyncLifetime
         // Assert: Verify payment state unchanged
         await using var querySession = _fixture.GetDocumentSession();
         var unchangedPayment = await querySession.Events.AggregateStreamAsync<Payment>(payment.Id);
+        unchangedPayment.ShouldNotBeNull();
         unchangedPayment.Status.ShouldBe(PaymentStatus.Captured);
         unchangedPayment.TotalRefunded.ShouldBe(0m);
     }
@@ -232,6 +233,7 @@ public class RefundFlowTests : IAsyncLifetime
         // Assert: Verify payment remains in Failed status (no refund applied)
         await using var querySession = _fixture.GetDocumentSession();
         var unchangedPayment = await querySession.Events.AggregateStreamAsync<Payment>(payment.Id);
+        unchangedPayment.ShouldNotBeNull();
         unchangedPayment.Status.ShouldBe(PaymentStatus.Failed);
         unchangedPayment.TotalRefunded.ShouldBe(0m);
     }
@@ -270,6 +272,7 @@ public class RefundFlowTests : IAsyncLifetime
         // Assert: Verify payment remains fully refunded (no additional refund applied)
         await using var querySession = _fixture.GetDocumentSession();
         var finalPayment = await querySession.Events.AggregateStreamAsync<Payment>(payment.Id);
+        finalPayment.ShouldNotBeNull();
         finalPayment.Status.ShouldBe(PaymentStatus.Refunded);
         finalPayment.TotalRefunded.ShouldBe(amount); // Still the original full refund amount
         finalPayment.RefundableAmount.ShouldBe(0m);
