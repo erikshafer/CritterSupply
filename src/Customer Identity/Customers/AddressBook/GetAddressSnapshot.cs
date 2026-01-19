@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Marten;
 using Wolverine.Http;
 
 namespace CustomerIdentity.AddressBook;
@@ -29,23 +28,22 @@ public static class GetAddressSnapshotHandler
 
     public static async Task<CustomerAddress?> Load(
         Guid addressId,
-        IDocumentSession session,
+        CustomerIdentityDbContext dbContext,
         CancellationToken ct)
     {
-        return await session.LoadAsync<CustomerAddress>(addressId, ct);
+        return await dbContext.Addresses.FindAsync([addressId], ct);
     }
 
     [WolverineGet("/api/addresses/{addressId}/snapshot")]
     public static async Task<AddressSnapshot> Handle(
         Guid addressId,
         CustomerAddress address,
-        IDocumentSession session,
+        CustomerIdentityDbContext dbContext,
         CancellationToken ct)
     {
         // Update LastUsedAt timestamp
-        var updated = address with { LastUsedAt = DateTimeOffset.UtcNow };
-        session.Store(updated);
-        await session.SaveChangesAsync(ct);
+        address.UpdateLastUsedAt(DateTimeOffset.UtcNow);
+        await dbContext.SaveChangesAsync(ct);
 
         return new AddressSnapshot(
             address.AddressLine1,

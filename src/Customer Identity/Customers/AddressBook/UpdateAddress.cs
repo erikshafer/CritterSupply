@@ -1,6 +1,5 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
-using Marten;
 using Wolverine.Http;
 
 namespace CustomerIdentity.AddressBook;
@@ -97,11 +96,19 @@ public static class UpdateAddressHandler
         return WolverineContinue.NoProblems;
     }
 
+    public static async Task<CustomerAddress?> Load(
+        UpdateAddress command,
+        CustomerIdentityDbContext dbContext,
+        CancellationToken ct)
+    {
+        return await dbContext.Addresses.FindAsync([command.AddressId], ct);
+    }
+
     [WolverinePut("/api/customers/{customerId}/addresses/{addressId}")]
     public static async Task Handle(
         UpdateAddress command,
         CustomerAddress address,
-        IDocumentSession session,
+        CustomerIdentityDbContext dbContext,
         IAddressVerificationService verificationService,
         CancellationToken ct)
     {
@@ -124,28 +131,17 @@ public static class UpdateAddressHandler
             command.PostalCode,
             command.Country);
 
-        var updated = address with
-        {
-            Type = command.Type,
-            Nickname = command.Nickname,
-            AddressLine1 = finalAddress.AddressLine1,
-            AddressLine2 = finalAddress.AddressLine2,
-            City = finalAddress.City,
-            StateOrProvince = finalAddress.StateOrProvince,
-            PostalCode = finalAddress.PostalCode,
-            Country = finalAddress.Country,
-            IsVerified = verificationResult.Status is VerificationStatus.Verified or VerificationStatus.Corrected
-        };
+        address.Update(
+            type: command.Type,
+            nickname: command.Nickname,
+            addressLine1: finalAddress.AddressLine1,
+            addressLine2: finalAddress.AddressLine2,
+            city: finalAddress.City,
+            stateOrProvince: finalAddress.StateOrProvince,
+            postalCode: finalAddress.PostalCode,
+            country: finalAddress.Country,
+            isVerified: verificationResult.Status is VerificationStatus.Verified or VerificationStatus.Corrected);
 
-        session.Store(updated);
-        await session.SaveChangesAsync(ct);
-    }
-
-    public static async Task<CustomerAddress?> Load(
-        UpdateAddress command,
-        IDocumentSession session,
-        CancellationToken ct)
-    {
-        return await session.LoadAsync<CustomerAddress>(command.AddressId, ct);
+        await dbContext.SaveChangesAsync(ct);
     }
 }
