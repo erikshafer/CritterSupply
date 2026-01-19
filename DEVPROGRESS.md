@@ -347,6 +347,25 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 
 **Objective**: Refactor Customer Identity BC from Marten document store to Entity Framework Core to demonstrate relational modeling and EF Core + Wolverine integration
 
+**Vision: Traditional DDD + EF Core as Pedagogical Bridge**
+
+Customer Identity BC serves as an **intentional showcase** for traditional DDD patterns with relational persistence, making it the ideal **entry point** for developers new to CritterSupply:
+
+- **Onboarding Path**: "Start with CI BC to learn Wolverine + EF Core (familiar territory) → Move to event-sourced BCs (new concepts)"
+- **Familiar Patterns**: Traditional aggregate roots, navigation properties, foreign keys, migrations
+- **Pure DDD Concepts**: Aggregates, entities, value objects, invariants, transactional consistency boundaries
+- **Wolverine Showcase**: Demonstrate Wolverine works with *existing* PostgreSQL/SQL Server + EF Core setups (not just Marten)
+- **Contrast & Compare**: CI uses relational model; Payments/Orders/Inventory use event sourcing (learn when to use each)
+
+**Why This Matters:**
+- Many teams have existing EF Core codebases - CI BC proves "you can start using Wolverine today"
+- Lower barrier to entry than diving straight into event sourcing
+- Side-by-side comparison teaches *when* to use relational vs event-sourced models
+- Traditional DDD patterns are well-understood; event sourcing patterns can be learned incrementally
+
+**Potential Future Enhancement:**
+Consider documenting CI BC as "DDD Reference Implementation" with explicit callouts to DDD patterns in code comments, making it a learning resource for both Wolverine *and* DDD concepts.
+
 **Why Now:**
 - Customer Identity is perfect relational use case (Customer → Addresses with foreign keys)
 - Demonstrates when to use EF Core vs Marten in same system
