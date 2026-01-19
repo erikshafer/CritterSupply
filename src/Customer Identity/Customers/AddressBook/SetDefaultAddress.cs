@@ -1,6 +1,6 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
-using Marten;
+using Microsoft.EntityFrameworkCore;
 using Wolverine.Http;
 
 namespace CustomerIdentity.AddressBook;
@@ -50,37 +50,35 @@ public static class SetDefaultAddressHandler
         return WolverineContinue.NoProblems;
     }
 
+    public static async Task<CustomerAddress?> Load(
+        SetDefaultAddress command,
+        CustomerIdentityDbContext dbContext,
+        CancellationToken ct)
+    {
+        return await dbContext.Addresses.FindAsync([command.AddressId], ct);
+    }
+
     [WolverinePut("/api/customers/{customerId}/addresses/{addressId}/set-default")]
     public static async Task Handle(
         SetDefaultAddress command,
         CustomerAddress address,
-        IDocumentSession session,
+        CustomerIdentityDbContext dbContext,
         CancellationToken ct)
     {
         // Unset existing defaults that conflict with this address type
-        var existingDefaults = await session.Query<CustomerAddress>()
+        var existingDefaults = await dbContext.Addresses
             .Where(a => a.CustomerId == command.CustomerId && a.IsDefault)
             .Where(a => a.Type == address.Type || a.Type == AddressType.Both || address.Type == AddressType.Both)
             .ToListAsync(ct);
 
         foreach (var existingDefault in existingDefaults)
         {
-            var unset = existingDefault with { IsDefault = false };
-            session.Store(unset);
+            existingDefault.SetAsDefault(false);
         }
 
         // Set this address as default
-        var updated = address with { IsDefault = true };
-        session.Store(updated);
+        address.SetAsDefault();
 
-        await session.SaveChangesAsync(ct);
-    }
-
-    public static async Task<CustomerAddress?> Load(
-        SetDefaultAddress command,
-        IDocumentSession session,
-        CancellationToken ct)
-    {
-        return await session.LoadAsync<CustomerAddress>(command.AddressId, ct);
+        await dbContext.SaveChangesAsync(ct);
     }
 }

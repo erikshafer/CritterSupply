@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
-using Marten;
+using Microsoft.EntityFrameworkCore;
+using Wolverine;
 using Wolverine.Http;
 
 namespace CustomerIdentity.AddressBook;
@@ -80,15 +81,45 @@ public sealed record AddAddress(
 /// </summary>
 public static class AddAddressHandler
 {
+    public static async Task<ProblemDetails> Before(
+        AddAddress command,
+        CustomerIdentityDbContext dbContext,
+        CancellationToken ct)
+    {
+        // Check if customer exists
+        var customerExists = await dbContext.Customers
+            .AsNoTracking()
+            .AnyAsync(c => c.Id == command.CustomerId, ct);
+
+        if (!customerExists)
+            return new ProblemDetails
+            {
+                Detail = "Customer not found",
+                Status = 404
+            };
+
+        // Check nickname uniqueness
+        var nicknameExists = await dbContext.Addresses
+            .AsNoTracking()
+            .AnyAsync(a => a.CustomerId == command.CustomerId && a.Nickname == command.Nickname, ct);
+
+        if (nicknameExists)
+            return new ProblemDetails
+            {
+                Detail = $"Address with nickname '{command.Nickname}' already exists",
+                Status = 409
+            };
+
+        return WolverineContinue.NoProblems;
+    }
+
     [WolverinePost("/api/customers/{customerId}/addresses")]
     public static async Task<CreationResponse> Handle(
         AddAddress command,
-        IDocumentSession session,
+        CustomerIdentityDbContext dbContext,
         IAddressVerificationService verificationService,
         CancellationToken ct)
     {
-        var addressId = Guid.CreateVersion7();
-
         // Verify address before saving
         var verificationResult = await verificationService.VerifyAsync(
             command.AddressLine1,
@@ -108,23 +139,8 @@ public static class AddAddressHandler
             command.PostalCode,
             command.Country);
 
-        // If this address is being set as default, unset any existing defaults for this type
-        if (command.IsDefault)
-        {
-            var existingDefaults = await session.Query<CustomerAddress>()
-                .Where(a => a.CustomerId == command.CustomerId && a.IsDefault)
-                .Where(a => a.Type == command.Type || a.Type == AddressType.Both || command.Type == AddressType.Both)
-                .ToListAsync(ct);
-
-            foreach (var existingDefault in existingDefaults)
-            {
-                var updated = existingDefault with { IsDefault = false };
-                session.Store(updated);
-            }
-        }
-
-        var address = new CustomerAddress(
-            addressId,
+        // Create address directly (don't load customer to avoid tracking issues)
+        var address = CustomerAddress.Create(
             command.CustomerId,
             command.Type,
             command.Nickname,
@@ -134,14 +150,27 @@ public static class AddAddressHandler
             finalAddress.StateOrProvince,
             finalAddress.PostalCode,
             finalAddress.Country,
-            command.IsDefault,
-            IsVerified: verificationResult.Status is VerificationStatus.Verified or VerificationStatus.Corrected,
-            DateTimeOffset.UtcNow,
-            LastUsedAt: null);
+            isVerified: verificationResult.Status is VerificationStatus.Verified or VerificationStatus.Corrected);
 
-        session.Store(address);
-        await session.SaveChangesAsync(ct);
+        // If this address is being set as default, unset any existing defaults for this type
+        if (command.IsDefault)
+        {
+            var existingDefaults = await dbContext.Addresses
+                .Where(a => a.CustomerId == command.CustomerId && a.IsDefault)
+                .Where(a => a.Type == command.Type || a.Type == AddressType.Both || command.Type == AddressType.Both)
+                .ToListAsync(ct);
 
-        return new CreationResponse($"/api/customers/{command.CustomerId}/addresses/{addressId}");
+            foreach (var existingDefault in existingDefaults)
+            {
+                existingDefault.SetAsDefault(false);
+            }
+
+            address.SetAsDefault();
+        }
+
+        dbContext.Addresses.Add(address);
+        await dbContext.SaveChangesAsync(ct);
+
+        return new CreationResponse($"/api/customers/{command.CustomerId}/addresses/{address.Id}");
     }
 }

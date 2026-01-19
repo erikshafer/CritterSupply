@@ -1,7 +1,9 @@
 using Alba;
+using CustomerIdentity.AddressBook;
 using JasperFx.CommandLine;
-using Marten;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 using Wolverine;
 
@@ -11,7 +13,7 @@ public class CustomersApiFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:18-alpine")
-        .WithDatabase("customers_test_db")
+        .WithDatabase("customer_identity_test_db")
         .WithName($"customers-postgres-test-{Guid.NewGuid():N}")
         .WithCleanUp(true)
         .Build();
@@ -32,14 +34,22 @@ public class CustomersApiFixture : IAsyncLifetime
         {
             builder.ConfigureServices(services =>
             {
-                services.ConfigureMarten(opts =>
-                {
-                    opts.Connection(_connectionString);
-                });
+                // Remove the default DbContext registration
+                services.RemoveAll<DbContextOptions<CustomerIdentityDbContext>>();
+                services.RemoveAll<CustomerIdentityDbContext>();
+
+                // Register DbContext with test connection string
+                services.AddDbContext<CustomerIdentityDbContext>(options =>
+                    options.UseNpgsql(_connectionString));
 
                 services.DisableAllExternalWolverineTransports();
             });
         });
+
+        // Apply migrations
+        using var scope = Host.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<CustomerIdentityDbContext>();
+        await dbContext.Database.MigrateAsync();
     }
 
     public async Task DisposeAsync()
@@ -65,19 +75,18 @@ public class CustomersApiFixture : IAsyncLifetime
         await _postgres.DisposeAsync();
     }
 
-    public IDocumentSession GetDocumentSession()
+    public CustomerIdentityDbContext GetDbContext()
     {
-        return Host.Services.GetRequiredService<IDocumentStore>().LightweightSession();
+        var scope = Host.Services.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<CustomerIdentityDbContext>();
     }
 
-    public IDocumentStore GetDocumentStore()
+    public async Task CleanAllDataAsync()
     {
-        return Host.Services.GetRequiredService<IDocumentStore>();
-    }
+        using var scope = Host.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<CustomerIdentityDbContext>();
 
-    public async Task CleanAllDocumentsAsync()
-    {
-        var store = GetDocumentStore();
-        await store.Advanced.Clean.DeleteAllDocumentsAsync();
+        await dbContext.Addresses.ExecuteDeleteAsync();
+        await dbContext.Customers.ExecuteDeleteAsync();
     }
 }

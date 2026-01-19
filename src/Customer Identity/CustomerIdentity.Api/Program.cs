@@ -2,39 +2,21 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using CustomerIdentity.AddressBook;
 using JasperFx;
-using JasperFx.Resources;
-using Marten;
-using Weasel.Core;
+using Microsoft.EntityFrameworkCore;
 using Wolverine;
 using Wolverine.FluentValidation;
 using Wolverine.Http;
 using Wolverine.Http.FluentValidation;
-using Wolverine.Marten;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.ApplyJasperFxExtensions();
 
-var martenConnectionString = builder.Configuration.GetConnectionString("marten")
-                             ?? "Host=localhost;Port=5432;Database=critter_supply_customers;Username=postgres;Password=postgres";
+// Configure EF Core with Postgres
+var connectionString = builder.Configuration.GetConnectionString("postgres")
+                       ?? throw new Exception("The connection string for the PostgreSQL database was not found");
 
-builder.Services.AddMarten(opts =>
-    {
-        opts.Connection(martenConnectionString);
-        opts.AutoCreateSchemaObjects = AutoCreate.All;
-        opts.UseSystemTextJsonForSerialization(EnumStorage.AsString);
-
-        opts.DatabaseSchemaName = "customers";
-        opts.DisableNpgsqlLogging = true;
-
-        // Configure document storage for CustomerAddress
-        opts.Schema.For<CustomerAddress>()
-            .Index(x => x.CustomerId)
-            .Index(x => x.IsDefault);
-    })
-    .UseLightweightSessions()
-    .IntegrateWithWolverine();
-
-builder.Services.AddResourceSetupOnStartup();
+builder.Services.AddDbContext<CustomerIdentityDbContext>(options =>
+    options.UseNpgsql(connectionString));
 
 builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(opts =>
 {

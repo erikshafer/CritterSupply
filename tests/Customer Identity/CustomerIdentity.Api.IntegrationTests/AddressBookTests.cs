@@ -1,6 +1,6 @@
 using Alba;
 using CustomerIdentity.AddressBook;
-using Marten;
+using Microsoft.EntityFrameworkCore;
 using Shouldly;
 
 namespace CustomerIdentity.Api.IntegrationTests;
@@ -14,10 +14,21 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
         _fixture = fixture;
     }
 
+    private async Task SeedCustomerAsync(Guid customerId)
+    {
+        await using var dbContext = _fixture.GetDbContext();
+        var email = $"{customerId:N}@example.com"; // Use customer ID for unique email
+        var customer = Customer.Create(customerId, email, "John", "Doe");
+        dbContext.Customers.Add(customer);
+        await dbContext.SaveChangesAsync();
+    }
+
     [Fact]
     public async Task CanAddAddressToCustomer()
     {
         var customerId = Guid.CreateVersion7();
+        await SeedCustomerAsync(customerId);
+
         var command = new AddAddress(
             customerId,
             AddressType.Shipping,
@@ -41,8 +52,8 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
         location.ShouldStartWith($"/api/customers/{customerId}/addresses/");
 
         // Verify address was persisted
-        await using var session = _fixture.GetDocumentSession();
-        var addresses = await session.Query<CustomerAddress>()
+        await using var dbContext = _fixture.GetDbContext();
+        var addresses = await dbContext.Addresses
             .Where(a => a.CustomerId == customerId)
             .ToListAsync();
 
@@ -56,6 +67,7 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
     public async Task AddingDefaultAddressUnsetsExistingDefault()
     {
         var customerId = Guid.CreateVersion7();
+        await SeedCustomerAsync(customerId);
 
         // Add first default shipping address
         var firstCommand = new AddAddress(
@@ -96,8 +108,8 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
         });
 
         // Verify only the second address is default
-        await using var session = _fixture.GetDocumentSession();
-        var addresses = await session.Query<CustomerAddress>()
+        await using var dbContext = _fixture.GetDbContext();
+        var addresses = await dbContext.Addresses
             .Where(a => a.CustomerId == customerId)
             .ToListAsync();
 
@@ -114,6 +126,7 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
     public async Task CanUpdateAddress()
     {
         var customerId = Guid.CreateVersion7();
+        await SeedCustomerAsync(customerId);
 
         // Add address
         var addCommand = new AddAddress(
@@ -157,8 +170,8 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
         });
 
         // Verify update
-        await using var session = _fixture.GetDocumentSession();
-        var updated = await session.LoadAsync<CustomerAddress>(addressId);
+        await using var dbContext = _fixture.GetDbContext();
+        var updated = await dbContext.Addresses.FindAsync(addressId);
 
         updated.ShouldNotBeNull();
         updated.Nickname.ShouldBe("Home (Updated)");
@@ -172,6 +185,7 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
     public async Task CanSetDefaultAddress()
     {
         var customerId = Guid.CreateVersion7();
+        await SeedCustomerAsync(customerId);
 
         // Add two addresses, first one default
         var firstCommand = new AddAddress(
@@ -223,8 +237,8 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
         });
 
         // Verify only second address is default
-        await using var session = _fixture.GetDocumentSession();
-        var addresses = await session.Query<CustomerAddress>()
+        await using var dbContext = _fixture.GetDbContext();
+        var addresses = await dbContext.Addresses
             .Where(a => a.CustomerId == customerId)
             .ToListAsync();
 
@@ -237,6 +251,7 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
     public async Task CanGetCustomerAddresses()
     {
         var customerId = Guid.CreateVersion7();
+        await SeedCustomerAsync(customerId);
 
         // Add multiple addresses
         var shippingCommand = new AddAddress(
@@ -282,7 +297,7 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
             x.StatusCodeShouldBe(200);
         });
 
-        var addresses = result.ReadAsJson<List<CustomerAddress>>();
+        var addresses = result.ReadAsJson<List<AddressSummary>>();
         addresses.ShouldNotBeNull();
         addresses.Count.ShouldBe(2);
     }
@@ -291,6 +306,7 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
     public async Task CanGetAddressSnapshot()
     {
         var customerId = Guid.CreateVersion7();
+        await SeedCustomerAsync(customerId);
 
         // Add address
         var command = new AddAddress(
@@ -331,8 +347,8 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
         snapshot.Country.ShouldBe("US");
 
         // Verify LastUsedAt was updated
-        await using var session = _fixture.GetDocumentSession();
-        var address = await session.LoadAsync<CustomerAddress>(addressId);
+        await using var dbContext = _fixture.GetDbContext();
+        var address = await dbContext.Addresses.FindAsync(addressId);
         address.ShouldNotBeNull();
         address.LastUsedAt.ShouldNotBeNull();
     }
@@ -341,6 +357,7 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
     public async Task AddressTypesBothHandlesDefaultsCorrectly()
     {
         var customerId = Guid.CreateVersion7();
+        await SeedCustomerAsync(customerId);
 
         // Add shipping-only default
         var shippingCommand = new AddAddress(
@@ -400,8 +417,8 @@ public class AddressBookTests : IClassFixture<CustomersApiFixture>
         });
 
         // Verify only the Both address is default
-        await using var session = _fixture.GetDocumentSession();
-        var addresses = await session.Query<CustomerAddress>()
+        await using var dbContext = _fixture.GetDbContext();
+        var addresses = await dbContext.Addresses
             .Where(a => a.CustomerId == customerId)
             .ToListAsync();
 
