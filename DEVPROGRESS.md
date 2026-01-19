@@ -429,11 +429,19 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 
 **Implementation Notes:**
 - See CONTEXTS.md "Product Catalog" section for complete specification
-- Use relational persistence (Marten document store) for write model
-- Create denormalized read model projections for query optimization
-- Human-readable SKUs (e.g., "CBOWL-CER-LG-BLU"), not GUIDs
-- Use placeholder images (via.placeholder.com) for seed data
-- Hardcode prices in Product entity for v1 (defer Pricing BC to later)
+- **Persistence**: Marten document store (NOT event sourcing) - master data, read-heavy
+- **Value Objects**: Strongly-typed identity and domain values with validation
+  - `Sku` - Product identifier with constraints (A-Z uppercase, 0-9, hyphens only, max 24 chars)
+  - `ProductName` - Product display name with constraints (mixed case, letters/numbers/spaces, special chars `. , ! & ( ) -`, max 100 chars)
+  - `CategoryName` - Simple string wrapper for now, future subdomain handles marketplace mapping
+  - `ProductImage` - URL validation via `IImageValidator` interface (stub for now)
+  - All value objects use factory methods (`Sku.From(string)`) + JSON converters for ergonomics
+  - Implicit string operators for Marten queries and serialization transparency
+- **Soft Delete**: Use Marten's `.SoftDeleted()` feature - preserve audit trail
+- **Collections**: Use `IReadOnlyList<T>` for immutability
+- **Integration Messages**: Scaffold `ProductAdded`, `ProductUpdated`, `ProductDiscontinued` - publish but don't test receipt
+- **Pricing**: NO hardcoded prices - deferred to Pricing BC entirely
+- **Seed Data**: C# code (type-safe) with 20-30 products, placeholder images (via.placeholder.com)
 
 ---
 

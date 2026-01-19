@@ -71,6 +71,7 @@ A list of tools, technologies, techniques, and other details to help define how 
 - **Command Execution**: Wolverine 5+
 - **Event-Driven Framework**: Wolverine 5+
 - **Messaging Tool**: RabbitMQ as the message-broker using the AMQP to communicate across bounded contexts, value streams, etc.
+- **Collections**: Use `IReadOnlyList<T>`, `IReadOnlyCollection<T>` for immutability (see Collection Patterns below)
 
 ### Prefer Pure Functions for Business Logic
 
@@ -341,6 +342,319 @@ public sealed record AddressDetails(
     string Postcode
 );
 ```
+
+#### Collection Patterns
+
+**Always prefer immutable collections** unless there is an explicit, documented use case requiring mutability.
+
+**Prefer:**
+- `IReadOnlyList<T>` for ordered collections
+- `IReadOnlyCollection<T>` for unordered collections
+- `IReadOnlyDictionary<TKey, TValue>` for key-value pairs
+
+**Avoid:**
+- `List<T>` (mutable)
+- `IList<T>` (mutable interface)
+- `ICollection<T>` (mutable interface)
+
+```csharp
+// Good - Immutable collections
+public sealed record Product(
+    string Sku,
+    string Name,
+    IReadOnlyList<ProductImage> Images,  // Immutable
+    IReadOnlyList<string> Tags);         // Immutable
+
+// Bad - Mutable collections
+public sealed record Product(
+    string Sku,
+    string Name,
+    List<ProductImage> Images,  // Can be modified externally
+    List<string> Tags);         // Can be modified externally
+```
+
+**Creating Immutable Collections:**
+
+```csharp
+// Constructor accepting arrays/lists
+public static Product Create(string sku, string name, ProductImage[] images)
+{
+    return new Product(
+        sku,
+        name,
+        images.ToList().AsReadOnly(),  // Convert to IReadOnlyList
+        []  // Empty collection
+    );
+}
+
+// Using collection expressions (C# 12+)
+var images = new List<ProductImage> { image1, image2 };
+var product = new Product(sku, name, images.AsReadOnly(), []);
+```
+
+**Why Immutability:**
+- Prevents accidental mutation (thread-safe by default)
+- Clear intent (this collection won't change)
+- Easier to reason about (no hidden side effects)
+- Consistent with functional programming principles
+- Works seamlessly with Marten, EF Core, and JSON serialization
+
+#### Value Object Patterns
+
+**Use value objects** to wrap primitive types with domain-specific validation and behavior. Value objects make implicit constraints explicit and prevent invalid states from being representable.
+
+**When to Use Value Objects:**
+- Identity values with format constraints (SKU, OrderId, CustomerId)
+- Domain concepts with business rules (ProductName, EmailAddress, PhoneNumber)
+- Values requiring validation (Money, Percentage, PositiveInteger)
+- Primitive obsession code smell (too many raw strings/ints)
+
+**Standard Value Object Pattern:**
+
+All value objects in CritterSupply follow this consistent pattern:
+
+1. **Sealed record** - Immutable and value-based equality
+2. **Factory method** - `From(string)` for validated construction
+3. **Private parameterless constructor** - Required by Marten/JSON deserializers
+4. **Implicit string operator** - Seamless conversion to string for queries/serialization
+5. **JSON converter** - Transparent serialization (serializes as plain string, not wrapped object)
+
+**Example: Sku Value Object**
+
+```csharp
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
+
+namespace ProductCatalog.Products;
+
+/// <summary>
+/// Strongly-typed SKU identifier for products.
+/// Enforces format constraints while remaining string-compatible for serialization.
+/// Rules: A-Z (uppercase only), 0-9, hyphens (-), max 24 characters.
+/// </summary>
+[JsonConverter(typeof(SkuJsonConverter))]
+public sealed record Sku
+{
+    private const int MaxLength = 24;
+    private static readonly Regex ValidPattern = new(@"^[A-Z0-9\-]+$", RegexOptions.Compiled);
+
+    public string Value { get; init; } = null!;
+
+    private Sku() { }  // For Marten/JSON deserialization
+
+    public static Sku From(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException("SKU cannot be empty", nameof(value));
+
+        if (value.Length > MaxLength)
+            throw new ArgumentException($"SKU cannot exceed {MaxLength} characters", nameof(value));
+
+        if (!ValidPattern.IsMatch(value))
+            throw new ArgumentException(
+                "SKU must contain only uppercase letters (A-Z), numbers (0-9), and hyphens (-)",
+                nameof(value));
+
+        return new Sku { Value = value };
+    }
+
+    public static implicit operator string(Sku sku) => sku.Value;
+
+    public override string ToString() => Value;
+}
+
+public sealed class SkuJsonConverter : JsonConverter<Sku>
+{
+    public override Sku Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var value = reader.GetString();
+        return value is null
+            ? throw new JsonException("SKU cannot be null")
+            : Sku.From(value);
+    }
+
+    public override void Write(Utf8JsonWriter writer, Sku value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.Value);
+    }
+}
+```
+
+**Example: ProductName Value Object**
+
+```csharp
+/// <summary>
+/// Strongly-typed product name.
+/// Enforces format constraints while remaining string-compatible for serialization.
+/// Rules: Mixed case allowed, letters, numbers, spaces, and special chars (. , ! & ( ) -), max 100 characters.
+/// </summary>
+[JsonConverter(typeof(ProductNameJsonConverter))]
+public sealed record ProductName
+{
+    private const int MaxLength = 100;
+
+    // Allows: A-Z, a-z, 0-9, spaces, and special chars: . , ! & ( ) -
+    private static readonly Regex ValidPattern = new(@"^[A-Za-z0-9\s.,!&()\-]+$", RegexOptions.Compiled);
+
+    public string Value { get; init; } = null!;
+
+    private ProductName() { }  // For Marten/JSON deserialization
+
+    public static ProductName From(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException("Product name cannot be empty", nameof(value));
+
+        var trimmed = value.Trim();
+
+        if (trimmed.Length > MaxLength)
+            throw new ArgumentException($"Product name cannot exceed {MaxLength} characters", nameof(value));
+
+        if (!ValidPattern.IsMatch(trimmed))
+            throw new ArgumentException(
+                "Product name contains invalid characters. Allowed: letters, numbers, spaces, and . , ! & ( ) -",
+                nameof(value));
+
+        return new ProductName { Value = trimmed };
+    }
+
+    public static implicit operator string(ProductName name) => name.Value;
+
+    public override string ToString() => Value;
+}
+
+public sealed class ProductNameJsonConverter : JsonConverter<ProductName>
+{
+    public override ProductName Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var value = reader.GetString();
+        return value is null
+            ? throw new JsonException("Product name cannot be null")
+            : ProductName.From(value);
+    }
+
+    public override void Write(Utf8JsonWriter writer, ProductName value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.Value);
+    }
+}
+```
+
+**Usage in Domain Models:**
+
+```csharp
+// Good - Using value objects
+public sealed record Product
+{
+    public Sku Sku { get; init; } = null!;
+    public ProductName Name { get; init; } = null!;
+    public CategoryName Category { get; init; } = null!;
+    // ...
+
+    private Product() { }
+
+    public static Product Create(string sku, string name, string category)
+    {
+        return new Product
+        {
+            Sku = Sku.From(sku),              // Validates format
+            Name = ProductName.From(name),    // Validates format
+            Category = CategoryName.From(category),
+            Status = ProductStatus.Active,
+            AddedAt = DateTimeOffset.UtcNow
+        };
+    }
+}
+```
+
+**Usage in Marten Configuration:**
+
+```csharp
+// Marten document store configuration
+opts.Schema.For<Product>()
+    .Identity(x => x.Sku)  // Implicit conversion to string works seamlessly
+    .SoftDeleted();
+```
+
+**Usage in HTTP Commands:**
+
+```csharp
+// Command using value objects
+public sealed record AddProduct(
+    string Sku,              // Plain string in HTTP JSON
+    string Name,             // Plain string in HTTP JSON
+    string Category,
+    string Description)
+{
+    public class AddProductValidator : AbstractValidator<AddProduct>
+    {
+        public AddProductValidator()
+        {
+            RuleFor(x => x.Sku).NotEmpty();
+            RuleFor(x => x.Name).NotEmpty();
+            RuleFor(x => x.Category).NotEmpty();
+        }
+    }
+}
+
+// Handler converts strings to value objects
+public static class AddProductHandler
+{
+    [WolverinePost("/api/products")]
+    public static async Task<CreationResponse> Handle(
+        AddProduct command,
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        var product = Product.Create(
+            command.Sku,      // Sku.From() called inside Create
+            command.Name,     // ProductName.From() called inside Create
+            command.Category);
+
+        session.Store(product);
+        await session.SaveChangesAsync(ct);
+
+        return new CreationResponse($"/api/products/{command.Sku}");
+    }
+}
+```
+
+**JSON Serialization Examples:**
+
+```json
+// HTTP Request (plain strings)
+{
+  "sku": "DOG-BOWL-001",
+  "name": "Premium Stainless Steel Dog Bowl",
+  "category": "Dog Bowls",
+  "description": "Dishwasher-safe, non-slip base"
+}
+
+// Marten Document (plain strings via JSON converter)
+{
+  "sku": "DOG-BOWL-001",
+  "name": "Premium Stainless Steel Dog Bowl",
+  "category": "Dog Bowls",
+  "status": "Active",
+  "addedAt": "2026-01-19T12:00:00Z"
+}
+```
+
+**Key Benefits:**
+
+1. **Type Safety** - Compiler prevents using wrong identifier types (can't pass Sku where ProductName expected)
+2. **Self-Documenting** - `Sku.From("ABC-123")` is clearer than `"ABC-123"` (explicit validation)
+3. **Validation at Boundaries** - Invalid values rejected at construction, not deep in business logic
+4. **Transparent Serialization** - JSON converter makes them serialize as plain strings (no {"value": "ABC-123"} wrapping)
+5. **Marten Compatibility** - Implicit operators work seamlessly with `.Identity()`, queries, and indexing
+6. **Refactoring Safety** - Changing constraints updates one place (factory method), not scattered validation code
+
+**When NOT to Use Value Objects:**
+
+- Simple strings with no constraints (descriptions, free-text fields)
+- Primitive types with no business rules (counts, flags)
+- Values that are truly primitives in the domain (temperatures, distances without validation)
 
 #### Disway Use of Inheritance
 
@@ -2551,6 +2865,287 @@ public class AddAddressTests : IClassFixture<CustomerIdentityTestFixture>
 4. **Migrations** - Use EF Core migrations for schema evolution (versioned, repeatable)
 5. **Foreign Keys** - Database-level referential integrity (cascade deletes)
 6. **Testing** - Alba + TestContainers work seamlessly with EF Core
+
+## Marten Document Store (Non-Event-Sourced) + Wolverine Integration
+
+Some BCs use Marten as a **document database** (like MongoDB) rather than an event store. This is appropriate for **master data** or **read-heavy** use cases where event sourcing doesn't provide value.
+
+### When to Use Marten Document Store vs Event Sourcing
+
+**Use Marten Document Store (NOT Event Sourcing) when:**
+- Master data with infrequent changes (Product Catalog)
+- Current state is all that matters (no need for historical replay)
+- Read-heavy workload (90%+ reads, few writes)
+- Document model fits naturally (flexible schema, nested objects)
+- No complex business logic requiring event replay
+
+**Use Marten Event Store when:**
+- Transaction data with frequent state changes (Orders, Payments, Inventory)
+- Historical changes are valuable (audit trail, temporal queries, event replay)
+- Complex business logic benefits from event sourcing patterns
+- Saga orchestration required
+
+**Examples in CritterSupply:**
+- **Document Store**: Product Catalog (products are master data, changes infrequent)
+- **Event Store**: Orders, Payments, Inventory, Fulfillment (transactional, event-driven)
+
+### Marten Document Store Patterns
+
+**1. Document Model with Immutability**
+
+Use immutable records with factory methods, just like event-sourced aggregates:
+
+```csharp
+// Good - Immutable document model with value objects
+public sealed record Product
+{
+    public Sku Sku { get; init; } = null!;  // Document identifier (value object)
+    public ProductName Name { get; init; } = null!;  // Value object with validation
+    public string Description { get; init; } = null!;
+    public CategoryName Category { get; init; } = null!;  // Value object
+    public IReadOnlyList<ProductImage> Images { get; init; } = [];
+    public IReadOnlyList<string> Tags { get; init; } = [];
+    public ProductStatus Status { get; init; }
+    public bool IsDeleted { get; init; }
+    public DateTimeOffset AddedAt { get; init; }
+    public DateTimeOffset? UpdatedAt { get; init; }
+
+    // Required by Marten
+    private Product() { }
+
+    // Factory method for creation - accepts plain strings, converts to value objects
+    public static Product Create(
+        string sku,
+        string name,
+        string description,
+        string category,
+        IReadOnlyList<ProductImage> images)
+    {
+        return new Product
+        {
+            Sku = Sku.From(sku),              // Validates format (uppercase, max 24 chars)
+            Name = ProductName.From(name),    // Validates format (max 100 chars, allowed chars)
+            Description = description,
+            Category = CategoryName.From(category),
+            Images = images,
+            Tags = [],
+            Status = ProductStatus.Active,
+            IsDeleted = false,
+            AddedAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    // Update methods using 'with' syntax
+    public Product Update(
+        string? name = null,
+        string? description = null,
+        string? category = null)
+    {
+        return this with
+        {
+            Name = name is not null ? ProductName.From(name) : Name,
+            Description = description ?? Description,
+            Category = category is not null ? CategoryName.From(category) : Category,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    public Product ChangeStatus(ProductStatus newStatus)
+    {
+        return this with
+        {
+            Status = newStatus,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    public Product SoftDelete()
+    {
+        return this with
+        {
+            IsDeleted = true,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+    }
+}
+```
+
+**2. Marten Configuration for Document Store**
+
+```csharp
+// Program.cs
+builder.Services.AddMarten(opts =>
+{
+    opts.Connection(connectionString);
+
+    // Document storage configuration (NOT event sourcing)
+    opts.Schema.For<Product>()
+        .Identity(x => x.Sku)  // Use SKU as identifier (not Guid)
+        .UniqueIndex(x => x.Sku)  // Enforce uniqueness
+        .Index(x => x.Category)  // Index for category queries
+        .Index(x => x.Status)  // Index for status filtering
+        .SoftDeleted();  // Built-in soft delete support
+});
+```
+
+**3. Handler Pattern for Document CRUD**
+
+```csharp
+// AddProduct.cs
+public sealed record AddProduct(
+    string Sku,
+    string Name,
+    string Description,
+    CategoryName Category,
+    IReadOnlyList<ProductImage> Images)
+{
+    public class AddProductValidator : AbstractValidator<AddProduct>
+    {
+        public AddProductValidator()
+        {
+            RuleFor(x => x.Sku).NotEmpty().MaximumLength(50);
+            RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
+            RuleFor(x => x.Images).NotEmpty();
+        }
+    }
+}
+
+public static class AddProductHandler
+{
+    [WolverinePost("/api/products")]
+    public static async Task<CreationResponse> Handle(
+        AddProduct command,
+        IDocumentSession session,  // Document session (NOT event store)
+        CancellationToken ct)
+    {
+        // Check for duplicate SKU
+        var existing = await session.Query<Product>()
+            .FirstOrDefaultAsync(p => p.Sku == command.Sku, ct);
+
+        if (existing is not null)
+            return new CreationResponse($"/api/products/{command.Sku}")
+            {
+                // Return 409 Conflict
+            };
+
+        // Create document
+        var product = Product.Create(
+            command.Sku,
+            command.Name,
+            command.Description,
+            command.Category,
+            command.Images);
+
+        session.Store(product);  // Direct document insert (NOT StartStream)
+        await session.SaveChangesAsync(ct);
+
+        // Publish integration message (NOT domain event)
+        // TODO: Publish ProductAdded integration message
+
+        return new CreationResponse($"/api/products/{command.Sku}");
+    }
+}
+```
+
+**4. Query Patterns**
+
+```csharp
+// GetProductListing.cs
+public sealed record GetProductListing(
+    CategoryName? Category = null,
+    ProductStatus? Status = null,
+    int PageNumber = 1,
+    int PageSize = 20);
+
+public static class GetProductListingHandler
+{
+    [WolverineGet("/api/products")]
+    public static async Task<PagedResult<ProductSummary>> Handle(
+        GetProductListing query,
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        var productsQuery = session.Query<Product>()
+            .Where(p => !p.IsDeleted);  // Soft delete filter
+
+        if (query.Category is not null)
+            productsQuery = productsQuery.Where(p => p.Category == query.Category);
+
+        if (query.Status.HasValue)
+            productsQuery = productsQuery.Where(p => p.Status == query.Status.Value);
+
+        var total = await productsQuery.CountAsync(ct);
+
+        var products = await productsQuery
+            .OrderBy(p => p.Name)
+            .Skip((query.PageNumber - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .Select(p => new ProductSummary(p.Sku, p.Name, p.Category, p.Status))
+            .ToListAsync(ct);
+
+        return new PagedResult<ProductSummary>(products, total, query.PageNumber, query.PageSize);
+    }
+}
+```
+
+**5. Update Patterns**
+
+```csharp
+// UpdateProduct.cs
+public static class UpdateProductHandler
+{
+    [WolverinePut("/api/products/{sku}")]
+    public static async Task Handle(
+        string sku,
+        UpdateProduct command,
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        // Load document
+        var product = await session.LoadAsync<Product>(sku, ct);
+
+        if (product is null)
+            return; // 404 Not Found
+
+        // Update using immutable pattern
+        var updated = product.Update(
+            name: command.Name,
+            description: command.Description,
+            category: command.Category);
+
+        // Store updated document (Marten detects changes)
+        session.Store(updated);
+        await session.SaveChangesAsync(ct);
+
+        // Publish integration message
+        // TODO: Publish ProductUpdated integration message
+    }
+}
+```
+
+### Key Differences: Document Store vs Event Sourcing
+
+| Aspect | Document Store | Event Sourcing |
+|--------|---------------|----------------|
+| **Session Type** | `IDocumentSession` | `IDocumentSession` (same interface) |
+| **Write Operation** | `session.Store(document)` | `session.Events.Append(aggregateId, event)` |
+| **Read Operation** | `session.Query<T>()` or `session.LoadAsync<T>(id)` | `session.Events.AggregateStreamAsync<T>(id)` |
+| **Identity** | Any type (string, Guid, int) | Stream ID (typically Guid) |
+| **Persistence** | Document stored directly (like MongoDB) | Events stored, aggregate rebuilt on read |
+| **Updates** | In-place document updates | Append new events to stream |
+| **History** | No historical changes | Full event history preserved |
+| **Use Cases** | Master data, read-heavy, infrequent changes | Transactional data, event-driven logic |
+
+### Key Takeaways: Marten Document Store + Wolverine
+
+1. **IDocumentSession Injection** - Same DI pattern as event sourcing, different usage
+2. **Immutability** - Use immutable records with `with` syntax, even for document models
+3. **Factory Methods** - `Create()` for construction, `Update()` methods for changes
+4. **Soft Delete** - Use Marten's `.SoftDeleted()` configuration for built-in filtering
+5. **Indexes** - Configure indexes for query performance (category, status, etc.)
+6. **String Identifiers** - Documents can use human-readable IDs (SKU) instead of GUIDs
+7. **Integration Messages** - Publish messages to notify other BCs (not persisted as domain events)
+8. **Testing** - Same Alba + TestContainers pattern as event-sourced BCs
 
 ## Testing Principles
 
