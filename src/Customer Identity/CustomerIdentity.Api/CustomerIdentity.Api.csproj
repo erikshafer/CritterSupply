@@ -11,7 +11,6 @@
 
     <ItemGroup>
         <PackageReference Include="WolverineFx.Http.FluentValidation" />
-        <PackageReference Include="WolverineFx.Http.Marten" />
         <PackageReference Include="WolverineFx.RabbitMQ" />
     </ItemGroup>
 
