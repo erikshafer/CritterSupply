@@ -548,6 +548,24 @@ The Returns context owns the reverse logistics flow—handling customer return r
 
 The Customer Identity context owns customer identity, profiles, and persistent data like addresses and saved payment method tokens. It provides the foundation for personalized shopping experiences by maintaining customer preferences and frequently-used information across the system.
 
+**Persistence Strategy (Cycle 13):**
+
+Customer Identity uses **Entity Framework Core** with PostgreSQL for traditional relational persistence. This differs from other BCs (Orders, Payments, Inventory, Fulfillment) which use Marten for event sourcing.
+
+**Why EF Core instead of Marten:**
+- **Relational Model Fits Naturally** - Customer/Address is a classic one-to-many relationship with foreign keys
+- **No Event Sourcing Needed** - Current state is all that matters (historical changes not valuable)
+- **Navigation Properties** - `Customer.Addresses` collection simplifies queries
+- **Database Constraints** - Foreign keys and unique constraints enforce invariants at database level
+- **Pedagogical Value** - Demonstrates Wolverine works with existing EF Core codebases (not just Marten)
+- **Entry Point for Learning** - Traditional DDD patterns (aggregate roots, entities) before introducing event sourcing
+
+**Aggregate Root (Traditional DDD):**
+- `Customer` — aggregate root with navigation property to `CustomerAddress` entities
+- `CustomerAddress` — entity with foreign key to `Customer`
+- Relationships enforced via EF Core foreign key constraints (cascade delete)
+- EF Core migrations provide versioned schema evolution
+
 ### Subdomains
 
 **AddressBook:**

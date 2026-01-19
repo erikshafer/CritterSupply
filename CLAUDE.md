@@ -1983,6 +1983,7 @@ While most of CritterSupply uses Marten (event sourcing + document store), **Cus
 - Foreign key constraints enforce referential integrity
 - Schema evolution via migrations
 - Team is more familiar with EF Core patterns
+- Current state is all that matters (no need for event history)
 
 **Use Marten when:**
 - Event sourcing is beneficial (Orders, Payments, Inventory, Fulfillment)
@@ -1990,6 +1991,50 @@ While most of CritterSupply uses Marten (event sourcing + document store), **Cus
 - High-performance queries with JSONB indexes
 - No complex relational joins needed
 - Projection-based read models
+- Event history is valuable for audit, replay, or temporal queries
+
+### Package Dependencies: EF Core vs Marten
+
+Wolverine provides separate packages for EF Core and Marten integration. **Choose the appropriate package based on your persistence strategy:**
+
+**For EF Core (Customer Identity BC):**
+```xml
+<ItemGroup>
+    <!-- Core Wolverine packages -->
+    <PackageReference Include="WolverineFx.Http.FluentValidation" />
+    <PackageReference Include="WolverineFx.RabbitMQ" />
+
+    <!-- EF Core integration -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="WolverineFx.EntityFrameworkCore" />
+</ItemGroup>
+```
+
+**For Marten (Orders, Payments, Inventory, Fulfillment BCs):**
+```xml
+<ItemGroup>
+    <!-- Core Wolverine packages -->
+    <PackageReference Include="WolverineFx.Http.FluentValidation" />
+    <PackageReference Include="WolverineFx.RabbitMQ" />
+
+    <!-- Marten integration (includes event sourcing + document store) -->
+    <PackageReference Include="WolverineFx.Http.Marten" />
+</ItemGroup>
+```
+
+**Key Differences:**
+- `WolverineFx.Http.Marten` - Provides Marten-specific HTTP endpoint helpers (e.g., `[AggregateHandler]`, `IStartStream`, event sourcing workflow)
+- `WolverineFx.EntityFrameworkCore` - Provides EF Core-specific features (e.g., automatic `DbContext` injection, transactional middleware)
+- Both use the same core `WolverineFx.Http` for HTTP endpoints, so handler patterns remain consistent
+- `WolverineFx.Http.Marten` transitively includes Marten packages (no need to reference Marten separately)
+- EF Core requires explicit `Microsoft.EntityFrameworkCore.*` package references
+
+**Common Packages (Both Approaches):**
+- `WolverineFx.Http.FluentValidation` - FluentValidation integration for command validation
+- `WolverineFx.RabbitMQ` - RabbitMQ messaging for cross-BC communication
+- `Microsoft.AspNetCore.OpenApi` / `Swashbuckle.AspNetCore` - API documentation
 
 ### Customer Identity BC: EF Core Example
 

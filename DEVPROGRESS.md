@@ -274,6 +274,59 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 
 #### ✅ Recent Cycles
 
+**Cycle 13: Customer Identity BC - EF Core Migration (Completed - 2026-01-19)**
+- **Objective**: Refactor Customer Identity BC from Marten document store to Entity Framework Core to demonstrate relational modeling and EF Core + Wolverine integration
+- **BC Work**: Full migration to EF Core with traditional aggregate root patterns
+    - `Customer` aggregate root with navigation properties to `CustomerAddress` entities (one-to-many)
+    - `CustomerIdentityDbContext` with explicit EF Core configuration (fluent API)
+    - EF Core migrations for schema evolution (`InitialCreate` migration)
+    - Foreign key relationships with cascade delete
+    - Unique constraints: (CustomerId, Nickname), Customer.Email
+    - `CustomerIdentityDbContextFactory` for design-time tooling (reads from appsettings.json)
+    - Refactored all handlers to use `DbContext` instead of `IDocumentSession`
+    - Preserved all existing functionality (add/update/delete addresses, address verification)
+    - **Status**: ✅ 12/12 integration tests passing (migration complete)
+    - **Files**: `/src/Customer Identity/Customers/AddressBook/` (EF Core entities, context, handlers)
+- **Key Technical Challenges**:
+    - **DbUpdateConcurrencyException**: Initial implementation loaded Customer entity unnecessarily via navigation properties
+        - **Root Cause**: `dbContext.Customers.Include(c => c.Addresses)` caused EF Core to track Customer entity
+        - **Solution**: Create `CustomerAddress` directly without loading Customer; use `dbContext.Addresses.Add(address)`
+        - **Lesson**: Avoid loading aggregate roots when only adding child entities (foreign key is sufficient)
+    - **JSON Serialization**: Returning entity directly from GET endpoints failed (no parameterless constructor)
+        - **Solution**: Create `AddressSummary` DTO for API responses (id, type, nickname, displayLine, isDefault, isVerified)
+        - **Lesson**: Always project entities to DTOs for HTTP responses (separation of persistence and API contracts)
+    - **CustomerAddress.Update() Missing Type Parameter**: UpdateAddress handler wasn't updating address type
+        - **Solution**: Add `type` parameter to `Update()` method signature
+        - **Lesson**: EF Core change tracking requires explicit property updates (immutability patterns need `with` syntax for records)
+- **Key Learnings: EF Core + Wolverine Integration**:
+    - **DbContext Injection**: Wolverine injects `DbContext` into handlers just like `IDocumentSession` (same DI pattern)
+    - **Change Tracking**: EF Core automatically tracks entity changes; call `SaveChangesAsync()` to persist
+    - **Navigation Properties**: Use `.Include()` for eager loading, but avoid loading when not needed (performance + concurrency issues)
+    - **Migrations**: EF Core migrations provide versioned schema evolution (better than manual SQL scripts)
+    - **Foreign Keys**: Database-level referential integrity enforces aggregate boundaries (cascade deletes, constraint violations)
+    - **Design-Time Factory**: `IDesignTimeDbContextFactory` must read connection string from appsettings.json (avoid hardcoded values)
+    - **Testing**: Alba + TestContainers work seamlessly with EF Core (same pattern as Marten integration tests)
+- **Key Learnings: EF Core vs Marten Decision Criteria**:
+    - **Use EF Core when**: Traditional relational model fits naturally (Customer → Addresses), complex joins needed, foreign key constraints valuable, team familiar with EF Core
+    - **Use Marten when**: Event sourcing beneficial (Orders, Payments, Inventory), document model fits (flexible schema, JSONB), high-performance queries with JSONB indexes
+    - **Architectural Benefit**: Demonstrating both in same system shows when to use each persistence strategy
+- **Pedagogical Achievement**:
+    - Customer Identity BC now serves as **entry point** for developers learning Critter Stack
+    - "Start with Wolverine + EF Core (familiar) → Move to event sourcing (new concepts)"
+    - Traditional DDD patterns (aggregate roots, entities, navigation properties) shown alongside event-sourced BCs
+    - Proves Wolverine works with existing EF Core codebases (not just Marten)
+- **Testing Updates**:
+    - All 12 integration tests passing (behavior preserved during migration)
+    - Test database renamed: `customers_test_db` → `customer_identity_test_db` (consistent naming)
+    - TestContainers pattern unchanged (PostgreSQL container lifecycle same for EF Core and Marten)
+- **Documentation Updates**:
+    - Added comprehensive EF Core + Wolverine patterns to CLAUDE.md
+    - Documented when to use EF Core vs Marten in CLAUDE.md
+    - Added package dependency guidance (`WolverineFx.EntityFrameworkCore` vs `WolverineFx.Http.Marten`)
+    - Added EF Core entity patterns (immutability, change tracking, DTOs)
+    - Connection string configuration best practices (appsettings.json, not hardcoded)
+    - Updated CONTEXTS.md with Customer Identity entry points and integration patterns
+
 **Cycle 10: Customer Identity BC - Address Management (Completed - 2026-01-15)**
 - **Objective**: Create Customer Identity bounded context with AddressBook subdomain for realistic e-commerce address management
 - **BC Work**: AddressBook subdomain
@@ -343,109 +396,11 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 
 #### 🔜 Planned
 
-**Next Priority (Cycle 13): Customer Identity BC - EF Core Migration**
-
-**Objective**: Refactor Customer Identity BC from Marten document store to Entity Framework Core to demonstrate relational modeling and EF Core + Wolverine integration
-
-**Vision: Traditional DDD + EF Core as Pedagogical Bridge**
-
-Customer Identity BC serves as an **intentional showcase** for traditional DDD patterns with relational persistence, making it the ideal **entry point** for developers new to CritterSupply:
-
-- **Onboarding Path**: "Start with CI BC to learn Wolverine + EF Core (familiar territory) → Move to event-sourced BCs (new concepts)"
-- **Familiar Patterns**: Traditional aggregate roots, navigation properties, foreign keys, migrations
-- **Pure DDD Concepts**: Aggregates, entities, value objects, invariants, transactional consistency boundaries
-- **Wolverine Showcase**: Demonstrate Wolverine works with *existing* PostgreSQL/SQL Server + EF Core setups (not just Marten)
-- **Contrast & Compare**: CI uses relational model; Payments/Orders/Inventory use event sourcing (learn when to use each)
-
-**Why This Matters:**
-- Many teams have existing EF Core codebases - CI BC proves "you can start using Wolverine today"
-- Lower barrier to entry than diving straight into event sourcing
-- Side-by-side comparison teaches *when* to use relational vs event-sourced models
-- Traditional DDD patterns are well-understood; event sourcing patterns can be learned incrementally
-
-**Potential Future Enhancement:**
-Consider documenting CI BC as "DDD Reference Implementation" with explicit callouts to DDD patterns in code comments, making it a learning resource for both Wolverine *and* DDD concepts.
-
-**Why Now:**
-- Customer Identity is perfect relational use case (Customer → Addresses with foreign keys)
-- Demonstrates when to use EF Core vs Marten in same system
-- EF Core is dominant .NET ORM (important to showcase Wolverine integration)
-- Existing tests validate behavior is preserved during migration
-- Small BC scope makes migration manageable (7 integration tests, 5 unit tests)
-
-**Key Deliverables:**
-- `Customer` aggregate root with navigation properties to `CustomerAddress` entities
-- `CustomerIdentityDbContext` with EF Core configuration (fluent API)
-- EF Core migrations for schema evolution
-- Refactor handlers to use `DbContext` instead of `IDocumentSession`
-- Preserve all existing functionality (add/update/delete addresses, address verification)
-- Update integration tests to use EF Core TestContainers
-- Update unit tests (no changes needed - pure functions remain pure)
-
-**Migration Scope:**
-- ✅ AddressBook subdomain (all existing functionality)
-- ✅ Address verification service integration (no changes needed)
-- ⚠️ Customer Profile subdomain (future - not yet implemented)
-- ⚠️ Payment Methods subdomain (future - not yet implemented)
-
-**Technical Details:**
-- **Database**: Continue using Postgres (EF Core Npgsql provider)
-- **Relationships**: One-to-many (Customer → Addresses) with cascade delete
-- **Indexes**: Unique constraint on (CustomerId, Nickname), unique index on Customer.Email
-- **Migrations**: Use EF Core migrations for schema changes
-- **Wolverine Integration**: Inject `CustomerIdentityDbContext` into handlers (same pattern as `IDocumentSession`)
-
-**Testing Strategy:**
-- All 7 existing integration tests must pass (behavior unchanged)
-- Alba + TestContainers still used (EF Core works seamlessly)
-- Unit tests for address verification remain unchanged
-- Add new test: Verify foreign key constraints work correctly
-- Add new test: Verify cascade delete removes addresses when customer deleted
-
-**Why EF Core for Customer Identity:**
-1. **Relational Model Fits Naturally** - Customer/Address is classic relational use case
-2. **Navigation Properties** - `Customer.Addresses` collection simplifies queries
-3. **Foreign Keys** - Enforces referential integrity at database level
-4. **Migrations** - Schema evolution with versioned migrations
-5. **Industry Standard** - Most .NET developers familiar with EF Core patterns
-
-**Why NOT Marten for Customer Identity:**
-- Document store doesn't add value (no flexible schema needed)
-- No event sourcing needed (current state is all that matters)
-- Relational queries more natural (join customer with addresses)
-
-**Implementation Notes:**
-- See CONTEXTS.md "Customer Identity" section for EF Core relational model specification
-- See CLAUDE.md "Entity Framework Core + Wolverine" section for integration patterns
-- Preserve immutability patterns (`private set`, `record` where applicable)
-- Keep command/handler colocation pattern
-- Keep FluentValidation for command validation
-- Wolverine still handles command execution and HTTP endpoints
-
-**Migration Steps (Documented for Implementation):**
-1. Add EF Core packages (Microsoft.EntityFrameworkCore, Npgsql.EntityFrameworkCore.PostgreSQL)
-2. Create `CustomerIdentityDbContext` with `Customer` and `CustomerAddress` entities
-3. Configure relationships and constraints in `OnModelCreating`
-4. Create initial migration (`Add-Migration InitialCreate`)
-5. Refactor handlers to use `DbContext` instead of `IDocumentSession`
-6. Update `Program.cs` to configure EF Core instead of Marten for this BC
-7. Run integration tests (should pass with no changes)
-8. Update seed data to use EF Core
-9. Verify all endpoints work via manual testing
-
-**Dependencies:**
-- None - self-contained refactoring
-
-**Post-Migration:**
-- Customer Identity demonstrates EF Core + Wolverine
-- Product Catalog (next cycle) demonstrates Marten document store
-- System now showcases both persistence strategies
+*Ready for next cycle - Cycle 13 complete*
 
 ---
 
-**Second Priority (Cycle 14): Product Catalog BC (Phase 1 - Core CRUD)**
-
-**Note**: Product Catalog was previously planned as Cycle 13, but Customer Identity EF Core migration takes priority to showcase EF Core + Wolverine integration before building new BCs.
+**Next Priority (Cycle 14): Product Catalog BC (Phase 1 - Core CRUD)**
 
 **Objective**: Build product catalog with CRUD operations and query endpoints for Customer Experience BC integration
 
