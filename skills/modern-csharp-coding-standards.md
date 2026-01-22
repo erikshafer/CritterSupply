@@ -1,421 +1,432 @@
----
-name: modern-csharp-coding-standards
-description: Write modern C# code using records, pattern matching, value objects, async/await, and best-practice API design patterns. Emphasizes functional-style programming with C# 14+ features.
----
-
 # Modern C# Coding Standards
 
-## When to Use This Skill
-
-Use this skill when:
-- Writing new C# code or refactoring existing code
-- Designing public APIs for libraries or services
-- Implementing domain models, entities, value objects, and similar models
-- Building async/await-heavy applications
-- Optimizing performance-critical code paths
+C# language features, code style, and best practices for CritterSupply.
 
 ## Core Principles
 
-1. **Immutability by Default** - Use `record` types and `init`-only properties
-2. **Type Safety** - Leverage nullable reference types and value objects
-3. **Modern Pattern Matching** - Use `switch` expressions and patterns extensively
-4. **Async Everywhere** - Prefer async APIs with proper cancellation support
-5. **API Design** - Accept abstractions, return appropriately specific types
-6. **Composition Over Inheritance** - Avoid abstract base classes, prefer composition
+1. **Immutability by default** — Use records, readonly collections, `with` expressions
+2. **Sealed by default** — Prevent unintended inheritance
+3. **Value objects for domain concepts** — Wrap primitives with validation
+4. **Pure functions where possible** — Separate decisions from side effects
 
----
+## Records and Immutability
 
-## Best Practices Summary
-
-### DO's ✅
-- Use `record` for events, messages, domain entities, and value objects
-- Prefer composition over inheritance
-- Avoid abstract base classes in application code
-- Use `sealed` by default with records and classes unless inheritance is required
-- Leverage pattern matching with `switch` expressions
-- Enable and respect nullable reference types
-- Use async/await for all I/O operations
-- Accept `CancellationToken` in all async methods
-- Use `Span<T>` and `Memory<T>` for high-performance scenarios
-- Accept abstractions (`IEnumerable<T>`, `IReadOnlyList<T>`)
-- Return appropriate interfaces or concrete types
-- Use `ConfigureAwait(false)` in library code
-- Pool buffers with `ArrayPool<T>` for large allocations
-
-### DON'Ts ❌
-- Don't use mutable classes when records work
-- Don't use classes for value objects
-- Don't create deep inheritance hierarchies
-- Don't ignore nullable reference type warnings
-- Don't block on async code (`.Result`, `.Wait()`)
-- Don't use `byte[]` when `Span<byte>` suffices
-- Don't forget `CancellationToken` parameters
-- Don't return mutable collections from APIs
-- Don't throw exceptions for expected business errors
-- Don't use `string` concatenation in loops
-- Don't allocate large arrays repeatedly (use `ArrayPool`)
-
----
-
-## Additional Resources
-
-- **C# Language Specification**: https://learn.microsoft.com/en-us/dotnet/csharp/
-- **Pattern Matching**: https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/functional/pattern-matching
-- **Async Best Practices**: https://learn.microsoft.com/en-us/archive/msdn-magazine/2013/march/async-await-best-practices-in-asynchronous-programming
-- **.NET Performance Tips**: https://learn.microsoft.com/en-us/dotnet/framework/performance/
-
----
-
-## Language Patterns
-
-### Records for Immutable Data (C# 9+)
-
-Use `record` types for messages, events, domain entities, and DTOs.
+Use records for commands, queries, events, DTOs, and value objects:
 
 ```csharp
-// A simple record. In this case, it's a command. No validation or behavior. That is handled by FluentValidation or similar library.
-public sealed record BeginOrder(
-    Guid OrderId,
-    Guid CustomerId,
-    DateTimeOffset StartedAt);
+// Commands
+public sealed record ProcessPayment(Guid PaymentId, decimal Amount);
 
-// Record with validation in constructor. Useful when FluentValidation (library) is not in place or an option.
-public sealed record EmailAddress
-{
-    public string Value { get; init; }
+// Events
+public sealed record PaymentProcessed(Guid PaymentId, DateTimeOffset ProcessedAt);
 
-    public EmailAddress(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value) || !value.Contains('@'))
-            throw new ArgumentException("Invalid email address", nameof(value));
+// Value objects
+public sealed record Money(decimal Amount, string Currency);
 
-        Value = value;
-    }
-}
-
-// Record representing a value object symbolozing a product item with price. Includes factory methods with validation.
-public sealed record PricedProductItem
-{
-    public Guid ProductId => ProductItem.ProductId;
-
-    public int Quantity => ProductItem.Quantity;
-
-    public decimal UnitPrice { get; }
-
-    public decimal TotalPrice => Quantity * UnitPrice;
-    public ProductItem ProductItem { get; }
-
-    private PricedProductItem(ProductItem productItem, decimal unitPrice)
-    {
-        ProductItem = productItem;
-        UnitPrice = unitPrice;
-    }
-
-    public static PricedProductItem Create(Guid? productId, int? quantity, decimal? unitPrice) =>
-        Create(
-            ProductItem.From(productId, quantity),
-            unitPrice
-        );
-
-    public static PricedProductItem Create(ProductItem productItem, decimal? unitPrice) =>
-        unitPrice switch
-        {
-            null => throw new ArgumentNullException(nameof(unitPrice)),
-            <= 0 => throw new ArgumentOutOfRangeException(nameof(unitPrice),
-                "Unit price has to be positive number"),
-            _ => new PricedProductItem(productItem, unitPrice.Value)
-        };
-        
-    // Other methods such as MatchesProductAndPrice, HasTheSameQuantity, SubtractQuantity removed for brevity.
-}
-
-// Record with computed properties
-public sealed record Order(
-    Guid Id,
-    decimal Subtotal,
-    decimal Tax)
-{
-    public decimal Total => Subtotal + Tax;
-}
-
-// Records with collections - use IReadOnlyList
-public sealed record ShoppingCart(
-    Guid CartId,
-    Guid CustomerId,
-    IReadOnlyList<CartItem> Items)
-{
-    public decimal Total => Items.Sum(item => item.Price * item.Quantity);
-}
-
-// Simple domain event
-public sealed record CartInitialized(
-    Guid CartId,
-    Guid CustomerId,
-    DateTimeOffset InitializedAt);
-
-// Simple message used for integration events
-public sealed record CartFinalized(
-    Guid CartId,
-    Guid ClientId,
-    IReadOnlyList<PricedProductItem> ProductItems,
-    decimal TotalPrice,
-    DateTime FinalizedAt
-)
-
-// Simple immutable DTO
-public sealed record CustomerDto(
-    string Id,
-    string Name,
-    string Email);
+// DTOs / View models
+public sealed record PaymentView(Guid Id, decimal Amount, PaymentStatus Status);
 ```
 
----
-
-### Pattern Matching (C# 8-14)
-
-Leverage modern pattern matching for cleaner, more expressive code.
+Use `with` expressions for immutable updates:
 
 ```csharp
-// Switch expressions with value objects
-public string GetPaymentMethodDescription(PaymentMethod payment) => payment switch
+public sealed record Payment(Guid Id, PaymentStatus Status, DateTimeOffset? ProcessedAt)
 {
-    { Type: PaymentType.CreditCard, Last4: var last4 } => $"Credit card ending in {last4}",
-    { Type: PaymentType.BankTransfer, AccountNumber: var account } => $"Bank transfer from {account}",
-    { Type: PaymentType.Cash } => "Cash payment",
-    _ => "Unknown payment method"
-};
+    public Payment MarkAsProcessed() =>
+        this with
+        {
+            Status = PaymentStatus.Processed,
+            ProcessedAt = DateTimeOffset.UtcNow
+        };
+}
+```
+
+## Sealed by Default
+
+All commands, queries, events, and models should be `sealed`:
+
+```csharp
+// GOOD
+public sealed record GetCustomerAddress(Guid CustomerId);
+public sealed record CustomerShippingAddress(Guid Id, string AddressLine1, /* ... */);
+
+// BAD — allows unintended inheritance
+public record GetCustomerAddress(Guid CustomerId);
+```
+
+## Collection Patterns
+
+**Always prefer immutable collections:**
+
+```csharp
+// GOOD — Immutable
+public sealed record Product(
+    string Sku,
+    string Name,
+    IReadOnlyList<ProductImage> Images,
+    IReadOnlyList<string> Tags);
+
+// BAD — Mutable
+public sealed record Product(
+    string Sku,
+    string Name,
+    List<ProductImage> Images,  // Can be modified externally
+    List<string> Tags);
+```
+
+**Prefer:**
+- `IReadOnlyList<T>` for ordered collections
+- `IReadOnlyCollection<T>` for unordered collections
+- `IReadOnlyDictionary<TKey, TValue>` for key-value pairs
+
+**Creating immutable collections:**
+
+```csharp
+// From array
+var images = imageArray.ToList().AsReadOnly();
+
+// Empty collection (C# 12+)
+var tags = new List<string>().AsReadOnly();
+// Or using collection expressions
+IReadOnlyList<string> tags = [];
+```
+
+## Value Object Pattern
+
+Use value objects to wrap primitives with domain-specific validation. All value objects follow a standard pattern:
+
+1. **Sealed record** with `Value` property
+2. **Factory method** (`From(string)`) with validation
+3. **Private parameterless constructor** for Marten/JSON
+4. **Implicit string operator** for seamless queries
+5. **JSON converter** for transparent serialization
+
+### Example: Sku (uppercase, alphanumeric + hyphens, max 24 chars)
+
+```csharp
+[JsonConverter(typeof(SkuJsonConverter))]
+public sealed record Sku
+{
+    private const int MaxLength = 24;
+    private static readonly Regex ValidPattern = new(@"^[A-Z0-9\-]+$", RegexOptions.Compiled);
+
+    public string Value { get; init; } = null!;
+    private Sku() { }
+
+    public static Sku From(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException("SKU cannot be empty", nameof(value));
+        if (value.Length > MaxLength)
+            throw new ArgumentException($"SKU cannot exceed {MaxLength} characters", nameof(value));
+        if (!ValidPattern.IsMatch(value))
+            throw new ArgumentException("SKU must be uppercase letters, numbers, and hyphens only", nameof(value));
+
+        return new Sku { Value = value };
+    }
+
+    public static implicit operator string(Sku sku) => sku.Value;
+    public override string ToString() => Value;
+}
+
+public sealed class SkuJsonConverter : JsonConverter<Sku>
+{
+    public override Sku Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() is { } value ? Sku.From(value) : throw new JsonException("SKU cannot be null");
+
+    public override void Write(Utf8JsonWriter writer, Sku value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value.Value);
+}
+```
+
+### Example: ProductName (mixed case, special chars allowed, max 100 chars)
+
+```csharp
+[JsonConverter(typeof(ProductNameJsonConverter))]
+public sealed record ProductName
+{
+    private const int MaxLength = 100;
+    private static readonly Regex ValidPattern = new(@"^[A-Za-z0-9\s.,!&()\-]+$", RegexOptions.Compiled);
+
+    public string Value { get; init; } = null!;
+    private ProductName() { }
+
+    public static ProductName From(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException("Product name cannot be empty", nameof(value));
+
+        var trimmed = value.Trim();
+        if (trimmed.Length > MaxLength)
+            throw new ArgumentException($"Product name cannot exceed {MaxLength} characters", nameof(value));
+        if (!ValidPattern.IsMatch(trimmed))
+            throw new ArgumentException("Invalid characters in product name", nameof(value));
+
+        return new ProductName { Value = trimmed };
+    }
+
+    public static implicit operator string(ProductName name) => name.Value;
+    public override string ToString() => Value;
+}
+
+public sealed class ProductNameJsonConverter : JsonConverter<ProductName>
+{
+    public override ProductName Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.GetString() is { } value ? ProductName.From(value) : throw new JsonException("Name cannot be null");
+
+    public override void Write(Utf8JsonWriter writer, ProductName value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value.Value);
+}
+```
+
+### Usage in Domain Models
+
+```csharp
+public sealed record Product
+{
+    public Sku Sku { get; init; } = null!;
+    public ProductName Name { get; init; } = null!;
+    public CategoryName Category { get; init; } = null!;
+    // ...
+
+    private Product() { }
+
+    public static Product Create(string sku, string name, string category)
+    {
+        return new Product
+        {
+            Sku = Sku.From(sku),              // Validates constraints
+            Name = ProductName.From(name),
+            Category = CategoryName.From(category),
+            AddedAt = DateTimeOffset.UtcNow
+        };
+    }
+}
+```
+
+### Usage in Marten Configuration
+
+```csharp
+opts.Schema.For<Product>()
+    .Identity(x => x.Sku)  // Implicit conversion to string
+    .SoftDeleted();
+```
+
+### Usage in HTTP Commands
+
+```csharp
+public sealed record AddProduct(string Sku, string Name, string Category);
+
+public static class AddProductHandler
+{
+    [WolverinePost("/api/products")]
+    public static async Task<CreationResponse> Handle(
+        AddProduct command,
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        var product = Product.Create(command.Sku, command.Name, command.Category);
+        session.Store(product);
+        await session.SaveChangesAsync(ct);
+        return new CreationResponse($"/api/products/{command.Sku}");
+    }
+}
+```
+
+### JSON Serialization
+
+Value objects serialize as plain strings (not wrapped objects):
+
+```json
+// HTTP Request
+{ "sku": "DOG-BOWL-001", "name": "Premium Dog Bowl" }
+
+// Marten Document
+{ "sku": "DOG-BOWL-001", "name": "Premium Dog Bowl", "status": "Active" }
+```
+
+### When to Use
+
+**Use value objects for:**
+- Identity values with constraints (Sku, OrderId, CustomerId)
+- Domain concepts with rules (ProductName, EmailAddress)
+- Values requiring validation (Money, Percentage)
+
+**Don't use for:**
+- Strings with no constraints (descriptions, free-text)
+- Primitives with no business rules (counts, flags)
+
+## FluentValidation
+
+Use FluentValidation for command/query validation, nested inside the command:
+
+```csharp
+public sealed record AddProduct(string Sku, string Name, string Description)
+{
+    public class AddProductValidator : AbstractValidator<AddProduct>
+    {
+        public AddProductValidator()
+        {
+            RuleFor(x => x.Sku).NotEmpty().MaximumLength(24);
+            RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
+            RuleFor(x => x.Description).MaximumLength(2000);
+        }
+    }
+}
+```
+
+> **Reference:** [FluentValidation Documentation](https://docs.fluentvalidation.net/)
+
+## Status Enums
+
+Use enums for aggregate lifecycle state instead of booleans:
+
+```csharp
+// GOOD
+public enum PaymentStatus
+{
+    Pending,
+    Authorized,
+    Captured,
+    Failed,
+    Refunded
+}
+
+public sealed record Payment(Guid Id, PaymentStatus Status)
+{
+    public bool IsTerminal => Status is PaymentStatus.Captured or PaymentStatus.Failed or PaymentStatus.Refunded;
+}
+
+// BAD — multiple booleans create ambiguity
+public sealed record Payment(Guid Id, bool IsAuthorized, bool IsCaptured, bool IsFailed);
+```
+
+## Factory Methods
+
+Use static factory methods for object creation:
+
+```csharp
+public sealed record Customer
+{
+    public Guid Id { get; init; }
+    public string Email { get; init; } = null!;
+    public DateTimeOffset CreatedAt { get; init; }
+
+    private Customer() { }  // Private constructor
+
+    public static Customer Create(string email)
+    {
+        return new Customer
+        {
+            Id = Guid.CreateVersion7(),
+            Email = email,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+    }
+}
+```
+
+## Nullable Reference Types
+
+Enable nullable reference types and be explicit about nullability:
+
+```csharp
+// Explicit nullable
+public sealed record CustomerAddress(
+    string AddressLine1,
+    string? AddressLine2,  // Explicitly nullable
+    string City,
+    string Postcode);
+
+// In handlers
+public static ProblemDetails Before(GetCustomer query, Customer? customer)
+{
+    if (customer is null)
+        return new ProblemDetails { Detail = "Not found", Status = 404 };
+
+    return WolverineContinue.NoProblems;
+}
+```
+
+## Pattern Matching
+
+Use modern pattern matching:
+
+```csharp
+// Type patterns
+if (result is SuccessResult success)
+{
+    // Use success
+}
 
 // Property patterns
-public decimal CalculateDiscount(Order order) => order switch
+if (payment is { Status: PaymentStatus.Pending, Amount: > 0 })
 {
-    { Total: > 1000m } => order.Total * 0.15m,
-    { Total: > 500m } => order.Total * 0.10m,
-    { Total: > 100m } => order.Total * 0.05m,
-    _ => 0m
-};
+    // Process payment
+}
 
-// Relational and logical patterns
-public string ClassifyTemperature(int temp) => temp switch
+// Switch expressions
+var message = status switch
 {
-    < 0 => "Freezing",
-    >= 0 and < 10 => "Cold",
-    >= 10 and < 20 => "Cool",
-    >= 20 and < 30 => "Warm",
-    >= 30 => "Hot",
-    _ => throw new ArgumentOutOfRangeException(nameof(temp))
-};
-
-// List patterns (C# 11+)
-public bool IsValidSequence(int[] numbers) => numbers switch
-{
-    [] => false,                                      // Empty
-    [_] => true,                                      // Single element
-    [var first, .., var last] when first < last => true,  // First < last
-    _ => false
-};
-
-// Type patterns with null checks
-public string FormatValue(object? value) => value switch
-{
-    null => "null",
-    string s => $"\"{s}\"",
-    int i => i.ToString(),
-    double d => d.ToString("F2"),
-    DateTime dt => dt.ToString("yyyy-MM-dd"),
-    Money m => m.ToString(),
-    IEnumerable<object> collection => $"[{string.Join(", ", collection)}]",
-    _ => value.ToString() ?? "unknown"
-};
-
-// Combining patterns for complex logic
-public record OrderState(bool IsPaid, bool IsShipped, bool IsCancelled);
-
-public string GetOrderStatus(OrderState state) => state switch
-{
-    { IsCancelled: true } => "Cancelled",
-    { IsPaid: true, IsShipped: true } => "Delivered",
-    { IsPaid: true, IsShipped: false } => "Processing",
-    { IsPaid: false } => "Awaiting Payment",
-    _ => "Unknown"
-};
-
-// Pattern matching with value objects
-public decimal CalculateShipping(Money total, Country destination) => (total, destination) switch
-{
-    ({ Amount: > 100m }, _) => 0m,                    // Free shipping over $100
-    (_, { Code: "US" or "CA" }) => 5m,                // North America
-    (_, { Code: "GB" or "FR" or "DE" }) => 10m,       // Europe
-    _ => 25m                                           // International
+    PaymentStatus.Pending => "Awaiting processing",
+    PaymentStatus.Authorized => "Payment authorized",
+    PaymentStatus.Captured => "Payment complete",
+    PaymentStatus.Failed => "Payment failed",
+    _ => "Unknown status"
 };
 ```
 
----
+## Async/Await
 
-### Nullable Reference Types (C# 8+)
-
-Enable nullable reference types in your project and handle nulls explicitly.
+Follow async best practices:
 
 ```csharp
-// In .csproj
-<PropertyGroup>
-    <Nullable>enable</Nullable>
-</PropertyGroup>
-
-// Explicit nullability
-public class UserService
+// GOOD — async all the way, with cancellation
+public static async Task<Payment?> Handle(
+    GetPayment query,
+    IDocumentSession session,
+    CancellationToken ct)
 {
-    // Non-nullable by default
-    public string GetUserName(User user) => user.Name;
-
-    // Explicitly nullable return
-    public string? FindUserName(string userId)
-    {
-        var user = _repository.Find(userId);
-        return user?.Name;  // Returns null if user not found
-    }
-
-    // Null-forgiving operator (use sparingly!)
-    public string GetRequiredConfigValue(string key)
-    {
-        var value = Configuration[key];
-        return value!;  // Only if you're CERTAIN it's not null
-    }
-
-    // Nullable value objects
-    public Money? GetAccountBalance(string accountId)
-    {
-        var account = _repository.Find(accountId);
-        return account?.Balance;
-    }
+    return await session.LoadAsync<Payment>(query.PaymentId, ct);
 }
 
-// Pattern matching with null checks
-public decimal GetDiscount(Customer? customer) => customer switch
-{
-    null => 0m,
-    { IsVip: true } => 0.20m,
-    { OrderCount: > 10 } => 0.10m,
-    _ => 0.05m
-};
+// GOOD — return Task directly when no await needed
+public static Task<Payment?> Handle(GetPayment query, IDocumentSession session, CancellationToken ct)
+    => session.LoadAsync<Payment>(query.PaymentId, ct);
 
-// Null-coalescing patterns
-public string GetDisplayName(User? user) =>
-    user?.PreferredName ?? user?.Email ?? "Guest";
-
-// Guard clauses with ArgumentNullException.ThrowIfNull (C# 11+)
-public void ProcessOrder(Order? order)
-{
-    ArgumentNullException.ThrowIfNull(order);
-
-    // order is now non-nullable in this scope
-    Console.WriteLine(order.Id);
-}
+// BAD — blocking on async
+public static Payment? Handle(GetPayment query, IDocumentSession session)
+    => session.LoadAsync<Payment>(query.PaymentId).Result;  // Deadlock risk!
 ```
 
----
+## GUIDs
 
-## Composition Over Inheritance
-
-**Avoid abstract base classes and inheritance hierarchies.** Use composition and interfaces instead.
+Use `Guid.CreateVersion7()` for new identifiers (time-ordered, better for database indexing):
 
 ```csharp
-// ❌ BAD: Abstract base class hierarchy
-public abstract class PaymentProcessor
-{
-    public abstract Task<PaymentResult> ProcessAsync(Money amount);
-
-    protected async Task<bool> ValidateAsync(Money amount)
-    {
-        // Shared validation logic
-        return amount.Amount > 0;
-    }
-}
-
-public class CreditCardProcessor : PaymentProcessor
-{
-    public override async Task<PaymentResult> ProcessAsync(Money amount)
-    {
-        await ValidateAsync(amount);
-        // Process credit card...
-    }
-}
-
-// ✅ GOOD: Composition with interfaces
-public interface IPaymentProcessor
-{
-    Task<PaymentResult> ProcessAsync(Money amount, CancellationToken cancellationToken);
-}
-
-public interface IPaymentValidator
-{
-    Task<ValidationResult> ValidateAsync(Money amount, CancellationToken cancellationToken);
-}
-
-// Concrete implementations compose validators
-public sealed class CreditCardProcessor : IPaymentProcessor
-{
-    private readonly IPaymentValidator _validator;
-    private readonly ICreditCardGateway _gateway;
-
-    public CreditCardProcessor(IPaymentValidator validator, ICreditCardGateway gateway)
-    {
-        _validator = validator;
-        _gateway = gateway;
-    }
-
-    public async Task<PaymentResult> ProcessAsync(Money amount, CancellationToken cancellationToken)
-    {
-        var validation = await _validator.ValidateAsync(amount, cancellationToken);
-        if (!validation.IsValid)
-            return PaymentResult.Failed(validation.Error);
-
-        return await _gateway.ChargeAsync(amount, cancellationToken);
-    }
-}
-
-// ✅ GOOD: Static helper classes for shared logic (no inheritance)
-public static class PaymentValidation
-{
-    public static ValidationResult ValidateAmount(Money amount)
-    {
-        if (amount.Amount <= 0)
-            return ValidationResult.Invalid("Amount must be positive");
-
-        if (amount.Amount > 10000m)
-            return ValidationResult.Invalid("Amount exceeds maximum");
-
-        return ValidationResult.Valid();
-    }
-}
-
-// ✅ GOOD: Records for modeling variants (not inheritance)
-public enum PaymentType { CreditCard, BankTransfer, Cash }
-
-public record PaymentMethod
-{
-    public PaymentType Type { get; init; }
-    public string? Last4 { get; init; }           // For credit cards
-    public string? AccountNumber { get; init; }    // For bank transfers
-
-    public static PaymentMethod CreditCard(string last4) => new()
-    {
-        Type = PaymentType.CreditCard,
-        Last4 = last4
-    };
-
-    public static PaymentMethod BankTransfer(string accountNumber) => new()
-    {
-        Type = PaymentType.BankTransfer,
-        AccountNumber = accountNumber
-    };
-
-    public static PaymentMethod Cash() => new() { Type = PaymentType.Cash };
-}
+var paymentId = Guid.CreateVersion7();
+var orderId = Guid.CreateVersion7();
 ```
 
-**When inheritance is acceptable:**
-- Framework requirements (e.g., `ControllerBase` in ASP.NET Core)
-- Library integration (e.g., custom exceptions inheriting from `Exception`)
-- **These should be rare cases in your application code**
+## DateTimeOffset
 
----
+Always use `DateTimeOffset` instead of `DateTime` for timestamps:
+
+```csharp
+// GOOD — includes timezone information
+public DateTimeOffset CreatedAt { get; init; }
+public DateTimeOffset? ProcessedAt { get; init; }
+
+// Use UTC
+var now = DateTimeOffset.UtcNow;
+```
+
+## Naming Conventions
+
+| Type | Convention | Example |
+|------|------------|---------|
+| Commands | Verb + Noun | `ProcessPayment`, `AddItemToCart` |
+| Queries | Get + Noun | `GetPaymentById`, `GetCartSummary` |
+| Events | Noun + Past Verb | `PaymentProcessed`, `ItemAdded` |
+| Handlers | Command/Query + Handler | `ProcessPaymentHandler` |
+| Validators | Command/Query + Validator | `ProcessPaymentValidator` |

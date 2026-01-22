@@ -13,6 +13,13 @@
     <File Path="skills/critterstack-testing-patterns.md" />
     <File Path="skills/modern-csharp-coding-standards.md" />
     <File Path="skills/testcontainers-integration-tests.md" />
+    <File Path="skills\bff-signalr-patterns.md" />
+    <File Path="skills\efcore-wolverine-integration.md" />
+    <File Path="skills\external-service-integration.md" />
+    <File Path="skills\marten-document-store.md" />
+    <File Path="skills\marten-event-sourcing.md" />
+    <File Path="skills\vertical-slice-organization.md" />
+    <File Path="skills\wolverine-message-handlers.md" />
   </Folder>
   <Folder Name="/Order Management/">
     <Project Path="src/Order Management/Orders.Api/Orders.Api.csproj" />
