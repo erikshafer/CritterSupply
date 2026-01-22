@@ -232,16 +232,101 @@ tests/
     Orders.UnitTests/
 ```
 
-## When to Split Projects
+## Project Naming Conventions
+
+### Single Project Pattern
+
+When domain and API are combined in one project:
+
+```
+src/
+  <BC Name>/
+    <ProjectName>/              # SDK: Microsoft.NET.Sdk.Web
+      <ProjectName>.csproj
+      Program.cs                # Hosting + Wolverine + Marten config
+      Features/                 # Handlers (commands, queries)
+      Domain/                   # Aggregates, value objects
+
+tests/
+  <BC Name>/
+    <ProjectName>.IntegrationTests/
+      <ProjectName>.IntegrationTests.csproj
+```
+
+**Example:** Customer Identity BC
+- `src/Customer Identity/Customers/Customers.csproj`
+- `tests/Customer Identity/Customers.IntegrationTests/`
+
+### Split Project Pattern
+
+When domain and API are separated:
+
+```
+src/
+  <BC Name>/
+    <ProjectName>/              # SDK: Microsoft.NET.Sdk (class library)
+      <ProjectName>.csproj
+      Features/                 # Handlers (domain logic only)
+      Domain/                   # Aggregates, value objects
+    <ProjectName>.Api/          # SDK: Microsoft.NET.Sdk.Web
+      <ProjectName>.Api.csproj
+      Program.cs                # Hosting + Wolverine + Marten config
+      Features/                 # HTTP endpoint handlers
+
+tests/
+  <BC Name>/
+    <ProjectName>.Api.IntegrationTests/  # NOTE: Named after API project!
+      <ProjectName>.Api.IntegrationTests.csproj
+```
+
+**Example:** Order Management BC
+- Domain: `src/Order Management/Orders/Orders.csproj`
+- API: `src/Order Management/Orders.Api/Orders.Api.csproj`
+- Tests: `tests/Order Management/Orders.Api.IntegrationTests/`
+
+**Example:** Product Catalog BC
+- Domain: `src/Product Catalog/ProductCatalog/ProductCatalog.csproj`
+- API: `src/Product Catalog/ProductCatalog.Api/ProductCatalog.Api.csproj`
+- Tests: `tests/Product Catalog/ProductCatalog.Api.IntegrationTests/`
+
+### Key Naming Rules
+
+1. **Domain project name** = Base name (e.g., `Orders`, `ProductCatalog`, `Payments`)
+2. **API project name** = Base name + `.Api` suffix (e.g., `Orders.Api`, `ProductCatalog.Api`)
+3. **Test project name** = API project name + `.IntegrationTests` suffix
+4. **IMPORTANT:** When split, tests reference the **API project**, not the domain project
+5. **Folder names** can have spaces (e.g., `Order Management/`), but project names should not
+
+### When to Split Projects
 
 **Single project (domain + API):**
 - Simple BCs with straightforward hosting
-- Most BCs in CritterSupply
+- No plans to share domain logic across multiple hosts
+- Small team or solo development
 
 **Separate projects (domain + API):**
-- Complex hosting requirements
-- Shared domain logic across multiple hosts
+- Complex hosting requirements (multiple entry points)
+- Shared domain logic across multiple hosts (API + background workers)
 - Clear separation needed for large teams
+- Most BCs in CritterSupply use this pattern
+
+### Common Mistake to Avoid
+
+❌ **Wrong:** Test project named after domain project when using split pattern
+```
+src/Order Management/Orders/
+src/Order Management/Orders.Api/
+tests/Order Management/Orders.IntegrationTests/  # WRONG!
+```
+
+✅ **Correct:** Test project named after API project
+```
+src/Order Management/Orders/
+src/Order Management/Orders.Api/
+tests/Order Management/Orders.Api.IntegrationTests/  # CORRECT
+```
+
+**Why?** Integration tests host the API project (which contains `Program.cs` and HTTP endpoints), not the domain project.
 
 ## Integration Messages Location
 

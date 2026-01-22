@@ -54,6 +54,11 @@
     <Project Path="src/Customer Identity/Customers/CustomerIdentity.csproj" />
     <Project Path="tests/Customer Identity/CustomerIdentity.Api.IntegrationTests/CustomerIdentity.Api.IntegrationTests.csproj" />
   </Folder>
+  <Folder Name="/Product Catalog/">
+    <Project Path="src/Product Catalog/ProductCatalog.Api/ProductCatalog.Api.csproj" />
+    <Project Path="src/Product Catalog/ProductCatalog/ProductCatalog.csproj" />
+    <Project Path="tests/Product Catalog/ProductCatalog.Api.IntegrationTests/ProductCatalog.Api.IntegrationTests.csproj" />
+  </Folder>
   <Folder Name="/Shared/">
     <Project Path="src/Shared/Messages.Contracts/Messages.Contracts.csproj" />
   </Folder>
