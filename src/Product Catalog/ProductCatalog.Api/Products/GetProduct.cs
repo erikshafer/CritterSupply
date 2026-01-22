@@ -10,6 +10,11 @@ public sealed record GetProduct(string Sku);
 
 public static class GetProductHandler
 {
+    public static Task<Product?> Load(string sku, IDocumentSession session, CancellationToken ct)
+    {
+        return session.LoadAsync<Product>(sku, ct);
+    }
+
     public static ProblemDetails Before(GetProduct query, Product? product)
     {
         if (product is null)

@@ -21,6 +21,11 @@ public sealed record ChangeProductStatus(string Sku, ProductStatus NewStatus)
 
 public static class ChangeProductStatusHandler
 {
+    public static Task<Product?> Load(string sku, IDocumentSession session, CancellationToken ct)
+    {
+        return session.LoadAsync<Product>(sku, ct);
+    }
+
     public static ProblemDetails Before(ChangeProductStatus command, Product? product)
     {
         if (product is null)

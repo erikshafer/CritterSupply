@@ -25,7 +25,7 @@ public sealed record Product
     public DateTimeOffset AddedAt { get; init; }
     public DateTimeOffset? UpdatedAt { get; init; }
 
-    private Product() { }
+    public Product() { }
 
     public static Product Create(
         string sku,

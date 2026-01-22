@@ -23,8 +23,20 @@ public sealed record UpdateProduct(
     {
         public UpdateProductValidator()
         {
-            RuleFor(x => x.Sku).NotEmpty().MaximumLength(24);
-            RuleFor(x => x.Name).MaximumLength(100).When(x => x.Name is not null);
+            // SKU validation - must match Sku value object rules
+            RuleFor(x => x.Sku)
+                .NotEmpty()
+                .MaximumLength(24)
+                .Matches(@"^[A-Z0-9\-]+$")
+                .WithMessage("SKU must contain only uppercase letters (A-Z), numbers (0-9), and hyphens (-)");
+
+            // Product name validation when provided - must match ProductName value object rules
+            RuleFor(x => x.Name)
+                .MaximumLength(100)
+                .Matches(@"^[A-Za-z0-9\s.,!&()\-]+$")
+                .WithMessage("Product name contains invalid characters. Allowed: letters, numbers, spaces, and . , ! & ( ) -")
+                .When(x => x.Name is not null);
+
             RuleFor(x => x.Description).MaximumLength(2000).When(x => x.Description is not null);
             RuleFor(x => x.Category).MaximumLength(50).When(x => x.Category is not null);
             RuleFor(x => x.LongDescription).MaximumLength(5000).When(x => x.LongDescription is not null);
@@ -36,6 +48,11 @@ public sealed record UpdateProduct(
 
 public static class UpdateProductHandler
 {
+    public static Task<Product?> Load(string sku, IDocumentSession session, CancellationToken ct)
+    {
+        return session.LoadAsync<Product>(sku, ct);
+    }
+
     public static ProblemDetails Before(UpdateProduct command, Product? product)
     {
         if (product is null)

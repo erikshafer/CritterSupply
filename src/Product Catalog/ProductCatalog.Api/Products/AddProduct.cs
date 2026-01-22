@@ -21,10 +21,30 @@ public sealed record AddProduct(
     {
         public AddProductValidator()
         {
-            RuleFor(x => x.Sku).NotEmpty().MaximumLength(24);
-            RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
-            RuleFor(x => x.Description).NotEmpty().MaximumLength(2000);
-            RuleFor(x => x.Category).NotEmpty().MaximumLength(50);
+            // SKU validation - must match Sku value object rules
+            RuleFor(x => x.Sku)
+                .NotEmpty()
+                .MaximumLength(24)
+                .Matches(@"^[A-Z0-9\-]+$")
+                .WithMessage("SKU must contain only uppercase letters (A-Z), numbers (0-9), and hyphens (-)");
+
+            // Product name validation - must match ProductName value object rules
+            RuleFor(x => x.Name)
+                .NotEmpty()
+                .MaximumLength(100)
+                .Matches(@"^[A-Za-z0-9\s.,!&()\-]+$")
+                .WithMessage("Product name contains invalid characters. Allowed: letters, numbers, spaces, and . , ! & ( ) -");
+
+            // Description validation
+            RuleFor(x => x.Description)
+                .NotEmpty()
+                .MaximumLength(2000);
+
+            // Category validation - must match CategoryName value object rules
+            RuleFor(x => x.Category)
+                .NotEmpty()
+                .MaximumLength(50);
+
             RuleFor(x => x.LongDescription).MaximumLength(5000).When(x => x.LongDescription is not null);
             RuleFor(x => x.Subcategory).MaximumLength(50).When(x => x.Subcategory is not null);
             RuleFor(x => x.Brand).MaximumLength(100).When(x => x.Brand is not null);

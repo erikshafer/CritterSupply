@@ -4,6 +4,7 @@ using ProductCatalog.Shared;
 using Wolverine;
 using Wolverine.FluentValidation;
 using Wolverine.Http;
+using Wolverine.Http.FluentValidation;
 using Wolverine.Marten;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -42,8 +43,11 @@ builder.Services.AddSingleton<IImageValidator, StubImageValidator>();
 
 var app = builder.Build();
 
-// Wolverine HTTP endpoints
-app.MapWolverineEndpoints();
+// Wolverine HTTP endpoints with FluentValidation middleware
+app.MapWolverineEndpoints(opts =>
+{
+    opts.UseFluentValidationProblemDetailMiddleware();
+});
 
 app.Run();
 
