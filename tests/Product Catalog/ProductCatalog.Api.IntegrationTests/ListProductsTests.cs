@@ -5,6 +5,7 @@ using Shouldly;
 
 namespace ProductCatalog.IntegrationTests;
 
+[Collection(IntegrationTestCollection.Name)]
 public sealed class ListProductsTests : IClassFixture<ProductCatalogFixture>
 {
     private readonly ProductCatalogFixture _fixture;

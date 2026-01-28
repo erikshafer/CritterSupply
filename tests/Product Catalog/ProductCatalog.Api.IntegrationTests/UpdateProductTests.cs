@@ -5,6 +5,7 @@ using Shouldly;
 
 namespace ProductCatalog.IntegrationTests;
 
+[Collection(IntegrationTestCollection.Name)]
 public sealed class UpdateProductTests : IClassFixture<ProductCatalogFixture>
 {
     private readonly ProductCatalogFixture _fixture;
@@ -26,7 +27,7 @@ public sealed class UpdateProductTests : IClassFixture<ProductCatalogFixture>
         await _fixture.Host.Scenario(s =>
         {
             s.Put.Json(command).ToUrl("/api/products/DOG-BOWL-001");
-            s.StatusCodeShouldBeOk();
+            s.StatusCodeShouldBe(204); // No Content for successful PUT
         });
 
         // Assert - Verify the change
@@ -53,7 +54,7 @@ public sealed class UpdateProductTests : IClassFixture<ProductCatalogFixture>
         await _fixture.Host.Scenario(s =>
         {
             s.Put.Json(command).ToUrl("/api/products/DOG-TOY-ROPE");
-            s.StatusCodeShouldBeOk();
+            s.StatusCodeShouldBe(204); // No Content for successful PUT
         });
 
         // Assert
@@ -78,7 +79,7 @@ public sealed class UpdateProductTests : IClassFixture<ProductCatalogFixture>
         await _fixture.Host.Scenario(s =>
         {
             s.Put.Json(command).ToUrl("/api/products/DOG-BOWL-001");
-            s.StatusCodeShouldBeOk();
+            s.StatusCodeShouldBe(204); // No Content for successful PUT
         });
 
         // Assert

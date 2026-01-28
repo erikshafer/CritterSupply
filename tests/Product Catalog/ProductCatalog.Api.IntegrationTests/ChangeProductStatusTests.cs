@@ -5,6 +5,7 @@ using Shouldly;
 
 namespace ProductCatalog.IntegrationTests;
 
+[Collection(IntegrationTestCollection.Name)]
 public sealed class ChangeProductStatusTests : IClassFixture<ProductCatalogFixture>
 {
     private readonly ProductCatalogFixture _fixture;
@@ -24,7 +25,7 @@ public sealed class ChangeProductStatusTests : IClassFixture<ProductCatalogFixtu
         await _fixture.Host.Scenario(s =>
         {
             s.Patch.Json(command).ToUrl("/api/products/DOG-BOWL-001/status");
-            s.StatusCodeShouldBeOk();
+            s.StatusCodeShouldBe(204); // No Content for successful PATCH
         });
 
         // Assert
@@ -49,7 +50,7 @@ public sealed class ChangeProductStatusTests : IClassFixture<ProductCatalogFixtu
         await _fixture.Host.Scenario(s =>
         {
             s.Patch.Json(command).ToUrl("/api/products/CAT-TREE-5FT/status");
-            s.StatusCodeShouldBeOk();
+            s.StatusCodeShouldBe(204); // No Content for successful PATCH
         });
 
         // Assert
@@ -72,7 +73,7 @@ public sealed class ChangeProductStatusTests : IClassFixture<ProductCatalogFixtu
         await _fixture.Host.Scenario(s =>
         {
             s.Patch.Json(command).ToUrl("/api/products/XMAS-PET-SWEATER/status");
-            s.StatusCodeShouldBeOk();
+            s.StatusCodeShouldBe(204); // No Content for successful PATCH
         });
 
         // Assert

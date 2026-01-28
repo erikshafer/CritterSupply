@@ -272,7 +272,7 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 
 **Cycle 14: Product Catalog BC (Phase 1 - Core CRUD) - IN PROGRESS**
 
-**Current Status:** Project structure complete, validation working, core handlers implemented, test infrastructure issues
+**Current Status:** Test infrastructure fixed, 19/24 tests passing, seed data adjustments needed
 
 **Completed Work:**
 - ✅ Project structure split (domain + API) following BC naming conventions
@@ -287,8 +287,8 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
   - `Sku` - Product identifier (uppercase A-Z, 0-9, hyphens, max 24 chars)
   - `ProductName` - Display name (mixed case, letters/numbers/spaces, special chars, max 100 chars)
   - `CategoryName` - Simple string wrapper (future: marketplace mapping subdomain)
-  - `ProductImage` - URL + alt text + sort order
-  - `ProductDimensions` - Length/width/height/weight
+  - `ProductImage` - URL + alt text + sort order (public constructor for JSON)
+  - `ProductDimensions` - Length/width/height/weight (public constructor for JSON)
 - ✅ Product document model with Marten configuration
   - Uses string `Id` property (derived from Sku) for Marten identity
   - Indexes on Sku, Category, Status for query performance
@@ -298,42 +298,54 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
   - POST `/api/products` - AddProduct (create new product)
   - GET `/api/products/{sku}` - GetProduct (retrieve by SKU)
   - GET `/api/products` - ListProducts (paginated, filterable by category/status)
-  - PUT `/api/products/{sku}` - UpdateProduct (update existing product)
-  - PATCH `/api/products/{sku}/status` - ChangeProductStatus (status transitions)
+  - PUT `/api/products/{sku}` - UpdateProduct (update existing product, returns 204)
+  - PATCH `/api/products/{sku}/status` - ChangeProductStatus (status transitions, returns 204)
 - ✅ FluentValidation properly configured
   - Added `using Wolverine.Http.FluentValidation` to Program.cs
   - Called `UseFluentValidationProblemDetailMiddleware()` on `MapWolverineEndpoints()`
   - Validators mirror value object constraints (SKU regex, name character rules)
   - Validation returns proper 400 errors (not 500s)
-- ✅ Compound handlers with `Load()` methods
-  - GetProduct, UpdateProduct, ChangeProductStatus all use `Load()` to fetch by string SKU
-  - `Before()` methods validate loaded product (null checks, terminal state checks)
-  - Clean separation: Load → Validate → Handle
+- ✅ Handler patterns refined
+  - GetProduct: Removed query object, uses direct `Load()` with SKU parameter
+  - UpdateProduct/ChangeProductStatus: Use `Load()` + `Before()` validation
+  - ListProducts: Direct method parameters (nullable) with defaults applied in handler body
+  - Marten value object queries use `.Value` property comparison (not direct value object comparison)
 
-**Known Issues:**
-- 🔍 Marten schema DDL errors when running full test suite in parallel
-  - Individual tests pass when run alone (e.g., `CanAddNewProduct`, validation tests)
-  - All 24 tests fail with schema creation errors when run together
-  - Likely test isolation/database cleanup issue between test runs
-  - Not application code issue - CRUD operations and validation work correctly
+**Test Infrastructure Fixes:**
+- ✅ Created `IntegrationTestCollection` with `[CollectionDefinition]` for sequential test execution
+- ✅ Added `[Collection(IntegrationTestCollection.Name)]` to all test classes
+- ✅ Updated `ProductCatalogFixture` to use `ConfigureMarten()` pattern (not environment variables)
+- ✅ Changed to PostgreSQL 18-alpine image with proper constructor syntax
+- ✅ Added `JasperFxEnvironment.AutoStartHost = true` for Alba compatibility
+- ✅ Created basic `SeedData` class for test products
 
 **Test Results:**
-- Individual test runs: ✅ Passing (validation, CRUD operations work)
-- Full test suite: ❌ 0/24 passing (DDL errors prevent test execution)
-- Core functionality verified working through individual test runs
+- **19/24 tests passing** ✅ (was 0/24)
+- Core CRUD operations working correctly
+- Validation working (400 errors)
+- Pagination working with defaults
+- 5 remaining failures due to seed data mismatches with test expectations:
+  - `CanFilterProductsByCategory` - expects products with matching category
+  - `CanFilterProductsByCategoryAndStatus` - expects filtered results
+  - `CanGetProductBySku` - expects different product name in seed data
+  - `GetProduct_ReturnsProductWithDimensions` - seed data missing dimensions
+  - `GetProduct_ReturnsProductWithImages` - seed data missing images
 
 **Next Steps:**
-- Investigate Marten test isolation issue (database cleanup between tests)
-- Likely needs proper TestContainers database lifecycle management
-- Once tests stabilized, add seed data with 20-30 realistic products
-- Verify all CRUD operations with full test suite passing
+- Update seed data to match test expectations (correct names, add dimensions, add images)
+- Verify all 24 tests pass
+- Add comprehensive seed data with 20-30 realistic products for demo purposes
+- Document final patterns and complete Cycle 14
 
 **Key Learnings:**
-- FluentValidation for HTTP requires `WolverineFx.Http.FluentValidation` package + `UseFluentValidationProblemDetailMiddleware()`
-- Validation rules must duplicate value object constraints in FluentValidation validators (return 400 not 500)
-- Compound handlers with `Load()` pattern work well for document store queries
-- Product record needs public constructor for System.Text.Json deserialization
-- Marten `Id` property can be string (no need for Guid when using SKU as natural key)
+- **xUnit Collection Fixtures**: Required for sequential test execution with Marten/TestContainers to avoid DDL concurrency errors
+- **ConfigureMarten()**: Preferred pattern over environment variables for test database configuration
+- **FluentValidation HTTP**: Requires `WolverineFx.Http.FluentValidation` + `UseFluentValidationProblemDetailMiddleware()` on `MapWolverineEndpoints()`
+- **Handler Query Objects**: When using `Load()` pattern, don't pass query objects - Wolverine can't construct them. Use direct parameters instead.
+- **Query Parameter Defaults**: Use nullable parameters with null-coalescing inside handler (defaults in signature don't work with query string binding)
+- **Marten Value Object Queries**: Must query on `.Value` property, not the value object directly (`p.Category.Value == category`)
+- **HTTP Status Codes**: Handlers returning `Task` (void) produce 204 No Content for PUT/PATCH operations
+- **JSON Deserialization**: All records used in collections need public parameterless constructors
 
 #### ✅ Recent Cycles
 

@@ -6,8 +6,6 @@ using Wolverine.Http;
 
 namespace ProductCatalog.Api.Products;
 
-public sealed record GetProduct(string Sku);
-
 public static class GetProductHandler
 {
     public static Task<Product?> Load(string sku, IDocumentSession session, CancellationToken ct)
@@ -15,7 +13,7 @@ public static class GetProductHandler
         return session.LoadAsync<Product>(sku, ct);
     }
 
-    public static ProblemDetails Before(GetProduct query, Product? product)
+    public static ProblemDetails Before(Product? product)
     {
         if (product is null)
             return new ProblemDetails { Detail = "Product not found", Status = 404 };
@@ -24,7 +22,7 @@ public static class GetProductHandler
     }
 
     [WolverineGet("/api/products/{sku}")]
-    public static Product Handle(GetProduct query, Product product)
+    public static Product Handle(Product product)
     {
         return product;
     }

@@ -60,6 +60,7 @@ public class ShipmentLifecycleTests : IAsyncLifetime
         // Assert 1: Verify assigned
         await using var session2 = _fixture.GetDocumentSession();
         var assignedShipment = await session2.LoadAsync<Shipment>(shipmentId);
+        assignedShipment.ShouldNotBeNull();
         assignedShipment.Status.ShouldBe(ShipmentStatus.Assigned);
         assignedShipment.WarehouseId.ShouldBe("WH-WEST");
         assignedShipment.AssignedAt.ShouldNotBeNull();
@@ -71,6 +72,7 @@ public class ShipmentLifecycleTests : IAsyncLifetime
         // Assert 2: Verify dispatched
         await using var session3 = _fixture.GetDocumentSession();
         var dispatchedShipment = await session3.LoadAsync<Shipment>(shipmentId);
+        dispatchedShipment.ShouldNotBeNull();
         dispatchedShipment.Status.ShouldBe(ShipmentStatus.Shipped);
         dispatchedShipment.Carrier.ShouldBe("FedEx");
         dispatchedShipment.TrackingNumber.ShouldBe("1Z999AA10123456784");
@@ -83,6 +85,7 @@ public class ShipmentLifecycleTests : IAsyncLifetime
         // Assert 3: Verify delivered
         await using var session4 = _fixture.GetDocumentSession();
         var deliveredShipment = await session4.LoadAsync<Shipment>(shipmentId);
+        deliveredShipment.ShouldNotBeNull();
         deliveredShipment.Status.ShouldBe(ShipmentStatus.Delivered);
         deliveredShipment.DeliveredAt.ShouldNotBeNull();
     }
@@ -127,6 +130,7 @@ public class ShipmentLifecycleTests : IAsyncLifetime
         // Assert: Verify shipment is still in Pending status
         await using var session2 = _fixture.GetDocumentSession();
         var unchangedShipment = await session2.LoadAsync<Shipment>(shipmentId);
+        unchangedShipment.ShouldNotBeNull();
         unchangedShipment.Status.ShouldBe(ShipmentStatus.Pending);
         unchangedShipment.Carrier.ShouldBeNull();
         unchangedShipment.TrackingNumber.ShouldBeNull();
@@ -175,6 +179,7 @@ public class ShipmentLifecycleTests : IAsyncLifetime
         // Assert: Verify shipment is still Assigned, not Delivered
         await using var session2 = _fixture.GetDocumentSession();
         var unchangedShipment = await session2.LoadAsync<Shipment>(shipmentId);
+        unchangedShipment.ShouldNotBeNull();
         unchangedShipment.Status.ShouldBe(ShipmentStatus.Assigned);
         unchangedShipment.DeliveredAt.ShouldBeNull();
     }
@@ -231,6 +236,8 @@ public class ShipmentLifecycleTests : IAsyncLifetime
         var assigned1 = await session2.LoadAsync<Shipment>(shipment1.Id);
         var assigned2 = await session2.LoadAsync<Shipment>(shipment2.Id);
 
+        assigned1.ShouldNotBeNull();
+        assigned2.ShouldNotBeNull();
         assigned1.WarehouseId.ShouldBe("WH-NORTH");
         assigned2.WarehouseId.ShouldBe("WH-SOUTH");
         assigned1.Status.ShouldBe(ShipmentStatus.Assigned);

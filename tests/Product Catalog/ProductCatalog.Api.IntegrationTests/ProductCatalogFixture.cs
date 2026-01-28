@@ -1,4 +1,5 @@
 using Alba;
+using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
 using ProductCatalog.Products;
@@ -10,11 +11,11 @@ namespace ProductCatalog.IntegrationTests;
 /// <summary>
 /// Alba fixture for Product Catalog integration tests.
 /// Uses TestContainers for isolated Postgres instance.
+/// Collection fixture pattern ensures sequential test execution and proper resource sharing.
 /// </summary>
 public sealed class ProductCatalogFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("product_catalog_test")
         .WithName($"productcatalog-postgres-test-{Guid.NewGuid():N}")
         .WithCleanUp(true)
@@ -30,23 +31,28 @@ public sealed class ProductCatalogFixture : IAsyncLifetime
 
         _connectionString = _postgres.GetConnectionString();
 
+        // Necessary for WebApplicationFactory usage with Alba for integration testing
+        JasperFxEnvironment.AutoStartHost = true;
+
         // Build Alba host with test database
         Host = await AlbaHost.For<Program>(builder =>
         {
-            // Override connection string via environment variable
-            Environment.SetEnvironmentVariable("ConnectionStrings__Postgres", _connectionString);
-
             builder.ConfigureServices(services =>
             {
+                // Configure Marten with the test container connection string directly
+                services.ConfigureMarten(opts =>
+                {
+                    opts.Connection(_connectionString);
+                });
+
                 // Disable external transports for tests
                 services.DisableAllExternalWolverineTransports();
             });
         });
 
-        // Ensure schema is created and seed test data
+        // Seed test data
         using var scope = Host.Services.CreateScope();
         var store = scope.ServiceProvider.GetRequiredService<IDocumentStore>();
-        await store.Advanced.Clean.CompletelyRemoveAllAsync();
         await SeedData.SeedProductsAsync(store);
     }
 

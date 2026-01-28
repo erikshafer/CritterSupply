@@ -21,35 +21,42 @@ public static class ListProductsHandler
 {
     [WolverineGet("/api/products")]
     public static async Task<ProductListResult> Handle(
-        ListProducts query,
         IDocumentSession session,
+        int? page,
+        int? pageSize,
+        string? category,
+        ProductStatus? status,
         CancellationToken ct)
     {
+        // Apply defaults for pagination
+        var actualPage = page ?? 1;
+        var actualPageSize = pageSize ?? 20;
+
         var queryable = session.Query<Product>()
             .Where(p => !p.IsDeleted);
 
         // Filter by category if provided
-        if (query.Category is not null)
+        if (category is not null)
         {
-            var category = CategoryName.From(query.Category);
-            queryable = queryable.Where(p => p.Category == category);
+            // Query on the Value property since Marten doesn't support value object comparison directly
+            queryable = queryable.Where(p => p.Category.Value == category);
         }
 
         // Filter by status if provided
-        if (query.Status is not null)
+        if (status is not null)
         {
-            queryable = queryable.Where(p => p.Status == query.Status.Value);
+            queryable = queryable.Where(p => p.Status == status.Value);
         }
 
         // Paginate
         var pagedList = await queryable
             .OrderBy(p => p.AddedAt)
-            .ToPagedListAsync(query.Page, query.PageSize, ct);
+            .ToPagedListAsync(actualPage, actualPageSize, ct);
 
         return new ProductListResult(
             pagedList.ToList().AsReadOnly(),
-            query.Page,
-            query.PageSize,
+            actualPage,
+            actualPageSize,
             (int)pagedList.TotalItemCount);
     }
 }

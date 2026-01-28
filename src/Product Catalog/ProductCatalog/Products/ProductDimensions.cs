@@ -11,7 +11,7 @@ public sealed record ProductDimensions
     public decimal Height { get; init; }  // Inches
     public decimal Weight { get; init; }  // Pounds
 
-    private ProductDimensions() { }
+    public ProductDimensions() { }
 
     public static ProductDimensions Create(decimal length, decimal width, decimal height, decimal weight)
     {

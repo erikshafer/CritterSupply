@@ -10,7 +10,7 @@ public sealed record ProductImage
     public string AltText { get; init; } = null!;
     public int SortOrder { get; init; }
 
-    private ProductImage() { }
+    public ProductImage() { }
 
     public static ProductImage Create(string url, string altText, int sortOrder = 0)
     {
