@@ -1109,23 +1109,36 @@ Product Catalog is a **read-heavy** BC with very different access patterns than 
 ### Entities
 
 **Product (Aggregate Root):**
-- `Sku` (string) - Primary identifier, human-readable (e.g., "CBOWL-CER-LG-BLU")
-- `Name` (string) - Display name (e.g., "Ceramic Dog Bowl - Large - Blue")
+- `Sku` (Sku value object) - Primary identifier, strongly-typed with validation (uppercase A-Z, 0-9, hyphens only, max 24 chars)
+  - Examples: "DOG-BOWL-001", "CAT-TOY-LASER", "FISH-TANK-20G"
+  - Factory method: `Sku.From("DOG-BOWL-001")`
+  - Serializes as plain string in JSON/Marten
+- `Name` (ProductName value object) - Display name, strongly-typed with validation (mixed case, special chars `. , ! & ( ) -`, max 100 chars)
+  - Examples: "Premium Stainless Steel Dog Bowl", "Interactive Cat Toy - Laser Pointer & Feathers!", "20 Gallon Fish Tank (Includes Filter)"
+  - Factory method: `ProductName.From("Premium Dog Bowl")`
+  - Serializes as plain string in JSON/Marten
 - `Description` (string) - Marketing copy
 - `LongDescription` (string) - Full product details
-- `Category` (ProductCategory) - Primary category (e.g., "Bowls & Feeders")
+- `Category` (CategoryName value object) - Primary category (simple string wrapper for Phase 1)
 - `Subcategory` (string) - Optional subcategory (e.g., "Ceramic Bowls")
 - `Brand` (string) - Manufacturer/brand name (e.g., "PetSupreme")
-- `Tags` (List<string>) - Searchable tags (e.g., ["dishwasher-safe", "non-slip", "large-breed"])
-- `Images` (List<ProductImage>) - Product photos (primary + additional angles)
+- `Tags` (IReadOnlyList<string>) - Searchable tags (e.g., ["dishwasher-safe", "non-slip", "large-breed"])
+- `Images` (IReadOnlyList<ProductImage>) - Product photos (primary + additional angles)
 - `Dimensions` (ProductDimensions) - Physical size/weight for shipping calculations
 - `Status` (ProductStatus) - Active, Discontinued, ComingSoon, OutOfSeason
 - `AddedAt` (DateTimeOffset) - When product was added to catalog
-- `UpdatedAt` (DateTimeOffset) - Last modification timestamp
+- `UpdatedAt` (DateTimeOffset?) - Last modification timestamp
 
-**ProductCategory (Value Object):**
-- Hierarchical structure (e.g., "Dogs > Bowls & Feeders > Ceramic Bowls")
-- Used for navigation menus and breadcrumbs
+**ProductCategory / CategoryName (Value Object - Phase 1):**
+- **Phase 1 Implementation**: Simple string value (e.g., "Dogs", "Dog Bowls", "Cat Toys")
+- **Future Vision (Post-Cycle 15)**: Full Category subdomain with marketplace mapping
+  - Internal categories (our categorization scheme)
+  - Marketplace mappings (Ebay categories ≠ Amazon categories ≠ Walmart categories ≠ Target categories)
+  - Many-to-many relationships (one internal category maps to multiple marketplace categories)
+  - Category hierarchy management (parent/child relationships)
+  - **Why separate subdomain?** Category mapping is complex enough to warrant its own bounded context within Product Catalog
+  - **Why not its own BC?** Categories are tightly coupled to products; not valuable as standalone service
+- **Current Design Decision**: Keep simple now (string-based) to enable rapid Product Catalog development
 - Examples: Dogs, Cats, Birds, Fish, Reptiles, Small Animals
 
 **ProductImage (Value Object):**

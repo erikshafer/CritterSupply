@@ -270,7 +270,82 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 
 #### 🔄 In Progress
 
-*No active work - ready for next cycle*
+**Cycle 14: Product Catalog BC (Phase 1 - Core CRUD) - IN PROGRESS**
+
+**Current Status:** Test infrastructure fixed, 19/24 tests passing, seed data adjustments needed
+
+**Completed Work:**
+- ✅ Project structure split (domain + API) following BC naming conventions
+  - Domain: `src/Product Catalog/ProductCatalog/` (class library)
+  - API: `src/Product Catalog/ProductCatalog.Api/` (Web SDK)
+  - Tests: `tests/Product Catalog/ProductCatalog.Api.IntegrationTests/`
+- ✅ Enhanced `skills/vertical-slice-organization.md` with comprehensive project naming documentation
+  - Added "Project Naming Conventions" section with single vs split project patterns
+  - Documented common mistake: test project must be named after API project (`.Api.IntegrationTests`)
+  - Added real examples from Orders, Customer Identity, and Product Catalog BCs
+- ✅ Value objects with factory methods and JSON converters
+  - `Sku` - Product identifier (uppercase A-Z, 0-9, hyphens, max 24 chars)
+  - `ProductName` - Display name (mixed case, letters/numbers/spaces, special chars, max 100 chars)
+  - `CategoryName` - Simple string wrapper (future: marketplace mapping subdomain)
+  - `ProductImage` - URL + alt text + sort order (public constructor for JSON)
+  - `ProductDimensions` - Length/width/height/weight (public constructor for JSON)
+- ✅ Product document model with Marten configuration
+  - Uses string `Id` property (derived from Sku) for Marten identity
+  - Indexes on Sku, Category, Status for query performance
+  - Soft delete support via Marten `.SoftDeleted()`
+  - Public parameterless constructor for JSON deserialization
+- ✅ CRUD HTTP endpoints with Wolverine handlers
+  - POST `/api/products` - AddProduct (create new product)
+  - GET `/api/products/{sku}` - GetProduct (retrieve by SKU)
+  - GET `/api/products` - ListProducts (paginated, filterable by category/status)
+  - PUT `/api/products/{sku}` - UpdateProduct (update existing product, returns 204)
+  - PATCH `/api/products/{sku}/status` - ChangeProductStatus (status transitions, returns 204)
+- ✅ FluentValidation properly configured
+  - Added `using Wolverine.Http.FluentValidation` to Program.cs
+  - Called `UseFluentValidationProblemDetailMiddleware()` on `MapWolverineEndpoints()`
+  - Validators mirror value object constraints (SKU regex, name character rules)
+  - Validation returns proper 400 errors (not 500s)
+- ✅ Handler patterns refined
+  - GetProduct: Removed query object, uses direct `Load()` with SKU parameter
+  - UpdateProduct/ChangeProductStatus: Use `Load()` + `Before()` validation
+  - ListProducts: Direct method parameters (nullable) with defaults applied in handler body
+  - Marten value object queries use `.Value` property comparison (not direct value object comparison)
+
+**Test Infrastructure Fixes:**
+- ✅ Created `IntegrationTestCollection` with `[CollectionDefinition]` for sequential test execution
+- ✅ Added `[Collection(IntegrationTestCollection.Name)]` to all test classes
+- ✅ Updated `ProductCatalogFixture` to use `ConfigureMarten()` pattern (not environment variables)
+- ✅ Changed to PostgreSQL 18-alpine image with proper constructor syntax
+- ✅ Added `JasperFxEnvironment.AutoStartHost = true` for Alba compatibility
+- ✅ Created basic `SeedData` class for test products
+
+**Test Results:**
+- **19/24 tests passing** ✅ (was 0/24)
+- Core CRUD operations working correctly
+- Validation working (400 errors)
+- Pagination working with defaults
+- 5 remaining failures due to seed data mismatches with test expectations:
+  - `CanFilterProductsByCategory` - expects products with matching category
+  - `CanFilterProductsByCategoryAndStatus` - expects filtered results
+  - `CanGetProductBySku` - expects different product name in seed data
+  - `GetProduct_ReturnsProductWithDimensions` - seed data missing dimensions
+  - `GetProduct_ReturnsProductWithImages` - seed data missing images
+
+**Next Steps:**
+- Update seed data to match test expectations (correct names, add dimensions, add images)
+- Verify all 24 tests pass
+- Add comprehensive seed data with 20-30 realistic products for demo purposes
+- Document final patterns and complete Cycle 14
+
+**Key Learnings:**
+- **xUnit Collection Fixtures**: Required for sequential test execution with Marten/TestContainers to avoid DDL concurrency errors
+- **ConfigureMarten()**: Preferred pattern over environment variables for test database configuration
+- **FluentValidation HTTP**: Requires `WolverineFx.Http.FluentValidation` + `UseFluentValidationProblemDetailMiddleware()` on `MapWolverineEndpoints()`
+- **Handler Query Objects**: When using `Load()` pattern, don't pass query objects - Wolverine can't construct them. Use direct parameters instead.
+- **Query Parameter Defaults**: Use nullable parameters with null-coalescing inside handler (defaults in signature don't work with query string binding)
+- **Marten Value Object Queries**: Must query on `.Value` property, not the value object directly (`p.Category.Value == category`)
+- **HTTP Status Codes**: Handlers returning `Task` (void) produce 204 No Content for PUT/PATCH operations
+- **JSON Deserialization**: All records used in collections need public parameterless constructors
 
 #### ✅ Recent Cycles
 
@@ -429,11 +504,19 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 
 **Implementation Notes:**
 - See CONTEXTS.md "Product Catalog" section for complete specification
-- Use relational persistence (Marten document store) for write model
-- Create denormalized read model projections for query optimization
-- Human-readable SKUs (e.g., "CBOWL-CER-LG-BLU"), not GUIDs
-- Use placeholder images (via.placeholder.com) for seed data
-- Hardcode prices in Product entity for v1 (defer Pricing BC to later)
+- **Persistence**: Marten document store (NOT event sourcing) - master data, read-heavy
+- **Value Objects**: Strongly-typed identity and domain values with validation
+  - `Sku` - Product identifier with constraints (A-Z uppercase, 0-9, hyphens only, max 24 chars)
+  - `ProductName` - Product display name with constraints (mixed case, letters/numbers/spaces, special chars `. , ! & ( ) -`, max 100 chars)
+  - `CategoryName` - Simple string wrapper for now, future subdomain handles marketplace mapping
+  - `ProductImage` - URL validation via `IImageValidator` interface (stub for now)
+  - All value objects use factory methods (`Sku.From(string)`) + JSON converters for ergonomics
+  - Implicit string operators for Marten queries and serialization transparency
+- **Soft Delete**: Use Marten's `.SoftDeleted()` feature - preserve audit trail
+- **Collections**: Use `IReadOnlyList<T>` for immutability
+- **Integration Messages**: Scaffold `ProductAdded`, `ProductUpdated`, `ProductDiscontinued` - publish but don't test receipt
+- **Pricing**: NO hardcoded prices - deferred to Pricing BC entirely
+- **Seed Data**: C# code (type-safe) with 20-30 products, placeholder images (via.placeholder.com)
 
 ---
 

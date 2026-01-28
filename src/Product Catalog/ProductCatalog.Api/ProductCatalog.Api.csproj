@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Marten" />
+    <PackageReference Include="WolverineFx.Http.Marten" />
+    <PackageReference Include="WolverineFx.Http.FluentValidation" />
+    <PackageReference Include="FluentValidation" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../ProductCatalog/ProductCatalog.csproj" />
+    <ProjectReference Include="../../Shared/Messages.Contracts/Messages.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

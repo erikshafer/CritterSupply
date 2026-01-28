@@ -1,114 +1,323 @@
----
-name: critterstack-testing-patterns
-description: Write unit and integration tests for applications using the Critter Stack, which tools include Wolverine and Marten. Covers message handling, message validation, event persistence, endpoint interaction validation. Includes guidance on using the Alba integration testing library. 
----
-
 # Critter Stack Testing Patterns
 
-## When to Use This Skill
+Patterns for testing Wolverine and Marten applications in CritterSupply.
 
-Use this skill when:
-- Writing unit tests for Wolverine message handlers
-- Testing Marten event sourcing and document storage
-- Validating message routing and endpoint interactions
-- Mocking external dependencies in handler tests
+## Planned: End-to-End Testing
 
-### ✅ Use Alba for integration tests
+This document is intended for integration and unit level tests, not end-to-end (E2E) tests. The intent is that system-wide E2E testing will be appended here in its own section or be included in another document. The idea at the moment is to leverage a BDD-aligned framework like SpecFlow and write the specifications in the Gherkin language.
 
-Easy integration testing for ASP.NET Core applications, especially those using Wolverine and Marten.
-- Declarative Syntax
-- Classic & Minimal API Support
-- Authorization Stubbing
+## Core Philosophy
 
-### ✅ Use Shouldly for validation
+1. **Prefer integration tests over unit tests** — Test complete vertical slices
+2. **Use real infrastructure** — TestContainers for Postgres, RabbitMQ
+3. **Pure functions are easy to unit test** — Thanks to A-Frame architecture
+4. **BDD-style for integration tests** — Focus on behavior, not implementation
 
-Shouldly is an assertion framework which focuses on giving great error messages when the assertion fails while being simple and terse. Shouldly uses the code before the ShouldBe statement to report on errors, which makes diagnosing easier.
+## Testing Tools
 
-## Required NuGet Packages
+| Tool | Purpose |
+|------|---------|
+| **xUnit** | Test framework |
+| **Shouldly** | Readable assertions |
+| **Alba** | HTTP integration testing |
+| **TestContainers** | Real Postgres/RabbitMQ in Docker |
+| **NSubstitute** | Mocking (only when necessary) |
 
-```xml
-<ItemGroup>
-  <!-- xUnit (or your preferred test framework) -->
-  <PackageReference Include="xunit" Version="*" />
-  <PackageReference Include="xunit.runner.visualstudio" Version="*" />
-  <PackageReference Include="Microsoft.NET.Test.Sdk" Version="*" />
+Simply put, xUnit is mature and proven as a test framework. Shouldly provides great error messages ontop of being declaritive. Alba is another open-source project from the JasperFx team, like Wolverine and Marten, enabling effortless usage and a declarative syntax for ASP.NET Core application testing. TestContainers allow us to use actual databases for testing our applications that we can spin-up and spin-down with ease. NSubstitute is the tool of choice if we absolutely need to mock something, as it provides a succinct syntax to focus on behavior instead of configuration.
 
-  <!-- Integration testing framework -->
-  <PackageReference Include="Alba" Version="*" />
-    
-  <!-- Assertions (recommended) -->
-  <PackageReference Include="Shouldly" Version="*" />
-</ItemGroup>
-```
----
-
-## Additional Resources
-
-- **Alba (documentation)**: https://jasperfx.github.io/alba/
-- **Alba (github)**: https://github.com/JasperFx/alba
-- **Shouldly (documentation)**: https://docs.shouldly.org/
-- **Shouldly (github)**: https://github.com/shouldly/shouldly
-
-# Alba - Sending and Checking JSON
-
-Example 1: Sending a JSON command and checking for a successful (200 OK) response.
+## Integration Test Fixture
 
 ```csharp
-// Good, inherit from IntegrationContext and set the AppFixture.
-public class AddInventoryTests(AppFixture fixture) : IntegrationContext(fixture)
+public class PaymentsTestFixture : IAsyncLifetime
 {
-    private readonly AppFixture _fixture = fixture;
+    public IAlbaHost Host { get; private set; } = null!;
+    public IDocumentSession Session { get; private set; } = null!;
 
-    // A simple yet effective test using Alba to send a JSON command
-    [Fact]
-    public async Task AddInventorySucceeds()
+    private PostgreSqlContainer _postgres = null!;
+
+    public async Task InitializeAsync()
     {
-        // Arrange
-        var id = Guid.CreateVersion7();
-        var command = new AddInventory(id, 10, "Initial stock");
+        _postgres = new PostgreSqlBuilder()
+            .WithImage("postgres:18-alpine")
+            .WithDatabase("payments_test_db")
+            .WithName($"payments-postgres-test-{Guid.NewGuid():N}")
+            .WithCleanUp(true)
+            .Build();
 
-        // Act & Assert
-        await _fixture.Host!.Scenario(x =>
+        await _postgres.StartAsync();
+
+        Host = await AlbaHost.For<Program>(builder =>
         {
-            x.Post.Url($"/api/inventory/{id}/add");
-            x.Post.Json(command);
-            x.StatusCodeShouldBeOk(); // Expect a 200 OK response
+            builder.ConfigureServices(services =>
+            {
+                // Replace connection string with TestContainers
+                services.Configure<MartenOptions>(opts =>
+                    opts.Connection(_postgres.GetConnectionString()));
+
+                // Use stub for external services
+                services.AddSingleton<IPaymentGateway, StubPaymentGateway>();
+            });
+        });
+
+        Session = Host.Services.GetRequiredService<IDocumentSession>();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await Host.DisposeAsync();
+        await _postgres.DisposeAsync();
+    }
+}
+```
+
+> **Reference:** [Alba Documentation](https://jasperfx.github.io/alba/)
+
+## Integration Test Pattern
+
+```csharp
+public class ProcessPaymentTests : IClassFixture<PaymentsTestFixture>
+{
+    private readonly PaymentsTestFixture _fixture;
+
+    public ProcessPaymentTests(PaymentsTestFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    [Fact]
+    public async Task ProcessPayment_WithValidPayment_ReturnsSuccess()
+    {
+        // Arrange — seed the aggregate
+        var paymentId = Guid.CreateVersion7();
+        var initiated = new PaymentInitiated(paymentId, Guid.NewGuid(), 100m, DateTimeOffset.UtcNow);
+        _fixture.Session.Events.StartStream<Payment>(paymentId, initiated);
+        await _fixture.Session.SaveChangesAsync();
+
+        // Act — invoke the endpoint
+        var command = new ProcessPayment(paymentId, 100m);
+
+        var result = await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(command).ToUrl($"/api/payments/{paymentId}/process");
+            s.StatusCodeShouldBe(200);
+        });
+
+        // Assert — verify the aggregate state
+        var payment = await _fixture.Session.Events.AggregateStreamAsync<Payment>(paymentId);
+
+        payment.ShouldNotBeNull();
+        payment.Status.ShouldBe(PaymentStatus.Processed);
+    }
+
+    [Fact]
+    public async Task ProcessPayment_WithNonExistentPayment_Returns404()
+    {
+        var command = new ProcessPayment(Guid.NewGuid(), 100m);
+
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(command).ToUrl($"/api/payments/{command.PaymentId}/process");
+            s.StatusCodeShouldBe(404);
         });
     }
 }
 ```
 
-Example 2: Sending a JSON command and checking for a specific response body. Assertions are handled by the Shouldly library. As we're working with event sourced data, made possible by Marten, we query for events after sending the command via a `LightweightSession`. If we were needing to check data stored via EF Core, we would do something similar with a `DbContext` fetching the designated entity.
+## Unit Testing Pure Functions
+
+Thanks to A-Frame architecture, handlers are pure functions that are easy to unit test:
 
 ```csharp
+public class ProcessPaymentHandlerTests
+{
     [Fact]
-    public async Task CommitInventory_WithExistingReservation_Succeeds()
+    public void Before_WithNullPayment_Returns404()
     {
-        // Arrange
-        var productId = Guid.CreateVersion7();
-        var orderId = Guid.CreateVersion7();
+        var command = new ProcessPayment(Guid.NewGuid(), 100m);
 
-        await using var session = Store.LightweightSession();
-        var inventoryAdded = new InventoryAdded(productId, 100, "Initial stock", DateTimeProvider.UtcNow);
-        var inventoryReserved = new InventoryReserved(orderId, 15, DateTimeProvider.UtcNow);
-        session.Events.StartStream<ProductInventory>(productId, inventoryAdded, inventoryReserved);
-        await session.SaveChangesAsync();
+        var result = ProcessPaymentHandler.Before(command, payment: null);
 
-        var command = new CommitInventory(productId, orderId);
-
-        // Act
-        var tracked = await Host.InvokeMessageAndWaitAsync(command);
-
-        // Assert
-        tracked.Executed.MessagesOf<CommitInventory>()
-            .ShouldHaveSingleItem();
-
-        await using var querySession = Store.LightweightSession();
-        var inventory = await querySession.Events.AggregateStreamAsync<ProductInventory>(productId);
-
-        inventory.ShouldNotBeNull();
-        inventory.AvailableQuantity.ShouldBe(85); // Still reduced
-        inventory.ReservedQuantity.ShouldBe(0); // Reservation removed
-        inventory.Reservations.ShouldNotContainKey(orderId); // No longer reserved
+        result.Status.ShouldBe(404);
+        result.Detail.ShouldBe("Payment not found");
     }
+
+    [Fact]
+    public void Before_WithAlreadyProcessedPayment_Returns400()
+    {
+        var command = new ProcessPayment(Guid.NewGuid(), 100m);
+        var payment = CreatePayment(PaymentStatus.Processed);
+
+        var result = ProcessPaymentHandler.Before(command, payment);
+
+        result.Status.ShouldBe(400);
+    }
+
+    [Fact]
+    public void Handle_WithPendingPayment_ReturnsProcessedEvent()
+    {
+        var command = new ProcessPayment(Guid.NewGuid(), 100m);
+        var payment = CreatePayment(PaymentStatus.Pending);
+
+        var (events, messages) = ProcessPaymentHandler.Handle(command, payment);
+
+        events.ShouldContain(e => e is PaymentProcessed);
+    }
+
+    private static Payment CreatePayment(PaymentStatus status) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), 100m, status, null, null);
+}
 ```
+
+## Testing Validators
+
+```csharp
+public class ProcessPaymentValidatorTests
+{
+    private readonly ProcessPayment.ProcessPaymentValidator _validator = new();
+
+    [Fact]
+    public void Validate_WithEmptyPaymentId_Fails()
+    {
+        var command = new ProcessPayment(Guid.Empty, 100m);
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldContain(e => e.PropertyName == "PaymentId");
+    }
+
+    [Fact]
+    public void Validate_WithZeroAmount_Fails()
+    {
+        var command = new ProcessPayment(Guid.NewGuid(), 0m);
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldContain(e => e.PropertyName == "Amount");
+    }
+
+    [Fact]
+    public void Validate_WithValidCommand_Passes()
+    {
+        var command = new ProcessPayment(Guid.NewGuid(), 100m);
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeTrue();
+    }
+}
+```
+
+> **Reference:** [FluentValidation Testing](https://docs.fluentvalidation.net/en/latest/testing.html)
+
+## Testing Event-Sourced Aggregates
+
+```csharp
+public class PaymentAggregateTests
+{
+    [Fact]
+    public void Apply_PaymentProcessed_UpdatesStatus()
+    {
+        var payment = CreatePendingPayment();
+        var @event = new PaymentProcessed(payment.Id, DateTimeOffset.UtcNow);
+
+        var updated = payment.Apply(@event);
+
+        updated.Status.ShouldBe(PaymentStatus.Processed);
+        updated.ProcessedAt.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void Apply_PaymentFailed_IncrementsRetryCount()
+    {
+        var payment = CreatePendingPayment();
+        var @event = new PaymentFailed(payment.Id, "Insufficient funds", true, DateTimeOffset.UtcNow);
+
+        var updated = payment.Apply(@event);
+
+        updated.Status.ShouldBe(PaymentStatus.Failed);
+        updated.RetryCount.ShouldBe(1);
+        updated.FailureReason.ShouldBe("Insufficient funds");
+    }
+
+    private static Payment CreatePendingPayment() =>
+        new(Guid.NewGuid(), Guid.NewGuid(), 100m, PaymentStatus.Pending, 0, null, null);
+}
+```
+
+## Cross-Context Refactoring Checklist
+
+After changes affecting multiple bounded contexts, **always run the full test suite**:
+
+**When to run all tests:**
+- Adding/removing project references between BCs
+- Moving code between projects
+- Updating namespaces across files
+- Refactoring handlers or sagas
+- Modifying shared infrastructure
+
+**Test execution:**
+```bash
+# Build first (catches compile errors)
+dotnet build
+
+# Run all tests
+dotnet test
+
+# Or by category
+dotnet test --filter "Category=Unit"
+dotnet test --filter "Category=Integration"
+```
+
+**Exit criteria:**
+- Solution builds with 0 errors
+- All unit tests pass
+- All integration tests pass
+- No unused project references remain
+
+## Shouldly Assertions
+
+```csharp
+// Basic assertions
+result.ShouldNotBeNull();
+result.Status.ShouldBe(PaymentStatus.Processed);
+result.Amount.ShouldBeGreaterThan(0);
+
+// Collection assertions
+events.ShouldNotBeEmpty();
+events.ShouldContain(e => e is PaymentProcessed);
+events.Count.ShouldBe(1);
+
+// Exception assertions
+Should.Throw<InvalidOperationException>(() => payment.Process());
+```
+
+> **Reference:** [Shouldly Documentation](https://docs.shouldly.org/)
+
+## Test Organization
+
+```
+tests/
+  Payment Processing/
+    Payments.IntegrationTests/
+      Features/
+        ProcessPaymentTests.cs
+        CapturePaymentTests.cs
+      PaymentsTestFixture.cs
+    Payments.UnitTests/
+      Handlers/
+        ProcessPaymentHandlerTests.cs
+      Validators/
+        ProcessPaymentValidatorTests.cs
+      Domain/
+        PaymentAggregateTests.cs
+```
+
+## Key Principles
+
+1. **Integration tests cover vertical slices** — HTTP request to database verification
+2. **Unit tests cover pure functions** — `Before()`, `Handle()`, `Apply()` methods
+3. **Use stubs for external services** — Tests shouldn't depend on third-party APIs
+4. **Real infrastructure via TestContainers** — Postgres, RabbitMQ in Docker
+5. **Test code follows production standards** — Same C# conventions apply
