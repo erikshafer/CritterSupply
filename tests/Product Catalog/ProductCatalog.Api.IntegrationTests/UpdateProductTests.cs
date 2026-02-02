@@ -89,7 +89,7 @@ public sealed class UpdateProductTests : IClassFixture<ProductCatalogFixture>
         });
 
         var result = product.ReadAsJson<Product>();
-        result.Category.Value.ShouldBe("Cats");
+        result.Category.ShouldBe("Cats");
     }
 
     [Fact]

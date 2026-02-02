@@ -15,24 +15,33 @@ public static class SeedData
         // Seed products for testing
         var products = new[]
         {
+            // DOG-BOWL-001 - used by GetProductTests (needs name, images, dimensions)
             Product.Create(
                 "DOG-BOWL-001",
-                "Premium Dog Bowl",
+                "Premium Stainless Steel Dog Bowl",
                 "Stainless steel dog bowl, dishwasher safe",
-                "Dogs"),
+                "Dogs",
+                images: new[]
+                {
+                    ProductImage.Create("https://placeholder.com/dog-bowl-001.jpg", "Premium dog bowl image", 0)
+                }.ToList().AsReadOnly(),
+                dimensions: ProductDimensions.Create(8.5m, 8.5m, 3.0m, 1.2m)),
 
+            // DOG-TOY-ROPE - used by UpdateProductTests
             Product.Create(
                 "DOG-TOY-ROPE",
                 "Rope Tug Toy",
                 "Durable rope toy for interactive play",
                 "Dogs"),
 
+            // CAT-TREE-5FT - used by ChangeProductStatusTests and filtering
             Product.Create(
                 "CAT-TREE-5FT",
                 "5ft Cat Tree",
                 "Multi-level cat tree with scratching posts",
                 "Cats"),
 
+            // XMAS-PET-SWEATER - used by ChangeProductStatusTests (OutOfSeason)
             Product.Create(
                 "XMAS-PET-SWEATER",
                 "Holiday Pet Sweater",

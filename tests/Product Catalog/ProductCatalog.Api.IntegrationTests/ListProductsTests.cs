@@ -64,7 +64,7 @@ public sealed class ListProductsTests : IClassFixture<ProductCatalogFixture>
         // Assert
         var result = response.ReadAsJson<ProductListResult>();
         result.Products.ShouldNotBeEmpty();
-        result.Products.ShouldAllBe(p => p.Category.Value == "Dogs");
+        result.Products.ShouldAllBe(p => p.Category == "Dogs");
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class ListProductsTests : IClassFixture<ProductCatalogFixture>
         // Assert
         var result = response.ReadAsJson<ProductListResult>();
         result.Products.ShouldNotBeEmpty();
-        result.Products.ShouldAllBe(p => p.Category.Value == "Cats" && p.Status == ProductStatus.Active);
+        result.Products.ShouldAllBe(p => p.Category == "Cats" && p.Status == ProductStatus.Active);
     }
 
     [Fact]

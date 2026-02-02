@@ -14,7 +14,7 @@ public sealed record Product
     public ProductName Name { get; init; } = null!;
     public string Description { get; init; } = null!;
     public string? LongDescription { get; init; }
-    public CategoryName Category { get; init; } = null!;
+    public string Category { get; init; } = null!;  // Simple string for Phase 1 (future: full Category subdomain)
     public string? Subcategory { get; init; }
     public string? Brand { get; init; }
     public IReadOnlyList<ProductImage> Images { get; init; } = [];
@@ -47,7 +47,7 @@ public sealed record Product
             Name = ProductName.From(name),
             Description = description,
             LongDescription = longDescription,
-            Category = CategoryName.From(category),
+            Category = category?.Trim() ?? throw new ArgumentException("Category cannot be empty", nameof(category)),
             Subcategory = subcategory,
             Brand = brand,
             Images = images ?? [],
@@ -75,7 +75,7 @@ public sealed record Product
             Name = name is not null ? ProductName.From(name) : Name,
             Description = description ?? Description,
             LongDescription = longDescription ?? LongDescription,
-            Category = category is not null ? CategoryName.From(category) : Category,
+            Category = category ?? Category,
             Subcategory = subcategory ?? Subcategory,
             Brand = brand ?? Brand,
             Images = images ?? Images,

@@ -38,8 +38,7 @@ public static class ListProductsHandler
         // Filter by category if provided
         if (category is not null)
         {
-            // Query on the Value property since Marten doesn't support value object comparison directly
-            queryable = queryable.Where(p => p.Category.Value == category);
+            queryable = queryable.Where(p => p.Category == category);
         }
 
         // Filter by status if provided

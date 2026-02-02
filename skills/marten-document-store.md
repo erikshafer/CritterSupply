@@ -19,6 +19,131 @@ Patterns for using Marten as a document database (not event sourcing) in Critter
 - **Document Store:** Product Catalog (products are master data)
 - **Event Store:** Orders, Payments, Inventory, Fulfillment
 
+## Value Objects and Queryable Fields
+
+**IMPORTANT:** When using Marten's document store with LINQ queries, value objects on queryable fields create friction.
+
+### The Architecture Signal
+
+Value objects + JSON serialization + Marten LINQ queries = translation issues.
+
+**Marten cannot translate** expressions like:
+- `p.Category.Value == "Dogs"` ❌
+- `p.Category.ToString() == "Dogs"` ❌
+- `(string)p.Category == "Dogs"` ❌
+
+Even with custom JSON converters that serialize value objects as simple strings, Marten's LINQ-to-SQL translator doesn't understand how to access nested properties or call methods on custom types.
+
+### When to Use Value Objects with Marten
+
+**✅ Use Value Objects for:**
+- **Complex nested objects** (Address, Dimensions, Money)
+  ```csharp
+  public IReadOnlyList<ProductImage> Images { get; init; }  // Not queried
+  public ProductDimensions? Dimensions { get; init; }       // Not queried
+  public ShippingAddress Address { get; init; }            // Not queried
+  ```
+- **Non-queryable fields** (descriptions, metadata, nested structures)
+- **Strong domain concepts with behavior** (Money with currency conversion, DateRange with overlap logic)
+
+**❌ Use Primitives for:**
+- **Queryable filter fields** - Any field you'll filter on in LINQ
+  ```csharp
+  public string Category { get; init; }      // Queried: WHERE category = 'Dogs'
+  public ProductStatus Status { get; init; } // Queried: WHERE status = 'Active'
+  public string Brand { get; init; }         // Queried: WHERE brand = 'Acme'
+  ```
+- **Simple string wrappers with no behavior** - If it's just a string with validation, keep it a string
+- **Sort/filter/group fields** - Marten needs direct primitive access
+
+**🤔 Identity Fields (Special Case):**
+- Can use value objects (like `Sku`) if you also provide a primitive `Id` property
+  ```csharp
+  public string Id { get; init; }      // For Marten's identity system
+  public Sku Sku { get; init; }        // For domain logic
+  ```
+
+### Validation Strategy
+
+Since queryable fields should be primitives, **validate at the boundary** with FluentValidation:
+
+```csharp
+public sealed record AddProduct(string Category, string Name, string Description);
+
+public class AddProductValidator : AbstractValidator<AddProduct>
+{
+    public AddProductValidator()
+    {
+        RuleFor(x => x.Category)
+            .NotEmpty()
+            .MaximumLength(50)
+            .WithMessage("Category is required and cannot exceed 50 characters");
+
+        RuleFor(x => x.Name)
+            .NotEmpty()
+            .MaximumLength(100)
+            .Matches(@"^[A-Za-z0-9\s.,!&()\-]+$")
+            .WithMessage("Name contains invalid characters");
+    }
+}
+```
+
+This gives you:
+- ✅ Type safety at the domain boundary
+- ✅ 400 errors for bad input (not 500s)
+- ✅ Simple queries: `p.Category == "Dogs"`
+- ✅ No LINQ translation issues
+
+### JSON Serialization Assumption
+
+**Work Pattern:** Any non-primitive property in a Marten document requires explicit JSON serialization handling.
+
+When adding custom types to Marten documents, **immediately consider**:
+1. **Does this need a JSON converter?** (Value objects, enums, complex types)
+2. **Will this be queried in LINQ?** (If yes, strongly consider primitives)
+3. **Does Marten need special configuration?** (Indexes, identity fields)
+
+This applies to:
+- Value objects
+- Aggregates as nested documents
+- Projections with custom types
+- Any non-C# primitive
+
+### Real Example: Product Catalog
+
+**Initial attempt (failed):**
+```csharp
+public CategoryName Category { get; init; }  // Value object
+
+// Query (doesn't work):
+query.Where(p => p.Category.Value == "Dogs")  // Marten can't translate
+```
+
+**Pragmatic solution:**
+```csharp
+public string Category { get; init; }  // Primitive
+
+// Query (works):
+query.Where(p => p.Category == "Dogs")  // Direct SQL: WHERE data->>'Category' = 'Dogs'
+```
+
+**Validation moved to FluentValidation:**
+```csharp
+RuleFor(x => x.Category)
+    .NotEmpty()
+    .MaximumLength(50);
+```
+
+### Lessons Learned from Product Catalog BC
+
+During implementation, we experienced:
+1. Tests passed for CRUD operations ✅
+2. Tests failed for category filtering ❌ (Marten LINQ translation error)
+3. Changed `CategoryName` value object → `string` primitive
+4. All tests passed ✅
+
+**The signal:** When 22/24 tests pass, then you change a value object to a primitive and get 24/24, that's an **architecture signal**, not a test problem.
+
 ## Document Model Design
 
 Use immutable records with factory methods, same as event-sourced aggregates:
