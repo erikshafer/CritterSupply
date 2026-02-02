@@ -9,12 +9,11 @@ using Wolverine;
 
 namespace CustomerIdentity.Api.IntegrationTests;
 
-public class CustomersApiFixture : IAsyncLifetime
+public class TestFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:18-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("customer_identity_test_db")
-        .WithName($"customers-postgres-test-{Guid.NewGuid():N}")
+        .WithName($"customer-identity-postgres-test-{Guid.NewGuid():N}")
         .WithCleanUp(true)
         .Build();
 

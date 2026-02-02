@@ -268,9 +268,63 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
     - Property-based tests and validation tests became obsolete when local command entry point removed
     - CLAUDE.md documentation must explicitly call out all colocation requirements (not just imply via examples)
 
-#### 🔄 In Progress
+**Cycle 14: Product Catalog BC (Phase 1 - Core CRUD) - COMPLETED (2026-02-02)**
 
-*No active work - ready for next cycle*
+**Objective**: Build Product Catalog BC with CRUD operations and query endpoints using Marten document store (non-event-sourced)
+
+**BC Work**: Core product management with document store patterns
+- Product document model with factory methods (`Create()`, `Update()`, `ChangeStatus()`)
+- `Sku` and `ProductName` value objects with factory methods and JSON converters
+- **Category as primitive string** (not value object) - queryable fields should be primitives with Marten
+- `ProductImage` and `ProductDimensions` value objects for complex nested structures
+- CRUD HTTP endpoints: POST, GET, GET (list), PUT, PATCH status
+- Marten configuration with indexes on Sku, Category, Status for query performance
+- Soft delete support via Marten `.SoftDeleted()`
+- FluentValidation at HTTP boundaries for validation (returns 400 errors)
+- **Status**: ✅ 24/24 integration tests passing
+- **Files**: `/src/Product Catalog/ProductCatalog/` and `/tests/Product Catalog/ProductCatalog.Api.IntegrationTests/`
+
+**Key Technical Challenges**:
+- **Value Objects + Marten LINQ Queries = Friction**: CategoryName value object couldn't be queried in LINQ expressions
+  - **Root Cause**: Marten LINQ couldn't translate expressions like `p.Category.Value == "Dogs"` or `p.Category.ToString()`
+  - **Solution**: Changed Product.Category from `CategoryName` value object to `string` primitive
+  - **Architecture Signal**: 19/24 tests passing → 24/24 after changing VO to primitive
+  - **Pattern**: Use primitives for queryable fields, value objects for complex structures, FluentValidation at boundaries
+
+**Key Learnings**:
+- **xUnit Collection Fixtures**: Required for sequential test execution with Marten/TestContainers to avoid DDL concurrency errors
+- **ConfigureMarten()**: Preferred pattern over environment variables for test database configuration
+- **FluentValidation HTTP**: Requires `WolverineFx.Http.FluentValidation` + `UseFluentValidationProblemDetailMiddleware()` on `MapWolverineEndpoints()`
+- **Handler Query Objects**: When using `Load()` pattern, don't pass query objects - Wolverine can't construct them. Use direct parameters instead.
+- **Query Parameter Defaults**: Use nullable parameters with null-coalescing inside handler (defaults in signature don't work with query string binding)
+- **Marten Value Object Queries**: Primitives for queryable fields (Category, Status), VOs for complex structures (Dimensions, Images)
+- **HTTP Status Codes**: Handlers returning `Task` (void) produce 204 No Content for PUT/PATCH operations
+- **JSON Deserialization**: All records used in collections need public parameterless constructors
+- **Architecture Signals**: Test failures that indicate architectural friction, not code bugs (22/24 → 24/24 after VO → primitive change)
+- **JSON Serialization First**: When adding custom types (VOs), account for JSON serialization immediately
+- **Value Object Decision Criteria with Marten**:
+  - ✅ Use VOs for: Complex nested objects (Address, Dimensions, Money), non-queryable fields, strong domain concepts with behavior
+  - ❌ Use primitives for: Queryable filter/sort/group fields, simple string wrappers
+- **Validation Strategy**: Primitives at boundaries validated with FluentValidation (returns 400 errors), not VOs with factory methods
+
+**Documentation Updates**: ✅ COMPLETED (2026-02-02)
+- ✅ Added comprehensive "Value Objects and Queryable Fields" section to `skills/marten-document-store.md`
+- ✅ Documented when to use VOs vs primitives with Marten (decision criteria)
+- ✅ Explained "architecture signal" pattern (test failures indicating architectural mismatches)
+- ✅ Added validation strategy guidance (FluentValidation at boundaries for primitives)
+- ✅ Documented JSON serialization as immediate consideration when creating custom types
+- ✅ Real example from Product Catalog BC showing Category change from VO to primitive
+
+**Test Results**: ✅ All 24/24 integration tests passing
+- AddProduct: Creates products with all fields
+- GetProduct: Retrieves products by SKU with images/dimensions
+- ListProducts: Pagination, category filtering, status filtering
+- UpdateProduct: Updates product details
+- ChangeProductStatus: Transitions between Active/OutOfSeason/Discontinued
+
+#### 🔜 Planned
+
+*Ready for next cycle - Cycle 14 complete*
 
 #### ✅ Recent Cycles
 
@@ -396,48 +450,11 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 
 #### 🔜 Planned
 
-*Ready for next cycle - Cycle 13 complete*
+*Ready for next cycle - Cycle 14 complete*
 
 ---
 
-**Next Priority (Cycle 14): Product Catalog BC (Phase 1 - Core CRUD)**
-
-**Objective**: Build product catalog with CRUD operations and query endpoints for Customer Experience BC integration
-
-**Why Second:**
-- Required dependency for Customer Experience BC (product listings, search)
-- Self-contained BC (no dependencies on other BCs for Phase 1)
-- Demonstrates read-heavy, query-optimized architecture patterns
-- Seed data enables realistic Customer Experience demos
-
-**Key Deliverables:**
-- Product aggregate (SKU, name, description, images, category, brand, tags, status)
-- Admin endpoints for merchandising team (add/update/status change)
-- Query endpoints for product listing and detail (paginated, filterable)
-- Seed data with 20-30 realistic products across multiple categories
-- Integration tests for CRUD and query operations
-
-**Dependencies:**
-- None for Phase 1 (self-contained)
-- Future phases integrate with Inventory BC (availability), Pricing BC (prices)
-
-**Implementation Phases:**
-1. **Phase 1 (Cycle 13)** - Core Product CRUD + query endpoints
-2. **Phase 2 (Cycle 14)** - Category hierarchy management
-3. **Phase 3 (Cycle 15)** - Product search functionality
-4. **Phase 4 (Post Cycle 15)** - Customer Experience integration
-
-**Implementation Notes:**
-- See CONTEXTS.md "Product Catalog" section for complete specification
-- Use relational persistence (Marten document store) for write model
-- Create denormalized read model projections for query optimization
-- Human-readable SKUs (e.g., "CBOWL-CER-LG-BLU"), not GUIDs
-- Use placeholder images (via.placeholder.com) for seed data
-- Hardcode prices in Product entity for v1 (defer Pricing BC to later)
-
----
-
-**Third Priority (Cycle 15+): Customer Experience BC (Storefront BFF)**
+**Next Priority (Cycle 15+): Customer Experience BC (Storefront BFF)**
 
 **Objective**: Build customer-facing web store using Backend-for-Frontend pattern with Blazor Server and SignalR
 

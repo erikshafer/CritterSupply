@@ -5,11 +5,11 @@ using Shouldly;
 
 namespace CustomerIdentity.Api.IntegrationTests;
 
-public class AddressBookTests : IClassFixture<CustomersApiFixture>
+public class AddressBookTests : IClassFixture<TestFixture>
 {
-    private readonly CustomersApiFixture _fixture;
+    private readonly TestFixture _fixture;
 
-    public AddressBookTests(CustomersApiFixture fixture)
+    public AddressBookTests(TestFixture fixture)
     {
         _fixture = fixture;
     }
