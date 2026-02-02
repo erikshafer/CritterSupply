@@ -307,6 +307,17 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
   - ❌ Use primitives for: Queryable filter/sort/group fields, simple string wrappers
 - **Validation Strategy**: Primitives at boundaries validated with FluentValidation (returns 400 errors), not VOs with factory methods
 
+**TestFixture Standardization**: ✅ COMPLETED (2026-02-02)
+- ✅ Added 5 standard helper methods to Product Catalog TestFixture:
+  - `GetDocumentSession()` - Direct database access for seeding/verification
+  - `GetDocumentStore()` - Advanced operations (cleanup)
+  - `CleanAllDocumentsAsync()` - Test isolation between runs
+  - `ExecuteAndWaitAsync<T>()` - Message execution with cascading tracking
+  - `TrackedHttpCall()` - HTTP calls with message tracking
+- ✅ Added `TaskCanceledException` handling in `DisposeAsync()` to suppress cleanup warnings
+- ✅ Standardized null check (`is not null` → `!= null`) for consistency with other BCs
+- **Result**: All 122 tests passing across solution, zero cleanup warnings
+
 **Documentation Updates**: ✅ COMPLETED (2026-02-02)
 - ✅ Added comprehensive "Value Objects and Queryable Fields" section to `skills/marten-document-store.md`
 - ✅ Documented when to use VOs vs primitives with Marten (decision criteria)
@@ -314,6 +325,14 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 - ✅ Added validation strategy guidance (FluentValidation at boundaries for primitives)
 - ✅ Documented JSON serialization as immediate consideration when creating custom types
 - ✅ Real example from Product Catalog BC showing Category change from VO to primitive
+- ✅ **Completely rewrote** `skills/critterstack-testing-patterns.md`:
+  - Added full Marten TestFixture pattern (150+ lines) with all 5 helper methods
+  - Added EF Core TestFixture pattern (80+ lines) for Customer Identity BC
+  - Added Collection Fixture section (sequential test execution, DDL concurrency prevention)
+  - Updated integration test examples with real Product Catalog and Payments code
+  - Added "TestFixture Helper Methods" section with use cases and examples
+  - Added standardization summary tables for quick reference
+  - Enhanced Key Principles to emphasize standardized fixtures across BCs
 
 **Test Results**: ✅ All 24/24 integration tests passing
 - AddProduct: Creates products with all fields
@@ -321,6 +340,15 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 - ListProducts: Pagination, category filtering, status filtering
 - UpdateProduct: Updates product details
 - ChangeProductStatus: Transitions between Active/OutOfSeason/Discontinued
+
+**Solution-Wide Test Results**: ✅ All 122/122 tests passing (100% success rate)
+- Payments: 30 tests (11 unit + 19 integration)
+- Inventory: 16 integration tests
+- Fulfillment: 6 integration tests
+- Shopping: 9 integration tests
+- Orders: 25 integration tests
+- Customer Identity: 12 integration tests
+- Product Catalog: 24 integration tests
 
 #### 🔜 Planned
 

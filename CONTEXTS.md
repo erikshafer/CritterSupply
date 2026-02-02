@@ -1089,7 +1089,7 @@ else
 
 The Product Catalog context owns the master product data—SKUs, descriptions, images, categorization, and searchability. This BC is the source of truth for "what we sell" but does NOT own pricing, inventory levels, or promotional rules (those are separate concerns).
 
-**Status**: Planned (not yet implemented)
+**Status**: ✅ Phase 1 Complete (Core CRUD) - 24/24 integration tests passing
 
 ### Architecture: Read-Heavy, Query-Optimized
 
@@ -1119,7 +1119,7 @@ Product Catalog is a **read-heavy** BC with very different access patterns than 
   - Serializes as plain string in JSON/Marten
 - `Description` (string) - Marketing copy
 - `LongDescription` (string) - Full product details
-- `Category` (CategoryName value object) - Primary category (simple string wrapper for Phase 1)
+- `Category` (string) - Primary category (primitive string for Marten LINQ queryability - see Architecture Signal below)
 - `Subcategory` (string) - Optional subcategory (e.g., "Ceramic Bowls")
 - `Brand` (string) - Manufacturer/brand name (e.g., "PetSupreme")
 - `Tags` (IReadOnlyList<string>) - Searchable tags (e.g., ["dishwasher-safe", "non-slip", "large-breed"])
@@ -1129,8 +1129,16 @@ Product Catalog is a **read-heavy** BC with very different access patterns than 
 - `AddedAt` (DateTimeOffset) - When product was added to catalog
 - `UpdatedAt` (DateTimeOffset?) - Last modification timestamp
 
-**ProductCategory / CategoryName (Value Object - Phase 1):**
-- **Phase 1 Implementation**: Simple string value (e.g., "Dogs", "Dog Bowls", "Cat Toys")
+**ProductCategory / CategoryName - Architecture Signal:**
+- **✅ Phase 1 Implementation**: Primitive `string` (NOT a value object)
+- **Architecture Signal Discovered (Cycle 14)**: Value objects + Marten LINQ queries = friction
+  - **Initial Plan**: `CategoryName` value object with `Value` property
+  - **Problem**: Marten LINQ couldn't translate `p.Category.Value == "Dogs"` or `p.Category.ToString()`
+  - **Test Failure**: 19/24 tests passing → filtering by category failed with 500 errors
+  - **Solution**: Changed `Category` from `CategoryName` value object to primitive `string`
+  - **Result**: 24/24 tests passing, clean LINQ queries (`p.Category == "Dogs"`)
+  - **Pattern**: Use primitives for queryable fields, value objects for complex structures, FluentValidation at boundaries
+  - **Validation**: FluentValidation at HTTP boundary (returns 400 errors) instead of factory method
 - **Future Vision (Post-Cycle 15)**: Full Category subdomain with marketplace mapping
   - Internal categories (our categorization scheme)
   - Marketplace mappings (Ebay categories ≠ Amazon categories ≠ Walmart categories ≠ Target categories)
@@ -1138,7 +1146,7 @@ Product Catalog is a **read-heavy** BC with very different access patterns than 
   - Category hierarchy management (parent/child relationships)
   - **Why separate subdomain?** Category mapping is complex enough to warrant its own bounded context within Product Catalog
   - **Why not its own BC?** Categories are tightly coupled to products; not valuable as standalone service
-- **Current Design Decision**: Keep simple now (string-based) to enable rapid Product Catalog development
+  - **Note**: Even with future Category subdomain, Product.Category will likely remain a primitive string for queryability
 - Examples: Dogs, Cats, Birds, Fish, Reptiles, Small Animals
 
 **ProductImage (Value Object):**
