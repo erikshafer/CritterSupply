@@ -1,16 +1,15 @@
-using Alba;
 using ProductCatalog.Api.Products;
 using ProductCatalog.Products;
 using Shouldly;
 
-namespace ProductCatalog.IntegrationTests;
+namespace ProductCatalog.Api.IntegrationTests;
 
 [Collection(IntegrationTestCollection.Name)]
-public sealed class ChangeProductStatusTests : IClassFixture<ProductCatalogFixture>
+public sealed class ChangeProductStatusTests : IClassFixture<TestFixture>
 {
-    private readonly ProductCatalogFixture _fixture;
+    private readonly TestFixture _fixture;
 
-    public ChangeProductStatusTests(ProductCatalogFixture fixture)
+    public ChangeProductStatusTests(TestFixture fixture)
     {
         _fixture = fixture;
     }

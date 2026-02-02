@@ -5,7 +5,7 @@ using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.Tracking;
 
-namespace Fulfillment.Api.IntegrationTests;
+namespace ProductCatalog.Api.IntegrationTests;
 
 /// <summary>
 /// Test fixture providing PostgreSQL via TestContainers and Alba host for integration tests.
@@ -14,8 +14,8 @@ namespace Fulfillment.Api.IntegrationTests;
 public class TestFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
-        .WithDatabase("fulfillment_test_db")
-        .WithName($"fulfillment-postgres-test-{Guid.NewGuid():N}")
+        .WithDatabase("product_catalog_test")
+        .WithName($"product_catalog-postgres-test-{Guid.NewGuid():N}")
         .WithCleanUp(true)
         .Build();
 
@@ -48,6 +48,11 @@ public class TestFixture : IAsyncLifetime
                 services.DisableAllExternalWolverineTransports();
             });
         });
+
+        // Seed test data
+        using var scope = Host.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IDocumentStore>();
+        await SeedData.SeedProductsAsync(store);
     }
 
     public async Task DisposeAsync()
@@ -63,6 +68,10 @@ public class TestFixture : IAsyncLifetime
             {
                 // Ignore if already disposed during async shutdown
             }
+            catch (TaskCanceledException)
+            {
+                // Ignore if tasks were canceled during async shutdown
+            }
             catch (AggregateException ex) when (ex.InnerExceptions.All(e =>
                 e is OperationCanceledException or ObjectDisposedException))
             {
@@ -72,7 +81,6 @@ public class TestFixture : IAsyncLifetime
 
         await _postgres.DisposeAsync();
     }
-
 
     /// <summary>
     /// Gets a Marten document session for direct database operations.

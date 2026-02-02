@@ -1,7 +1,7 @@
 using Marten;
 using ProductCatalog.Products;
 
-namespace ProductCatalog.IntegrationTests;
+namespace ProductCatalog.Api.IntegrationTests;
 
 /// <summary>
 /// Seeds test data for Product Catalog integration tests.
