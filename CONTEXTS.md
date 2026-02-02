@@ -1686,6 +1686,434 @@ public static class ProductSeeder
 
 ---
 
+## Vendor Identity
+
+The Vendor Identity context manages authentication, authorization, and user lifecycle for vendor personnel accessing CritterSupply systems. Structurally similar to Customer Identity, but serving a distinct user population with potentially different authentication requirements (SSO with vendor's corporate IdP, different MFA policies, etc.).
+
+**Status**: 🔜 Planned (Future Cycles)
+
+**Persistence Strategy**: Entity Framework Core (following Customer Identity pattern)
+
+### Purpose
+
+Authenticate vendor users, manage their lifecycle, and provide tenant-scoped claims for downstream contexts. Each vendor organization is a separate tenant with isolated user management.
+
+### Multi-Tenancy Model
+
+One tenant per vendor organization. User records are scoped to their vendor tenant. The issued claims include tenant identifier (`VendorTenantId`) for downstream authorization in Vendor Portal and potentially other contexts (e.g., Catalog for product associations).
+
+### Aggregates
+
+**VendorTenant (Aggregate Root):**
+- `Id` (Guid) - Canonical tenant identifier used throughout Vendor Identity and Vendor Portal
+- `OrganizationName` (string) - Vendor company name
+- `Status` (TenantStatus enum) - Onboarding, Active, Suspended, Deactivated
+- `OnboardedAt` (DateTimeOffset) - When vendor was added to CritterSupply
+- `ContactEmail` (string) - Primary contact for vendor organization
+
+**VendorUser (Entity):**
+- `Id` (Guid) - User identifier
+- `VendorTenantId` (Guid) - Foreign key to VendorTenant
+- `Email` (string) - Login email, unique across all vendor users
+- `PasswordHash` (string) - Bcrypt/Argon2 hash
+- `FirstName`, `LastName` (string) - User profile
+- `Status` (VendorUserStatus enum) - Invited, Active, Deactivated
+- `MfaEnabled` (bool) - Multi-factor authentication enrollment
+- `InvitedAt`, `ActivatedAt` (DateTimeOffset?) - Lifecycle timestamps
+- `LastLoginAt` (DateTimeOffset?) - Audit trail
+
+### What it receives
+
+None from other bounded contexts. Vendor Identity initiates identity flows based on administrative actions (tenant creation, user invitation).
+
+### What it publishes
+
+**Integration Events:**
+- `VendorTenantCreated` - New vendor organization onboarded (includes `VendorTenantId`, `OrganizationName`, timestamp)
+- `VendorUserInvited` - Invitation sent to vendor personnel (includes `UserId`, `VendorTenantId`, `Email`)
+- `VendorUserActivated` - User completed registration (includes `UserId`, `VendorTenantId`, activation timestamp)
+- `VendorUserDeactivated` - User access revoked (includes `UserId`, `VendorTenantId`, reason)
+- `VendorUserPasswordReset` - Password changed, for audit trail (includes `UserId`, timestamp)
+
+### Core Invariants
+
+**Tenant Invariants:**
+- Vendor tenant IDs are immutable once created (canonical identifier)
+- Organization names must be unique across all vendor tenants
+- Tenants can only be deactivated, never deleted (preserve historical data)
+
+**User Invariants:**
+- Email addresses must be unique across all vendor users
+- Users belong to exactly one vendor tenant (no multi-tenancy for users)
+- Users can only be activated after invitation
+- Deactivated users cannot be reactivated (must create new user)
+- MFA enrollment cannot be disabled once enabled (security policy)
+
+### What it doesn't own
+
+- Vendor Portal access logic (Vendor Portal consumes tenant claims)
+- Product-vendor associations (placeholder in Catalog BC for future design)
+- Analytics or insights (Vendor Portal responsibility)
+- Change request approval workflows (Catalog BC responsibility)
+
+### Integration Points
+
+| Context | Relationship | Notes |
+|---------|--------------|-------|
+| Vendor Portal | Downstream | Consumes identity events (`VendorUserActivated`, `VendorUserDeactivated`), relies on tenant claims (`VendorTenantId`) for data isolation |
+| Catalog | Downstream (Future) | May consume `VendorTenantCreated` to associate products with vendors (design deferred, placeholder integration point) |
+
+### Integration Flows
+
+**Tenant Onboarding:**
+```
+CreateVendorTenant (command from admin UI)
+  └─> CreateVendorTenantHandler
+      ├─> VendorTenant entity persisted
+      └─> Publish VendorTenantCreated → Vendor Portal, Catalog
+
+VendorTenantCreated (integration message)
+  └─> Vendor Portal: Initialize tenant-scoped projections
+  └─> [Future] Catalog: Create vendor-product association records
+```
+
+**User Invitation and Activation:**
+```
+InviteVendorUser (command from admin UI)
+  └─> InviteVendorUserHandler
+      ├─> VendorUser entity created with Status=Invited
+      ├─> Send invitation email (external service)
+      └─> Publish VendorUserInvited → Vendor Portal
+
+CompleteVendorUserRegistration (command from user)
+  └─> CompleteVendorUserRegistrationHandler
+      ├─> VendorUser.Status → Active
+      ├─> Set password hash
+      └─> Publish VendorUserActivated → Vendor Portal
+
+DeactivateVendorUser (command from admin UI)
+  └─> DeactivateVendorUserHandler
+      ├─> VendorUser.Status → Deactivated
+      └─> Publish VendorUserDeactivated → Vendor Portal
+```
+
+**Authentication Flow:**
+```
+AuthenticateVendorUser (command from login page)
+  └─> AuthenticateVendorUserHandler
+      ├─> Query VendorUser by email
+      ├─> Verify password hash
+      ├─> Issue JWT with claims:
+      │   ├─> UserId
+      │   ├─> VendorTenantId (for tenant isolation)
+      │   ├─> Email
+      │   └─> Roles (Admin, Viewer, Editor)
+      └─> Update LastLoginAt timestamp
+```
+
+### HTTP Endpoints (Planned)
+
+**Authentication:**
+- `POST /api/vendor-auth/login` - Authenticate vendor user
+- `POST /api/vendor-auth/logout` - Invalidate session
+- `POST /api/vendor-auth/reset-password` - Initiate password reset
+
+**Admin (Tenant Management):**
+- `POST /api/admin/vendor-tenants` - Create new vendor organization
+- `GET /api/admin/vendor-tenants` - List all vendor tenants
+- `GET /api/admin/vendor-tenants/{tenantId}` - Get tenant details
+- `PATCH /api/admin/vendor-tenants/{tenantId}/status` - Change tenant status
+
+**Admin (User Management):**
+- `POST /api/admin/vendor-tenants/{tenantId}/users/invite` - Invite vendor user
+- `GET /api/admin/vendor-tenants/{tenantId}/users` - List users for tenant
+- `PATCH /api/admin/vendor-users/{userId}/deactivate` - Deactivate user
+
+**User Self-Service:**
+- `POST /api/vendor-users/complete-registration` - Complete invited user registration
+- `POST /api/vendor-users/change-password` - Change password (authenticated)
+- `POST /api/vendor-users/enroll-mfa` - Enable multi-factor authentication
+
+### Structural Similarity to Customer Identity
+
+Vendor Identity follows the same patterns established in Customer Identity BC:
+- Same aggregate root pattern (Tenant/User entities with navigation properties)
+- Same authentication flows (or parallel implementations if vendor auth differs, e.g., SSO)
+- Same event shapes where applicable (e.g., `UserActivated` pattern)
+- Same persistence strategy (EF Core with PostgreSQL)
+- Opportunity to extract shared infrastructure if patterns converge (e.g., password hashing, JWT issuance)
+
+The separation exists because vendors and customers are distinct populations with different lifecycles, access patterns, and potentially different auth requirements (e.g., corporate SSO for vendors vs. social login for customers). Keeping them separate in the reference architecture demonstrates the bounded context pattern more clearly.
+
+### Privacy and Compliance Considerations
+
+**Vendor User Data:**
+- Email addresses required for login (not PII by most regulations, but still sensitive)
+- Password hashes never exposed or logged
+- MFA enrollment status tracked for security audits
+
+**Data Deletion (GDPR/CCPA):**
+- Vendor users can request deletion
+- Personal data deleted from Vendor Identity BC
+- Audit logs retain user IDs and timestamps (legitimate interest: security, compliance)
+- Vendor Portal projections may retain aggregated data (no PII)
+
+---
+
+## Vendor Portal
+
+The Vendor Portal context provides partnered vendors with a private, tenant-isolated view into how their products perform within CritterSupply. Vendors can see sales analytics across configurable time periods, monitor inventory levels, and submit change requests for their product data. The portal captures vendor intent and displays status—actual approval decisions live in other contexts (primarily Catalog).
+
+**Status**: 🔜 Planned (Future Cycles)
+
+**Persistence Strategy**: Marten (document store for accounts/requests, projections for read models)
+
+### Purpose
+
+Present pre-aggregated sales and inventory analytics scoped to the vendor's products, allow vendors to save custom filters and views for their dashboards, accept and track product change requests, and display request status based on events from downstream contexts.
+
+### Multi-Tenancy Model
+
+One tenant per vendor organization (`VendorTenantId` from Vendor Identity BC). Each vendor's data is fully isolated using Marten's multi-tenancy capabilities. Users belong to a single tenant, though the model supports a list of tenant associations to accommodate future scenarios (acquisitions, portfolio companies, regional splits).
+
+### Aggregates and Projections
+
+**Aggregates (Write Models):**
+
+- `VendorAccount` - Portal-specific settings, saved views, notification preferences
+  - `VendorTenantId` (Guid) - Tenant identifier from Vendor Identity
+  - `SavedViews` (IReadOnlyList<SavedDashboardView>) - Custom filter configurations
+  - `NotificationPreferences` (NotificationSettings) - Email/SMS alert preferences
+  - `ContactInfo` (VendorContactInfo) - Portal-specific contact (may differ from Vendor Identity)
+
+- `ChangeRequest` - Tracks lifecycle of submitted product corrections (event-sourced)
+  - `Id` (Guid) - Request identifier
+  - `VendorTenantId` (Guid) - Tenant scope
+  - `ProductSku` (string) - Target product
+  - `RequestType` (ChangeRequestType enum) - DescriptionChange, ImageUpload, ProductCorrection
+  - `Status` (ChangeRequestStatus enum) - Pending, Approved, Rejected
+  - `SubmittedAt`, `ResolvedAt` (DateTimeOffset?) - Lifecycle timestamps
+
+**Projections (Read Models, Pre-Aggregated):**
+
+- `ProductPerformanceSummary` - Sales metrics by SKU, bucketed by time period
+  - `VendorTenantId`, `ProductSku` (partition keys)
+  - `DailySales`, `WeeklySales`, `MonthlySales`, `QuarterlySales`, `YearlySales` (aggregated metrics)
+  - `Revenue`, `UnitsSold`, `AverageOrderValue` (per time bucket)
+
+- `InventorySnapshot` - Current stock levels and recent movement
+  - `VendorTenantId`, `ProductSku` (partition keys)
+  - `AvailableQuantity`, `ReservedQuantity`, `WarehouseId`
+  - `LastRestockedAt`, `LastSoldAt` (timestamps)
+
+- `ChangeRequestStatus` - Current state of all pending and resolved requests
+  - `VendorTenantId` (partition key)
+  - `RequestId`, `ProductSku`, `RequestType`, `Status`, `SubmittedAt`, `ResolvedAt`
+
+- `SavedDashboardView` - Vendor-configured filters and display preferences
+  - `VendorTenantId`, `ViewId` (partition keys)
+  - `Name`, `FilterCriteria` (JSON), `SortOrder`
+
+### What it receives
+
+**Integration Messages:**
+
+From **Orders**:
+- `OrderPlaced` - Feeds sales aggregation (includes line items, order total, timestamp)
+- `OrderItemShipped` - Updates sales metrics (shipped units)
+- `OrderItemReturned` - Adjusts sales metrics (returned units, refunds)
+
+From **Inventory**:
+- `InventoryAdjusted` - Updates inventory snapshots (quantity changes)
+- `StockReplenished` - Feeds inventory snapshots (restock events)
+- `LowStockDetected` - Alerts vendors of low inventory (threshold crossed)
+
+From **Catalog**:
+- `ProductCreated` - Maintains product reference data (new products)
+- `ProductUpdated` - Updates product reference data (description changes)
+- `ProductDiscontinued` - Marks products as discontinued in projections
+- `DescriptionChangeApproved` - Updates change request status (approval)
+- `DescriptionChangeRejected` - Updates change request status (rejection)
+- `ImageChangeApproved` - Updates change request status (approval)
+- `ImageChangeRejected` - Updates change request status (rejection)
+
+From **Vendor Identity**:
+- `VendorUserActivated` - Grants portal access to new users
+- `VendorUserDeactivated` - Revokes portal access
+- `VendorTenantCreated` - Initializes tenant-scoped projections
+
+### What it publishes
+
+**Integration Messages:**
+
+- `DescriptionChangeRequested` - Vendor proposes updated description or bullet points (includes `ProductSku`, `NewDescription`, `RequestId`, `VendorTenantId`)
+- `ImageUploadRequested` - Vendor submits new product images for review (includes `ProductSku`, `ImageUrls`, `RequestId`, `VendorTenantId`)
+- `ProductCorrectionRequested` - Vendor flags an error (wrong weight, incorrect ingredients, etc.) (includes `ProductSku`, `CorrectionType`, `CorrectionDetails`, `RequestId`, `VendorTenantId`)
+- `DashboardViewSaved` - Vendor saves custom filter/view configuration (includes `VendorTenantId`, `ViewId`, `FilterCriteria`)
+
+### Core Invariants
+
+**Multi-Tenancy Invariants:**
+- All queries and projections must be scoped to `VendorTenantId`
+- Vendors can only see data for products associated with their tenant (enforced by Marten tenant isolation)
+- Change requests must reference products belonging to the requesting vendor's tenant
+
+**Change Request Invariants:**
+- A change request cannot be submitted without a valid `ProductSku`
+- A change request can only be in one state at a time (Pending, Approved, Rejected)
+- Change requests cannot be edited after submission (immutable once created)
+- Only pending requests can transition to approved/rejected
+- Approved/rejected requests are terminal states (no further transitions)
+
+**Dashboard View Invariants:**
+- View names must be unique per vendor tenant
+- View configurations must be valid JSON
+- Vendors can have unlimited saved views
+
+### What it doesn't own
+
+- Product approval workflows (Catalog BC owns approval logic)
+- Sales data (Orders BC is source of truth)
+- Inventory levels (Inventory BC is source of truth)
+- User authentication (Vendor Identity BC owns auth)
+- Product master data (Catalog BC owns product definitions)
+
+### Integration Points
+
+| Context | Relationship | Notes |
+|---------|--------------|-------|
+| Vendor Identity | Upstream | Authenticates vendor users, provides tenant claims (`VendorTenantId`) for data isolation |
+| Catalog | Downstream | Receives change requests (`DescriptionChangeRequested`, `ImageUploadRequested`, `ProductCorrectionRequested`), publishes approval outcomes |
+| Orders | Upstream | Source of sales events (`OrderPlaced`, `OrderItemShipped`, `OrderItemReturned`) for analytics aggregation |
+| Inventory | Upstream | Source of stock-level events (`InventoryAdjusted`, `StockReplenished`, `LowStockDetected`) for inventory snapshots |
+
+### Integration Flows
+
+**Read-Only Analytics (Sales Performance):**
+```
+[Orders BC domain logic]
+OrderPlaced (integration message from Orders)
+  └─> OrderPlacedHandler (Vendor Portal)
+      ├─> Extract line items for vendor's products
+      ├─> Update ProductPerformanceSummary projection (daily/weekly/monthly buckets)
+      └─> Increment revenue, units sold, order count
+
+GetProductPerformance (query from vendor dashboard)
+  └─> GetProductPerformanceHandler
+      ├─> Query ProductPerformanceSummary projection (scoped to VendorTenantId)
+      ├─> Filter by date range (last 30 days, last quarter, etc.)
+      └─> Return aggregated sales metrics
+```
+
+**Read-Only Analytics (Inventory Snapshot):**
+```
+[Inventory BC domain logic]
+InventoryAdjusted (integration message from Inventory)
+  └─> InventoryAdjustedHandler (Vendor Portal)
+      ├─> Update InventorySnapshot projection (scoped to VendorTenantId)
+      └─> Set AvailableQuantity, ReservedQuantity, LastRestockedAt
+
+GetInventorySnapshot (query from vendor dashboard)
+  └─> GetInventorySnapshotHandler
+      ├─> Query InventorySnapshot projection (scoped to VendorTenantId)
+      ├─> Filter by ProductSku, WarehouseId
+      └─> Return current stock levels
+```
+
+**Change Request Flow (Description Update):**
+```
+SubmitDescriptionChange (command from vendor dashboard)
+  └─> SubmitDescriptionChangeHandler
+      ├─> Create ChangeRequest aggregate (Status=Pending)
+      ├─> Persist to Marten
+      └─> Publish DescriptionChangeRequested → Catalog BC
+
+[Catalog BC processes approval workflow]
+
+DescriptionChangeApproved (integration message from Catalog)
+  └─> DescriptionChangeApprovedHandler (Vendor Portal)
+      ├─> Update ChangeRequest aggregate (Status=Approved, ResolvedAt=now)
+      └─> Update ChangeRequestStatus projection
+
+GetChangeRequestStatus (query from vendor dashboard)
+  └─> GetChangeRequestStatusHandler
+      ├─> Query ChangeRequestStatus projection (scoped to VendorTenantId)
+      └─> Return list of pending/approved/rejected requests
+```
+
+**Saved Dashboard Views:**
+```
+SaveDashboardView (command from vendor dashboard)
+  └─> SaveDashboardViewHandler
+      ├─> Update VendorAccount aggregate (add to SavedViews collection)
+      ├─> Persist to Marten
+      └─> Publish DashboardViewSaved (optional, for analytics)
+
+GetSavedViews (query from vendor dashboard)
+  └─> GetSavedViewsHandler
+      ├─> Query VendorAccount aggregate (scoped to VendorTenantId)
+      └─> Return list of saved view configurations
+```
+
+### HTTP Endpoints (Planned)
+
+**Analytics Queries:**
+- `GET /api/vendor-portal/performance?sku={sku}&period={period}` - Sales metrics by SKU and time period
+- `GET /api/vendor-portal/inventory?sku={sku}` - Current inventory snapshot
+- `GET /api/vendor-portal/dashboard` - Aggregated dashboard data (top products, alerts)
+
+**Change Requests:**
+- `POST /api/vendor-portal/change-requests/description` - Submit description change
+- `POST /api/vendor-portal/change-requests/images` - Submit image upload
+- `POST /api/vendor-portal/change-requests/correction` - Submit product correction
+- `GET /api/vendor-portal/change-requests` - List all change requests (paginated, filterable)
+- `GET /api/vendor-portal/change-requests/{requestId}` - Get change request details
+
+**Account Management:**
+- `GET /api/vendor-portal/account` - Get vendor account settings
+- `PUT /api/vendor-portal/account/notifications` - Update notification preferences
+- `POST /api/vendor-portal/account/views` - Save dashboard view configuration
+- `GET /api/vendor-portal/account/views` - List saved views
+- `DELETE /api/vendor-portal/account/views/{viewId}` - Delete saved view
+
+### Phased Roadmap
+
+**Phase 1 — Vendor Identity Foundation**
+- `VendorTenant` and `VendorUser` aggregates
+- Basic registration/authentication flow
+- Tenant-scoped claim issuance
+- Events: `VendorTenantCreated`, `VendorUserActivated`
+
+**Phase 2 — Read-Only Analytics (Portal)**
+- Subscribe to Orders and Inventory events
+- Build `ProductPerformanceSummary` and `InventorySnapshot` projections
+- Basic dashboard displaying sales by time period
+- Tenant isolation via Marten multi-tenancy, driven by Vendor Identity claims
+
+**Phase 3 — Saved Views (Portal)**
+- `VendorAccount` aggregate with preferences
+- `SavedDashboardView` projection
+- Vendor can save and switch between custom filter configurations
+
+**Phase 4 — Change Requests (Portal + Catalog)**
+- `ChangeRequest` aggregate with saga-style lifecycle tracking
+- Image upload flow (emit `ImageUploadRequested`, listen for approval)
+- Description/correction request flow
+- Request history and status display
+- Catalog-side handlers for approval workflow
+
+**Phase 5 — Full Identity Lifecycle**
+- User invitation flow
+- Password reset, MFA enrollment
+- User deactivation
+- Audit events
+
+**Phase 6 — Account Management (Portal)**
+- Vendor-editable account settings (notification preferences, contact info)
+- Integration with Vendor Identity for user management visibility
+
+---
+
 ## Future Considerations
 
 The following contexts are acknowledged but not yet defined:

@@ -482,6 +482,87 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 
 ---
 
+## Future Cycles (Not Scheduled)
+
+The following bounded contexts are planned for future development but not yet assigned to specific cycles. They represent logical extensions of the CritterSupply system once the core customer-facing experience is complete.
+
+### Vendor Identity & Vendor Portal
+
+**Objective**: Enable partnered vendors to manage their product data and view analytics on how their products perform within CritterSupply.
+
+**Why These Contexts:**
+- **Vendor Identity** provides authentication and user management for vendor personnel (similar to Customer Identity but for a different user population)
+- **Vendor Portal** gives vendors read-only analytics (sales, inventory) and the ability to submit product change requests
+- Demonstrates multi-tenancy patterns (one tenant per vendor organization)
+- Shows how to build tenant-isolated systems with Marten's multi-tenancy capabilities
+- Illustrates choreography between BCs (Vendor Portal subscribes to Orders/Inventory events for analytics)
+
+**Architecture Decisions:**
+- **Vendor Identity**: EF Core (follows Customer Identity pattern for consistency)
+- **Vendor Portal**: Marten document store + projections (read-heavy workload, pre-aggregated analytics)
+- **Multi-Tenancy**: `VendorTenantId` from Vendor Identity used as tenant discriminator throughout Vendor Portal
+- **Integration**: Vendor Portal subscribes to `OrderPlaced`, `InventoryAdjusted` for analytics; publishes `DescriptionChangeRequested`, `ImageUploadRequested` to Catalog BC
+
+**Phased Roadmap (6 Phases):**
+
+**Phase 1 — Vendor Identity Foundation**
+- `VendorTenant` and `VendorUser` aggregates (EF Core)
+- Basic registration/authentication flow
+- Tenant-scoped claim issuance (JWT with `VendorTenantId`)
+- Events: `VendorTenantCreated`, `VendorUserActivated`
+- **Dependencies**: None (self-contained)
+
+**Phase 2 — Read-Only Analytics (Portal)**
+- Subscribe to Orders and Inventory events
+- Build `ProductPerformanceSummary` and `InventorySnapshot` projections (Marten)
+- Basic dashboard displaying sales by time period (daily/weekly/monthly/quarterly/yearly)
+- Tenant isolation via Marten multi-tenancy, driven by Vendor Identity claims
+- **Dependencies**: Vendor Identity (Phase 1), Orders BC, Inventory BC
+
+**Phase 3 — Saved Views (Portal)**
+- `VendorAccount` aggregate with preferences (Marten document store)
+- `SavedDashboardView` projection
+- Vendor can save and switch between custom filter configurations
+- **Dependencies**: Phase 2
+
+**Phase 4 — Change Requests (Portal + Catalog)**
+- `ChangeRequest` aggregate with saga-style lifecycle tracking (Marten event-sourced)
+- Image upload flow (emit `ImageUploadRequested`, listen for `ImageChangeApproved`/`ImageChangeRejected`)
+- Description/correction request flow (same pattern)
+- Request history and status display
+- Catalog-side handlers for approval workflow (new feature in Catalog BC)
+- **Dependencies**: Phase 3, Catalog BC
+
+**Phase 5 — Full Identity Lifecycle**
+- User invitation flow (email invitations with registration links)
+- Password reset, MFA enrollment
+- User deactivation
+- Audit events (`VendorUserPasswordReset`, etc.)
+- **Dependencies**: Phase 1 (extends Vendor Identity)
+
+**Phase 6 — Account Management (Portal)**
+- Vendor-editable account settings (notification preferences, contact info)
+- Integration with Vendor Identity for user management visibility (list users, view roles)
+- **Dependencies**: Phase 5
+
+**Key Technical Considerations:**
+- **Catalog Integration**: Product-vendor associations deferred to avoid blocking Vendor Portal development; placeholder integration point documented in CONTEXTS.md
+- **Change Request Approval**: Catalog BC owns approval logic; Vendor Portal displays status based on events from Catalog
+- **Tenant Isolation**: All Vendor Portal queries/projections scoped to `VendorTenantId` (enforced by Marten multi-tenancy)
+- **Authentication Differences**: Vendor Identity may require SSO with vendor's corporate IdP, different MFA policies than Customer Identity
+
+**Estimated Effort:**
+- Phase 1-2: 2-3 cycles (foundational identity + analytics projections)
+- Phase 3-4: 2 cycles (saved views + change requests with Catalog integration)
+- Phase 5-6: 1-2 cycles (full identity lifecycle + account management)
+- **Total**: 5-7 cycles
+
+**Documentation:**
+- See CONTEXTS.md "Vendor Identity" and "Vendor Portal" sections for complete specifications
+- Integration contracts (inbound/outbound events) documented in CONTEXTS.md
+
+---
+
 **Next Priority (Cycle 15+): Customer Experience BC (Storefront BFF)**
 
 **Objective**: Build customer-facing web store using Backend-for-Frontend pattern with Blazor Server and SignalR

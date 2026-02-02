@@ -90,8 +90,10 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 | 📊 **Inventory**           | Stock levels and reservations       | ✅ Complete |
 | 🚚 **Fulfillment**         | Picking, packing, shipping          | ✅ Complete |
 | 👤 **Customer Identity**   | Addresses and saved payment methods | ✅ Complete |
+| 📦 **Product Catalog**     | Product definitions and pricing     | ✅ Complete |
 | 🎁 **Customer Experience** | Storefront BFF (Blazor + SignalR)   | 🔜 Planned |
-| 📦 **Product Catalog**     | Product definitions and pricing     | 🔜 Planned |
+| 🏢 **Vendor Identity**     | Vendor user authentication & tenant management | 🔜 Planned |
+| 📊 **Vendor Portal**       | Vendor analytics, insights, change requests | 🔜 Planned |
 | 🔄 **Returns**             | Return authorization and processing | 🔜 Planned |
 
 For detailed responsibilities, interactions, and event flows between contexts, see [CONTEXTS.md](./CONTEXTS.md).
