@@ -350,9 +350,64 @@ Payments Context → Orders Integration → Inventory Context → Orders Integra
 - Customer Identity: 12 integration tests
 - Product Catalog: 24 integration tests
 
+**Cycle 15: Customer Experience BC Prerequisites (Completed - 2026-02-03)**
+
+**Objective**: Add missing query endpoints required for BFF layer to compose views from multiple BCs
+
+**BC Work**: Query endpoint additions across Shopping and Orders BCs
+- Added `GET /api/carts/{cartId}` to Shopping BC (returns cart with line items and totals)
+- Added `GET /api/checkouts/{checkoutId}` to Orders BC (returns checkout wizard state)
+- Added `GET /api/orders?customerId={customerId}` to Orders BC (lists orders for customer)
+- Added Marten index on `Order.CustomerId` for efficient customer order queries
+- **Status**: ✅ 11/11 new integration tests passing (4 cart + 3 checkout + 4 orders)
+- **Files**:
+  - Shopping: `Shopping.Api/Cart/GetCartEndpoint.cs` + tests
+  - Orders: `Orders.Api/Checkout/GetCheckoutEndpoint.cs`, `Orders.Api/Placement/ListOrdersEndpoint.cs` + tests
+
+**Connection String Standardization**: ✅ COMPLETED (2026-02-03)
+- **Issue**: Shopping, Customer Identity, and Product Catalog APIs had incorrect connection strings preventing startup with docker-compose
+- **Root Cause**: Port mismatch (5432 vs 5433) and missing/inconsistent database configuration
+- **Standard Established**:
+  - **Host**: `localhost` (for local development)
+  - **Port**: `5433` (docker-compose maps container's 5432 to host's 5433)
+  - **Database**: `postgres` (single database, schema-per-BC for isolation)
+  - **Schema**: Each BC uses `opts.DatabaseSchemaName = Constants.<BcName>.ToLowerInvariant()`
+- **Fixes Applied**:
+  - ✅ Shopping.Api: Port 5432→5433, Database shopping→postgres (uses `shopping` schema)
+  - ✅ CustomerIdentity.Api: Port 5432→5433 (uses `customer_identity` schema)
+  - ✅ ProductCatalog.Api: Added missing connection string with port 5433 (uses `catalog` schema)
+- **Verification**: All 3 APIs start successfully with `docker-compose --profile all up`
+- **Key Learning**: Always verify API projects start with docker-compose dependencies, not just integration tests
+
+**API Project Configuration Standards**: ✅ DOCUMENTED (2026-02-03)
+- **Issue**: Missing/inconsistent launchSettings.json files causing manual setup for each new BC
+- **Documentation Added**: New "API Project Configuration" section in CLAUDE.md with:
+  - Connection string standard (host, port, database, schema pattern)
+  - launchSettings.json template with profile naming convention
+  - **Port Allocation Table** showing assigned ports (5231-5236) and reserved ports for future BCs
+  - Port assignment strategy: increment by 1 for each new BC (e.g., Shopping=5236, next BFF=5237)
+- **Why It Matters**: Prevents port conflicts, enables running multiple APIs simultaneously during debugging
+- **Key Learning**: Document infrastructure configuration standards proactively to reduce repetitive manual setup
+
+**Solution-Wide Test Results**: ✅ All 133/133 tests passing (100% success rate)
+- Payments: 30 tests (11 unit + 19 integration)
+- Inventory: 16 integration tests
+- Fulfillment: 6 integration tests
+- Shopping: 13 integration tests (+4)
+- Orders: 32 integration tests (+7)
+- Customer Identity: 12 integration tests
+- Product Catalog: 24 integration tests
+
 #### 🔜 Planned
 
-*Ready for next cycle - Cycle 14 complete*
+*Ready for Cycle 16 - Customer Experience BC (BFF + Blazor)*
+
+**All Dependencies Complete:**
+- ✅ Shopping BC with cart query endpoint
+- ✅ Orders BC with checkout + orders query endpoints
+- ✅ Customer Identity BC with address queries
+- ✅ Product Catalog BC with product listings
+- ✅ All APIs verified working with docker-compose
 
 #### ✅ Recent Cycles
 

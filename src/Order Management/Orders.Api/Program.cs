@@ -37,7 +37,8 @@ builder.Services.AddMarten(opts =>
         // Configure Order saga document storage
         opts.Schema.For<Order>()
             .Identity(x => x.Id)
-            .UseNumericRevisions(true);
+            .UseNumericRevisions(true)
+            .Index(x => x.CustomerId); // Index for querying orders by customer
 
         // Configure Checkout aggregate as an event sourced stream
         opts.Projections.Snapshot<Checkout>(SnapshotLifecycle.Inline);
