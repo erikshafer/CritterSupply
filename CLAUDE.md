@@ -70,6 +70,74 @@ src/
 
 See `skills/vertical-slice-organization.md` for complete file organization patterns.
 
+## API Project Configuration
+
+When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure these configurations are in place:
+
+### 1. Connection String (appsettings.json)
+
+**Standard format:**
+```json
+{
+  "ConnectionStrings": {
+    "marten": "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=postgres"
+  }
+}
+```
+
+**Key Points:**
+- **Host**: `localhost` (for local development with docker-compose)
+- **Port**: `5433` (docker-compose maps container's 5432 → host's 5433)
+- **Database**: `postgres` (single shared database)
+- **Schema**: Each BC uses its own schema via `opts.DatabaseSchemaName = Constants.<BcName>.ToLowerInvariant()`
+
+**EF Core Projects** use `"postgres"` as the connection string name instead of `"marten"`.
+
+### 2. Launch Settings (Properties/launchSettings.json)
+
+**Required:** Each API project MUST have a `Properties/launchSettings.json` file with a unique port.
+
+**Standard format:**
+```json
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "<BcName>Api": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "api",
+      "applicationUrl": "http://localhost:52XX",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+```
+
+**Port Allocation Table** (increment by 1 for each new BC):
+
+| BC                            | Port     | Status      |
+|-------------------------------|----------|-------------|
+| Orders                        | 5231     | ✅ Assigned  |
+| Payments                      | 5232     | ✅ Assigned  |
+| Inventory                     | 5233     | ✅ Assigned  |
+| Fulfillment                   | 5234     | ✅ Assigned  |
+| Customer Identity             | 5235     | ✅ Assigned  |
+| Shopping                      | 5236     | ✅ Assigned  |
+| Product Catalog               | 5133     | ✅ Assigned  |
+| **Customer Experience (BFF)** | **5237** | 🔜 Next     |
+| Vendor Portal                 | 5238     | 📋 Reserved |
+| Vendor Identity               | 5239     | 📋 Reserved |
+
+**Why this matters:**
+- Allows running multiple APIs simultaneously during development
+- Prevents port conflicts when debugging in IDE
+- Enables easy service discovery during local integration testing
+
+**When creating a new BC:** Check the port allocation table above and use the next available port number.
+
 ---
 
 ## Skill Invocation Guide

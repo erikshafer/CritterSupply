@@ -82,19 +82,19 @@ CritterSupply is organized into bounded contexts. As described in Domain-Driven 
 
 Below is a table of each contexts' focused responsibilities, along with their current implementation status:
 
-| Context                    | Responsibility                      | Status     |
-|----------------------------|-------------------------------------|------------|
-| 📨 **Orders**              | Order lifecycle and checkout        | ✅ Complete |
-| 💳 **Payments**            | Authorization, capture, refunds     | ✅ Complete |
-| 🛒 **Shopping**            | Cart management                     | ✅ Complete |
-| 📊 **Inventory**           | Stock levels and reservations       | ✅ Complete |
-| 🚚 **Fulfillment**         | Picking, packing, shipping          | ✅ Complete |
-| 👤 **Customer Identity**   | Addresses and saved payment methods | ✅ Complete |
-| 📦 **Product Catalog**     | Product definitions and pricing     | ✅ Complete |
-| 🎁 **Customer Experience** | Storefront BFF (Blazor + SignalR)   | 🔜 Planned |
+| Context                    | Responsibility                                 | Status     |
+|----------------------------|------------------------------------------------|------------|
+| 📨 **Orders**              | Order lifecycle and checkout                   | ✅ Complete |
+| 💳 **Payments**            | Authorization, capture, refunds                | ✅ Complete |
+| 🛒 **Shopping**            | Cart management                                | ✅ Complete |
+| 📊 **Inventory**           | Stock levels and reservations                  | ✅ Complete |
+| 🚚 **Fulfillment**         | Picking, packing, shipping                     | ✅ Complete |
+| 👤 **Customer Identity**   | Addresses and saved payment methods            | ✅ Complete |
+| 📦 **Product Catalog**     | Product definitions and pricing                | ✅ Complete |
+| 🎁 **Customer Experience** | Storefront BFF (Blazor + SignalR)              | 🔜 Planned |
 | 🏢 **Vendor Identity**     | Vendor user authentication & tenant management | 🔜 Planned |
-| 📊 **Vendor Portal**       | Vendor analytics, insights, change requests | 🔜 Planned |
-| 🔄 **Returns**             | Return authorization and processing | 🔜 Planned |
+| 📊 **Vendor Portal**       | Vendor analytics, insights, change requests    | 🔜 Planned |
+| 🔄 **Returns**             | Return authorization and processing            | 🔜 Planned |
 
 For detailed responsibilities, interactions, and event flows between contexts, see [CONTEXTS.md](./CONTEXTS.md).
 
