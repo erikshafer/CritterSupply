@@ -25,6 +25,145 @@ When implementing integrations between bounded contexts:
 
 If there's a discrepancy between code and CONTEXTS.md, **CONTEXTS.md wins**. This is why it's imperative to keep it update to date when plans, flows, behaviors, and integrations change.
 
+## Documentation Structure
+
+CritterSupply uses a modular documentation structure optimized for AI-assisted development and reference architecture clarity.
+
+### Planning & Progress Documentation
+
+**Active Cycles & Roadmap:**
+- **[docs/planning/CYCLES.md](./docs/planning/CYCLES.md)** — Active development cycle, recent completions, upcoming work (replaces old DEVPROGRESS.md wall of text)
+- **[docs/planning/cycles/](./docs/planning/cycles/)** — Detailed per-cycle plans with objectives, deliverables, completion criteria
+- **[docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md)** — Future work not yet scheduled
+
+**When to Use:**
+- Starting a new cycle: Create `docs/planning/cycles/cycle-NN-name.md` with detailed plan
+- Tracking progress: Update `CYCLES.md` (move from "Upcoming" to "Current" to "Recently Completed")
+- Retrospective: Add "Implementation Notes" section to cycle plan after completion
+
+### Architectural Decision Records (ADRs)
+
+**Location:** [docs/decisions/](./docs/decisions/)
+
+**Format:** `NNNN-title.md` (e.g., `0004-sse-over-signalr.md`)
+
+**Purpose:** Capture **why** we made key architectural choices without lengthy prose
+
+**When to Create an ADR:**
+- Technology selection decisions (SSE vs SignalR, EF Core vs Marten, etc.)
+- Pattern/approach decisions (value objects vs primitives for queryable fields)
+- Bounded context boundary changes (Checkout migration from Shopping to Orders)
+- Integration pattern choices (orchestration vs choreography)
+
+**ADR Template:**
+```markdown
+# ADR NNNN: Title
+
+**Status:** ✅ Accepted / ⚠️ Proposed / ❌ Rejected / 🔄 Superseded
+
+**Date:** YYYY-MM-DD
+
+**Context:** [What problem are we solving? What constraints exist?]
+
+**Decision:** [What did we decide?]
+
+**Rationale:** [Why did we decide this? What are the benefits?]
+
+**Consequences:** [What are the positive/negative outcomes? Trade-offs?]
+
+**Alternatives Considered:** [What other options did we evaluate? Why rejected?]
+
+**References:** [Links to cycle plans, CONTEXTS.md sections, skills docs]
+```
+
+**Existing ADRs:**
+- [ADR 0001: Checkout Migration to Orders](./docs/decisions/0001-checkout-migration-to-orders.md) (Cycle 8)
+- [ADR 0002: EF Core for Customer Identity](./docs/decisions/0002-ef-core-for-customer-identity.md) (Cycle 13)
+- [ADR 0003: Value Objects vs Primitives for Queryable Fields](./docs/decisions/0003-value-objects-vs-primitives-queryable-fields.md) (Cycle 14)
+- [ADR 0004: SSE over SignalR](./docs/decisions/0004-sse-over-signalr.md) (Cycle 16)
+
+### BDD Feature Specifications (Gherkin)
+
+**Location:** [docs/features/](./docs/features/)
+
+**Organization:** One subdirectory per bounded context (e.g., `docs/features/shopping/`, `docs/features/customer-experience/`)
+
+**Purpose:** Capture user-facing behavior in Given/When/Then format **before** implementation
+
+**Benefits:**
+- **Living Documentation:** Features describe system capabilities from user perspective
+- **Test Generation:** Can scaffold integration tests from Gherkin scenarios
+- **Clarity:** Forces thinking about user value before writing code
+- **Reference Architecture Value:** Shows BDD practices for developers learning from CritterSupply
+
+**When to Create Feature Files:**
+- Before starting a cycle: Write 2-3 `.feature` files for key user stories
+- During implementation: Reference scenarios as acceptance criteria for integration tests
+- After completion: Feature files serve as living documentation (verified by tests)
+
+**Gherkin Template:**
+```gherkin
+Feature: Feature Name
+  As a [user type]
+  I want to [action]
+  So that [business value]
+
+  Background:
+    Given [common setup for all scenarios]
+
+  Scenario: Happy path scenario name
+    Given [precondition]
+    When [action]
+    Then [expected outcome]
+    And [additional assertion]
+
+  Scenario: Edge case scenario name
+    Given [different precondition]
+    When [action]
+    Then [different expected outcome]
+```
+
+**Feature File Organization:**
+```
+docs/features/
+├── shopping/
+│   ├── cart-management.feature
+│   └── checkout-wizard.feature
+├── orders/
+│   ├── order-placement.feature
+│   └── order-saga-orchestration.feature
+├── customer-experience/
+│   ├── product-browsing.feature
+│   ├── cart-real-time-updates.feature
+│   └── checkout-flow.feature
+└── [other BCs]/
+```
+
+### Workflow for New Cycles
+
+**Before Starting a Cycle (Planning Phase):**
+1. Create cycle plan: `docs/planning/cycles/cycle-NN-name.md`
+2. Write 2-3 Gherkin `.feature` files for key user stories
+3. Create ADRs for any architectural decisions made during planning
+4. Review CONTEXTS.md for integration requirements
+5. Update `docs/planning/CYCLES.md` (move cycle from "Upcoming" to "Current")
+
+**During a Cycle (Implementation Phase):**
+1. Implement features using `.feature` files as acceptance criteria
+2. Write integration tests verifying Gherkin scenarios
+3. Update cycle plan with "Implementation Notes" section (learnings, gotchas)
+4. Create ADRs when making architectural decisions during implementation
+
+**After Completing a Cycle (Retrospective Phase):**
+1. Mark cycle complete in `CYCLES.md` (add completion date + summary)
+2. Update CONTEXTS.md with new integration flows
+3. Archive detailed notes in cycle-specific doc (`cycles/cycle-NN-name.md`)
+4. Plan next cycle based on backlog
+
+### Legacy Documentation
+
+**DEVPROGRESS.md** — Deprecated as of 2026-02-04. See deprecation notice at top of file. Kept for historical reference only.
+
 ## Quick References
 
 ### Preferred Tools

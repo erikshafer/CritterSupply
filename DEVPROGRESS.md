@@ -1,5 +1,17 @@
 # CritterSupply Development Progress
 
+> **⚠️ DEPRECATION NOTICE (2026-02-04):**
+> This file is being phased out in favor of a more modular documentation structure.
+> **Please see the new documentation:**
+> - **Active Cycles & Progress:** [docs/planning/CYCLES.md](./docs/planning/CYCLES.md)
+> - **Detailed Cycle Plans:** [docs/planning/cycles/](./docs/planning/cycles/)
+> - **Architectural Decisions (ADRs):** [docs/decisions/](./docs/decisions/)
+> - **BDD Feature Specifications:** [docs/features/](./docs/features/)
+>
+> This file will remain for historical reference but will no longer be actively updated after Cycle 16.
+
+---
+
 Notes about the current "dev status" or "dev progress" of the CritterSupply project. Highlighting the development style, current cycle, completed work, and next steps without implementation details.
 
 ## Development Style: Ping-Pong Integration Pattern
