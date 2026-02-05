@@ -38,7 +38,7 @@ A non-exhaustive list of the patterns, paradigms, and principles demonstrated in
 - A-Frame Architecture (pure business logic)
 - Railway-Oriented Programming (Wolverine middleware)
 
-### 🤖 AI-assisted Development <a id='1.3'></a>
+## 🤖 AI-assisted Development <a id='1.3'></a>
 
 This project is built with Claude as a collaborative coding partner. Beyond just generating code, it's an exercise in teaching AI tools to think in event-driven patterns and leverage the Critter Stack idiomatically—helping to improve the guidance these tools can offer the broader community.
 
@@ -46,10 +46,19 @@ That is to say, the more these tools see well-structured examples, the better gu
 
 See [CLAUDE.md](./CLAUDE.md) for the project-specific instructions Claude follows when working on this codebase.
 
-#### 🚫 Thinking Machines <a id='1.3.1'></a>
+### AI-Discoverable Documentation:
+
+The codebase uses a structured documentation approach optimized for AI assistants:
+- **[docs/planning/](./docs/planning/)** - Development cycles, detailed plans, and roadmap
+- **[docs/decisions/](./docs/decisions/)** - Architectural Decision Records (ADRs) explaining key choices
+- **[docs/features/](./docs/features/)** - BDD specifications in Gherkin format (Given/When/Then scenarios)
+
+These are automatically discoverable by AI assistants through [CLAUDE.md](./CLAUDE.md), which serves as the entry point for AI-assisted development. This structure ensures AI tools can locate planning context, understand architectural decisions, and reference user stories without manual prompting.
+
+### 🚫 Thinking Machines <a id='1.3.1'></a>
 Who knows. Maybe one day we'll ban "thinking machines" and have to build everything ourselves again. 😉 (see: Dune, Warhammer 40k, Battlestar Galactica, Mass Effect, and others)
 
-### 🛠️ Technology Stack <a id='1.4'></a>
+## 🛠️ Technology Stack <a id='1.4'></a>
 
 **Language & Runtime:**
 - C# 14+ (.NET 10+)

@@ -21,6 +21,21 @@
     <File Path="skills\vertical-slice-organization.md" />
     <File Path="skills\wolverine-message-handlers.md" />
   </Folder>
+  <Folder Name="/.SolutionItems/Documentation/">
+    <File Path="docs\README.md" />
+  </Folder>
+  <Folder Name="/.SolutionItems/Documentation/Planning/">
+    <File Path="docs\planning\CYCLES.md" />
+    <File Path="docs\planning\cycles\cycle-16-customer-experience.md" />
+  </Folder>
+  <Folder Name="/.SolutionItems/Documentation/Decisions/">
+    <File Path="docs\decisions\0004-sse-over-signalr.md" />
+  </Folder>
+  <Folder Name="/.SolutionItems/Documentation/Features/">
+    <File Path="docs\features\customer-experience\cart-real-time-updates.feature" />
+    <File Path="docs\features\customer-experience\checkout-flow.feature" />
+    <File Path="docs\features\customer-experience\product-browsing.feature" />
+  </Folder>
   <Folder Name="/Order Management/">
     <Project Path="src/Order Management/Orders.Api/Orders.Api.csproj" />
     <Project Path="src/Order Management/Orders/Orders.csproj" />
