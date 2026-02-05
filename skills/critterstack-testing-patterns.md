@@ -1,5 +1,7 @@
 # Critter Stack Testing Patterns
 
+> **Scope:** This skill covers testing patterns for Wolverine handlers, Marten aggregates, and Alba HTTP scenarios. For TestContainers infrastructure setup and container lifecycle management, see `testcontainers-integration-tests.md`.
+
 Patterns for testing Wolverine and Marten applications in CritterSupply.
 
 ## Planned: End-to-End Testing

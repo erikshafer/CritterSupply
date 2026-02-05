@@ -4,6 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
+    <PackageVersion Include="Reqnroll" Version="3.3.3" />
+    <PackageVersion Include="Reqnroll.xUnit" Version="3.3.3" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.1.0" />
     <PackageVersion Include="Marten" Version="8.17.0" />
     <PackageVersion Include="WolverineFx.Http.FluentValidation" Version="5.10.0" />

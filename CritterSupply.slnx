@@ -12,6 +12,7 @@
   <Folder Name="/.SolutionItems/Skills/">
     <File Path="skills/critterstack-testing-patterns.md" />
     <File Path="skills/modern-csharp-coding-standards.md" />
+    <File Path="skills/reqnroll-bdd-testing.md" />
     <File Path="skills/testcontainers-integration-tests.md" />
     <File Path="skills\bff-signalr-patterns.md" />
     <File Path="skills\efcore-wolverine-integration.md" />
@@ -30,6 +31,7 @@
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Decisions/">
     <File Path="docs\decisions\0004-sse-over-signalr.md" />
+    <File Path="docs\decisions\0005-reqnroll-bdd-framework.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Features/">
     <File Path="docs\features\customer-experience\cart-real-time-updates.feature" />
