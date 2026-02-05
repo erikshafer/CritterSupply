@@ -62,13 +62,13 @@ src/Customer Experience/Storefront.Web/
 ├── Components/
 │   ├── ProductCard.razor
 │   ├── CartSummary.razor
-│   ├── CheckoutProgress.razor
-│   └── AddressSelector.razor
+│   ├── CheckoutProgress.razor (MudStepper)
+│   └── AddressSelector.razor (MudSelect)
 ├── Shared/
-│   ├── MainLayout.razor
-│   └── NavMenu.razor
+│   ├── MainLayout.razor      # MudLayout with MudAppBar
+│   └── NavMenu.razor         # MudNavMenu
 ├── wwwroot/                  # Static assets (CSS, images)
-└── Program.cs                # Blazor + SSE + Wolverine setup
+└── Program.cs                # Blazor + SSE + Wolverine + MudBlazor setup
 ```
 
 **Integration Tests:**
@@ -297,16 +297,21 @@ SSE Event Received ("cart-updated")
 1. **Authentication:** Use ASP.NET Core Identity or stub authentication for reference architecture?
    - **Recommendation:** Stub for now (hardcode `customerId` in queries), add Identity later
 
-2. **Caching Strategy:** Redis for BFF view model caching?
+2. **UI Framework:** MudBlazor or Bootstrap?
+   - **Decision (2026-02-05):** Use MudBlazor for Material Design components and modern UI
+   - **Rationale:** Polished components, active community, aligns with future client work
+   - **Package:** `MudBlazor` NuGet package
+
+3. **Caching Strategy:** Redis for BFF view model caching?
    - **Recommendation:** No caching for Cycle 16 (premature optimization), add in future cycle if needed
 
-3. **Error Handling:** How to display domain BC errors to customers?
+4. **Error Handling:** How to display domain BC errors to customers?
    - **Recommendation:** Friendly error messages ("Unable to load cart. Please try again."), log technical details
 
-4. **Offline Support:** PWA capabilities for cart persistence when offline?
+5. **Offline Support:** PWA capabilities for cart persistence when offline?
    - **Recommendation:** Out of scope for Cycle 16, consider for future enhancement
 
-5. **Mobile BFF:** Separate project or shared composition logic with different endpoints?
+6. **Mobile BFF:** Separate project or shared composition logic with different endpoints?
    - **Recommendation:** Out of scope for Cycle 16, evaluate after desktop web is complete
 
 ---
@@ -316,8 +321,10 @@ SSE Event Received ("cart-updated")
 - [CONTEXTS.md - Customer Experience](../../../CONTEXTS.md#customer-experience)
 - [Skill: BFF + SignalR Patterns](../../../skills/bff-signalr-patterns.md) (adapt for SSE)
 - [ADR 0004: SSE over SignalR](../../decisions/0004-sse-over-signalr.md)
+- [ADR 0005: MudBlazor UI Framework](../../decisions/0005-mudblazor-ui-framework.md)
 - [Feature: Cart Real-Time Updates](../../features/customer-experience/cart-real-time-updates.feature)
 - [Feature: Checkout Flow](../../features/customer-experience/checkout-flow.feature)
+- [MudBlazor Documentation](https://mudblazor.com/)
 
 ---
 
