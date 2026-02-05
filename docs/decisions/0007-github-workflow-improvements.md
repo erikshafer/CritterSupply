@@ -102,15 +102,15 @@ This ADR proposes a **phased approach** to modernizing the GitHub workflow to su
 - ✅ No architectural changes required
 - ✅ Low risk, high reward
 
-**Estimated Effort:** 2-4 hours
+**Estimated Effort:** 2 hours
 
 ---
 
-### Phase 2: Multi-Job Pipeline for Bounded Contexts (Future - Frontend Integration)
+### Phase 2: Multi-Job Pipeline for Bounded Contexts (After Frontend Integration)
 
 **Goal:** Enable independent BC builds and frontend integration
 
-**Trigger:** When Customer Experience BFF (Blazor) is production-ready (Cycle 16+)
+**Trigger:** When Customer Experience BFF (Blazor) is production-ready (Cycle 16 or later)
 
 **Architecture:**
 
@@ -195,7 +195,7 @@ jobs:
 
 ---
 
-### Phase 3: Docker Image Building & Registry (Future - Deployment Readiness)
+### Phase 3: Docker Image Building & Registry (When Deployment is Planned)
 
 **Goal:** Build and publish Docker images for each BC
 
@@ -259,7 +259,7 @@ jobs:
 
 ---
 
-### Phase 4: Deployment Automation (Future - Production Deployment)
+### Phase 4: Deployment Automation (When Infrastructure is Ready)
 
 **Goal:** Automated deployments to staging and production
 
@@ -311,7 +311,7 @@ jobs:
 
 ---
 
-### Phase 5: Quality & Security Gates (Future - Enterprise Readiness)
+### Phase 5: Quality & Security Gates (Ongoing Improvements)
 
 **Goal:** Enforce quality standards and detect vulnerabilities
 
@@ -363,7 +363,7 @@ jobs:
 
 ---
 
-### Phase 6: Performance & Load Testing (Future - Scale Validation)
+### Phase 6: Performance & Load Testing (When SLAs are Defined)
 
 **Goal:** Automated performance regression detection
 
@@ -397,19 +397,19 @@ jobs:
 
 ## Recommended Implementation Order
 
-### Immediate (Before Cycle 17)
+### Immediate (Before Next Cycle)
 1. ✅ **Phase 1: Optimize Current CI** - Low effort, high impact
    - Add test parallelization
    - Add test result artifacts
    - Add basic path filtering
 
-### Short-Term (Cycle 17-18, Q1 2026)
+### Short-Term (After Phase 1)
 2. ✅ **Phase 5: Security Scanning** - Critical for production
    - Add CodeQL analysis
    - Enable Dependabot
    - Low effort, high security value
 
-### Medium-Term (Cycle 19-22, Q2 2026)
+### Medium-Term (After Frontend is Stable)
 3. ✅ **Phase 2: Multi-Job Pipeline** - After frontend is stable
    - Split BC builds into parallel jobs
    - Add frontend-specific tooling
@@ -418,7 +418,7 @@ jobs:
    - Create Dockerfiles for all BCs
    - Push to GHCR
 
-### Long-Term (Q3-Q4 2026)
+### Long-Term (When Infrastructure is Ready)
 5. ✅ **Phase 4: Deployment Automation** - When hosting is defined
    - Choose hosting platform
    - Implement GitOps or direct deployment
@@ -514,20 +514,18 @@ If approved, Phase 1 can be implemented immediately with these concrete steps:
 # Change in .github/workflows/dotnet.yml
 - name: Test
 -  run: dotnet test --no-build --logger:"console;verbosity=normal" -- -parallel none
-+  run: dotnet test --no-build --logger:"console;verbosity=normal" --collect:"Code Coverage"
++  run: dotnet test --no-build --logger:"console;verbosity=normal" --logger:"trx;LogFileName=test-results.trx"
 ```
 
 ### 2. Add Test Result Artifacts (10 minutes)
 ```yaml
-- name: Test
-  run: dotnet test --no-build --logger:"trx;LogFileName=test-results.trx"
-
 - name: Upload Test Results
   if: always()
   uses: actions/upload-artifact@v4
   with:
-    name: test-results
-    path: '**/test-results.trx'
+    name: test-results-${{ github.run_number }}
+    path: '**/TestResults/**/*.trx'
+    retention-days: 30
 ```
 
 ### 3. Add Path-Based Triggering (20 minutes)
@@ -576,12 +574,23 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: csharp
+          queries: security-extended
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:csharp"
 ```
 
 ### Total Effort for Phase 1: ~2 hours

@@ -73,7 +73,7 @@ Current CI Pipeline (8-10 minutes):
 
 ---
 
-### Phase 2: Multi-Job Pipeline (Q2 2026) 🟡 MEDIUM PRIORITY
+### Phase 2: Multi-Job Pipeline 🟡 MEDIUM PRIORITY
 
 **When:** After Cycle 16 (Customer Experience BFF is stable)
 
@@ -93,7 +93,7 @@ Current CI Pipeline (8-10 minutes):
 
 ---
 
-### Phase 3: Docker Images (Q2-Q3 2026) 🟡 MEDIUM PRIORITY
+### Phase 3: Docker Images 🟡 MEDIUM PRIORITY
 
 **When:** When deployment is planned
 
@@ -113,7 +113,7 @@ Current CI Pipeline (8-10 minutes):
 
 ---
 
-### Phase 4: Deployment Automation (Q3-Q4 2026) 🟢 LOW PRIORITY
+### Phase 4: Deployment Automation 🟢 LOW PRIORITY
 
 **When:** When hosting environment is defined
 
@@ -128,9 +128,9 @@ Current CI Pipeline (8-10 minutes):
 
 ---
 
-### Phase 5: Quality & Security Gates (Q1-Q2 2026) 🔴 HIGH PRIORITY
+### Phase 5: Quality & Security Gates 🔴 HIGH PRIORITY
 
-**When:** Incremental (CodeQL in Phase 1, others later)
+**When:** Incremental (CodeQL in Phase 1, others as needed)
 
 **Changes:**
 - ✅ CodeQL (Phase 1)
@@ -143,7 +143,7 @@ Current CI Pipeline (8-10 minutes):
 
 ---
 
-### Phase 6: Performance Testing (Q4 2026) 🟢 LOW PRIORITY
+### Phase 6: Performance Testing 🟢 LOW PRIORITY
 
 **When:** When performance SLAs are defined
 
@@ -161,23 +161,23 @@ Current CI Pipeline (8-10 minutes):
 ## 📅 Recommended Timeline
 
 ```
-Q1 2026 (Now):
+Immediate:
 ├─ Phase 1: Quick Wins ✅ (2 hours)
 ├─ Phase 5: CodeQL Security ✅ (included in Phase 1)
 └─ Monitor & measure impact
 
-Q2 2026:
-├─ Cycle 16: Customer Experience BFF completion
+Short-Term:
+├─ Complete Cycle 16: Customer Experience BFF
 ├─ Phase 2: Multi-Job Pipeline (1-2 days)
 ├─ Phase 3: Docker Images (2-3 days)
 └─ Phase 5: Coverage & Dependabot (1 day)
 
-Q3 2026:
+Medium-Term:
 ├─ Choose hosting platform (AWS/Azure/GCP)
 ├─ Phase 4: Deployment Automation (1-2 weeks)
 └─ Production deployment prep
 
-Q4 2026:
+Long-Term:
 ├─ Define performance SLAs
 ├─ Phase 6: Performance Testing (3-5 days)
 └─ Refine deployment automation
@@ -192,27 +192,27 @@ Q4 2026:
 - **Benefit:** 30-50% faster CI, security scanning, better observability
 - **ROI:** Immediate payback (saves time on every PR)
 
-### Phase 2 (Q2 2026)
+### Phase 2 (After Frontend is Stable)
 - **Cost:** 1-2 days engineering time
 - **Benefit:** 60-70% faster CI for focused changes, frontend support
 - **ROI:** High (compounds with every PR)
 
-### Phase 3 (Q2-Q3 2026)
+### Phase 3 (When Deployment is Planned)
 - **Cost:** 2-3 days engineering time
 - **Benefit:** Deployment-ready artifacts
 - **ROI:** Enables production deployment
 
-### Phase 4 (Q3-Q4 2026)
+### Phase 4 (When Infrastructure is Ready)
 - **Cost:** 1-2 weeks engineering + infra costs
 - **Benefit:** Zero-downtime deployments, staging environment
 - **ROI:** Depends on deployment frequency
 
-### Phase 5 (Q1-Q2 2026)
+### Phase 5 (Ongoing)
 - **Cost:** 1-2 days engineering time
 - **Benefit:** Compliance readiness, vulnerability detection
 - **ROI:** Risk mitigation (prevents costly security incidents)
 
-### Phase 6 (Q4 2026)
+### Phase 6 (When SLAs are Defined)
 - **Cost:** 3-5 days engineering time
 - **Benefit:** Performance regression detection
 - **ROI:** Quality assurance (prevents performance degradation)
@@ -226,7 +226,7 @@ Q4 2026:
 - ✅ Enable CodeQL security scanning?
 - ✅ Test parallelization concerns?
 
-### Future Decisions (Q2-Q4 2026)
+### Future Decisions (As Project Evolves)
 - [ ] When is Cycle 16 (BFF) production-ready? → Triggers Phase 2
 - [ ] Which hosting platform? (AWS/Azure/GCP) → Informs Phase 3 & 4
 - [ ] What are performance SLAs? → Defines Phase 6 scope

@@ -88,7 +88,7 @@
 
 ---
 
-## Phase 2: Multi-Job Pipeline (Q2 2026)
+## Phase 2: Multi-Job Pipeline (After Frontend is Stable)
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -145,7 +145,7 @@
 
 ---
 
-## Phase 3: Docker Images (Q2-Q3 2026)
+## Phase 3: Docker Images (When Deployment is Planned)
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -195,7 +195,7 @@
 
 ---
 
-## Phase 4: Deployment Automation (Q3-Q4 2026)
+## Phase 4: Deployment Automation (When Infrastructure is Ready)
 
 ### Option A: GitOps (Kubernetes + ArgoCD)
 
@@ -284,7 +284,7 @@
 
 ---
 
-## Phase 5: Quality & Security Gates (Q1-Q2 2026)
+## Phase 5: Quality & Security Gates (Ongoing)
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -325,7 +325,7 @@
 
 ---
 
-## Phase 6: Performance Testing (Q4 2026)
+## Phase 6: Performance Testing (When SLAs are Defined)
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -473,12 +473,12 @@ Phase 1 (Immediate):
 ├─ Single BC change:     5-6 min ⚡ (parallel tests)
 └─ Full solution change: 5-6 min ⚡ (parallel tests)
 
-Phase 2 (Q2 2026):
+Phase 2 (After Frontend):
 ├─ Documentation change: 0 min ✅ (skipped)
 ├─ Single BC change:     2-3 min ⚡⚡ (only that BC builds)
 └─ Full solution change: 4-5 min ⚡ (parallel BC builds)
 
-Phase 3-6 (Q2-Q4 2026):
+Phase 3-6 (Later Phases):
 ├─ Documentation change: 0 min ✅ (skipped)
 ├─ Single BC change:     2-3 min ⚡⚡ (focused build + deploy)
 └─ Full solution change: 8-12 min 🎯 (all checks + deploy)
@@ -492,11 +492,11 @@ Phase 3-6 (Q2-Q4 2026):
 |-------|----------|--------|------------|-------------|
 | **0 - Current** | Now | - | 8-10 min | ✅ Simple, works |
 | **1 - Quick Wins** | Immediate | 2 hours | 5-6 min | ⚡ 40% faster, security |
-| **2 - Multi-Job** | Q2 2026 | 1-2 days | 2-5 min | 🎯 Parallel, focused |
-| **3 - Docker** | Q2-Q3 2026 | 2-3 days | +2 min | 📦 Deployable |
-| **4 - Deploy** | Q3-Q4 2026 | 1-2 weeks | +5 min | 🚀 Automated |
-| **5 - Quality** | Q1-Q2 2026 | 1-2 days | +3 min | 🛡️ Secure |
-| **6 - Perf** | Q4 2026 | 3-5 days | +5 min | 📊 SLA validation |
+| **2 - Multi-Job** | After frontend | 1-2 days | 2-5 min | 🎯 Parallel, focused |
+| **3 - Docker** | When deploying | 2-3 days | +2 min | 📦 Deployable |
+| **4 - Deploy** | When ready | 1-2 weeks | +5 min | 🚀 Automated |
+| **5 - Quality** | Ongoing | 1-2 days | +3 min | 🛡️ Secure |
+| **6 - Perf** | When needed | 3-5 days | +5 min | 📊 SLA validation |
 
 ---
 

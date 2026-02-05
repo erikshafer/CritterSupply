@@ -15,7 +15,7 @@ Phase 1 focuses on quick, low-risk improvements to the existing CI workflow:
 
 **Estimated Time:** 2 hours  
 **Risk Level:** Low  
-**Expected Benefit:** 30-50% faster CI builds
+**Expected Benefit:** 20-40% faster CI builds
 
 ---
 
@@ -39,7 +39,7 @@ Phase 1 focuses on quick, low-risk improvements to the existing CI workflow:
 ### Change
 ```yaml
 - name: Test
-  run: dotnet test --no-build --logger:"console;verbosity=normal;verbosity=detailed" --logger:"trx;LogFileName=test-results.trx"
+  run: dotnet test --no-build --logger:"console;verbosity=normal" --logger:"trx;LogFileName=test-results.trx"
 ```
 
 ### Explanation

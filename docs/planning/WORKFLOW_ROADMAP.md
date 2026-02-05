@@ -51,7 +51,7 @@
 
 ---
 
-### Phase 2: Multi-Job Pipeline (Q2 2026)
+### Phase 2: Multi-Job Pipeline (After Frontend is Stable)
 
 **Goal:** Enable independent BC builds and frontend integration
 
@@ -92,11 +92,11 @@
 - 🎯 Only build what changed
 - 🎨 Frontend-specific tooling (Bunit, Playwright)
 
-**Timeline:** Q2 2026 (after Blazor frontend is stable)
+**Timeline:** After Blazor frontend is stable
 
 ---
 
-### Phase 3: Docker Images (Q2-Q3 2026)
+### Phase 3: Docker Images (When Deployment is Planned)
 
 **Goal:** Build and publish container images for deployment
 
@@ -112,11 +112,11 @@
 - 🔒 Immutable versioning (`sha-abc123`)
 - ☸️ Ready for Kubernetes/container orchestration
 
-**Timeline:** Q2-Q3 2026 (when hosting platform is chosen)
+**Timeline:** When hosting platform is chosen
 
 ---
 
-### Phase 4: Deployment Automation (Q3-Q4 2026)
+### Phase 4: Deployment Automation (When Infrastructure is Ready)
 
 **Goal:** Automated deployments to staging and production
 
@@ -134,11 +134,11 @@ Option C: Managed Services
   CI → Build Images → Push to AWS App Runner / Azure Container Apps
 ```
 
-**Timeline:** Q3-Q4 2026 (depends on infrastructure decisions)
+**Timeline:** When infrastructure decisions are made
 
 ---
 
-### Phase 5: Quality & Security Gates (Q1-Q2 2026)
+### Phase 5: Quality & Security Gates (Ongoing)
 
 **Goal:** Enforce quality standards
 
@@ -148,11 +148,11 @@ Option C: Managed Services
 - 🔍 Dependency scanning (Dependabot)
 - 📈 SonarCloud analysis (optional)
 
-**Timeline:** Q1-Q2 2026 (CodeQL in Phase 1, others incremental)
+**Timeline:** Incremental (CodeQL in Phase 1, others as needed)
 
 ---
 
-### Phase 6: Performance Testing (Q4 2026)
+### Phase 6: Performance Testing (When SLAs are Defined)
 
 **Goal:** Automated performance regression detection
 
@@ -161,7 +161,7 @@ Option C: Managed Services
 - k6 or Locust for load testing
 - Performance comparison against baseline
 
-**Timeline:** Q4 2026 (when performance SLAs are defined)
+**Timeline:** When performance SLAs are defined
 
 ---
 
@@ -170,11 +170,11 @@ Option C: Managed Services
 | Phase | Priority | Effort | Timeline | Blocker |
 |-------|----------|--------|----------|---------|
 | Phase 1: Quick Wins | 🔴 High | 2 hours | **Immediate** | None - Can start now |
-| Phase 5: Security | 🔴 High | 1 day | Q1 2026 | None - Part of Phase 1 |
-| Phase 2: Multi-Job | 🟡 Medium | 1-2 days | Q2 2026 | Needs Blazor frontend (Cycle 16+) |
-| Phase 3: Docker Images | 🟡 Medium | 2-3 days | Q2-Q3 2026 | Needs hosting platform decision |
-| Phase 4: Deployment | 🟢 Low | 1-2 weeks | Q3-Q4 2026 | Needs infrastructure setup |
-| Phase 6: Performance | 🟢 Low | 3-5 days | Q4 2026 | Needs performance SLAs defined |
+| Phase 5: Security | 🔴 High | 1 day | After Phase 1 | None - Part of Phase 1 |
+| Phase 2: Multi-Job | 🟡 Medium | 1-2 days | After frontend | Needs Blazor frontend (Cycle 16+) |
+| Phase 3: Docker Images | 🟡 Medium | 2-3 days | When deploying | Needs hosting platform decision |
+| Phase 4: Deployment | 🟢 Low | 1-2 weeks | When ready | Needs infrastructure setup |
+| Phase 6: Performance | 🟢 Low | 3-5 days | When needed | Needs performance SLAs defined |
 
 ---
 
@@ -205,28 +205,28 @@ Before implementing each phase, answer these questions:
 - [x] Do we want test result artifacts?
 - [x] Should we enable CodeQL security scanning?
 
-### Phase 2 (Q2 2026)
+### Phase 2 (After Frontend is Stable)
 - [ ] Is the Blazor frontend stable enough for dedicated CI jobs?
 - [ ] Do we want separate jobs per BC or just backend/frontend split?
 - [ ] What frontend testing tools do we need? (Bunit, Playwright, Cypress)
 
-### Phase 3 (Q2-Q3 2026)
+### Phase 3 (When Deployment is Planned)
 - [ ] Which container registry? (GHCR, Docker Hub, ECR, ACR)
 - [ ] Do we need multi-arch images? (amd64, arm64)
 - [ ] What tagging strategy? (SHA, semver, latest)
 
-### Phase 4 (Q3-Q4 2026)
+### Phase 4 (When Infrastructure is Ready)
 - [ ] What is the target hosting platform?
 - [ ] Do we need staging and production environments?
 - [ ] GitOps or direct deployment?
 - [ ] What deployment strategy? (blue-green, rolling, canary)
 
-### Phase 5 (Q1-Q2 2026)
+### Phase 5 (Ongoing)
 - [ ] What code coverage threshold? (70%? 80%?)
 - [ ] Do we need SonarCloud or is CodeQL sufficient?
 - [ ] Are there compliance requirements (SOC2, HIPAA)?
 
-### Phase 6 (Q4 2026)
+### Phase 6 (When SLAs are Defined)
 - [ ] What are the performance SLAs?
 - [ ] What load profile should we test? (100 users? 1000?)
 - [ ] Which operations need performance benchmarks?
