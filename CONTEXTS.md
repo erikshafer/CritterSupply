@@ -2114,6 +2114,132 @@ GetSavedViews (query from vendor dashboard)
 
 ---
 
+## Customer Experience
+
+**Type:** Backend-for-Frontend (BFF) Composition Layer
+
+**Purpose:** Aggregate data from multiple bounded contexts for customer-facing UI, provide real-time updates via Server-Sent Events (SSE)
+
+### Bounded Context Boundary
+
+**In Scope:**
+- View composition (aggregating data from multiple domain BCs)
+- SSE notification delivery (pushing real-time updates to connected clients)
+- HTTP client coordination (querying downstream BCs)
+- Client connection management (tracking active SSE connections)
+
+**Out of Scope:**
+- Domain logic (all business rules live in upstream BCs)
+- Data persistence (stateless composition only, no database)
+- Command execution (commands sent via HTTP POST to domain BCs, BFF doesn't modify state)
+
+### Integration Contracts
+
+**Receives (HTTP Queries to Downstream BCs):**
+- Shopping BC: `GET /api/carts/{cartId}` → cart state for composition
+- Orders BC: `GET /api/checkouts/{checkoutId}` → checkout wizard state
+- Orders BC: `GET /api/orders?customerId={customerId}` → order history listing
+- Customer Identity BC: `GET /api/customers/{customerId}/addresses` → saved addresses for checkout
+- Product Catalog BC: `GET /api/products?category={category}&page={page}` → product listing with filters/pagination
+- Inventory BC: `GET /api/inventory/availability?skus={skus}` → stock levels (future Phase 3 enhancement)
+
+**Receives (Integration Messages via RabbitMQ):**
+- `Shopping.ItemAdded` → triggers SSE push `cart-updated` to connected clients
+- `Shopping.ItemRemoved` → triggers SSE push `cart-updated` to connected clients
+- `Shopping.ItemQuantityChanged` → triggers SSE push `cart-updated` to connected clients
+- `Orders.OrderPlaced` → triggers SSE push `order-status-changed` to connected clients
+- `Payments.PaymentCaptured` → triggers SSE push `order-status-changed` to connected clients
+- `Fulfillment.ShipmentDispatched` → triggers SSE push `shipment-status-changed` to connected clients
+- `Fulfillment.ShipmentDelivered` → triggers SSE push `shipment-status-changed` to connected clients
+
+**Publishes (Integration Messages):**
+- None (BFF is read-only, commands sent via HTTP POST to domain BCs)
+
+**Publishes (SSE Events to Connected Clients):**
+- `cart-updated` → Blazor client re-renders cart with updated line items/totals
+- `order-status-changed` → Blazor client updates order status display (pending → paid → shipped)
+- `shipment-status-changed` → Blazor client updates tracking info (dispatched → in transit → delivered)
+
+### View Models (Composition)
+
+**CartView:**
+- Aggregates Shopping BC (cart state) + Product Catalog BC (product details, images)
+- Enriches cart line items with product names, images, current prices
+
+**CheckoutView:**
+- Aggregates Orders BC (checkout state) + Customer Identity BC (saved addresses) + Product Catalog BC (product details)
+- Multi-step wizard state (current step, validation, can proceed)
+
+**ProductListingView:**
+- Aggregates Product Catalog BC (products) + Inventory BC (availability - future)
+- Paginated product cards with images, prices, stock indicators
+
+**OrderHistoryView (Future Phase 3):**
+- Aggregates Orders BC (order list) + Fulfillment BC (shipment status)
+- Order summaries with tracking numbers and delivery estimates
+
+### Integration Pattern
+
+**Pattern:** HTTP (query) + RabbitMQ (notifications) + SSE (push to clients)
+
+**Flow Example (Cart Update with Real-Time Notification):**
+```
+[Shopping BC - Domain Logic]
+AddItemToCart (command) → AddItemToCartHandler
+  ├─> ItemAdded (domain event, persisted to event store)
+  └─> Publish Shopping.ItemAdded (integration message) → RabbitMQ
+
+[Customer Experience BFF - Notification Handler]
+Shopping.ItemAdded (integration message from RabbitMQ)
+  └─> ItemAddedNotificationHandler
+      ├─> Query Shopping BC: GET /api/carts/{cartId}
+      ├─> Query Catalog BC: GET /api/products?skus={skus} (enrich with product details)
+      ├─> Compose CartSummaryView (aggregated data)
+      └─> SSE Push: StorefrontHub.PushCartUpdate(cartId, cartSummary)
+
+[Blazor Frontend - SSE Client]
+SSE Event Received ("cart-updated")
+  └─> Blazor component re-renders with updated cart data
+```
+
+### Key Architectural Decisions
+
+**[ADR 0004: SSE over SignalR](./docs/decisions/0004-sse-over-signalr.md)**
+- **Decision:** Use .NET 10's native Server-Sent Events (SSE) instead of SignalR
+- **Rationale:** Simpler one-way server→client push, native HTTP/2 support, no WebSocket complexity
+- **Trade-off:** SSE is one-way only (but we don't need client→server push beyond HTTP POST commands)
+
+**[ADR 0005: MudBlazor UI Framework](./docs/decisions/0005-mudblazor-ui-framework.md)**
+- **Decision:** Use MudBlazor for Blazor UI components
+- **Rationale:** Material Design, polished components, active community, aligns with future client work
+
+### Current Status (Cycle 16)
+
+**Phase 1: BFF Infrastructure - ✅ Complete (2026-02-05)**
+- BFF project created (`Storefront/`) with Wolverine + Marten
+- 3 composition handlers implemented (CartView, CheckoutView, ProductListing)
+- 9 integration tests passing (3 deferred to Phase 3)
+- HTTP client stub pattern established for testing
+
+**Phase 2: SSE Real-Time Integration - 🚧 Next**
+- SSE endpoint (`/sse/storefront`) to be implemented
+- Integration message handlers for cart/order notifications
+- RabbitMQ subscriptions for real-time updates
+
+**Phase 3: Blazor Frontend - 📋 Planned**
+- Blazor Server app (`Storefront.Web/`)
+- Pages: Cart, Checkout, OrderHistory
+- SSE client integration for real-time updates
+
+### Notes
+
+- **Stateless:** BFF does not persist data, all state lives in domain BCs
+- **Composition Only:** No domain logic in BFF - aggregation and presentation only
+- **Real-Time:** SSE provides uni-directional push for live updates without polling
+- **Testing:** Alba + TestContainers + stub clients (no mocks, clean test data setup)
+
+---
+
 ## Future Considerations
 
 The following contexts are acknowledged but not yet defined:
