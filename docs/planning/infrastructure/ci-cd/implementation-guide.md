@@ -1,12 +1,12 @@
-# Phase 1 Implementation Guide: Quick CI Improvements
+# Quick Wins Implementation Guide: CI Improvements
 
-> **Purpose:** Step-by-step instructions to implement Phase 1 workflow improvements from [ADR 0007](../decisions/0007-github-workflow-improvements.md).
+> **Purpose:** Step-by-step instructions to implement Quick Wins workflow improvements from [ADR 0007](../../../decisions/0007-github-workflow-improvements.md).
 
 ---
 
 ## Overview
 
-Phase 1 focuses on quick, low-risk improvements to the existing CI workflow:
+This guide covers quick, low-risk improvements to the existing CI workflow (CI/CD Modernization Phase 1):
 
 - ✅ Enable test parallelization
 - ✅ Add test result artifacts
@@ -448,7 +448,7 @@ Phase 1 is successful if:
 After successful implementation:
 
 1. **Update ADR 0007** - Mark Phase 1 as "✅ Implemented"
-2. **Update WORKFLOW_ROADMAP.md** - Update Phase 1 status
+2. **Update roadmap.md** - Update Phase 1 status
 3. **Document performance improvement** - Add actual metrics to ADR
 4. **Communicate to team** - Share results and any learnings
 5. **Plan Phase 2** - Schedule when to implement multi-job pipeline
@@ -457,8 +457,8 @@ After successful implementation:
 
 ## References
 
-- **ADR 0007:** [GitHub Workflow Improvements](../decisions/0007-github-workflow-improvements.md)
-- **Roadmap:** [WORKFLOW_ROADMAP.md](./WORKFLOW_ROADMAP.md)
+- **ADR 0007:** [GitHub Workflow Improvements](../../../decisions/0007-github-workflow-improvements.md)
+- **Roadmap:** [roadmap.md](./roadmap.md)
 - **GitHub Actions Docs:** https://docs.github.com/en/actions
 - **CodeQL Docs:** https://docs.github.com/en/code-security/code-scanning
 

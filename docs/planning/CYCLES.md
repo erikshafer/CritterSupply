@@ -198,5 +198,15 @@ For brevity, early cycles (Payments, Inventory, Fulfillment, Shopping, refactori
 
 ---
 
+## Infrastructure Initiatives
+
+For non-feature development work (CI/CD, monitoring, tooling):
+
+**[CI/CD Workflow Modernization](./infrastructure/ci-cd/)** - 6-phase roadmap to modernize GitHub Actions pipeline
+- [ADR 0007](../decisions/0007-github-workflow-improvements.md) - Full architectural decision
+- [Quick Start](./infrastructure/ci-cd/README.md) - Overview and current status
+
+---
+
 **Last Updated:** 2026-02-05
 **Maintained By:** Erik Shafer / Claude AI Assistant

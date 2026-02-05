@@ -182,9 +182,9 @@ Option C: Managed Services
 
 ### For Immediate Implementation (Phase 1)
 
-1. **Review ADR 0007** - [Read full proposal](../decisions/0007-github-workflow-improvements.md)
+1. **Review ADR 0007** - [Read full proposal](../../../decisions/0007-github-workflow-improvements.md)
 2. **Approve Phase 1** - Low risk, high reward improvements
-3. **Implement changes** - See implementation steps in ADR
+3. **Implement changes** - See [implementation-guide.md](./implementation-guide.md)
 4. **Measure impact** - Compare CI times before/after
 
 ### For Future Planning
@@ -235,10 +235,12 @@ Before implementing each phase, answer these questions:
 
 ## Resources
 
-- **Full ADR:** [ADR 0007: GitHub Workflow Improvements](../decisions/0007-github-workflow-improvements.md)
-- **Current Workflow:** [.github/workflows/dotnet.yml](../../.github/workflows/dotnet.yml)
-- **Bounded Contexts:** [CONTEXTS.md](../../CONTEXTS.md)
-- **Development Cycles:** [CYCLES.md](./CYCLES.md)
+- **Full ADR:** [ADR 0007: GitHub Workflow Improvements](../../../decisions/0007-github-workflow-improvements.md)
+- **Implementation Guide:** [implementation-guide.md](./implementation-guide.md)
+- **Visual Guide:** [visual-guide.md](./visual-guide.md)
+- **Current Workflow:** [.github/workflows/dotnet.yml](../../../../.github/workflows/dotnet.yml)
+- **Bounded Contexts:** [CONTEXTS.md](../../../../CONTEXTS.md)
+- **Development Cycles:** [CYCLES.md](../CYCLES.md)
 
 ---
 
