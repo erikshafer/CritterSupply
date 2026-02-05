@@ -1,4 +1,3 @@
-using Marten;
 using ProductCatalog.Api.Products;
 using ProductCatalog.Products;
 using Reqnroll;
