@@ -14,6 +14,12 @@ This directory contains planning, decisions, and feature specifications for the 
 
 **[BACKLOG.md](./planning/BACKLOG.md)** - Future work not yet scheduled
 
+**CI/CD Workflow Proposal (NEW - 2026-02-05):**
+- [Executive Summary](./planning/WORKFLOW_PROPOSAL_SUMMARY.md) - Quick overview of workflow improvements
+- [ADR 0007: GitHub Workflow Improvements](./decisions/0007-github-workflow-improvements.md) - Detailed 6-phase proposal
+- [Workflow Roadmap](./planning/WORKFLOW_ROADMAP.md) - Visual timeline and priorities
+- [Phase 1 Implementation Guide](./planning/phase-1-implementation-guide.md) - Step-by-step instructions
+
 ---
 
 ### [decisions/](./decisions/) - Architectural Decision Records (ADRs)
@@ -22,6 +28,9 @@ Lightweight records capturing **why** we made key architectural choices.
 
 **Existing ADRs:**
 - [0004: SSE over SignalR](./decisions/0004-sse-over-signalr.md) - Real-time updates for Customer Experience BC
+- [0005: MudBlazor UI Framework](./decisions/0005-mudblazor-ui-framework.md) - UI component library choice
+- [0006: Reqnroll BDD Framework](./decisions/0006-reqnroll-bdd-framework.md) - BDD testing approach
+- [0007: GitHub Workflow Improvements](./decisions/0007-github-workflow-improvements.md) - **NEW** 6-phase CI/CD roadmap
 - _(Historical ADRs to be backfilled for Cycles 1-15)_
 
 **When to Create an ADR:**
@@ -104,4 +113,4 @@ _(Reserved for future architecture diagrams and overviews)_
 
 ---
 
-**Last Updated:** 2026-02-04
+**Last Updated:** 2026-02-05
