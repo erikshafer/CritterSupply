@@ -1,4 +1,4 @@
-# ADR 0005: Reqnroll for BDD Testing
+# ADR 0006: Reqnroll for BDD Testing
 
 **Status:** ✅ Accepted
 
