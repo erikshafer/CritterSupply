@@ -31,7 +31,8 @@
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Decisions/">
     <File Path="docs\decisions\0004-sse-over-signalr.md" />
-    <File Path="docs\decisions\0005-reqnroll-bdd-framework.md" />
+    <File Path="docs\decisions\0005-mudblazor-ui-framework.md" />
+    <File Path="docs\decisions\0006-reqnroll-bdd-framework.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Features/">
     <File Path="docs\features\customer-experience\cart-real-time-updates.feature" />
@@ -75,6 +76,10 @@
     <Project Path="src/Product Catalog/ProductCatalog.Api/ProductCatalog.Api.csproj" />
     <Project Path="src/Product Catalog/ProductCatalog/ProductCatalog.csproj" />
     <Project Path="tests/Product Catalog/ProductCatalog.Api.IntegrationTests/ProductCatalog.Api.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/Customer Experience/">
+    <Project Path="src/Customer Experience/Storefront/Storefront.csproj" />
+    <Project Path="tests/Customer Experience/Storefront.IntegrationTests/Storefront.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Shared/">
     <Project Path="src/Shared/Messages.Contracts/Messages.Contracts.csproj" />
