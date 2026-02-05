@@ -12,12 +12,12 @@ This approach is inspired by the [A-Frame Architecture](https://jeremydmiller.co
 
 Wolverine invokes methods in this order:
 
-| Lifecycle | Method Names | Purpose |
-|-----------|--------------|---------|
+| Lifecycle      | Method Names                                                              | Purpose                        |
+|----------------|---------------------------------------------------------------------------|--------------------------------|
 | Before Handler | `Before`, `BeforeAsync`, `Load`, `LoadAsync`, `Validate`, `ValidateAsync` | Load data, check preconditions |
-| Handler | `Handle`, `HandleAsync` | Business logic (pure function) |
-| After Handler | `After`, `AfterAsync`, `PostProcess`, `PostProcessAsync` | Side effects, notifications |
-| Finally | `Finally`, `FinallyAsync` | Cleanup (runs even on failure) |
+| Handler        | `Handle`, `HandleAsync`                                                   | Business logic (pure function) |
+| After Handler  | `After`, `AfterAsync`, `PostProcess`, `PostProcessAsync`                  | Side effects, notifications    |
+| Finally        | `Finally`, `FinallyAsync`                                                 | Cleanup (runs even on failure) |
 
 > **Reference:** [Wolverine Compound Handlers](https://wolverinefx.net/guide/handlers/middleware.html)
 
@@ -141,19 +141,105 @@ public static class InitializeCartHandler
 
 > **Reference:** [Wolverine HTTP + Marten](https://wolverinefx.net/guide/http/marten.html)
 
+### Pattern 4: Returning Updated Aggregate State
+
+Use `UpdatedAggregate<T>` to return the updated state of a projected aggregate as the HTTP response:
+
+```csharp
+[AggregateHandler]
+[WolverinePost("/orders/{id}/confirm")]
+public static (UpdatedAggregate, Events) Handle(ConfirmOrder command, Order order)
+{
+    return (
+        new UpdatedAggregate(),
+        [new OrderConfirmed()]
+    );
+}
+```
+
+**When multiple event streams are involved**, use the generic `UpdatedAggregate<T>` to specify which aggregate to return:
+
+```csharp
+public static class MakePurchaseHandler
+{
+    // Use UpdatedAggregate<T> to tell Wolverine we want *only* the XAccount as the response
+    public static UpdatedAggregate<XAccount> Handle(
+        MakePurchase command,
+        [WriteAggregate] IEventStream<XAccount> account,
+        [WriteAggregate] IEventStream<Inventory> inventory)
+    {
+        if (command.Number > inventory.Aggregate.Quantity ||
+            (command.Number * inventory.Aggregate.UnitPrice) > account.Aggregate.Balance)
+        {
+            // Do nothing if validation fails
+            return new UpdatedAggregate<XAccount>();
+        }
+
+        account.AppendOne(new ItemPurchased(command.InventoryId, command.Number, inventory.Aggregate.UnitPrice));
+        inventory.AppendOne(new Drawdown(command.Number));
+
+        return new UpdatedAggregate<XAccount>();
+    }
+}
+```
+
+**Key points:**
+- `UpdatedAggregate` (non-generic) returns the single aggregate from the handler
+- `UpdatedAggregate<T>` (generic) specifies which aggregate to return when using multiple `[WriteAggregate]` streams
+- The aggregate must have a Marten projection configured to compute its state
+- Wolverine automatically queries the projection and returns the updated aggregate as the HTTP response body
+
+> **Reference:** [Wolverine UpdatedAggregate Documentation](https://wolverine.netlify.app/guide/http/marten.html#responding-with-the-updated-aggregate)
+
 ### Summary Table
 
-| Scenario | Return Type | Stream Creation |
-|----------|-------------|-----------------|
-| Update existing aggregate | `(Events, OutgoingMessages)` | N/A — uses `[WriteAggregate]` |
-| Start new stream (message handler) | `OutgoingMessages` | `session.Events.StartStream<T>()` |
-| Start new stream (HTTP endpoint) | `(IStartStream, HttpResponse)` | `MartenOps.StartStream<T>()` |
+| Scenario                           | Return Type                                 | Stream Creation                   |
+|------------------------------------|---------------------------------------------|-----------------------------------|
+| Update existing aggregate          | `(Events, OutgoingMessages)`                | N/A — uses `[WriteAggregate]`     |
+| Return updated aggregate state     | `UpdatedAggregate` or `UpdatedAggregate<T>` | N/A — uses `[WriteAggregate]`     |
+| Start new stream (message handler) | `OutgoingMessages`                          | `session.Events.StartStream<T>()` |
+| Start new stream (HTTP endpoint)   | `(IStartStream, HttpResponse)`              | `MartenOps.StartStream<T>()`      |
 
-## `[WriteAggregate]` vs `Load()` Pattern
+## Aggregate Loading Patterns
 
-**Always prefer `[WriteAggregate]`** — it's the cleanest pattern. Only fall back to `Load()` when Wolverine cannot auto-resolve the aggregate ID.
+Wolverine provides three approaches for loading event-sourced aggregates: `[ReadAggregate]` for read-only access, `[WriteAggregate]` for modifications, and `Load()` for complex scenarios.
 
-### Use `[WriteAggregate]` When:
+### `[ReadAggregate]` — Read-Only Access
+
+Use `[ReadAggregate]` when you need to query the current state of an aggregate without modifying it. This is ideal for HTTP GET endpoints:
+
+```csharp
+[WolverineGet("/orders/{id}")]
+public static Order? GetOrder(Guid id, [ReadAggregate] Order? order) => order;
+
+[WolverineGet("/orders/{id}/status")]
+public static OrderStatusResponse GetStatus(Guid id, [ReadAggregate] Order? order)
+{
+    if (order is null)
+        return new OrderStatusResponse { Status = "NotFound" };
+
+    return new OrderStatusResponse
+    {
+        Status = order.Status.ToString(),
+        LastUpdated = order.UpdatedAt
+    };
+}
+```
+
+**Key points:**
+- No events are persisted — read-only operation
+- Wolverine loads the aggregate by projecting all events in the stream
+- Returns the aggregate (or DTO derived from it) directly
+- Ideal for query endpoints that don't modify state
+- Aggregate can be nullable (`Order?`) for 404 handling
+
+> **Reference:** [Wolverine ReadAggregate Documentation](https://wolverine.netlify.app/guide/http/marten.html#reading-the-latest-version-of-an-aggregate)
+
+### `[WriteAggregate]` — Modifying Aggregates
+
+**Always prefer `[WriteAggregate]`** — it's the cleanest pattern for commands. Only fall back to `Load()` when Wolverine cannot auto-resolve the aggregate ID.
+
+**Use when:**
 
 The command has the aggregate ID as a direct property:
 
@@ -178,9 +264,11 @@ public static class CapturePaymentHandler
 }
 ```
 
-### Use `Load()` When:
+### `Load()` — Complex ID Resolution
 
-The aggregate ID must be computed or discovered:
+Use `Load()` when the aggregate ID must be computed or discovered from the command:
+
+**Use when:**
 
 ```csharp
 public sealed record ReserveStock(Guid OrderId, string Sku, string WarehouseId, int Quantity)
@@ -224,14 +312,16 @@ public static class ReserveStockHandler
 
 > **Reference:** [Wolverine Aggregate Handler Workflow](https://wolverinefx.net/guide/durability/marten/event-sourcing.html#aggregate-handlers-and-event-sourcing)
 
-### Key Differences
+### Summary: Choosing the Right Pattern
 
-| Aspect | `[WriteAggregate]` | `Load()` Pattern |
-|--------|-------------------|------------------|
-| Aggregate Loading | Automatic | Manual via `Load()` |
-| ID Resolution | Direct command property | Computed or queried |
-| Event Persistence | Automatic via return | Manual via `session.Events.Append()` |
-| Return Type | `(Events, OutgoingMessages)` | `OutgoingMessages` only |
+| Aspect | `[ReadAggregate]` | `[WriteAggregate]` | `Load()` Pattern |
+|--------|------------------|-------------------|------------------|
+| **Use Case** | Query aggregate state | Modify aggregate | Complex ID resolution |
+| **Aggregate Loading** | Automatic | Automatic | Manual via `Load()` |
+| **ID Resolution** | Direct route parameter | Direct command property | Computed or queried |
+| **Event Persistence** | None (read-only) | Automatic via return | Manual via `session.Events.Append()` |
+| **Return Type** | Aggregate or DTO | `(Events, OutgoingMessages)` | `OutgoingMessages` only |
+| **Typical Endpoints** | GET | POST, PUT, DELETE | Any (when needed) |
 
 ### Common Pitfall: Double Persistence
 
@@ -268,6 +358,58 @@ Use `CreationResponse` for POST endpoints:
 
 ```csharp
 public sealed record PlaceOrderResponse(Guid Id) : CreationResponse($"/api/orders/{Id}");
+```
+
+## HTTP Endpoint Conventions
+
+CritterSupply uses **flat, resource-centric** HTTP endpoints:
+
+```
+/api/carts/{cartId}
+/api/orders/{orderId}
+/api/payments/{paymentId}
+/api/products/{sku}
+```
+
+**Key principles:**
+- **Resources are top-level** — Not nested under BC names (e.g., `/api/orders`, not `/api/order-management/orders`)
+- **Resource names are plural nouns** — `/api/products`, not `/api/product`
+- **BC ownership is internal** — URL structure doesn't expose bounded context boundaries
+- **Avoid deep nesting** — Prefer `/api/order-items?orderId={orderId}` over `/api/orders/{orderId}/items`
+
+**Why flat structure?**
+- Simpler client routing and API discovery
+- Easier to refactor bounded context boundaries without breaking URLs
+- Clearer resource ownership (each resource has one canonical URL)
+- Aligns with REST best practices for resource addressability
+
+**Examples:**
+
+```csharp
+// GOOD: Flat, resource-centric
+[WolverineGet("/api/orders/{orderId}")]
+public static Task<Order?> GetOrder(Guid orderId, IDocumentSession session)
+    => session.LoadAsync<Order>(orderId);
+
+[WolverinePost("/api/carts")]
+public static (IStartStream, CreatedAtRoute<AddCartResponse>) AddCart(AddCart command)
+{
+    var cartId = Guid.CreateVersion7();
+    var @event = new CartCreated(cartId, command.CustomerId, DateTimeOffset.UtcNow);
+
+    return (
+        MartenOps.StartStream<Cart>(cartId, @event),
+        new CreatedAtRoute<AddCartResponse>("GetCart", new { cartId }, new AddCartResponse(cartId))
+    );
+}
+
+// AVOID: Nested resources (harder to maintain)
+[WolverineGet("/api/orders/{orderId}/items")]
+public static Task<List<OrderItem>> GetOrderItems(Guid orderId) { /* ... */ }
+
+// PREFER: Query parameter for filtering
+[WolverineGet("/api/order-items")]
+public static Task<List<OrderItem>> GetOrderItems([FromQuery] Guid orderId) { /* ... */ }
 ```
 
 ## File Organization

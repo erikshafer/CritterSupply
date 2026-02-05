@@ -291,9 +291,9 @@ For message handlers, HTTP endpoints, compound handlers, or aggregate workflows:
 
 Covers:
 - Compound handler lifecycle (`Before`, `Validate`, `Load`, `Handle`)
-- Return patterns (`Events`, `OutgoingMessages`, `IStartStream`)
-- `[WriteAggregate]` vs `Load()` pattern decision tree
-- HTTP endpoint attributes
+- Return patterns (`Events`, `OutgoingMessages`, `IStartStream`, `UpdatedAggregate<T>`)
+- Aggregate loading patterns (`[ReadAggregate]`, `[WriteAggregate]`, `Load()`)
+- HTTP endpoint attributes and URL conventions
 
 ### When Working with Event Sourcing
 
@@ -387,27 +387,29 @@ For unit and integration test patterns:
 Covers:
 - Alba integration test fixtures
 - Testing pure function handlers
-- TestContainers setup
 - Cross-context refactoring checklist
 
+For TestContainers setup and infrastructure testing:
+
+**Read:** `skills/testcontainers-integration-tests.md`
+
+Covers:
+- Why TestContainers over mocks
+- TestFixture patterns for Marten and EF Core
+- Container lifecycle management
+- Performance tips and best practices
+
+For BDD testing with Gherkin and Reqnroll:
+
+**Read:** `skills/reqnroll-bdd-testing.md`
+
+Covers:
+- When to use BDD vs Alba-only tests
+- Writing Gherkin feature files
+- Step definition patterns
+- Integration with TestFixture and Alba
+
 ---
-
-## HTTP Endpoint Conventions
-
-CritterSupply uses **flat, resource-centric** HTTP endpoints:
-
-```
-/api/carts/{cartId}
-/api/orders/{orderId}
-/api/payments/{paymentId}
-/api/products/{sku}
-```
-
-- Resources are top-level (not nested under BC names)
-- Resource names are plural nouns
-- BC ownership is internal, not exposed in URLs
-
-Avoid deep nesting: `/api/orders/{orderId}/items` → prefer `/api/order-items?orderId={orderId}`
 
 ## Cross-Context Refactoring
 
@@ -457,3 +459,5 @@ See [DEVPROGRESS.md](./DEVPROGRESS.md) for current development status.
 | `vertical-slice-organization.md` | File structure, colocation patterns |
 | `modern-csharp-coding-standards.md` | C# language features, immutability |
 | `critterstack-testing-patterns.md` | Unit and integration testing |
+| `testcontainers-integration-tests.md` | TestContainers setup, patterns for Marten and EF Core |
+| `reqnroll-bdd-testing.md` | BDD testing with Gherkin and Reqnroll |
