@@ -184,6 +184,7 @@ docs/features/
 - **Sealed by default** — All commands, queries, events, and models are `sealed`
 - **Integration tests over unit tests** — Test complete vertical slices with Alba
 - **A-Frame architecture** — Infrastructure at edges, pure logic in the middle
+- **Always update .sln** — When creating new projects, immediately add them to `CritterSupply.sln` using `dotnet sln add`
 
 ## Solution Organization
 
@@ -266,9 +267,10 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 | Customer Identity             | 5235     | ✅ Assigned  |
 | Shopping                      | 5236     | ✅ Assigned  |
 | Product Catalog               | 5133     | ✅ Assigned  |
-| **Customer Experience (BFF)** | **5237** | 🔜 Next     |
-| Vendor Portal                 | 5238     | 📋 Reserved |
-| Vendor Identity               | 5239     | 📋 Reserved |
+| **Customer Experience (BFF)** | **5237** | ✅ Assigned  |
+| **Customer Experience (Web)** | **5238** | ✅ Assigned  |
+| Vendor Portal                 | 5239     | 📋 Reserved |
+| Vendor Identity               | 5240     | 📋 Reserved |
 
 **Why this matters:**
 - Allows running multiple APIs simultaneously during development
@@ -481,6 +483,46 @@ Covers:
 - Writing Gherkin feature files
 - Step definition patterns
 - Integration with TestFixture and Alba
+
+---
+
+## Project Creation Workflow
+
+**IMPORTANT:** When creating new projects (APIs, test projects, Blazor apps, etc.), always follow this checklist:
+
+### New Project Checklist
+
+1. **Create the project:**
+   ```bash
+   dotnet new <template> -n <ProjectName> -o "<path>"
+   ```
+
+2. **Add to solution file (CRITICAL):**
+   ```bash
+   dotnet sln add "<path>/<ProjectName>.csproj"
+   ```
+   **Why:** Ensures IDE tooling discovers the project and `dotnet build`/`dotnet test` at root includes it.
+
+3. **Add package references:**
+   - Use `<PackageReference Include="PackageName" />` (no version - Central Package Management)
+   - If package not in `Directory.Packages.props`, add it there first with version
+
+4. **Configure launchSettings.json (if API/Web project):**
+   - Check port allocation table (see API Project Configuration section above)
+   - Use next available port
+   - Update port allocation table in this file
+
+5. **Build and verify:**
+   ```bash
+   dotnet build
+   ```
+
+6. **Update documentation:**
+   - Add run instructions to README.md
+   - Update bounded context status table if applicable
+   - Update port allocation table in CLAUDE.md
+
+**Common Mistake:** Forgetting step 2 (adding to .sln) - this breaks IDE tooling and makes the project invisible to root-level `dotnet` commands.
 
 ---
 

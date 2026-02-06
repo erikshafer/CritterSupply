@@ -15,6 +15,7 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.2" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="5.10.0" />
+    <PackageVersion Include="MudBlazor" Version="8.5.1" />
     <!-- Test -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />

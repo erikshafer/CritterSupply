@@ -1,0 +1,176 @@
+@page "/cart"
+@rendermode InteractiveServer
+@using System.Text.Json
+@inject IHttpClientFactory HttpClientFactory
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Shopping Cart - CritterSupply</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Shopping Cart</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_cartView == null || !_cartView.Items.Any())
+{
+    <MudAlert Severity="Severity.Info">Your cart is empty.</MudAlert>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" Class="mt-4">
+        Browse Products
+    </MudButton>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4">
+                @foreach (var item in _cartView.Items)
+                {
+                    <MudCard Class="mb-3">
+                        <MudCardContent>
+                            <MudGrid>
+                                <MudItem xs="3">
+                                    <MudImage Src="@item.ProductImageUrl" Alt="@item.ProductName" Height="100" ObjectFit="ObjectFit.Cover" />
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudText Typo="Typo.h6">@item.ProductName</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">SKU: @item.Sku</MudText>
+                                    <MudText Typo="Typo.body1" Class="mt-2">@item.UnitPrice.ToString("C")</MudText>
+                                </MudItem>
+                                <MudItem xs="3" Class="d-flex flex-column align-end">
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Qty: @item.Quantity</MudText>
+                                    <MudText Typo="Typo.h6">@item.LineTotal.ToString("C")</MudText>
+                                </MudItem>
+                            </MudGrid>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h5" Class="mb-4">Order Summary</MudText>
+                <MudDivider Class="mb-3" />
+                <div class="d-flex justify-space-between mb-2">
+                    <MudText Typo="Typo.body1">Subtotal</MudText>
+                    <MudText Typo="Typo.body1">@_cartView.Subtotal.ToString("C")</MudText>
+                </div>
+                <MudDivider Class="my-3" />
+                <div class="d-flex justify-space-between mb-4">
+                    <MudText Typo="Typo.h6">Total</MudText>
+                    <MudText Typo="Typo.h6">@_cartView.Subtotal.ToString("C")</MudText>
+                </div>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Href="/checkout">
+                    Proceed to Checkout
+                </MudButton>
+            </MudPaper>
+
+            @if (_sseConnected)
+            {
+                <MudChip T="string" Icon="@Icons.Material.Filled.Wifi" Color="Color.Success" Size="Size.Small" Class="mt-2">
+                    Real-time updates active
+                </MudChip>
+            }
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private CartView? _cartView;
+    private bool _isLoading = true;
+    private bool _sseConnected = false;
+    private DotNetObjectReference<Cart>? _dotNetHelper;
+
+    // Stub customer ID - in real app this would come from authentication
+    private readonly Guid _customerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private readonly Guid _cartId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCart();
+        await SubscribeToSSE();
+    }
+
+    private async Task LoadCart()
+    {
+        _isLoading = true;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("StorefrontApi");
+            _cartView = await client.GetFromJsonAsync<CartView>($"/api/storefront/carts/{_cartId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load cart: {ex.Message}");
+            _cartView = null;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SubscribeToSSE()
+    {
+        try
+        {
+            _dotNetHelper = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("sseClient.subscribe", _customerId.ToString(), _dotNetHelper);
+            _sseConnected = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to subscribe to SSE: {ex.Message}");
+            _sseConnected = false;
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnSseEvent(JsonElement eventData)
+    {
+        Console.WriteLine($"SSE event received: {eventData}");
+
+        // Parse event type
+        if (eventData.TryGetProperty("eventType", out var eventType))
+        {
+            var eventTypeName = eventType.GetString();
+
+            if (eventTypeName == "cart-updated")
+            {
+                // Reload cart data from BFF
+                await LoadCart();
+                StateHasChanged();
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("sseClient.unsubscribe");
+            _dotNetHelper?.Dispose();
+        }
+        catch
+        {
+            // Ignore disposal errors
+        }
+    }
+
+    // View model matching BFF CartView
+    private sealed record CartView(
+        Guid CartId,
+        Guid CustomerId,
+        IReadOnlyList<CartLineItemView> Items,
+        decimal Subtotal);
+
+    private sealed record CartLineItemView(
+        string Sku,
+        string ProductName,
+        string ProductImageUrl,
+        int Quantity,
+        decimal UnitPrice,
+        decimal LineTotal);
+}

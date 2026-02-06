@@ -79,10 +79,14 @@ Who knows. Maybe one day we'll ban "thinking machines" and have to build everyth
 - xUnit - Test framework
 - Shouldly - Assertion library
 - FluentValidation - Command validation
+- [Reqnroll](https://reqnroll.net/) - BDD testing with Gherkin feature files
+
+**UI & Real-Time:**
+- [Blazor Server](https://learn.microsoft.com/en-us/aspnet/core/blazor/) - Customer-facing UI (Customer Experience BC)
+- [MudBlazor](https://mudblazor.com/) - Material Design component library for Blazor
+- Server-Sent Events (SSE) - Real-time updates from BFF to Blazor UI (see [ADR 0004](./docs/decisions/0004-sse-over-signalr.md))
 
 **Future:**
-- Blazor Server - Customer-facing UI (Customer Experience BC)
-- SignalR - Real-time notifications
 - .NET Aspire - Orchestration (planned)
 
 ## 🗺️ Bounded Contexts <a id='2.0'></a>
@@ -100,7 +104,7 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 | 🚚 **Fulfillment**         | Picking, packing, shipping                     | ✅ Complete |
 | 👤 **Customer Identity**   | Addresses and saved payment methods            | ✅ Complete |
 | 📦 **Product Catalog**     | Product definitions and pricing                | ✅ Complete |
-| 🎁 **Customer Experience** | Storefront BFF (Blazor + SignalR)              | 🔜 Planned |
+| 🎁 **Customer Experience** | Storefront BFF (Blazor + SSE)                  | 🚧 In Progress |
 | 🏢 **Vendor Identity**     | Vendor user authentication & tenant management | 🔜 Planned |
 | 📊 **Vendor Portal**       | Vendor analytics, insights, change requests    | 🔜 Planned |
 | 🔄 **Returns**             | Return authorization and processing            | 🔜 Planned |
@@ -141,26 +145,51 @@ dotnet build
 Want to run a specific part of the business? Each bounded context can be run independently as a self-hosted API using the `dotnet run` command. Here are examples for each context:
 
 ```bash
-# Run Orders BC
+# Run Orders BC (Port 5231)
 dotnet run --project "src/Order Management/Orders.Api/Orders.Api.csproj"
 
-# Run Payments BC
+# Run Payments BC (Port 5232)
 dotnet run --project "src/Payment Processing/Payments.Api/Payments.Api.csproj"
 
-# Run Shopping BC
-dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
-
-# Run Inventory BC
+# Run Inventory BC (Port 5233)
 dotnet run --project "src/Inventory Management/Inventory.Api/Inventory.Api.csproj"
 
-# Run Fulfillment BC
+# Run Fulfillment BC (Port 5234)
 dotnet run --project "src/Fulfillment Management/Fulfillment.Api/Fulfillment.Api.csproj"
 
-# Run Customer Identity BC
+# Run Customer Identity BC (Port 5235)
 dotnet run --project "src/Customer Identity/CustomerIdentity.Api/CustomerIdentity.Api.csproj"
+
+# Run Shopping BC (Port 5236)
+dotnet run --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"
+
+# Run Product Catalog BC (Port 5133)
+dotnet run --project "src/Product Catalog/ProductCatalog.Api/ProductCatalog.Api.csproj"
+
+# Run Customer Experience BFF (Port 5237)
+dotnet run --project "src/Customer Experience/Storefront.Api/Storefront.Api.csproj"
+
+# Run Customer Experience Web UI (Port 5238 - Blazor Server)
+dotnet run --project "src/Customer Experience/Storefront.Web/Storefront.Web.csproj"
 ```
 
-Each BC exposes a Swagger UI at `/api` (e.g., `http://localhost:5000/api`).
+**Ports:**
+- Each BC API exposes a Swagger UI at `/api` (e.g., `http://localhost:5231/api` for Orders)
+- Customer Experience Web UI runs at `http://localhost:5238` (Blazor Server app)
+
+**To run the full Customer Experience stack:**
+```bash
+# Start infrastructure (Postgres + RabbitMQ)
+docker-compose --profile all up -d
+
+# Start BFF API (in one terminal)
+dotnet run --project "src/Customer Experience/Storefront.Api/Storefront.Api.csproj"
+
+# Start Blazor Web UI (in another terminal)
+dotnet run --project "src/Customer Experience/Storefront.Web/Storefront.Web.csproj"
+
+# Then navigate to http://localhost:5238 in your browser
+```
 
 #### 🧪 Test
 
