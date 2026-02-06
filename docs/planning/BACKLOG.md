@@ -25,7 +25,7 @@ Implement automated browser tests for Customer Experience Blazor UI.
 4. Add to CI/CD pipeline
 
 **Acceptance Criteria:**
-- Automated tests verify all manual test scenarios from MANUAL-TESTING-PHASE3.md
+- Automated tests verify all manual test scenarios from cycle-16-phase-3-manual-testing.md
 - Tests run in CI/CD pipeline
 - No flaky tests (stable browser automation)
 
@@ -34,7 +34,7 @@ Implement automated browser tests for Customer Experience Blazor UI.
 - Decision on testing framework (ADR needed)
 
 **References:**
-- `docs/planning/cycles/MANUAL-TESTING-PHASE3.md`
+- `docs/planning/cycles/cycle-16-phase-3-manual-testing.md`
 - Cycle 16 Phase 3 completion notes
 
 ---

@@ -9,6 +9,18 @@
     <File Path="docker-compose.yml" />
     <File Path="README.md" />
   </Folder>
+  <Folder Name="/.SolutionItems/Documentation/Planning/Cycles/">
+    <File Path="docs/planning/cycles/cycle-16-phase-3-fixes.md" />
+    <File Path="docs/planning/cycles/cycle-16-phase-3-manual-testing.md" />
+    <File Path="docs\planning\cycles\cycle-16-customer-experience.md" />
+  </Folder>
+  <Folder Name="/.SolutionItems/Documentation/Planning/Infrastructure/" />
+  <Folder Name="/.SolutionItems/Documentation/Planning/Infrastructure/CI-CD/">
+    <File Path="docs/planning/infrastructure/ci-cd/implementation-guide.md" />
+    <File Path="docs/planning/infrastructure/ci-cd/README.md" />
+    <File Path="docs/planning/infrastructure/ci-cd/roadmap.md" />
+    <File Path="docs/planning/infrastructure/ci-cd/visual-guide.md" />
+  </Folder>
   <Folder Name="/.SolutionItems/Skills/">
     <File Path="skills/bff-realtime-patterns.md" />
     <File Path="skills/critterstack-testing-patterns.md" />
@@ -26,10 +38,8 @@
     <File Path="docs\README.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Planning/">
-    <File Path="docs/planning/cycles/cycle-16-phase-3-fixes.md" />
-    <File Path="docs/planning/cycles/cycle-16-phase-3-manual-testing.md" />
+    <File Path="docs/planning/BACKLOG.md" />
     <File Path="docs\planning\CYCLES.md" />
-    <File Path="docs\planning\cycles\cycle-16-customer-experience.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Decisions/">
     <File Path="docs/decisions/0007-github-workflow-improvements.md" />

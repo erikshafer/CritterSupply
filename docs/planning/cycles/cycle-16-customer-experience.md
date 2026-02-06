@@ -589,7 +589,7 @@ src/Customer Experience/Storefront.Web/
 - **Status:** ⏳ **DEFERRED to future cycle**
 - **Decision:** Manual browser testing sufficient for Phase 3
 - **Future Work:** Create ADR for browser testing strategy (Playwright vs Selenium vs bUnit)
-- **Documented in:** `docs/planning/cycles/MANUAL-TESTING-PHASE3.md`
+- **Documented in:** `docs/planning/cycles/cycle-16-phase-3-manual-testing.md`
 
 **Key Learnings:**
 - `dotnet new blazor` scaffolds Bootstrap by default - must manually remove for MudBlazor-only projects
