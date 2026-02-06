@@ -1,6 +1,286 @@
-@Storefront.Api_HostAddress = http://localhost:5041
+### Storefront API (BFF) - Manual Testing & Verification
+### Base URL: http://localhost:5237
 
-GET {{Storefront.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+@HostAddress = http://localhost:5237
+@CustomerId = 11111111-1111-1111-1111-111111111111
+@CartId = 22222222-2222-2222-2222-222222222222
+@CheckoutId = 33333333-3333-3333-3333-333333333333
+
+###############################################
+###   Health Check & API Availability      ###
+###############################################
+
+### Health Check
+GET {{HostAddress}}/health
+accept: */*
+
+> {%
+    client.test("Storefront API is healthy", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### Root Redirect (should redirect to /api)
+GET {{HostAddress}}
+accept: */*
+
+> {%
+    client.test("Root redirects to API documentation", function() {
+        client.assert(response.status === 301, "Response status is not 301 (redirect)");
+    });
+%}
+
+###
+
+###############################################
+###   BFF Composition Queries              ###
+###############################################
+
+### 1. Get Cart View (Composition: Shopping BC + Catalog BC)
+GET {{HostAddress}}/api/storefront/carts/{{CartId}}
+accept: application/json
+
+> {%
+    client.test("Cart view retrieved successfully", function() {
+        client.assert(response.status === 200 || response.status === 404, "Unexpected response status");
+    });
+    if (response.status === 200) {
+        client.assert(response.body.cartId !== undefined, "CartId not returned");
+        client.assert(response.body.items !== undefined, "Items not returned");
+    }
+%}
+
+###
+
+### 2. Get Checkout View (Composition: Orders BC + Customer Identity BC + Catalog BC)
+GET {{HostAddress}}/api/storefront/checkouts/{{CheckoutId}}
+accept: application/json
+
+> {%
+    client.test("Checkout view retrieved successfully", function() {
+        client.assert(response.status === 200 || response.status === 404, "Unexpected response status");
+    });
+    if (response.status === 200) {
+        client.assert(response.body.checkoutId !== undefined, "CheckoutId not returned");
+        client.assert(response.body.savedAddresses !== undefined, "SavedAddresses not returned");
+    }
+%}
+
+###
+
+### 3. Get Product Listing (Composition: Catalog BC + Inventory BC)
+GET {{HostAddress}}/api/storefront/products
+accept: application/json
+
+> {%
+    client.test("Product listing retrieved successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(Array.isArray(response.body.products), "Expected products array");
+    });
+%}
+
+###
+
+### 4. Get Product Listing - Page 2
+GET {{HostAddress}}/api/storefront/products?page=2&pageSize=10
+accept: application/json
+
+> {%
+    client.test("Product listing page 2 retrieved", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.currentPage === 2, "Page number mismatch");
+    });
+%}
+
+###
+
+### 5. Get Product Listing - Filter by Category (Dogs)
+GET {{HostAddress}}/api/storefront/products?category=Dogs
+accept: application/json
+
+> {%
+    client.test("Dogs category products retrieved", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(Array.isArray(response.body.products), "Expected products array");
+    });
+%}
+
+###
+
+### 6. Get Product Listing - Filter by Category (Cats)
+GET {{HostAddress}}/api/storefront/products?category=Cats&page=1&pageSize=20
+accept: application/json
+
+> {%
+    client.test("Cats category products retrieved with pagination", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+###############################################
+###   SSE (Server-Sent Events) Endpoint    ###
+###############################################
+### Note: SSE requires long-lived connection - test manually in browser
+### JavaScript EventSource API: new EventSource('/sse/storefront?customerId=...')
+
+### 7. SSE Endpoint (Will hang - this is expected)
+# This endpoint streams real-time events to connected clients
+# To test: Open this URL in browser or use curl with --no-buffer
+# Expected: Connection stays open, events pushed as they occur
+GET {{HostAddress}}/sse/storefront?customerId={{CustomerId}}
+accept: text/event-stream
+
+> {%
+    client.test("SSE endpoint available (connection will hang)", function() {
+        // This test won't complete - SSE keeps connection open
+        // Just verify the endpoint responds
+        client.assert(response.status === 200 || response.contentType.type === "text/event-stream", "SSE endpoint not responding correctly");
+    });
+%}
+
+###
+
+###############################################
+###   Error Scenarios                      ###
+###############################################
+
+### 8. Get Non-Existent Cart View (404 Expected)
+GET {{HostAddress}}/api/storefront/carts/00000000-0000-0000-0000-000000000000
+accept: application/json
+
+> {%
+    client.test("Non-existent cart returns 404", function() {
+        client.assert(response.status === 404, "Expected 404 for non-existent cart");
+    });
+%}
+
+###
+
+### 9. Get Non-Existent Checkout View (404 Expected)
+GET {{HostAddress}}/api/storefront/checkouts/00000000-0000-0000-0000-000000000000
+accept: application/json
+
+> {%
+    client.test("Non-existent checkout returns 404", function() {
+        client.assert(response.status === 404, "Expected 404 for non-existent checkout");
+    });
+%}
+
+###
+
+###############################################
+###   RabbitMQ Integration Verification    ###
+###############################################
+### These tests verify end-to-end message flow from domain BCs → RabbitMQ → Storefront → SSE
+
+### 10. Verify Cart Update Triggers SSE (Manual Test)
+# Prerequisites:
+# 1. Open browser to http://localhost:5238/cart (Blazor UI)
+# 2. Open browser DevTools → Network tab → look for SSE connection
+# 3. Run this request to trigger RabbitMQ message
+# Expected:
+# - Shopping.Api publishes Shopping.ItemAdded to RabbitMQ
+# - Storefront.Api receives message via RabbitMQ subscription
+# - ItemAddedHandler queries Shopping BC for updated cart
+# - EventBroadcaster pushes to SSE channel
+# - Browser receives SSE event and updates Cart page
+#
+# To execute: Use Shopping.Api.http → Add Item to Cart request
+# Then observe browser Cart page for real-time update
+
+###
+
+### 11. Check Storefront Logs for RabbitMQ Messages
+# After running Shopping.Api cart operations, check Storefront.Api console output:
+# Expected log entries:
+# - "Wolverine: Received message Shopping.ItemAdded"
+# - "ItemAddedHandler: Processing cart update for cart {CartId}"
+# - "EventBroadcaster: Broadcasting cart-updated event to {N} subscribers"
+
+###
+
+###############################################
+###   End-to-End Workflow Test             ###
+###############################################
+### This workflow demonstrates the complete customer journey
+
+### 12. Workflow Step 1: Initialize Cart (via Shopping.Api)
+# See Shopping.Api.http → Initialize Cart
+
+###
+
+### 13. Workflow Step 2: Add Items to Cart (via Shopping.Api)
+# See Shopping.Api.http → Add Item to Cart
+# Expected: SSE notification pushed to browser
+
+###
+
+### 14. Workflow Step 3: View Cart (via Storefront BFF)
+GET {{HostAddress}}/api/storefront/carts/{{CartId}}
+accept: application/json
+
+> {%
+    client.test("Cart view shows composed data", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 15. Workflow Step 4: Initiate Checkout (via Shopping.Api)
+# See Shopping.Api.http → Initiate Checkout
+
+###
+
+### 16. Workflow Step 5: View Checkout (via Storefront BFF)
+GET {{HostAddress}}/api/storefront/checkouts/{{CheckoutId}}
+accept: application/json
+
+> {%
+    client.test("Checkout view shows composed data", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 17. Workflow Step 6: Complete Checkout (via Orders.Api)
+# See Orders.Api.http → Complete Checkout
+# Expected: Orders.OrderPlaced published → SSE notification to browser
+
+###
+
+###############################################
+###   Performance & Load Testing           ###
+###############################################
+
+### 18. Concurrent Cart View Requests (Load Test)
+# Run this request multiple times concurrently to test BFF caching/performance
+GET {{HostAddress}}/api/storefront/carts/{{CartId}}
+accept: application/json
+
+> {%
+    client.test("Cart view performance test", function() {
+        client.assert(response.status === 200 || response.status === 404, "Unexpected response");
+        client.assert(response.responseTime < 1000, "Response time should be under 1 second");
+    });
+%}
+
+###
+
+### 19. Product Listing Performance Test
+GET {{HostAddress}}/api/storefront/products?page=1&pageSize=50
+accept: application/json
+
+> {%
+    client.test("Product listing performance", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.responseTime < 2000, "Response time should be under 2 seconds");
+    });
+%}
 
 ###

@@ -6,13 +6,56 @@ Future work items not yet scheduled into specific cycles.
 
 ## Customer Experience BC
 
+### Authentication (Customer Identity Integration)
+**Priority:** Medium
+**Effort:** 2-3 sessions
+**Deferred From:** Cycle 17 (Surgical Focus)
+**Target Cycle:** 18 or 19
+
+**Description:**
+Replace stub `customerId` with real authentication via Customer Identity BC.
+
+**Rationale for Deferral:**
+Authentication adds significant complexity and isn't required to demonstrate the reference architecture's core capabilities (event sourcing, sagas, BFF pattern, SSE). Keeping stub customerId in Cycle 17 allows focus on integration completeness.
+
+**Tasks:**
+1. Create ADR for authentication strategy (cookie/JWT, where to store session)
+2. Implement authentication in Storefront.Web (cookie/JWT)
+3. Call Customer Identity BC for login/logout
+4. Store customerId in session/claims
+5. Update Cart.razor, Checkout.razor to use authenticated customerId
+6. Add authorization policies (only authenticated users can access cart/checkout)
+7. Add Login/Logout pages with MudBlazor forms
+8. Add "Sign In" / "My Account" buttons to AppBar
+
+**Acceptance Criteria:**
+- Users must log in to access cart/checkout
+- CustomerId comes from authenticated session (no hardcoded GUIDs)
+- Logout clears session
+- Protected routes redirect to login page
+- Session persists across browser refreshes
+
+**Dependencies:**
+- Customer Identity BC complete (✅)
+- Cycle 17 complete (end-to-end flows working with stub customerId)
+
+**References:**
+- `docs/planning/cycles/cycle-17-customer-experience-enhancement.md`
+- Cycle 16 Phase 3 completion notes
+
+---
+
 ### Automated Browser Testing
 **Priority:** Medium
 **Effort:** 2-3 sessions
-**Deferred From:** Cycle 16 Phase 3
+**Deferred From:** Cycle 17 (Surgical Focus)
+**Target Cycle:** 18 or 19
 
 **Description:**
 Implement automated browser tests for Customer Experience Blazor UI.
+
+**Rationale for Deferral:**
+Manual browser testing sufficient for Cycle 16 Phase 3 completion verification. Automated browser tests require framework evaluation, infrastructure setup, and maintenance overhead. Defer until after core integration is complete (Cycle 17).
 
 **Tasks:**
 1. Create ADR for browser testing strategy (Playwright vs Selenium vs bUnit)
@@ -22,104 +65,50 @@ Implement automated browser tests for Customer Experience Blazor UI.
    - Checkout wizard navigation (4 steps)
    - Order history table display
    - Real-time SSE updates (end-to-end)
+   - Product listing page (pagination, filtering)
+   - Add to cart / Remove from cart flows
 4. Add to CI/CD pipeline
 
 **Acceptance Criteria:**
 - Automated tests verify all manual test scenarios from cycle-16-phase-3-manual-testing.md
 - Tests run in CI/CD pipeline
 - No flaky tests (stable browser automation)
+- Tests complete in <5 minutes
 
 **Dependencies:**
-- Phase 3 manual testing complete
+- Cycle 17 complete (end-to-end flows working)
 - Decision on testing framework (ADR needed)
 
 **References:**
 - `docs/planning/cycles/cycle-16-phase-3-manual-testing.md`
-- Cycle 16 Phase 3 completion notes
+- `docs/planning/cycles/cycle-17-customer-experience-enhancement.md`
 
 ---
 
-### Backend Integration (RabbitMQ)
-**Priority:** High
-**Effort:** 1-2 sessions
-**Deferred From:** Cycle 16 Phase 3
+### Advanced Features (Future)
+**Priority:** Low
+**Effort:** Varies
+**Target Cycle:** 20+
 
 **Description:**
-Configure Shopping BC and Storefront BFF to exchange integration messages via RabbitMQ.
+"Icing on the cake" features that enhance customer experience but aren't core to reference architecture.
 
-**Tasks:**
-1. Configure Shopping.Api to publish `Shopping.ItemAdded`, `ItemRemoved`, `ItemQuantityChanged` to RabbitMQ
-2. Configure Storefront.Api to subscribe to Shopping integration messages
-3. Test end-to-end SSE flow:
-   - Add item to cart in Shopping BC
-   - Integration message published to RabbitMQ
-   - Storefront.Api receives message
-   - EventBroadcaster pushes SSE event
-   - Blazor Cart page updates in real-time
-4. Add integration tests for RabbitMQ message flow
+**Rationale for Deferral:**
+Focus Cycle 17 on integration completeness (connecting existing pieces). Advanced features can be added incrementally in future cycles as pedagogical enhancements.
 
-**Acceptance Criteria:**
-- Real-time cart updates work end-to-end
-- No messages lost (inbox/outbox pattern verified)
-- Integration tests verify message flow
+**Potential Features:**
+- **Product Search** - Full-text search across Product Catalog BC (requires Search BC or Catalog enhancement)
+- **Wishlist** - Save items for later (new aggregate in Shopping BC)
+- **Order Tracking Page** - Detailed shipment timeline with carrier updates
+- **Customer Profile/Preferences** - Manage account settings (Customer Identity enhancement)
+- **Multi-Device Cart Sync** - Advanced SSE scenarios (cart updates across devices)
+- **Progressive Web App (PWA)** - Offline capabilities, add to home screen
+- **Product Recommendations** - "Customers also bought" (requires Recommendations BC or ML integration)
+- **Mobile App (Xamarin/MAUI)** - Separate mobile BFF with different composition needs
 
 **Dependencies:**
-- Phase 3 SSE infrastructure complete (✅)
-- RabbitMQ running in docker-compose (✅)
-
-**References:**
-- `docs/planning/cycles/cycle-16-customer-experience.md` Phase 3 notes
-- `CONTEXTS.md` - Shopping BC integration contracts
-
----
-
-### Authentication (Customer Identity Integration)
-**Priority:** Medium
-**Effort:** 2-3 sessions
-
-**Description:**
-Replace stub `customerId` with real authentication via Customer Identity BC.
-
-**Tasks:**
-1. Implement authentication in Storefront.Web (cookie/JWT)
-2. Call Customer Identity BC for login/logout
-3. Store customerId in session/claims
-4. Update Cart.razor, Checkout.razor to use authenticated customerId
-5. Add authorization policies (only authenticated users can access cart/checkout)
-
-**Acceptance Criteria:**
-- Users must log in to access cart/checkout
-- CustomerId comes from authenticated session (no hardcoded GUIDs)
-- Logout clears session
-
-**Dependencies:**
-- Customer Identity BC complete (✅)
-
----
-
-### Real Data Integration
-**Priority:** High
-**Effort:** 1-2 sessions
-
-**Description:**
-Replace stub data with real cart/checkout data from backend BCs.
-
-**Tasks:**
-1. Implement `GetCartView` to query Shopping BC + Product Catalog BC
-2. Implement `GetCheckoutView` to query Orders BC + Customer Identity BC
-3. Update Blazor pages to handle loading states and errors
-4. Add integration tests for BFF composition queries
-
-**Acceptance Criteria:**
-- Cart page displays real cart data
-- Checkout page displays real saved addresses from Customer Identity BC
-- Error handling for missing data (empty cart, no addresses)
-
-**Dependencies:**
-- Shopping BC complete (✅)
-- Orders BC complete (✅)
-- Customer Identity BC complete (✅)
-- Product Catalog BC complete (✅)
+- Cycle 17 complete
+- May require new bounded contexts (Search, Recommendations)
 
 ---
 

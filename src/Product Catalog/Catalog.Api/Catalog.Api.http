@@ -1,0 +1,344 @@
+### Product Catalog API - Manual Testing & Verification
+### Base URL: http://localhost:5133
+
+@HostAddress = http://localhost:5133
+
+###############################################
+###   Health Check & API Availability      ###
+###############################################
+
+### Health Check
+GET {{HostAddress}}/health
+accept: */*
+
+> {%
+    client.test("Product Catalog API is healthy", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### Root Redirect (should redirect to /api)
+GET {{HostAddress}}
+accept: */*
+
+> {%
+    client.test("Root redirects to API documentation", function() {
+        client.assert(response.status === 301, "Response status is not 301 (redirect)");
+    });
+%}
+
+###
+
+###############################################
+###   Product Management - CRUD            ###
+###############################################
+
+### 1. Create Product (Dog Bowl)
+POST {{HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "DOG-BOWL-01",
+  "name": "Ceramic Dog Bowl",
+  "description": "Durable ceramic bowl for dogs, dishwasher safe",
+  "category": "Dogs",
+  "price": 19.99,
+  "inventoryCount": 100,
+  "imageUrl": "https://example.com/images/dog-bowl-01.jpg"
+}
+
+> {%
+    client.test("Product created successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.id !== undefined, "Product ID not returned");
+    });
+    client.global.set("DogBowlProductId", response.body.id);
+%}
+
+###
+
+### 2. Create Product (Cat Toy)
+POST {{HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "CAT-TOY-05",
+  "name": "Interactive Cat Laser",
+  "description": "Automatic laser toy keeps cats entertained for hours",
+  "category": "Cats",
+  "price": 29.99,
+  "inventoryCount": 50,
+  "imageUrl": "https://example.com/images/cat-toy-05.jpg"
+}
+
+> {%
+    client.test("Second product created successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.id !== undefined, "Product ID not returned");
+    });
+    client.global.set("CatToyProductId", response.body.id);
+%}
+
+###
+
+### 3. Create Product (Fish Tank)
+POST {{HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "FISH-TANK-20",
+  "name": "20 Gallon Fish Tank",
+  "description": "Complete starter kit with filter and LED lighting",
+  "category": "Fish",
+  "price": 89.99,
+  "inventoryCount": 25,
+  "imageUrl": "https://example.com/images/fish-tank-20.jpg"
+}
+
+> {%
+    client.test("Third product created successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+    client.global.set("FishTankProductId", response.body.id);
+%}
+
+###
+
+### 4. Get Product by ID
+GET {{HostAddress}}/api/products/{{DogBowlProductId}}
+accept: application/json
+
+> {%
+    client.test("Product retrieved successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.sku === "DOG-BOWL-01", "SKU mismatch");
+    });
+%}
+
+###
+
+### 5. Get All Products (Paginated)
+GET {{HostAddress}}/api/products?page=1&pageSize=10
+accept: application/json
+
+> {%
+    client.test("Product listing retrieved", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(Array.isArray(response.body.items), "Expected items array");
+        client.assert(response.body.totalCount >= 3, "Expected at least 3 products");
+    });
+%}
+
+###
+
+### 6. Get Products by Category (Dogs)
+GET {{HostAddress}}/api/products?category=Dogs
+accept: application/json
+
+> {%
+    client.test("Dogs category products retrieved", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(Array.isArray(response.body.items), "Expected items array");
+    });
+%}
+
+###
+
+### 7. Get Products by Category (Cats)
+GET {{HostAddress}}/api/products?category=Cats
+accept: application/json
+
+> {%
+    client.test("Cats category products retrieved", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 8. Update Product
+PUT {{HostAddress}}/api/products/{{DogBowlProductId}}
+Content-Type: application/json
+
+{
+  "id": "{{DogBowlProductId}}",
+  "sku": "DOG-BOWL-01",
+  "name": "Ceramic Dog Bowl (Updated)",
+  "description": "Premium ceramic bowl for dogs, microwave and dishwasher safe",
+  "category": "Dogs",
+  "price": 24.99,
+  "inventoryCount": 100,
+  "imageUrl": "https://example.com/images/dog-bowl-01-v2.jpg"
+}
+
+> {%
+    client.test("Product updated successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 9. Change Product Status (Discontinue)
+PATCH {{HostAddress}}/api/products/{{FishTankProductId}}/status
+Content-Type: application/json
+
+{
+  "id": "{{FishTankProductId}}",
+  "status": "Discontinued"
+}
+
+> {%
+    client.test("Product status changed successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 10. Get Product After Status Change
+GET {{HostAddress}}/api/products/{{FishTankProductId}}
+accept: application/json
+
+> {%
+    client.test("Product status updated correctly", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.status === "Discontinued", "Status not updated");
+    });
+%}
+
+###
+
+###############################################
+###   Error Scenarios                      ###
+###############################################
+
+### 11. Get Non-Existent Product (404 Expected)
+GET {{HostAddress}}/api/products/00000000-0000-0000-0000-000000000000
+accept: application/json
+
+> {%
+    client.test("Non-existent product returns 404", function() {
+        client.assert(response.status === 404, "Expected 404 for non-existent product");
+    });
+%}
+
+###
+
+### 12. Create Product with Duplicate SKU (Conflict Expected)
+POST {{HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "DOG-BOWL-01",
+  "name": "Duplicate Bowl",
+  "description": "This should fail due to duplicate SKU",
+  "category": "Dogs",
+  "price": 19.99,
+  "inventoryCount": 10,
+  "imageUrl": "https://example.com/images/duplicate.jpg"
+}
+
+> {%
+    client.test("Duplicate SKU rejected", function() {
+        client.assert(response.status === 409 || response.status === 400, "Expected 409 or 400 for duplicate SKU");
+    });
+%}
+
+###
+
+### 13. Create Product with Negative Price (Validation Error Expected)
+POST {{HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "INVALID-PROD",
+  "name": "Invalid Product",
+  "description": "This should fail due to negative price",
+  "category": "Dogs",
+  "price": -10.00,
+  "inventoryCount": 10,
+  "imageUrl": "https://example.com/images/invalid.jpg"
+}
+
+> {%
+    client.test("Negative price rejected", function() {
+        client.assert(response.status === 400, "Expected 400 for negative price");
+    });
+%}
+
+###
+
+###############################################
+###   Integration Scenarios                ###
+###############################################
+### Note: These products are used in Shopping cart tests
+
+### 14. Bulk Create Products (Test Data Setup)
+# Product 1
+POST {{HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "TEST-BONE-01",
+  "name": "Rawhide Chew Bone",
+  "description": "Natural rawhide bone for medium dogs",
+  "category": "Dogs",
+  "price": 8.99,
+  "inventoryCount": 200,
+  "imageUrl": "https://example.com/images/bone-01.jpg"
+}
+
+> {%
+    client.test("Test product 1 created", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+# Product 2
+POST {{HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "TEST-CATNIP-01",
+  "name": "Organic Catnip Toy",
+  "description": "Stuffed mouse with premium catnip",
+  "category": "Cats",
+  "price": 5.99,
+  "inventoryCount": 150,
+  "imageUrl": "https://example.com/images/catnip-01.jpg"
+}
+
+> {%
+    client.test("Test product 2 created", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+# Product 3
+POST {{HostAddress}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "TEST-FILTER-01",
+  "name": "Aquarium Filter Cartridge",
+  "description": "Replacement cartridge for standard filters",
+  "category": "Fish",
+  "price": 12.99,
+  "inventoryCount": 75,
+  "imageUrl": "https://example.com/images/filter-01.jpg"
+}
+
+> {%
+    client.test("Test product 3 created", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
