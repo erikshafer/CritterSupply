@@ -1,0 +1,180 @@
+@page "/checkout"
+@rendermode InteractiveServer
+@inject IHttpClientFactory HttpClientFactory
+
+<PageTitle>Checkout - CritterSupply</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Checkout</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_checkoutView == null)
+{
+    <MudAlert Severity="Severity.Error">Unable to load checkout. Please try again.</MudAlert>
+}
+else
+{
+    <MudStepper @ref="_stepper" ActiveStepIndex="@((int)_checkoutView.CurrentStep - 1)" Linear="true">
+        <!-- Step 1: Shipping Address -->
+        <MudStep Title="Shipping Address">
+            <MudText Typo="Typo.h6" Class="mb-4">Select Shipping Address</MudText>
+
+            @if (_checkoutView.SavedAddresses.Any())
+            {
+                <MudSelect T="Guid" Label="Saved Addresses" Variant="Variant.Outlined" @bind-Value="_selectedAddressId">
+                    @foreach (var address in _checkoutView.SavedAddresses)
+                    {
+                        <MudSelectItem T="Guid" Value="@address.AddressId">@address.Nickname - @address.DisplayLine</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info">No saved addresses. Add an address to continue.</MudAlert>
+            }
+
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-4">
+                Stepper navigation: Use built-in Next/Previous buttons below
+            </MudText>
+        </MudStep>
+
+        <!-- Step 2: Shipping Method -->
+        <MudStep Title="Shipping Method">
+            <MudText Typo="Typo.h6" Class="mb-4">Select Shipping Method</MudText>
+
+            <MudRadioGroup @bind-Value="_selectedShippingMethod">
+                <MudRadio Value="@("Standard")">Standard Ground (5-7 days) - $5.99</MudRadio>
+                <MudRadio Value="@("Express")">Express Shipping (2-3 days) - $12.99</MudRadio>
+                <MudRadio Value="@("NextDay")">Next Day Air (1 day) - $24.99</MudRadio>
+            </MudRadioGroup>
+
+        </MudStep>
+
+        <!-- Step 3: Payment -->
+        <MudStep Title="Payment">
+            <MudText Typo="Typo.h6" Class="mb-4">Provide Payment Method</MudText>
+
+            <MudTextField @bind-Value="_paymentToken" Label="Payment Token (stub)" Variant="Variant.Outlined" Placeholder="tok_visa_test_12345" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                In production, this would integrate with Stripe/PayPal for tokenized payment processing.
+            </MudText>
+
+        </MudStep>
+
+        <!-- Step 4: Review & Submit -->
+        <MudStep Title="Review & Submit">
+            <MudText Typo="Typo.h6" Class="mb-4">Order Summary</MudText>
+
+            <MudPaper Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Line Items</MudText>
+                @foreach (var item in _checkoutView.Items)
+                {
+                    <div class="d-flex justify-space-between mb-2">
+                        <MudText>@item.ProductName (x@item.Quantity)</MudText>
+                        <MudText>@item.LineTotal.ToString("C")</MudText>
+                    </div>
+                }
+
+                <MudDivider Class="my-3" />
+
+                <div class="d-flex justify-space-between mb-2">
+                    <MudText>Subtotal</MudText>
+                    <MudText>@_checkoutView.Subtotal.ToString("C")</MudText>
+                </div>
+                <div class="d-flex justify-space-between mb-2">
+                    <MudText>Shipping</MudText>
+                    <MudText>@_checkoutView.ShippingCost.ToString("C")</MudText>
+                </div>
+
+                <MudDivider Class="my-3" />
+
+                <div class="d-flex justify-space-between">
+                    <MudText Typo="Typo.h6">Total</MudText>
+                    <MudText Typo="Typo.h6">@_checkoutView.Total.ToString("C")</MudText>
+                </div>
+            </MudPaper>
+
+            <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@PlaceOrder" Class="mt-4">
+                Place Order
+            </MudButton>
+        </MudStep>
+    </MudStepper>
+}
+
+@code {
+    private MudStepper? _stepper;
+    private CheckoutView? _checkoutView;
+    private bool _isLoading = true;
+
+    private Guid _selectedAddressId;
+    private string _selectedShippingMethod = "Standard";
+    private string _paymentToken = "";
+
+    // Stub checkout ID
+    private readonly Guid _checkoutId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCheckout();
+    }
+
+    private async Task LoadCheckout()
+    {
+        _isLoading = true;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("StorefrontApi");
+            _checkoutView = await client.GetFromJsonAsync<CheckoutView>($"/api/storefront/checkouts/{_checkoutId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load checkout: {ex.Message}");
+            _checkoutView = null;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task PlaceOrder()
+    {
+        // TODO: POST to BFF to complete checkout
+        Console.WriteLine("Place Order clicked - would POST to /api/storefront/checkouts/{id}/complete");
+    }
+
+    // View models matching BFF
+    private sealed record CheckoutView(
+        Guid CheckoutId,
+        Guid CustomerId,
+        CheckoutStep CurrentStep,
+        IReadOnlyList<CartLineItemView> Items,
+        IReadOnlyList<AddressSummary> SavedAddresses,
+        decimal Subtotal,
+        decimal ShippingCost,
+        decimal Total,
+        bool CanProceedToNextStep);
+
+    private enum CheckoutStep
+    {
+        ShippingAddress = 1,
+        ShippingMethod = 2,
+        Payment = 3,
+        Review = 4
+    }
+
+    private sealed record AddressSummary(
+        Guid AddressId,
+        string Nickname,
+        string DisplayLine);
+
+    private sealed record CartLineItemView(
+        string Sku,
+        string ProductName,
+        string ProductImageUrl,
+        int Quantity,
+        decimal UnitPrice,
+        decimal LineTotal);
+}

@@ -67,6 +67,13 @@ var app = builder.Build();
 // Map Wolverine HTTP endpoints
 app.MapWolverineEndpoints();
 
+// Redirect root to Swagger/API documentation
+app.MapGet("/", (HttpResponse response) =>
+{
+    response.Headers.Append("Location", "/api");
+    response.StatusCode = StatusCodes.Status301MovedPermanently;
+}).ExcludeFromDescription();
+
 app.Run();
 
 // Make Program accessible for testing

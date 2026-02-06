@@ -64,6 +64,13 @@ public static class AddProductHandler
         IDocumentSession session,
         CancellationToken ct)
     {
+        // Check for duplicate SKU
+        var existing = await session.LoadAsync<Product>(command.Sku, ct);
+        if (existing is not null)
+        {
+            throw new InvalidOperationException("Product with SKU already exists");
+        }
+
         // Convert DTOs to value objects
         var images = command.Images?
             .Select(dto => ProductImage.Create(dto.Url, dto.AltText, dto.SortOrder))

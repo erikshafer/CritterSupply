@@ -10,11 +10,11 @@
     <File Path="README.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Skills/">
+    <File Path="skills/bff-realtime-patterns.md" />
     <File Path="skills/critterstack-testing-patterns.md" />
     <File Path="skills/modern-csharp-coding-standards.md" />
     <File Path="skills/reqnroll-bdd-testing.md" />
     <File Path="skills/testcontainers-integration-tests.md" />
-    <File Path="skills\bff-signalr-patterns.md" />
     <File Path="skills\efcore-wolverine-integration.md" />
     <File Path="skills\external-service-integration.md" />
     <File Path="skills\marten-document-store.md" />
@@ -26,10 +26,13 @@
     <File Path="docs\README.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Planning/">
+    <File Path="docs/planning/cycles/cycle-16-phase-3-fixes.md" />
+    <File Path="docs/planning/cycles/cycle-16-phase-3-manual-testing.md" />
     <File Path="docs\planning\CYCLES.md" />
     <File Path="docs\planning\cycles\cycle-16-customer-experience.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Decisions/">
+    <File Path="docs/decisions/0007-github-workflow-improvements.md" />
     <File Path="docs\decisions\0004-sse-over-signalr.md" />
     <File Path="docs\decisions\0005-mudblazor-ui-framework.md" />
     <File Path="docs\decisions\0006-reqnroll-bdd-framework.md" />
@@ -79,6 +82,7 @@
   </Folder>
   <Folder Name="/Customer Experience/">
     <Project Path="src/Customer Experience/Storefront.Api/Storefront.Api.csproj" />
+    <Project Path="src/Customer Experience/Storefront.Web/Storefront.Web.csproj" />
     <Project Path="src/Customer Experience/Storefront/Storefront.csproj" />
     <Project Path="tests/Customer Experience/Storefront.IntegrationTests/Storefront.IntegrationTests.csproj" />
   </Folder>

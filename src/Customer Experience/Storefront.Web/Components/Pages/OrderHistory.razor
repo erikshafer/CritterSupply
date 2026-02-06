@@ -1,0 +1,49 @@
+@page "/orders"
+@rendermode InteractiveServer
+
+<PageTitle>Order History - CritterSupply</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Order History</MudText>
+
+<MudAlert Severity="Severity.Info">
+    Order History page - placeholder for Phase 3. Will display customer's past orders with real-time shipment updates.
+</MudAlert>
+
+<MudTable Items="@_orders" Hover="true" Striped="true" Class="mt-4">
+    <HeaderContent>
+        <MudTh>Order ID</MudTh>
+        <MudTh>Date</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh>Total</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>@context.OrderId</MudTd>
+        <MudTd>@context.PlacedAt.ToString("d")</MudTd>
+        <MudTd>
+            <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip>
+        </MudTd>
+        <MudTd>@context.Total.ToString("C")</MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>No orders found.</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private readonly List<OrderSummary> _orders = new()
+    {
+        new OrderSummary(Guid.NewGuid(), DateTimeOffset.Now.AddDays(-5), "Delivered", 129.99m),
+        new OrderSummary(Guid.NewGuid(), DateTimeOffset.Now.AddDays(-2), "Shipped", 45.00m),
+        new OrderSummary(Guid.NewGuid(), DateTimeOffset.Now.AddDays(-1), "Placed", 89.99m)
+    };
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Placed" => Color.Info,
+        "Shipped" => Color.Primary,
+        "Delivered" => Color.Success,
+        _ => Color.Default
+    };
+
+    private sealed record OrderSummary(Guid OrderId, DateTimeOffset PlacedAt, string Status, decimal Total);
+}

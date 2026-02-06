@@ -184,6 +184,7 @@ docs/features/
 - **Sealed by default** — All commands, queries, events, and models are `sealed`
 - **Integration tests over unit tests** — Test complete vertical slices with Alba
 - **A-Frame architecture** — Infrastructure at edges, pure logic in the middle
+- **Always update .sln** — When creating new projects, immediately add them to `CritterSupply.sln` using `dotnet sln add`
 
 ## Solution Organization
 
@@ -266,9 +267,10 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 | Customer Identity             | 5235     | ✅ Assigned  |
 | Shopping                      | 5236     | ✅ Assigned  |
 | Product Catalog               | 5133     | ✅ Assigned  |
-| **Customer Experience (BFF)** | **5237** | 🔜 Next     |
-| Vendor Portal                 | 5238     | 📋 Reserved |
-| Vendor Identity               | 5239     | 📋 Reserved |
+| **Customer Experience (BFF)** | **5237** | ✅ Assigned  |
+| **Customer Experience (Web)** | **5238** | ✅ Assigned  |
+| Vendor Portal                 | 5239     | 📋 Reserved |
+| Vendor Identity               | 5240     | 📋 Reserved |
 
 **Why this matters:**
 - Allows running multiple APIs simultaneously during development
@@ -420,7 +422,7 @@ Covers:
 
 For customer-facing frontends aggregating multiple BCs:
 
-**Read:** `skills/bff-signalr-patterns.md`
+**Read:** `skills/bff-realtime-patterns.md`
 
 Covers:
 - View composition from multiple BCs
@@ -484,6 +486,54 @@ Covers:
 
 ---
 
+## Project Creation Workflow
+
+**IMPORTANT:** When creating new projects (APIs, test projects, Blazor apps, etc.), always follow this checklist:
+
+### New Project Checklist
+
+1. **Create the project:**
+   ```bash
+   dotnet new <template> -n <ProjectName> -o "<path>"
+   ```
+
+2. **Add to solution file(s):**
+   ```bash
+   # How to add the project to a .sln file (classic solution file - for dotnet CLI)
+   dotnet sln add "<path>/<ProjectName>.csproj"
+
+   # How to add to .slnx (modern XML solution file - for Visual Studio/Rider Solution Explorer)
+   # Manually edit CritterSupply.slnx and add project to appropriate <Folder> section
+   ```
+   **Why:**
+   - We want to make sure that projects, along with specific files like markdown documentation (.MD) are visible in the "Solution Explorer" view when it's enabled in Visual Studio or Rider.
+
+3. **Add package references:**
+   - Use `<PackageReference Include="PackageName" />` (no version - Central Package Management)
+   - If package not in `Directory.Packages.props`, add it there first with version
+
+4. **Configure launchSettings.json (if API/Web project):**
+   - Check port allocation table (see API Project Configuration section above)
+   - Use next available port
+   - Update port allocation table in this file
+
+5. **Build and verify:**
+   ```bash
+   dotnet build
+   ```
+
+6. **Update documentation:**
+   - Add run instructions to README.md
+   - Update bounded context status table if applicable
+   - Update port allocation table in CLAUDE.md
+
+**Common Mistakes:**
+- Forgetting step 2 (adding to `.sln` and `.slnx`) - this breaks IDE tooling
+- Adding to `.sln` but forgetting `.slnx` - project builds but doesn't appear in IDE Solution Explorer
+- Creating duplicate entries in `.slnx` - keep projects organized in appropriate folder sections
+
+---
+
 ## Cross-Context Refactoring
 
 After changes affecting multiple bounded contexts, **always run the full test suite**:
@@ -528,7 +578,7 @@ See [DEVPROGRESS.md](./DEVPROGRESS.md) for current development status.
 | `marten-document-store.md` | Document database patterns (non-event-sourced) |
 | `efcore-wolverine-integration.md` | Entity Framework Core with Wolverine |
 | `external-service-integration.md` | Strategy pattern, graceful degradation |
-| `bff-signalr-patterns.md` | Backend-for-Frontend, real-time updates |
+| `bff-realtime-patterns.md` | Backend-for-Frontend, real-time updates (SSE + SignalR) |
 | `vertical-slice-organization.md` | File structure, colocation patterns |
 | `modern-csharp-coding-standards.md` | C# language features, immutability |
 | `critterstack-testing-patterns.md` | Unit and integration testing |

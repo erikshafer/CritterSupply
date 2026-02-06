@@ -720,7 +720,7 @@ When Shopping BC completes checkout, it doesn't pass an `AddressId` to Orders BC
 
 The Customer Experience context owns the customer-facing frontend orchestration using the Backend-for-Frontend (BFF) pattern. This BC composes data from multiple domain BCs to optimize UI performance and provide a cohesive customer experience across web and future mobile channels.
 
-**Status**: Planned (not yet implemented)
+**Status**: 🚧 In Progress (Cycle 16 - Phase 3 Complete, Backend Integration Next)
 
 ### Architecture Pattern: Backend-for-Frontend (BFF)
 
@@ -735,20 +735,25 @@ The Customer Experience context owns the customer-facing frontend orchestration 
 
 **Storefront (Web):**
 
-Customer-facing web store built with Blazor Server, demonstrating full-stack C# development with real-time updates via SignalR and Wolverine integration.
+Customer-facing web store built with Blazor Server, demonstrating full-stack C# development with real-time updates via Server-Sent Events (SSE) and Wolverine integration.
 
-**Key Pages (Minimal Implementation):**
+**Implemented Pages (Phase 3):**
+- ✅ Home page (navigation cards)
+- ✅ Shopping cart view (SSE-enabled for real-time updates)
+- ✅ Checkout flow (MudStepper wizard with 4 steps)
+- ✅ Order history (MudTable with order list)
+
+**Future Pages:**
 - Product listing page (queries Catalog BC)
-- Shopping cart view (queries Shopping BC, real-time updates via SignalR)
-- Checkout flow (queries Orders + Customer Identity BCs, multi-step wizard)
-- Order history (queries Orders BC)
 - Account/address management (queries Customer Identity BC)
 
 **Technology Stack:**
-- **Blazor Server** - C# full-stack, component model, easier SignalR integration than WASM
-- **SignalR** - Real-time cart/order updates pushed from domain BCs
+- **Blazor Server** - C# full-stack, component model, interactive render modes
+- **MudBlazor** - Material Design component library (ADR 0005)
+- **Server-Sent Events (SSE)** - Real-time cart/order updates pushed from domain BCs (ADR 0004)
 - **Wolverine HTTP** - BFF endpoints for view composition
 - **Alba** - Integration testing for BFF composition endpoints
+- **JavaScript Interop** - EventSource API for SSE subscriptions
 
 **Future Expansion:**
 - Mobile BFF (different composition needs than web)
@@ -799,11 +804,14 @@ Customer-facing web store built with Blazor Server, demonstrating full-stack C# 
 - `AddAddress` → Customer Identity BC
 - `UpdateAddress` → Customer Identity BC
 
-**SignalR Messages (to connected clients):**
-- `CartUpdated` — cart state changed (item added/removed/quantity changed)
-- `OrderStatusChanged` — order progressed through lifecycle
-- `InventoryAlert` — low stock warning for items in cart
-- `CheckoutStepCompleted` — wizard progression feedback
+**SSE Events (to connected clients via EventBroadcaster):**
+- `cart-updated` — cart state changed (item added/removed/quantity changed)
+- `order-placed` — order successfully placed (checkout complete)
+
+**Future SSE Events:**
+- `order-status-changed` — order progressed through lifecycle
+- `inventory-alert` — low stock warning for items in cart
+- `shipment-dispatched` — shipment tracking notification
 
 ### Core Invariants
 
@@ -815,9 +823,10 @@ Customer-facing web store built with Blazor Server, demonstrating full-stack C# 
 
 **Real-Time Notification Invariants:**
 - Only authenticated users receive notifications for their data
-- SignalR connections scoped to customer ID (security boundary)
-- Domain BCs publish integration messages; BFF transforms to SignalR messages
-- Failed SignalR delivery does NOT fail domain operations (fire-and-forget)
+- SSE streams scoped to customer ID (security boundary)
+- Domain BCs publish integration messages; BFF transforms to SSE events via EventBroadcaster
+- Failed SSE delivery does NOT fail domain operations (fire-and-forget)
+- EventBroadcaster uses `Channel<T>` for in-memory pub/sub (no persistence)
 
 ### What it doesn't own
 
@@ -848,20 +857,26 @@ GetCheckoutView (BFF query)
 AddItemToCart (command)
   └─> AddItemToCartHandler
       ├─> ItemAdded (domain event, persisted)
-      └─> Publish Shopping.ItemAdded (integration message) → RabbitMQ
+      └─> Publish Shopping.ItemAdded (integration message) → RabbitMQ (Phase 4)
 
-[Customer Experience BFF]
+[Customer Experience BFF - Storefront.Api]
 Shopping.ItemAdded (integration message from RabbitMQ)
-  └─> ItemAddedNotificationHandler
-      ├─> Query Shopping BC for updated cart state
-      ├─> Compose CartSummaryView
-      └─> SignalR push to connected client
-          └─> StorefrontHub.Clients.Group($"cart:{cartId}")
-              └─> SendAsync("CartUpdated", cartSummary)
+  └─> ItemAddedHandler (Storefront/Notifications/)
+      ├─> Map to StorefrontEvent discriminated union
+      └─> Publish to EventBroadcaster (Channel<StorefrontEvent>)
+          └─> SSE endpoint consumes channel
+              └─> Filter by customerId
+                  └─> Serialize to JSON with "$type" discriminator
+                      └─> Stream to EventSource client
 
-[Blazor Frontend]
-StorefrontHub.On("CartUpdated")
-  └─> Update UI component (cart icon badge, cart page refresh)
+[Blazor Frontend - Storefront.Web]
+JavaScript EventSource (/sse/storefront?customerId={id})
+  └─> onmessage event received
+      └─> Parse JSON event
+          └─> Invoke C# callback via JSInvokable
+              └─> OnSseEvent(JsonElement eventData)
+                  └─> Update Blazor component state
+                      └─> StateHasChanged() triggers UI refresh
 ```
 
 **Command Flow (Customer Adds Item to Cart):**
@@ -878,106 +893,133 @@ async Task AddToCart()
                   └─> [BFF receives event, pushes SignalR update - see above]
 ```
 
-### Project Structure (Planned)
+### Project Structure (Implemented - Phase 3)
 
 ```
 src/
   Customer Experience/
-    Storefront/                       # BFF domain (view composition, SignalR hub)
-      Composition/                    # View model composition from multiple BCs
-        CheckoutView.cs
-        ProductListingView.cs
-        OrderHistoryView.cs
-      Notifications/                  # SignalR hub + integration message handlers
-        StorefrontHub.cs
-        CartUpdateNotifier.cs
-        OrderStatusNotifier.cs
-      Queries/                        # BFF query handlers (composition)
-        GetCheckoutView.cs
-        GetProductListing.cs
-        GetOrderHistory.cs
-      Commands/                       # BFF command handlers (delegation to domain BCs)
-        AddItemToCartCommand.cs
-        CompleteCheckoutCommand.cs
-      Clients/                        # HTTP clients for domain BC queries
-        IShoppingClient.cs
-        IOrdersClient.cs
-        ICustomerIdentityClient.cs
-        ICatalogClient.cs
-    Storefront.Web/                   # Blazor Server app
-      Pages/
-        Index.razor                   # Product catalog landing
-        Cart.razor                    # Shopping cart view
-        Checkout.razor                # Checkout wizard
-        OrderHistory.razor            # Customer order list
-        OrderDetails.razor            # Order tracking page
-        Account/
-          Addresses.razor             # Address management
+    Storefront/                       # BFF domain (regular SDK)
+      Storefront.csproj               # References: Messages.Contracts only
+      Clients/                        # HTTP client interfaces (domain)
+        IShoppingClient.cs            # ✅ Implemented
+        IOrdersClient.cs              # ✅ Implemented
+        ICustomerIdentityClient.cs    # ✅ Implemented
+        ICatalogClient.cs             # ✅ Implemented
+      Composition/                    # View models
+        CartView.cs                   # ✅ Implemented
+        CheckoutView.cs               # ✅ Implemented
+        ProductListingView.cs         # ✅ Implemented
+      Notifications/                  # Integration message handlers + EventBroadcaster
+        IEventBroadcaster.cs          # ✅ Implemented
+        EventBroadcaster.cs           # ✅ Implemented (Channel<T> pub/sub)
+        StorefrontEvent.cs            # ✅ Implemented (discriminated union)
+        ItemAddedHandler.cs           # ✅ Implemented
+        ItemRemovedHandler.cs         # ✅ Implemented
+        ItemQuantityChangedHandler.cs # ✅ Implemented
+        OrderPlacedHandler.cs         # ✅ Implemented
+
+    Storefront.Api/                   # API project (Web SDK)
+      Storefront.Api.csproj           # References: Storefront, Messages.Contracts
+      Program.cs                      # ✅ Wolverine + Marten + DI setup
+      appsettings.json                # ✅ Connection strings
+      Properties/launchSettings.json  # ✅ Port 5237
+      Queries/                        # HTTP endpoints (BFF composition)
+        GetCartView.cs                # ✅ Implemented (namespace: Storefront.Api.Queries)
+        GetCheckoutView.cs            # ✅ Implemented
+        GetProductListing.cs          # ✅ Implemented
+      Clients/                        # HTTP client implementations
+        ShoppingClient.cs             # ✅ Implemented (namespace: Storefront.Api.Clients)
+        OrdersClient.cs               # ✅ Implemented
+        CustomerIdentityClient.cs     # ✅ Implemented
+        CatalogClient.cs              # ✅ Implemented
+      StorefrontHub.cs                # ✅ SSE endpoint (IAsyncEnumerable<T>)
+
+    Storefront.Web/                   # Blazor Server app (Web SDK)
+      Storefront.Web.csproj           # ✅ MudBlazor
+      Program.cs                      # ✅ MudBlazor + HttpClient config
+      Properties/launchSettings.json  # ✅ Port 5238
       Components/
-        ProductCard.razor
-        CartSummary.razor
-        CheckoutProgress.razor
-        AddressSelector.razor
-      Shared/
-        MainLayout.razor
-        NavMenu.razor
-      wwwroot/                        # Static assets (CSS, images)
-      Program.cs                      # Blazor + SignalR + Wolverine setup
+        App.razor                     # ✅ MudBlazor CSS/JS references
+        _Imports.razor                # ✅ MudBlazor namespace
+        Layout/
+          MainLayout.razor            # ✅ MudLayout with AppBar + Drawer
+          InteractiveAppBar.razor     # ✅ Interactive component (render mode fix)
+        Pages/
+          Home.razor                  # ✅ Landing page (navigation cards)
+          Cart.razor                  # ✅ SSE-enabled cart page
+          Checkout.razor              # ✅ MudStepper wizard (4 steps)
+          OrderHistory.razor          # ✅ MudTable with orders
+      wwwroot/
+        js/
+          sse-client.js               # ✅ JavaScript EventSource client
+        app.css                       # ✅ Minimal CSS (MudBlazor handles styling)
 
 tests/
   Customer Experience/
     Storefront.IntegrationTests/      # Alba tests for BFF composition
-      CheckoutViewCompositionTests.cs
-      RealTimeNotificationTests.cs
+      CartViewCompositionTests.cs     # ✅ Implemented
+      CheckoutViewCompositionTests.cs # ✅ Implemented
+      ProductListingCompositionTests.cs # ✅ Implemented
+      SseEndpointTests.cs             # ✅ Implemented
+      EventBroadcasterTests.cs        # ✅ Implemented
 ```
 
-### Implementation Notes
+### Implementation Notes (Phase 3)
 
-**SignalR + Wolverine Integration:**
+**EventBroadcaster Pattern (In-Memory Pub/Sub with Channel<T>):**
 ```csharp
-// Storefront/Notifications/StorefrontHub.cs
-public class StorefrontHub : Hub
+// Storefront/Notifications/IEventBroadcaster.cs
+public interface IEventBroadcaster
 {
-    public async Task SubscribeToCart(Guid cartId)
-    {
-        // Add connection to cart-specific group
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"cart:{cartId}");
-    }
+    void Publish(StorefrontEvent @event);
+    IAsyncEnumerable<StorefrontEvent> SubscribeAsync(Guid customerId, CancellationToken ct);
+}
 
-    public async Task SubscribeToOrderUpdates(Guid customerId)
+// Storefront/Notifications/EventBroadcaster.cs
+public sealed class EventBroadcaster : IEventBroadcaster
+{
+    private readonly Channel<StorefrontEvent> _channel = Channel.CreateUnbounded<StorefrontEvent>();
+
+    public void Publish(StorefrontEvent @event) => _channel.Writer.TryWrite(@event);
+
+    public async IAsyncEnumerable<StorefrontEvent> SubscribeAsync(
+        Guid customerId,
+        [EnumeratorCancellation] CancellationToken ct)
     {
-        // Add connection to customer-specific group
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"customer:{customerId}");
+        await foreach (var @event in _channel.Reader.ReadAllAsync(ct))
+        {
+            // Customer isolation - only stream events for this customer
+            if (@event.CustomerId == customerId)
+                yield return @event;
+        }
     }
 }
 
-// Storefront/Notifications/CartUpdateNotifier.cs
-public static class CartUpdateNotifier
+// Storefront/Notifications/ItemAddedHandler.cs (Wolverine handler)
+public static class ItemAddedHandler
 {
-    public static async Task Handle(
-        Shopping.ItemAdded message,
-        IHubContext<StorefrontHub> hubContext,
-        IShoppingClient shoppingClient,
+    public static void Handle(Shopping.ItemAdded message, IEventBroadcaster broadcaster)
+    {
+        broadcaster.Publish(new StorefrontEvent.CartUpdated(
+            message.CustomerId, message.CartId, message.Sku, message.Quantity));
+    }
+}
+
+// Storefront.Api/StorefrontHub.cs (SSE endpoint)
+public static class StorefrontHub
+{
+    [WolverineGet("/sse/storefront")]
+    public static IAsyncEnumerable<StorefrontEvent> Subscribe(
+        Guid customerId,
+        IEventBroadcaster broadcaster,
         CancellationToken ct)
     {
-        // Query Shopping BC for updated cart state
-        var cart = await shoppingClient.GetCartAsync(message.CartId, ct);
-
-        // Compose view model
-        var cartSummary = new CartSummaryView(
-            cart.Id,
-            cart.Items.Count,
-            cart.Items.Sum(i => i.Quantity * i.UnitPrice));
-
-        // Push to connected clients in this cart's group
-        await hubContext.Clients
-            .Group($"cart:{message.CartId}")
-            .SendAsync("CartUpdated", cartSummary, ct);
+        return broadcaster.SubscribeAsync(customerId, ct);
     }
 }
 ```
 
-**Blazor Component with Real-Time Updates:**
+**Blazor Component with SSE Real-Time Updates:**
 ```razor
 @* Storefront.Web/Pages/Cart.razor *@
 @page "/cart/{cartId:guid}"
@@ -1001,6 +1043,7 @@ else
             Item="@item"
             OnRemove="@(() => RemoveItem(item.Sku))" />
     }
+}
 
     <button @onclick="Checkout">Proceed to Checkout</button>
 }
@@ -1346,7 +1389,7 @@ tests/
       SkuGenerationTests.cs
 ```
 
-### Implementation Notes
+### Implementation Notes (Phase 3)
 
 **1. SKU Generation Strategy**
 
