@@ -1,6 +1,7 @@
+using Storefront.Clients;
 using System.Text.Json;
 
-namespace Storefront.Clients;
+namespace Storefront.Api.Clients;
 
 public sealed class CustomerIdentityClient : ICustomerIdentityClient
 {

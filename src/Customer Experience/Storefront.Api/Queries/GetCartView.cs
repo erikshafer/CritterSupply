@@ -3,7 +3,7 @@ using Storefront.Clients;
 using Storefront.Composition;
 using Wolverine.Http;
 
-namespace Storefront.Queries;
+namespace Storefront.Api.Queries;
 
 /// <summary>
 /// Query to get composed cart view (Shopping BC + Catalog BC)
@@ -23,6 +23,9 @@ public static class GetCartViewHandler
         {
             // Query Shopping BC for cart state
             var cart = await shoppingClient.GetCartAsync(cartId, ct);
+
+            if (cart is null)
+                return Results.NotFound();
 
             // Enrich line items with product details from Catalog BC
             var enrichedItems = new List<CartLineItemView>();

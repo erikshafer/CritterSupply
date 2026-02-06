@@ -277,6 +277,79 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 
 **When creating a new BC:** Check the port allocation table above and use the next available port number.
 
+### 3. BFF Project Structure Pattern
+
+**IMPORTANT:** Backend-for-Frontend (BFF) projects follow the **same domain/API split pattern** as all other bounded contexts.
+
+**BFF Anatomy:**
+
+```
+src/<BC Name>/
+├── <ProjectName>/                      # Domain project (regular SDK)
+│   ├── <ProjectName>.csproj            # References: Messages.Contracts only
+│   ├── Clients/                        # HTTP client interfaces (domain)
+│   │   └── I*Client.cs
+│   ├── Composition/                    # View models for UI
+│   │   └── *View.cs
+│   └── Notifications/                  # Integration message handlers
+│       ├── IEventBroadcaster.cs        # SSE pub/sub interface
+│       ├── EventBroadcaster.cs         # Channel-based implementation
+│       ├── *Event.cs                   # Discriminated union for SSE
+│       └── *Handler.cs                 # Integration message handlers
+│
+└── <ProjectName>.Api/                  # API project (Web SDK)
+    ├── <ProjectName>.Api.csproj        # References: <ProjectName>, Messages.Contracts
+    ├── Program.cs                      # Wolverine + Marten + DI setup
+    ├── appsettings.json                # Connection strings
+    ├── Properties/launchSettings.json  # Port allocation
+    ├── Queries/                        # HTTP endpoints (composition)
+    │   └── Get*View.cs                 # namespace: <ProjectName>.Api.Queries
+    ├── Clients/                        # HTTP client implementations
+    │   └── *Client.cs                  # namespace: <ProjectName>.Api.Clients
+    └── *Hub.cs                         # SSE endpoint (namespace: <ProjectName>.Api)
+```
+
+**Example: Customer Experience BFF (Storefront)**
+
+```
+src/Customer Experience/
+├── Storefront/                         # Domain project
+│   ├── Clients/                        # Interfaces for Shopping, Orders, Catalog, etc.
+│   ├── Composition/                    # CartView, CheckoutView, ProductListingView
+│   └── Notifications/                  # ItemAddedHandler, OrderPlacedHandler, EventBroadcaster
+│
+└── Storefront.Api/                     # API project
+    ├── Program.cs                      # Wolverine handler discovery for both assemblies
+    ├── Queries/                        # GetCartView, GetCheckoutView, GetProductListing
+    ├── Clients/                        # ShoppingClient, OrdersClient, CatalogClient
+    └── StorefrontHub.cs                # SSE endpoint at /sse/storefront
+```
+
+**Key Configuration (Program.cs):**
+
+```csharp
+// Discover handlers in both API and Domain assemblies
+builder.Host.UseWolverine(opts =>
+{
+    // API assembly (Queries)
+    opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
+
+    // Domain assembly (Integration message handlers)
+    opts.Discovery.IncludeAssembly(typeof(Storefront.Notifications.IEventBroadcaster).Assembly);
+});
+```
+
+**Why This Pattern:**
+- **Separation of Concerns:** Domain logic (composition, notification handling) separate from infrastructure (HTTP, DI)
+- **Testability:** Test project references API project (brings in domain transitively)
+- **Consistency:** BFF follows same pattern as Orders, Shopping, Payments, etc.
+- **Namespace Clarity:** `<ProjectName>.*` for domain, `<ProjectName>.Api.*` for infrastructure
+
+**Common Mistakes to Avoid:**
+- ❌ Single Web SDK project combining domain + infrastructure
+- ❌ Domain project referencing Wolverine packages (not needed - handlers discovered via API assembly reference)
+- ❌ Forgetting to include domain assembly in `opts.Discovery.IncludeAssembly()`
+
 ---
 
 ## Skill Invocation Guide
