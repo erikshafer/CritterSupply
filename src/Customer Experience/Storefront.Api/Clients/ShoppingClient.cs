@@ -1,6 +1,7 @@
+using Storefront.Clients;
 using System.Text.Json;
 
-namespace Storefront.Clients;
+namespace Storefront.Api.Clients;
 
 public sealed class ShoppingClient : IShoppingClient
 {
@@ -11,15 +12,17 @@ public sealed class ShoppingClient : IShoppingClient
         _httpClient = httpClientFactory.CreateClient("ShoppingClient");
     }
 
-    public async Task<CartDto> GetCartAsync(Guid cartId, CancellationToken ct = default)
+    public async Task<CartDto?> GetCartAsync(Guid cartId, CancellationToken ct = default)
     {
         var response = await _httpClient.GetAsync($"/api/carts/{cartId}", ct);
-        response.EnsureSuccessStatusCode();
+
+        if (!response.IsSuccessStatusCode)
+            return null; // Cart not found
 
         var content = await response.Content.ReadAsStringAsync(ct);
         return JsonSerializer.Deserialize<CartDto>(content, new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
-        }) ?? throw new InvalidOperationException($"Cart {cartId} not found");
+        });
     }
 }

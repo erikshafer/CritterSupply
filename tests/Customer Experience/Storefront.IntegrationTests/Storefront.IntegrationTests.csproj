@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../../src/Customer Experience/Storefront/Storefront.csproj" />
+    <ProjectReference Include="../../../src/Customer Experience/Storefront.Api/Storefront.Api.csproj" />
   </ItemGroup>
 
   <ItemGroup>

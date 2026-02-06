@@ -3,7 +3,7 @@ using Storefront.Clients;
 using Storefront.Composition;
 using Wolverine.Http;
 
-namespace Storefront.Queries;
+namespace Storefront.Api.Queries;
 
 /// <summary>
 /// Query to get composed checkout view (Orders BC + Customer Identity BC)

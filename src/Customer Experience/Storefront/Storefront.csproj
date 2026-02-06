@@ -1,19 +1,18 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\Shared\Messages.Contracts\Messages.Contracts.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Marten" />
-    <PackageReference Include="WolverineFx.Http.FluentValidation" />
-    <PackageReference Include="WolverineFx.Http.Marten" />
-  </ItemGroup>
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Messages.Contracts\Messages.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- No packages needed - this is pure domain logic with HTTP client interfaces -->
+    <!-- Wolverine handlers are discovered from Storefront.Api assembly reference -->
+  </ItemGroup>
 
 </Project>

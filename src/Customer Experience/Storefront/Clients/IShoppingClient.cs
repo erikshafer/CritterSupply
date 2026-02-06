@@ -5,7 +5,7 @@ namespace Storefront.Clients;
 /// </summary>
 public interface IShoppingClient
 {
-    Task<CartDto> GetCartAsync(Guid cartId, CancellationToken ct = default);
+    Task<CartDto?> GetCartAsync(Guid cartId, CancellationToken ct = default);
 }
 
 /// <summary>

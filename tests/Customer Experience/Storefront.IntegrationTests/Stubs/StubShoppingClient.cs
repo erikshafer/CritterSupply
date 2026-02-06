@@ -15,14 +15,29 @@ public class StubShoppingClient : IShoppingClient
         _carts[cartId] = new CartDto(cartId, customerId, items.ToList());
     }
 
-    public Task<CartDto> GetCartAsync(Guid cartId, CancellationToken ct = default)
+    /// <summary>
+    /// Configure cart data for testing (alternative to AddCart with explicit CartDto)
+    /// </summary>
+    public void ConfigureCart(Guid cartId, CartDto cart)
+    {
+        _carts[cartId] = cart;
+    }
+
+    public Task<CartDto?> GetCartAsync(Guid cartId, CancellationToken ct = default)
     {
         if (_carts.TryGetValue(cartId, out var cart))
         {
-            return Task.FromResult(cart);
+            return Task.FromResult<CartDto?>(cart);
         }
 
-        var exception = new HttpRequestException($"Cart {cartId} not found", null, System.Net.HttpStatusCode.NotFound);
-        throw exception;
+        return Task.FromResult<CartDto?>(null);
+    }
+
+    /// <summary>
+    /// Clear all configured cart data (for test isolation)
+    /// </summary>
+    public void Clear()
+    {
+        _carts.Clear();
     }
 }
