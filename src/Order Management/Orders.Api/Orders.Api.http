@@ -1,0 +1,228 @@
+### Orders API - Manual Testing & Verification
+### Base URL: http://localhost:5231
+
+@HostAddress = http://localhost:5231
+@CustomerId = 11111111-1111-1111-1111-111111111111
+@CheckoutId = 22222222-2222-2222-2222-222222222222
+
+###############################################
+###   Health Check & API Availability      ###
+###############################################
+
+### Health Check
+GET {{HostAddress}}/health
+accept: */*
+
+> {%
+    client.test("Orders API is healthy", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### Root Redirect (should redirect to /api)
+GET {{HostAddress}}
+accept: */*
+
+> {%
+    client.test("Root redirects to API documentation", function() {
+        client.assert(response.status === 301, "Response status is not 301 (redirect)");
+    });
+%}
+
+###
+
+###############################################
+###   Checkout Workflow                    ###
+###############################################
+
+### 1. Get Checkout State
+GET {{HostAddress}}/api/checkouts/{{CheckoutId}}
+accept: application/json
+
+> {%
+    client.test("Checkout retrieved successfully", function() {
+        client.assert(response.status === 200 || response.status === 404, "Unexpected response status");
+    });
+    if (response.status === 200) {
+        client.global.set("CheckoutCustomerId", response.body.customerId);
+    }
+%}
+
+###
+
+### 2. Select Shipping Address
+PUT {{HostAddress}}/api/checkouts/{{CheckoutId}}/shipping-address
+Content-Type: application/json
+
+{
+  "checkoutId": "{{CheckoutId}}",
+  "addressId": "33333333-3333-3333-3333-333333333333"
+}
+
+> {%
+    client.test("Shipping address selected", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 3. Select Shipping Method
+PUT {{HostAddress}}/api/checkouts/{{CheckoutId}}/shipping-method
+Content-Type: application/json
+
+{
+  "checkoutId": "{{CheckoutId}}",
+  "shippingMethod": "Standard Ground",
+  "shippingCost": 5.99
+}
+
+> {%
+    client.test("Shipping method selected", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 4. Provide Payment Method
+PUT {{HostAddress}}/api/checkouts/{{CheckoutId}}/payment-method
+Content-Type: application/json
+
+{
+  "checkoutId": "{{CheckoutId}}",
+  "paymentMethodToken": "tok_visa_test_12345"
+}
+
+> {%
+    client.test("Payment method provided", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 5. Complete Checkout (Creates Order)
+POST {{HostAddress}}/api/checkouts/{{CheckoutId}}/complete
+Content-Type: application/json
+
+{
+  "checkoutId": "{{CheckoutId}}"
+}
+
+> {%
+    client.test("Checkout completed successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.orderId !== undefined, "Order ID not returned");
+    });
+    client.global.set("OrderId", response.body.orderId);
+%}
+
+###
+
+###############################################
+###   Order Queries                        ###
+###############################################
+
+### 6. Get Order by ID
+GET {{HostAddress}}/api/orders/{{OrderId}}
+accept: application/json
+
+> {%
+    client.test("Order retrieved successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.id === client.global.get("OrderId"), "Order ID mismatch");
+    });
+%}
+
+###
+
+### 7. Get Orders by Customer ID
+GET {{HostAddress}}/api/orders?customerId={{CustomerId}}
+accept: application/json
+
+> {%
+    client.test("Customer orders retrieved", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(Array.isArray(response.body), "Expected array of orders");
+    });
+%}
+
+###
+
+###############################################
+###   Error Scenarios                      ###
+###############################################
+
+### 8. Get Non-Existent Checkout (404 Expected)
+GET {{HostAddress}}/api/checkouts/00000000-0000-0000-0000-000000000000
+accept: application/json
+
+> {%
+    client.test("Non-existent checkout returns 404", function() {
+        client.assert(response.status === 404, "Expected 404 for non-existent checkout");
+    });
+%}
+
+###
+
+### 9. Get Non-Existent Order (404 Expected)
+GET {{HostAddress}}/api/orders/00000000-0000-0000-0000-000000000000
+accept: application/json
+
+> {%
+    client.test("Non-existent order returns 404", function() {
+        client.assert(response.status === 404, "Expected 404 for non-existent order");
+    });
+%}
+
+###
+
+### 10. Complete Checkout Without Address (Validation Error Expected)
+POST {{HostAddress}}/api/checkouts/{{CheckoutId}}/complete
+Content-Type: application/json
+
+{
+  "checkoutId": "{{CheckoutId}}"
+}
+
+> {%
+    client.test("Incomplete checkout rejected", function() {
+        // May be 400 (validation) or 404 (already completed)
+        client.assert(response.status === 400 || response.status === 404, "Expected 400 or 404");
+    });
+%}
+
+###
+
+###############################################
+###   RabbitMQ Integration Verification    ###
+###############################################
+### Note: CompleteCheckout publishes Orders.OrderPlaced to RabbitMQ
+### Check Storefront.Api logs for message receipt
+### Check browser Order History page for SSE updates
+
+### 11. Complete Checkout (Triggers RabbitMQ Message)
+# Expected: Orders.OrderPlaced published to storefront-notifications queue
+# Expected: Storefront.Api OrderPlacedHandler receives message
+# Expected: SSE broadcast to connected clients
+POST {{HostAddress}}/api/checkouts/{{CheckoutId}}/complete
+Content-Type: application/json
+
+{
+  "checkoutId": "{{CheckoutId}}"
+}
+
+> {%
+    client.test("Checkout completed - check RabbitMQ logs", function() {
+        // May succeed or fail depending on checkout state
+        client.assert(response.status === 200 || response.status === 400 || response.status === 404, "Unexpected status");
+    });
+    if (response.status === 200) {
+        client.global.set("RabbitMQTestOrderId", response.body.orderId);
+    }
+%}
+
+###

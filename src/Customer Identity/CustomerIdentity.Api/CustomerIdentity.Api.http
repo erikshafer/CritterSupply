@@ -1,0 +1,327 @@
+### Customer Identity API - Manual Testing & Verification
+### Base URL: http://localhost:5235
+
+@HostAddress = http://localhost:5235
+@CustomerId = 11111111-1111-1111-1111-111111111111
+
+###############################################
+###   Health Check & API Availability      ###
+###############################################
+
+### Health Check
+GET {{HostAddress}}/health
+accept: */*
+
+> {%
+    client.test("Customer Identity API is healthy", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### Root Redirect (should redirect to /api)
+GET {{HostAddress}}
+accept: */*
+
+> {%
+    client.test("Root redirects to API documentation", function() {
+        client.assert(response.status === 301, "Response status is not 301 (redirect)");
+    });
+%}
+
+###
+
+###############################################
+###   Customer Management                  ###
+###############################################
+
+### 1. Create Customer
+POST {{HostAddress}}/api/customers
+Content-Type: application/json
+
+{
+  "firstName": "Alice",
+  "lastName": "Johnson",
+  "email": "alice.johnson@example.com",
+  "phone": "+1-206-555-0123"
+}
+
+> {%
+    client.test("Customer created successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.id !== undefined, "Customer ID not returned");
+    });
+    client.global.set("TestCustomerId", response.body.id);
+%}
+
+###
+
+### 2. Get Customer by ID
+GET {{HostAddress}}/api/customers/{{TestCustomerId}}
+accept: application/json
+
+> {%
+    client.test("Customer retrieved successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.email === "alice.johnson@example.com", "Email mismatch");
+    });
+%}
+
+###
+
+###############################################
+###   Address Management                   ###
+###############################################
+
+### 3. Add Address to Customer
+POST {{HostAddress}}/api/customers/{{TestCustomerId}}/addresses
+Content-Type: application/json
+
+{
+  "customerId": "{{TestCustomerId}}",
+  "nickname": "Home",
+  "addressLine1": "123 Main St",
+  "addressLine2": "Apt 4B",
+  "city": "Seattle",
+  "stateOrProvince": "WA",
+  "postalCode": "98101",
+  "country": "USA",
+  "addressType": "Both",
+  "isDefault": true
+}
+
+> {%
+    client.test("Address added successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.addressId !== undefined, "Address ID not returned");
+    });
+    client.global.set("HomeAddressId", response.body.addressId);
+%}
+
+###
+
+### 4. Add Second Address
+POST {{HostAddress}}/api/customers/{{TestCustomerId}}/addresses
+Content-Type: application/json
+
+{
+  "customerId": "{{TestCustomerId}}",
+  "nickname": "Work",
+  "addressLine1": "456 Office Blvd",
+  "addressLine2": "Suite 200",
+  "city": "Seattle",
+  "stateOrProvince": "WA",
+  "postalCode": "98102",
+  "country": "USA",
+  "addressType": "Shipping",
+  "isDefault": false
+}
+
+> {%
+    client.test("Second address added successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.addressId !== undefined, "Address ID not returned");
+    });
+    client.global.set("WorkAddressId", response.body.addressId);
+%}
+
+###
+
+### 5. Get Customer Addresses
+GET {{HostAddress}}/api/customers/{{TestCustomerId}}/addresses
+accept: application/json
+
+> {%
+    client.test("Customer addresses retrieved", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(Array.isArray(response.body), "Expected array of addresses");
+        client.assert(response.body.length >= 2, "Expected at least 2 addresses");
+    });
+%}
+
+###
+
+### 6. Get Addresses by Type (Shipping Only)
+GET {{HostAddress}}/api/customers/{{TestCustomerId}}/addresses?type=Shipping
+accept: application/json
+
+> {%
+    client.test("Shipping addresses retrieved", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(Array.isArray(response.body), "Expected array of addresses");
+    });
+%}
+
+###
+
+### 7. Get Address Snapshot (Immutable Copy for Orders)
+GET {{HostAddress}}/api/addresses/{{HomeAddressId}}/snapshot
+accept: application/json
+
+> {%
+    client.test("Address snapshot retrieved", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.addressLine1 === "123 Main St", "Address line 1 mismatch");
+    });
+%}
+
+###
+
+### 8. Update Address
+PUT {{HostAddress}}/api/customers/{{TestCustomerId}}/addresses/{{HomeAddressId}}
+Content-Type: application/json
+
+{
+  "customerId": "{{TestCustomerId}}",
+  "addressId": "{{HomeAddressId}}",
+  "nickname": "Home (Updated)",
+  "addressLine1": "123 Main Street",
+  "addressLine2": "Apt 4B",
+  "city": "Seattle",
+  "stateOrProvince": "WA",
+  "postalCode": "98101",
+  "country": "USA",
+  "addressType": "Both",
+  "isDefault": true
+}
+
+> {%
+    client.test("Address updated successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 9. Set Default Address
+PUT {{HostAddress}}/api/customers/{{TestCustomerId}}/addresses/{{WorkAddressId}}/set-default
+Content-Type: application/json
+
+{
+  "customerId": "{{TestCustomerId}}",
+  "addressId": "{{WorkAddressId}}",
+  "addressType": "Shipping"
+}
+
+> {%
+    client.test("Default address set successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 10. Delete Address (Soft Delete)
+DELETE {{HostAddress}}/api/customers/{{TestCustomerId}}/addresses/{{WorkAddressId}}
+
+> {%
+    client.test("Address deleted successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+###############################################
+###   Error Scenarios                      ###
+###############################################
+
+### 11. Get Non-Existent Customer (404 Expected)
+GET {{HostAddress}}/api/customers/00000000-0000-0000-0000-000000000000
+accept: application/json
+
+> {%
+    client.test("Non-existent customer returns 404", function() {
+        client.assert(response.status === 404, "Expected 404 for non-existent customer");
+    });
+%}
+
+###
+
+### 12. Add Address with Invalid Postal Code (Validation Error Expected)
+POST {{HostAddress}}/api/customers/{{TestCustomerId}}/addresses
+Content-Type: application/json
+
+{
+  "customerId": "{{TestCustomerId}}",
+  "nickname": "Invalid",
+  "addressLine1": "123 Test St",
+  "city": "Seattle",
+  "stateOrProvince": "WA",
+  "postalCode": "INVALID",
+  "country": "USA",
+  "addressType": "Shipping",
+  "isDefault": false
+}
+
+> {%
+    client.test("Invalid postal code rejected", function() {
+        client.assert(response.status === 400, "Expected 400 for invalid postal code");
+    });
+%}
+
+###
+
+### 13. Get Address Snapshot for Non-Existent Address (404 Expected)
+GET {{HostAddress}}/api/addresses/00000000-0000-0000-0000-000000000000/snapshot
+accept: application/json
+
+> {%
+    client.test("Non-existent address snapshot returns 404", function() {
+        client.assert(response.status === 404, "Expected 404 for non-existent address");
+    });
+%}
+
+###
+
+###############################################
+###   Integration Scenarios                ###
+###############################################
+### Note: These scenarios support Checkout workflow in Orders BC
+
+### 14. Create Customer + Address (Complete Setup)
+# Step 1: Create Customer
+POST {{HostAddress}}/api/customers
+Content-Type: application/json
+
+{
+  "firstName": "Bob",
+  "lastName": "Smith",
+  "email": "bob.smith@example.com",
+  "phone": "+1-206-555-9999"
+}
+
+> {%
+    client.test("Customer created for integration test", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+    client.global.set("IntegrationTestCustomerId", response.body.id);
+%}
+
+###
+
+# Step 2: Add Default Address
+POST {{HostAddress}}/api/customers/{{IntegrationTestCustomerId}}/addresses
+Content-Type: application/json
+
+{
+  "customerId": "{{IntegrationTestCustomerId}}",
+  "nickname": "Shipping Address",
+  "addressLine1": "789 Test Ave",
+  "city": "Portland",
+  "stateOrProvince": "OR",
+  "postalCode": "97201",
+  "country": "USA",
+  "addressType": "Shipping",
+  "isDefault": true
+}
+
+> {%
+    client.test("Default address added for integration test", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+    client.global.set("IntegrationTestAddressId", response.body.addressId);
+%}
+
+###

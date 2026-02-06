@@ -141,22 +141,27 @@ Cycle 16 completed 2026-02-05. See "Recently Completed" below.
 
 ## Upcoming Cycles (Planned)
 
-**Cycle 17:** Product Catalog Phase 2 (Category Management)
-- Full Category subdomain with marketplace mappings
-- Category hierarchy (parent/child relationships)
-- Many-to-many relationships (internal categories → marketplace categories)
+**Cycle 17:** Customer Experience Enhancement (Surgical Focus)
+- Complete RabbitMQ integration (end-to-end SSE flow)
+- Replace stub data with real BC queries
+- Cart command integration (add/remove items from UI)
+- Checkout command integration (complete checkout from UI)
+- Product listing page with pagination/filtering
+- Additional SSE handlers (payment confirmed, shipment dispatched)
+- Polish & bug fixes (cart badge, validation, error toasts)
 
-**Cycle 18:** Vendor Identity + Vendor Portal Phase 1
-- Vendor tenant and user authentication (EF Core)
-- Read-only analytics (sales projections, inventory snapshots)
-- Multi-tenancy with Marten
+**Cycle 18+:** Authentication & Authorization
+- Customer Identity BC authentication integration
+- Replace stub customerId with real session
+- Login/logout pages
+- Protected routes
 
-**Cycle 19:** Returns BC
-- Return authorization and eligibility windows
-- Reverse logistics workflow
-- Integration with Orders saga (return states)
+**Cycle 19+:** Automated Browser Testing
+- ADR for browser testing framework (Playwright vs Selenium vs bUnit)
+- Automated tests for key scenarios
+- CI/CD pipeline integration
 
-**Cycle 20+:** Product Catalog Phase 3 (Search), Vendor Portal Phase 2 (Change Requests)
+**Cycle 20+:** Product Catalog Phase 2 (Category Management), Vendor Identity + Vendor Portal Phase 1, Returns BC
 
 [View Backlog](./BACKLOG.md)
 

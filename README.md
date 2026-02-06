@@ -199,6 +199,22 @@ To `test` the entire solution, run this command in the root of the project:
 dotnet test
 ```
 
+#### 🧪 Manual API Testing
+
+Each bounded context API includes a comprehensive `.http` file for manual testing in JetBrains IDEs (Rider, IntelliJ IDEA with HTTP Client plugin):
+
+- `Shopping.Api.http` - Cart management operations
+- `Orders.Api.http` - Checkout and order workflows
+- `CustomerIdentity.Api.http` - Customer and address management
+- `Catalog.Api.http` - Product catalog queries and updates
+- `Storefront.Api.http` - BFF composition queries and SSE endpoints
+
+**See [docs/HTTP-FILES-GUIDE.md](./docs/HTTP-FILES-GUIDE.md)** for comprehensive testing instructions, including:
+- How to use .http files in JetBrains IDEs
+- Port configuration and troubleshooting
+- End-to-end testing scenarios
+- RabbitMQ integration verification
+
 #### 💡 Run with Aspire <a id='5.3'></a>
 
 To be implemented. It is on the roadmap.
