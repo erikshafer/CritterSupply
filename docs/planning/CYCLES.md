@@ -6,28 +6,44 @@ This document tracks active and recent development cycles. For complete historic
 
 ## Current Cycle
 
-**Cycle 16: Customer Experience BC (BFF + Blazor)** - 🚧 In Progress
-- **Start Date:** 2026-02-04
-- **Status:** Phase 1-2 Complete (BFF + SSE Infrastructure), Phase 3 Next (Blazor UI)
-- **Plan:** [cycle-16-customer-experience.md](./cycles/cycle-16-customer-experience.md)
-- **Features:**
-  - [Product Browsing](../features/customer-experience/product-browsing.feature)
-  - [Cart Real-Time Updates](../features/customer-experience/cart-real-time-updates.feature)
-  - [Checkout Flow](../features/customer-experience/checkout-flow.feature)
-- **Key Decisions:**
-  - [ADR 0004: SSE over SignalR](../decisions/0004-sse-over-signalr.md)
-  - [ADR 0005: MudBlazor UI Framework](../decisions/0005-mudblazor-ui-framework.md)
-  - [ADR 0006: Reqnroll BDD Framework](../decisions/0006-reqnroll-bdd-framework.md)
-- **Progress:**
-  - ✅ Phase 1: BFF Infrastructure (9 integration tests passing, 3 deferred to Phase 3)
-  - ✅ Phase 2: SSE Real-Time Integration (5 SSE tests passing, EventBroadcaster + handlers complete)
-  - 🚧 Phase 3: Blazor Frontend (next)
-  - 📋 Phase 4: Documentation & Cleanup
-- **Test Results:** 13/17 passing (76%), 4 skipped
+**None** - Ready for next cycle
+
+Cycle 16 completed 2026-02-05. See "Recently Completed" below.
 
 ---
 
 ## Recently Completed (Last 5 Cycles)
+
+### Cycle 16: Customer Experience BC (BFF + Blazor) - ✅ Complete (2026-02-05)
+
+**Objective:** Build customer-facing storefront using Backend-for-Frontend (BFF) pattern with Blazor Server and Server-Sent Events (SSE)
+
+**Key Deliverables:**
+- 3-project BFF structure (Storefront domain, Storefront.Api, Storefront.Web)
+- EventBroadcaster pattern with `Channel<T>` for in-memory pub/sub
+- SSE real-time integration (discriminated unions, customer isolation)
+- Blazor Server frontend with MudBlazor Material Design components
+- 4 pages: Home, Cart (SSE-enabled), Checkout (MudStepper), Order History (MudTable)
+- JavaScript EventSource client for SSE subscriptions
+- Interactive component pattern (solving Blazor render mode limitation)
+- Comprehensive skills documentation (`skills/bff-realtime-patterns.md`)
+
+**Results:** 13/17 tests passing (4 deferred - real data integration). Manual browser testing passed all acceptance criteria.
+
+**Key Decisions:**
+- [ADR 0004: SSE over SignalR](../decisions/0004-sse-over-signalr.md)
+- [ADR 0005: MudBlazor UI Framework](../decisions/0005-mudblazor-ui-framework.md)
+- [ADR 0006: Reqnroll BDD Framework](../decisions/0006-reqnroll-bdd-framework.md)
+
+**Deferred to Future Cycles:**
+- Backend RabbitMQ integration (end-to-end SSE flow)
+- Real cart/checkout data integration
+- Authentication with Customer Identity BC
+- Automated browser testing (Playwright/Selenium/bUnit)
+
+**Details:** [cycle-16-customer-experience.md](./cycles/cycle-16-customer-experience.md)
+
+---
 
 ### Cycle 15: Customer Experience Prerequisites - ✅ Complete (2026-02-03)
 
@@ -168,11 +184,11 @@ For brevity, early cycles (Payments, Inventory, Fulfillment, Shopping, refactori
 - Product Catalog: 24 integration tests
 - Customer Experience (Storefront): 13 integration tests (4 deferred to Phase 3)
 
-**Bounded Contexts In Progress:** 1/10
-- 🚧 Customer Experience (Cycle 16 - Phase 1-2 Complete, Phase 3 Next)
+**Bounded Contexts In Progress:** 0/10
+- (None - ready for next cycle)
 
-**Bounded Contexts Complete:** 7/10 (70%)
-- ✅ Orders, Payments, Shopping, Inventory, Fulfillment, Customer Identity, Product Catalog
+**Bounded Contexts Complete:** 8/10 (80%)
+- ✅ Orders, Payments, Shopping, Inventory, Fulfillment, Customer Identity, Product Catalog, Customer Experience
 - 📋 Vendor Identity, Vendor Portal (Future)
 
 ---
@@ -209,5 +225,5 @@ For non-feature development work (CI/CD, monitoring, tooling):
 
 ---
 
-**Last Updated:** 2026-02-05
+**Last Updated:** 2026-02-05 (Cycle 16 Complete)
 **Maintained By:** Erik Shafer / Claude AI Assistant

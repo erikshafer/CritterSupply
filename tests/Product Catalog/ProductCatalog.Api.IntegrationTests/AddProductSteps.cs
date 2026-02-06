@@ -13,7 +13,6 @@ public sealed class AddProductSteps
 
     private AddProduct? _command;
     private IScenarioResult? _result;
-    private Exception? _exception;
 
     public AddProductSteps(ScenarioContext scenarioContext)
     {
@@ -30,25 +29,25 @@ public sealed class AddProductSteps
     [Given(@"I have a product with SKU ""(.*)""")]
     public void GivenIHaveAProductWithSku(string sku)
     {
-        _command = new AddProduct(sku, "", "", "");
+        _command = new AddProduct(sku, "Product Name", "Product Description", "Category");
     }
 
     [Given(@"the product name is ""(.*)""")]
     public void GivenTheProductNameIs(string name)
     {
-        _command = _command with { Name = name };
+        _command = _command! with { Name = name };
     }
 
     [Given(@"the product category is ""(.*)""")]
     public void GivenTheProductCategoryIs(string category)
     {
-        _command = _command with { Category = category };
+        _command = _command! with { Category = category };
     }
 
     [Given(@"the product description is ""(.*)""")]
     public void GivenTheProductDescriptionIs(string description)
     {
-        _command = _command with { Description = description };
+        _command = _command! with { Description = description };
     }
 
     [Given(@"the product has the following images:")]
@@ -60,7 +59,7 @@ public sealed class AddProductSteps
             int.Parse(row["DisplayOrder"])
         )).ToList();
 
-        _command = _command with { Images = images };
+        _command = _command! with { Images = images };
     }
 
     [Given(@"a product with SKU ""(.*)"" already exists")]
@@ -82,18 +81,15 @@ public sealed class AddProductSteps
     [When(@"I add the product to the catalog")]
     public async Task WhenIAddTheProductToTheCatalog()
     {
-        try
+        _result = await _fixture.Host.Scenario(s =>
         {
-            _result = await _fixture.Host.Scenario(s =>
-            {
-                s.Post.Json(_command).ToUrl("/api/products");
-            });
+            s.Post.Json(_command).ToUrl("/api/products");
+            s.IgnoreStatusCode(); // Don't assert status code in Alba - we'll check it in Then steps
+        });
 
-            _scenarioContext["sku"] = _command!.Sku;
-        }
-        catch (Exception ex)
+        if (_result.Context.Response.StatusCode == 201)
         {
-            _exception = ex;
+            _scenarioContext["sku"] = _command!.Sku;
         }
     }
 
@@ -102,17 +98,11 @@ public sealed class AddProductSteps
     {
         _command = new AddProduct(sku, "Duplicate Product", "Description", "Dogs");
 
-        try
+        _result = await _fixture.Host.Scenario(s =>
         {
-            _result = await _fixture.Host.Scenario(s =>
-            {
-                s.Post.Json(_command).ToUrl("/api/products");
-            });
-        }
-        catch (Exception ex)
-        {
-            _exception = ex;
-        }
+            s.Post.Json(_command).ToUrl("/api/products");
+            s.IgnoreStatusCode(); // Don't assert status code in Alba - we'll check it in Then steps
+        });
     }
 
     [Then(@"the product should be successfully created")]
