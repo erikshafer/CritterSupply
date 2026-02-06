@@ -18,6 +18,7 @@ using Wolverine.FluentValidation;
 using Wolverine.Http;
 using Wolverine.Http.FluentValidation;
 using Wolverine.Marten;
+using Wolverine.RabbitMQ;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.ApplyJasperFxExtensions();
@@ -79,6 +80,22 @@ builder.Host.UseWolverine(opts =>
     // Explicitly include the Order saga and Checkout namespace for handler discovery
     opts.Discovery.IncludeType<Order>();
     opts.Discovery.IncludeType<Checkout>();
+
+    // Configure RabbitMQ for publishing integration messages
+    var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");
+    opts.UseRabbitMq(rabbit =>
+    {
+        rabbit.HostName = rabbitConfig["hostname"] ?? "localhost";
+        rabbit.VirtualHost = rabbitConfig["virtualhost"] ?? "/";
+        rabbit.Port = rabbitConfig.GetValue<int?>("port") ?? 5672;
+        rabbit.UserName = rabbitConfig["username"] ?? "guest";
+        rabbit.Password = rabbitConfig["password"] ?? "guest";
+    })
+    .AutoProvision();
+
+    // Publish OrderPlaced to storefront-notifications queue
+    opts.PublishMessage<Messages.Contracts.Orders.OrderPlaced>()
+        .ToRabbitQueue("storefront-notifications");
 });
 
 builder.Services.AddEndpointsApiExplorer();

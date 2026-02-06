@@ -2,6 +2,7 @@ using Marten;
 using Storefront.Notifications;
 using Wolverine;
 using Wolverine.Http;
+using Wolverine.RabbitMQ;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,13 +27,21 @@ builder.Host.UseWolverine(opts =>
     opts.Discovery.IncludeAssembly(typeof(Program).Assembly); // Storefront.Api (Queries)
     opts.Discovery.IncludeAssembly(typeof(Storefront.Notifications.IEventBroadcaster).Assembly); // Storefront (Notifications)
 
-    // TODO (Phase 2b): Configure RabbitMQ subscriptions for integration messages
-    // When Shopping.Api and Orders.Api are configured to publish messages to RabbitMQ:
-    // - Subscribe to Shopping.ItemAdded, Shopping.ItemRemoved, Shopping.ItemQuantityChanged
-    // - Subscribe to Orders.OrderPlaced, Payments.PaymentCaptured
-    //
-    // For now, SSE infrastructure is tested via Wolverine.InvokeMessageAndWaitAsync
-    // which directly injects messages into handlers without needing RabbitMQ
+    // Configure RabbitMQ for subscribing to integration messages
+    var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");
+    opts.UseRabbitMq(rabbit =>
+    {
+        rabbit.HostName = rabbitConfig["hostname"] ?? "localhost";
+        rabbit.VirtualHost = rabbitConfig["virtualhost"] ?? "/";
+        rabbit.Port = rabbitConfig.GetValue<int?>("port") ?? 5672;
+        rabbit.UserName = rabbitConfig["username"] ?? "guest";
+        rabbit.Password = rabbitConfig["password"] ?? "guest";
+    })
+    .AutoProvision();
+
+    // Subscribe to Shopping BC integration messages
+    opts.ListenToRabbitQueue("storefront-notifications")
+        .ProcessInline(); // Process messages immediately (no buffering)
 });
 
 // Add HTTP clients for downstream BC queries

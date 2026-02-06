@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using Wolverine;
 using Wolverine.Http;
 using Wolverine.Marten;
 
@@ -46,10 +47,19 @@ public static class RemoveItemFromCartHandler
     }
 
     [WolverineDelete("/api/carts/{cartId}/items/{sku}")]
-    public static ItemRemoved Handle(
+    public static (ItemRemoved, OutgoingMessages) Handle(
         RemoveItemFromCart command,
         [WriteAggregate] Cart cart)
     {
-        return new ItemRemoved(command.Sku, DateTimeOffset.UtcNow);
+        var @event = new ItemRemoved(command.Sku, DateTimeOffset.UtcNow);
+
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new Messages.Contracts.Shopping.ItemRemoved(
+            cart.Id,
+            cart.CustomerId ?? Guid.Empty, // Anonymous carts use Guid.Empty
+            command.Sku,
+            DateTimeOffset.UtcNow));
+
+        return (@event, outgoing);
     }
 }
