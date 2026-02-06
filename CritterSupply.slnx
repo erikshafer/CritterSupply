@@ -79,6 +79,7 @@
   </Folder>
   <Folder Name="/Customer Experience/">
     <Project Path="src/Customer Experience/Storefront.Api/Storefront.Api.csproj" />
+    <Project Path="src/Customer Experience/Storefront.Web/Storefront.Web.csproj" />
     <Project Path="src/Customer Experience/Storefront/Storefront.csproj" />
     <Project Path="tests/Customer Experience/Storefront.IntegrationTests/Storefront.IntegrationTests.csproj" />
   </Folder>
