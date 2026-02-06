@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using Wolverine;
 using Wolverine.Http;
 using Wolverine.Marten;
 
@@ -43,14 +44,25 @@ public static class AddItemToCartHandler
     }
 
     [WolverinePost("/api/carts/{cartId}/items")]
-    public static ItemAdded Handle(
+    public static (ItemAdded, OutgoingMessages) Handle(
         AddItemToCart command,
         [WriteAggregate] Cart cart)
     {
-        return new ItemAdded(
+        var @event = new ItemAdded(
             command.Sku,
             command.Quantity,
             command.UnitPrice,
             DateTimeOffset.UtcNow);
+
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new Messages.Contracts.Shopping.ItemAdded(
+            cart.Id,
+            cart.CustomerId ?? Guid.Empty, // Anonymous carts use Guid.Empty
+            command.Sku,
+            command.Quantity,
+            command.UnitPrice,
+            DateTimeOffset.UtcNow));
+
+        return (@event, outgoing);
     }
 }

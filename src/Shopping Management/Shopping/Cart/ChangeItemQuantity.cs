@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using Wolverine;
 using Wolverine.Http;
 using Wolverine.Marten;
 
@@ -48,16 +49,27 @@ public static class ChangeItemQuantityHandler
     }
 
     [WolverinePut("/api/carts/{cartId}/items/{sku}/quantity")]
-    public static ItemQuantityChanged Handle(
+    public static (ItemQuantityChanged, OutgoingMessages) Handle(
         ChangeItemQuantity command,
         [WriteAggregate] Cart cart)
     {
         var oldQuantity = cart.Items[command.Sku].Quantity;
 
-        return new ItemQuantityChanged(
+        var @event = new ItemQuantityChanged(
             command.Sku,
             oldQuantity,
             command.NewQuantity,
             DateTimeOffset.UtcNow);
+
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new Messages.Contracts.Shopping.ItemQuantityChanged(
+            cart.Id,
+            cart.CustomerId ?? Guid.Empty, // Anonymous carts use Guid.Empty
+            command.Sku,
+            oldQuantity,
+            command.NewQuantity,
+            DateTimeOffset.UtcNow));
+
+        return (@event, outgoing);
     }
 }
