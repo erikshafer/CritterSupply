@@ -86,8 +86,4 @@
   <Folder Name="/Shared/">
     <Project Path="src/Shared/Messages.Contracts/Messages.Contracts.csproj" />
   </Folder>
-  <Folder Name="/src/" />
-  <Folder Name="/src/Customer Experience/">
-    <Project Path="src/Customer Experience/Storefront.Web/Storefront.Web.csproj" />
-  </Folder>
 </Solution>

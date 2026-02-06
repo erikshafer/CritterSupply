@@ -497,11 +497,16 @@ Covers:
    dotnet new <template> -n <ProjectName> -o "<path>"
    ```
 
-2. **Add to solution file (CRITICAL):**
+2. **Add to solution file(s):**
    ```bash
+   # How to add the project to a .sln file (classic solution file - for dotnet CLI)
    dotnet sln add "<path>/<ProjectName>.csproj"
+
+   # How to add to .slnx (modern XML solution file - for Visual Studio/Rider Solution Explorer)
+   # Manually edit CritterSupply.slnx and add project to appropriate <Folder> section
    ```
-   **Why:** Ensures IDE tooling discovers the project and `dotnet build`/`dotnet test` at root includes it.
+   **Why:**
+   - We want to make sure that projects, along with specific files like markdown documentation (.MD) are visible in the "Solution Explorer" view when it's enabled in Visual Studio or Rider.
 
 3. **Add package references:**
    - Use `<PackageReference Include="PackageName" />` (no version - Central Package Management)
@@ -522,7 +527,10 @@ Covers:
    - Update bounded context status table if applicable
    - Update port allocation table in CLAUDE.md
 
-**Common Mistake:** Forgetting step 2 (adding to .sln) - this breaks IDE tooling and makes the project invisible to root-level `dotnet` commands.
+**Common Mistakes:**
+- Forgetting step 2 (adding to `.sln` and `.slnx`) - this breaks IDE tooling
+- Adding to `.sln` but forgetting `.slnx` - project builds but doesn't appear in IDE Solution Explorer
+- Creating duplicate entries in `.slnx` - keep projects organized in appropriate folder sections
 
 ---
 
