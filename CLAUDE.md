@@ -422,7 +422,7 @@ Covers:
 
 For customer-facing frontends aggregating multiple BCs:
 
-**Read:** `skills/bff-signalr-patterns.md`
+**Read:** `skills/bff-realtime-patterns.md`
 
 Covers:
 - View composition from multiple BCs
@@ -578,7 +578,7 @@ See [DEVPROGRESS.md](./DEVPROGRESS.md) for current development status.
 | `marten-document-store.md` | Document database patterns (non-event-sourced) |
 | `efcore-wolverine-integration.md` | Entity Framework Core with Wolverine |
 | `external-service-integration.md` | Strategy pattern, graceful degradation |
-| `bff-signalr-patterns.md` | Backend-for-Frontend, real-time updates |
+| `bff-realtime-patterns.md` | Backend-for-Frontend, real-time updates (SSE + SignalR) |
 | `vertical-slice-organization.md` | File structure, colocation patterns |
 | `modern-csharp-coding-standards.md` | C# language features, immutability |
 | `critterstack-testing-patterns.md` | Unit and integration testing |

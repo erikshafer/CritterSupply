@@ -649,7 +649,7 @@ src/Customer Experience/Storefront.Web/
 ## References
 
 - [CONTEXTS.md - Customer Experience](../../../CONTEXTS.md#customer-experience)
-- [Skill: BFF + SignalR Patterns](../../../skills/bff-signalr-patterns.md) (adapt for SSE)
+- [Skill: BFF + Real-Time Patterns](../../../skills/bff-realtime-patterns.md) (SSE + SignalR)
 - [ADR 0004: SSE over SignalR](../../decisions/0004-sse-over-signalr.md)
 - [ADR 0005: MudBlazor UI Framework](../../decisions/0005-mudblazor-ui-framework.md)
 - [Feature: Cart Real-Time Updates](../../features/customer-experience/cart-real-time-updates.feature)
