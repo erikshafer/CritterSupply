@@ -26,10 +26,13 @@
     <File Path="docs\README.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Planning/">
+    <File Path="docs/planning/cycles/cycle-16-phase-3-fixes.md" />
+    <File Path="docs/planning/cycles/cycle-16-phase-3-manual-testing.md" />
     <File Path="docs\planning\CYCLES.md" />
     <File Path="docs\planning\cycles\cycle-16-customer-experience.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Decisions/">
+    <File Path="docs/decisions/0007-github-workflow-improvements.md" />
     <File Path="docs\decisions\0004-sse-over-signalr.md" />
     <File Path="docs\decisions\0005-mudblazor-ui-framework.md" />
     <File Path="docs\decisions\0006-reqnroll-bdd-framework.md" />

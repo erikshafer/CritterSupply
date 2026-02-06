@@ -6,7 +6,7 @@
 
 ## Prerequisites
 
-Ensure the following are running:
+Ensure the following is running:
 
 ```bash
 # 1. Start infrastructure
