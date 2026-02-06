@@ -10,11 +10,11 @@
     <File Path="README.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Skills/">
+    <File Path="skills/bff-realtime-patterns.md" />
     <File Path="skills/critterstack-testing-patterns.md" />
     <File Path="skills/modern-csharp-coding-standards.md" />
     <File Path="skills/reqnroll-bdd-testing.md" />
     <File Path="skills/testcontainers-integration-tests.md" />
-    <File Path="skills\bff-signalr-patterns.md" />
     <File Path="skills\efcore-wolverine-integration.md" />
     <File Path="skills\external-service-integration.md" />
     <File Path="skills\marten-document-store.md" />
