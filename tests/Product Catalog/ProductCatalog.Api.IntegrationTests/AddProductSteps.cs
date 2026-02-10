@@ -87,6 +87,9 @@ public sealed class AddProductSteps
             s.IgnoreStatusCode(); // Don't assert status code in Alba - we'll check it in Then steps
         });
 
+        // Store in ScenarioContext to preserve between steps
+        _scenarioContext["result"] = _result;
+
         if (_result.Context.Response.StatusCode == 201)
         {
             _scenarioContext["sku"] = _command!.Sku;
@@ -103,13 +106,17 @@ public sealed class AddProductSteps
             s.Post.Json(_command).ToUrl("/api/products");
             s.IgnoreStatusCode(); // Don't assert status code in Alba - we'll check it in Then steps
         });
+
+        // Store in ScenarioContext to preserve between steps
+        _scenarioContext["result"] = _result;
     }
 
     [Then(@"the product should be successfully created")]
     public void ThenTheProductShouldBeSuccessfullyCreated()
     {
-        _result.ShouldNotBeNull();
-        _result.Context.Response.StatusCode.ShouldBe(201);
+        var result = _scenarioContext.Get<IScenarioResult>("result");
+        result.ShouldNotBeNull();
+        result.Context.Response.StatusCode.ShouldBe(201);
     }
 
     [Then(@"the product should be retrievable by SKU ""(.*)""")]
@@ -149,23 +156,26 @@ public sealed class AddProductSteps
     [Then(@"the request should fail with status code (.*)")]
     public void ThenTheRequestShouldFailWithStatusCode(int expectedStatusCode)
     {
-        _result.ShouldNotBeNull();
-        _result.Context.Response.StatusCode.ShouldBe(expectedStatusCode);
+        var result = _scenarioContext.Get<IScenarioResult>("result");
+        result.ShouldNotBeNull();
+        result.Context.Response.StatusCode.ShouldBe(expectedStatusCode);
     }
 
     [Then(@"the error message should indicate ""(.*)""")]
     public async Task ThenTheErrorMessageShouldIndicate(string expectedMessage)
     {
-        _result.ShouldNotBeNull();
-        var responseBody = await _result.ReadAsTextAsync();
+        var result = _scenarioContext.Get<IScenarioResult>("result");
+        result.ShouldNotBeNull();
+        var responseBody = await result.ReadAsTextAsync();
         responseBody.ShouldContain(expectedMessage, Case.Insensitive);
     }
 
     [Then(@"the error message should contain ""(.*)""")]
     public async Task ThenTheErrorMessageShouldContain(string expectedText)
     {
-        _result.ShouldNotBeNull();
-        var responseBody = await _result.ReadAsTextAsync();
+        var result = _scenarioContext.Get<IScenarioResult>("result");
+        result.ShouldNotBeNull();
+        var responseBody = await result.ReadAsTextAsync();
         responseBody.ShouldContain(expectedText, Case.Insensitive);
     }
 }

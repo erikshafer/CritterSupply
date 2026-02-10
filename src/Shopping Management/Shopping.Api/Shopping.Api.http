@@ -37,6 +37,15 @@ accept: */*
 ###   Cart Workflow - Authenticated User   ###
 ###############################################
 
+POST http://localhost:5236/api/carts
+Content-Type: application/json
+
+{
+    "customerId": "c0000000-0000-0000-0000-000000000001",
+    "sessionId": null
+}
+
+
 ### 1. Initialize Cart (Authenticated Customer)
 POST {{HostAddress}}/api/carts
 Content-Type: application/json
@@ -48,10 +57,11 @@ Content-Type: application/json
 
 > {%
     client.test("Cart initialized successfully", function() {
-        client.assert(response.status === 200, "Response status is not 200");
-        client.assert(response.body.id !== undefined, "Cart ID not returned");
+        client.assert(response.status === 201, "Response status is not 201 Created");
+        client.assert(response.body.value !== undefined, "Cart ID not returned in response.body.value");
+        client.assert(response.headers.valueOf("Location") !== null, "Location header not set");
     });
-    client.global.set("CartId", response.body.id);
+    client.global.set("CartId", response.body.value);
 %}
 
 ###
@@ -93,6 +103,17 @@ Content-Type: application/json
 %}
 
 ###
+
+### 3.6 Change Item Quantity
+PUT {{HostAddress}}/api/carts/{{CartId}}/items/DOG-BOWL-01/quantity
+Content-Type: application/json
+
+{
+    "cartId": "{{CartId}}",
+    "sku": "DOG-BOWL-01",
+    "newQuantity": 3
+}
+
 
 ### 4. Get Cart State
 GET {{HostAddress}}/api/carts/{{CartId}}
@@ -183,10 +204,11 @@ Content-Type: application/json
 
 > {%
     client.test("Anonymous cart initialized successfully", function() {
-        client.assert(response.status === 200, "Response status is not 200");
-        client.assert(response.body.id !== undefined, "Cart ID not returned");
+        client.assert(response.status === 201, "Response status is not 201 Created");
+        client.assert(response.body.value !== undefined, "Cart ID not returned in response.body.value");
+        client.assert(response.headers.valueOf("Location") !== null, "Location header not set");
     });
-    client.global.set("AnonymousCartId", response.body.id);
+    client.global.set("AnonymousCartId", response.body.value);
 %}
 
 ###
