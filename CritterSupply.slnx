@@ -13,6 +13,8 @@
     <File Path="docs/planning/cycles/cycle-16-phase-3-fixes.md" />
     <File Path="docs/planning/cycles/cycle-16-phase-3-manual-testing.md" />
     <File Path="docs\planning\cycles\cycle-16-customer-experience.md" />
+    <File Path="docs/planning/cycles/cycle-17-customer-identity-integration.md" />
+    <File Path="docs/planning/cycles/cycle-18-customer-experience-phase-2.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Planning/Infrastructure/" />
   <Folder Name="/.SolutionItems/Documentation/Planning/Infrastructure/CI-CD/">
@@ -45,6 +47,7 @@
   <Folder Name="/.SolutionItems/Documentation/Planning/">
     <File Path="docs/planning/BACKLOG.md" />
     <File Path="docs\planning\CYCLES.md" />
+    <File Path="docs/planning/CYCLE-18-QUICKSTART.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Decisions/">
     <File Path="docs/decisions/0007-github-workflow-improvements.md" />

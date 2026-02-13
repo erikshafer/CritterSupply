@@ -309,6 +309,117 @@ public class CustomerIdentityTestFixture : IAsyncLifetime
 }
 ```
 
+## Common Pitfalls & Solutions
+
+### Pitfall 1: Route Parameter Binding with Query Objects
+
+**Problem:**
+```csharp
+// ❌ Incorrect: Wolverine tries to resolve GetCustomer from DI container
+[WolverineGet("/api/customers/{customerId}")]
+public static async Task<IResult> Handle(
+    GetCustomer query,  // Can't be injected!
+    CustomerIdentityDbContext dbContext,
+    CancellationToken ct)
+{
+    // ...
+}
+```
+
+**Error:**
+```
+JasperFx.CodeGeneration.UnResolvableVariableException:
+JasperFx was unable to resolve a variable of type GetCustomer
+```
+
+**Solution:**
+```csharp
+// ✅ Correct: Route parameter binds directly to method parameter
+[WolverineGet("/api/customers/{customerId}")]
+public static async Task<IResult> Handle(
+    Guid customerId,  // Binds from route parameter
+    CustomerIdentityDbContext dbContext,
+    CancellationToken ct)
+{
+    var customer = await dbContext.Customers
+        .AsNoTracking()
+        .Where(c => c.Id == customerId)
+        .Select(c => new CustomerResponse(...))
+        .FirstOrDefaultAsync(ct);
+
+    return customer is null ? Results.NotFound() : Results.Ok(customer);
+}
+```
+
+**Rule:** When using `{parameterName}` in route templates, method parameters should match the route parameter type directly. Query objects are for POST/PUT bodies, not GET routes with path parameters.
+
+### Pitfall 2: DELETE Endpoints Without JSON Body
+
+**Problem:**
+```http
+DELETE http://localhost:5236/api/carts/019c591d-be87-7a9c-bc19-f66798e03b8e
+```
+
+**Error:**
+```
+HTTP 400 Bad Request
+"The input does not contain any JSON tokens"
+```
+
+**Root Cause:**
+Handler signature expects command object (JSON body):
+```csharp
+[WolverineDelete("/api/carts/{cartId}")]
+public static CartCleared Handle(
+    ClearCart command,  // Requires JSON body!
+    [WriteAggregate] Cart cart)
+{
+    // ...
+}
+```
+
+**Solution:**
+Send JSON body with DELETE request:
+```http
+DELETE http://localhost:5236/api/carts/019c591d-be87-7a9c-bc19-f66798e03b8e
+Content-Type: application/json
+
+{
+  "cartId": "019c591d-be87-7a9c-bc19-f66798e03b8e",
+  "reason": "Manual cleanup"
+}
+```
+
+**Rule:** DELETE endpoints can accept JSON bodies (not just path parameters). If handler expects a command object, send the full JSON payload.
+
+### Pitfall 3: Hardcoded Foreign Key References
+
+**Problem:**
+```csharp
+// ❌ Stub/placeholder bypasses referential integrity
+var customerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+```
+
+**Consequences:**
+- Creates invalid foreign key references
+- Breaks queries with navigation properties
+- Masks integration issues until runtime
+- Foreign key constraints violated in database
+
+**Solution:**
+```csharp
+// ✅ Create customer first via Customer Identity BC
+var createCustomerResponse = await customerIdentityClient.CreateCustomer(
+    new CreateCustomerRequest("alice@example.com", "Alice", "Smith"));
+
+var customerId = createCustomerResponse.CustomerId;
+
+// Then use real customerId for cart/checkout
+var cart = await shoppingClient.InitializeCart(customerId);
+```
+
+**Rule:** When integrating BCs, identify and remove all stub/placeholder data early. Foreign key constraints enforce referential integrity—let them catch bugs!
+
 ## Key Takeaways
 
 1. **DbContext Injection** — Wolverine injects `DbContext` into handlers like any other dependency
@@ -316,4 +427,7 @@ public class CustomerIdentityTestFixture : IAsyncLifetime
 3. **Change Tracking** — EF Core tracks entity changes automatically
 4. **SaveChangesAsync** — Call explicitly (or use `AutoApplyTransactions`)
 5. **Migrations** — Use EF Core migrations for schema evolution
-6. **Foreign Keys** — Database-level referential integrity
+6. **Foreign Keys** — Database-level referential integrity catches bugs early (fail fast!)
+7. **Route Parameter Binding** — Match route parameters directly in method signature (not wrapped in query objects)
+8. **DELETE with JSON Body** — DELETE endpoints can accept command objects via JSON body
+9. **No Stub Data** — Remove placeholders early; let FK constraints validate integrations
