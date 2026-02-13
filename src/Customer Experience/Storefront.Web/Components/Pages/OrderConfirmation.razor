@@ -1,0 +1,234 @@
+@page "/order-confirmation/{OrderId:guid}"
+@rendermode InteractiveServer
+@using System.Text.Json
+@inject IHttpClientFactory HttpClientFactory
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Order Confirmation - CritterSupply</PageTitle>
+
+@if (_isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_orderNotFound)
+{
+    <MudAlert Severity="Severity.Error">Order not found.</MudAlert>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" Class="mt-4">
+        Return to Home
+    </MudButton>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12">
+            <MudPaper Class="pa-4">
+                <div class="d-flex align-center mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" Class="mr-2" />
+                    <div>
+                        <MudText Typo="Typo.h4">Order Confirmed!</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Thank you for your order</MudText>
+                    </div>
+                </div>
+
+                <MudDivider Class="my-4" />
+
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudText Typo="Typo.h6" Class="mb-2">Order Details</MudText>
+                        <div class="d-flex mb-2">
+                            <MudText Typo="Typo.body2" Class="mr-2" Style="font-weight: 600;">Order ID:</MudText>
+                            <MudText Typo="Typo.body2">@OrderId</MudText>
+                        </div>
+                        <div class="d-flex mb-2">
+                            <MudText Typo="Typo.body2" Class="mr-2" Style="font-weight: 600;">Status:</MudText>
+                            <MudChip T="string" Color="@GetStatusColor(_currentStatus)" Size="Size.Small">@_currentStatus</MudChip>
+                        </div>
+                        <div class="d-flex mb-2">
+                            <MudText Typo="Typo.body2" Class="mr-2" Style="font-weight: 600;">Order Date:</MudText>
+                            <MudText Typo="Typo.body2">@DateTime.UtcNow.ToString("MMMM dd, yyyy")</MudText>
+                        </div>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        @if (_sseConnected)
+                        {
+                            <MudAlert Severity="Severity.Success" Dense="true" Class="mb-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Wifi" Class="mr-2" />
+                                Receiving real-time order updates
+                            </MudAlert>
+                        }
+
+                        @if (!string.IsNullOrEmpty(_latestUpdate))
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true">
+                                @_latestUpdate
+                            </MudAlert>
+                        }
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.h6" Class="mb-2">What's Next?</MudText>
+                <MudList T="string" Dense="true">
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Email">
+                        You'll receive an order confirmation email shortly
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.CreditCard">
+                        Payment processing will complete within minutes
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.Inventory">
+                        Your order will be prepared for shipment
+                    </MudListItem>
+                    <MudListItem T="string" Icon="@Icons.Material.Filled.LocalShipping">
+                        You'll receive tracking information once shipped
+                    </MudListItem>
+                </MudList>
+
+                <MudDivider Class="my-4" />
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" Class="mr-2">
+                    Continue Shopping
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/orders">
+                    View Order History
+                </MudButton>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter]
+    public Guid OrderId { get; set; }
+
+    private bool _isLoading = true;
+    private bool _orderNotFound = false;
+    private bool _sseConnected = false;
+    private string _currentStatus = "Placed";
+    private string? _latestUpdate = null;
+    private DotNetObjectReference<OrderConfirmation>? _dotNetHelper;
+
+    // Stub customer ID - in real app this would come from authentication
+    private readonly Guid _customerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrderStatus();
+        await SubscribeToSSE();
+    }
+
+    private async Task LoadOrderStatus()
+    {
+        _isLoading = true;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("StorefrontApi");
+            var response = await client.GetAsync($"/api/storefront/orders/{OrderId}");
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _orderNotFound = true;
+            }
+            else if (response.IsSuccessStatusCode)
+            {
+                // Parse order status from response
+                // For now, default to "Placed" status
+                _currentStatus = "Placed";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load order status: {ex.Message}");
+            // Still show confirmation page even if status fetch fails
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SubscribeToSSE()
+    {
+        try
+        {
+            _dotNetHelper = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("sseClient.subscribe", _customerId.ToString(), _dotNetHelper);
+            _sseConnected = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to subscribe to SSE: {ex.Message}");
+            _sseConnected = false;
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnSseEvent(JsonElement eventData)
+    {
+        Console.WriteLine($"SSE event received: {eventData}");
+
+        // Parse event type
+        if (eventData.TryGetProperty("eventType", out var eventType))
+        {
+            var eventTypeName = eventType.GetString();
+
+            switch (eventTypeName)
+            {
+                case "order-placed":
+                    _currentStatus = "Placed";
+                    _latestUpdate = "Order placed successfully";
+                    StateHasChanged();
+                    break;
+
+                case "payment-confirmed":
+                    _currentStatus = "Payment Confirmed";
+                    _latestUpdate = "Payment processed successfully";
+                    StateHasChanged();
+                    break;
+
+                case "shipment-dispatched":
+                    _currentStatus = "Shipped";
+                    if (eventData.TryGetProperty("trackingNumber", out var tracking))
+                    {
+                        _latestUpdate = $"Order shipped! Tracking: {tracking.GetString()}";
+                    }
+                    else
+                    {
+                        _latestUpdate = "Order has been shipped";
+                    }
+                    StateHasChanged();
+                    break;
+
+                case "shipment-delivered":
+                    _currentStatus = "Delivered";
+                    _latestUpdate = "Order delivered successfully";
+                    StateHasChanged();
+                    break;
+            }
+        }
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Placed" => Color.Info,
+        "Payment Confirmed" => Color.Success,
+        "Shipped" => Color.Primary,
+        "Delivered" => Color.Success,
+        _ => Color.Default
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("sseClient.unsubscribe");
+            _dotNetHelper?.Dispose();
+        }
+        catch
+        {
+            // Ignore disposal errors
+        }
+    }
+}
