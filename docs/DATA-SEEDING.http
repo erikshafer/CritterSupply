@@ -1,6 +1,9 @@
 ### CritterSupply - Test Data Seeding
 ### Run these requests in order to populate the system with test data
 ### for manual testing of Customer Experience features
+###
+### IMPORTANT: This script uses DYNAMIC GUIDs (generated fresh each run)
+### to prevent collision errors. You can safely re-run steps 1-16 multiple times.
 
 ### PREREQUISITES:
 ### 1. Start infrastructure: docker-compose --profile all up -d
@@ -15,10 +18,8 @@
 @ProductCatalogHost = http://localhost:5133
 @ShoppingHost = http://localhost:5236
 
-# Test data IDs (used by Blazor UI)
-@CustomerId = 11111111-1111-1111-1111-111111111111
-@CartId = 22222222-2222-2222-2222-222222222222
-@CheckoutId = 33333333-3333-3333-3333-333333333333
+# Dynamic IDs - generated fresh each run (prevents collision errors)
+# These will be captured from API responses and reused in subsequent requests
 
 ###############################################
 ###   Step 1: Create Test Customer         ###
@@ -29,7 +30,7 @@ POST {{CustomerIdentityHost}}/api/customers
 Content-Type: application/json
 
 {
-  "customerId": "{{CustomerId}}",
+  "customerId": "{{$uuid}}",
   "email": "alice@example.com",
   "firstName": "Alice",
   "lastName": "Johnson"
@@ -39,7 +40,14 @@ Content-Type: application/json
     client.test("Customer created successfully", function() {
         client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
     });
-    client.log("✅ Customer created: alice@example.com");
+
+    // Extract Customer ID from Location header (e.g., "/api/customers/abc-123")
+    const location = response.headers.valueOf("Location");
+    if (location) {
+        const customerId = location.split('/').pop();
+        client.global.set("CustomerId", customerId);
+        client.log("✅ Customer created: " + customerId + " (alice@example.com)");
+    }
 %}
 
 ###
@@ -355,16 +363,19 @@ POST {{ShoppingHost}}/api/carts
 Content-Type: application/json
 
 {
-  "customerId": "{{CustomerId}}",
-  "cartId": "{{CartId}}"
+  "customerId": "{{CustomerId}}"
 }
 
 > {%
     client.test("Shopping cart initialized", function() {
         client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
     });
-    client.log("✅ Cart initialized with ID: {{CartId}}");
-    client.log("   This matches the hardcoded CartId used by Blazor UI");
+
+    // Capture CartId from response body
+    if (response.body && response.body.cartId) {
+        client.global.set("CartId", response.body.cartId);
+        client.log("✅ Cart initialized: " + response.body.cartId);
+    }
 %}
 
 ###
@@ -473,6 +484,12 @@ Accept: application/json
 ### You may need to delete/recreate the database instead
 
 ### RESET: Delete Cart (if needed)
-# DELETE {{ShoppingHost}}/api/carts/{{CartId}}
+#DELETE {{ShoppingHost}}/api/carts/{{CartId}}
+#Content-Type: application/json
+#
+#{
+#  "cartId": "{{CartId}}",
+#  "reason": "Manual cleanup"
+#}
 
 ###

@@ -27,13 +27,13 @@ public static class GetCustomerHandler
 {
     [WolverineGet("/api/customers/{customerId}")]
     public static async Task<IResult> Handle(
-        GetCustomer query,
+        Guid customerId,
         CustomerIdentityDbContext dbContext,
         CancellationToken ct)
     {
         var customer = await dbContext.Customers
             .AsNoTracking()
-            .Where(c => c.Id == query.CustomerId)
+            .Where(c => c.Id == customerId)
             .Select(c => new CustomerResponse(
                 c.Id,
                 c.Email,
