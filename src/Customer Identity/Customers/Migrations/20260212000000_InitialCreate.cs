@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -11,8 +11,12 @@ namespace CustomerIdentity.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.EnsureSchema(
+                name: "customeridentity");
+
             migrationBuilder.CreateTable(
                 name: "Customers",
+                schema: "customeridentity",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
@@ -28,6 +32,7 @@ namespace CustomerIdentity.Migrations
 
             migrationBuilder.CreateTable(
                 name: "Addresses",
+                schema: "customeridentity",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
@@ -51,6 +56,7 @@ namespace CustomerIdentity.Migrations
                     table.ForeignKey(
                         name: "FK_Addresses_Customers_CustomerId",
                         column: x => x.CustomerId,
+                        principalSchema: "customeridentity",
                         principalTable: "Customers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
@@ -58,17 +64,20 @@ namespace CustomerIdentity.Migrations
 
             migrationBuilder.CreateIndex(
                 name: "IX_Addresses_CustomerId",
+                schema: "customeridentity",
                 table: "Addresses",
                 column: "CustomerId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Addresses_CustomerId_Nickname",
+                schema: "customeridentity",
                 table: "Addresses",
                 columns: new[] { "CustomerId", "Nickname" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Customers_Email",
+                schema: "customeridentity",
                 table: "Customers",
                 column: "Email",
                 unique: true);
@@ -78,10 +87,12 @@ namespace CustomerIdentity.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "Addresses");
+                name: "Addresses",
+                schema: "customeridentity");
 
             migrationBuilder.DropTable(
-                name: "Customers");
+                name: "Customers",
+                schema: "customeridentity");
         }
     }
 }

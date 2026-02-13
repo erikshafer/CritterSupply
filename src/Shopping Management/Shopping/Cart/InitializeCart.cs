@@ -7,7 +7,8 @@ namespace Shopping.Cart;
 
 public sealed record InitializeCart(
     Guid? CustomerId,
-    string? SessionId)
+    string? SessionId,
+    Guid? CartId = null)
 {
     public class InitializeCartValidator : AbstractValidator<InitializeCart>
     {
@@ -25,7 +26,8 @@ public static class InitializeCartHandler
     [WolverinePost("/api/carts")]
     public static (CreationResponse<Guid>, IStartStream) Handle(InitializeCart command)
     {
-        var cartId = Guid.CreateVersion7();
+        // Use provided CartId if specified, otherwise generate new one
+        var cartId = command.CartId ?? Guid.CreateVersion7();
         var @event = new CartInitialized(
             command.CustomerId,
             command.SessionId,

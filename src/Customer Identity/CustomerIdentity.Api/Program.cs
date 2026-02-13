@@ -46,6 +46,14 @@ builder.Services.AddWolverineHttp();
 
 var app = builder.Build();
 
+// Apply EF Core migrations on startup (development only)
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<CustomerIdentityDbContext>();
+    await dbContext.Database.MigrateAsync();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
