@@ -145,6 +145,70 @@ accept: text/event-stream
 ###
 
 ###############################################
+###   BFF Cart Commands (NEW - Cycle 17)   ###
+###############################################
+
+### 20. Add Item to Cart (via BFF)
+POST {{HostAddress}}/api/storefront/carts/{{CartId}}/items
+Content-Type: application/json
+
+{
+  "sku": "DOG-BOWL-01",
+  "quantity": 2,
+  "unitPrice": 19.99
+}
+
+> {%
+    client.test("Item added to cart via BFF", function() {
+        client.assert(response.status === 204 || response.status === 404, "Unexpected response status");
+    });
+%}
+
+###
+
+### 21. Change Item Quantity (via BFF)
+PUT {{HostAddress}}/api/storefront/carts/{{CartId}}/items/DOG-BOWL-01/quantity
+Content-Type: application/json
+
+{
+  "newQuantity": 5
+}
+
+> {%
+    client.test("Item quantity changed via BFF", function() {
+        client.assert(response.status === 204 || response.status === 404, "Unexpected response status");
+    });
+%}
+
+###
+
+### 22. Remove Item from Cart (via BFF)
+DELETE {{HostAddress}}/api/storefront/carts/{{CartId}}/items/DOG-BOWL-01
+
+> {%
+    client.test("Item removed from cart via BFF", function() {
+        client.assert(response.status === 204 || response.status === 404, "Unexpected response status");
+    });
+%}
+
+###
+
+### 23. Complete Checkout (via BFF)
+POST {{HostAddress}}/api/storefront/checkouts/{{CheckoutId}}/complete
+
+> {%
+    client.test("Checkout completed via BFF", function() {
+        client.assert(response.status === 200 || response.status === 204 || response.status === 404, "Unexpected response status");
+    });
+    if (response.status === 200 && response.body.orderId) {
+        client.global.set("OrderId", response.body.orderId);
+        client.log("Order placed successfully! OrderId: " + response.body.orderId);
+    }
+%}
+
+###
+
+###############################################
 ###   Error Scenarios                      ###
 ###############################################
 
@@ -207,50 +271,145 @@ accept: application/json
 ###   End-to-End Workflow Test             ###
 ###############################################
 ### This workflow demonstrates the complete customer journey
+### Run these in order to test the full cycle
 
 ### 12. Workflow Step 1: Initialize Cart (via Shopping.Api)
 # See Shopping.Api.http → Initialize Cart
+# POST http://localhost:5236/api/carts
+# Body: { "customerId": "{{CustomerId}}" }
+# Save returned cartId as {{CartId}}
 
 ###
 
-### 13. Workflow Step 2: Add Items to Cart (via Shopping.Api)
-# See Shopping.Api.http → Add Item to Cart
-# Expected: SSE notification pushed to browser
+### 13. Workflow Step 2: Browse Products (via Storefront BFF)
+GET {{HostAddress}}/api/storefront/products?category=Dogs&page=1&pageSize=10
+accept: application/json
+
+> {%
+    client.test("Products retrieved for browsing", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(Array.isArray(response.body.products), "Expected products array");
+    });
+    if (response.body.products.length > 0) {
+        client.global.set("ProductSku", response.body.products[0].sku);
+        client.global.set("ProductPrice", response.body.products[0].price);
+        client.log("Product selected: " + response.body.products[0].sku);
+    }
+%}
 
 ###
 
-### 14. Workflow Step 3: View Cart (via Storefront BFF)
+### 14. Workflow Step 3: Add Items to Cart (via Storefront BFF)
+POST {{HostAddress}}/api/storefront/carts/{{CartId}}/items
+Content-Type: application/json
+
+{
+  "sku": "DOG-BOWL-01",
+  "quantity": 2,
+  "unitPrice": 19.99
+}
+
+> {%
+    client.test("Item added to cart via BFF", function() {
+        client.assert(response.status === 204 || response.status === 404, "Unexpected response status");
+    });
+%}
+
+###
+
+### 15. Workflow Step 4: View Cart (via Storefront BFF)
 GET {{HostAddress}}/api/storefront/carts/{{CartId}}
 accept: application/json
 
 > {%
     client.test("Cart view shows composed data", function() {
         client.assert(response.status === 200, "Response status is not 200");
+        client.assert(Array.isArray(response.body.items), "Expected items array");
+    });
+    client.log("Cart Subtotal: $" + response.body.subtotal);
+%}
+
+###
+
+### 16. Workflow Step 5: Update Quantity (via Storefront BFF)
+PUT {{HostAddress}}/api/storefront/carts/{{CartId}}/items/DOG-BOWL-01/quantity
+Content-Type: application/json
+
+{
+  "newQuantity": 3
+}
+
+> {%
+    client.test("Quantity updated via BFF", function() {
+        client.assert(response.status === 204 || response.status === 404, "Unexpected response status");
     });
 %}
 
 ###
 
-### 15. Workflow Step 4: Initiate Checkout (via Shopping.Api)
+### 17. Workflow Step 6: Initiate Checkout (via Shopping.Api)
 # See Shopping.Api.http → Initiate Checkout
+# POST http://localhost:5236/api/carts/{{CartId}}/checkout
+# Save returned checkoutId as {{CheckoutId}}
 
 ###
 
-### 16. Workflow Step 5: View Checkout (via Storefront BFF)
+### 18. Workflow Step 7: View Checkout (via Storefront BFF)
 GET {{HostAddress}}/api/storefront/checkouts/{{CheckoutId}}
 accept: application/json
 
 > {%
     client.test("Checkout view shows composed data", function() {
         client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.items !== undefined, "Expected items in checkout");
     });
+    client.log("Checkout Total: $" + response.body.total);
 %}
 
 ###
 
-### 17. Workflow Step 6: Complete Checkout (via Orders.Api)
-# See Orders.Api.http → Complete Checkout
-# Expected: Orders.OrderPlaced published → SSE notification to browser
+### 19. Workflow Step 8: Complete Checkout (via Storefront BFF)
+POST {{HostAddress}}/api/storefront/checkouts/{{CheckoutId}}/complete
+
+> {%
+    client.test("Checkout completed via BFF", function() {
+        client.assert(response.status === 200 || response.status === 204 || response.status === 400, "Unexpected response status");
+    });
+    if (response.status === 200 && response.body.orderId) {
+        client.global.set("OrderId", response.body.orderId);
+        client.log("✅ Order placed successfully! OrderId: " + response.body.orderId);
+    } else if (response.status === 400) {
+        client.log("⚠️ Checkout validation failed (missing address/shipping/payment)");
+    }
+%}
+
+###
+
+###############################################
+###   SSE Real-Time Update Testing         ###
+###############################################
+### Test that BFF commands trigger SSE updates to connected clients
+
+### TEST PROCEDURE: SSE Real-Time Cart Updates
+# 1. Open Blazor UI in browser: http://localhost:5238/cart
+# 2. Open DevTools → Network tab → filter for "sse" → verify connection open
+# 3. Run request #20 (Add Item to Cart) above
+# 4. Observe browser Cart page updates in real-time without refresh
+# Expected flow:
+#   - POST /api/storefront/carts/{cartId}/items
+#   - BFF delegates to Shopping BC
+#   - Shopping BC publishes ItemAdded to RabbitMQ
+#   - Storefront.Api ItemAddedHandler receives message
+#   - EventBroadcaster pushes to SSE channel
+#   - Browser receives SSE event → Cart.razor reloads cart data
+
+### TEST PROCEDURE: SSE Real-Time Order Updates
+# 1. Open Blazor UI in browser: http://localhost:5238/order-confirmation/{orderId}
+# 2. Open DevTools → Network tab → filter for "sse" → verify connection open
+# 3. Simulate order lifecycle events via Orders.Api
+# 4. Observe order status updates in real-time
+# Expected events:
+#   - order-placed → Payment Confirmed → Shipped → Delivered
 
 ###
 
@@ -258,7 +417,7 @@ accept: application/json
 ###   Performance & Load Testing           ###
 ###############################################
 
-### 18. Concurrent Cart View Requests (Load Test)
+### 24. Concurrent Cart View Requests (Load Test)
 # Run this request multiple times concurrently to test BFF caching/performance
 GET {{HostAddress}}/api/storefront/carts/{{CartId}}
 accept: application/json
@@ -272,7 +431,7 @@ accept: application/json
 
 ###
 
-### 19. Product Listing Performance Test
+### 25. Product Listing Performance Test
 GET {{HostAddress}}/api/storefront/products?page=1&pageSize=50
 accept: application/json
 
@@ -282,5 +441,73 @@ accept: application/json
         client.assert(response.responseTime < 2000, "Response time should be under 2 seconds");
     });
 %}
+
+###
+
+###############################################
+###   Manual Testing Checklist             ###
+###############################################
+### Prerequisites for full end-to-end testing:
+# 1. Start all services:
+#    - docker-compose up -d (Postgres, RabbitMQ)
+#    - Shopping.Api (port 5236)
+#    - Orders.Api (port 5231)
+#    - Customer Identity.Api (port 5235)
+#    - Product Catalog.Api (port 5133)
+#    - Storefront.Api (BFF, port 5237)
+#    - Storefront.Web (Blazor, port 5238)
+#
+# 2. Seed data:
+#    - Add products via Product Catalog.Api
+#    - Add customer via Customer Identity.Api
+#    - Add addresses for customer
+#
+# 3. Run workflow steps 12-19 above in order
+#
+# 4. Open browser to http://localhost:5238 and verify:
+#    - Products page displays catalog
+#    - Add to Cart works
+#    - Cart page shows items
+#    - Quantity +/- buttons work
+#    - Remove button works
+#    - SSE updates cart in real-time
+#    - Checkout wizard flows work
+#    - Place Order creates order and navigates to confirmation
+#    - Order confirmation page shows status
+#    - SSE updates order status in real-time
+
+###
+
+###############################################
+###   Manual Testing Checklist             ###
+###############################################
+### Prerequisites for full end-to-end testing:
+# 1. Start all services:
+#    - docker-compose up -d (Postgres, RabbitMQ)
+#    - Shopping.Api (port 5236)
+#    - Orders.Api (port 5231)
+#    - Customer Identity.Api (port 5235)
+#    - Product Catalog.Api (port 5133)
+#    - Storefront.Api (BFF, port 5237)
+#    - Storefront.Web (Blazor, port 5238)
+#
+# 2. Seed data:
+#    - Add products via Product Catalog.Api
+#    - Add customer via Customer Identity.Api
+#    - Add addresses for customer
+#
+# 3. Run workflow steps 12-19 above in order
+#
+# 4. Open browser to http://localhost:5238 and verify:
+#    - Products page displays catalog
+#    - Add to Cart works
+#    - Cart page shows items
+#    - Quantity +/- buttons work
+#    - Remove button works
+#    - SSE updates cart in real-time
+#    - Checkout wizard flows work
+#    - Place Order creates order and navigates to confirmation
+#    - Order confirmation page shows status
+#    - SSE updates order status in real-time
 
 ###
