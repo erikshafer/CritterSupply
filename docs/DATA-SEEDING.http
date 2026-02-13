@@ -1,0 +1,478 @@
+### CritterSupply - Test Data Seeding
+### Run these requests in order to populate the system with test data
+### for manual testing of Customer Experience features
+
+### PREREQUISITES:
+### 1. Start infrastructure: docker-compose --profile all up -d
+### 2. Launch services: Use "Full Stack (APIs + Blazor UI)" run configuration
+### 3. Wait for all services to be ready (check console logs)
+
+###############################################
+###   Variables                            ###
+###############################################
+
+@CustomerIdentityHost = http://localhost:5235
+@ProductCatalogHost = http://localhost:5133
+@ShoppingHost = http://localhost:5236
+
+# Test data IDs (used by Blazor UI)
+@CustomerId = 11111111-1111-1111-1111-111111111111
+@CartId = 22222222-2222-2222-2222-222222222222
+@CheckoutId = 33333333-3333-3333-3333-333333333333
+
+###############################################
+###   Step 1: Create Test Customer         ###
+###############################################
+
+### 1. Create Customer
+POST {{CustomerIdentityHost}}/api/customers
+Content-Type: application/json
+
+{
+  "customerId": "{{CustomerId}}",
+  "email": "alice@example.com",
+  "firstName": "Alice",
+  "lastName": "Johnson"
+}
+
+> {%
+    client.test("Customer created successfully", function() {
+        client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
+    });
+    client.log("✅ Customer created: alice@example.com");
+%}
+
+###
+
+###############################################
+###   Step 2: Add Customer Address         ###
+###############################################
+
+### 2. Add Shipping Address for Customer
+POST {{CustomerIdentityHost}}/api/customers/{{CustomerId}}/addresses
+Content-Type: application/json
+
+{
+  "customerId": "{{CustomerId}}",
+  "type": "Shipping",
+  "nickname": "Home",
+  "addressLine1": "123 Main Street",
+  "addressLine2": "Apt 4B",
+  "city": "Seattle",
+  "stateOrProvince": "WA",
+  "postalCode": "98101",
+  "country": "US",
+  "isDefault": true
+}
+
+> {%
+    client.test("Address added successfully", function() {
+        client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
+    });
+    if (response.body && response.body.addressId) {
+        client.global.set("AddressId", response.body.addressId);
+        client.log("✅ Address created: " + response.body.addressId);
+    }
+%}
+
+###
+
+### 3. Add Second Address (Office)
+POST {{CustomerIdentityHost}}/api/customers/{{CustomerId}}/addresses
+Content-Type: application/json
+
+{
+  "customerId": "{{CustomerId}}",
+  "type": "Shipping",
+  "nickname": "Office",
+  "addressLine1": "456 Corporate Blvd",
+  "addressLine2": "Suite 200",
+  "city": "Bellevue",
+  "stateOrProvince": "WA",
+  "postalCode": "98004",
+  "country": "US",
+  "isDefault": false
+}
+
+> {%
+    client.test("Second address added", function() {
+        client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
+    });
+    client.log("✅ Office address created");
+%}
+
+###
+
+###############################################
+###   Step 3: Seed Products (Catalog)      ###
+###############################################
+
+### 4. Add Product: Ceramic Dog Bowl
+POST {{ProductCatalogHost}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "DOG-BOWL-01",
+  "name": "Ceramic Dog Bowl (Large)",
+  "description": "Durable ceramic bowl for large dogs",
+  "longDescription": "This large ceramic dog bowl is perfect for big breeds. Dishwasher safe and chip-resistant. Holds 8 cups of food or water.",
+  "category": "Dogs",
+  "dimensions": {
+    "length": 10.0,
+    "width": 10.0,
+    "height": 4.0,
+    "weight": 2.5
+  },
+  "images": [
+    {
+      "url": "https://via.placeholder.com/400x300/4A90E2/FFFFFF?text=Ceramic+Dog+Bowl",
+      "altText": "Large ceramic dog bowl in blue",
+      "sortOrder": 1
+    }
+  ]
+}
+
+> {%
+    client.test("Dog bowl product added", function() {
+        client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
+    });
+    client.log("✅ Product added: DOG-BOWL-01");
+%}
+
+###
+
+### 5. Add Product: Interactive Cat Laser
+POST {{ProductCatalogHost}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "CAT-TOY-05",
+  "name": "Interactive Cat Laser Pointer",
+  "description": "Automatic laser toy for cats",
+  "longDescription": "Keep your cat entertained for hours with this automatic laser pointer. Features random patterns, adjustable speed, and auto-shutoff after 15 minutes.",
+  "category": "Cats",
+  "dimensions": {
+    "length": 6.0,
+    "width": 6.0,
+    "height": 8.0,
+    "weight": 0.8
+  },
+  "images": [
+    {
+      "url": "https://via.placeholder.com/400x300/E74C3C/FFFFFF?text=Cat+Laser+Toy",
+      "altText": "Interactive cat laser pointer",
+      "sortOrder": 1
+    }
+  ]
+}
+
+> {%
+    client.test("Cat laser product added", function() {
+        client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
+    });
+    client.log("✅ Product added: CAT-TOY-05");
+%}
+
+###
+
+### 6. Add Product: Premium Dog Food
+POST {{ProductCatalogHost}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "DOG-FOOD-99",
+  "name": "Premium Dog Food (30lb)",
+  "description": "Grain-free premium dog food",
+  "longDescription": "High-protein, grain-free dog food made with real chicken and vegetables. No artificial preservatives. Suitable for all life stages.",
+  "category": "Dogs",
+  "dimensions": {
+    "length": 20.0,
+    "width": 12.0,
+    "height": 8.0,
+    "weight": 30.0
+  },
+  "images": [
+    {
+      "url": "https://via.placeholder.com/400x300/F39C12/FFFFFF?text=Premium+Dog+Food",
+      "altText": "30lb bag of premium dog food",
+      "sortOrder": 1
+    }
+  ]
+}
+
+> {%
+    client.test("Dog food product added", function() {
+        client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
+    });
+    client.log("✅ Product added: DOG-FOOD-99");
+%}
+
+###
+
+### 7. Add Product: Retractable Dog Leash
+POST {{ProductCatalogHost}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "DOG-LEASH-77",
+  "name": "Retractable Dog Leash (16ft)",
+  "description": "Heavy-duty retractable leash for dogs",
+  "longDescription": "Retractable leash extends up to 16 feet. One-button brake and lock. Ergonomic anti-slip handle. Supports dogs up to 110 lbs.",
+  "category": "Dogs",
+  "dimensions": {
+    "length": 5.0,
+    "width": 5.0,
+    "height": 2.0,
+    "weight": 0.6
+  },
+  "images": [
+    {
+      "url": "https://via.placeholder.com/400x300/2ECC71/FFFFFF?text=Dog+Leash",
+      "altText": "Retractable dog leash",
+      "sortOrder": 1
+    }
+  ]
+}
+
+> {%
+    client.test("Dog leash product added", function() {
+        client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
+    });
+    client.log("✅ Product added: DOG-LEASH-77");
+%}
+
+###
+
+### 8. Add Product: Cat Collar
+POST {{ProductCatalogHost}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "CAT-COLLAR-33",
+  "name": "Reflective Cat Collar with Bell",
+  "description": "Safety collar for cats",
+  "longDescription": "Adjustable reflective collar with breakaway safety buckle and removable bell. Suitable for cats 8-12 lbs.",
+  "category": "Cats",
+  "dimensions": {
+    "length": 12.0,
+    "width": 0.5,
+    "height": 0.25,
+    "weight": 0.1
+  },
+  "images": [
+    {
+      "url": "https://via.placeholder.com/400x300/9B59B6/FFFFFF?text=Cat+Collar",
+      "altText": "Reflective cat collar with bell",
+      "sortOrder": 1
+    }
+  ]
+}
+
+> {%
+    client.test("Cat collar product added", function() {
+        client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
+    });
+    client.log("✅ Product added: CAT-COLLAR-33");
+%}
+
+###
+
+### 9. Add Product: Fish Tank
+POST {{ProductCatalogHost}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "FISH-TANK-20",
+  "name": "20 Gallon Fish Tank Starter Kit",
+  "description": "Complete aquarium kit",
+  "longDescription": "20-gallon glass aquarium with LED lighting, filter, heater, and decorations. Perfect for tropical fish. Includes setup guide.",
+  "category": "Fish",
+  "dimensions": {
+    "length": 24.0,
+    "width": 12.0,
+    "height": 16.0,
+    "weight": 25.0
+  },
+  "images": [
+    {
+      "url": "https://via.placeholder.com/400x300/3498DB/FFFFFF?text=Fish+Tank",
+      "altText": "20 gallon fish tank with accessories",
+      "sortOrder": 1
+    }
+  ]
+}
+
+> {%
+    client.test("Fish tank product added", function() {
+        client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
+    });
+    client.log("✅ Product added: FISH-TANK-20");
+%}
+
+###
+
+### 10. Add Product: Bird Cage
+POST {{ProductCatalogHost}}/api/products
+Content-Type: application/json
+
+{
+  "sku": "BIRD-CAGE-01",
+  "name": "Large Parakeet Cage",
+  "description": "Spacious cage for small birds",
+  "longDescription": "Large wire cage suitable for parakeets, canaries, and finches. Includes perches, feeding bowls, and removable tray for easy cleaning.",
+  "category": "Birds",
+  "dimensions": {
+    "length": 30.0,
+    "width": 18.0,
+    "height": 36.0,
+    "weight": 15.0
+  },
+  "images": [
+    {
+      "url": "https://via.placeholder.com/400x300/1ABC9C/FFFFFF?text=Bird+Cage",
+      "altText": "Large bird cage for parakeets",
+      "sortOrder": 1
+    }
+  ]
+}
+
+> {%
+    client.test("Bird cage product added", function() {
+        client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
+    });
+    client.log("✅ Product added: BIRD-CAGE-01");
+    client.log("✅✅ All products seeded! Total: 7 products");
+%}
+
+###
+
+###############################################
+###   Step 4: Initialize Shopping Cart     ###
+###############################################
+
+### 11. Initialize Shopping Cart
+POST {{ShoppingHost}}/api/carts
+Content-Type: application/json
+
+{
+  "customerId": "{{CustomerId}}",
+  "cartId": "{{CartId}}"
+}
+
+> {%
+    client.test("Shopping cart initialized", function() {
+        client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
+    });
+    client.log("✅ Cart initialized with ID: {{CartId}}");
+    client.log("   This matches the hardcoded CartId used by Blazor UI");
+%}
+
+###
+
+###############################################
+###   Step 5: (Optional) Add Item to Cart  ###
+###############################################
+### Run this if you want to pre-populate the cart before testing the UI
+
+### 12. Add Dog Bowl to Cart (Optional)
+POST {{ShoppingHost}}/api/carts/{{CartId}}/items
+Content-Type: application/json
+
+{
+  "cartId": "{{CartId}}",
+  "sku": "DOG-BOWL-01",
+  "quantity": 2,
+  "unitPrice": 19.99
+}
+
+> {%
+    client.test("Item added to cart", function() {
+        client.assert(response.status === 200 || response.status === 204, "Expected 200 or 204");
+    });
+    client.log("✅ Added DOG-BOWL-01 to cart (qty: 2)");
+%}
+
+###
+
+### 13. Add Cat Laser to Cart (Optional)
+POST {{ShoppingHost}}/api/carts/{{CartId}}/items
+Content-Type: application/json
+
+{
+  "cartId": "{{CartId}}",
+  "sku": "CAT-TOY-05",
+  "quantity": 1,
+  "unitPrice": 29.99
+}
+
+> {%
+    client.test("Item added to cart", function() {
+        client.assert(response.status === 200 || response.status === 204, "Expected 200 or 204");
+    });
+    client.log("✅ Added CAT-TOY-05 to cart (qty: 1)");
+%}
+
+###
+
+###############################################
+###   Verification                         ###
+###############################################
+
+### 14. Verify Customer Exists
+GET {{CustomerIdentityHost}}/api/customers/{{CustomerId}}
+Accept: application/json
+
+> {%
+    client.test("Customer retrieved", function() {
+        client.assert(response.status === 200, "Customer should exist");
+        client.assert(response.body.email === "alice@example.com", "Email mismatch");
+    });
+%}
+
+###
+
+### 15. Verify Customer Has Addresses
+GET {{CustomerIdentityHost}}/api/customers/{{CustomerId}}/addresses
+Accept: application/json
+
+> {%
+    client.test("Addresses retrieved", function() {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(Array.isArray(response.body), "Expected array");
+        client.assert(response.body.length >= 2, "Expected at least 2 addresses");
+    });
+    client.log("✅ Customer has " + response.body.length + " saved addresses");
+%}
+
+###
+
+### 16. Verify Products Were Added
+GET {{ProductCatalogHost}}/api/products?page=1&pageSize=50
+Accept: application/json
+
+> {%
+    client.test("Products retrieved", function() {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(response.body.items.length >= 7, "Expected at least 7 products");
+    });
+    client.log("✅ Product catalog contains " + response.body.items.length + " products");
+    client.log("✅✅✅ DATA SEEDING COMPLETE!");
+    client.log("");
+    client.log("🎉 Ready for manual testing!");
+    client.log("   Open browser: http://localhost:5238");
+    client.log("   Test customer: alice@example.com");
+    client.log("   Cart ID: " + client.global.get("CartId"));
+%}
+
+###
+
+###############################################
+###   Cleanup (Run if you need to reset)   ###
+###############################################
+### WARNING: These operations may fail if aggregates are event-sourced
+### You may need to delete/recreate the database instead
+
+### RESET: Delete Cart (if needed)
+# DELETE {{ShoppingHost}}/api/carts/{{CartId}}
+
+###

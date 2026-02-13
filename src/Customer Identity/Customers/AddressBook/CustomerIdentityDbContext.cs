@@ -18,6 +18,9 @@ public sealed class CustomerIdentityDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // Use dedicated schema for Customer Identity BC
+        modelBuilder.HasDefaultSchema("customeridentity");
+
         // Customer configuration
         modelBuilder.Entity<Customer>(entity =>
         {

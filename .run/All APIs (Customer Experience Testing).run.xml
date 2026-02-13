@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="All APIs (Customer Experience Testing)" type="CompoundRunConfigurationType">
+    <toRun name="ProductCatalog.Api: http" type="LaunchSettings" />
+    <toRun name="CustomerIdentity.Api: CustomerIdentityApi" type="LaunchSettings" />
+    <toRun name="Shopping.Api: ShoppingApi" type="LaunchSettings" />
+    <toRun name="Orders.Api: OrdersApi" type="LaunchSettings" />
+    <toRun name="Storefront.Api: StorefrontApi" type="LaunchSettings" />
+    <method v="2" />
+  </configuration>
+</component>
