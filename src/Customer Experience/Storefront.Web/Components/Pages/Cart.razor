@@ -39,8 +39,24 @@ else
                                     <MudText Typo="Typo.body1" Class="mt-2">@item.UnitPrice.ToString("C")</MudText>
                                 </MudItem>
                                 <MudItem xs="3" Class="d-flex flex-column align-end">
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Qty: @item.Quantity</MudText>
-                                    <MudText Typo="Typo.h6">@item.LineTotal.ToString("C")</MudText>
+                                    <div class="d-flex align-center mb-2">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Remove"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => DecreaseQuantity(item.Sku, item.Quantity))"
+                                                       Disabled="@(item.Quantity <= 1)" />
+                                        <MudText Typo="Typo.body1" Class="mx-2">@item.Quantity</MudText>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => IncreaseQuantity(item.Sku, item.Quantity))" />
+                                    </div>
+                                    <MudText Typo="Typo.h6" Class="mb-2">@item.LineTotal.ToString("C")</MudText>
+                                    <MudButton Variant="Variant.Text"
+                                               Color="Color.Error"
+                                               Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.Delete"
+                                               OnClick="@(() => RemoveItem(item.Sku))">
+                                        Remove
+                                    </MudButton>
                                 </MudItem>
                             </MudGrid>
                         </MudCardContent>
@@ -143,6 +159,71 @@ else
                 await LoadCart();
                 StateHasChanged();
             }
+        }
+    }
+
+    private async Task RemoveItem(string sku)
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("StorefrontApi");
+            var response = await client.DeleteAsync($"/api/storefront/carts/{_cartId}/items/{sku}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Item {sku} removed successfully");
+                // SSE will trigger cart reload automatically
+            }
+            else
+            {
+                Console.WriteLine($"Failed to remove item {sku}: {response.StatusCode}");
+                // TODO: Show error toast (Task 7)
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error removing item {sku}: {ex.Message}");
+            // TODO: Show error toast (Task 7)
+        }
+    }
+
+    private async Task IncreaseQuantity(string sku, int currentQuantity)
+    {
+        await ChangeQuantity(sku, currentQuantity + 1);
+    }
+
+    private async Task DecreaseQuantity(string sku, int currentQuantity)
+    {
+        if (currentQuantity > 1)
+        {
+            await ChangeQuantity(sku, currentQuantity - 1);
+        }
+    }
+
+    private async Task ChangeQuantity(string sku, int newQuantity)
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("StorefrontApi");
+            var response = await client.PutAsJsonAsync(
+                $"/api/storefront/carts/{_cartId}/items/{sku}/quantity",
+                new { newQuantity });
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Item {sku} quantity changed to {newQuantity}");
+                // SSE will trigger cart reload automatically
+            }
+            else
+            {
+                Console.WriteLine($"Failed to change quantity for {sku}: {response.StatusCode}");
+                // TODO: Show error toast (Task 7)
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error changing quantity for {sku}: {ex.Message}");
+            // TODO: Show error toast (Task 7)
         }
     }
 
