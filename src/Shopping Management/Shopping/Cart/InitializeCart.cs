@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Http;
 using Wolverine.Http;
 using Wolverine.Marten;
 
@@ -22,7 +23,7 @@ public sealed record InitializeCart(
 public static class InitializeCartHandler
 {
     [WolverinePost("/api/carts")]
-    public static (IStartStream, CreationResponse) Handle(InitializeCart command)
+    public static (CreationResponse<Guid>, IStartStream) Handle(InitializeCart command)
     {
         var cartId = Guid.CreateVersion7();
         var @event = new CartInitialized(
@@ -32,6 +33,10 @@ public static class InitializeCartHandler
 
         var stream = MartenOps.StartStream<Cart>(cartId, @event);
 
-        return (stream, new CreationResponse($"/api/carts/{cartId}"));
+        // CRITICAL: CreationResponse MUST come first in the tuple!
+        // First item = HTTP response, Second item = side effect (stream creation)
+        var response = new CreationResponse<Guid>($"/api/carts/{cartId}", cartId);
+
+        return (response, stream);
     }
 }

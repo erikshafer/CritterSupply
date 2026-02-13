@@ -1,6 +1,7 @@
 @page "/checkout"
 @rendermode InteractiveServer
 @inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Navigation
 
 <PageTitle>Checkout - CritterSupply</PageTitle>
 
@@ -141,9 +142,41 @@ else
 
     private async Task PlaceOrder()
     {
-        // TODO: POST to BFF to complete checkout
-        Console.WriteLine("Place Order clicked - would POST to /api/storefront/checkouts/{id}/complete");
+        try
+        {
+            var client = HttpClientFactory.CreateClient("StorefrontApi");
+            var response = await client.PostAsync($"/api/storefront/checkouts/{_checkoutId}/complete", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Parse order ID from response
+                var result = await response.Content.ReadFromJsonAsync<PlaceOrderResponse>();
+
+                if (result?.OrderId != null)
+                {
+                    Console.WriteLine($"Order placed successfully: {result.OrderId}");
+                    // Navigate to order confirmation page
+                    Navigation.NavigateTo($"/order-confirmation/{result.OrderId}");
+                }
+                else
+                {
+                    Console.WriteLine("Order placed successfully (no order ID returned)");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Failed to place order: {response.StatusCode}");
+                // TODO: Show error toast (Task 7)
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error placing order: {ex.Message}");
+            // TODO: Show error toast (Task 7)
+        }
     }
+
+    private sealed record PlaceOrderResponse(Guid? OrderId);
 
     // View models matching BFF
     private sealed record CheckoutView(

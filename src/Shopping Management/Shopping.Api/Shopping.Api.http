@@ -1,0 +1,321 @@
+### Shopping API - Manual Testing & Verification
+### Base URL: http://localhost:5236
+
+@HostAddress = http://localhost:5236
+@CustomerId = 11111111-1111-1111-1111-111111111111
+@AnonymousSessionId = session-12345-anonymous
+
+###############################################
+###   Health Check & API Availability      ###
+###############################################
+
+### Health Check
+GET {{HostAddress}}/health
+accept: */*
+
+> {%
+    client.test("Shopping API is healthy", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### Root Redirect (should redirect to /api)
+GET {{HostAddress}}
+accept: */*
+
+> {%
+    client.test("Root redirects to API documentation", function() {
+        client.assert(response.status === 301, "Response status is not 301 (redirect)");
+    });
+%}
+
+###
+
+###############################################
+###   Cart Workflow - Authenticated User   ###
+###############################################
+
+POST http://localhost:5236/api/carts
+Content-Type: application/json
+
+{
+    "customerId": "c0000000-0000-0000-0000-000000000001",
+    "sessionId": null
+}
+
+
+### 1. Initialize Cart (Authenticated Customer)
+POST {{HostAddress}}/api/carts
+Content-Type: application/json
+
+{
+  "customerId": "{{CustomerId}}",
+  "sessionId": null
+}
+
+> {%
+    client.test("Cart initialized successfully", function() {
+        client.assert(response.status === 201, "Response status is not 201 Created");
+        client.assert(response.body.value !== undefined, "Cart ID not returned in response.body.value");
+        client.assert(response.headers.valueOf("Location") !== null, "Location header not set");
+    });
+    client.global.set("CartId", response.body.value);
+%}
+
+###
+
+### 2. Add Item to Cart (Dog Bowl)
+POST {{HostAddress}}/api/carts/{{CartId}}/items
+Content-Type: application/json
+
+{
+  "cartId": "{{CartId}}",
+  "sku": "DOG-BOWL-01",
+  "quantity": 2,
+  "unitPrice": 19.99
+}
+
+> {%
+    client.test("Item added to cart successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 3. Add Another Item (Cat Toy)
+POST {{HostAddress}}/api/carts/{{CartId}}/items
+Content-Type: application/json
+
+{
+  "cartId": "{{CartId}}",
+  "sku": "CAT-TOY-05",
+  "quantity": 1,
+  "unitPrice": 29.99
+}
+
+> {%
+    client.test("Second item added successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 3.6 Change Item Quantity
+PUT {{HostAddress}}/api/carts/{{CartId}}/items/DOG-BOWL-01/quantity
+Content-Type: application/json
+
+{
+    "cartId": "{{CartId}}",
+    "sku": "DOG-BOWL-01",
+    "newQuantity": 3
+}
+
+
+### 4. Get Cart State
+GET {{HostAddress}}/api/carts/{{CartId}}
+accept: application/json
+
+> {%
+    client.test("Cart retrieved successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.items !== undefined, "Cart items not returned");
+        client.assert(Object.keys(response.body.items).length === 2, "Expected 2 items in cart");
+    });
+%}
+
+###
+
+### 5. Update Item Quantity
+PUT {{HostAddress}}/api/carts/{{CartId}}/items/DOG-BOWL-01/quantity
+Content-Type: application/json
+
+{
+  "cartId": "{{CartId}}",
+  "sku": "DOG-BOWL-01",
+  "newQuantity": 5
+}
+
+> {%
+    client.test("Item quantity updated successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 6. Remove Item from Cart
+DELETE {{HostAddress}}/api/carts/{{CartId}}/items/CAT-TOY-05
+
+> {%
+    client.test("Item removed successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 7. Get Updated Cart State
+GET {{HostAddress}}/api/carts/{{CartId}}
+accept: application/json
+
+> {%
+    client.test("Cart retrieved after updates", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(Object.keys(response.body.items).length === 1, "Expected 1 item in cart");
+    });
+%}
+
+###
+
+### 8. Initiate Checkout
+POST {{HostAddress}}/api/carts/{{CartId}}/checkout
+Content-Type: application/json
+
+{
+  "cartId": "{{CartId}}"
+}
+
+> {%
+    client.test("Checkout initiated successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.checkoutId !== undefined, "Checkout ID not returned");
+    });
+    client.global.set("CheckoutId", response.body.checkoutId);
+%}
+
+###
+
+###############################################
+###   Cart Workflow - Anonymous User       ###
+###############################################
+
+### 9. Initialize Anonymous Cart
+POST {{HostAddress}}/api/carts
+Content-Type: application/json
+
+{
+  "customerId": null,
+  "sessionId": "{{AnonymousSessionId}}"
+}
+
+> {%
+    client.test("Anonymous cart initialized successfully", function() {
+        client.assert(response.status === 201, "Response status is not 201 Created");
+        client.assert(response.body.value !== undefined, "Cart ID not returned in response.body.value");
+        client.assert(response.headers.valueOf("Location") !== null, "Location header not set");
+    });
+    client.global.set("AnonymousCartId", response.body.value);
+%}
+
+###
+
+### 10. Add Item to Anonymous Cart
+POST {{HostAddress}}/api/carts/{{AnonymousCartId}}/items
+Content-Type: application/json
+
+{
+  "cartId": "{{AnonymousCartId}}",
+  "sku": "FISH-TANK-20",
+  "quantity": 1,
+  "unitPrice": 89.99
+}
+
+> {%
+    client.test("Item added to anonymous cart", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 11. Get Anonymous Cart
+GET {{HostAddress}}/api/carts/{{AnonymousCartId}}
+accept: application/json
+
+> {%
+    client.test("Anonymous cart retrieved", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.customerId === null, "Anonymous cart should have null customerId");
+    });
+%}
+
+###
+
+###############################################
+###   Error Scenarios                      ###
+###############################################
+
+### 12. Get Non-Existent Cart (404 Expected)
+GET {{HostAddress}}/api/carts/00000000-0000-0000-0000-000000000000
+accept: application/json
+
+> {%
+    client.test("Non-existent cart returns 404", function() {
+        client.assert(response.status === 404, "Expected 404 for non-existent cart");
+    });
+%}
+
+###
+
+### 13. Add Item with Invalid Quantity (Validation Error Expected)
+POST {{HostAddress}}/api/carts/{{CartId}}/items
+Content-Type: application/json
+
+{
+  "cartId": "{{CartId}}",
+  "sku": "TEST-SKU",
+  "quantity": -1,
+  "unitPrice": 10.00
+}
+
+> {%
+    client.test("Negative quantity rejected", function() {
+        client.assert(response.status === 400, "Expected 400 for invalid quantity");
+    });
+%}
+
+###
+
+### 14. Remove Non-Existent Item (404 Expected)
+DELETE {{HostAddress}}/api/carts/{{CartId}}/items/NON-EXISTENT-SKU
+
+> {%
+    client.test("Removing non-existent item returns 404", function() {
+        client.assert(response.status === 404, "Expected 404 for non-existent item");
+    });
+%}
+
+###
+
+###############################################
+###   RabbitMQ Integration Verification    ###
+###############################################
+### Note: These operations publish integration messages to RabbitMQ
+### Check Storefront.Api logs for message receipt
+### Check browser Cart page for real-time SSE updates
+
+### 15. Add Item (Triggers RabbitMQ Message)
+# Expected: Shopping.ItemAdded published to storefront-notifications queue
+# Expected: Storefront.Api ItemAddedHandler receives message
+# Expected: SSE broadcast to connected clients
+POST {{HostAddress}}/api/carts/{{CartId}}/items
+Content-Type: application/json
+
+{
+  "cartId": "{{CartId}}",
+  "sku": "RABBIT-TEST-01",
+  "quantity": 1,
+  "unitPrice": 15.99
+}
+
+> {%
+    client.test("Item added - check RabbitMQ logs", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###

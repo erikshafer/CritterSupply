@@ -11,11 +11,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Marten document store configuration
 var connectionString = builder.Configuration.GetConnectionString("Postgres")
-    ?? "Host=localhost;Database=critter_supply_catalog;Username=postgres;Password=postgres";
+    ?? "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=postgres";
 
 builder.Services.AddMarten(opts =>
 {
     opts.Connection(connectionString);
+    opts.DatabaseSchemaName = "productcatalog"; // Use dedicated schema in shared database
 
     // Product document configuration
     opts.Schema.For<Product>()

@@ -121,25 +121,56 @@ public static async Task<OutgoingMessages> Handle(
 
 ### Pattern 3: Starting New Streams (HTTP Endpoints)
 
-For HTTP endpoints, use `MartenOps.StartStream()` which returns `IStartStream`:
+For HTTP endpoints that create new event-sourced aggregates, use `MartenOps.StartStream()` which returns `IStartStream`:
 
 ```csharp
 public static class InitializeCartHandler
 {
     [WolverinePost("/api/carts")]
-    public static (IStartStream, CreationResponse) Handle(InitializeCart command)
+    public static (CreationResponse<Guid>, IStartStream) Handle(InitializeCart command)
     {
         var cartId = Guid.CreateVersion7();
-        var @event = new CartInitialized(command.CustomerId, DateTimeOffset.UtcNow);
+        var @event = new CartInitialized(command.CustomerId, command.SessionId, DateTimeOffset.UtcNow);
 
         var stream = MartenOps.StartStream<Cart>(cartId, @event);
 
-        return (stream, new CreationResponse($"/api/carts/{cartId}"));
+        // CRITICAL: Response MUST come first in the tuple!
+        var response = new CreationResponse<Guid>($"/api/carts/{cartId}", cartId);
+
+        return (response, stream);
     }
 }
 ```
 
-> **Reference:** [Wolverine HTTP + Marten](https://wolverinefx.net/guide/http/marten.html)
+**⚠️ CRITICAL: Tuple Order Matters!**
+
+In Wolverine, **the first item in a return tuple is ALWAYS treated as the HTTP response**.
+
+- ✅ **Correct:** `(CreationResponse<Guid>, IStartStream)` → Returns 201 Created with JSON body
+- ❌ **Wrong:** `(IStartStream, CreationResponse)` → Returns 204 No Content (no body!)
+
+**Using `CreationResponse<T>`:**
+
+- `CreationResponse<T>` (generic) includes the value `T` in the response body
+- `CreationResponse` (non-generic) only sets the Location header (no body)
+- Returns HTTP 201 Created with Location header + JSON body
+
+**Example response:**
+```http
+HTTP/1.1 201 Created
+Location: /api/carts/019c49bf-9852-73c1-bb67-da545727eca4
+Content-Type: application/json
+
+{
+  "value": "019c49bf-9852-73c1-bb67-da545727eca4",
+  "url": "/api/carts/019c49bf-9852-73c1-bb67-da545727eca4"
+}
+```
+
+> **References:**
+> - [Wolverine HTTP + Marten](https://wolverinefx.net/guide/http/marten.html)
+> - [Wolverine HTTP Return Types](https://wolverinefx.net/guide/http/endpoints.html)
+> - [CQRS with Marten Tutorial](https://wolverinefx.net/tutorials/cqrs-with-marten.html#start-a-new-stream)
 
 ### Pattern 4: Returning Updated Aggregate State
 

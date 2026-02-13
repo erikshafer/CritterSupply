@@ -605,15 +605,49 @@ Manages customer shipping and billing addresses with support for multiple saved 
 
 None. Customer Identity BC is primarily query-driven (other BCs query for address data).
 
-**Query Endpoints (HTTP):**
-- `GET /api/customers/{customerId}/addresses` — returns all addresses for customer (optionally filtered by type)
-- `GET /api/addresses/{addressId}/snapshot` — returns immutable `AddressSnapshot` for integration (updates `LastUsedAt`)
+**HTTP Endpoints (Added in Cycle 17):**
 
-**Integration Flow (Cycle 11):**
-1. Shopping BC queries `GetCustomerAddresses` during checkout → presents address list to customer
-2. Customer selects address → Shopping BC stores `AddressId` in Checkout aggregate
-3. On checkout completion → Shopping BC queries `GetAddressSnapshot` → receives immutable snapshot
-4. Shopping BC publishes `CheckoutCompleted` with embedded `AddressSnapshot` → Orders BC receives and persists
+**Customer CRUD:**
+- `POST /api/customers` — create customer (email, firstName, lastName)
+- `GET /api/customers/{customerId}` — retrieve customer details
+
+**Address CRUD:**
+- `POST /api/customers/{customerId}/addresses` — add address to customer
+- `GET /api/customers/{customerId}/addresses` — list all addresses for customer (optionally filtered by type)
+- `GET /api/customers/{customerId}/addresses/{addressId}` — get address details
+- `PUT /api/customers/{customerId}/addresses/{addressId}` — update address
+- `DELETE /api/customers/{customerId}/addresses/{addressId}` — delete address
+
+**Integration Flow (Cycle 17 - Shopping BC Integration):**
+1. **Customer Creation:** Before initializing cart, create customer via `POST /api/customers`
+   - Request: `{ "email": "alice@example.com", "firstName": "Alice", "lastName": "Smith" }`
+   - Response: `{ "customerId": "019c591d-..." }`
+
+2. **Cart Initialization:** Shopping BC's `InitializeCart` now accepts real `customerId` parameter
+   - Before Cycle 17: Used hardcoded stub (`00000000-0000-0000-0000-000000000001`)
+   - After Cycle 17: Accepts legitimate `customerId` from Customer Identity BC
+   - Foreign key validation ensures customer exists before cart creation
+
+3. **Checkout Integration:** Checkout aggregate references real customer records
+   - Checkout stores `customerId` with foreign key constraint
+   - Orders BC can query Customer Identity for customer/address data during order processing
+
+**End-to-End Flow (Customer → Cart → Checkout → Order):**
+```
+POST /api/customers
+  ↓
+customerId (Guid)
+  ↓
+POST /api/carts/initialize (with customerId)
+  ↓
+POST /api/carts/{cartId}/items (add items)
+  ↓
+POST /api/checkouts/initiate (from cart)
+  ↓
+POST /api/checkouts/{checkoutId}/shipping-address (with address details)
+  ↓
+POST /api/orders/place (from checkout)
+```
 
 ### Core Invariants
 

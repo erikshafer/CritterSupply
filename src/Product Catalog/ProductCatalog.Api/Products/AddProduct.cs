@@ -59,7 +59,7 @@ public sealed record ProductDimensionsDto(decimal Length, decimal Width, decimal
 public static class AddProductHandler
 {
     [WolverinePost("/api/products")]
-    public static async Task<CreationResponse> Handle(
+    public static async Task<IResult> Handle(
         AddProduct command,
         IDocumentSession session,
         CancellationToken ct)
@@ -68,7 +68,7 @@ public static class AddProductHandler
         var existing = await session.LoadAsync<Product>(command.Sku, ct);
         if (existing is not null)
         {
-            throw new InvalidOperationException("Product with SKU already exists");
+            return Results.Conflict(new { Message = "Product with SKU already exists" });
         }
 
         // Convert DTOs to value objects
@@ -102,6 +102,6 @@ public static class AddProductHandler
         session.Store(product);
         await session.SaveChangesAsync(ct);
 
-        return new CreationResponse($"/api/products/{command.Sku}");
+        return Results.Created($"/api/products/{command.Sku}", new { Sku = command.Sku });
     }
 }

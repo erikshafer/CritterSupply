@@ -177,6 +177,12 @@ docs/features/
 - **Message Handling**: Wolverine 5+
 - **Messaging**: RabbitMQ (AMQP)
 
+### Manual Testing
+
+For manual API testing using `.http` files in JetBrains IDEs, see **[docs/HTTP-FILES-GUIDE.md](./docs/HTTP-FILES-GUIDE.md)**.
+
+Each bounded context API includes a comprehensive `.http` file with test scenarios, assertions, and RabbitMQ integration verification.
+
 ### Core Principles
 
 - **Pure functions for business logic** — Handlers should be pure; side effects at the edges

@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Full Stack (APIs + Blazor UI)" type="CompoundRunConfigurationType">
+    <toRun name="ProductCatalog.Api: http" type="LaunchSettings" />
+    <toRun name="CustomerIdentity.Api: CustomerIdentityApi" type="LaunchSettings" />
+    <toRun name="Shopping.Api: ShoppingApi" type="LaunchSettings" />
+    <toRun name="Orders.Api: OrdersApi" type="LaunchSettings" />
+    <toRun name="Storefront.Api: StorefrontApi" type="LaunchSettings" />
+    <toRun name="Storefront.Web: StorefrontWeb" type="LaunchSettings" />
+    <method v="2" />
+  </configuration>
+</component>

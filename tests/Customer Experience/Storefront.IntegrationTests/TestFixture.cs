@@ -1,4 +1,3 @@
-using Alba;
 using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,6 +48,23 @@ public class TestFixture : IAsyncLifetime
                 {
                     opts.Connection(_connectionString);
                 });
+
+                // Remove existing scoped client registrations from Program.cs
+                var shoppiingClientDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IShoppingClient));
+                if (shoppiingClientDescriptor != null)
+                    services.Remove(shoppiingClientDescriptor);
+
+                var catalogClientDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ICatalogClient));
+                if (catalogClientDescriptor != null)
+                    services.Remove(catalogClientDescriptor);
+
+                var ordersClientDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IOrdersClient));
+                if (ordersClientDescriptor != null)
+                    services.Remove(ordersClientDescriptor);
+
+                var identityClientDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ICustomerIdentityClient));
+                if (identityClientDescriptor != null)
+                    services.Remove(identityClientDescriptor);
 
                 // Replace real HTTP clients with stubs for testing
                 services.AddSingleton<IShoppingClient>(StubShoppingClient);
