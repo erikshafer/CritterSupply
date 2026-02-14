@@ -11,13 +11,19 @@ This document tracks active and recent development cycles. For complete historic
 **Objective:** Wire everything together—RabbitMQ → SSE → Blazor, UI commands → API, real data queries
 
 **Key Deliverables:**
-1. Shopping command integration (Blazor UI → Shopping API)
-2. Product Catalog integration (real data with pagination/filtering)
-3. Checkout command integration (Blazor UI → Orders API)
-4. Order lifecycle SSE handlers (PaymentAuthorized, InventoryAllocated, ShipmentDispatched)
-5. UI polish (loading states, validation, error handling)
+1. ✅ Shopping command integration (Blazor UI → Shopping API)
+2. ✅ Product Catalog integration (real data with pagination/filtering)
+3. ✅ Checkout command integration (Blazor UI → Orders API)
+4. 🔄 Order lifecycle SSE handlers (PaymentAuthorized, InventoryAllocated, ShipmentDispatched) - In Progress
+5. ⏸️ UI polish (loading states, validation, error handling) - Pending
 
-**Current Phase:** Phase 1 - Shopping Command Integration
+**Current Phase:** Phase 4 - Order Lifecycle SSE Handlers
+
+**Progress Summary:**
+- **Phase 1 Complete:** IShoppingClient extended with 5 command methods (InitializeCart, AddItem, RemoveItem, ChangeQuantity, ClearCart). ShoppingClient implementation complete. Cart.razor wired to BFF endpoints. Cart badge updated with SSE real-time item count.
+- **Phase 2 Complete:** CatalogClient updated to map Product Catalog BC responses (handles value objects like Sku, ProductName). Products.razor already wired with pagination/filtering/add-to-cart. Price field stubbed (future Pricing BC).
+- **Phase 3 Complete:** IOrdersClient extended with 4 checkout command methods (ProvideShippingAddress, SelectShippingMethod, ProvidePaymentMethod, CompleteCheckout). OrdersClient implementation complete. CompleteCheckout BFF handler updated to use typed client.
+- **Phase 4 In Progress:** Adding SSE handlers for order lifecycle events (PaymentAuthorized, InventoryAllocated, ShipmentDispatched).
 
 **Plan:** [cycle-18-customer-experience-phase-2.md](./cycles/cycle-18-customer-experience-phase-2.md)
 
