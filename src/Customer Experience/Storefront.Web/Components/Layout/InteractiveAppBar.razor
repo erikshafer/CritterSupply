@@ -1,10 +1,13 @@
 @rendermode InteractiveServer
+@using System.Text.Json
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <MudAppBar Elevation="1">
     <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
     <MudText Typo="Typo.h6">CritterSupply</MudText>
     <MudSpacer />
-    <MudBadge Content="@_cartItemCount" Color="Color.Secondary" Overlap="true">
+    <MudBadge Content="@_cartItemCount" Color="Color.Secondary" Overlap="true" Visible="@(_cartItemCount > 0)">
         <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" />
     </MudBadge>
 </MudAppBar>
@@ -29,6 +32,51 @@
     public EventCallback<bool> DrawerOpenChanged { get; set; }
 
     private int _cartItemCount = 0;
+    private DotNetObjectReference<InteractiveAppBar>? _dotNetHelper;
+
+    // Stub customer ID - in real app this would come from authentication
+    private readonly Guid _customerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await SubscribeToSSE();
+        }
+    }
+
+    private async Task SubscribeToSSE()
+    {
+        try
+        {
+            _dotNetHelper = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("sseClient.subscribe", _customerId.ToString(), _dotNetHelper);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to subscribe to SSE in AppBar: {ex.Message}");
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnSseEvent(JsonElement eventData)
+    {
+        // Parse event type
+        if (eventData.TryGetProperty("eventType", out var eventType))
+        {
+            var eventTypeName = eventType.GetString();
+
+            if (eventTypeName == "cart-updated")
+            {
+                // Extract itemCount from event data
+                if (eventData.TryGetProperty("itemCount", out var itemCount))
+                {
+                    _cartItemCount = itemCount.GetInt32();
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+    }
 
     private async Task ToggleDrawer()
     {
@@ -36,5 +84,16 @@
         await DrawerOpenChanged.InvokeAsync(DrawerOpen);
     }
 
-    // TODO: Wire up cart item count from SSE subscription or API query
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("sseClient.unsubscribe");
+            _dotNetHelper?.Dispose();
+        }
+        catch
+        {
+            // Ignore disposal errors
+        }
+    }
 }

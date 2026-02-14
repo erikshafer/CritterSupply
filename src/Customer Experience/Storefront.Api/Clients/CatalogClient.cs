@@ -1,4 +1,5 @@
 using Storefront.Clients;
+using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace Storefront.Api.Clients;
@@ -6,6 +7,10 @@ namespace Storefront.Api.Clients;
 public sealed class CatalogClient : ICatalogClient
 {
     private readonly HttpClient _httpClient;
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public CatalogClient(IHttpClientFactory httpClientFactory)
     {
@@ -15,17 +20,17 @@ public sealed class CatalogClient : ICatalogClient
     public async Task<ProductDto?> GetProductAsync(string sku, CancellationToken ct = default)
     {
         var response = await _httpClient.GetAsync($"/api/products/{sku}", ct);
-        
+
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             return null;
 
         response.EnsureSuccessStatusCode();
 
-        var content = await response.Content.ReadAsStringAsync(ct);
-        return JsonSerializer.Deserialize<ProductDto>(content, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
+        var catalogProduct = await response.Content.ReadFromJsonAsync<CatalogProductResponse>(JsonOptions, ct);
+        if (catalogProduct is null)
+            return null;
+
+        return MapToProductDto(catalogProduct);
     }
 
     public async Task<PagedResult<ProductDto>> GetProductsAsync(
@@ -41,10 +46,46 @@ public sealed class CatalogClient : ICatalogClient
         var response = await _httpClient.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();
 
-        var content = await response.Content.ReadAsStringAsync(ct);
-        return JsonSerializer.Deserialize<PagedResult<ProductDto>>(content, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        }) ?? new PagedResult<ProductDto>(Array.Empty<ProductDto>(), 0, page, pageSize);
+        var catalogResponse = await response.Content.ReadFromJsonAsync<CatalogProductListResponse>(JsonOptions, ct);
+        if (catalogResponse is null)
+            return new PagedResult<ProductDto>([], 0, page, pageSize);
+
+        var products = catalogResponse.Products
+            .Select(MapToProductDto)
+            .ToList();
+
+        return new PagedResult<ProductDto>(products, catalogResponse.TotalCount, catalogResponse.Page, catalogResponse.PageSize);
     }
+
+    private static ProductDto MapToProductDto(CatalogProductResponse product)
+    {
+        return new ProductDto(
+            Sku: product.Sku?.Value ?? product.Id ?? string.Empty,
+            Name: product.Name?.Value ?? "Unknown Product",
+            Description: product.Description ?? string.Empty,
+            Category: product.Category ?? "Uncategorized",
+            Price: 0m, // TODO: Price will come from Pricing BC in future cycle
+            Status: product.Status ?? "Unknown",
+            Images: product.Images?.Select(i => new ProductImageDto(i.Url, i.AltText, i.SortOrder)).ToList() ?? []);
+    }
+
+    // Response types matching Product Catalog BC API
+    private sealed record CatalogProductListResponse(
+        IReadOnlyList<CatalogProductResponse> Products,
+        int Page,
+        int PageSize,
+        int TotalCount);
+
+    private sealed record CatalogProductResponse(
+        string? Id,
+        CatalogSku? Sku,
+        CatalogProductName? Name,
+        string? Description,
+        string? Category,
+        string? Status,
+        IReadOnlyList<CatalogProductImage>? Images);
+
+    private sealed record CatalogSku(string Value);
+    private sealed record CatalogProductName(string Value);
+    private sealed record CatalogProductImage(string Url, string AltText, int SortOrder);
 }

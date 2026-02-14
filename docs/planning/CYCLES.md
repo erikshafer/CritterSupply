@@ -6,15 +6,59 @@ This document tracks active and recent development cycles. For complete historic
 
 ## Current Cycle
 
-**None** - Ready to start Cycle 18
+### Cycle 18: Customer Experience Enhancement (Phase 2) - ✅ Complete (2026-02-13)
 
-Cycle 17 completed 2026-02-13. See "Recently Completed" below.
+**Objective:** Wire everything together—RabbitMQ → SSE → Blazor, UI commands → API, real data queries
 
-**Next Up:** [Cycle 18: Customer Experience Enhancement (Phase 2)](./cycles/cycle-18-customer-experience-phase-2.md) - RabbitMQ integration, Blazor UI commands, real Catalog data
+**Key Deliverables:**
+1. ✅ Shopping command integration (Blazor UI → Shopping API)
+2. ✅ Product Catalog integration (real data with pagination/filtering)
+3. ✅ Checkout command integration (Blazor UI → Orders API)
+4. ✅ Order lifecycle SSE handlers (PaymentAuthorized, ReservationConfirmed, ShipmentDispatched)
+5. ✅ UI polish (loading states, validation, error handling, testing)
+
+**Results:** Build succeeded with 0 warnings/0 errors. All 5 phases complete.
+
+**Key Achievements:**
+- **Typed HTTP Clients:** Refactored all BFF command handlers to use IShoppingClient, IOrdersClient, ICatalogClient interfaces instead of IHttpClientFactory
+- **Value Object Handling:** Product Catalog integration correctly unwraps Sku and ProductName value objects to plain strings for DTOs
+- **Real-Time Cart Badge:** InteractiveAppBar.razor subscribes to SSE "cart-updated" events for live item count
+- **Order Lifecycle SSE:** PaymentAuthorized, ReservationConfirmed, ShipmentDispatched handlers broadcast status changes via EventBroadcaster
+- **UI Polish:** MudSnackbar toast notifications for all user actions, loading states with disabled buttons during operations, enhanced empty states
+
+**Known TODOs for Future Cycles:**
+- Resolve CustomerId in order lifecycle SSE handlers (currently stubbed - need to query Orders BC or enhance integration messages)
+- Parse OrderId from CompleteCheckout response (currently returns checkoutId)
+- Add Price field when Pricing BC is implemented (currently stubbed as 0m)
+
+**Plan:** [cycle-18-customer-experience-phase-2.md](./cycles/cycle-18-customer-experience-phase-2.md)
 
 ---
 
 ## Recently Completed (Last 5 Cycles)
+
+### Cycle 18: Customer Experience Enhancement (Phase 2) - ✅ Complete (2026-02-13)
+
+**Objective:** Wire everything together—RabbitMQ → SSE → Blazor, UI commands → API, real data queries
+
+**Key Deliverables:**
+- Shopping command integration (5 methods: InitializeCart, AddItem, RemoveItem, ChangeQuantity, ClearCart)
+- Product Catalog integration with value object unwrapping (Sku, ProductName)
+- Checkout command integration (4 methods: ProvideShippingAddress, SelectShippingMethod, ProvidePaymentMethod, CompleteCheckout)
+- Order lifecycle SSE handlers (PaymentAuthorized, ReservationConfirmed, ShipmentDispatched)
+- UI polish (MudSnackbar toasts, loading states, enhanced empty states)
+
+**Results:** Build succeeded with 0 warnings/0 errors. All 5 phases complete.
+
+**Key Achievements:**
+- Typed HTTP Clients pattern (IShoppingClient, IOrdersClient, ICatalogClient)
+- Real-time cart badge updates via SSE
+- Complete error handling with user feedback toasts
+- Enhanced UX with loading indicators and disabled states
+
+**Details:** [cycle-18-customer-experience-phase-2.md](./cycles/cycle-18-customer-experience-phase-2.md)
+
+---
 
 ### Cycle 17: Customer Identity Integration - ✅ Complete (2026-02-13)
 
@@ -167,15 +211,7 @@ Cycle 17 completed 2026-02-13. See "Recently Completed" below.
 
 ## Upcoming Cycles (Planned)
 
-**Cycle 18:** Customer Experience Enhancement (Phase 2 - UI Commands & Real-Time)
-- Complete RabbitMQ integration (end-to-end SSE flow from Orders/Shopping)
-- Cart command integration (add/remove items from Blazor UI → Shopping API)
-- Checkout command integration (complete checkout from UI → Orders API)
-- Product listing page with real Product Catalog data (pagination/filtering)
-- Additional SSE handlers (payment confirmed, shipment dispatched, inventory allocated)
-- UI polish (cart badge count, validation feedback, error toasts)
-
-**Cycle 19+:** Authentication & Authorization
+**Cycle 19:** Authentication & Authorization
 - Customer Identity BC authentication integration
 - Replace stub customerId with real session
 - Login/logout pages
@@ -256,5 +292,5 @@ For non-feature development work (CI/CD, monitoring, tooling):
 
 ---
 
-**Last Updated:** 2026-02-13 (Cycle 17 Complete)
+**Last Updated:** 2026-02-13 (Cycle 18 Complete)
 **Maintained By:** Erik Shafer / Claude AI Assistant

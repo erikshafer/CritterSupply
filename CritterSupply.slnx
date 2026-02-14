@@ -37,6 +37,8 @@
     <File Path="skills\wolverine-message-handlers.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/">
+    <File Path="docs/CYCLE-18-TESTING-SUMMARY.md" />
+    <File Path="docs/QUICK-START.md" />
     <File Path="docs\DATA-SEEDING.http" />
     <File Path="docs\HTTP-FILES-GUIDE.md" />
     <File Path="docs\MANUAL-TEST-CHECKLIST.md" />

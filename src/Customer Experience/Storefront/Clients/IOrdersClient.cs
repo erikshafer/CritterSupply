@@ -1,15 +1,42 @@
 namespace Storefront.Clients;
 
 /// <summary>
-/// HTTP client for querying Orders BC
+/// HTTP client for querying and commanding Orders BC
 /// </summary>
 public interface IOrdersClient
 {
+    // Queries
     Task<CheckoutDto> GetCheckoutAsync(Guid checkoutId, CancellationToken ct = default);
     Task<PagedResult<OrderDto>> GetOrdersAsync(
         Guid customerId,
         int page = 1,
         int pageSize = 20,
+        CancellationToken ct = default);
+
+    // Commands
+    Task ProvideShippingAddressAsync(
+        Guid checkoutId,
+        string addressLine1,
+        string? addressLine2,
+        string city,
+        string stateOrProvince,
+        string postalCode,
+        string country,
+        CancellationToken ct = default);
+
+    Task SelectShippingMethodAsync(
+        Guid checkoutId,
+        string shippingMethod,
+        decimal shippingCost,
+        CancellationToken ct = default);
+
+    Task ProvidePaymentMethodAsync(
+        Guid checkoutId,
+        string paymentMethodToken,
+        CancellationToken ct = default);
+
+    Task<Guid> CompleteCheckoutAsync(
+        Guid checkoutId,
         CancellationToken ct = default);
 }
 
