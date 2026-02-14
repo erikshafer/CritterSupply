@@ -47,4 +47,66 @@ public class StubOrdersClient : IOrdersClient
 
         return Task.FromResult(new PagedResult<OrderDto>(customerOrders, totalCount, page, pageSize));
     }
+
+    public Task ProvideShippingAddressAsync(
+        Guid checkoutId,
+        string addressLine1,
+        string? addressLine2,
+        string city,
+        string stateOrProvince,
+        string postalCode,
+        string country,
+        CancellationToken ct = default)
+    {
+        // Stub implementation - just verify checkout exists
+        if (!_checkouts.ContainsKey(checkoutId))
+            throw new HttpRequestException($"Checkout {checkoutId} not found", null, System.Net.HttpStatusCode.NotFound);
+
+        return Task.CompletedTask;
+    }
+
+    public Task SelectShippingMethodAsync(
+        Guid checkoutId,
+        string shippingMethod,
+        decimal shippingCost,
+        CancellationToken ct = default)
+    {
+        // Stub implementation - just verify checkout exists
+        if (!_checkouts.ContainsKey(checkoutId))
+            throw new HttpRequestException($"Checkout {checkoutId} not found", null, System.Net.HttpStatusCode.NotFound);
+
+        return Task.CompletedTask;
+    }
+
+    public Task ProvidePaymentMethodAsync(
+        Guid checkoutId,
+        string paymentMethodToken,
+        CancellationToken ct = default)
+    {
+        // Stub implementation - just verify checkout exists
+        if (!_checkouts.ContainsKey(checkoutId))
+            throw new HttpRequestException($"Checkout {checkoutId} not found", null, System.Net.HttpStatusCode.NotFound);
+
+        return Task.CompletedTask;
+    }
+
+    public Task<Guid> CompleteCheckoutAsync(Guid checkoutId, CancellationToken ct = default)
+    {
+        // Stub implementation - verify checkout exists and create order
+        if (!_checkouts.TryGetValue(checkoutId, out var checkout))
+            throw new HttpRequestException($"Checkout {checkoutId} not found", null, System.Net.HttpStatusCode.NotFound);
+
+        var orderId = Guid.CreateVersion7();
+        var order = new OrderDto(
+            orderId,
+            checkout.CustomerId,
+            "Placed",
+            DateTimeOffset.UtcNow,
+            0m); // Stub total
+
+        _orders.Add(order);
+        _checkouts.Remove(checkoutId);
+
+        return Task.FromResult(orderId);
+    }
 }
