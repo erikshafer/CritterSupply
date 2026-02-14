@@ -6,11 +6,20 @@ This document tracks active and recent development cycles. For complete historic
 
 ## Current Cycle
 
-**None** - Ready to start Cycle 18
+### Cycle 18: Customer Experience Enhancement (Phase 2) - 🔄 In Progress (Started 2026-02-13)
 
-Cycle 17 completed 2026-02-13. See "Recently Completed" below.
+**Objective:** Wire everything together—RabbitMQ → SSE → Blazor, UI commands → API, real data queries
 
-**Next Up:** [Cycle 18: Customer Experience Enhancement (Phase 2)](./cycles/cycle-18-customer-experience-phase-2.md) - RabbitMQ integration, Blazor UI commands, real Catalog data
+**Key Deliverables:**
+1. Shopping command integration (Blazor UI → Shopping API)
+2. Product Catalog integration (real data with pagination/filtering)
+3. Checkout command integration (Blazor UI → Orders API)
+4. Order lifecycle SSE handlers (PaymentAuthorized, InventoryAllocated, ShipmentDispatched)
+5. UI polish (loading states, validation, error handling)
+
+**Current Phase:** Phase 1 - Shopping Command Integration
+
+**Plan:** [cycle-18-customer-experience-phase-2.md](./cycles/cycle-18-customer-experience-phase-2.md)
 
 ---
 

@@ -1,4 +1,5 @@
 using FluentValidation;
+using Storefront.Clients;
 using Wolverine.Http;
 
 namespace Storefront.Api.Commands;
@@ -29,32 +30,25 @@ public static class ChangeItemQuantityHandler
         Guid cartId,
         string sku,
         ChangeItemQuantityRequest request,
-        IHttpClientFactory httpClientFactory,
+        IShoppingClient shoppingClient,
         CancellationToken ct)
     {
-        var client = httpClientFactory.CreateClient("ShoppingClient");
-
-        var response = await client.PutAsJsonAsync(
-            $"/api/carts/{cartId}/items/{sku}/quantity",
-            new
-            {
-                newQuantity = request.NewQuantity
-            },
-            ct);
-
-        if (response.IsSuccessStatusCode)
+        try
         {
+            await shoppingClient.ChangeQuantityAsync(cartId, sku, request.NewQuantity, ct);
             return Results.NoContent(); // 204 - Quantity updated successfully
         }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             return Results.NotFound(new { message = "Cart or item not found" });
         }
-
-        return Results.Problem(
-            title: "Failed to update item quantity",
-            statusCode: (int)response.StatusCode);
+        catch (HttpRequestException ex)
+        {
+            return Results.Problem(
+                title: "Failed to update item quantity",
+                detail: ex.Message,
+                statusCode: (int)(ex.StatusCode ?? System.Net.HttpStatusCode.InternalServerError));
+        }
     }
 }
 

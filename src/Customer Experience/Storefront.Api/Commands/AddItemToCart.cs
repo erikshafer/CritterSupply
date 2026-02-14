@@ -1,4 +1,5 @@
 using FluentValidation;
+using Storefront.Clients;
 using Wolverine.Http;
 
 namespace Storefront.Api.Commands;
@@ -30,34 +31,25 @@ public static class AddItemToCartHandler
     public static async Task<IResult> Handle(
         Guid cartId,
         AddItemToCartRequest request,
-        IHttpClientFactory httpClientFactory,
+        IShoppingClient shoppingClient,
         CancellationToken ct)
     {
-        var client = httpClientFactory.CreateClient("ShoppingClient");
-
-        var response = await client.PostAsJsonAsync(
-            $"/api/carts/{cartId}/items",
-            new
-            {
-                sku = request.Sku,
-                quantity = request.Quantity,
-                unitPrice = request.UnitPrice
-            },
-            ct);
-
-        if (response.IsSuccessStatusCode)
+        try
         {
+            await shoppingClient.AddItemAsync(cartId, request.Sku, request.Quantity, request.UnitPrice, ct);
             return Results.NoContent(); // 204 - Item added successfully
         }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             return Results.NotFound(new { message = "Cart not found" });
         }
-
-        return Results.Problem(
-            title: "Failed to add item to cart",
-            statusCode: (int)response.StatusCode);
+        catch (HttpRequestException ex)
+        {
+            return Results.Problem(
+                title: "Failed to add item to cart",
+                detail: ex.Message,
+                statusCode: (int)(ex.StatusCode ?? System.Net.HttpStatusCode.InternalServerError));
+        }
     }
 }
 
