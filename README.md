@@ -44,54 +44,76 @@ This project is built with Claude as a collaborative coding partner. Beyond just
 
 That is to say, the more these tools see well-structured examples, the better guidance they can offer developers exploring these approaches for the first time.
 
-See [CLAUDE.md](./CLAUDE.md) for the project-specific instructions Claude follows when working on this codebase.
-
-### AI-Discoverable Documentation:
-
-The codebase uses a structured documentation approach optimized for AI assistants:
-- **[docs/planning/](./docs/planning/)** - Development cycles, detailed plans, and roadmap
-- **[docs/decisions/](./docs/decisions/)** - Architectural Decision Records (ADRs) explaining key choices
-- **[docs/features/](./docs/features/)** - BDD specifications in Gherkin format (Given/When/Then scenarios)
-
-These are automatically discoverable by AI assistants through [CLAUDE.md](./CLAUDE.md), which serves as the entry point for AI-assisted development. This structure ensures AI tools can locate planning context, understand architectural decisions, and reference user stories without manual prompting.
-
-### 🚫 Thinking Machines <a id='1.3.1'></a>
-Who knows. Maybe one day we'll ban "thinking machines" and have to build everything ourselves again. 😉 (see: Dune, Warhammer 40k, Battlestar Galactica, Mass Effect, and others)
+See [CLAUDE.md](./CLAUDE.md) for AI development guidelines and [docs/README.md](./docs/README.md) for comprehensive documentation structure.
 
 ## 🛠️ Technology Stack <a id='1.4'></a>
 
-**Language & Runtime:**
-- C# 14+ (.NET 10+)
+- **Core:** C# 14+ (.NET 10), [Wolverine](https://wolverine.netlify.app/), [Marten](https://martendb.io/), [EF Core](https://learn.microsoft.com/en-us/ef/core/)
+- **Infrastructure:** PostgreSQL, RabbitMQ, Docker
+- **Testing:** [Alba](https://jasperfx.github.io/alba/), [Testcontainers](https://dotnet.testcontainers.org/), xUnit, [Reqnroll](https://reqnroll.net/)
+- **UI:** [Blazor Server](https://learn.microsoft.com/en-us/aspnet/core/blazor/), [MudBlazor](https://mudblazor.com/), Server-Sent Events (SSE)
 
-**Core Frameworks:**
-- [Wolverine](https://wolverine.netlify.app/) - Command/message handling, HTTP endpoints, sagas
-- [Marten](https://martendb.io/) - Event sourcing and document store (Orders, Payments, Inventory, Fulfillment)
-- [Entity Framework Core](https://learn.microsoft.com/en-us/ef/core/) - Traditional relational persistence (Customer Identity)
-
-**Infrastructure:**
-- PostgreSQL - Database for both Marten (document store and event store) and EF Core (traditional relational store)
-- RabbitMQ - Message broker for cross-BC communication
-- Docker - Containerization and local development
-
-**Testing:**
-- [Alba](https://jasperfx.github.io/alba/) - Integration testing with HTTP scenarios
-- [Testcontainers](https://dotnet.testcontainers.org/) - Disposable database instances for tests
-- xUnit - Test framework
-- Shouldly - Assertion library
-- FluentValidation - Command validation
-- [Reqnroll](https://reqnroll.net/) - BDD testing with Gherkin feature files
-
-**UI & Real-Time:**
-- [Blazor Server](https://learn.microsoft.com/en-us/aspnet/core/blazor/) - Customer-facing UI (Customer Experience BC)
-- [MudBlazor](https://mudblazor.com/) - Material Design component library for Blazor
-- Server-Sent Events (SSE) - Real-time updates from BFF to Blazor UI (see [ADR 0004](./docs/decisions/0004-sse-over-signalr.md))
-
-**Future:**
-- .NET Aspire - Orchestration (planned)
+See [CLAUDE.md](./CLAUDE.md) for complete technology details and development guidelines.
 
 ## 🗺️ Bounded Contexts <a id='2.0'></a>
 
 CritterSupply is organized into bounded contexts. As described in Domain-Driven Design, bounded contexts help lower the cost of consensus. If one is unfamiliar with the concept, a crude yet simple way of picturing it is that each context could have its own team in an organization. That's not a rule by any means, but hopefully that helps you paint a picture of how CritterSupply is divided up logically and physically in this repo.
+
+### Architecture Overview
+
+```mermaid
+graph TB
+    %% Customer-Facing Layer
+    CE[🎁 Customer Experience<br/>Storefront BFF + Blazor]
+    
+    %% Core Business Contexts
+    Shopping[🛒 Shopping<br/>Cart Management]
+    Orders[📨 Orders<br/>Order Lifecycle]
+    Payments[💳 Payments<br/>Authorization & Capture]
+    Inventory[📊 Inventory<br/>Stock & Reservations]
+    Fulfillment[🚚 Fulfillment<br/>Shipping & Delivery]
+    
+    %% Supporting Contexts
+    CustomerID[👤 Customer Identity<br/>Addresses & Profiles]
+    Catalog[📦 Product Catalog<br/>Products & Pricing]
+    
+    %% Customer Experience interactions
+    CE -->|Get Cart| Shopping
+    CE -->|Place Order| Orders
+    CE -->|Browse Products| Catalog
+    CE -->|Get Customer Data| CustomerID
+    
+    %% Order Orchestration (Saga)
+    Orders -->|Authorize Payment| Payments
+    Orders -->|Reserve Stock| Inventory
+    Orders -->|Create Shipment| Fulfillment
+    
+    %% Data enrichment
+    Shopping -.->|Product Details| Catalog
+    Orders -.->|Customer Snapshot| CustomerID
+    
+    %% Real-time notifications
+    Shopping -.->|Cart Updated| CE
+    Orders -.->|Order Placed| CE
+    Fulfillment -.->|Order Fulfilled| CE
+    
+    classDef bff fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef core fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef support fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    
+    class CE bff
+    class Shopping,Orders,Payments,Inventory,Fulfillment core
+    class CustomerID,Catalog support
+```
+
+**Legend:**
+- **Solid arrows (→)**: Synchronous HTTP calls (composition, orchestration)
+- **Dotted arrows (⋯→)**: Asynchronous integration messages (RabbitMQ)
+- **Blue**: Customer-facing layer (BFF)
+- **Orange**: Core business contexts (event-sourced)
+- **Purple**: Supporting contexts
+
+### Bounded Context Status
 
 Below is a table of each contexts' focused responsibilities, along with their current implementation status:
 
@@ -122,126 +144,47 @@ This software solution has multiple dependencies that need to be running locally
 
 ### 🛠️ Local Development <a id='5.3'></a>
 
-To run the solution locally, you have multiple options. Either run with Docker Compose and `dotnet` commands to run specific or all modules, or have everything orchestrated and launched with [Aspire](https://aspire.dev/).
-
-#### 🐋 Run with Docker Compose
-
-To launch Docker with the `all` profile, use this `docker-compose` command:
+#### Quick Start
 
 ```bash
+# 1. Start infrastructure (Postgres + RabbitMQ)
 docker-compose --profile all up -d
-```
 
-#### 🏗️ Build
-
-To `build` the entire solution, run this command in the root of the project:
-
-```bash
+# 2. Build the solution
 dotnet build
-```
 
-#### 🏃🏻 Run Individual Bounded Contexts
-
-Want to run a specific part of the business? Each bounded context can be run independently as a self-hosted API using the `dotnet run` command. Here are examples for each context:
-
-```bash
-# Run Orders BC (Port 5231)
-dotnet run --project "src/Order Management/Orders.Api/Orders.Api.csproj"
-
-# Run Payments BC (Port 5232)
-dotnet run --project "src/Payment Processing/Payments.Api/Payments.Api.csproj"
-
-# Run Inventory BC (Port 5233)
-dotnet run --project "src/Inventory Management/Inventory.Api/Inventory.Api.csproj"
-
-# Run Fulfillment BC (Port 5234)
-dotnet run --project "src/Fulfillment Management/Fulfillment.Api/Fulfillment.Api.csproj"
-
-# Run Customer Identity BC (Port 5235)
-dotnet run --project "src/Customer Identity/CustomerIdentity.Api/CustomerIdentity.Api.csproj"
-
-# Run Shopping BC (Port 5236)
-dotnet run --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"
-
-# Run Product Catalog BC (Port 5133)
-dotnet run --project "src/Product Catalog/ProductCatalog.Api/ProductCatalog.Api.csproj"
-
-# Run Customer Experience BFF (Port 5237)
-dotnet run --project "src/Customer Experience/Storefront.Api/Storefront.Api.csproj"
-
-# Run Customer Experience Web UI (Port 5238 - Blazor Server)
-dotnet run --project "src/Customer Experience/Storefront.Web/Storefront.Web.csproj"
-```
-
-**Ports:**
-- Each BC API exposes a Swagger UI at `/api` (e.g., `http://localhost:5231/api` for Orders)
-- Customer Experience Web UI runs at `http://localhost:5238` (Blazor Server app)
-
-**To run the full Customer Experience stack:**
-```bash
-# Start infrastructure (Postgres + RabbitMQ)
-docker-compose --profile all up -d
-
-# Start BFF API (in one terminal)
-dotnet run --project "src/Customer Experience/Storefront.Api/Storefront.Api.csproj"
-
-# Start Blazor Web UI (in another terminal)
-dotnet run --project "src/Customer Experience/Storefront.Web/Storefront.Web.csproj"
-
-# Then navigate to http://localhost:5238 in your browser
-```
-
-#### 🧪 Test
-
-To `test` the entire solution, run this command in the root of the project:
-
-```bash
+# 3. Run tests
 dotnet test
+
+# 4. Run a specific BC (e.g., Customer Experience)
+dotnet run --project "src/Customer Experience/Storefront.Web/Storefront.Web.csproj"
+# Navigate to http://localhost:5238
+```
+
+#### Run Individual Bounded Contexts
+
+Each BC can be run independently. See [CLAUDE.md](./CLAUDE.md) for port allocations and detailed run commands.
+
+```bash
+# Examples:
+dotnet run --project "src/Order Management/Orders.Api/Orders.Api.csproj"        # Port 5231
+dotnet run --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"  # Port 5236
+dotnet run --project "src/Product Catalog/ProductCatalog.Api/ProductCatalog.Api.csproj"  # Port 5133
 ```
 
 #### 🧪 Manual API Testing
 
-Each bounded context API includes a comprehensive `.http` file for manual testing in JetBrains IDEs (Rider, IntelliJ IDEA with HTTP Client plugin):
-
-- `Shopping.Api.http` - Cart management operations
-- `Orders.Api.http` - Checkout and order workflows
-- `CustomerIdentity.Api.http` - Customer and address management
-- `Catalog.Api.http` - Product catalog queries and updates
-- `Storefront.Api.http` - BFF composition queries and SSE endpoints
-
-**See [docs/HTTP-FILES-GUIDE.md](./docs/HTTP-FILES-GUIDE.md)** for comprehensive testing instructions, including:
-- How to use .http files in JetBrains IDEs
-- Port configuration and troubleshooting
-- End-to-end testing scenarios
-- RabbitMQ integration verification
-
-#### 💡 Run with Aspire <a id='5.3'></a>
-
-To be implemented. It is on the roadmap.
-
+Each BC includes `.http` files for manual testing. See [docs/HTTP-FILES-GUIDE.md](./docs/HTTP-FILES-GUIDE.md) for usage instructions.
 
 ## 🏫 Resources <a id='9.0'></a>
 
-Blogs, articles, videos, and other resources will be listed here.
-
-### Tools Used <a id='9.1'></a>
-
-I stick with [JetBrains](https://www.jetbrains.com/)' suite of tools, such as their .NET specific IDE named [Rider](https://www.jetbrains.com/rider/), which is used exclusively with this project. I also use [DataGrip](https://www.jetbrains.com/datagrip/) from JetBrains when I need a dedicated window to database operations.
-
-<img src="https://img.shields.io/badge/Rider-480C15?style=for-the-badge&logo=Rider&logoColor=white" alt="jetbrains rider">
-
-<img src="https://img.shields.io/badge/DataGrip-2F0F3F?style=for-the-badge&logo=Rider&logoColor=white" alt="jetbrains datagrip">
+- **Blog:** [event-sourcing.dev](https://www.event-sourcing.dev)
+- **Wolverine:** [wolverine.netlify.app](https://wolverine.netlify.app/)
+- **Marten:** [martendb.io](https://martendb.io/)
+- **Tools:** [JetBrains Rider](https://www.jetbrains.com/rider/), [DataGrip](https://www.jetbrains.com/datagrip/)
 
 ## 👷‍♂️ Maintainer <a id='10.0'></a>
 
-Erik "Faelor" Shafer
+**Erik "Faelor" Shafer**
 
-[<img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" />](https://www.linkedin.com/in/erikshafer/) [<img src="https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white" />](https://www.youtube.com/@event-sourcing)
-
-[![blog](https://img.shields.io/badge/blog-event--sourcing.dev-blue)](https://www.event-sourcing.dev/) [![Twitter Follow](https://img.shields.io/twitter/url?label=reach%20me%20%40Faelor&style=social&url=https%3A%2F%2Ftwitter.com%2Ffaelor)](https://twitter.com/faelor) ![Bluesky followers](https://img.shields.io/bluesky/followers/erikshafer.bsky.social) ![Twitch Status](https://img.shields.io/twitch/status/faelor)
-
-
-- linkedin: [in/erikshafer](https://www.linkedin.com/in/erikshafer/)
-- blog: [event-sourcing.dev](https://www.event-sourcing.dev)
-- youtube: [@event-sourcing](https://www.youtube.com/@event-sourcing)
-- bluesky: [erikshafer](https://bsky.app/profile/erikshafer.bsky.social)
+[LinkedIn](https://www.linkedin.com/in/erikshafer/) • [Blog](https://www.event-sourcing.dev) • [YouTube](https://www.youtube.com/@event-sourcing) • [Bluesky](https://bsky.app/profile/erikshafer.bsky.social)

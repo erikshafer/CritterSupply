@@ -2,6 +2,16 @@
 
 This directory contains planning, decisions, and feature specifications for the CritterSupply reference architecture.
 
+## 🤖 AI-Discoverable Documentation
+
+CritterSupply uses a structured documentation approach optimized for AI assistants:
+
+- **[planning/](./planning/)** - Development cycles, detailed plans, and roadmap
+- **[decisions/](./decisions/)** - Architectural Decision Records (ADRs) explaining key choices
+- **[features/](./features/)** - BDD specifications in Gherkin format (Given/When/Then scenarios)
+
+These are automatically discoverable by AI assistants through [CLAUDE.md](../CLAUDE.md), which serves as the entry point for AI-assisted development. This structure ensures AI tools can locate planning context, understand architectural decisions, and reference user stories without manual prompting.
+
 ## 📋 Documentation Structure
 
 ### [planning/](./planning/) - Development Planning & Progress
