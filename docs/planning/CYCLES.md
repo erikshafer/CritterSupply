@@ -6,38 +6,13 @@ This document tracks active and recent development cycles. For complete historic
 
 ## Current Cycle
 
-### Cycle 18: Customer Experience Enhancement (Phase 2) - ✅ Complete (2026-02-13)
-
-**Objective:** Wire everything together—RabbitMQ → SSE → Blazor, UI commands → API, real data queries
-
-**Key Deliverables:**
-1. ✅ Shopping command integration (Blazor UI → Shopping API)
-2. ✅ Product Catalog integration (real data with pagination/filtering)
-3. ✅ Checkout command integration (Blazor UI → Orders API)
-4. ✅ Order lifecycle SSE handlers (PaymentAuthorized, ReservationConfirmed, ShipmentDispatched)
-5. ✅ UI polish (loading states, validation, error handling, testing)
-
-**Results:** Build succeeded with 0 warnings/0 errors. All 5 phases complete.
-
-**Key Achievements:**
-- **Typed HTTP Clients:** Refactored all BFF command handlers to use IShoppingClient, IOrdersClient, ICatalogClient interfaces instead of IHttpClientFactory
-- **Value Object Handling:** Product Catalog integration correctly unwraps Sku and ProductName value objects to plain strings for DTOs
-- **Real-Time Cart Badge:** InteractiveAppBar.razor subscribes to SSE "cart-updated" events for live item count
-- **Order Lifecycle SSE:** PaymentAuthorized, ReservationConfirmed, ShipmentDispatched handlers broadcast status changes via EventBroadcaster
-- **UI Polish:** MudSnackbar toast notifications for all user actions, loading states with disabled buttons during operations, enhanced empty states
-
-**Known TODOs for Future Cycles:**
-- Resolve CustomerId in order lifecycle SSE handlers (currently stubbed - need to query Orders BC or enhance integration messages)
-- Parse OrderId from CompleteCheckout response (currently returns checkoutId)
-- Add Price field when Pricing BC is implemented (currently stubbed as 0m)
-
-**Plan:** [cycle-18-customer-experience-phase-2.md](./cycles/cycle-18-customer-experience-phase-2.md)
+*No active cycle - ready to begin Cycle 19*
 
 ---
 
 ## Recently Completed (Last 5 Cycles)
 
-### Cycle 18: Customer Experience Enhancement (Phase 2) - ✅ Complete (2026-02-13)
+### Cycle 18: Customer Experience Enhancement (Phase 2) - ✅ Complete (2026-02-14)
 
 **Objective:** Wire everything together—RabbitMQ → SSE → Blazor, UI commands → API, real data queries
 
@@ -56,6 +31,28 @@ This document tracks active and recent development cycles. For complete historic
 - Complete error handling with user feedback toasts
 - Enhanced UX with loading indicators and disabled states
 
+**Key Learnings:**
+- **Integration testing gaps** - 80% of bugs found during manual testing would have been caught by Alba + TestContainers
+- **API contract verification** - Always verify actual API responses before creating DTOs (3 bugs from field name/type mismatches)
+- **Wolverine Events collection pattern** - CRITICAL: `[WriteAggregate]` handlers MUST return `Events` collection (plural), not single event
+- **Testing pyramid** - Need to shift from 90% manual testing to 70% integration tests + 20% unit tests + 10% manual
+- **BDD test coverage** - Gherkin scenarios written but no Reqnroll step definitions implemented (deferred to Cycle 19+)
+
+**Bugs Fixed Post-Implementation:**
+1. CartDto field name mismatch (`"Id"` vs `"cartId"`)
+2. Product Catalog value object assumptions (expected `CatalogSku` but API returns `string`)
+3. Product Status type mismatch (`string` vs `int`)
+4. Hardcoded stub GUIDs in Blazor UI (workaround documented until authentication in Cycle 19)
+5. **CRITICAL:** Cart events not persisting to database (wrong return type - single event vs Events collection)
+
+**Recommendations for Future Cycles:**
+- Write integration tests BEFORE manual testing (add test milestone to cycle workflow)
+- Verify typed HTTP clients against real APIs with TestContainers
+- Always assert event persistence in Wolverine handler tests
+- Update skills documentation with Events collection pattern + typed client testing
+- Create reusable test fixtures (`StorefrontTestFixture`) for BFF testing
+
+**Retrospective:** [CYCLE-18-RETROSPECTIVE.md](../CYCLE-18-RETROSPECTIVE.md)
 **Details:** [cycle-18-customer-experience-phase-2.md](./cycles/cycle-18-customer-experience-phase-2.md)
 
 ---
@@ -292,5 +289,5 @@ For non-feature development work (CI/CD, monitoring, tooling):
 
 ---
 
-**Last Updated:** 2026-02-13 (Cycle 18 Complete)
+**Last Updated:** 2026-02-14 (Cycle 18 Complete + Retrospective)
 **Maintained By:** Erik Shafer / Claude AI Assistant

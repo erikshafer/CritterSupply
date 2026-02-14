@@ -488,5 +488,193 @@ public static class ItemAddedHandler
 
 ---
 
+---
+
+## Implementation Notes (Post-Completion)
+
+**Status:** ✅ Complete (2026-02-14)
+**Actual Duration:** 1 day
+
+### What Went Well
+
+1. **Typed HTTP Clients Pattern** - Clean abstraction for BFF → Backend BC communication
+2. **Product Catalog Integration** - Successfully integrated real data with pagination/filtering
+3. **Cart Event Persistence Fix** - Identified and fixed critical bug in Wolverine event handling
+4. **SSE Cart Badge** - Real-time updates working for AddItem operations
+5. **UI Polish** - MudSnackbar toasts, loading states, error handling all implemented
+
+### Bugs Found & Fixed
+
+#### Bug 1: CartDto Field Name Mismatch ❌→✅
+**Symptom:** BFF GetCartView returned `cartId: "00000000-0000-0000-0000-000000000000"` (empty GUID)
+
+**Root Cause:** Shopping BC returns `"cartId"` in JSON, but Storefront's `CartDto` expected `"Id"`. JSON deserialization failed silently, defaulting to `Guid.Empty`.
+
+**Fix:** Updated `CartDto` to use `CartId` as primary property, added convenience `Id` property for backward compatibility.
+
+```csharp
+public sealed record CartDto(
+    Guid CartId,      // ✅ Matches Shopping BC response
+    Guid CustomerId,
+    IReadOnlyList<CartItemDto> Items)
+{
+    public Guid Id => CartId;  // Convenience property
+}
+```
+
+**Lesson Learned:** Always verify DTO field names match actual API responses. Integration tests with real HTTP calls would catch this.
+
+---
+
+#### Bug 2: Product Catalog Value Object Assumption ❌→✅
+**Symptom:** Products page showed "No products found" despite 7 products seeded.
+
+**Root Cause:** Assumed Product Catalog BC returned value objects like:
+```json
+{
+  "sku": { "value": "DOG-BOWL-01" },
+  "name": { "value": "Ceramic Dog Bowl" }
+}
+```
+
+But actual response was plain strings:
+```json
+{
+  "sku": "DOG-BOWL-01",
+  "name": "Ceramic Dog Bowl"
+}
+```
+
+**Fix:** Changed `CatalogProductResponse` DTO to use `string? Sku` and `string? Name` instead of value object types.
+
+**Lesson Learned:** Don't assume API contract structure—verify with actual HTTP requests first. Document API response formats in skills docs or OpenAPI specs.
+
+---
+
+#### Bug 3: Product Status Type Mismatch ❌→✅
+**Symptom:** 500 error when fetching cart with items (enrichment step failed).
+
+**Error:**
+```
+System.Text.Json.JsonException: Cannot get the value of a token type 'Number' as a string.
+Path: $.status
+```
+
+**Root Cause:** Product Catalog BC returns `"status": 0` (integer enum), but `CatalogProductResponse` expected `string? Status`.
+
+**Fix:** Changed `Status` field to `int?` and converted to string in mapping function:
+```csharp
+Status: product.Status?.ToString() ?? "Unknown"
+```
+
+**Lesson Learned:** Enum serialization can be number or string depending on configuration. Use `JsonStringEnumConverter` consistently or handle both formats.
+
+---
+
+#### Bug 4: Cart Event Persistence Failure ❌→✅ (CRITICAL BUG)
+**Symptom:** POST to add item returned 200 OK, but cart still showed `"items": []` on GET. Items were NOT being saved.
+
+**Root Cause:** Wolverine handlers returned `(ItemAdded, OutgoingMessages)` tuple. Wolverine didn't recognize the first element as an event collection, so it never appended to the event stream.
+
+**Database Evidence:** SQL query showed only `CartInitialized` event (version 1), no `ItemAdded` events.
+
+**Fix:** Changed return type from `(ItemAdded, OutgoingMessages)` to `(Events, OutgoingMessages)` and wrapped event in collection:
+```csharp
+// ❌ Before
+public static (ItemAdded, OutgoingMessages) Handle(...)
+{
+    return (@event, outgoing);
+}
+
+// ✅ After
+public static (Events, OutgoingMessages) Handle(...)
+{
+    return ([@event], outgoing);  // Wrap in collection
+}
+```
+
+Applied to: `AddItemToCart`, `RemoveItemFromCart`, `ChangeItemQuantity`
+
+**Lesson Learned:** Wolverine's `[WriteAggregate]` pattern requires returning `Events` collection (plural), not a single event. This is a critical pattern—add integration test to verify events are actually persisted.
+
+---
+
+#### Bug 5: Hardcoded Stub GUIDs ❌→✅
+**Symptom:** Cart page said "empty" even after adding items via HTTP file.
+
+**Root Cause:** Blazor UI uses hardcoded `_cartId = Guid.Parse("22222222-2222-2222-2222-222222222222")`, but Shopping BC's `InitializeCart` generates dynamic GUIDs using `Guid.CreateVersion7()`. Seeded cart had different GUID than UI expected.
+
+**Fix:** Updated QUICK-START.md with Step 3.1 instructions to copy actual CartId from seeding output and paste into `Products.razor` and `Cart.razor`.
+
+**Lesson Learned:** Hardcoded stub GUIDs are problematic for development. Options:
+- Use consistent test GUIDs in seeding scripts (but Shopping BC can't force specific GUIDs with event sourcing)
+- Implement authentication so UI knows real customer's cart
+- Store CartId in browser localStorage after initialization
+
+**Future:** Cycle 19 (Authentication) will eliminate this issue by fetching real customer's cart from session.
+
+---
+
+### Known Issues (Deferred to Future Cycles)
+
+#### Issue 1: Cart Quantity Changes Don't Update in Real-Time
+**Symptom:** Click +/- buttons on cart page, number doesn't change until page refresh.
+
+**Root Cause:** `Cart.razor` only handles `"cart-updated"` SSE event (from AddItem). Doesn't handle `"item-quantity-changed"` or `"item-removed"` events.
+
+**Status:** Documented in QUICK-START.md troubleshooting section. TODO added to `Cart.razor`.
+
+**Workaround:** Refresh page manually to see updated quantities.
+
+**Tracked For:** Cycle 19
+
+---
+
+#### Issue 2: CustomerId Resolution in Order Lifecycle SSE Handlers
+**Symptom:** Order lifecycle handlers (PaymentAuthorized, ReservationConfirmed, ShipmentDispatched) broadcast with `customerId = Guid.Empty`.
+
+**Root Cause:** Integration messages from Payments/Inventory/Fulfillment only include `OrderId`, not `CustomerId`. Handlers need to query Orders BC to resolve customer.
+
+**Status:** TODO comments added to all three handlers.
+
+**Tracked For:** Cycle 19
+
+---
+
+### Recommendations for Future Cycles
+
+**1. Integration Tests for DTO Mapping**
+- Add Alba tests that make real HTTP calls and deserialize responses
+- Catch field name mismatches (e.g., `Id` vs `cartId`) before runtime
+- Example: `ShoppingApiTests.GetCart_ShouldDeserializeCorrectly()`
+
+**2. API Contract Documentation**
+- Document actual JSON response formats in `skills/` or OpenAPI specs
+- Don't rely on assumptions about value objects vs primitives
+- Include example responses in `.http` files
+
+**3. Event Persistence Verification**
+- Add test that verifies events are actually written to database
+- Don't just test "200 OK" response—query event store afterward
+- Example: `AddItemToCart_ShouldPersistEventToDatabase()`
+
+**4. Wolverine Pattern Documentation**
+- Clarify that `[WriteAggregate]` requires returning `Events` (plural)
+- Add to `skills/wolverine-message-handlers.md` with examples
+- Common mistake: Returning `(Event, OutgoingMessages)` instead of `(Events, OutgoingMessages)`
+
+**5. Hardcoded Test Data Strategy**
+- Decide: Fixed GUIDs in tests vs dynamic GUIDs with discovery
+- If dynamic: Provide tooling to inspect/copy GUIDs easily
+- If fixed: Document how to seed with specific GUIDs
+
+**6. Real-Time UI Updates**
+- Complete SSE event coverage for all cart operations
+- Test multi-browser scenarios (customer isolation)
+- Consider optimistic UI updates (show change immediately, rollback on failure)
+
+---
+
+**Completed:** 2026-02-14
 **Created:** 2026-02-13
 **Author:** Erik Shafer / Claude AI Assistant

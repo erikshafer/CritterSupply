@@ -47,7 +47,7 @@ public static class RemoveItemFromCartHandler
     }
 
     [WolverineDelete("/api/carts/{cartId}/items/{sku}")]
-    public static (ItemRemoved, OutgoingMessages) Handle(
+    public static (Events, OutgoingMessages) Handle(
         RemoveItemFromCart command,
         [WriteAggregate] Cart cart)
     {
@@ -60,6 +60,6 @@ public static class RemoveItemFromCartHandler
             command.Sku,
             DateTimeOffset.UtcNow));
 
-        return (@event, outgoing);
+        return ([@event], outgoing);
     }
 }

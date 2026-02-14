@@ -65,10 +65,31 @@ dotnet run --launch-profile StorefrontWeb --project "src/Customer Experience/Sto
 2. Click **"Run All Requests in File"** (▶▶) button at top
 3. Wait for 16 requests to complete (~15 seconds)
 4. **Verify output panel shows:**
-   - ✅ Customer created: alice@example.com
+   - ✅ Customer created: 11111111-1111-1111-1111-111111111111 (alice@example.com)
    - ✅ 2 addresses added
    - ✅ 7 products seeded
-   - ✅ Cart initialized
+   - ✅ Cart initialized: `<copy-this-cart-id>`
+
+5. **IMPORTANT:** Copy the CartId from Step 11 output
+   - Example: `✅ Cart initialized: 019c5dc4-dbcd-77b6-9923-edb340d960c2`
+
+### Step 3.1: Update Blazor UI with Actual CartId
+
+**The Blazor UI uses hardcoded stub GUIDs that must match your seeded data.**
+
+**Update Products.razor:**
+1. Open `src/Customer Experience/Storefront.Web/Components/Pages/Products.razor`
+2. Find line ~90: `private readonly Guid _cartId = Guid.Parse("22222222-2222-2222-2222-222222222222");`
+3. Replace `22222222-2222-2222-2222-222222222222` with your CartId from Step 3
+4. Save the file - **Blazor will hot-reload automatically**
+
+**Update Cart.razor:**
+1. Open `src/Customer Experience/Storefront.Web/Components/Pages/Cart.razor`
+2. Find line ~109: `private readonly Guid _cartId = Guid.Parse("22222222-2222-2222-2222-222222222222");`
+3. Replace `22222222-2222-2222-2222-222222222222` with your CartId from Step 3
+4. Save the file - **Blazor will hot-reload automatically**
+
+**NOTE:** CustomerId is hardcoded as `11111111-1111-1111-1111-111111111111` and matches the seeded customer - no change needed.
 
 ---
 
@@ -152,10 +173,10 @@ You've verified:
 **Check:** Port conflicts - verify nothing else using ports 5231-5238
 **Fix:** `netstat -ano | findstr :52` (Windows) or `lsof -i :52` (macOS/Linux)
 
-### Products don't load
-**Check:** Product Catalog.Api logs for errors
-**Verify:** Products seeded via Step 3
-**Test:** http://localhost:5133/api/products?page=1&pageSize=10
+### Products don't load / Cart says "empty"
+**Problem:** Blazor UI uses hardcoded stub CartId that doesn't match the seeded cart
+**Fix:** Follow Step 3.1 to update `Products.razor` and `Cart.razor` with actual CartId
+**Verify:** Products seeded via Step 3: http://localhost:5133/api/products?page=1&pageSize=10
 
 ### SSE not connecting
 **Check:** Browser DevTools → Console for JavaScript errors
@@ -166,6 +187,12 @@ You've verified:
 **Check:** RabbitMQ container running (`docker ps`)
 **Verify:** Queue `storefront-notifications` exists (http://localhost:15672)
 **Review:** Storefront.Api logs for Wolverine handler errors
+
+### Cart quantity changes don't update in real-time (Known Issue)
+**Symptom:** Click +/- buttons on cart page, number doesn't change until page refresh
+**Status:** Works correctly (backend updates), but SSE real-time refresh not implemented yet
+**Workaround:** Refresh the page manually to see updated quantities
+**Tracked:** TODO for Cycle 19 - Cart.razor needs to listen for ItemQuantityChanged SSE events and re-fetch cart data
 
 ---
 

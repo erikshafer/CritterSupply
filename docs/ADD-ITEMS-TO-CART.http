@@ -1,0 +1,99 @@
+### Add Items to Cart - Quick Test
+### Use this to quickly add items to your seeded cart for testing
+
+@ShoppingHost = http://localhost:5236
+@CartId = 019c5dd6-29d2-7fb9-9d90-cf760997d1c0
+
+### 1. Add Dog Bowl to Cart
+POST {{ShoppingHost}}/api/carts/{{CartId}}/items
+Content-Type: application/json
+
+{
+  "cartId": "{{CartId}}",
+  "sku": "DOG-BOWL-01",
+  "quantity": 2,
+  "unitPrice": 19.99
+}
+
+> {%
+    client.test("Dog bowl added", function() {
+        client.assert(response.status === 200 || response.status === 204, "Expected 200 or 204");
+    });
+    client.log("✅ Added DOG-BOWL-01 to cart (qty: 2)");
+%}
+
+###
+
+### 2. Add Cat Laser to Cart
+POST {{ShoppingHost}}/api/carts/{{CartId}}/items
+Content-Type: application/json
+
+{
+  "cartId": "{{CartId}}",
+  "sku": "CAT-TOY-05",
+  "quantity": 1,
+  "unitPrice": 29.99
+}
+
+> {%
+    client.test("Cat laser added", function() {
+        client.assert(response.status === 200 || response.status === 204, "Expected 200 or 204");
+    });
+    client.log("✅ Added CAT-TOY-05 to cart (qty: 1)");
+%}
+
+###
+
+### 3. Add Dog Food to Cart
+POST {{ShoppingHost}}/api/carts/{{CartId}}/items
+Content-Type: application/json
+
+{
+  "cartId": "{{CartId}}",
+  "sku": "DOG-FOOD-99",
+  "quantity": 1,
+  "unitPrice": 49.99
+}
+
+> {%
+    client.test("Dog food added", function() {
+        client.assert(response.status === 200 || response.status === 204, "Expected 200 or 204");
+    });
+    client.log("✅ Added DOG-FOOD-99 to cart (qty: 1)");
+    client.log("✅✅✅ ALL ITEMS ADDED! Cart has 3 items (4 total quantity)");
+%}
+
+###
+
+### 4. Verify Cart Contents (BFF)
+GET http://localhost:5237/api/storefront/carts/{{CartId}}
+Accept: application/json
+
+> {%
+    client.test("Cart has items", function() {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(response.body.items.length === 3, "Expected 3 items");
+    });
+    client.log("✅ Cart verified: " + response.body.items.length + " items, subtotal: $" + response.body.subtotal);
+%}
+
+###
+
+GET http://localhost:5236/api/carts/019c5dd6-29d2-7fb9-9d90-cf760997d1c0
+Accept: application/json
+
+###
+GET http://localhost:5133/api/products?page=1&pageSize=20
+Accept: application/json
+
+###
+
+POST http://localhost:5236/api/carts/019c5dd6-29d2-7fb9-9d90-cf760997d1c0/items
+Content-Type: application/json
+
+{
+    "cartId": "019c5dd6-29d2-7fb9-9d90-cf760997d1c0",
+    "sku": "DOG-BOWL-01",
+    "quantity": 2,
+    "unitPrice": 19.99
+}

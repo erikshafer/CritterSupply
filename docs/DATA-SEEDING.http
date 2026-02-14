@@ -30,7 +30,7 @@ POST {{CustomerIdentityHost}}/api/customers
 Content-Type: application/json
 
 {
-  "customerId": "{{$uuid}}",
+  "customerId": "11111111-1111-1111-1111-111111111111",
   "email": "alice@example.com",
   "firstName": "Alice",
   "lastName": "Johnson"
@@ -41,13 +41,9 @@ Content-Type: application/json
         client.assert(response.status === 200 || response.status === 201, "Expected 200 or 201");
     });
 
-    // Extract Customer ID from Location header (e.g., "/api/customers/abc-123")
-    const location = response.headers.valueOf("Location");
-    if (location) {
-        const customerId = location.split('/').pop();
-        client.global.set("CustomerId", customerId);
-        client.log("✅ Customer created: " + customerId + " (alice@example.com)");
-    }
+    // Use hardcoded Customer ID (matches Blazor UI stub)
+    client.global.set("CustomerId", "11111111-1111-1111-1111-111111111111");
+    client.log("✅ Customer created: 11111111-1111-1111-1111-111111111111 (alice@example.com)");
 %}
 
 ###
@@ -372,13 +368,17 @@ Content-Type: application/json
     });
 
     // Capture CartId from response body
-    if (response.body && response.body.cartId) {
-        client.global.set("CartId", response.body.cartId);
-        client.log("✅ Cart initialized: " + response.body.cartId);
+    if (response.body && response.body.value) {
+        client.global.set("CartId", response.body.value);
+        client.log("✅ Cart initialized: " + response.body.value);
     }
 %}
 
 ###
+
+
+### Get Cart View (BFF)
+GET http://localhost:5237/api/storefront/carts/019c5dd6-29d2-7fb9-9d90-cf760997d1c0
 
 ###############################################
 ###   Step 5: (Optional) Add Item to Cart  ###

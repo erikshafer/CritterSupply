@@ -20,9 +20,13 @@ public interface IShoppingClient
 /// Cart DTO from Shopping BC
 /// </summary>
 public sealed record CartDto(
-    Guid Id,
+    Guid CartId,
     Guid CustomerId,
-    IReadOnlyList<CartItemDto> Items);
+    IReadOnlyList<CartItemDto> Items)
+{
+    // Convenience property for handlers that expect "Id"
+    public Guid Id => CartId;
+}
 
 /// <summary>
 /// Cart item DTO from Shopping BC
