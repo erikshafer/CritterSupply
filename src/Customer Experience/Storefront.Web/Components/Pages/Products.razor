@@ -1,6 +1,7 @@
 @page "/products"
 @rendermode InteractiveServer
 @inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
 
 <PageTitle>Products - CritterSupply</PageTitle>
 
@@ -26,10 +27,14 @@
 @if (_isLoading)
 {
     <MudProgressCircular Indeterminate="true" />
+    <MudText Typo="Typo.body1" Class="mt-2">Loading products...</MudText>
 }
 else if (_productListing == null || !_productListing.Products.Any())
 {
-    <MudAlert Severity="Severity.Info">No products found.</MudAlert>
+    <MudAlert Severity="Severity.Info" Class="mb-4">No products found. Try adjusting your filters.</MudAlert>
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@ClearFilters">
+        Clear Filters
+    </MudButton>
 }
 else
 {
@@ -137,20 +142,24 @@ else
 
             if (response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"Item {sku} added to cart");
-                // TODO: Show success toast (Task 7)
+                Snackbar.Add("Item added to cart!", Severity.Success);
             }
             else
             {
-                Console.WriteLine($"Failed to add item {sku} to cart: {response.StatusCode}");
-                // TODO: Show error toast (Task 7)
+                Snackbar.Add($"Failed to add item to cart: {response.StatusCode}", Severity.Error);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error adding item {sku} to cart: {ex.Message}");
-            // TODO: Show error toast (Task 7)
+            Snackbar.Add($"Error adding item to cart: {ex.Message}", Severity.Error);
         }
+    }
+
+    private async Task ClearFilters()
+    {
+        _selectedCategory = null;
+        _currentPage = 1;
+        await LoadProducts();
     }
 
     // View models matching BFF responses

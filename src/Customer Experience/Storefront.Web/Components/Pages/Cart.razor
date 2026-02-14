@@ -3,6 +3,7 @@
 @using System.Text.Json
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JS
+@inject ISnackbar Snackbar
 @implements IAsyncDisposable
 
 <PageTitle>Shopping Cart - CritterSupply</PageTitle>
@@ -12,11 +13,12 @@
 @if (_isLoading)
 {
     <MudProgressCircular Indeterminate="true" />
+    <MudText Typo="Typo.body1" Class="mt-2">Loading your cart...</MudText>
 }
 else if (_cartView == null || !_cartView.Items.Any())
 {
     <MudAlert Severity="Severity.Info">Your cart is empty.</MudAlert>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" Class="mt-4">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/products" Class="mt-4">
         Browse Products
     </MudButton>
 }
@@ -43,18 +45,20 @@ else
                                         <MudIconButton Icon="@Icons.Material.Filled.Remove"
                                                        Size="Size.Small"
                                                        OnClick="@(() => DecreaseQuantity(item.Sku, item.Quantity))"
-                                                       Disabled="@(item.Quantity <= 1)" />
+                                                       Disabled="@(item.Quantity <= 1 || _isProcessing)" />
                                         <MudText Typo="Typo.body1" Class="mx-2">@item.Quantity</MudText>
                                         <MudIconButton Icon="@Icons.Material.Filled.Add"
                                                        Size="Size.Small"
-                                                       OnClick="@(() => IncreaseQuantity(item.Sku, item.Quantity))" />
+                                                       OnClick="@(() => IncreaseQuantity(item.Sku, item.Quantity))"
+                                                       Disabled="@_isProcessing" />
                                     </div>
                                     <MudText Typo="Typo.h6" Class="mb-2">@item.LineTotal.ToString("C")</MudText>
                                     <MudButton Variant="Variant.Text"
                                                Color="Color.Error"
                                                Size="Size.Small"
                                                StartIcon="@Icons.Material.Filled.Delete"
-                                               OnClick="@(() => RemoveItem(item.Sku))">
+                                               OnClick="@(() => RemoveItem(item.Sku))"
+                                               Disabled="@_isProcessing">
                                         Remove
                                     </MudButton>
                                 </MudItem>
@@ -96,6 +100,7 @@ else
 @code {
     private CartView? _cartView;
     private bool _isLoading = true;
+    private bool _isProcessing = false;
     private bool _sseConnected = false;
     private DotNetObjectReference<Cart>? _dotNetHelper;
 
@@ -164,6 +169,7 @@ else
 
     private async Task RemoveItem(string sku)
     {
+        _isProcessing = true;
         try
         {
             var client = HttpClientFactory.CreateClient("StorefrontApi");
@@ -171,19 +177,21 @@ else
 
             if (response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"Item {sku} removed successfully");
+                Snackbar.Add("Item removed from cart", Severity.Success);
                 // SSE will trigger cart reload automatically
             }
             else
             {
-                Console.WriteLine($"Failed to remove item {sku}: {response.StatusCode}");
-                // TODO: Show error toast (Task 7)
+                Snackbar.Add($"Failed to remove item: {response.StatusCode}", Severity.Error);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error removing item {sku}: {ex.Message}");
-            // TODO: Show error toast (Task 7)
+            Snackbar.Add($"Error removing item: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
         }
     }
 
@@ -202,6 +210,7 @@ else
 
     private async Task ChangeQuantity(string sku, int newQuantity)
     {
+        _isProcessing = true;
         try
         {
             var client = HttpClientFactory.CreateClient("StorefrontApi");
@@ -211,19 +220,21 @@ else
 
             if (response.IsSuccessStatusCode)
             {
-                Console.WriteLine($"Item {sku} quantity changed to {newQuantity}");
+                Snackbar.Add("Quantity updated", Severity.Success);
                 // SSE will trigger cart reload automatically
             }
             else
             {
-                Console.WriteLine($"Failed to change quantity for {sku}: {response.StatusCode}");
-                // TODO: Show error toast (Task 7)
+                Snackbar.Add($"Failed to update quantity: {response.StatusCode}", Severity.Error);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error changing quantity for {sku}: {ex.Message}");
-            // TODO: Show error toast (Task 7)
+            Snackbar.Add($"Error updating quantity: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
         }
     }
 
