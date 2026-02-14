@@ -49,7 +49,7 @@ public static class ChangeItemQuantityHandler
     }
 
     [WolverinePut("/api/carts/{cartId}/items/{sku}/quantity")]
-    public static (ItemQuantityChanged, OutgoingMessages) Handle(
+    public static (Events, OutgoingMessages) Handle(
         ChangeItemQuantity command,
         [WriteAggregate] Cart cart)
     {
@@ -70,6 +70,6 @@ public static class ChangeItemQuantityHandler
             command.NewQuantity,
             DateTimeOffset.UtcNow));
 
-        return (@event, outgoing);
+        return ([@event], outgoing);
     }
 }

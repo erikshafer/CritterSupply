@@ -44,7 +44,7 @@ public static class AddItemToCartHandler
     }
 
     [WolverinePost("/api/carts/{cartId}/items")]
-    public static (ItemAdded, OutgoingMessages) Handle(
+    public static (Events, OutgoingMessages) Handle(
         AddItemToCart command,
         [WriteAggregate] Cart cart)
     {
@@ -63,6 +63,6 @@ public static class AddItemToCartHandler
             command.UnitPrice,
             DateTimeOffset.UtcNow));
 
-        return (@event, outgoing);
+        return ([@event], outgoing);
     }
 }

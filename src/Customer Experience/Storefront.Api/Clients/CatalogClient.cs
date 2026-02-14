@@ -60,12 +60,12 @@ public sealed class CatalogClient : ICatalogClient
     private static ProductDto MapToProductDto(CatalogProductResponse product)
     {
         return new ProductDto(
-            Sku: product.Sku?.Value ?? product.Id ?? string.Empty,
-            Name: product.Name?.Value ?? "Unknown Product",
+            Sku: product.Sku ?? product.Id ?? string.Empty,
+            Name: product.Name ?? "Unknown Product",
             Description: product.Description ?? string.Empty,
             Category: product.Category ?? "Uncategorized",
             Price: 0m, // TODO: Price will come from Pricing BC in future cycle
-            Status: product.Status ?? "Unknown",
+            Status: product.Status?.ToString() ?? "Unknown",
             Images: product.Images?.Select(i => new ProductImageDto(i.Url, i.AltText, i.SortOrder)).ToList() ?? []);
     }
 
@@ -78,14 +78,12 @@ public sealed class CatalogClient : ICatalogClient
 
     private sealed record CatalogProductResponse(
         string? Id,
-        CatalogSku? Sku,
-        CatalogProductName? Name,
+        string? Sku,            // Product Catalog returns plain string, not value object
+        string? Name,           // Product Catalog returns plain string, not value object
         string? Description,
         string? Category,
-        string? Status,
+        int? Status,            // Product Catalog returns integer enum (0 = Active, etc.)
         IReadOnlyList<CatalogProductImage>? Images);
 
-    private sealed record CatalogSku(string Value);
-    private sealed record CatalogProductName(string Value);
     private sealed record CatalogProductImage(string Url, string AltText, int SortOrder);
 }
