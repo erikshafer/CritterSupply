@@ -48,6 +48,23 @@ See [CLAUDE.md](./CLAUDE.md) for AI development guidelines and [docs/README.md](
 
 **📋 Architectural Review:** See [docs/ARCHITECTURAL-REVIEW.md](./docs/ARCHITECTURAL-REVIEW.md) for an independent review of bounded context design, service communication patterns, and recommendations from an experienced software architect perspective.
 
+### Custom Agents
+
+CritterSupply includes specialized GitHub Copilot agents with domain expertise to assist with development:
+
+- **🏪 Product Owner** ([`.github/agents/product-owner.md`](./.github/agents/product-owner.md)) - E-commerce domain expert with 10+ years experience in vendor relations, product/inventory management, and marketplace channels. Provides business-focused feedback on event-driven workflows, bounded context boundaries, and how business processes translate into distributed architecture.
+
+**How to use:** Tag the agent in your pull request or issue comments to get business perspective on architectural decisions, event modeling, or workflow validation.
+
+**Example prompts:**
+```
+@product-owner Does this order cancellation flow match real-world e-commerce policies?
+
+@product-owner Should "BackorderRequested" be a separate event or extend "ReservationFailed"?
+
+@product-owner We're adding product recommendations. Should that live in Product Catalog or Shopping BC?
+```
+
 ## 🛠️ Technology Stack <a id='1.4'></a>
 
 - **Core:** C# 14+ (.NET 10), [Wolverine](https://wolverine.netlify.app/), [Marten](https://martendb.io/), [EF Core](https://learn.microsoft.com/en-us/ef/core/)
