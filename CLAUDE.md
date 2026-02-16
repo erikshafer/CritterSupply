@@ -209,10 +209,17 @@ tests/
 ```
 src/
   Customer Identity/Customers/
-  Order Management/Orders/, Orders.Api/
-  Payment Processing/Payments/, Payments.Api/
+  Order Management/Orders/, Orders.Api/           # Conceptually: "Orders"
+  Payment Processing/Payments/, Payments.Api/    # Conceptually: "Payments"
+  Shopping Management/Shopping/, Shopping.Api/   # Conceptually: "Shopping"
+  Inventory Management/Inventory/, Inventory.Api/ # Conceptually: "Inventory"
+  Fulfillment Management/Fulfillment/, Fulfillment.Api/ # Conceptually: "Fulfillment"
+  Product Catalog/ProductCatalog/, ProductCatalog.Api/
+  Customer Experience/Storefront/, Storefront.Api/, Storefront.Web/
   Shared/Messages.Contracts/
 ```
+
+> **Note:** Folder names may differ from conceptual BC names. See `docs/BC-NAMING-ANALYSIS.md` for proposed naming improvements (e.g., "Orders" instead of "Order Management").
 
 See `skills/vertical-slice-organization.md` for complete file organization patterns.
 
@@ -264,19 +271,21 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 
 **Port Allocation Table** (increment by 1 for each new BC):
 
-| BC                            | Port     | Status      |
-|-------------------------------|----------|-------------|
-| Orders                        | 5231     | ✅ Assigned  |
-| Payments                      | 5232     | ✅ Assigned  |
-| Inventory                     | 5233     | ✅ Assigned  |
-| Fulfillment                   | 5234     | ✅ Assigned  |
-| Customer Identity             | 5235     | ✅ Assigned  |
-| Shopping                      | 5236     | ✅ Assigned  |
-| Product Catalog               | 5133     | ✅ Assigned  |
-| **Customer Experience (BFF)** | **5237** | ✅ Assigned  |
-| **Customer Experience (Web)** | **5238** | ✅ Assigned  |
-| Vendor Portal                 | 5239     | 📋 Reserved |
-| Vendor Identity               | 5240     | 📋 Reserved |
+| BC                            | Port     | Status      | Folder Name                    |
+|-------------------------------|----------|-------------|--------------------------------|
+| Orders                        | 5231     | ✅ Assigned  | Order Management/              |
+| Payments                      | 5232     | ✅ Assigned  | Payment Processing/            |
+| Inventory                     | 5233     | ✅ Assigned  | Inventory Management/          |
+| Fulfillment                   | 5234     | ✅ Assigned  | Fulfillment Management/        |
+| Customer Identity             | 5235     | ✅ Assigned  | Customer Identity/             |
+| Shopping                      | 5236     | ✅ Assigned  | Shopping Management/           |
+| Product Catalog               | 5133     | ✅ Assigned  | Product Catalog/               |
+| **Customer Experience (BFF)** | **5237** | ✅ Assigned  | Customer Experience/Storefront.Api/ |
+| **Customer Experience (Web)** | **5238** | ✅ Assigned  | Customer Experience/Storefront.Web/ |
+| Vendor Portal                 | 5239     | 📋 Reserved | (future)                       |
+| Vendor Identity               | 5240     | 📋 Reserved | (future)                       |
+
+> **Note:** Conceptual BC names shown (e.g., "Orders", "Payments"). Folder names may differ. See `docs/BC-NAMING-ANALYSIS.md` for naming rationale.
 
 **Why this matters:**
 - Allows running multiple APIs simultaneously during development
