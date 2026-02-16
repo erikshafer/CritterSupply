@@ -142,19 +142,17 @@ graph TB
 - **Orange**: Core business contexts (event-sourced)
 - **Purple**: Supporting contexts
 
-> **Note:** Diagram shows conceptual BC names. Folder names may differ (e.g., `Order Management/` folder for "Orders" context). See [docs/BC-NAMING-ANALYSIS.md](./docs/BC-NAMING-ANALYSIS.md).
-
 ### Bounded Context Status
 
-Below is a table of each contexts' focused responsibilities, along with their current implementation status. *(Proposed conceptual names shown in parentheses - see docs/BC-NAMING-ANALYSIS.md for rationale)*
+Below is a table of each contexts' focused responsibilities, along with their current implementation status.
 
 | Context                    | Responsibility                                 | Status     |
 |----------------------------|------------------------------------------------|------------|
-| 📨 **Orders** *(Order Management)* | Order lifecycle and checkout orchestration     | ✅ Complete |
-| 💳 **Payments** *(Payment Processing)* | Authorization, capture, refunds                | ✅ Complete |
-| 🛒 **Shopping** *(Shopping Management)* | Cart management                                | ✅ Complete |
-| 📊 **Inventory** *(Inventory Management)* | Stock levels and reservations                  | ✅ Complete |
-| 🚚 **Fulfillment** *(Fulfillment Management)* | Picking, packing, shipping                     | ✅ Complete |
+| 📨 **Orders** | Order lifecycle and checkout orchestration     | ✅ Complete |
+| 💳 **Payments** | Authorization, capture, refunds                | ✅ Complete |
+| 🛒 **Shopping** | Cart management                                | ✅ Complete |
+| 📊 **Inventory** | Stock levels and reservations                  | ✅ Complete |
+| 🚚 **Fulfillment** | Picking, packing, shipping                     | ✅ Complete |
 | 👤 **Customer Identity**   | Addresses and saved payment methods            | ✅ Complete |
 | 📦 **Product Catalog**     | Product definitions and pricing                | ✅ Complete |
 | 🎁 **Customer Experience** | Storefront BFF (Blazor + SSE)                  | 🚧 In Progress |
@@ -197,13 +195,11 @@ dotnet run --project "src/Customer Experience/Storefront.Web/Storefront.Web.cspr
 Each BC can be run independently. See [CLAUDE.md](./CLAUDE.md) for port allocations and detailed run commands.
 
 ```bash
-# Examples (using current folder names):
-dotnet run --project "src/Order Management/Orders.Api/Orders.Api.csproj"        # Port 5231
-dotnet run --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"  # Port 5236
+# Examples:
+dotnet run --project "src/Orders/Orders.Api/Orders.Api.csproj"        # Port 5231
+dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"  # Port 5236
 dotnet run --project "src/Product Catalog/ProductCatalog.Api/ProductCatalog.Api.csproj"  # Port 5133
 ```
-
-> **Note:** Folder names may differ from conceptual BC names (e.g., `Order Management/` folder, but "Orders" context). See [docs/BC-NAMING-ANALYSIS.md](./docs/BC-NAMING-ANALYSIS.md) for proposed naming improvements.
 
 #### 🧪 Manual API Testing
 

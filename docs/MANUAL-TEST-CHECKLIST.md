@@ -42,10 +42,10 @@ In Rider or IntelliJ IDEA:
 If compound run configuration not available:
 ```bash
 # Terminal 1 - Shopping BC
-dotnet run --launch-profile ShoppingApi --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"
+dotnet run --launch-profile ShoppingApi --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
 
 # Terminal 2 - Orders BC
-dotnet run --launch-profile OrdersApi --project "src/Order Management/Orders.Api/Orders.Api.csproj"
+dotnet run --launch-profile OrdersApi --project "src/Orders/Orders.Api/Orders.Api.csproj"
 
 # Terminal 3 - Customer Identity BC
 dotnet run --launch-profile CustomerIdentityApi --project "src/Customer Identity/CustomerIdentity.Api/CustomerIdentity.Api.csproj"
@@ -181,12 +181,12 @@ dotnet run --launch-profile StorefrontWeb --project "src/Customer Experience/Sto
 **Prerequisites:** Cart must have items from Steps 5-6.
 
 ### 7.1 Initiate Checkout
-1. Via HTTP: Open `src/Shopping Management/Shopping.Api/Shopping.Api.http`
+1. Via HTTP: Open `src/Shopping/Shopping.Api/Shopping.Api.http`
 2. Run **"Initiate Checkout"** request
 3. **Expected:** 200 OK, captures `CheckoutId`
 
 ### 7.2 Complete Checkout
-1. Open `src/Order Management/Orders.Api/Orders.Api.http`
+1. Open `src/Orders/Orders.Api/Orders.Api.http`
 2. Run these requests sequentially:
    - **"Provide Shipping Address"** → 204 No Content
    - **"Select Shipping Method"** → 204 No Content
@@ -308,7 +308,7 @@ dotnet run --launch-profile StorefrontWeb --project "src/Customer Experience/Sto
 **Alternative:**
 ```powershell
 $env:ASPNETCORE_URLS="http://localhost:5236"
-dotnet run --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"
+dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
 ```
 
 ### Issue: RabbitMQ connection refused

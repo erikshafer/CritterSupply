@@ -119,8 +119,8 @@ This directory contains comprehensive documentation for implementing Microsoft A
 ```bash
 # 10+ manual steps, 9-10 terminal windows
 docker-compose --profile all up -d
-dotnet run --project "src/Order Management/Orders.Api/Orders.Api.csproj"
-dotnet run --project "src/Payment Processing/Payments.Api/Payments.Api.csproj"
+dotnet run --project "src/Orders/Orders.Api/Orders.Api.csproj"
+dotnet run --project "src/Payments/Payments.Api/Payments.Api.csproj"
 # ... 7 more commands
 ```
 

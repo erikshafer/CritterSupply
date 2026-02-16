@@ -9,11 +9,11 @@
 
 | Current Folder             | Proposed Name   | Why Change?                                               |
 |----------------------------|-----------------|-----------------------------------------------------------|
-| `Order Management/`        | **Orders**      | Simpler, industry standard (Shopify Orders, Amazon Orders) |
-| `Payment Processing/`      | **Payments**    | Shorter, clearer (Stripe Payments, PayPal Payments)      |
-| `Shopping Management/`     | **Shopping**    | Allows future expansion, removes vague "Management"       |
-| `Inventory Management/`    | **Inventory**   | Simpler (though "Management" somewhat justified)          |
-| `Fulfillment Management/`  | **Fulfillment** | Industry standard (Amazon Fulfillment)                    |
+| `Orders/`        | **Orders**      | Simpler, industry standard (Shopify Orders, Amazon Orders) |
+| `Payments/`      | **Payments**    | Shorter, clearer (Stripe Payments, PayPal Payments)      |
+| `Shopping/`     | **Shopping**    | Allows future expansion, removes vague "Management"       |
+| `Inventory/`    | **Inventory**   | Simpler (though "Management" somewhat justified)          |
+| `Fulfillment/`  | **Fulfillment** | Industry standard (Amazon Fulfillment)                    |
 
 ---
 

@@ -32,11 +32,11 @@ docker-compose --profile all up -d
 sleep 10
 
 # Step 3: Start each API (8 commands)
-dotnet run --project "src/Order Management/Orders.Api/Orders.Api.csproj" &
-dotnet run --project "src/Payment Processing/Payments.Api/Payments.Api.csproj" &
-dotnet run --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj" &
-dotnet run --project "src/Inventory Management/Inventory.Api/Inventory.Api.csproj" &
-dotnet run --project "src/Fulfillment Management/Fulfillment.Api/Fulfillment.Api.csproj" &
+dotnet run --project "src/Orders/Orders.Api/Orders.Api.csproj" &
+dotnet run --project "src/Payments/Payments.Api/Payments.Api.csproj" &
+dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj" &
+dotnet run --project "src/Inventory/Inventory.Api/Inventory.Api.csproj" &
+dotnet run --project "src/Fulfillment/Fulfillment.Api/Fulfillment.Api.csproj" &
 dotnet run --project "src/Customer Identity/CustomerIdentity.Api/CustomerIdentity.Api.csproj" &
 dotnet run --project "src/Product Catalog/ProductCatalog.Api/ProductCatalog.Api.csproj" &
 dotnet run --project "src/Customer Experience/Storefront.Api/Storefront.Api.csproj" &

@@ -4,7 +4,7 @@
 
 ```
 ┌─────────────────────────────────────┐
-│     Order Management/               │  🎯 → Orders
+│     Orders/               │  🎯 → Orders
 │     (saga orchestration)            │
 └─────────────────────────────────────┘
            ↓ orchestrates
@@ -199,9 +199,9 @@ Product Catalog  ← Our term (emphasizes master data)
 
 **Current State:**
 ```
-src/Order Management/Orders/
-src/Payment Processing/Payments/
-src/Shopping Management/Shopping/
+src/Orders/Orders/
+src/Payments/Payments/
+src/Shopping/Shopping/
 ```
 
 **Proposed State (Future PR):**

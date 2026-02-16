@@ -30,11 +30,11 @@ dotnet test
 **Services to Start (Manual Testing):**
 ```bash
 # Terminal 1: Shopping API
-dotnet run --project "src/Shopping Management/Shopping.Api"
+dotnet run --project "src/Shopping/Shopping.Api"
 # Port: 5236
 
 # Terminal 2: Orders API
-dotnet run --project "src/Order Management/Orders.Api"
+dotnet run --project "src/Orders/Orders.Api"
 # Port: 5231
 
 # Terminal 3: Product Catalog API

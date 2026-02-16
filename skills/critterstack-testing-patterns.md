@@ -706,7 +706,7 @@ Should.Throw<InvalidOperationException>(() => payment.Process());
 
 ```
 tests/
-  Payment Processing/
+  Payments/
     Payments.IntegrationTests/
       Features/
         ProcessPaymentTests.cs

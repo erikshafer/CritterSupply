@@ -327,9 +327,9 @@ public static (Events, OutgoingMessages) Handle(
 - Update `skills/wolverine-message-handlers.md` with clear guidance on return types
 
 **Files Changed:**
-- `src/Shopping Management/Shopping/Cart/AddItemToCart.cs:26-41`
-- `src/Shopping Management/Shopping/Cart/RemoveItemFromCart.cs:20-32`
-- `src/Shopping Management/Shopping/Cart/ChangeItemQuantity.cs:26-43`
+- `src/Shopping/Shopping/Cart/AddItemToCart.cs:26-41`
+- `src/Shopping/Shopping/Cart/RemoveItemFromCart.cs:20-32`
+- `src/Shopping/Shopping/Cart/ChangeItemQuantity.cs:26-43`
 
 ---
 

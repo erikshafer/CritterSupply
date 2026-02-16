@@ -31,10 +31,10 @@ Should show `postgres` (port 5433) and `rabbitmq` (ports 5672, 15672).
 
 ```bash
 # Terminal 1 - Shopping BC
-dotnet run --launch-profile ShoppingApi --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"
+dotnet run --launch-profile ShoppingApi --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
 
 # Terminal 2 - Orders BC
-dotnet run --launch-profile OrdersApi --project "src/Order Management/Orders.Api/Orders.Api.csproj"
+dotnet run --launch-profile OrdersApi --project "src/Orders/Orders.Api/Orders.Api.csproj"
 
 # Terminal 3 - Customer Identity BC
 dotnet run --launch-profile CustomerIdentityApi --project "src/Customer Identity/CustomerIdentity.Api/CustomerIdentity.Api.csproj"

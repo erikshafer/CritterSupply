@@ -158,14 +158,14 @@ dotnet run
 docker-compose --profile all up -d
 
 # Start individual APIs manually
-dotnet run --project "src/Order Management/Orders.Api/Orders.Api.csproj"
+dotnet run --project "src/Orders/Orders.Api/Orders.Api.csproj"
 ```
 
 **Option C: Hybrid (Infrastructure only)**
 ```bash
 # Use Docker Compose for infra, run specific API via dotnet CLI
 docker-compose --profile all up -d
-dotnet run --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"
+dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
 ```
 
 ## Rationale

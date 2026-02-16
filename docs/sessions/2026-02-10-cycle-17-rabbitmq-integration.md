@@ -58,9 +58,9 @@ Content-Type: application/json
 ```
 
 **Files Changed:**
-- `src/Shopping Management/Shopping/Cart/InitializeCart.cs`
+- `src/Shopping/Shopping/Cart/InitializeCart.cs`
 - `skills/wolverine-message-handlers.md` (Pattern 3 - comprehensive documentation added)
-- `src/Shopping Management/Shopping.Api/Shopping.Api.http` (updated assertions for 201 + `response.body.value`)
+- `src/Shopping/Shopping.Api/Shopping.Api.http` (updated assertions for 201 + `response.body.value`)
 
 **Result:** ✅ Returns proper 201 Created with cart ID in body
 
@@ -126,7 +126,7 @@ Content-Type: application/json
 2. **Change Blazor UI** to use `c0000000-0000-0000-0000-000000000001`
 
 **Files to Check:**
-- `src/Shopping Management/Shopping.Api/Shopping.Api.http` (line 5: `@CustomerId`)
+- `src/Shopping/Shopping.Api/Shopping.Api.http` (line 5: `@CustomerId`)
 - `src/Customer Experience/Storefront.Web/...` (wherever customer ID is hardcoded)
 
 **Status:** ⚠️ NOT YET FIXED
@@ -197,13 +197,13 @@ docker ps
 **Terminal 1 - Shopping BC:**
 ```bash
 cd /path/to/CritterSupply
-dotnet run --launch-profile ShoppingApi --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"
+dotnet run --launch-profile ShoppingApi --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
 ```
 
 **Terminal 2 - Orders BC:**
 ```bash
 cd /path/to/CritterSupply
-dotnet run --launch-profile OrdersApi --project "src/Order Management/Orders.Api/Orders.Api.csproj"
+dotnet run --launch-profile OrdersApi --project "src/Orders/Orders.Api/Orders.Api.csproj"
 ```
 
 **Terminal 3 - Storefront BFF API (WATCH THIS ONE!):**
@@ -238,7 +238,7 @@ curl http://localhost:5236/health
 ## 📁 Key Files Modified This Session
 
 ### Code Changes
-- `src/Shopping Management/Shopping/Cart/InitializeCart.cs` - Fixed tuple order for 201 response
+- `src/Shopping/Shopping/Cart/InitializeCart.cs` - Fixed tuple order for 201 response
 - `src/Product Catalog/ProductCatalog.Api/Products/AddProduct.cs` - Fixed duplicate SKU handling
 - `tests/Product Catalog/ProductCatalog.Api.IntegrationTests/AddProductSteps.cs` - ScenarioContext fix
 
@@ -247,7 +247,7 @@ curl http://localhost:5236/health
 - `SESSION-SUMMARY-2026-02-10.md` - This file
 
 ### HTTP Files
-- `src/Shopping Management/Shopping.Api/Shopping.Api.http` - Updated assertions and Change Item Quantity request
+- `src/Shopping/Shopping.Api/Shopping.Api.http` - Updated assertions and Change Item Quantity request
 
 ---
 
