@@ -1,27 +1,31 @@
 # Implementation Guide: Addressing Architectural Review Concerns
 
-**Last Updated:** 2026-02-14  
+**Last Updated:** 2026-02-16  
 **Source:** [docs/ARCHITECTURAL-REVIEW.md](./ARCHITECTURAL-REVIEW.md)
 
 This document provides a prioritized roadmap for addressing the five architectural concerns identified in the comprehensive architectural review.
+
+**Update (2026-02-16):** Priorities revised based on feedback. Event sourcing + Wolverine transactional outbox provides excellent message durability, so RabbitMQ infrastructure concern is about operational visibility (MEDIUM), not reliability (HIGH).
 
 ---
 
 ## Priority Matrix
 
-| Priority | Concern                                        | Effort | Timeline           | Status      |
-|----------|------------------------------------------------|--------|--------------------|-------------|
-| **HIGH** | #1: Inconsistent RabbitMQ Infrastructure       | Medium | Before Production  | 📋 Planned   |
-| **MED**  | #2: Shared Database Instance                   | High   | Before Scaling     | 📋 Planned   |
-| **MED**  | #3: Synchronous HTTP in Shopping Context       | Medium | Before High Traffic| 📋 Planned   |
-| **L-M**  | #4: Limited Saga Compensation Logic            | Medium | Before Production  | 📋 Planned   |
-| **LOW**  | #5: BFF Coupled to Queue Names                 | Low    | Future Enhancement | 📋 Planned   |
+| Priority | Concern                                        | Effort | Timeline                        | Status      |
+|----------|------------------------------------------------|--------|---------------------------------|-------------|
+| **HIGH** | #4: Limited Saga Compensation Logic            | Medium | Before Production               | 📋 Planned   |
+| **MED**  | #1: Inconsistent RabbitMQ Infrastructure       | Medium | Before Operational Dashboards   | 📋 Planned   |
+| **MED**  | #2: Shared Database Instance                   | High   | Before Scaling                  | 📋 Planned   |
+| **MED**  | #3: Synchronous HTTP in Shopping Context       | Medium | Before High Traffic             | 📋 Planned   |
+| **LOW**  | #5: BFF Coupled to Queue Names                 | Low    | Future Enhancement              | 📋 Planned   |
 
 ---
 
-## Concern #1: Inconsistent RabbitMQ Infrastructure (HIGH PRIORITY)
+## Concern #1: Inconsistent RabbitMQ Infrastructure (MEDIUM PRIORITY)
 
 **ADR:** [0008-rabbitmq-configuration-consistency.md](./decisions/0008-rabbitmq-configuration-consistency.md)
+
+**Key Context:** Event sourcing + Wolverine transactional outbox provides excellent message durability. This concern is about operational visibility and explicit contracts, not reliability.
 
 ### Implementation Checklist
 
@@ -204,7 +208,7 @@ Choose your strategy:
 
 ---
 
-## Concern #4: Limited Saga Compensation Logic (LOW-MEDIUM PRIORITY)
+## Concern #4: Limited Saga Compensation Logic (HIGH PRIORITY)
 
 ### Implementation Checklist
 
@@ -269,11 +273,17 @@ Choose your strategy:
 
 ### Before Production (Critical Path)
 
-**Week 1:**
-1. Concern #1: RabbitMQ Infrastructure (7 hours)
-2. Concern #4: Saga Compensation (7 hours)
+**Priority 1: Saga Compensation (Financial Risk)**
+1. Concern #4: Saga Compensation Logic (7 hours) - **Prevents customer being charged without product delivery**
 
-**Total:** 14 hours (2 days)
+**Total:** 7 hours (1 day)
+
+### Before Operational Dashboards / Polyglot Integration
+
+**Priority 2: Messaging Visibility**
+2. Concern #1: RabbitMQ Infrastructure (7 hours) - **For operational visibility, not durability (event sourcing handles that)**
+
+**Total:** 7 hours (1 day)
 
 ### Before Horizontal Scaling
 

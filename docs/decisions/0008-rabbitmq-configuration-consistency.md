@@ -2,11 +2,14 @@
 
 **Status:** ⚠️ Proposed
 
-**Date:** 2026-02-14
+**Date:** 2026-02-14  
+**Updated:** 2026-02-16 (Priority revised based on event sourcing feedback)
 
 **Context:**
 
 Currently, only 3 of 7 bounded context APIs have RabbitMQ explicitly configured (Orders, Shopping, Storefront). The remaining contexts (Payments, Inventory, Fulfillment) rely on Wolverine's internal local queues and transactional outbox patterns without explicit RabbitMQ publishing configuration.
+
+**Important Update (2026-02-16):** These bounded contexts use **event sourcing with Marten**, which provides excellent message durability. Events are persisted to PostgreSQL, and Wolverine's `UseDurableOutboxOnAllSendingEndpoints()` ensures messages survive failures. **This is not a reliability concern**—it's about operational visibility and explicit contracts.
 
 **Current State:**
 
@@ -15,19 +18,20 @@ Currently, only 3 of 7 bounded context APIs have RabbitMQ explicitly configured 
 | **Orders**           | ✅ Yes             | `OrderPlaced` → `storefront-notifications`            |
 | **Shopping**         | ✅ Yes             | `ItemAdded`, `ItemRemoved`, `ItemQuantityChanged`     |
 | **Storefront (BFF)** | ✅ Yes             | (Consumer only)                                       |
-| **Payments**         | ❌ No              | Relies on Wolverine local queues                      |
-| **Inventory**        | ❌ No              | Relies on Wolverine local queues                      |
-| **Fulfillment**      | ❌ No              | Relies on Wolverine local queues                      |
+| **Payments**         | ❌ No              | Relies on Wolverine local queues + transactional outbox |
+| **Inventory**        | ❌ No              | Relies on Wolverine local queues + transactional outbox |
+| **Fulfillment**      | ❌ No              | Relies on Wolverine local queues + transactional outbox |
 
 **Problem:**
 
-While Wolverine's transactional outbox ensures message delivery within the .NET ecosystem, the lack of explicit RabbitMQ configuration creates several issues:
+While Wolverine's transactional outbox + event sourcing ensures message delivery and durability, the lack of explicit RabbitMQ configuration creates operational challenges:
 
-1. **Discoverability:** Other teams/services cannot see message flows in RabbitMQ management UI
-2. **Observability:** No visibility into message rates, queue depths, or dead-letter queues for Payments/Inventory/Fulfillment
-3. **Polyglot Integration:** Future non-.NET services cannot consume messages from these contexts
-4. **Horizontal Scaling:** Unclear message routing behavior when scaling to multiple instances
-5. **Operational Inconsistency:** Some BCs use RabbitMQ, others don't (confusing for operations teams)
+1. **Observability Gap:** Other teams/services cannot see message flows in RabbitMQ management UI (Wolverine handles internally)
+2. **Polyglot Integration:** Future non-.NET services cannot consume messages from these contexts without explicit exchanges
+3. **Operational Discoverability:** Requires inspecting .NET code to understand what messages are published
+4. **Standardization:** Inconsistent messaging approach across BCs (some use RabbitMQ, others don't)
+
+**Note on Message Durability:** The event-sourced architecture with Marten + Wolverine transactional outbox already provides excellent durability. This ADR is **not** about fixing a reliability issue.
 
 **Decision:**
 
@@ -225,7 +229,9 @@ opts.ListenToRabbitQueue("storefront-orders-events")
 
 **Total Effort:** ~7 hours
 
-**Priority:** HIGH (before production deployment)
+**Priority:** MEDIUM (before operational dashboards or polyglot integration)
+
+**Rationale for Priority:** The event-sourced architecture with Marten + Wolverine transactional outbox provides excellent message durability. This is not a reliability concern—it's about making implicit messaging contracts explicit for operational visibility and future extensibility.
 
 ---
 

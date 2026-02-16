@@ -17,12 +17,12 @@ However, as the system approaches production readiness, **five architectural con
 **Strengths:**
 - ✅ Clean bounded context separation with well-defined responsibilities
 - ✅ Event sourcing implemented correctly with Marten snapshots
-- ✅ Transactional outbox pattern used consistently
+- ✅ Transactional outbox pattern used consistently (excellent message durability)
 - ✅ Order saga properly orchestrates complex workflows
 - ✅ Separate schemas per bounded context (logical database separation)
 
 **Areas for Improvement:**
-- ⚠️ Inconsistent messaging infrastructure (RabbitMQ not enabled for critical contexts)
+- ⚠️ Inconsistent messaging infrastructure (operational visibility gap, not a durability issue)
 - ⚠️ Shared database instance (single point of failure, operational bottlenecks)
 - ⚠️ Synchronous HTTP coupling between Shopping and Customer Identity
 - ⚠️ Limited error handling and compensation in saga workflows
@@ -30,7 +30,7 @@ However, as the system approaches production readiness, **five architectural con
 
 ---
 
-## Concern #1: Inconsistent Messaging Infrastructure (HIGH PRIORITY)
+## Concern #1: Inconsistent Messaging Infrastructure (MEDIUM PRIORITY)
 
 ### The Issue
 
@@ -46,15 +46,17 @@ Only **3 of 7** bounded context APIs have RabbitMQ enabled:
 | **Fulfillment**      | ❌ **No**          | None configured     | ⚠️ **Limited** (Wolverine local handlers only) |
 | **CustomerIdentity** | ❌ **No**          | N/A                 | N/A (HTTP-only service) |
 
-**Current State:** Payments, Inventory, and Fulfillment contexts rely on **Wolverine's internal local queues** and transactional outbox, but **do not explicitly publish integration messages to RabbitMQ**. This works fine for intra-process communication but creates hidden coupling.
+**Current State:** Payments, Inventory, and Fulfillment contexts rely on **Wolverine's internal local queues** and transactional outbox, but **do not explicitly publish integration messages to RabbitMQ**. 
+
+**Important Note:** These bounded contexts use **event sourcing with Marten**, which provides excellent resilience. Events are durably persisted to PostgreSQL, and Wolverine's `UseDurableOutboxOnAllSendingEndpoints()` ensures messages survive failures. The concern here is **not about message durability** (which is solid), but about **operational visibility and explicit contracts**.
 
 ### Why This Matters
 
-1. **Discoverability:** Other teams/services cannot see what messages these contexts publish (no RabbitMQ exchanges/queues visible)
-2. **Resilience:** If Payments.Api crashes after handling `PaymentCaptured`, the `PaymentCaptured` integration message is not reliably delivered to Orders via RabbitMQ (relies on Wolverine's internal retry)
-3. **Observability:** RabbitMQ management UI doesn't show message flows for Payments → Orders, Inventory → Orders, Fulfillment → Orders
-4. **Polyglot Integration:** Future non-.NET services cannot consume messages from Payments/Inventory/Fulfillment (no RabbitMQ exchanges)
-5. **Horizontal Scaling:** If you scale Payments.Api to 3 instances, message routing becomes unclear without explicit queue configuration
+1. **Observability Gap:** RabbitMQ management UI doesn't show message flows for Payments → Orders, Inventory → Orders, Fulfillment → Orders (Wolverine handles it internally, but operations teams lose visibility)
+2. **Polyglot Integration:** Future non-.NET services cannot consume messages from Payments/Inventory/Fulfillment (no RabbitMQ exchanges exposed)
+3. **Operational Discoverability:** Other teams/services cannot easily see what messages these contexts publish without inspecting .NET code
+4. **Horizontal Scaling Clarity:** While Wolverine handles scaling correctly, explicit RabbitMQ configuration makes message distribution patterns more obvious
+5. **Standardization:** Inconsistent messaging approach across BCs (some use RabbitMQ, others don't) can confuse operations teams
 
 ### The Evidence
 
@@ -91,7 +93,9 @@ builder.Host.UseWolverine(opts =>
 
 **Action:** Enable RabbitMQ for Payments, Inventory, and Fulfillment APIs with explicit message routing.
 
-**Priority:** HIGH (before production deployment)
+**Priority:** MEDIUM (before polyglot integration or operational dashboards)
+
+**Key Insight:** The event-sourced foundation with Marten + Wolverine transactional outbox provides excellent message durability. This recommendation is about making implicit messaging contracts explicit for operational visibility and future extensibility, not about fixing a reliability issue.
 
 **Implementation:**
 
@@ -752,10 +756,10 @@ This ensures **exactly-once delivery semantics** (no duplicate messages, no lost
 
 | Priority | Concern                                        | Effort | Risk if Not Addressed       |
 |----------|------------------------------------------------|--------|-----------------------------|
-| **HIGH** | #1: Inconsistent RabbitMQ Infrastructure       | Medium | Hidden coupling, poor observability, scaling issues |
+| **HIGH** | #4: Limited Saga Compensation Logic            | Medium | Financial risk, stuck sagas, manual cleanup |
+| **MED**  | #1: Inconsistent RabbitMQ Infrastructure       | Medium | Operational visibility gap, polyglot integration blocked |
 | **MED**  | #2: Shared Database Instance                   | High   | Single point of failure, resource contention |
 | **MED**  | #3: Synchronous HTTP in Shopping Context       | Medium | Availability coupling, cascading failures |
-| **L-M**  | #4: Limited Saga Compensation Logic            | Medium | Financial risk, stuck sagas, manual cleanup |
 | **LOW**  | #5: BFF Coupled to Queue Names                 | Low    | Publisher/subscriber violation, future BFF complexity |
 
 ---
@@ -766,10 +770,11 @@ CritterSupply demonstrates a **solid foundation** for event-driven architecture 
 
 The five concerns identified are **not blockers** but rather **evolutionary improvements** that should be addressed as the system scales:
 
-1. **Before Production:** Address concerns #1 (RabbitMQ consistency) and #4 (saga compensation)
-2. **Before Horizontal Scaling:** Address concern #2 (shared database)
-3. **Before High Traffic:** Address concern #3 (synchronous coupling)
-4. **Future Enhancement:** Address concern #5 (BFF messaging pattern)
+1. **Before Production:** Address concern #4 (saga compensation logic) - highest financial risk
+2. **Before Horizontal Scaling:** Address concerns #1 (RabbitMQ standardization for operational visibility), #2 (database separation), and #3 (synchronous coupling mitigation)
+3. **Future Enhancement:** Address concern #5 (BFF messaging pattern - already partially addressed by #1)
+
+**Key Insight on Event Sourcing:** The event-sourced architecture with Marten + Wolverine transactional outbox provides excellent message durability. Concerns about messaging infrastructure are about operational visibility and explicit contracts, not reliability.
 
 **Overall Assessment:** This codebase is ready for production with minor enhancements. The architectural patterns are sound, and the concerns identified are typical of early-stage microservices systems that can be addressed incrementally.
 

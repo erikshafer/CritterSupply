@@ -44,15 +44,16 @@ The codebase demonstrates **strong fundamentals** with clear bounded context bou
 
 ## 🚨 Five Architectural Concerns
 
-### 1. Inconsistent RabbitMQ Infrastructure (HIGH PRIORITY)
+### 1. Inconsistent RabbitMQ Infrastructure (MEDIUM PRIORITY)
 
 **Problem:** Only 3 of 7 APIs have RabbitMQ explicitly configured (Orders, Shopping, Storefront). Payments, Inventory, and Fulfillment rely on Wolverine's internal queues without explicit message publishing.
 
+**Important Context:** These bounded contexts use **event sourcing with Marten**, providing excellent message durability. Events are persisted to PostgreSQL, and Wolverine's transactional outbox ensures messages survive failures. **This is not a reliability issue**—it's about operational visibility and explicit contracts.
+
 **Impact:**
-- Poor observability (can't see message flows in RabbitMQ UI)
+- Operational visibility gap (can't see message flows in RabbitMQ UI)
 - Can't integrate with non-.NET services
-- Unclear horizontal scaling behavior
-- Operational inconsistency across bounded contexts
+- Inconsistent messaging patterns across BCs
 
 **Recommendation:** Enable RabbitMQ for all BCs with fanout exchanges for pub/sub pattern.
 
@@ -94,7 +95,7 @@ The codebase demonstrates **strong fundamentals** with clear bounded context bou
 
 ---
 
-### 4. Limited Saga Compensation Logic (LOW-MEDIUM PRIORITY)
+### 4. Limited Saga Compensation Logic (HIGH PRIORITY)
 
 **Problem:** Order saga has incomplete compensation (rollback) logic for unhappy paths.
 
@@ -128,8 +129,10 @@ The codebase demonstrates **strong fundamentals** with clear bounded context bou
 ## Implementation Roadmap
 
 ### Before Production (Critical Path) - 2 Days
-1. ✅ Fix RabbitMQ infrastructure consistency (7 hours)
-2. ✅ Add saga compensation logic (7 hours)
+1. ✅ Add saga compensation logic (7 hours) - **Highest financial risk**
+
+### Before Operational Dashboards/Polyglot Integration - 1 Day
+2. ✅ Fix RabbitMQ infrastructure consistency (7 hours) - **For visibility, not durability**
 
 ### Before Horizontal Scaling - 1.5 Days
 3. ✅ Separate database instances (6.5 hours + testing)
@@ -138,7 +141,7 @@ The codebase demonstrates **strong fundamentals** with clear bounded context bou
 4. ✅ Add circuit breaker for HTTP calls (4 hours)
 
 ### Future Enhancement
-5. ✅ BFF messaging pattern (already addressed by #1)
+5. ✅ BFF messaging pattern (already addressed by #2)
 
 **Total Effort:** ~28 hours (3.5 days)
 
