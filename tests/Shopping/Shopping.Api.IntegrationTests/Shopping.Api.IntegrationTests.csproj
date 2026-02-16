@@ -23,7 +23,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\..\src\Shopping Management\Shopping.Api\Shopping.Api.csproj" />
+        <ProjectReference Include="..\..\..\src\Shopping\Shopping.Api\Shopping.Api.csproj" />
     </ItemGroup>
 
 </Project>

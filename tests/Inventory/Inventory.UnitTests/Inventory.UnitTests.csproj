@@ -23,7 +23,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\..\src\Inventory Management\Inventory\Inventory.csproj" />
+        <ProjectReference Include="..\..\..\src\Inventory\Inventory\Inventory.csproj" />
     </ItemGroup>
 
 </Project>

@@ -25,7 +25,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\..\src\Order Management\Orders\Orders.csproj" />
+        <ProjectReference Include="..\..\..\src\Orders\Orders\Orders.csproj" />
     </ItemGroup>
 
 </Project>
