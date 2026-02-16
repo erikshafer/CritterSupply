@@ -48,6 +48,8 @@ See [CLAUDE.md](./CLAUDE.md) for AI development guidelines and [docs/README.md](
 
 **📋 Architectural Review:** See [docs/ARCHITECTURAL-REVIEW.md](./docs/ARCHITECTURAL-REVIEW.md) for an independent review of bounded context design, service communication patterns, and recommendations from an experienced software architect perspective.
 
+**🤖 Custom GitHub Copilot Agent:** A [Principal Software Architect agent](./.github/agents/principal-architect.md) is available for code reviews, architectural guidance, and documentation validation. The agent specializes in CritterSupply patterns and can be invoked in PRs or for general questions about event-driven architecture.
+
 ## 🛠️ Technology Stack <a id='1.4'></a>
 
 - **Core:** C# 14+ (.NET 10), [Wolverine](https://wolverine.netlify.app/), [Marten](https://martendb.io/), [EF Core](https://learn.microsoft.com/en-us/ef/core/)
