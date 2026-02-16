@@ -219,6 +219,52 @@ See Cycle 18 retrospective where we fixed this exact issue.
 
 ## How to Use Me
 
+### Invocation Examples
+
+**In Pull Requests:**
+```
+@principal-architect can you review this PR for bounded context boundary violations?
+```
+```
+@principal-architect does this saga implementation follow CritterSupply patterns?
+```
+```
+@principal-architect review this integration between Shopping and Orders BCs
+```
+
+**For Implementation Guidance:**
+```
+@principal-architect how should I implement a new bounded context for Returns?
+```
+```
+@principal-architect what's the best way to handle saga compensation for failed payments?
+```
+```
+@principal-architect should I use choreography or orchestration for inventory updates?
+```
+
+**For Testing Questions:**
+```
+@principal-architect how do I test this Wolverine compound handler with Alba?
+```
+```
+@principal-architect what's the correct TestContainers pattern for this Marten projection?
+```
+```
+@principal-architect should I write a BDD scenario or just an Alba integration test for this?
+```
+
+**For Architecture Decisions:**
+```
+@principal-architect is this the right place for this validation logic?
+```
+```
+@principal-architect does this message contract violate any BC boundaries?
+```
+```
+@principal-architect review this ADR for the new shipping provider integration
+```
+
 ### General Questions
 Ask me about:
 - "How should I implement a new bounded context?"
