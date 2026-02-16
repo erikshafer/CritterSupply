@@ -48,7 +48,26 @@ See [CLAUDE.md](./CLAUDE.md) for AI development guidelines and [docs/README.md](
 
 **📋 Architectural Review:** See [docs/ARCHITECTURAL-REVIEW.md](./docs/ARCHITECTURAL-REVIEW.md) for an independent review of bounded context design, service communication patterns, and recommendations from an experienced software architect perspective.
 
-**🤖 Custom GitHub Copilot Agent:** A [Principal Software Architect agent](./.github/agents/principal-architect.md) is available for code reviews, architectural guidance, and documentation validation. The agent specializes in CritterSupply patterns and can be invoked in PRs or for general questions about event-driven architecture.
+### Custom Agents
+
+CritterSupply includes specialized GitHub Copilot agents with domain expertise to assist with development:
+
+- **👨‍💼 Principal Software Architect** ([`.github/agents/principal-architect.md`](./.github/agents/principal-architect.md)) - Expert in .NET, event-driven systems, distributed architecture, and the Critter Stack (Wolverine + Marten). Reviews code quality, system design, bounded context boundaries, and project trajectory with 15+ years of production experience.
+
+- **🏪 Product Owner** ([`.github/agents/product-owner.md`](./.github/agents/product-owner.md)) - E-commerce domain expert with 10+ years experience in vendor relations, product/inventory management, and marketplace channels. Provides business-focused feedback on event-driven workflows, bounded context boundaries, and how business processes translate into distributed architecture.
+
+**How to use:** Tag the agent (`@principal-architect` or `@product-owner`) in pull request or issue comments to get specialized feedback on architectural decisions, code quality, or business workflow validation.
+
+**Example prompts:**
+```
+@principal-architect Can you review the event sourcing implementation in this PR?
+
+@product-owner Does this order cancellation flow match real-world e-commerce policies?
+
+@principal-architect Is this bounded context boundary properly defined?
+
+@product-owner Should "BackorderRequested" be a separate event or extend "ReservationFailed"?
+```
 
 ## 🛠️ Technology Stack <a id='1.4'></a>
 
