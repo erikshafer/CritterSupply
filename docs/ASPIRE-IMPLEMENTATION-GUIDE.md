@@ -861,7 +861,7 @@ After implementation, verify:
 
 After successful Aspire implementation:
 
-1. **Update ADR 0008** - Change status from "Proposed" to "Accepted"
+1. **Update ADR 0009** - Change status from "Proposed" to "Accepted"
 2. **Document Developer Onboarding** - Add "Install Aspire workload" to setup guide
 3. **Create Video Tutorial** - Screen recording of Aspire dashboard walkthrough
 4. **Monitor for Issues** - Gather feedback from team on developer experience
@@ -875,4 +875,4 @@ After successful Aspire implementation:
 - [.NET Aspire Documentation](https://learn.microsoft.com/en-us/dotnet/aspire/)
 - [Service Discovery in Aspire](https://learn.microsoft.com/en-us/dotnet/aspire/service-discovery/overview)
 - [Aspire Components Gallery](https://learn.microsoft.com/en-us/dotnet/aspire/fundamentals/components-overview)
-- [ADR 0008: Aspire Integration](./decisions/0008-aspire-integration.md)
+- [ADR 0009: Aspire Integration](./decisions/0008-aspire-integration.md)

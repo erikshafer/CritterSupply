@@ -10,7 +10,7 @@ This directory contains comprehensive documentation for implementing Microsoft A
 | **[ASPIRE-IMPLEMENTATION-GUIDE.md](./ASPIRE-IMPLEMENTATION-GUIDE.md)** | Step-by-step technical instructions | Developers implementing Aspire |
 | **[ASPIRE-COMPARISON.md](./ASPIRE-COMPARISON.md)** | Workflow comparisons (Aspire vs Docker Compose) | All Team Members |
 | **[ASPIRE-ARCHITECTURE.md](./ASPIRE-ARCHITECTURE.md)** | Visual diagrams and architecture explanations | Architects, Developers |
-| **[ADR 0008](./decisions/0008-aspire-integration.md)** | Architectural decision record | Technical Leadership |
+| **[ADR 0009](./decisions/0008-aspire-integration.md)** | Architectural decision record | Technical Leadership |
 
 ---
 
@@ -72,7 +72,7 @@ This directory contains comprehensive documentation for implementing Microsoft A
 ---
 
 ### 📖 If you want the **full technical context and rationale**
-**Read:** [ADR 0008: Aspire Integration](./decisions/0008-aspire-integration.md)
+**Read:** [ADR 0009: Aspire Integration](./decisions/0008-aspire-integration.md)
 
 **What you'll learn:**
 - Why we're considering Aspire (context)
@@ -157,7 +157,7 @@ dotnet run
 ### Phase 4: Documentation (30 mins)
 - Update README.md with Aspire instructions
 - Update CLAUDE.md with Aspire patterns
-- Finalize ADR 0008 (change status to "Accepted")
+- Finalize ADR 0009 (change status to "Accepted")
 
 ---
 
@@ -192,7 +192,7 @@ dotnet run
 - **Total Line Changes:** ~50 lines added
 
 ### Documentation (Complete)
-- **ADR 0008** - Decision Record (13KB)
+- **ADR 0009** - Decision Record (13KB)
 - **Implementation Guide** - Step-by-Step (26KB)
 - **Executive Summary** - Stakeholder View (13KB)
 - **Comparison Guide** - Aspire vs Docker Compose (11KB)

@@ -1,4 +1,4 @@
-# ADR 0008: .NET Aspire v13.1 Integration
+# ADR 0009: .NET Aspire v13.1 Integration
 
 **Status:** ⚠️ Proposed
 

@@ -267,7 +267,7 @@ opts.UseRabbitMq(rabbit =>
 
 15. Update README.md with Aspire instructions
 16. Update CLAUDE.md with Aspire patterns
-17. Create ADR 0008 (Aspire Integration decision record)
+17. Create ADR 0009 (Aspire Integration decision record)
 18. Create ASPIRE-GUIDE.md (developer reference)
 
 ---
@@ -305,7 +305,7 @@ Implementation is complete when:
 
 ### Documentation
 
-1. **ADR 0008** - Aspire Integration decision record
+1. **ADR 0009** - Aspire Integration decision record
 2. **ASPIRE-IMPLEMENTATION-GUIDE.md** - Step-by-step instructions
 3. **ASPIRE-SUMMARY.md** - This executive summary (can be shared with stakeholders)
 4. **README.md** - Updated with Aspire quick start
@@ -374,7 +374,7 @@ After 2 weeks of Aspire usage, measure:
 
 ## 📚 References
 
-- **ADR 0008:** Aspire Integration Decision Record (`docs/decisions/0008-aspire-integration.md`)
+- **ADR 0009:** Aspire Integration Decision Record (`docs/decisions/0008-aspire-integration.md`)
 - **Implementation Guide:** Step-by-step instructions (`docs/ASPIRE-IMPLEMENTATION-GUIDE.md`)
 - **Official Docs:** [.NET Aspire Documentation](https://learn.microsoft.com/en-us/dotnet/aspire/)
 - **Aspire 13.1 Release:** [What's New](https://learn.microsoft.com/en-us/dotnet/aspire/whats-new/aspire-13)
