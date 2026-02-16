@@ -469,7 +469,7 @@ If you decide synchronous HTTP is acceptable:
 
 ---
 
-## Concern #4: Limited Saga Compensation Logic (LOW-MEDIUM PRIORITY)
+## Concern #4: Limited Saga Compensation Logic (HIGH PRIORITY)
 
 ### The Issue
 
@@ -517,7 +517,7 @@ public void Handle(ReservationFailed message)
 
 **Action:** Enhance saga with comprehensive compensation logic and timeout handling.
 
-**Priority:** LOW-MEDIUM (before production, but not blocking initial launch)
+**Priority:** HIGH (before production - highest financial risk)
 
 **Implementation Strategy:**
 
