@@ -56,7 +56,9 @@ CritterSupply includes specialized GitHub Copilot agents with domain expertise t
 
 - **🏪 Product Owner** ([`.github/agents/product-owner.md`](./.github/agents/product-owner.md)) - E-commerce domain expert with 10+ years experience in vendor relations, product/inventory management, and marketplace channels. Provides business-focused feedback on event-driven workflows, bounded context boundaries, and how business processes translate into distributed architecture.
 
-**How to use:** Tag the agent (`@principal-architect` or `@product-owner`) in pull request or issue comments to get specialized feedback on architectural decisions, code quality, or business workflow validation.
+- **🚀 DevOps Engineer** ([`.github/agents/devops-engineer.md`](./.github/agents/devops-engineer.md)) - DevOps/GitOps specialist with expertise in CI/CD orchestration, Infrastructure as Code (IaC), deployment strategies (blue/green, canary, rollback), GitHub Actions, Docker/Kubernetes, and observability (OpenTelemetry). Designs autonomous deployment pipelines with risk analysis and environment-aware strategy adaptation.
+
+**How to use:** Tag the agent (`@principal-architect`, `@product-owner`, or `@devops-engineer`) in pull request or issue comments to get specialized feedback on architectural decisions, code quality, business workflow validation, or deployment strategies.
 
 **Example prompts:**
 ```
@@ -64,9 +66,13 @@ CritterSupply includes specialized GitHub Copilot agents with domain expertise t
 
 @product-owner Does this order cancellation flow match real-world e-commerce policies?
 
+@devops-engineer How should we deploy this Orders BC refactor with zero downtime?
+
 @principal-architect Is this bounded context boundary properly defined?
 
 @product-owner Should "BackorderRequested" be a separate event or extend "ReservationFailed"?
+
+@devops-engineer Can you design a Helm chart for Kubernetes deployment?
 ```
 
 ## 🛠️ Technology Stack <a id='1.4'></a>
