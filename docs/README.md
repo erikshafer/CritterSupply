@@ -19,16 +19,16 @@ These are automatically discoverable by AI assistants through [CLAUDE.md](../CLA
 **[CYCLES.md](./planning/CYCLES.md)** - Active development cycle, recent completions, upcoming work
 
 **[cycles/](./planning/cycles/)** - Detailed per-cycle plans with objectives, deliverables, and completion criteria
-- [cycle-16-customer-experience.md](./planning/cycles/cycle-16-customer-experience.md) - Customer Experience BC (BFF + Blazor) - Current
-- _(More cycles to be added as they are completed)_
+- [cycle-18-customer-experience-phase-2.md](./planning/cycles/cycle-18-customer-experience-phase-2.md) - Customer Experience Enhancement (Phase 2) - ✅ Complete (2026-02-14)
+- [cycle-17-customer-identity-integration.md](./planning/cycles/cycle-17-customer-identity-integration.md) - Customer Identity Integration - ✅ Complete (2026-02-13)
+- [cycle-16-customer-experience.md](./planning/cycles/cycle-16-customer-experience.md) - Customer Experience BC (BFF + Blazor) - ✅ Complete (2026-02-05)
+- _(Earlier cycles documented in CYCLES.md)_
 
 **[BACKLOG.md](./planning/BACKLOG.md)** - Future work not yet scheduled
 
-**CI/CD Workflow Proposal (NEW - 2026-02-05):**
-- [Executive Summary](./planning/WORKFLOW_PROPOSAL_SUMMARY.md) - Quick overview of workflow improvements
-- [ADR 0007: GitHub Workflow Improvements](./decisions/0007-github-workflow-improvements.md) - Detailed 6-phase proposal
-- [Workflow Roadmap](./planning/WORKFLOW_ROADMAP.md) - Visual timeline and priorities
-- [Phase 1 Implementation Guide](./planning/phase-1-implementation-guide.md) - Step-by-step instructions
+**Infrastructure Initiatives:**
+- [CI/CD Planning](./planning/infrastructure/ci-cd/) - GitHub Actions workflow improvements and roadmap
+- [ADR 0007: GitHub Workflow Improvements](./decisions/0007-github-workflow-improvements.md) - 6-phase CI/CD modernization proposal
 
 ---
 
@@ -40,8 +40,9 @@ Lightweight records capturing **why** we made key architectural choices.
 - [0004: SSE over SignalR](./decisions/0004-sse-over-signalr.md) - Real-time updates for Customer Experience BC
 - [0005: MudBlazor UI Framework](./decisions/0005-mudblazor-ui-framework.md) - UI component library choice
 - [0006: Reqnroll BDD Framework](./decisions/0006-reqnroll-bdd-framework.md) - BDD testing approach
-- [0007: GitHub Workflow Improvements](./decisions/0007-github-workflow-improvements.md) - **NEW** 6-phase CI/CD roadmap
-- _(Historical ADRs to be backfilled for Cycles 1-15)_
+- [0007: GitHub Workflow Improvements](./decisions/0007-github-workflow-improvements.md) - 6-phase CI/CD roadmap
+- [0008: RabbitMQ Configuration Consistency](./decisions/0008-rabbitmq-configuration-consistency.md) - Explicit RabbitMQ publishing configuration
+- [0009: .NET Aspire v13.1 Integration](./decisions/0009-aspire-integration.md) - Local development orchestration with Aspire
 
 **When to Create an ADR:**
 - Technology selection decisions (SSE vs SignalR, EF Core vs Marten)
@@ -60,17 +61,10 @@ User-facing behavior in Given/When/Then format, organized by bounded context.
 - [checkout-flow.feature](./features/customer-experience/checkout-flow.feature) - Multi-step checkout wizard
 - [product-browsing.feature](./features/customer-experience/product-browsing.feature) - Product listing and detail pages
 
+**Product Catalog BC:**
+- [add-product.feature](./features/product-catalog/add-product.feature) - Product creation and management
+
 _(Feature files for other BCs to be added over time)_
-
----
-
-### [architecture/](./architecture/) - High-Level Overviews
-
-_(Reserved for future architecture diagrams and overviews)_
-
-- Bounded context map
-- Integration patterns
-- Saga orchestration flows
 
 ---
 
@@ -110,17 +104,14 @@ _(Reserved for future architecture diagrams and overviews)_
 
 ---
 
-## 🎯 Quick Links for Cycle 16
+## 🎯 Current Status
 
-**Current Cycle:** Customer Experience BC (BFF + Blazor)
+**Latest Completed Cycle:** Cycle 18 - Customer Experience Enhancement (Phase 2) - ✅ Complete (2026-02-14)
 
-- **Plan:** [cycle-16-customer-experience.md](./planning/cycles/cycle-16-customer-experience.md)
-- **Decision:** [ADR 0004: SSE over SignalR](./decisions/0004-sse-over-signalr.md)
-- **Features:**
-  - [cart-real-time-updates.feature](./features/customer-experience/cart-real-time-updates.feature)
-  - [checkout-flow.feature](./features/customer-experience/checkout-flow.feature)
-  - [product-browsing.feature](./features/customer-experience/product-browsing.feature)
+**Next Planned Cycle:** Cycle 19 - Authentication & Authorization
+
+See [CYCLES.md](./planning/CYCLES.md) for detailed progress tracking and cycle history.
 
 ---
 
-**Last Updated:** 2026-02-05
+**Last Updated:** 2026-02-16
