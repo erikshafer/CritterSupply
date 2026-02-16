@@ -11,9 +11,11 @@ This document defines the bounded contexts within CritterSupply, an e-commerce r
 
 This architectural decision ensures each BC has a well-defined purpose and reduces cognitive load for developers working in either context.
 
-## Shopping
+## Shopping (Folder: Shopping Management)
 
-The Shopping context owns the customer's pre-purchase experience—building a cart prior to order commitment. This BC focuses on the exploratory phase of shopping, before the customer commits to purchase. Checkout was migrated to Orders BC in Cycle 8 to establish clearer bounded context boundaries.
+The Shopping context owns the customer's pre-purchase experience—managing the cart lifecycle from initialization to checkout handoff. This BC focuses on the exploratory phase of shopping, before the customer commits to purchase. **Checkout was migrated to Orders BC in Cycle 8** to establish clearer boundaries: Shopping focuses on exploration (adding/removing items, building cart), while Orders owns transactional commitment (checkout → order placement).
+
+**Naming Note:** The folder is currently `Shopping Management/` but the BC is conceptually "Shopping" (simpler, allows future expansion to wishlists/product browsing). See `docs/BC-NAMING-ANALYSIS.md` for naming rationale.
 
 ### Aggregates
 
@@ -111,9 +113,11 @@ InitiateCheckout (command)
 
 ---
 
-## Orders
+## Orders (Folder: Order Management)
 
-The Orders context owns the commercial commitment and coordinates the lifecycle from checkout through delivery or cancellation. This BC contains two key aggregates: **Checkout** (order finalization) and **Order** (order lifecycle saga). Checkout was migrated from Shopping BC in Cycle 8 to establish clearer bounded context boundaries—Shopping focuses on exploration, Orders focuses on transaction commitment.
+The Orders context owns the commercial commitment and **orchestrates** the order lifecycle across Payments, Inventory, and Fulfillment using a stateful saga. It coordinates multi-step workflows from checkout through delivery or cancellation, ensuring eventual consistency across bounded contexts. This BC contains two key aggregates: **Checkout** (order finalization) and **Order** (order lifecycle saga). Checkout was migrated from Shopping BC in Cycle 8 to establish clearer bounded context boundaries—Shopping focuses on exploration, Orders focuses on transaction commitment.
+
+**Naming Note:** The folder is currently `Order Management/` but the BC is conceptually "Orders" (simpler, industry standard). See `docs/BC-NAMING-ANALYSIS.md` for naming rationale.
 
 ### Aggregates
 
@@ -282,9 +286,11 @@ RefundFailed (from Payments)
 
 ---
 
-## Payments
+## Payments (Folder: Payment Processing)
 
-The Payments context owns the financial transaction lifecycle—capturing funds, handling failures, and processing refunds. It knows how to talk to payment providers but doesn't know why a payment is happening.
+The Payments context owns the financial transaction lifecycle—capturing funds, handling failures, and processing refunds. It knows how to talk to payment providers (Stripe, PayPal, etc.) but doesn't know why a payment is happening or make business decisions about retries.
+
+**Naming Note:** The folder is currently `Payment Processing/` but the BC is conceptually "Payments" (simpler, industry standard like Stripe Payments API). See `docs/BC-NAMING-ANALYSIS.md` for naming rationale.
 
 ### What it receives
 
@@ -351,9 +357,11 @@ RefundRequested (from Orders)
 
 ---
 
-## Inventory
+## Inventory (Folder: Inventory Management)
 
-The Inventory context owns stock levels and availability. It answers "do we have it?" and manages the reservation flow that prevents overselling. Stock is tracked per warehouse/fulfillment center.
+The Inventory context owns stock levels and availability per warehouse. It implements a **two-phase reservation pattern** (soft holds → committed allocations) to prevent overselling while supporting cancellations and payment failures. Stock is never decremented until a reservation is committed. This BC answers "do we have it?" and ensures no overselling through carefully managed reservation workflows.
+
+**Naming Note:** The folder is currently `Inventory Management/` but the BC is conceptually "Inventory" (simpler, though "Management" is more justified here due to reservation complexity). See `docs/BC-NAMING-ANALYSIS.md` for naming rationale.
 
 ### What it receives
 
@@ -416,9 +424,11 @@ ReservationReleaseRequested (from Orders)
 
 ---
 
-## Fulfillment
+## Fulfillment (Folder: Fulfillment Management)
 
-The Fulfillment context owns the physical execution of getting items from warehouse to customer. It takes over once Orders has secured payment and committed inventory.
+The Fulfillment context owns the physical execution of getting items from warehouse to customer—picking, packing, shipping, and delivery tracking. It takes over once Orders has secured payment and committed inventory. This BC integrates with carriers for tracking numbers and manages warehouse/FC routing logic.
+
+**Naming Note:** The folder is currently `Fulfillment Management/` but the BC is conceptually "Fulfillment" (simpler, industry standard). See `docs/BC-NAMING-ANALYSIS.md` for naming rationale.
 
 ### What it receives
 
@@ -752,11 +762,11 @@ When Shopping BC completes checkout, it doesn't pass an `AddressId` to Orders BC
 
 ## Customer Experience
 
-The Customer Experience context owns the customer-facing frontend orchestration using the Backend-for-Frontend (BFF) pattern. This BC composes data from multiple domain BCs to optimize UI performance and provide a cohesive customer experience across web and future mobile channels.
+The Customer Experience context is a **stateless BFF (Backend-for-Frontend)** that composes views from multiple domain BCs (Shopping, Orders, Catalog, Customer Identity). It does NOT contain domain logic or persist data—all state lives in upstream BCs. Real-time updates are pushed to Blazor clients via Server-Sent Events (SSE). This BC optimizes UI performance and provides a cohesive customer experience across web and future mobile channels.
 
 **Status**: 🚧 In Progress (Cycle 16 - Phase 3 Complete, Backend Integration Next)
 
-### Architecture Pattern: Backend-for-Frontend (BFF)
+### Architecture Pattern: Backend-for-Frontend (BFF) - Stateless Composition
 
 **Why BFF?**
 - **Composition**: Aggregates data from multiple BCs for optimized frontend views
@@ -1168,7 +1178,9 @@ The Product Catalog context owns the master product data—SKUs, descriptions, i
 
 **Status**: ✅ Phase 1 Complete (Core CRUD) - 24/24 integration tests passing
 
-### Architecture: Read-Heavy, Query-Optimized
+### Architecture: Read-Heavy, Query-Optimized (NOT Event Sourced)
+
+**Unlike Orders, Payments, and Inventory, this BC uses Marten as a document store (NOT event sourced)** because product data is read-heavy with infrequent changes, and current state matters more than historical events.
 
 Product Catalog is a **read-heavy** BC with very different access patterns than transactional BCs like Orders or Payments:
 - **90%+ reads** - Product listing pages, search, detail pages
