@@ -305,7 +305,7 @@ Each API project needs to reference ServiceDefaults and call `AddServiceDefaults
 
 **Example for Orders.Api:**
 ```bash
-# Edit src/Order Management/Orders.Api/Orders.Api.csproj
+# Edit src/Orders/Orders.Api/Orders.Api.csproj
 ```
 
 ```xml
@@ -719,7 +719,7 @@ docker-compose --profile all up -d
 dotnet build
 
 # 3. Run specific BC (e.g., Orders)
-dotnet run --project "src/Order Management/Orders.Api/Orders.Api.csproj"
+dotnet run --project "src/Orders/Orders.Api/Orders.Api.csproj"
 
 # 4. Run Storefront
 dotnet run --project "src/Customer Experience/Storefront.Web/Storefront.Web.csproj"
@@ -786,7 +786,7 @@ If Aspire integration causes issues, rollback is straightforward:
 4. **Continue using Docker Compose:**
    ```bash
    docker-compose --profile all up -d
-   dotnet run --project "src/Order Management/Orders.Api/Orders.Api.csproj"
+   dotnet run --project "src/Orders/Orders.Api/Orders.Api.csproj"
    ```
 
 ## Troubleshooting

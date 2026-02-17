@@ -197,10 +197,10 @@ The .NET solution mirrors bounded context boundaries:
     <Project Path="tests/Customer Identity/Customers.IntegrationTests/..." />
   </Folder>
 
-  <Folder Name="/Order Management/">
-    <Project Path="src/Order Management/Orders/Orders.csproj" />
-    <Project Path="src/Order Management/Orders.Api/Orders.Api.csproj" />
-    <Project Path="tests/Order Management/Orders.IntegrationTests/..." />
+  <Folder Name="/Orders/">
+    <Project Path="src/Orders/Orders/Orders.csproj" />
+    <Project Path="src/Orders/Orders.Api/Orders.Api.csproj" />
+    <Project Path="tests/Orders/Orders.IntegrationTests/..." />
   </Folder>
 
   <Folder Name="/Shared/">
@@ -215,10 +215,10 @@ The .NET solution mirrors bounded context boundaries:
 src/
   Customer Identity/           # BC folder
     Customers/                 # Domain + API (single project)
-  Order Management/            # BC folder
+  Orders/                      # BC folder
     Orders/                    # Domain project
     Orders.Api/                # API project (separate)
-  Payment Processing/
+  Payments/
     Payments/
     Payments.Api/
   Shared/
@@ -227,7 +227,7 @@ src/
 tests/
   Customer Identity/
     Customers.IntegrationTests/
-  Order Management/
+  Orders/
     Orders.IntegrationTests/
     Orders.UnitTests/
 ```
@@ -279,10 +279,10 @@ tests/
       <ProjectName>.Api.IntegrationTests.csproj
 ```
 
-**Example:** Order Management BC
-- Domain: `src/Order Management/Orders/Orders.csproj`
-- API: `src/Order Management/Orders.Api/Orders.Api.csproj`
-- Tests: `tests/Order Management/Orders.Api.IntegrationTests/`
+**Example:** Orders BC
+- Domain: `src/Orders/Orders/Orders.csproj`
+- API: `src/Orders/Orders.Api/Orders.Api.csproj`
+- Tests: `tests/Orders/Orders.Api.IntegrationTests/`
 
 **Example:** Product Catalog BC
 - Domain: `src/Product Catalog/ProductCatalog/ProductCatalog.csproj`
@@ -295,7 +295,7 @@ tests/
 2. **API project name** = Base name + `.Api` suffix (e.g., `Orders.Api`, `ProductCatalog.Api`)
 3. **Test project name** = API project name + `.IntegrationTests` suffix
 4. **IMPORTANT:** When split, tests reference the **API project**, not the domain project
-5. **Folder names** can have spaces (e.g., `Order Management/`), but project names should not
+5. **Folder names** can have spaces (e.g., `Customer Identity/`), but project names should not
 
 ### When to Split Projects
 
@@ -314,16 +314,16 @@ tests/
 
 ❌ **Wrong:** Test project named after domain project when using split pattern
 ```
-src/Order Management/Orders/
-src/Order Management/Orders.Api/
-tests/Order Management/Orders.IntegrationTests/  # WRONG!
+src/Orders/Orders/
+src/Orders/Orders.Api/
+tests/Orders/Orders.IntegrationTests/  # WRONG!
 ```
 
 ✅ **Correct:** Test project named after API project
 ```
-src/Order Management/Orders/
-src/Order Management/Orders.Api/
-tests/Order Management/Orders.Api.IntegrationTests/  # CORRECT
+src/Orders/Orders/
+src/Orders/Orders.Api/
+tests/Orders/Orders.Api.IntegrationTests/  # CORRECT
 ```
 
 **Why?** Integration tests host the API project (which contains `Program.cs` and HTTP endpoints), not the domain project.

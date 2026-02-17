@@ -29,7 +29,7 @@ Open **4 PowerShell/Terminal windows** in Rider or Windows Terminal:
 ### Terminal 1 - Shopping BC
 ```powershell
 cd C:\Code\CritterSupply
-dotnet run --launch-profile ShoppingApi --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"
+dotnet run --launch-profile ShoppingApi --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
 ```
 ✅ Wait for: "Application started. Press Ctrl+C to shut down."
 ✅ Listening on: `http://localhost:5236`
@@ -37,7 +37,7 @@ dotnet run --launch-profile ShoppingApi --project "src/Shopping Management/Shopp
 ### Terminal 2 - Orders BC
 ```powershell
 cd C:\Code\CritterSupply
-dotnet run --launch-profile OrdersApi --project "src/Order Management/Orders.Api/Orders.Api.csproj"
+dotnet run --launch-profile OrdersApi --project "src/Orders/Orders.Api/Orders.Api.csproj"
 ```
 ✅ Wait for: "Application started. Press Ctrl+C to shut down."
 ✅ Listening on: `http://localhost:5231`
@@ -72,7 +72,7 @@ dotnet run --launch-profile StorefrontWeb --project "src/Customer Experience/Sto
 
 ## Step 3: Test Cart Operations via HTTP File
 
-Open Rider → `src/Shopping Management/Shopping.Api/Shopping.Api.http`
+Open Rider → `src/Shopping/Shopping.Api/Shopping.Api.http`
 
 ### 3.1 Create Cart
 Run: **`### 3.1 Create Cart for Customer`**

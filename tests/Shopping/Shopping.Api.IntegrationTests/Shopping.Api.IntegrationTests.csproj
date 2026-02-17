@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -6,13 +6,11 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Alba" />
         <PackageReference Include="coverlet.collector" />
-        <PackageReference Include="FluentValidation" />
-        <PackageReference Include="FsCheck" />
-        <PackageReference Include="FsCheck.Xunit" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" />
-        <PackageReference Include="NSubstitute" />
         <PackageReference Include="Shouldly" />
+        <PackageReference Include="Testcontainers.PostgreSql" />
         <PackageReference Include="xunit" />
         <PackageReference Include="xunit.runner.visualstudio">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -25,7 +23,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\..\src\Order Management\Orders\Orders.csproj" />
+        <ProjectReference Include="..\..\..\src\Shopping\Shopping.Api\Shopping.Api.csproj" />
     </ItemGroup>
 
 </Project>

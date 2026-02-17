@@ -215,7 +215,7 @@ Content-Type: application/json
 
 For detailed HTTP request examples, see:
 - `src/Customer Experience/Storefront.Api/Storefront.Api.http` - BFF endpoints
-- `src/Shopping Management/Shopping.Api/Shopping.Api.http` - Cart operations
-- `src/Order Management/Orders.Api/Orders.Api.http` - Checkout operations
+- `src/Shopping/Shopping.Api/Shopping.Api.http` - Cart operations
+- `src/Orders/Orders.Api/Orders.Api.http` - Checkout operations
 - `src/Customer Identity/CustomerIdentity.Api/CustomerIdentity.Api.http` - Customer/address management
 - `src/Product Catalog/Catalog.Api/Catalog.Api.http` - Product seeding

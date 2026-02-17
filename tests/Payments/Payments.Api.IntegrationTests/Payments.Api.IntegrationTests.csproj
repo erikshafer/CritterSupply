@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -21,11 +21,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Using Include="Xunit" />
+        <Using Include="Xunit"/>
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\..\src\Order Management\Orders.Api\Orders.Api.csproj" />
+        <ProjectReference Include="..\..\..\src\Payments\Payments.Api\Payments.Api.csproj" />
     </ItemGroup>
 
 </Project>

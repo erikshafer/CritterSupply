@@ -69,8 +69,8 @@ This ADR proposes a **phased approach** to modernizing the GitHub workflow to su
    on:
      pull_request:
        paths:
-         - 'src/Order Management/**'
-         - 'tests/Order Management/**'
+         - 'src/Orders/**'
+         - 'tests/Orders/**'
          - '.github/workflows/**'
    ```
 
@@ -131,11 +131,11 @@ jobs:
         with:
           filters: |
             orders:
-              - 'src/Order Management/**'
-              - 'tests/Order Management/**'
+              - 'src/Orders/**'
+              - 'tests/Orders/**'
             payments:
-              - 'src/Payment Processing/**'
-              - 'tests/Payment Processing/**'
+              - 'src/Payments/**'
+              - 'tests/Payments/**'
             frontend:
               - 'src/Customer Experience/**'
               - 'tests/Customer Experience/**'
@@ -205,15 +205,15 @@ jobs:
 
 1. **Add Dockerfiles** for each BC API project
    ```dockerfile
-   # Example: src/Order Management/Orders.Api/Dockerfile
+   # Example: src/Orders/Orders.Api/Dockerfile
    FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
    WORKDIR /app
    EXPOSE 8080
 
    FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
    WORKDIR /src
-   COPY ["src/Order Management/Orders.Api/Orders.Api.csproj", "Orders.Api/"]
-   COPY ["src/Order Management/Orders/Orders.csproj", "Orders/"]
+   COPY ["src/Orders/Orders.Api/Orders.Api.csproj", "Orders.Api/"]
+   COPY ["src/Orders/Orders/Orders.csproj", "Orders/"]
    COPY ["src/Shared/Messages.Contracts/Messages.Contracts.csproj", "Messages.Contracts/"]
    RUN dotnet restore "Orders.Api/Orders.Api.csproj"
    COPY . .
@@ -235,7 +235,7 @@ jobs:
      uses: docker/build-push-action@v5
      with:
        context: .
-       file: src/Order Management/Orders.Api/Dockerfile
+       file: src/Orders/Orders.Api/Dockerfile
        push: true
        tags: |
          ghcr.io/erikshafer/crittersupply-orders:latest

@@ -25,8 +25,8 @@ All `.http` files are located in their respective API project folders:
 
 | API | Location | Port |
 |-----|----------|------|
-| **Shopping** | `src/Shopping Management/Shopping.Api/Shopping.Api.http` | 5236 |
-| **Orders** | `src/Order Management/Orders.Api/Orders.Api.http` | 5231 |
+| **Shopping** | `src/Shopping/Shopping.Api/Shopping.Api.http` | 5236 |
+| **Orders** | `src/Orders/Orders.Api/Orders.Api.http` | 5231 |
 | **Customer Identity** | `src/Customer Identity/CustomerIdentity.Api/CustomerIdentity.Api.http` | 5235 |
 | **Product Catalog** | `src/Product Catalog/Catalog.Api/Catalog.Api.http` | 5133 |
 | **Storefront (BFF)** | `src/Customer Experience/Storefront.Api/Storefront.Api.http` | 5237 |
@@ -147,20 +147,20 @@ When running APIs with `dotnet run` from the command line, ASP.NET ignores `laun
 
 **Option 1: Run with launch profile (Recommended)**
 ```bash
-dotnet run --launch-profile ShoppingApi --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"
+dotnet run --launch-profile ShoppingApi --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
 ```
 
 **Option 2: Set environment variable**
 ```powershell
 # PowerShell
 $env:ASPNETCORE_URLS="http://localhost:5236"
-dotnet run --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"
+dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
 ```
 
 ```bash
 # Bash
 export ASPNETCORE_URLS="http://localhost:5236"
-dotnet run --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"
+dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
 ```
 
 **Option 3: Use IDE's run configuration**

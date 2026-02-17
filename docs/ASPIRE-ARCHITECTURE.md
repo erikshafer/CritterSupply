@@ -426,13 +426,13 @@ sequenceDiagram
 ```
 CritterSupply/
 ├── src/
-│   ├── Order Management/
+│   ├── Orders/
 │   │   ├── Orders/
 │   │   └── Orders.Api/
-│   ├── Payment Processing/
+│   ├── Payments/
 │   │   ├── Payments/
 │   │   └── Payments.Api/
-│   ├── Shopping Management/
+│   ├── Shopping/
 │   │   ├── Shopping/
 │   │   └── Shopping.Api/
 │   ├── ... (5 more BCs)
@@ -455,13 +455,13 @@ CritterSupply/
 │   ├── CritterSupply.ServiceDefaults/  ← NEW: Shared Aspire config
 │   │   ├── Extensions.cs
 │   │   └── CritterSupply.ServiceDefaults.csproj
-│   ├── Order Management/
+│   ├── Orders/
 │   │   ├── Orders/
 │   │   └── Orders.Api/  (references ServiceDefaults)
-│   ├── Payment Processing/
+│   ├── Payments/
 │   │   ├── Payments/
 │   │   └── Payments.Api/  (references ServiceDefaults)
-│   ├── Shopping Management/
+│   ├── Shopping/
 │   │   ├── Shopping/
 │   │   └── Shopping.Api/  (references ServiceDefaults)
 │   ├── ... (5 more BCs, all reference ServiceDefaults)

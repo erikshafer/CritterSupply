@@ -31,9 +31,9 @@ Implementing Microsoft Aspire v13.1 in CritterSupply is **feasible and recommend
 ```bash
 # 10+ manual steps to start development
 docker-compose --profile all up -d
-dotnet run --project "src/Order Management/Orders.Api/Orders.Api.csproj"
-dotnet run --project "src/Payment Processing/Payments.Api/Payments.Api.csproj"
-dotnet run --project "src/Shopping Management/Shopping.Api/Shopping.Api.csproj"
+dotnet run --project "src/Orders/Orders.Api/Orders.Api.csproj"
+dotnet run --project "src/Payments/Payments.Api/Payments.Api.csproj"
+dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
 # ... 6 more APIs + Blazor app (9 total commands)
 ```
 

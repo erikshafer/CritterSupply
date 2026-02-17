@@ -62,33 +62,33 @@
     <File Path="docs\features\customer-experience\checkout-flow.feature" />
     <File Path="docs\features\customer-experience\product-browsing.feature" />
   </Folder>
-  <Folder Name="/Order Management/">
-    <Project Path="src/Order Management/Orders.Api/Orders.Api.csproj" />
-    <Project Path="src/Order Management/Orders/Orders.csproj" />
-    <Project Path="tests/Order Management/Orders.Api.IntegrationTests/Orders.Api.IntegrationTests.csproj" />
-    <Project Path="tests/Order Management/Orders.UnitTests/Orders.UnitTests.csproj" />
+  <Folder Name="/Orders/">
+    <Project Path="src/Orders/Orders.Api/Orders.Api.csproj" />
+    <Project Path="src/Orders/Orders/Orders.csproj" />
+    <Project Path="tests/Orders/Orders.Api.IntegrationTests/Orders.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Orders/Orders.UnitTests/Orders.UnitTests.csproj" />
   </Folder>
-  <Folder Name="/Payment Processing/">
-    <Project Path="src/Payment Processing/Payments.Api/Payments.Api.csproj" />
-    <Project Path="src/Payment Processing/Payments/Payments.csproj" />
-    <Project Path="tests/Payment Processing/Payments.Api.IntegrationTests/Payments.Api.IntegrationTests.csproj" />
-    <Project Path="tests/Payment Processing/Payments.UnitTests/Payments.UnitTests.csproj" />
+  <Folder Name="/Payments/">
+    <Project Path="src/Payments/Payments.Api/Payments.Api.csproj" />
+    <Project Path="src/Payments/Payments/Payments.csproj" />
+    <Project Path="tests/Payments/Payments.Api.IntegrationTests/Payments.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Payments/Payments.UnitTests/Payments.UnitTests.csproj" />
   </Folder>
-  <Folder Name="/Fulfillment Management/">
-    <Project Path="src/Fulfillment Management/Fulfillment.Api/Fulfillment.Api.csproj" />
-    <Project Path="src/Fulfillment Management/Fulfillment/Fulfillment.csproj" />
-    <Project Path="tests/Fulfillment Management/Fulfillment.Api.IntegrationTests/Fulfillment.Api.IntegrationTests.csproj" />
+  <Folder Name="/Fulfillment/">
+    <Project Path="src/Fulfillment/Fulfillment.Api/Fulfillment.Api.csproj" />
+    <Project Path="src/Fulfillment/Fulfillment/Fulfillment.csproj" />
+    <Project Path="tests/Fulfillment/Fulfillment.Api.IntegrationTests/Fulfillment.Api.IntegrationTests.csproj" />
   </Folder>
-  <Folder Name="/Inventory Management/">
-    <Project Path="src/Inventory Management/Inventory.Api/Inventory.Api.csproj" />
-    <Project Path="src/Inventory Management/Inventory/Inventory.csproj" />
-    <Project Path="tests/Inventory Management/Inventory.Api.IntegrationTests/Inventory.Api.IntegrationTests.csproj" />
-    <Project Path="tests/Inventory Management/Inventory.UnitTests/Inventory.UnitTests.csproj" />
+  <Folder Name="/Inventory/">
+    <Project Path="src/Inventory/Inventory.Api/Inventory.Api.csproj" />
+    <Project Path="src/Inventory/Inventory/Inventory.csproj" />
+    <Project Path="tests/Inventory/Inventory.Api.IntegrationTests/Inventory.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Inventory/Inventory.UnitTests/Inventory.UnitTests.csproj" />
   </Folder>
-  <Folder Name="/Shopping Management/">
-    <Project Path="src/Shopping Management/Shopping.Api/Shopping.Api.csproj" />
-    <Project Path="src/Shopping Management/Shopping/Shopping.csproj" />
-    <Project Path="tests/Shopping Management/Shopping.Api.IntegrationTests/Shopping.Api.IntegrationTests.csproj" />
+  <Folder Name="/Shopping/">
+    <Project Path="src/Shopping/Shopping.Api/Shopping.Api.csproj" />
+    <Project Path="src/Shopping/Shopping/Shopping.csproj" />
+    <Project Path="tests/Shopping/Shopping.Api.IntegrationTests/Shopping.Api.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Customer Identity/">
     <Project Path="src/Customer Identity/CustomerIdentity.Api/CustomerIdentity.Api.csproj" />
