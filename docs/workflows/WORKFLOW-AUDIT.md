@@ -6,6 +6,29 @@
 
 ---
 
+## Detailed Workflow Documentation
+
+For in-depth workflow analysis of each bounded context, see:
+
+- **[Orders Workflows](./orders-workflows.md)** - Saga orchestration, checkout flow, compensation patterns
+- **[Shopping Workflows](./shopping-workflows.md)** - Cart lifecycle, checkout handoff to Orders
+- **[Inventory Workflows](./inventory-workflows.md)** - Two-phase reservation (Reserve → Commit → Release)
+- **[Payments Workflows](./payments-workflows.md)** - Two-phase payment (Authorize → Capture), refunds
+- **[Fulfillment Workflows](./fulfillment-workflows.md)** - Shipment lifecycle (Request → Assign → Dispatch → Deliver)
+- **[Customer Experience Workflows](./customer-experience-workflows.md)** - BFF pattern, SSE real-time updates
+- **[Customer Identity Workflows](./customer-identity-workflows.md)** - EF Core CRUD, address management
+- **[Product Catalog Workflows](./product-catalog-workflows.md)** - Marten document store CRUD operations
+
+Each document includes:
+- Mermaid sequence/state diagrams showing actual implementation
+- Current status tables (what's implemented vs what's missing)
+- Engineering gaps with priority levels (P0/P1/P2)
+- Business questions for Product Owner
+- Testing coverage analysis
+- Next steps roadmap by cycle
+
+---
+
 ## Executive Summary
 
 This document provides an engineering assessment of CritterSupply's current workflow implementations. It compares documented architecture (CONTEXTS.md) against actual code, identifies gaps in error handling and resilience patterns, and highlights areas needing business review.
