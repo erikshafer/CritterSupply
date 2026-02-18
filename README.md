@@ -162,6 +162,21 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 
 For detailed responsibilities, interactions, and event flows between contexts, see [CONTEXTS.md](./CONTEXTS.md).
 
+### 🔌 External Service Integration (Stripe)
+
+The Payments BC includes comprehensive documentation for integrating with Stripe's payment API as a reference implementation for third-party service integration in event-driven systems:
+
+- **Research Spike:** [`docs/planning/spikes/stripe-api-integration.md`](./docs/planning/spikes/stripe-api-integration.md) — Comprehensive overview of Stripe's API patterns, webhook integration, idempotency, and error handling
+- **ADR:** [`docs/decisions/0010-stripe-payment-gateway-integration.md`](./docs/decisions/0010-stripe-payment-gateway-integration.md) — Architectural decision record for webhook-driven payment processing
+- **Code Examples:** [`docs/examples/stripe/`](./docs/examples/stripe/) — Reference implementations for payment gateway and webhook handlers
+
+**Key Patterns Demonstrated:**
+- Two-phase commit (authorize → capture) aligned with Order saga
+- Webhook-driven event handling for eventual consistency
+- HMAC-SHA256 signature verification for security
+- Idempotency keys for safe retries
+- Event deduplication in distributed systems
+
 ## ⏩ How to Run <a id='5.0'></a>
 
 ### Requirements <a id='5.2'></a>
