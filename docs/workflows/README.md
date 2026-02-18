@@ -1,115 +1,201 @@
-# Workflow Audit - Complete Package
+# Workflow Documentation - North Star Package
 
 **Project:** CritterSupply E-Commerce Reference Architecture  
-**Date:** 2026-02-17  
-**Status:** ✅ Complete - Ready for Engineering Cycle 19 Planning  
-**DevOps Review:** ⚠️ Approved with Conditions
+**Date:** 2026-02-18 (Updated from 2026-02-17 audit)  
+**Status:** ✅ Complete - Comprehensive Workflow Specifications  
+**Purpose:** Architectural North Star for Remaining Implementation
 
 ---
 
 ## 📦 Documentation Package Contents
 
-This directory contains the complete workflow audit and Product Owner review for all CritterSupply bounded contexts.
+This directory contains comprehensive workflow documentation for CritterSupply's e-commerce system, including:
+- **Previous Audit (2026-02-17):** Gap analysis, PO decisions, infrastructure review
+- **NEW: North Star Documentation (2026-02-18):** Complete workflow specifications for unimplemented features
 
-### Executive Documents
+### 🆕 North Star Workflow Documentation (NEW - 2026-02-18)
 
-1. **[PO-REVIEW-SUMMARY.md](./PO-REVIEW-SUMMARY.md)** (14KB)
-   - Executive summary for business stakeholders
-   - 3 critical (P0) gaps
-   - 5 high-priority (P1) gaps
-   - 14 business questions
-   - Proposed Cycle 19-22+ roadmap
+**Total: 6 new documents (~155KB), 40+ workflows, 60+ events, 50+ integration messages**
 
-2. **[PO-DECISIONS.md](./PO-DECISIONS.md)** (10KB)
-   - Product Owner's business decisions
-   - All 14 business questions answered
-   - Approved roadmap with modifications
-   - SLA definitions
-   - Additional business requirements
+1. **[WORKFLOWS-MASTER.md](./WORKFLOWS-MASTER.md)** (11KB) - 🌟 **START HERE**
+   - Overview of all workflows
+   - Navigation guide for developers/architects/POs
+   - Architectural principles (event sourcing, sagas, integration patterns)
+   - Common e-commerce edge cases
+   - Visual notation reference
 
-3. **[WORKFLOW-AUDIT.md](./WORKFLOW-AUDIT.md)** (28KB)
-   - Complete engineering assessment
-   - RabbitMQ integration analysis
-   - Resilience pattern gaps
-   - Error handling analysis
-   - Testing coverage gaps
+2. **[ROADMAP-VISUAL.md](./ROADMAP-VISUAL.md)** (19KB) - 📊 **Visual Roadmap**
+   - Implementation phases with diagrams
+   - Current state (8/10 BCs complete)
+   - Integration message flow diagrams
+   - Event sourcing patterns reference
+   - Success metrics & prioritization
 
-4. **[DEVOPS-INFRASTRUCTURE-REVIEW.md](./DEVOPS-INFRASTRUCTURE-REVIEW.md)** (42KB)
-   - Infrastructure readiness assessment
-   - RabbitMQ durability configuration
-   - Monitoring & alerting strategy
-   - Load testing infrastructure
-   - Production deployment options (K8s vs VM)
-   - Budget estimates ($650-700/month)
-   - ⚠️ Approved with conditions
+3. **[authentication-workflows.md](./authentication-workflows.md)** (22KB) - 🟢 **CYCLE 19 (NEXT)**
+   - Customer login/logout
+   - Cookie-based authentication
+   - Protected routes
+   - Anonymous cart merge
+   - Session timeout (idle + absolute)
+   - **Status:** Ready to implement (2-3 sessions)
 
-### Detailed Workflow Documentation (with Mermaid Diagrams)
+4. **[returns-workflows.md](./returns-workflows.md)** (25KB) - 🔄 **Returns BC**
+   - Return request → refund lifecycle
+   - 6 workflows (happy path + 5 edge cases)
+   - 16 aggregate events
+   - Inspection workflows (approve/reject)
+   - Restocking + refund integration
+   - **Status:** Documented, ready for Cycle 21-22 (3-5 sessions)
 
-5. **[orders-workflows.md](./orders-workflows.md)** (19KB)
-   - Checkout flow (multi-step wizard)
-   - Order saga orchestration (state machine)
-   - Integration events (Inventory, Payments, Fulfillment)
-   - Compensation flows
-   - RabbitMQ partial adoption analysis
+5. **[vendor-identity-workflows.md](./vendor-identity-workflows.md)** (28KB) - 🏢 **Vendor Identity BC**
+   - Multi-tenant authentication
+   - Vendor onboarding (invitation-based)
+   - User management (Owner, Admin, Editor, Viewer roles)
+   - Password reset + 2FA (TOTP)
+   - EF Core implementation (like Customer Identity)
+   - **Status:** Documented, future (2-3 sessions)
 
-5. **[shopping-workflows.md](./shopping-workflows.md)** (22KB)
-   - Cart lifecycle (event-sourced aggregate)
-   - Cart operations (Initialize, Add, Remove, Change, Clear, Checkout)
-   - Real-time SSE integration
-   - Checkout handoff to Orders BC
+6. **[vendor-portal-workflows.md](./vendor-portal-workflows.md)** (32KB) - 🎯 **Vendor Portal BC**
+   - Product management (CRUD + approval workflows)
+   - Inventory management (bulk CSV import)
+   - Order fulfillment (vendor perspective)
+   - Analytics dashboard (sales metrics)
+   - 3 projections (ProductPerformanceSummary, InventorySnapshot, ChangeRequestStatus)
+   - **Status:** Documented, future (5-8 sessions)
 
-6. **[inventory-workflows.md](./inventory-workflows.md)** (18KB)
-   - Two-phase reservation pattern (Reserve → Commit → Release)
-   - ProductInventory aggregate
-   - Choreography integration with Orders BC
+7. **[bc-enhancements.md](./bc-enhancements.md)** (23KB) - ✨ **18 Enhancements**
+   - Shopping BC: Wishlist, search, abandoned cart, price drift
+   - Product Catalog: Hierarchical categories, recommendations, bulk import
+   - Customer Identity: Profile, payment methods, address validation
+   - Orders BC: Modifications, partial cancellation, reorder
+   - Inventory BC: Backorders, low stock alerts
+   - Fulfillment BC: Carrier integration, delivery failures
+   - Prioritization matrix (45-75 sessions total)
 
-7. **[payments-workflows.md](./payments-workflows.md)** (21KB)
-   - Two-phase payment flow (Authorize → Capture)
-   - Refund processing
-   - Payment gateway strategy pattern
-   - Stub vs production implementation
+### 🆕 BDD Feature Files (NEW - 2026-02-18)
 
-8. **[fulfillment-workflows.md](./fulfillment-workflows.md)** (19KB)
-   - Shipment lifecycle (Request → Assign → Dispatch → Deliver)
-   - Warehouse selection strategy
-   - Carrier API integration (EasyPost)
+8. **[../features/returns/return-request.feature](../features/returns/return-request.feature)** (2KB)
+   - 4 key scenarios: Happy path, restocking fee, denied (outside window), rejected after inspection
+   - Gherkin format for BDD testing
 
-9. **[customer-experience-workflows.md](./customer-experience-workflows.md)** (19KB)
-   - Backend-for-Frontend (BFF) pattern
-   - Server-Sent Events (SSE) real-time notifications
-   - EventBroadcaster channel-based pub/sub
-   - View composition from multiple BCs
-
-10. **[customer-identity-workflows.md](./customer-identity-workflows.md)** (22KB)
-    - EF Core relational model (NOT event sourced)
-    - Customer + Address CRUD operations
-    - AddressSnapshot pattern for Orders integration
-    - Address verification service (stub → SmartyStreets)
-
-11. **[product-catalog-workflows.md](./product-catalog-workflows.md)** (21KB)
-    - Marten document store (NOT event sourced)
-    - Product document model with value objects (Sku, ProductName)
-    - Category management
-    - Full-text search roadmap
+9. **[../features/vendor-portal/product-management.feature](../features/vendor-portal/product-management.feature)** (4KB)
+   - 7 scenarios: Add product, publish, change request approval, CSV import, order fulfillment, analytics
 
 ---
 
-## 🎯 Key Findings Summary
+### Previous Audit Documents (2026-02-17)
 
-### ✅ What's Working (Happy Paths)
+10. **[PO-REVIEW-SUMMARY.md](./PO-REVIEW-SUMMARY.md)** (14KB)
+    - Gap analysis (P0/P1/P2 priorities)
+    - 14 business questions answered
+    - Cycle 19-22+ roadmap approved
 
-- All 8 bounded contexts functional with 97.5% test success rate (158/162 passing)
-- Core workflows complete: Cart → Checkout → Order → Inventory → Payment → Fulfillment
+11. **[PO-DECISIONS.md](./PO-DECISIONS.md)** (10KB)
+    - Business decisions (saga timeout, retry policies, SLAs)
+
+12. **[WORKFLOW-AUDIT.md](./WORKFLOW-AUDIT.md)** (28KB)
+    - Engineering assessment of existing BCs
+    - RabbitMQ adoption gaps
+    - Resilience patterns needed
+
+13. **[DEVOPS-INFRASTRUCTURE-REVIEW.md](./DEVOPS-INFRASTRUCTURE-REVIEW.md)** (42KB)
+    - Infrastructure readiness
+    - Production deployment strategy
+    - Budget estimates ($650-700/month)
+
+### Detailed BC Workflow Documentation (Existing, for Reference)
+
+14-22. **Existing BC Workflows** (~170KB total)
+    - orders-workflows.md (19KB) - Saga orchestration, compensation flows
+    - shopping-workflows.md (22KB) - Cart lifecycle, SSE integration
+    - inventory-workflows.md (18KB) - Two-phase reservation
+    - payments-workflows.md (21KB) - Authorize/capture, refunds
+    - fulfillment-workflows.md (19KB) - Shipment tracking
+    - customer-experience-workflows.md (19KB) - BFF + SSE patterns
+    - customer-identity-workflows.md (22KB) - EF Core CRUD
+    - product-catalog-workflows.md (21KB) - Marten document store
+
+---
+
+## 🎯 Quick Start Guide
+
+**Brand New to CritterSupply?**
+
+1. Start with **[WORKFLOWS-MASTER.md](./WORKFLOWS-MASTER.md)** - Overview & navigation
+2. Review **[ROADMAP-VISUAL.md](./ROADMAP-VISUAL.md)** - Visual roadmap with diagrams
+3. Read **[PO-REVIEW-SUMMARY.md](./PO-REVIEW-SUMMARY.md)** - Current state + gaps
+
+**Ready to Implement Features?**
+
+- **Next Cycle (Cycle 19):** Read **[authentication-workflows.md](./authentication-workflows.md)**
+- **Returns BC (Cycle 21-22):** Read **[returns-workflows.md](./returns-workflows.md)**
+- **Vendor BCs (Future):** Read **[vendor-identity-workflows.md](./vendor-identity-workflows.md)** + **[vendor-portal-workflows.md](./vendor-portal-workflows.md)**
+
+**Planning Enhancements?**
+
+- Read **[bc-enhancements.md](./bc-enhancements.md)** - 18 enhancements with prioritization
+
+---
+
+## 📊 Documentation Statistics
+
+### Overall Package
+
+**Total Documentation:**
+- **Previous Audit (2026-02-17):** ~212KB (gap analysis, decisions, existing BCs)
+- **North Star Package (2026-02-18):** ~155KB (new workflows, enhancements, features)
+- **Combined Total:** ~367KB across 22 files
+
+**North Star Package Metrics:**
+- **6 workflow documents** (~155KB)
+- **40+ workflows** documented (happy path + edge cases)
+- **60+ business events** defined (aggregate events + integration messages)
+- **50+ integration messages** specified (cross-BC communications)
+- **10+ state diagrams** (Mermaid format)
+- **2 BDD feature files** (11 Gherkin scenarios)
+
+### By Bounded Context (NEW)
+
+| BC | Document | Workflows | Events | Messages | Effort |
+|---|---|---|---|---|---|
+| Authentication | authentication-workflows.md | 7 | N/A (cookies) | N/A | 2-3 sessions |
+| Returns | returns-workflows.md | 6 | 16 | 12 | 3-5 sessions |
+| Vendor Identity | vendor-identity-workflows.md | 6 | 14 | 8 | 2-3 sessions |
+| Vendor Portal | vendor-portal-workflows.md | 7 | 4 | 16 | 5-8 sessions |
+| Enhancements | bc-enhancements.md | 18 | Varies | Varies | 45-75 sessions |
+
+---
+
+## 🎯 Key Findings Summary (Consolidated)
+
+### ✅ What's Implemented (80% Complete)
+
+- **8 of 10 BCs complete** with 97.5% test success rate (158/162 passing)
+- Core workflows functional: Cart → Checkout → Order → Inventory → Payment → Fulfillment
 - Event sourcing with Marten for transactional BCs
 - Saga orchestration for order lifecycle
 - Real-time cart updates via SSE
 - Integration tests with Alba + TestContainers
+- **Strong foundation for remaining 20% of system**
 
-### 🔴 Critical Gaps (P0 - Blocking Production)
+### 🚧 What's Remaining (20%)
 
-1. **RabbitMQ Adoption Incomplete** - 5/8 BCs use local queues (data loss risk on restart)
+**Unimplemented BCs:**
+1. **Returns BC** - Documented, ready for Cycle 21-22 (3-5 sessions)
+2. **Vendor Identity BC** - Documented, future cycles (2-3 sessions)
+3. **Vendor Portal BC** - Documented, future cycles (5-8 sessions)
+
+**Critical Features:**
+4. **Authentication** - Cycle 19 (2-3 sessions) - **NEXT PRIORITY**
+5. **18 Enhancements** - Post-core (45-75 sessions total)
+
+### 🔴 Critical Gaps (P0 - From 2026-02-17 Audit)
+
+1. **RabbitMQ Adoption Incomplete** - 5/8 BCs use local queues (data loss risk)
 2. **Customer Isolation Missing** - SSE broadcasts to ALL customers (privacy breach)
-3. **Payment Refund Compensation Incomplete** - Saga doesn't handle RefundCompleted (stuck orders)
+3. **Payment Refund Compensation** - Saga doesn't handle RefundCompleted (stuck orders)
+
+**Status:** These P0 gaps should be addressed in Cycle 19 alongside authentication
 
 ### 🟡 High-Priority Gaps (P1 - Needed for Production)
 
