@@ -1,10 +1,17 @@
 # CritterSupply
 
+[![Build](https://github.com/erikshafer/CritterSupply/actions/workflows/dotnet.yml/badge.svg?branch=main)](https://github.com/erikshafer/CritterSupply/actions/workflows/dotnet.yml)
+[![.NET](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/10.0)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.x-FF6600?logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com/)
+
 ## 🤔 What Is This Repository? <a id='1.0'></a>
 
 This repository demonstrates how to build robust, production-ready, event-driven systems using a realistic e-commerce domain.
 
 It also serves as a reference architecture for idiomatically leveraging the "Critter Stack"—[Wolverine](https://github.com/JasperFx/wolverine) and [Marten](https://github.com/JasperFx/marten)—to supercharge your .NET development. These tools just get out of your way so you can focus on the actual business problems at hand.
+
+**Best suited for:** .NET developers learning event sourcing and CQRS, architects evaluating the Critter Stack for production use, and teams transitioning from monolithic to event-driven architectures.
 
 ### 🛒 Ecommerce <a id='1.1'></a>
 
@@ -27,12 +34,12 @@ A non-exhaustive list of the patterns, paradigms, and principles demonstrated in
 - Stateful Sagas (Order orchestration)
 - Inbox Pattern (guaranteed message processing)
 - Outbox Pattern (reliable message publishing)
-- Reservation-based Workflows (inventory management)
+- Reservation-based Workflows (Inventory management)
 - Choreography vs Orchestration (BC integration patterns)
-- Snapshot Pattern (temporal consistency for addresses)
+- Snapshot Pattern (temporal consistency — e.g., address captured at order placement)
 - Backend-for-Frontend (BFF) Pattern (Customer Experience)
 - Vertical Slice Architecture (VSA)
-- Behavior-Driven Development (BDD)
+- Behavior-Driven Development (BDD) with Reqnroll (Product Catalog BC — reference implementation)
 - Domain-Driven Design (DDD)
 - Traditional DDD with EF Core (Customer Identity)
 - A-Frame Architecture (pure business logic)
@@ -155,7 +162,7 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 | 🚚 **Fulfillment** | Picking, packing, shipping                     | ✅ Complete |
 | 👤 **Customer Identity**   | Addresses and saved payment methods            | ✅ Complete |
 | 📦 **Product Catalog**     | Product definitions and pricing                | ✅ Complete |
-| 🎁 **Customer Experience** | Storefront BFF (Blazor + SSE)                  | 🚧 In Progress |
+| 🎁 **Customer Experience** | Storefront BFF (Blazor + SSE)                  | ✅ Complete |
 | 🏢 **Vendor Identity**     | Vendor user authentication & tenant management | 🔜 Planned |
 | 📊 **Vendor Portal**       | Vendor analytics, insights, change requests    | 🔜 Planned |
 | 🔄 **Returns**             | Return authorization and processing            | 🔜 Planned |
