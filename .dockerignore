@@ -23,3 +23,17 @@
 **/values.dev.yaml
 LICENSE
 README.md
+
+# Exclude test projects (not needed in production images)
+tests/
+**/*.Tests/
+**/*.IntegrationTests/
+**/*.UnitTests/
+
+# Exclude documentation (reduces build context size)
+docs/
+**/*.md
+!README.md
+
+# Exclude GitHub workflows
+.github/

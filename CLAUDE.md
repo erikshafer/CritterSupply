@@ -365,6 +365,136 @@ builder.Host.UseWolverine(opts =>
 
 ---
 
+## Docker Development
+
+CritterSupply supports both **native** and **containerized** development workflows.
+
+### Native Development (Default - Recommended)
+
+**Start infrastructure only:**
+```bash
+docker-compose --profile infrastructure up -d
+```
+
+**Why native development?**
+- ✅ Faster hot reload during code changes
+- ✅ Easier debugging (F5 in Rider/Visual Studio)
+- ✅ Lower memory footprint (~200MB per API vs ~100-200MB base + app overhead in container)
+- ✅ IDE tooling works seamlessly (profilers, diagnostics, live unit testing)
+- ✅ No Docker volume mount performance issues on Windows
+
+**When to use:** Daily feature development, debugging, iterative coding
+
+---
+
+### Containerized Development
+
+**Start all services (infrastructure + 8 APIs + Blazor web):**
+```bash
+docker-compose --profile all up --build
+```
+
+**Start selective services:**
+```bash
+# Infrastructure + specific BCs
+docker-compose --profile infrastructure --profile orders --profile shopping up
+
+# Infrastructure + all APIs (no Blazor web)
+docker-compose --profile infrastructure --profile orders --profile payments --profile inventory --profile fulfillment --profile customeridentity --profile shopping --profile catalog --profile storefront up
+```
+
+**Why containerized development?**
+- ✅ Onboarding new developers (no .NET SDK required on host)
+- ✅ Demonstrating full system to stakeholders
+- ✅ Integration testing across multiple BCs
+- ✅ Simulating production-like networking
+- ✅ CI/CD pipeline consistency (same containers in dev/staging/prod)
+
+**When to use:** Onboarding, demos, cross-BC integration testing, CI/CD validation
+
+---
+
+### Docker Compose Profiles
+
+| Profile | Services Started | Use Case |
+|---------|------------------|----------|
+| `infrastructure` | Postgres + RabbitMQ | Native development (default) |
+| `all` | All infrastructure + 8 APIs + Blazor web | Full system demo, onboarding |
+| `orders` | Orders.Api | Selective service testing |
+| `payments` | Payments.Api | Selective service testing |
+| `inventory` | Inventory.Api | Selective service testing |
+| `fulfillment` | Fulfillment.Api | Selective service testing |
+| `customeridentity` | CustomerIdentity.Api | Selective service testing |
+| `shopping` | Shopping.Api | Selective service testing |
+| `catalog` | ProductCatalog.Api | Selective service testing |
+| `storefront` | Storefront.Api | Selective service testing |
+| `ci` | Infrastructure only | CI/CD pipelines |
+
+**Combine profiles:**
+```bash
+docker-compose --profile infrastructure --profile orders up
+```
+
+---
+
+### Dockerfile Maintenance
+
+**When to rebuild container images:**
+- After modifying `Directory.Packages.props` (package version changes)
+- After adding/removing project references
+- After modifying `Program.cs` or DI registrations
+- After changing Marten/Wolverine configuration
+
+**Force rebuild:**
+```bash
+docker-compose --profile all up --build
+```
+
+**Clean build (remove cached layers):**
+```bash
+docker-compose --profile all build --no-cache
+```
+
+---
+
+### Connection String Differences
+
+**IMPORTANT:** Connection strings differ between native and containerized development.
+
+| Environment | Postgres Host | Postgres Port | RabbitMQ Host | RabbitMQ Port |
+|-------------|---------------|---------------|---------------|---------------|
+| **Native Development** | `localhost` | `5433` | `localhost` | `5672` |
+| **Containerized** | `postgres` | `5432` | `rabbitmq` | `5672` |
+
+**Why?**
+- **Native:** APIs run on host, connect to containerized Postgres/RabbitMQ via localhost:5433
+- **Containerized:** APIs run in containers, use Docker service names (`postgres`, `rabbitmq`) for inter-container communication
+
+**Implementation:**
+- `appsettings.json` uses `localhost:5433` (native default)
+- `docker-compose.yml` overrides connection strings with environment variables (`postgres:5432`)
+
+---
+
+### Troubleshooting
+
+**Problem:** Container builds fail with "file not found" errors
+**Solution:** Ensure `.dockerignore` excludes `bin/`, `obj/`, `tests/` folders
+
+**Problem:** Containers start but APIs return 500 errors
+**Solution:** Check connection strings in `docker-compose.yml` environment variables
+
+**Problem:** Hot reload doesn't work in containers
+**Solution:** Use native development for iterative coding. Containers are for demos/integration testing.
+
+**Problem:** Ports already in use
+**Solution:** Stop other containers or change port mappings in `docker-compose.yml`
+
+**Problem:** High memory usage with all containers
+**Solution:** Use selective profiles or native development. Full stack requires ~2-3GB RAM.
+
+---
+
 ## Skill Invocation Guide
 
 Skills provide detailed patterns and examples. Read the appropriate skill **before** implementing.
