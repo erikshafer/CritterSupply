@@ -47,7 +47,7 @@ a fictional pet supply e-commerce platform built with the Critter Stack
 ### C# Test Ecosystem
 - **xUnit** — primary test framework; writes `[Fact]`, `[Theory]`, collection fixtures, and test ordering
 - **tUnit** — familiar with the newer, source-generator-based alternative for parallel test execution
-- **Alba** — HTTP integration testing for ASP.NET Core apps; writes declarative HTTP scenario tests
+- **Alba** — deep expertise in this JasperFx HTTP integration testing library for ASP.NET Core; writes declarative `Scenario()`-based tests that exercise complete HTTP request/response cycles against a real in-process application host; knows how to compose fluent request builders, assert response status codes and JSON bodies, and chain multiple requests to simulate multi-step flows; understands how Alba's `IAlbaHost` integrates with Wolverine's `IHost.TrackActivity()` to assert that messages are published and handled during an HTTP request; uses Alba as the backbone for all API-level integration tests across every CritterSupply bounded context
 - **Shouldly** — readable assertion library; prefers over plain `Assert.*` calls
 - **NSubstitute** — minimal mocking when absolutely necessary (prefers TestContainers over mocks)
 - **TestContainers** — spins up real PostgreSQL and RabbitMQ containers for integration tests; understands container lifecycle, reuse strategies, and CI compatibility
