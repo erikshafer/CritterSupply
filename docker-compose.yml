@@ -1,31 +1,232 @@
 services:
+  # ===== INFRASTRUCTURE SERVICES =====
   postgres:
     container_name: crittersupply-postgres
     image: postgres:latest
     ports:
       - "5433:5432"
     environment:
-      - POSTGRES_DATABASE=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      POSTGRES_DATABASE: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     networks:
-      - pg_network
-    profiles: [ all, ci ]
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles: [infrastructure, all, ci]
 
   rabbitmq:
     container_name: crittersupply-rabbitmq
-    image: "rabbitmq:management"
+    image: rabbitmq:management
     ports:
       - "5672:5672"
       - "15672:15672"
     networks:
-      - rmq_network
-    profiles: [ all, ci ]
+      - backend
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles: [infrastructure, all, ci]
+
+  # ===== BOUNDED CONTEXT APIS =====
+  orders-api:
+    container_name: crittersupply-orders
+    build:
+      context: .
+      dockerfile: src/Orders/Orders.Api/Dockerfile
+    ports:
+      - "5231:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
+      Wolverine__RabbitMQ__Host: rabbitmq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    profiles: [all, orders]
+
+  payments-api:
+    container_name: crittersupply-payments
+    build:
+      context: .
+      dockerfile: src/Payments/Payments.Api/Dockerfile
+    ports:
+      - "5232:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
+      Wolverine__RabbitMQ__Host: rabbitmq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    profiles: [all, payments]
+
+  inventory-api:
+    container_name: crittersupply-inventory
+    build:
+      context: .
+      dockerfile: src/Inventory/Inventory.Api/Dockerfile
+    ports:
+      - "5233:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
+      Wolverine__RabbitMQ__Host: rabbitmq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    profiles: [all, inventory]
+
+  fulfillment-api:
+    container_name: crittersupply-fulfillment
+    build:
+      context: .
+      dockerfile: src/Fulfillment/Fulfillment.Api/Dockerfile
+    ports:
+      - "5234:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
+      Wolverine__RabbitMQ__Host: rabbitmq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    profiles: [all, fulfillment]
+
+  customeridentity-api:
+    container_name: crittersupply-customeridentity
+    build:
+      context: .
+      dockerfile: src/Customer Identity/CustomerIdentity.Api/Dockerfile
+    ports:
+      - "5235:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__postgres: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
+      Wolverine__RabbitMQ__Host: rabbitmq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    profiles: [all, customeridentity]
+
+  shopping-api:
+    container_name: crittersupply-shopping
+    build:
+      context: .
+      dockerfile: src/Shopping/Shopping.Api/Dockerfile
+    ports:
+      - "5236:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
+      Wolverine__RabbitMQ__Host: rabbitmq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    profiles: [all, shopping]
+
+  productcatalog-api:
+    container_name: crittersupply-catalog
+    build:
+      context: .
+      dockerfile: src/Product Catalog/ProductCatalog.Api/Dockerfile
+    ports:
+      - "5133:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
+      Wolverine__RabbitMQ__Host: rabbitmq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    profiles: [all, catalog]
+
+  storefront-api:
+    container_name: crittersupply-storefront-api
+    build:
+      context: .
+      dockerfile: src/Customer Experience/Storefront.Api/Dockerfile
+    ports:
+      - "5237:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
+      Wolverine__RabbitMQ__Host: rabbitmq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    profiles: [all, storefront]
+
+  storefront-web:
+    container_name: crittersupply-storefront-web
+    build:
+      context: .
+      dockerfile: src/Customer Experience/Storefront.Web/Dockerfile
+    ports:
+      - "5238:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ApiClients__ShoppingApiUrl: http://shopping-api:8080
+      ApiClients__OrdersApiUrl: http://orders-api:8080
+      ApiClients__CatalogApiUrl: http://productcatalog-api:8080
+      ApiClients__StorefrontApiUrl: http://storefront-api:8080
+    depends_on:
+      - orders-api
+      - shopping-api
+      - productcatalog-api
+      - storefront-api
+    networks:
+      - backend
+    profiles: [all]
 
 networks:
-  pg_network:
-    driver: bridge
-  rmq_network:
+  backend:
     driver: bridge
 
 volumes:

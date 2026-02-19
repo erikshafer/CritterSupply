@@ -188,11 +188,11 @@ This software solution has multiple dependencies that need to be running locally
 
 ### 🛠️ Local Development <a id='5.3'></a>
 
-#### Quick Start
+#### Quick Start (Native Development - Recommended)
 
 ```bash
-# 1. Start infrastructure (Postgres + RabbitMQ)
-docker-compose --profile all up -d
+# 1. Start infrastructure only (Postgres + RabbitMQ)
+docker-compose --profile infrastructure up -d
 
 # 2. Build the solution
 dotnet build
@@ -205,9 +205,53 @@ dotnet run --project "src/Customer Experience/Storefront.Web/Storefront.Web.cspr
 # Navigate to http://localhost:5238
 ```
 
-#### Run Individual Bounded Contexts
+**Why native development?**
+- Faster hot reload during code changes
+- Easier debugging (F5 in Rider/Visual Studio)
+- Lower memory footprint
+- IDE tooling works seamlessly
 
-Each BC can be run independently. See [CLAUDE.md](./CLAUDE.md) for port allocations and detailed run commands.
+#### Fully Containerized Development
+
+Run all services (infrastructure + 8 APIs + Blazor web) in Docker containers:
+
+```bash
+# Start entire stack
+docker-compose --profile all up --build
+
+# Navigate to http://localhost:5238 (Storefront.Web)
+# API endpoints available at their respective ports (5231-5238, 5133)
+```
+
+**When to use containerized development:**
+- Onboarding new developers (no .NET SDK required)
+- Demonstrating full system to stakeholders
+- Integration testing across multiple BCs
+- Simulating production-like networking
+
+**Selective service startup:**
+
+```bash
+# Infrastructure + specific BCs
+docker-compose --profile infrastructure --profile orders --profile shopping up
+
+# Infrastructure only (default for native development)
+docker-compose --profile infrastructure up -d
+```
+
+**Stop and cleanup:**
+
+```bash
+# Stop all containers
+docker-compose --profile all down
+
+# Stop and remove volumes (fresh start)
+docker-compose --profile all down -v
+```
+
+#### Run Individual Bounded Contexts (Native)
+
+Each BC can be run independently with `dotnet run`. See [CLAUDE.md](./CLAUDE.md) for port allocations and detailed run commands.
 
 ```bash
 # Examples:
