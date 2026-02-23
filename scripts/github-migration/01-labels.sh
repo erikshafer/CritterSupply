@@ -113,7 +113,10 @@ label "status:planned"          "c5def5" "Scheduled for an upcoming cycle"
 label "status:in-progress"      "fbca04" "Currently being worked on"
 label "status:blocked"          "d73a4a" "Blocked — waiting on dependency"
 label "status:deferred"         "cccccc" "Intentionally deferred to a future cycle"
-label "status:ready-for-review" "0075ca" "Implementation complete, awaiting review"
+
+# Note: status:ready-for-review is for ISSUES that need review before implementation
+# (e.g., spike results, RFC, ADR proposals). It is NOT for PR review status.
+label "status:ready-for-review" "0075ca" "Implementation complete, awaiting review (for Issues, not PRs)"
 
 # ---------------------------------------------------------------------------
 # Business Value labels  (prefix: value:)

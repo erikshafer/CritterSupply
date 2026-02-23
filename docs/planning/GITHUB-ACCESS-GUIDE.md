@@ -50,11 +50,22 @@ AI agents and the Product Owner need a GitHub Personal Access Token (PAT) to cre
 
 ### Required PAT Scopes
 
-| Scope | Why Needed |
-|---|---|
-| `repo` | Read/write access to issues, labels, milestones, and code |
-| `project` | Read/write access to GitHub Projects v2 |
-| `read:org` *(optional)* | Needed if the repo moves to a GitHub org |
+⚠️ **Security Note:** Use **fine-grained PATs** (not classic) to limit access to only this repository.
+
+| Scope | Why Needed | Risk if Compromised |
+|---|---|---|
+| `repo` (classic) OR Issues/PRs/Metadata (fine-grained) | Read/write access to issues, labels, milestones | ⚠️ Attacker can modify any repo you have access to (classic) OR only CritterSupply (fine-grained) |
+| `project` (classic) OR Projects (fine-grained) | Read/write access to GitHub Projects v2 | ⚠️ Attacker can modify project boards |
+| `read:org` *(optional)* | Needed if the repo moves to a GitHub org | Low risk (read-only org metadata) |
+
+**Recommendation:** Use **fine-grained PATs** with the following config:
+- **Repository access:** Only select repositories → `erikshafer/CritterSupply`
+- **Permissions:**
+  - Issues: **Read and write**
+  - Pull requests: **Read and write**
+  - Metadata: **Read-only** (required)
+  - Projects: **Read and write**
+- **Expiration:** 90 days (set calendar reminder to rotate)
 
 ### Creating a PAT
 
@@ -81,6 +92,9 @@ Once you have a PAT, add the GitHub MCP server to your AI tool's configuration.
 
 ### Configuration Format
 
+⚠️ **SECURITY WARNING:** Never commit PATs to git. Always use environment variables or a secrets manager.
+
+**Option 1: Environment Variable (Recommended)**
 ```json
 {
   "mcpServers": {
@@ -88,12 +102,39 @@ Once you have a PAT, add the GitHub MCP server to your AI tool's configuration.
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "<paste-your-pat-here>"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
       }
     }
   }
 }
 ```
+
+Then set `GITHUB_TOKEN` in your shell profile (`~/.bashrc`, `~/.zshrc`, or Windows Environment Variables):
+```bash
+export GITHUB_TOKEN="ghp_your_token_here"
+```
+
+**Option 2: OS Keychain (Most Secure)**
+- **macOS:** Store in Keychain, retrieve via `security find-generic-password`
+- **Windows:** Store in Credential Manager, retrieve via PowerShell
+- **Linux:** Use `gnome-keyring` or `pass` password manager
+
+**Option 3: GitHub CLI Credential Helper**
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "$(gh auth token)"
+      }
+    }
+  }
+}
+```
+
+This reuses the token from `gh auth login` (no duplication).
 
 ### Config File Locations by Tool
 
@@ -115,6 +156,37 @@ After adding the MCP config and restarting the AI tool, verify it's working by a
 > *"List the open issues in erikshafer/CritterSupply"*
 
 If it returns a list (or says no issues), MCP is connected. If it says it can't access GitHub, the PAT or config is incorrect.
+
+---
+
+### Security Best Practices
+
+| Practice | Why | How |
+|---|---|---|
+| **Use fine-grained PATs** | Least privilege — limit scope to single repo | GitHub → Settings → Personal Access Tokens (fine-grained) |
+| **Set expiration to 90 days** | Reduce blast radius if token leaks | Set expiration during PAT creation |
+| **Rotate tokens quarterly** | Limit window of vulnerability | Calendar reminder to regenerate |
+| **Never commit tokens to git** | Tokens in history are compromised forever | Use `.gitignore` for config files with secrets |
+| **Use `gh auth token` if possible** | Reuse GitHub CLI auth (single source of truth) | `"GITHUB_PERSONAL_ACCESS_TOKEN": "$(gh auth token)"` |
+| **Add `.cursor/mcp.json` to `.gitignore`** | Prevent accidental commit | See [Security Hardening](#security-hardening) below |
+
+### Security Hardening
+
+Add these entries to your **global** `.gitignore` (not just CritterSupply's repo):
+
+```bash
+# Add to ~/.gitignore_global (create if needed)
+.cursor/mcp.json
+.vscode/mcp.json
+**/claude_desktop_config.json
+```
+
+Then configure git to use it:
+```bash
+git config --global core.excludesfile ~/.gitignore_global
+```
+
+This prevents MCP config files with tokens from ever being committed, even if you forget.
 
 ---
 

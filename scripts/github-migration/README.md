@@ -250,6 +250,100 @@ Both have value. The whiteboard is erased (Issues close and become historical). 
 
 
 
+---
+
+## CI/CD Automation (GitHub Actions)
+
+To ensure labels stay synced, cycle issues are exported automatically, and label drift is detected, three GitHub Actions workflows have been added:
+
+### 1. **Label Sync Workflow** (`.github/workflows/sync-labels.yml`)
+
+**When it runs:**
+- Weekly on Mondays at 9 AM UTC (scheduled)
+- On push to `main` when `01-labels.sh` changes
+- Manually via workflow dispatch
+
+**What it does:**
+- Runs `01-labels.sh` automatically
+- Creates/updates labels to match canonical taxonomy
+- Prevents label drift from manual UI changes
+
+**Why it matters:** Ensures label taxonomy stays consistent across environments and prevents ad-hoc labels from accumulating.
+
+---
+
+### 2. **Export Cycle Issues Workflow** (`.github/workflows/export-cycle-issues.yml`)
+
+**When it runs:**
+- Automatically when a milestone is closed (webhook event)
+- Manually via workflow dispatch (specify milestone title)
+
+**What it does:**
+- Runs `04-export-cycle.sh` with the closed milestone title
+- Exports all closed issues to `docs/planning/cycles/cycle-NN-issues-export.md`
+- Commits the exported markdown file to the repository
+- Creates a tracking issue to update `CURRENT-CYCLE.md` for the next cycle
+
+**Why it matters:** Fulfills the **fork compatibility goal** from ADR 0011. Without this automation, the export step can be forgotten, breaking the "CritterSupply is fully self-contained" promise.
+
+**Manual trigger example:**
+```bash
+# Via GitHub UI: Actions → Export Cycle Issues → Run workflow
+# Enter milestone title: "Cycle 19: Authentication & Authorization"
+
+# Via GitHub CLI:
+gh workflow run export-cycle-issues.yml -f milestone_title="Cycle 19: Authentication & Authorization"
+```
+
+---
+
+### 3. **Validate Label Usage Workflow** (`.github/workflows/validate-labels.yml`)
+
+**When it runs:**
+- Daily at 8 AM UTC (scheduled)
+- On issue create/label/unlabel events
+- Manually via workflow dispatch
+
+**What it does:**
+- Compares current repo labels with canonical labels from `01-labels.sh`
+- Detects label drift (labels created outside the script)
+- Creates a tracking issue if drift is detected
+
+**Why it matters:** Catches accidental label creation in the GitHub UI or via external tools. Keeps the label taxonomy as the single source of truth.
+
+---
+
+### Benefits of CI/CD Automation
+
+| Manual Execution | With CI/CD Automation |
+|---|---|
+| ❌ Forget to run `04-export-cycle.sh` at cycle end → fork compatibility broken | ✅ Automatic export on milestone close |
+| ❌ Labels drift due to ad-hoc UI changes → taxonomy inconsistency | ✅ Weekly sync + drift detection |
+| ❌ Must remember to update `CURRENT-CYCLE.md` manually | ✅ Tracking issue auto-created as reminder |
+| ❌ Script execution depends on local environment (`gh`, `jq` installed) | ✅ Runs in isolated GitHub Actions runner |
+| ❌ No audit trail of when scripts were run | ✅ Workflow run history in Actions tab |
+
+---
+
+### Security Considerations for CI/CD
+
+**Permissions:**
+The workflows use the built-in `GITHUB_TOKEN` with minimal scopes:
+- `issues: write` — Required to create labels, close milestones, create tracking issues
+- `contents: write` — Required to commit exported markdown files
+- `contents: read` — Required to read scripts and docs
+
+**No PAT required:** The workflows do **not** require a Personal Access Token because they use the repository's `GITHUB_TOKEN`, which is automatically provided by GitHub Actions with repository-scoped permissions.
+
+**Rate limits:**
+- `GITHUB_TOKEN` has a higher rate limit (1,000 requests/hour per repository)
+- Workflows run at most once daily (scheduled jobs) or on specific events
+- No risk of hitting rate limits for this repository's scale
+
+---
+
+## Manual Steps Still Required
+
 Even with full scripting, these steps require the GitHub web UI:
 
 | Step | Why Manual | Estimated Time |

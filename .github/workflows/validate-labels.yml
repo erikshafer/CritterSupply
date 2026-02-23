@@ -1,0 +1,99 @@
+name: Validate Label Usage in Issues
+
+# Ensures that all labels used in Issues match the canonical taxonomy
+# Detects label drift and ad-hoc labels created outside the migration scripts
+
+on:
+  schedule:
+    # Run daily at 8 AM UTC
+    - cron: '0 8 * * *'
+  
+  issues:
+    types: [opened, labeled, unlabeled]
+  
+  workflow_dispatch:
+
+jobs:
+  validate-labels:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write  # To add comments on issues with invalid labels
+      contents: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install GitHub CLI
+        run: |
+          type -p gh >/dev/null || sudo apt-get install -y gh
+      
+      - name: Authenticate GitHub CLI
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+      
+      - name: Extract canonical labels from script
+        id: canonical
+        run: |
+          cd scripts/github-migration
+          # Extract all label names from 01-labels.sh
+          LABELS=$(grep -oP 'label "\K[^"]+' 01-labels.sh | sort | uniq)
+          echo "Canonical labels from 01-labels.sh:"
+          echo "$LABELS"
+          echo "$LABELS" > /tmp/canonical-labels.txt
+      
+      - name: Check for label drift
+        id: drift
+        run: |
+          # Get all labels currently in the repo
+          gh label list --limit 100 --json name --jq '.[].name' | sort > /tmp/current-labels.txt
+          
+          # Find labels not in canonical list
+          EXTRA_LABELS=$(comm -13 /tmp/canonical-labels.txt /tmp/current-labels.txt)
+          
+          if [ -n "$EXTRA_LABELS" ]; then
+            echo "⚠️ Label drift detected! The following labels exist but are not in 01-labels.sh:"
+            echo "$EXTRA_LABELS"
+            echo "drift_detected=true" >> $GITHUB_OUTPUT
+            echo "extra_labels<<EOF" >> $GITHUB_OUTPUT
+            echo "$EXTRA_LABELS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "✅ No label drift detected. All labels match canonical taxonomy."
+            echo "drift_detected=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create issue for label drift
+        if: steps.drift.outputs.drift_detected == 'true'
+        env:
+          EXTRA_LABELS: ${{ steps.drift.outputs.extra_labels }}
+        run: |
+          {
+            echo "## Label Drift Report"
+            echo ""
+            echo "The following labels exist in the repository but are **not defined** in \`scripts/github-migration/01-labels.sh\`:"
+            echo ""
+            echo '```'
+            echo "${EXTRA_LABELS}"
+            echo '```'
+            echo ""
+            echo "### Possible Causes"
+            echo "1. Labels were created manually via GitHub UI"
+            echo "2. Labels were created by a third-party tool or integration"
+            echo "3. Someone forgot to update \`01-labels.sh\` after creating a new label"
+            echo ""
+            echo "### Recommended Action"
+            echo "1. If these labels should be **canonical**, add them to \`scripts/github-migration/01-labels.sh\`"
+            echo "2. If they are **ad-hoc/temporary**, delete them and re-label affected issues"
+            echo "3. Run \`bash scripts/github-migration/01-labels.sh\` to sync"
+            echo ""
+            echo "### References"
+            echo "- [Label Taxonomy](scripts/github-migration/01-labels.sh)"
+            echo "- [ADR 0011](docs/decisions/0011-github-projects-issues-migration.md)"
+          } > /tmp/drift-issue-body.md
+
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "⚠️ Label Drift Detected" \
+            --label "type:technical-debt,bc:infrastructure" \
+            --body-file /tmp/drift-issue-body.md || echo "Issue already exists or creation failed"

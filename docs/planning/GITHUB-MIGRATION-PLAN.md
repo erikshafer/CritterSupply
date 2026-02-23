@@ -784,6 +784,144 @@ See the [full automation README](../../scripts/github-migration/README.md) for c
 
 ---
 
+## Troubleshooting Common Issues
+
+### Issue: "gh CLI not authenticated"
+
+**Symptom:** Scripts fail with "Not authenticated with GitHub CLI"
+
+**Fix:**
+```bash
+gh auth login
+# Choose: GitHub.com → HTTPS → Login with a web browser
+# Follow the one-time code prompt
+gh auth status  # Verify authentication
+```
+
+---
+
+### Issue: "Label not found" warnings during issue creation
+
+**Symptom:** Issues are created but labels are missing
+
+**Root Cause:** Labels weren't created before running `03-issues.sh`
+
+**Fix:**
+```bash
+cd scripts/github-migration
+bash 01-labels.sh  # Must run FIRST
+bash 03-issues.sh   # Re-run to apply labels to existing issues
+```
+
+---
+
+### Issue: Duplicate issues after re-running scripts
+
+**Symptom:** Multiple issues with slightly different titles
+
+**Root Cause:** The duplicate detection checks for **exact title match**. If the title changed, a new issue is created.
+
+**Fix:**
+```bash
+# Option 1: Close duplicates manually
+gh issue close 42 --comment "Duplicate of #41"
+
+# Option 2: Use rollback script (test repo only)
+cd scripts/github-migration
+bash rollback.sh --confirm-repo erikshafer/CritterSupply-Test
+```
+
+---
+
+### Issue: Milestones not appearing on issues
+
+**Symptom:** Issues are created but milestone field is empty
+
+**Root Cause:** Milestone title in `03-issues.sh` doesn't match exactly (case-sensitive, punctuation matters)
+
+**Fix:**
+```bash
+# Check exact milestone titles:
+gh api repos/erikshafer/CritterSupply/milestones --jq '.[].title'
+
+# Update 03-issues.sh to use exact titles from above
+# Re-run: bash 03-issues.sh
+```
+
+---
+
+### Issue: AI agent can't access GitHub Issues
+
+**Symptom:** Agent says "I don't have GitHub MCP tools" or "I can't list issues"
+
+**Fix:**
+1. Verify MCP server is configured: Check `.vscode/mcp.json` or tool-specific config
+2. Verify PAT is valid:
+   ```bash
+   gh auth token  # Should print a token starting with ghp_ or github_pat_
+   ```
+3. Restart AI tool after config changes (required for MCP servers to reload)
+4. Test manually:
+   ```bash
+   gh issue list  # If this works, the agent should work too
+   ```
+
+---
+
+### Issue: Workflow failed with "Resource not accessible by integration"
+
+**Symptom:** GitHub Actions workflows fail with permissions error
+
+**Root Cause:** `GITHUB_TOKEN` doesn't have required permissions
+
+**Fix:**
+Edit `.github/workflows/<workflow>.yml` and verify `permissions:` section:
+```yaml
+permissions:
+  issues: write    # Required for label/milestone/issue creation
+  contents: write  # Required for committing exported markdown
+```
+
+---
+
+### Issue: Export script creates empty markdown file
+
+**Symptom:** `04-export-cycle.sh` runs but output file is empty
+
+**Root Cause:** No issues found in the specified milestone (typo in milestone name or all issues are still open)
+
+**Fix:**
+```bash
+# Check milestone titles (exact match required):
+gh api repos/erikshafer/CritterSupply/milestones --jq '.[].title'
+
+# Check issues in milestone:
+gh issue list --milestone "Cycle 19: Authentication & Authorization" --state all
+
+# Run with correct title:
+bash 04-export-cycle.sh "Cycle 19: Authentication & Authorization"
+```
+
+---
+
+### Issue: Rate limit exceeded
+
+**Symptom:** `gh` commands fail with "rate limit exceeded" error
+
+**Root Cause:** Hit GitHub's 5,000 requests/hour limit for authenticated users
+
+**Fix:**
+```bash
+# Check rate limit status:
+gh api rate_limit
+
+# Wait for reset (shown in above output)
+# Or run scripts with delays between API calls:
+export GH_SLEEP=2  # Sleep 2 seconds between API calls (not implemented in current scripts)
+```
+
+---
+
 ## References
 
 - **ADR:** [0011-github-projects-issues-migration.md](../decisions/0011-github-projects-issues-migration.md)

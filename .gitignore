@@ -414,3 +414,20 @@ riderModule.iml
 
 # VS Code
 .vscode/
+
+# ==============================================================================
+# AI Tool MCP Configuration Files (may contain GitHub PATs)
+# Added by ADR 0011: GitHub Projects Migration
+# ==============================================================================
+# These files often contain Personal Access Tokens (PATs) in plaintext.
+# NEVER commit them to git. Use environment variables or OS keychains instead.
+# See docs/planning/GITHUB-ACCESS-GUIDE.md for secure configuration options.
+
+.vscode/mcp.json
+.cursor/mcp.json
+claude_desktop_config.json
+
+# Note: Global config locations vary by tool:
+# - Cursor global: ~/.cursor/mcp.json (not in repo, but listed for safety)
+# - Claude Desktop: ~/Library/Application Support/Claude/claude_desktop_config.json
+# - VS Code global: User settings (not in repo)

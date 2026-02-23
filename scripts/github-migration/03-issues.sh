@@ -56,6 +56,40 @@ for arg in "$@"; do
 done
 
 # ---------------------------------------------------------------------------
+# Helper: validate that required labels exist before creating issues
+# ---------------------------------------------------------------------------
+validate_labels() {
+  local labels_csv="$1"
+  local missing_labels=()
+  
+  # Fetch all existing labels (cache this across function calls)
+  if [ ! -f /tmp/repo-labels.txt ]; then
+    gh label list --repo "$REPO" --json name --jq '.[].name' > /tmp/repo-labels.txt 2>/dev/null || {
+      echo "⚠️  Could not fetch repo labels. Skipping validation."
+      return 0
+    }
+  fi
+  
+  # Check each label in the comma-separated list
+  IFS=',' read -ra LABEL_ARRAY <<< "$labels_csv"
+  for lbl in "${LABEL_ARRAY[@]}"; do
+    lbl_clean="${lbl// /}"  # Remove whitespace
+    if ! grep -qx "$lbl_clean" /tmp/repo-labels.txt; then
+      missing_labels+=("$lbl_clean")
+    fi
+  done
+  
+  if [ ${#missing_labels[@]} -gt 0 ]; then
+    echo "❌ ERROR: The following labels do not exist in the repository:"
+    printf '   - %s\n' "${missing_labels[@]}"
+    echo "   Run scripts/github-migration/01-labels.sh first to create all labels."
+    return 1
+  fi
+  
+  return 0
+}
+
+# ---------------------------------------------------------------------------
 # Helper: create an issue if one with the same title doesn't already exist
 # ---------------------------------------------------------------------------
 create_issue() {
@@ -63,6 +97,12 @@ create_issue() {
   local labels="$2"
   local milestone="$3"
   local body_file="$4"
+  
+  # Validate labels exist before attempting to create issue
+  if ! validate_labels "$labels"; then
+    echo "⚠️  Skipping issue creation: \"$title\" (invalid labels)"
+    return 1
+  fi
 
   if [ "$DRY_RUN" = true ]; then
     echo "[DRY RUN] Create issue: \"$title\""
@@ -109,9 +149,16 @@ create_issue() {
 # Temp directory for body files (cleaned up on exit)
 # ---------------------------------------------------------------------------
 TMPDIR_BODIES=$(mktemp -d)
-trap 'rm -rf "$TMPDIR_BODIES"' EXIT
+trap 'rm -rf "$TMPDIR_BODIES" /tmp/repo-labels.txt' EXIT
 
 echo "📋 Creating GitHub Issues for $REPO ..."
+echo ""
+
+# Pre-fetch all repo labels for validation (cache for entire script run)
+echo "📥 Fetching repository labels for validation..."
+gh label list --repo "$REPO" --json name --jq '.[].name' > /tmp/repo-labels.txt 2>/dev/null || {
+  echo "⚠️  Could not pre-fetch labels. Label validation will be skipped."
+}
 echo ""
 
 # ===========================================================================
@@ -165,7 +212,7 @@ EOF
 
 create_issue \
   "[Auth] Replace stub customerId with Customer Identity BC authentication" \
-  "bc:customer-experience,type:feature,priority:medium,status:planned" \
+  "bc:customer-experience,type:feature,value:high,urgency:high,status:planned" \
   "Cycle 19: Authentication & Authorization" \
   "$TMPDIR_BODIES/auth.md"
 
@@ -212,7 +259,7 @@ EOF
 
 create_issue \
   "[Testing] Automated browser tests for Customer Experience Blazor UI" \
-  "bc:customer-experience,type:testing,priority:medium,status:backlog" \
+  "bc:customer-experience,type:testing,value:medium,urgency:medium,status:backlog" \
   "Cycle 20: Automated Browser Testing" \
   "$TMPDIR_BODIES/browser-testing.md"
 
@@ -252,7 +299,7 @@ EOF
 
 create_issue \
   "[Infrastructure] Replace docker-compose with .NET Aspire for local orchestration" \
-  "bc:infrastructure,type:feature,priority:medium,status:backlog" \
+  "bc:infrastructure,type:feature,value:medium,urgency:low,status:backlog" \
   "Cycle 21+: Vendor Portal Phase 1" \
   "$TMPDIR_BODIES/aspire.md"
 
@@ -286,7 +333,7 @@ EOF
 
 create_issue \
   "[Testing] Add property-based tests with FsCheck for domain invariants" \
-  "type:testing,priority:low,status:backlog" \
+  "type:testing,value:low,urgency:low,status:backlog,bc:cross-cutting" \
   "Cycle 21+: Vendor Portal Phase 1" \
   "$TMPDIR_BODIES/property-testing.md"
 
@@ -327,7 +374,7 @@ EOF
 
 create_issue \
   "[BC] Vendor Portal bounded context — Phase 1" \
-  "bc:vendor-portal,type:feature,priority:low,status:backlog" \
+  "bc:vendor-portal,type:feature,value:low,urgency:low,status:backlog" \
   "Cycle 21+: Vendor Portal Phase 1" \
   "$TMPDIR_BODIES/vendor-portal.md"
 
@@ -367,7 +414,7 @@ EOF
 
 create_issue \
   "[BC] Returns bounded context" \
-  "bc:returns,type:feature,priority:low,status:backlog" \
+  "bc:returns,type:feature,value:low,urgency:low,status:backlog" \
   "Cycle 21+: Vendor Portal Phase 1" \
   "$TMPDIR_BODIES/returns.md"
 
