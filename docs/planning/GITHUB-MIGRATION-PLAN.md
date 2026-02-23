@@ -656,38 +656,110 @@ Configure these automation rules in the Project settings:
 
 ---
 
-## Part 10: Execution Checklist
+## Part 10: Migration Automation (Scripts)
 
-### One-Time Setup
+**Short answer: Yes, most of this can be scripted.**
+
+The `scripts/github-migration/` directory contains `gh` CLI scripts that automate creating labels, milestones, and issues from the existing markdown content. See the [full automation guide](../../scripts/github-migration/README.md) for all options, downsides, and error handling.
+
+### What the Scripts Do
+
+| Script | What It Creates | Time |
+|---|---|---|
+| [`01-labels.sh`](../../scripts/github-migration/01-labels.sh) | All `bc:*`, `type:*`, `status:*`, `priority:*` labels (~30) | ~2 min |
+| [`02-milestones.sh`](../../scripts/github-migration/02-milestones.sh) | Cycle 19 milestone (+ optional historical Cycles 1-18) | ~1 min |
+| [`03-issues.sh`](../../scripts/github-migration/03-issues.sh) | All backlog Issues + 11 ADR companion Issues | ~3 min |
+
+### Prerequisites for Scripts
+
+```bash
+# Install gh CLI
+brew install gh           # macOS
+winget install GitHub.cli  # Windows
+# Linux: https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+
+# Authenticate
+gh auth login
+
+# Verify
+gh auth status
+```
+
+### Run Order
+
+```bash
+cd scripts/github-migration
+
+# Step 1: Labels (must be created before issues reference them)
+bash 01-labels.sh
+
+# Step 2: Milestones
+bash 02-milestones.sh
+# Optional: include historical closed milestones for Cycles 1-18
+# bash 02-milestones.sh --include-historical
+
+# Step 3: Issues (backlog + ADR companions)
+bash 03-issues.sh
+
+# Preview without executing (all scripts support this)
+bash 03-issues.sh --dry-run
+```
+
+### What Still Requires the GitHub UI (~35 min, one time only)
+
+| Task | Why It's Manual |
+|---|---|
+| Create the GitHub Project board | `gh project create` is basic; custom fields need UI |
+| Add custom fields (Bounded Context, Priority, etc.) | No REST API support — Projects v2 fields are GraphQL only |
+| Configure Board/Table/Roadmap views | UI-only |
+| Set up workflow automation rules | UI-only |
+
+### Key Downsides and Errors
+
+1. **Duplicate issues** if script runs twice — mitigated by title-based existence check before each create
+2. **Labels must exist first** — running `03-issues.sh` before `01-labels.sh` silently drops labels
+3. **API rate limit** — 5,000 req/hour; ~110 total requests for full migration (well within limit)
+4. **Milestone title case-sensitivity** — mismatch silently drops the milestone on an issue
+5. **Projects v2 not fully scriptable** — custom fields and views require the UI or raw GraphQL
+
+See the [full automation README](../../scripts/github-migration/README.md) for complete details on each downside and its mitigation.
+
+---
+
+## Part 11: Execution Checklist
+
+### One-Time Setup (UI — ~35 min)
 - [ ] Create GitHub Project: "CritterSupply Development"
 - [ ] Add custom fields (Bounded Context, Priority, Effort, Type)
-- [ ] Create label taxonomy (bc:*, type:*, status:*, priority:*)
 - [ ] Configure Project views (Board, Backlog Table, Active Cycle, Roadmap)
 - [ ] Configure automation rules
 
-### Historical Migration
-- [ ] Create closed Milestones for Cycles 1-18
-- [ ] Create ADR companion Issues for all 11 ADRs
-- [ ] Create backlog Issues for all items in BACKLOG.md
+### Scripted Migration (~6 min)
+- [ ] `bash scripts/github-migration/01-labels.sh` — creates all labels
+- [ ] `bash scripts/github-migration/02-milestones.sh` — creates Cycle 19 milestone
+- [ ] `bash scripts/github-migration/03-issues.sh` — creates all backlog + ADR issues
+- [ ] Add new issues to the GitHub Project board (click "+ Add items")
+
+### Historical Migration (optional)
+- [ ] `bash scripts/github-migration/02-milestones.sh --include-historical` — closed Cycles 1-18
 
 ### Cycle 19 Setup
-- [ ] Create Milestone: "Cycle 19: Authentication & Authorization"
-- [ ] Create parent Cycle Epic Issue
-- [ ] Create individual task Issues for Cycle 19
-- [ ] Add deprecation notice to CYCLES.md
-- [ ] Add deprecation notice to BACKLOG.md
-- [ ] Create `docs/planning/CURRENT-CYCLE.md`
+- [ ] Create parent Cycle Epic Issue for Cycle 19 (see template in Part 3B)
+- [ ] Create individual task sub-issues for Cycle 19
+- [ ] Verify `docs/planning/CURRENT-CYCLE.md` is up to date
 
-### CLAUDE.md Updates
-- [ ] Update workflow section to reference GitHub Issues
-- [ ] Add note: "Before starting a cycle, check GitHub Issues for milestone"
-- [ ] Add note: "Use `Fixes #XX` in commits to close issues"
+### Already Done ✅
+- [x] Add deprecation notice to `CYCLES.md`
+- [x] Add deprecation notice to `BACKLOG.md`
+- [x] Create `docs/planning/CURRENT-CYCLE.md`
+- [x] Update `CLAUDE.md` with GitHub-first workflow
 
 ---
 
 ## References
 
 - **ADR:** [0011-github-projects-issues-migration.md](../decisions/0011-github-projects-issues-migration.md)
+- **Migration Scripts:** [scripts/github-migration/](../../scripts/github-migration/) — automated label/milestone/issue creation
 - **Current Cycle:** [CURRENT-CYCLE.md](./CURRENT-CYCLE.md) *(created during migration)*
 - **Historical cycles:** [docs/planning/cycles/](./cycles/)
 - **GitHub Projects docs:** https://docs.github.com/en/issues/planning-and-tracking-with-projects
