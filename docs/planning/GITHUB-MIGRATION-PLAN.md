@@ -14,6 +14,47 @@ The result is a **hybrid model**:
 - 🟦 **GitHub** = Live work tracking (issues, milestones, project boards)
 - 🟩 **Repo markdown** = AI context + long-form reference (CONTEXTS.md, skills/, ADRs)
 
+### Why This Works Across Every Machine You Own
+
+Project state lives in **GitHub's cloud**, not in files on any single machine's filesystem. This means:
+
+> As long as a machine has the **GitHub MCP server configured** and **GitHub authentication completed**, an AI agent on that machine (GitHub Copilot, Claude, Cursor, etc.) sees the exact same authoritative view of the project — the same open issues, the same active milestone, the same backlog — without needing to read, sync, or commit any markdown files.
+
+**MacBook → Windows desktop → Linux laptop:** same project state. No stale `CYCLES.md`. No merge conflicts from two machines diverging. No "I forgot to update the doc on my other computer."
+
+### Prerequisites (Per Machine)
+
+Before GitHub-first tracking works on a given machine, configure:
+
+| Prerequisite | What It Does | How to Set Up |
+|---|---|---|
+| **GitHub MCP server** | Gives the AI agent tools to call GitHub APIs (`list_issues`, `issue_read`, etc.) | Add to MCP config (see below) |
+| **GitHub auth** | Authenticates MCP server calls | Personal Access Token with `repo` + `project` scopes |
+| **context7 MCP** *(optional)* | Library documentation lookup during implementation | Add to MCP config alongside GitHub MCP |
+
+**GitHub MCP config example** (add to your AI tool's MCP configuration file):
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "<your-pat-here>"
+      }
+    }
+  }
+}
+```
+
+MCP config file locations by tool:
+- **VS Code (GitHub Copilot):** `.vscode/mcp.json` in the workspace, or user settings
+- **Cursor:** `.cursor/mcp.json` or global `~/.cursor/mcp.json`
+- **Claude Desktop:** `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows)
+- **Claude.ai (browser):** MCP configured via Claude integration settings
+
+Once the prerequisites are met, the fallback file (`docs/planning/CURRENT-CYCLE.md`) is only needed for truly offline/air-gapped scenarios.
+
 ---
 
 ## Part 1: Understanding GitHub Projects vs. What We Have

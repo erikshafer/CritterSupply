@@ -3,6 +3,13 @@
 > **Note:** This file is maintained as a lightweight AI-readable summary of the active development cycle.  
 > It is the fallback when GitHub Issues/Projects are not directly accessible.  
 > **Primary tracking:** GitHub Issues + GitHub Project board (see links below)
+>
+> **For full GitHub-first access on this machine, you need:**
+> 1. **GitHub MCP server** configured in your AI tool's MCP settings
+> 2. **GitHub auth** (personal access token with `repo` + `project` scopes)
+>
+> With both configured, query GitHub directly: `list_issues(milestone="Cycle 19", state="open")`  
+> This works identically on any machine — MacBook, Windows PC, Linux laptop.
 
 ---
 

@@ -98,6 +98,23 @@ Link ADR issues to the cycle issues and PRs that implement them. Currently ADR m
 **7. Milestone progress tracking**
 GitHub Milestones show `8/12 issues closed (67%)` — a live progress bar. Currently this requires manually counting checkboxes in a markdown file.
 
+**8. Cross-machine & multi-environment consistency** ⭐
+This is the most practically important benefit for a solo developer or small team working across multiple computers.
+
+Project state (Issues, Milestones, Project board) lives in **GitHub's cloud**, not in files on a particular machine's filesystem. That means:
+
+- A MacBook running Claude + GitHub MCP server sees the **exact same** open issues as a Windows desktop running GitHub Copilot
+- A Linux laptop with a fresh `git clone` picks up the correct current cycle state immediately by querying GitHub — not by reading potentially-stale markdown files
+- No "I forgot to commit my CYCLES.md edit on the other machine" situations
+- No merge conflicts on planning files from two machines diverging
+
+**Prerequisites for this to work on any machine:**
+1. **GitHub MCP server** configured in the AI agent's tool set (e.g., in `.vscode/mcp.json`, Cursor MCP config, or Claude Desktop config)
+2. **GitHub authentication** completed (personal access token with `repo` + `project` scopes, or GitHub OAuth app)
+3. *(Optional but recommended)* **context7 MCP** or equivalent for library documentation lookup
+
+Once those prerequisites are met, the AI agent's workflow is identical on every machine — query GitHub, not local files, for project state.
+
 ---
 
 ### Cons and Mitigations

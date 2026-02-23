@@ -39,6 +39,14 @@ CritterSupply uses a modular documentation structure optimized for AI-assisted d
 - **GitHub Project Board** — Kanban board view with columns: Backlog → In Progress → In Review → Done
 - **[docs/planning/CURRENT-CYCLE.md](./docs/planning/CURRENT-CYCLE.md)** — Lightweight AI-readable summary (fallback when GitHub MCP not available)
 
+**Why GitHub-first works across any machine (MacBook, Windows, Linux):**
+Project state lives in GitHub's cloud, not in local files. Any machine with the GitHub MCP server configured and GitHub auth completed gets the same authoritative view of open issues, active milestones, and backlog — no stale markdown, no sync needed.
+
+**Prerequisites per machine:**
+- ✅ **GitHub MCP server** — configured in your AI tool's MCP settings (VS Code, Cursor, Claude Desktop, etc.)
+- ✅ **GitHub auth** — personal access token with `repo` + `project` scopes
+- See [GITHUB-MIGRATION-PLAN.md — Prerequisites](./docs/planning/GITHUB-MIGRATION-PLAN.md#prerequisites-per-machine) for setup details
+
 **Legacy Markdown (Read-Only Archives):**
 - **[docs/planning/CYCLES.md](./docs/planning/CYCLES.md)** — Historical cycle records (Cycles 1–18); **deprecated for new cycles**
 - **[docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md)** — Historical backlog; **deprecated** (items migrated to GitHub Issues)
