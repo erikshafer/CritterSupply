@@ -45,7 +45,7 @@ Project state lives in GitHub's cloud, not in local files. Any machine with the 
 **Prerequisites per machine:**
 - ✅ **GitHub MCP server** — configured in your AI tool's MCP settings (VS Code, Cursor, Claude Desktop, etc.)
 - ✅ **GitHub auth** — personal access token with `repo` + `project` scopes
-- See [GITHUB-MIGRATION-PLAN.md — Prerequisites](./docs/planning/GITHUB-MIGRATION-PLAN.md#prerequisites-per-machine) for setup details
+- See [GITHUB-ACCESS-GUIDE.md](./docs/planning/GITHUB-ACCESS-GUIDE.md) for complete setup instructions (PAT creation, MCP config JSON, domain allowlist, verification checklist)
 
 **Legacy Markdown (Read-Only Archives):**
 - **[docs/planning/CYCLES.md](./docs/planning/CYCLES.md)** — Historical cycle records (Cycles 1–18); **deprecated for new cycles**

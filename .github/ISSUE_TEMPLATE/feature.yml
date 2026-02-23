@@ -1,0 +1,118 @@
+name: "✨ Feature Request"
+description: "A new feature or enhancement for a bounded context"
+title: "[BC] "
+labels: ["type:feature", "status:backlog"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Before filling this out:** Review [CONTEXTS.md](../CONTEXTS.md) to understand the bounded context boundaries and integration contracts.
+        AI agents read this issue body to understand what to implement — write clearly and completely.
+
+  - type: dropdown
+    id: bounded-context
+    attributes:
+      label: "Bounded Context"
+      description: "Which BC owns this feature? (If multi-BC, choose the orchestrating one and list dependencies below.)"
+      options:
+        - "bc:orders"
+        - "bc:payments"
+        - "bc:shopping"
+        - "bc:inventory"
+        - "bc:fulfillment"
+        - "bc:customer-identity"
+        - "bc:product-catalog"
+        - "bc:customer-experience"
+        - "bc:vendor-portal"
+        - "bc:returns"
+        - "bc:infrastructure"
+        - "bc:cross-cutting"
+    validations:
+      required: true
+
+  - type: textarea
+    id: business-goal
+    attributes:
+      label: "Business Goal"
+      description: "Why are we building this? What customer or business problem does it solve?"
+      placeholder: |
+        As a [customer / vendor / operator],
+        I want to [do something]
+        So that [I get this value / problem solved].
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: "Current Behavior (if applicable)"
+      description: "What happens today? Describe the gap."
+      placeholder: "Currently, the system does X which means customers experience Y..."
+
+  - type: textarea
+    id: desired-behavior
+    attributes:
+      label: "Desired Behavior"
+      description: "What should the system do after this feature is implemented?"
+      placeholder: |
+        - Customers can...
+        - The system should...
+        - When X happens, then Y should occur.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: "Acceptance Criteria"
+      description: "Given/When/Then scenarios. These become the Gherkin scenarios in the feature file."
+      placeholder: |
+        - [ ] Given [precondition], When [action], Then [expected outcome]
+        - [ ] Given [edge case], When [action], Then [expected error/fallback]
+        - [ ] Given [another scenario], When [action], Then [outcome]
+    validations:
+      required: true
+
+  - type: textarea
+    id: event-flow
+    attributes:
+      label: "Event Flow (for event-driven features)"
+      description: "Which events are consumed? Which events are published? Which other BCs are affected?"
+      placeholder: |
+        **Consumes:**
+        - `SomethingHappened` from bc:orders
+
+        **Publishes:**
+        - `SomethingElseOccurred` → consumed by bc:inventory, bc:customer-experience
+
+        **Cross-BC dependencies:**
+        - bc:inventory must handle X
+        - bc:payments must handle Y
+
+  - type: textarea
+    id: edge-cases
+    attributes:
+      label: "Edge Cases & Error Scenarios"
+      description: "What happens when things go wrong? What should NOT happen?"
+      placeholder: |
+        - If [condition], the system should [gracefully handle / reject / retry]
+        - [Specific state] is NOT allowed
+        - On failure, [compensation / rollback / notification] must occur
+
+  - type: input
+    id: gherkin-file
+    attributes:
+      label: "Gherkin Feature File (if exists or planned)"
+      description: "Path to the feature file, e.g. docs/features/orders/order-cancellation.feature"
+      placeholder: "docs/features/bc-name/feature-name.feature"
+
+  - type: textarea
+    id: references
+    attributes:
+      label: "References"
+      description: "Links to CONTEXTS.md sections, ADRs, related issues, or cycle plan docs."
+      placeholder: |
+        - CONTEXTS.md: [relevant section]
+        - ADR: [link if applicable]
+        - Related issues: #XX, #YY
+        - Cycle plan: docs/planning/cycles/cycle-NN-*.md

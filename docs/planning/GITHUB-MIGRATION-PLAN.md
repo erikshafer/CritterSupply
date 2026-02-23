@@ -787,6 +787,8 @@ See the [full automation README](../../scripts/github-migration/README.md) for c
 ## References
 
 - **ADR:** [0011-github-projects-issues-migration.md](../decisions/0011-github-projects-issues-migration.md)
+- **Access Guide:** [GITHUB-ACCESS-GUIDE.md](./GITHUB-ACCESS-GUIDE.md) — PAT setup, MCP config, domain allowlist, permissions per role
+- **Issue Templates:** [.github/ISSUE_TEMPLATE/](../../.github/ISSUE_TEMPLATE/) — Feature, Bug, Spike, ADR templates
 - **Migration Scripts:** [scripts/github-migration/](../../scripts/github-migration/) — automated label/milestone/issue creation
 - **Current Cycle:** [CURRENT-CYCLE.md](./CURRENT-CYCLE.md) *(created during migration)*
 - **Historical cycles:** [docs/planning/cycles/](./cycles/)

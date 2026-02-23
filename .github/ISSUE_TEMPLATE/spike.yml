@@ -1,0 +1,60 @@
+name: "🔬 Spike / Research"
+description: "Time-boxed investigation or proof of concept"
+title: "[Spike] "
+labels: ["type:spike", "status:backlog"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A spike is a time-boxed research task. It produces **knowledge and a decision**, not production code (usually).
+        Define the question to answer and what "done" looks like before starting.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: "Question to Answer"
+      description: "What specific question are we trying to answer? What decision will this spike unblock?"
+      placeholder: |
+        We need to decide [X] before implementing [Y].
+        This spike will answer: Is [approach A] or [approach B] the better choice for [reason]?
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: "Why Now? (Business / Technical Motivation)"
+      placeholder: "This blocks [issue #XX] from being implemented..."
+    validations:
+      required: true
+
+  - type: input
+    id: timebox
+    attributes:
+      label: "Timebox"
+      description: "Maximum time to spend on this spike (e.g., 2 hours, 1 session)"
+      placeholder: "2-3 hours"
+    validations:
+      required: true
+
+  - type: textarea
+    id: done-criteria
+    attributes:
+      label: "Definition of Done"
+      description: "What output marks this spike complete? (e.g., a written recommendation, a PoC branch, an ADR draft)"
+      placeholder: |
+        - [ ] Written recommendation (approve or reject approach, with rationale)
+        - [ ] Draft ADR created (if an architectural decision was made)
+        - [ ] Findings documented in a comment on this issue
+        - [ ] Decision recorded, issue closed
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: "References"
+      description: "Related issues, docs, or prior art."
+      placeholder: |
+        - Blocked issue: #XX
+        - Prior discussion: [link]

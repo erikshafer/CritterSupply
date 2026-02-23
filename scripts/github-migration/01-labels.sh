@@ -87,39 +87,56 @@ label "bc:customer-experience" "c2e0c6" "Customer Experience (Storefront) bounde
 label "bc:vendor-portal"       "bfdadc" "Vendor Portal bounded context"
 label "bc:returns"             "fef2c0" "Returns bounded context"
 label "bc:infrastructure"      "cccccc" "Infrastructure / DevOps / CI-CD"
+label "bc:cross-cutting"       "d4c5f9" "Affects multiple bounded contexts (e.g. tracing, Wolverine upgrades)"
 
 # ---------------------------------------------------------------------------
 # Type labels  (prefix: type:)
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Type labels ---"
-label "type:feature"       "0075ca" "New feature or enhancement"
-label "type:bug"           "d73a4a" "Something is broken"
-label "type:adr"           "e4e669" "Architectural Decision Record companion issue"
-label "type:spike"         "cfd3d7" "Research / investigation / proof of concept"
-label "type:retrospective" "ffffff" "Cycle retrospective notes or actions"
-label "type:documentation" "0052cc" "Documentation update"
-label "type:testing"       "d4c5f9" "Test coverage or testing infrastructure"
+label "type:feature"        "0075ca" "New feature or enhancement"
+label "type:bug"            "d73a4a" "Something is broken"
+label "type:adr"            "e4e669" "Architectural Decision Record companion issue"
+label "type:spike"          "cfd3d7" "Research / investigation / proof of concept"
+label "type:technical-debt" "e4e669" "Refactoring, cleanup, or deferred quality work"
+label "type:retrospective"  "ffffff" "Cycle retrospective notes or actions"
+label "type:documentation"  "0052cc" "Documentation update"
+label "type:testing"        "d4c5f9" "Test coverage or testing infrastructure"
 
 # ---------------------------------------------------------------------------
 # Status labels  (prefix: status:)
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Status labels ---"
-label "status:backlog"     "ededed" "In backlog — not yet scheduled"
-label "status:planned"     "c5def5" "Scheduled for an upcoming cycle"
-label "status:in-progress" "fbca04" "Currently being worked on"
-label "status:blocked"     "d73a4a" "Blocked — waiting on dependency"
-label "status:deferred"    "cccccc" "Intentionally deferred to a future cycle"
+label "status:backlog"          "ededed" "In backlog — not yet scheduled"
+label "status:planned"          "c5def5" "Scheduled for an upcoming cycle"
+label "status:in-progress"      "fbca04" "Currently being worked on"
+label "status:blocked"          "d73a4a" "Blocked — waiting on dependency"
+label "status:deferred"         "cccccc" "Intentionally deferred to a future cycle"
+label "status:ready-for-review" "0075ca" "Implementation complete, awaiting review"
 
 # ---------------------------------------------------------------------------
-# Priority labels  (prefix: priority:)
+# Business Value labels  (prefix: value:)
+# Capture the business/customer impact — separate from time urgency.
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Priority labels ---"
-label "priority:high"   "d73a4a" "High priority — next 1-2 cycles"
-label "priority:medium" "fbca04" "Medium priority — 3-6 cycles"
-label "priority:low"    "0e8a16" "Low priority — nice to have"
+echo "--- Business Value labels ---"
+label "value:critical" "d73a4a" "Core business function / revenue critical"
+label "value:high"     "e4511b" "Significant customer or business impact"
+label "value:medium"   "fbca04" "Moderate customer or business impact"
+label "value:low"      "0e8a16" "Nice-to-have / marginal improvement"
+
+# ---------------------------------------------------------------------------
+# Urgency labels  (prefix: urgency:)
+# Capture time sensitivity — separate from business value.
+# Example: A security patch may be low value but immediate urgency.
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Urgency labels ---"
+label "urgency:immediate" "d73a4a" "Must fix now — blocking, data integrity, or security risk"
+label "urgency:high"      "e4511b" "Fix next cycle — significant user impact"
+label "urgency:medium"    "fbca04" "Fix within 2-3 cycles — noticeable issue"
+label "urgency:low"       "0e8a16" "Fix when possible — minor inconvenience"
 
 echo ""
 echo "🎉 Done! Verify with: gh label list --repo $REPO"
