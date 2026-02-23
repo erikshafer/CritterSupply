@@ -257,6 +257,26 @@ CONTEXTS.md and ADR 0012 are the truth. The Issue is historical context showing 
 
 ---
 
+## Rollback Plan: GitHub MCP Regression
+
+If the GitHub MCP server stops working (tooling regression, deprecation, network changes), the system degrades gracefully in two layers:
+
+**Layer 1 — Immediate fallback (no code change needed):**
+`docs/planning/CURRENT-CYCLE.md` is always kept current in-repo. An AI agent without MCP access loads this file and gets the current cycle name, active milestone, and what tool to configure to restore full access. Work can continue with the human manually relaying issue state.
+
+**Layer 2 — Full offline operation (post-cycle export):**
+`04-export-cycle.sh` (automated by `export-cycle-issues.yml` workflow) commits closed Issues to `docs/planning/cycles/cycle-NN-issues-export.md` at the end of every cycle. If MCP is unavailable for an extended period, these exported files provide full historical context directly from the repo — no GitHub API access required.
+
+**Layer 3 — Revert to markdown-first (last resort):**
+The deprecated `CYCLES.md` and `BACKLOG.md` files are retained as read-only archives (never deleted). They can be reactivated as primary sources if the GitHub Issues approach fails entirely. All in-flight Issues would need to be exported manually before switching back.
+
+**Recovery time estimate:**
+- MCP outage lasting < 1 session: CURRENT-CYCLE.md fallback, human relays issue state
+- MCP outage lasting < 1 cycle: Export open issues manually with `gh issue list --json` before the MCP reconnects
+- Permanent MCP unavailability: Export all open issues, reactivate markdown workflow — estimated 2-4 hours of re-migration work
+
+---
+
 ## References
 
 - [GitHub Projects v2 Documentation](https://docs.github.com/en/issues/planning-and-tracking-with-projects)

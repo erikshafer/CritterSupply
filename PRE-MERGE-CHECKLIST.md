@@ -195,7 +195,7 @@ Before merging this PR to `main`, complete these verification steps:
 - [ ] **Run idempotency tests:**
   ```bash
   cd scripts/github-migration
-  bash test-idempotency.sh erikshafer/CritterSupply-Test
+  bash test-idempotency.sh --test-repo erikshafer/CritterSupply-Test
   # Should see: "🎉 All idempotency tests passed!"
   ```
 
