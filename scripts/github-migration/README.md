@@ -32,6 +32,7 @@ The `gh` CLI is GitHub's official command-line tool. It wraps the GitHub REST AP
 1. [`01-labels.sh`](./01-labels.sh) — Creates all `bc:*`, `type:*`, `status:*`, `priority:*` labels
 2. [`02-milestones.sh`](./02-milestones.sh) — Creates Cycle 19-21 milestones + optional historical milestones (closed)
 3. [`03-issues.sh`](./03-issues.sh) — Creates all backlog Issues from `docs/planning/BACKLOG.md`
+4. [`04-export-cycle.sh`](./04-export-cycle.sh) — ⭐ Exports a completed cycle's closed Issues back to markdown (run at cycle end)
 
 **How to run:**
 ```bash
@@ -44,6 +45,9 @@ cd scripts/github-migration
 bash 01-labels.sh
 bash 02-milestones.sh
 bash 03-issues.sh
+
+# At the END of each completed cycle, always run:
+bash 04-export-cycle.sh "Cycle 19: Authentication & Authorization"
 ```
 
 **Install `gh` CLI:**
@@ -211,7 +215,40 @@ bash 02-milestones.sh --include-historical
 
 ---
 
-## What Still Requires Manual Steps
+## Why Issue Export Matters: Fork Compatibility
+
+This is important enough to call out explicitly.
+
+**GitHub Issues, Milestones, and Project boards do NOT transfer with git forks or clones.**
+
+When a developer forks `erikshafer/CritterSupply` to learn from it or adapt it for their own project, they get:
+- ✅ All source code
+- ✅ All markdown docs (CONTEXTS.md, skills/, ADRs, feature files)
+- ❌ GitHub Issues — **gone**
+- ❌ GitHub Milestones — **gone**
+- ❌ GitHub Project board — **gone**
+
+This means the cycle-by-cycle evolution story of the architecture — which patterns were tried, which were rejected, what bugs were discovered during integration — becomes invisible to anyone who isn't actively watching the original repository.
+
+**The fix: run `04-export-cycle.sh` at the end of every cycle.**
+
+```bash
+bash 04-export-cycle.sh "Cycle 19: Authentication & Authorization"
+# Output: docs/planning/cycles/cycle-19-issues-export.md
+# Commit that file → now the history is in the repo for all forks
+```
+
+The exported markdown file captures every Issue from the cycle (title, status, labels, body) in a single readable document. It's not as interactive as GitHub Issues, but it preserves the "what we planned and what we learned" narrative that makes CritterSupply valuable as a reference architecture.
+
+**Think of it this way:**
+- 🟦 **GitHub Issues** = the whiteboard during active development
+- 🟩 **Exported markdown** = the photograph of the whiteboard after the meeting
+
+Both have value. The whiteboard is erased (Issues close and become historical). The photograph persists (markdown committed to the repo).
+
+---
+
+
 
 Even with full scripting, these steps require the GitHub web UI:
 
@@ -230,7 +267,9 @@ Scripts automate everything else (labels, milestones, issues). The remaining man
 ## Running Order Summary
 
 ```
-1. [ONE TIME, MANUAL] Create GitHub Project in UI (~35 min)
+ONE-TIME MIGRATION (do this once):
+
+1. [MANUAL, ~35 min] Create GitHub Project in UI
    → New Project → Name: "CritterSupply Development" → Board template
    → Add custom fields (Bounded Context, Priority, Effort, Type)
    → Configure Board view columns
@@ -240,10 +279,21 @@ Scripts automate everything else (labels, milestones, issues). The remaining man
 3. [SCRIPTED] bash 02-milestones.sh      (~1 min, ~5 API calls)
 4. [SCRIPTED] bash 03-issues.sh          (~3 min, ~60 API calls)
 
-5. [MANUAL] Add issues to Project board  (~5 min)
+5. [MANUAL, ~5 min] Add issues to Project board
    → In GitHub Project, click "+ Add items" → select all newly created issues
 
-Total time: ~1 hour (35 min UI + 6 min scripts + 5 min verification + 14 min buffer)
+Total time for one-time setup: ~1 hour
+
+---
+
+AT THE END OF EVERY CYCLE (do this each time a cycle completes):
+
+6. [SCRIPTED] bash 04-export-cycle.sh "Cycle NN: <Name>"
+   → Exports closed Issues to docs/planning/cycles/cycle-NN-issues-export.md
+   → Commit this file so git forks have complete cycle history
+
+Why: GitHub Issues don't transfer with forks. This export keeps CritterSupply
+     fully self-contained as a reference architecture. See [Why Issue Export Matters](#why-issue-export-matters-fork-compatibility).
 ```
 
 ---

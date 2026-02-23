@@ -176,9 +176,12 @@ docs/features/
 
 **After Completing a Cycle (Retrospective Phase):**
 1. Close GitHub Milestone (records completion date)
-2. Update `CONTEXTS.md` with new integration flows
-3. Create retrospective doc: `docs/planning/cycles/cycle-NN-retrospective.md`
-4. Update `docs/planning/CURRENT-CYCLE.md` to next cycle
+2. Export closed Issues to markdown for fork compatibility:
+   `bash scripts/github-migration/04-export-cycle.sh "Cycle NN: <Name>"`
+   Then commit the exported file (`docs/planning/cycles/cycle-NN-issues-export.md`)
+3. Update `CONTEXTS.md` with new integration flows
+4. Create retrospective doc: `docs/planning/cycles/cycle-NN-retrospective.md`
+5. Update `docs/planning/CURRENT-CYCLE.md` to next cycle
 
 ### Legacy Documentation
 

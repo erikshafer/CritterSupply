@@ -601,11 +601,21 @@ docs: update CURRENT-CYCLE.md for Cycle 19 start
 **After:**
 ```
 1. Close GitHub Milestone (sets completion date automatically)
-2. Create retrospective doc: docs/planning/cycles/cycle-NN-retrospective.md
-3. Update CONTEXTS.md with new integration flows
-4. Update docs/planning/CURRENT-CYCLE.md to next cycle
-5. GitHub Project: archive completed milestone items
+2. Export Issues to markdown for fork compatibility:
+   bash scripts/github-migration/04-export-cycle.sh "Cycle NN: <Name>"
+   git add docs/planning/cycles/cycle-NN-issues-export.md && git commit
+3. Create retrospective doc: docs/planning/cycles/cycle-NN-retrospective.md
+4. Update CONTEXTS.md with new integration flows
+5. Update docs/planning/CURRENT-CYCLE.md to next cycle
+6. GitHub Project: archive completed milestone items
 ```
+
+> **Why export to markdown?** GitHub Issues do not transfer with git forks. When someone
+> clones CritterSupply to learn from it, they get the code and markdown docs but lose all
+> Issue history. Exporting closed Issues to a committed markdown file ensures the cycle's
+> planning and learning history is preserved in the repository itself — making CritterSupply
+> fully self-contained as a reference architecture without requiring GitHub API access.
+> See [`scripts/github-migration/README.md`](../../scripts/github-migration/README.md) for details.
 
 ---
 
@@ -664,11 +674,14 @@ The `scripts/github-migration/` directory contains `gh` CLI scripts that automat
 
 ### What the Scripts Do
 
-| Script | What It Creates | Time |
+| Script | What It Creates | When |
 |---|---|---|
-| [`01-labels.sh`](../../scripts/github-migration/01-labels.sh) | All `bc:*`, `type:*`, `status:*`, `priority:*` labels (~30) | ~2 min |
-| [`02-milestones.sh`](../../scripts/github-migration/02-milestones.sh) | Cycle 19 milestone (+ optional historical Cycles 1-18) | ~1 min |
-| [`03-issues.sh`](../../scripts/github-migration/03-issues.sh) | All backlog Issues + 11 ADR companion Issues | ~3 min |
+| [`01-labels.sh`](../../scripts/github-migration/01-labels.sh) | All `bc:*`, `type:*`, `status:*`, `priority:*` labels (~30) | One-time setup |
+| [`02-milestones.sh`](../../scripts/github-migration/02-milestones.sh) | Cycle 19-21 milestones (+ optional historical Cycles 1-18) | One-time setup |
+| [`03-issues.sh`](../../scripts/github-migration/03-issues.sh) | All backlog Issues + 11 ADR companion Issues | One-time setup |
+| [`04-export-cycle.sh`](../../scripts/github-migration/04-export-cycle.sh) | ⭐ Exports closed Issues → markdown file | **End of every cycle** |
+
+> **Why `04-export-cycle.sh` is critical:** GitHub Issues, Milestones, and Project boards do **not** transfer with git forks. Developers who clone CritterSupply to learn from it lose the entire Issue history. Running this script at the end of each cycle exports the closed Issues to a committed markdown file (`docs/planning/cycles/cycle-NN-issues-export.md`), keeping CritterSupply self-contained and learnable without GitHub API access. See the [automation README](../../scripts/github-migration/README.md#why-issue-export-matters-fork-compatibility) for a full explanation.
 
 ### Prerequisites for Scripts
 
@@ -703,6 +716,11 @@ bash 03-issues.sh
 
 # Preview without executing (all scripts support this)
 bash 03-issues.sh --dry-run
+
+# Step 4: At the END of every completed cycle — export Issues to markdown
+bash 04-export-cycle.sh "Cycle 19: Authentication & Authorization"
+# → Creates: docs/planning/cycles/cycle-19-issues-export.md
+# → Commit this file so git forks retain the cycle history
 ```
 
 ### What Still Requires the GitHub UI (~35 min, one time only)
@@ -747,6 +765,16 @@ See the [full automation README](../../scripts/github-migration/README.md) for c
 - [ ] Create parent Cycle Epic Issue for Cycle 19 (see template in Part 3B)
 - [ ] Create individual task sub-issues for Cycle 19
 - [ ] Verify `docs/planning/CURRENT-CYCLE.md` is up to date
+
+### Recurring: At the End of Every Cycle ♻️
+- [ ] Close GitHub Milestone
+- [ ] `bash scripts/github-migration/04-export-cycle.sh "Cycle NN: <Name>"` — export closed Issues to markdown
+- [ ] Commit the exported file (`docs/planning/cycles/cycle-NN-issues-export.md`)
+- [ ] Create retrospective doc in `docs/planning/cycles/`
+- [ ] Update `docs/planning/CURRENT-CYCLE.md` to next cycle
+- [ ] Update `CONTEXTS.md` with new integration flows
+
+> The export step is essential for keeping CritterSupply self-contained as a reference architecture. See the [automation README](../../scripts/github-migration/README.md#why-issue-export-matters-fork-compatibility).
 
 ### Already Done ✅
 - [x] Add deprecation notice to `CYCLES.md`
