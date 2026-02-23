@@ -14,9 +14,32 @@
 # Potential issues:
 #   - Re-running on existing labels: gh updates color/description in place (safe)
 #   - Unknown repo: set REPO below or pass GH_REPO env var
+#
+# IMPORTANT — BC label semantics:
+#   bc:* labels are CONVENIENCE METADATA for filtering, not architecture.
+#   The authoritative bounded context definitions live in CONTEXTS.md.
+#   If a BC boundary changes (e.g., Checkout moved Shopping → Orders in Cycle 8),
+#   update CONTEXTS.md first, then relabel GitHub Issues. Labels follow architecture,
+#   they don't define it.
 # =============================================================================
 
 set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Preflight checks — fail fast with a clear message
+# ---------------------------------------------------------------------------
+if ! command -v gh &> /dev/null; then
+  echo "❌ gh CLI not found."
+  echo "   Install: brew install gh (macOS) | winget install GitHub.cli (Windows)"
+  echo "   Linux:   https://github.com/cli/cli/blob/trunk/docs/install_linux.md"
+  exit 1
+fi
+
+if ! gh auth status &> /dev/null; then
+  echo "❌ Not authenticated with GitHub CLI."
+  echo "   Run: gh auth login"
+  exit 1
+fi
 
 REPO="${GH_REPO:-erikshafer/CritterSupply}"
 DRY_RUN=false

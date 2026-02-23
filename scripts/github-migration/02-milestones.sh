@@ -4,8 +4,14 @@
 #
 # Run this SECOND (after 01-labels.sh, before 03-issues.sh).
 #
+# Milestone semantics:
+#   Milestones = CYCLES (temporal grouping — what was worked on in a time period).
+#   Labels     = BOUNDED CONTEXTS (logical grouping — which BC does this belong to).
+#   These are different concerns. Use both. To find "all Customer Experience work
+#   across Cycles 16-18," filter by label bc:customer-experience, not by Milestone.
+#
 # Usage:
-#   bash 02-milestones.sh                    # creates Cycle 19 only
+#   bash 02-milestones.sh                    # creates Cycle 19-21 milestones
 #   bash 02-milestones.sh --include-historical  # also creates closed Cycles 1-18
 #   bash 02-milestones.sh --dry-run          # print commands without executing
 #
@@ -20,6 +26,22 @@
 # =============================================================================
 
 set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Preflight checks — fail fast with a clear message
+# ---------------------------------------------------------------------------
+if ! command -v gh &> /dev/null; then
+  echo "❌ gh CLI not found."
+  echo "   Install: brew install gh (macOS) | winget install GitHub.cli (Windows)"
+  echo "   Linux:   https://github.com/cli/cli/blob/trunk/docs/install_linux.md"
+  exit 1
+fi
+
+if ! gh auth status &> /dev/null; then
+  echo "❌ Not authenticated with GitHub CLI."
+  echo "   Run: gh auth login"
+  exit 1
+fi
 
 REPO="${GH_REPO:-erikshafer/CritterSupply}"
 DRY_RUN=false

@@ -185,6 +185,33 @@ Once those prerequisites are met, the AI agent's workflow is identical on every 
 
 ---
 
+## Source of Truth Hierarchy
+
+To avoid ambiguity when GitHub Issues and the codebase diverge, the following hierarchy applies:
+
+```
+CONTEXTS.md (architectural truth — always wins)
+  ↓
+Code + Integration Tests (implementation reality)
+  ↓
+ADR markdown files (documented decisions)
+  ↓
+GitHub Issues (plans and intent at cycle start)
+```
+
+**Key principle:** Issues capture *intent at planning time*, not *truth after implementation*.
+
+**Example:** A Cycle 19 Issue titled "[Auth] Implement JWT authentication" is closed with a comment "Switched to cookie-based auth — see ADR 0012." The Issue title still says JWT, but:
+- The code uses cookies
+- CONTEXTS.md documents the cookie-based flow
+- ADR 0012 explains why
+
+CONTEXTS.md and ADR 0012 are the truth. The Issue is historical context showing the original plan. Do not update closed Issue titles to match implementation — update CONTEXTS.md and ADRs instead.
+
+**When CONTEXTS.md and Issues appear to conflict:** CONTEXTS.md wins, always. Update CONTEXTS.md proactively during the cycle as decisions change — don't wait until cycle-end retrospective.
+
+---
+
 ## Consequences
 
 ### Positive

@@ -20,9 +20,31 @@
 #   - Milestone not found: GitHub will reject the issue. Run 02-milestones.sh first.
 #   - Multi-line bodies: uses heredoc with single-quoted delimiter to prevent
 #     variable expansion inside the body text.
+#
+# ADR companion Issues:
+#   Issues created for ADRs are bookmarks for cross-referencing, not discussion threads.
+#   Close each ADR Issue immediately after creating it if the ADR is already in
+#   "Accepted" status — it should not appear as open work. If the ADR is still
+#   "Proposed," leave it open until a decision is made.
 # =============================================================================
 
 set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Preflight checks — fail fast with a clear message
+# ---------------------------------------------------------------------------
+if ! command -v gh &> /dev/null; then
+  echo "❌ gh CLI not found."
+  echo "   Install: brew install gh (macOS) | winget install GitHub.cli (Windows)"
+  echo "   Linux:   https://github.com/cli/cli/blob/trunk/docs/install_linux.md"
+  exit 1
+fi
+
+if ! gh auth status &> /dev/null; then
+  echo "❌ Not authenticated with GitHub CLI."
+  echo "   Run: gh auth login"
+  exit 1
+fi
 
 REPO="${GH_REPO:-erikshafer/CritterSupply}"
 DRY_RUN=false
