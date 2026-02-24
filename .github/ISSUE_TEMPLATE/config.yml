@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "📖 CONTEXTS.md (Architectural Source of Truth)"
+    url: https://github.com/erikshafer/CritterSupply/blob/main/CONTEXTS.md
+    about: "Always check CONTEXTS.md before writing an issue to understand BC boundaries and integration contracts."
+  - name: "📋 GitHub Project Board (CritterSupply Development)"
+    url: https://github.com/users/erikshafer/projects/1
+    about: "View the active Project board — Kanban view of all work in progress."
+  - name: "🗺️ Migration Plan"
+    url: https://github.com/erikshafer/CritterSupply/blob/main/docs/planning/GITHUB-MIGRATION-PLAN.md
+    about: "How we use GitHub Issues and Projects — conventions, label taxonomy, workflows."

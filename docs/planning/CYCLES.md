@@ -1,5 +1,15 @@
 # Development Cycles
 
+> **⚠️ MIGRATION IN PROGRESS (2026-02-23):**
+> CritterSupply is migrating from markdown-based planning to **GitHub Projects + Issues**.
+> - **New tracking:** GitHub Milestone per cycle, GitHub Issues per task, GitHub Project board
+> - **Migration plan:** [GITHUB-MIGRATION-PLAN.md](./GITHUB-MIGRATION-PLAN.md)
+> - **ADR:** [docs/decisions/0011-github-projects-issues-migration.md](../decisions/0011-github-projects-issues-migration.md)
+> - **AI agent fallback:** [CURRENT-CYCLE.md](./CURRENT-CYCLE.md)
+>
+> This file will become a **read-only historical archive** after Cycle 19 setup is complete.
+> Future cycles will be tracked in GitHub. Past cycle notes in `cycles/` remain as reference documentation.
+
 This document tracks active and recent development cycles. For complete historical details, see individual cycle plans in [`cycles/`](./cycles/).
 
 ---

@@ -1,5 +1,13 @@
 # CritterSupply Development Backlog
 
+> **⚠️ MIGRATION IN PROGRESS (2026-02-23):**
+> CritterSupply is migrating from markdown-based planning to **GitHub Projects + Issues**.
+> - **New backlog tracking:** GitHub Issues with label `status:backlog`
+> - **Migration plan:** [GITHUB-MIGRATION-PLAN.md](./GITHUB-MIGRATION-PLAN.md) — includes Issue templates for each item below
+> - **ADR:** [docs/decisions/0011-github-projects-issues-migration.md](../decisions/0011-github-projects-issues-migration.md)
+>
+> This file will become a **read-only historical archive** after backlog items are migrated to GitHub Issues.
+
 Future work items not yet scheduled into specific cycles.
 
 ---

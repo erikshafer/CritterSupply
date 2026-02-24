@@ -1,0 +1,113 @@
+name: Export Cycle Issues on Milestone Close
+
+# Automatically exports closed issues from a cycle milestone to markdown
+# Preserves cycle history for git forks (addresses fork compatibility goal)
+# Runs when a milestone is closed (webhook event)
+
+on:
+  milestone:
+    types: [closed]
+  
+  workflow_dispatch:
+    inputs:
+      milestone_title:
+        description: 'Milestone title to export (e.g., "Cycle 19: Authentication & Authorization")'
+        required: true
+        type: string
+
+jobs:
+  export-cycle-issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+      contents: write  # Required to commit exported markdown file
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Install dependencies
+        run: |
+          # Install gh CLI if not present
+          type -p gh >/dev/null || {
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh -y
+          }
+          
+          # Ensure jq is installed
+          sudo apt-get install -y jq
+      
+      - name: Authenticate GitHub CLI
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+      
+      - name: Determine milestone title
+        id: milestone
+        run: |
+          if [ "${{ github.event_name }}" = "milestone" ]; then
+            TITLE="${{ github.event.milestone.title }}"
+          else
+            TITLE="${{ inputs.milestone_title }}"
+          fi
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+      
+      - name: Export cycle issues
+        env:
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cd scripts/github-migration
+          bash 04-export-cycle.sh "${{ steps.milestone.outputs.title }}" --closed-only
+      
+      - name: Commit exported markdown
+        run: |
+          # Extract cycle number from milestone title
+          CYCLE_NUM=$(echo "${{ steps.milestone.outputs.title }}" | grep -oE '[0-9]+' | head -1)
+          EXPORT_FILE="docs/planning/cycles/cycle-${CYCLE_NUM}-issues-export.md"
+          
+          if [ -f "$EXPORT_FILE" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add "$EXPORT_FILE"
+            MILESTONE_TITLE="${{ steps.milestone.outputs.title }}"
+            git commit -m "docs: export Cycle ${CYCLE_NUM} issues to markdown for fork compatibility" \
+              -m "Automated export triggered by milestone close event." \
+              -m "Source: ${MILESTONE_TITLE}" \
+              -m "This preserves cycle history for git forks and clones. See ADR 0011 and scripts/github-migration/README.md for rationale."
+            git push
+            echo "✅ Exported $EXPORT_FILE and committed to repository"
+          else
+            echo "⚠️ No export file found at $EXPORT_FILE"
+            exit 1
+          fi
+      
+      - name: Create tracking issue for next cycle
+        if: success()
+        env:
+          MILESTONE_TITLE: ${{ steps.milestone.outputs.title }}
+        run: |
+          CYCLE_NUM=$(echo "${MILESTONE_TITLE}" | grep -oE '[0-9]+' | head -1)
+          NEXT_CYCLE=$((CYCLE_NUM + 1))
+
+          {
+            echo "Cycle ${CYCLE_NUM} (${MILESTONE_TITLE}) has completed and issues have been exported."
+            echo ""
+            echo "**Action Required:**"
+            echo "1. Update \`docs/planning/CURRENT-CYCLE.md\` to reflect Cycle ${NEXT_CYCLE}"
+            echo "2. Create Cycle ${NEXT_CYCLE} milestone if not already created"
+            echo "3. Review backlog and assign issues to the new milestone"
+            echo ""
+            echo "**References:**"
+            echo "- [Exported Cycle ${CYCLE_NUM} Issues](docs/planning/cycles/cycle-${CYCLE_NUM}-issues-export.md)"
+            echo "- [Migration Plan](docs/planning/GITHUB-MIGRATION-PLAN.md)"
+            echo "- [ADR 0011](docs/decisions/0011-github-projects-issues-migration.md)"
+          } > /tmp/tracking-issue-body.md
+
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "📋 Update CURRENT-CYCLE.md for Cycle ${NEXT_CYCLE}" \
+            --label "type:documentation,bc:infrastructure" \
+            --body-file /tmp/tracking-issue-body.md || echo "Issue creation skipped or failed"

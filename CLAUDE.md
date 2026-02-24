@@ -31,15 +31,32 @@ CritterSupply uses a modular documentation structure optimized for AI-assisted d
 
 ### Planning & Progress Documentation
 
-**Active Cycles & Roadmap:**
-- **[docs/planning/CYCLES.md](./docs/planning/CYCLES.md)** — Active development cycle, recent completions, upcoming work (replaces old DEVPROGRESS.md wall of text)
-- **[docs/planning/cycles/](./docs/planning/cycles/)** — Detailed per-cycle plans with objectives, deliverables, completion criteria
-- **[docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md)** — Future work not yet scheduled
+**⚠️ Migration in Progress (2026-02-23):** CritterSupply is moving from markdown-based planning to **GitHub Projects + Issues**. See [GITHUB-MIGRATION-PLAN.md](./docs/planning/GITHUB-MIGRATION-PLAN.md) and [ADR 0011](./docs/decisions/0011-github-projects-issues-migration.md).
 
-**When to Use:**
-- Starting a new cycle: Create `docs/planning/cycles/cycle-NN-name.md` with detailed plan
-- Tracking progress: Update `CYCLES.md` (move from "Upcoming" to "Current" to "Recently Completed")
-- Retrospective: Add "Implementation Notes" section to cycle plan after completion
+**Active Cycle Tracking (GitHub-First):**
+- **GitHub Issues** — One Issue per task; label with `bc:*`, `type:*`, `priority:*`, `status:*`
+- **GitHub Milestones** — One Milestone per cycle (e.g., `Cycle 19: Authentication & Authorization`)
+- **GitHub Project Board** — Kanban board view with columns: Backlog → In Progress → In Review → Done
+- **[docs/planning/CURRENT-CYCLE.md](./docs/planning/CURRENT-CYCLE.md)** — Lightweight AI-readable summary (fallback when GitHub MCP not available)
+
+**Why GitHub-first works across any machine (MacBook, Windows, Linux):**
+Project state lives in GitHub's cloud, not in local files. Any machine with the GitHub MCP server configured and GitHub auth completed gets the same authoritative view of open issues, active milestones, and backlog — no stale markdown, no sync needed.
+
+**Prerequisites per machine:**
+- ✅ **GitHub MCP server** — configured in your AI tool's MCP settings (VS Code, Cursor, Claude Desktop, etc.)
+- ✅ **GitHub auth** — personal access token with `repo` + `project` scopes
+- See [GITHUB-ACCESS-GUIDE.md](./docs/planning/GITHUB-ACCESS-GUIDE.md) for complete setup instructions (PAT creation, MCP config JSON, domain allowlist, verification checklist)
+
+**Legacy Markdown (Read-Only Archives):**
+- **[docs/planning/CYCLES.md](./docs/planning/CYCLES.md)** — Historical cycle records (Cycles 1–18); **deprecated for new cycles**
+- **[docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md)** — Historical backlog; **deprecated** (items migrated to GitHub Issues)
+- **[docs/planning/cycles/](./docs/planning/cycles/)** — Per-cycle retrospective docs; still created as markdown after each cycle
+
+**When to Use What:**
+- Starting a new cycle: Create GitHub Milestone + Issues; write `docs/planning/cycles/cycle-NN-name.md` for detailed plan
+- Tracking progress: Close GitHub Issues (use `Fixes #XX` in commits); GitHub Project board auto-updates
+- Checking current state: Call `list_issues(milestone="Cycle NN")` OR read `docs/planning/CURRENT-CYCLE.md`
+- Retrospective: Create markdown doc in `cycles/`; update `CURRENT-CYCLE.md`
 
 ### Architectural Decision Records (ADRs)
 
@@ -142,27 +159,37 @@ docs/features/
 ### Workflow for New Cycles
 
 **Before Starting a Cycle (Planning Phase):**
-1. Create cycle plan: `docs/planning/cycles/cycle-NN-name.md`
-2. Write 2-3 Gherkin `.feature` files for key user stories
-3. Create ADRs for any architectural decisions made during planning
-4. Review CONTEXTS.md for integration requirements
-5. Update `docs/planning/CYCLES.md` (move cycle from "Upcoming" to "Current")
+1. Create GitHub Milestone: `Cycle NN: <Name>` with target due date
+2. Create parent "Cycle Epic" Issue linked to Milestone
+3. Create individual task Issues (linked to Milestone) using labels: `bc:*`, `type:feature`, `priority:*`
+4. Write 2-3 Gherkin `.feature` files for key user stories
+5. Create ADR markdown file + companion GitHub Issue for architectural decisions
+6. Review `CONTEXTS.md` for integration requirements
+7. Update `docs/planning/CURRENT-CYCLE.md` with new cycle info
 
 **During a Cycle (Implementation Phase):**
 1. Implement features using `.feature` files as acceptance criteria
 2. Write integration tests verifying Gherkin scenarios
-3. Update cycle plan with "Implementation Notes" section (learnings, gotchas)
-4. Create ADRs when making architectural decisions during implementation
+3. Close Issues via `Fixes #XX` in commit messages (or PR description)
+4. Comment on Issues with implementation notes / blockers
+5. Create ADR markdown file when making architectural decisions
 
 **After Completing a Cycle (Retrospective Phase):**
-1. Mark cycle complete in `CYCLES.md` (add completion date + summary)
-2. Update CONTEXTS.md with new integration flows
-3. Archive detailed notes in cycle-specific doc (`cycles/cycle-NN-name.md`)
-4. Plan next cycle based on backlog
+1. Close GitHub Milestone (records completion date)
+2. Export closed Issues to markdown for fork compatibility:
+   `bash scripts/github-migration/04-export-cycle.sh "Cycle NN: <Name>"`
+   Then commit the exported file (`docs/planning/cycles/cycle-NN-issues-export.md`)
+3. Update `CONTEXTS.md` with new integration flows
+4. Create retrospective doc: `docs/planning/cycles/cycle-NN-retrospective.md`
+5. Update `docs/planning/CURRENT-CYCLE.md` to next cycle
 
 ### Legacy Documentation
 
-**DEVPROGRESS.md** — Deprecated as of 2026-02-04. See deprecation notice at top of file. Kept for historical reference only.
+**DEVPROGRESS.md** — Deprecated as of 2026-02-04. Kept for historical reference only.
+
+**docs/planning/CYCLES.md** — Deprecated for new cycles as of 2026-02-23 (migration to GitHub Issues). Kept as historical archive (Cycles 1–18).
+
+**docs/planning/BACKLOG.md** — Deprecated as of 2026-02-23 (migrated to GitHub Issues). Kept as historical reference.
 
 ## Quick References
 

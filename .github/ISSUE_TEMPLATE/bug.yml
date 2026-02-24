@@ -1,0 +1,89 @@
+name: "🐛 Bug Report"
+description: "Something is broken or behaving incorrectly"
+title: "[Bug] "
+labels: ["type:bug", "status:backlog"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the bug clearly. AI agents read this issue body to understand what to fix — include steps to reproduce and expected vs actual behavior.
+
+  - type: dropdown
+    id: bounded-context
+    attributes:
+      label: "Bounded Context"
+      description: "Which BC does this bug appear in?"
+      options:
+        - "bc:orders"
+        - "bc:payments"
+        - "bc:shopping"
+        - "bc:inventory"
+        - "bc:fulfillment"
+        - "bc:customer-identity"
+        - "bc:product-catalog"
+        - "bc:customer-experience"
+        - "bc:vendor-portal"
+        - "bc:returns"
+        - "bc:infrastructure"
+        - "bc:cross-cutting"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Bug Description"
+      description: "What is happening that shouldn't be?"
+      placeholder: "When a customer does X, the system incorrectly does Y instead of Z."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: "Steps to Reproduce"
+      placeholder: |
+        1. Start with [state / precondition]
+        2. Perform [action]
+        3. Observe [incorrect behavior]
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: "Expected Behavior"
+      description: "What should happen?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: "Actual Behavior"
+      description: "What actually happens?"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: "Urgency"
+      description: "How time-sensitive is this fix?"
+      options:
+        - "urgency:immediate (blocking users / data integrity risk)"
+        - "urgency:high (significant user impact, fix next cycle)"
+        - "urgency:medium (noticeable issue, fix within 2-3 cycles)"
+        - "urgency:low (minor inconvenience, fix when possible)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: "Additional Context"
+      description: "Logs, error messages, related issues, or CONTEXTS.md sections."
+      placeholder: |
+        - Error message / stack trace: [paste here]
+        - Related issue: #XX
+        - CONTEXTS.md section: [relevant section]

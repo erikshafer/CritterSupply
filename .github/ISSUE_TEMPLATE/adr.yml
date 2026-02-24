@@ -1,0 +1,63 @@
+name: "📐 ADR Companion"
+description: "Tracking issue for an Architectural Decision Record — bookmark for cross-referencing only"
+title: "[ADR NNNN] "
+labels: ["type:adr"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **ADR Issues are bookmarks, not discussion threads.**
+        
+        The authoritative ADR document lives in `docs/decisions/NNNN-title.md` in the repository.
+        This issue exists so the ADR shows up in searches, can be linked from commits/PRs, and
+        can be assigned to a Milestone (linking it to the cycle it was decided in).
+        
+        **Close this issue immediately once the ADR status is "Accepted" or "Rejected".**
+        Open ADR issues should only exist for ADRs that are still "Proposed" (under discussion).
+
+  - type: input
+    id: adr-number
+    attributes:
+      label: "ADR Number"
+      placeholder: "0011"
+    validations:
+      required: true
+
+  - type: input
+    id: adr-file
+    attributes:
+      label: "ADR File Path"
+      placeholder: "docs/decisions/0011-github-projects-issues-migration.md"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: adr-status
+    attributes:
+      label: "ADR Status"
+      options:
+        - "⚠️ Proposed (under discussion — leave issue OPEN)"
+        - "✅ Accepted (close this issue)"
+        - "❌ Rejected (close this issue)"
+        - "🔄 Superseded (close this issue, link to superseding ADR)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: "One-Line Summary"
+      description: "What was decided? One sentence."
+      placeholder: "Decided to use GitHub Projects + Issues instead of markdown files for planning and tracking."
+    validations:
+      required: true
+
+  - type: textarea
+    id: discussion
+    attributes:
+      label: "Discussion / Open Questions (for Proposed ADRs)"
+      description: "If this ADR is still Proposed, what questions need answering before it can be accepted?"
+      placeholder: |
+        Questions to resolve before accepting:
+        - [Question 1]
+        - [Question 2]
