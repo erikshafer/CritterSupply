@@ -33,6 +33,7 @@ The `gh` CLI is GitHub's official command-line tool. It wraps the GitHub REST AP
 2. [`02-milestones.sh`](./02-milestones.sh) — Creates Cycle 19-21 milestones + optional historical milestones (closed)
 3. [`03-issues.sh`](./03-issues.sh) — Creates all backlog Issues from `docs/planning/BACKLOG.md`
 4. [`04-export-cycle.sh`](./04-export-cycle.sh) — ⭐ Exports a completed cycle's closed Issues back to markdown (run at cycle end)
+5. [`remove-duplicate-column.sh`](./remove-duplicate-column.sh) — 🔧 Removes the duplicate "In Progress" column from project board #9 (requires `project` scope)
 
 **How to run:**
 ```bash
