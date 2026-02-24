@@ -45,7 +45,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
-      Wolverine__RabbitMQ__Host: rabbitmq
+      RabbitMQ__hostname: rabbitmq
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,7 +66,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
-      Wolverine__RabbitMQ__Host: rabbitmq
+      RabbitMQ__hostname: rabbitmq
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,7 +87,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
-      Wolverine__RabbitMQ__Host: rabbitmq
+      RabbitMQ__hostname: rabbitmq
     depends_on:
       postgres:
         condition: service_healthy
@@ -108,7 +108,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
-      Wolverine__RabbitMQ__Host: rabbitmq
+      RabbitMQ__hostname: rabbitmq
     depends_on:
       postgres:
         condition: service_healthy
@@ -129,7 +129,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__postgres: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
-      Wolverine__RabbitMQ__Host: rabbitmq
+      RabbitMQ__hostname: rabbitmq
     depends_on:
       postgres:
         condition: service_healthy
@@ -150,7 +150,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
-      Wolverine__RabbitMQ__Host: rabbitmq
+      RabbitMQ__hostname: rabbitmq
     depends_on:
       postgres:
         condition: service_healthy
@@ -171,7 +171,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
-      Wolverine__RabbitMQ__Host: rabbitmq
+      RabbitMQ__hostname: rabbitmq
     depends_on:
       postgres:
         condition: service_healthy
@@ -192,7 +192,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
-      Wolverine__RabbitMQ__Host: rabbitmq
+      RabbitMQ__hostname: rabbitmq
     depends_on:
       postgres:
         condition: service_healthy

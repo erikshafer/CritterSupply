@@ -10,7 +10,7 @@ using Wolverine.Marten;
 var builder = WebApplication.CreateBuilder(args);
 
 // Marten document store configuration
-var connectionString = builder.Configuration.GetConnectionString("Postgres")
+var connectionString = builder.Configuration.GetConnectionString("marten")
     ?? "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=postgres";
 
 builder.Services.AddMarten(opts =>
