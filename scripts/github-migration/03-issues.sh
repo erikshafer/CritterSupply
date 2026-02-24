@@ -64,7 +64,7 @@ validate_labels() {
   
   # Fetch all existing labels (cache this across function calls)
   if [ ! -f /tmp/repo-labels.txt ]; then
-    gh label list --repo "$REPO" --json name --jq '.[].name' > /tmp/repo-labels.txt 2>/dev/null || {
+    gh label list --repo "$REPO" --limit 100 --json name --jq '.[].name' > /tmp/repo-labels.txt 2>/dev/null || {
       echo "⚠️  Could not fetch repo labels. Skipping validation."
       return 0
     }
@@ -133,14 +133,16 @@ create_issue() {
   done
 
   local number
-  number=$(gh issue create \
+  local create_output
+  create_output=$(gh issue create \
     --repo "$REPO" \
     --title "$title" \
     "${label_flags[@]}" \
     --milestone "$milestone" \
-    --body-file "$body_file" \
-    --json number \
-    --jq '.number')
+    --body-file "$body_file" 2>&1)
+
+  # Extract issue number from URL (works with all gh versions)
+  number=$(echo "$create_output" | grep -oE 'https://github.com/[^/]+/[^/]+/issues/([0-9]+)' | grep -oE '[0-9]+$' || echo "?")
 
   echo "✅ Issue #$number: $title"
 }
@@ -156,7 +158,7 @@ echo ""
 
 # Pre-fetch all repo labels for validation (cache for entire script run)
 echo "📥 Fetching repository labels for validation..."
-gh label list --repo "$REPO" --json name --jq '.[].name' > /tmp/repo-labels.txt 2>/dev/null || {
+gh label list --repo "$REPO" --limit 100 --json name --jq '.[].name' > /tmp/repo-labels.txt 2>/dev/null || {
   echo "⚠️  Could not pre-fetch labels. Label validation will be skipped."
 }
 echo ""
@@ -470,13 +472,15 @@ EOF
   fi
 
   local number
-  number=$(gh issue create \
+  local create_output
+  create_output=$(gh issue create \
     --repo "$REPO" \
     --title "$title" \
     --label "type:adr" \
-    --body-file "$TMPDIR_BODIES/adr-${adr_num}.md" \
-    --json number \
-    --jq '.number')
+    --body-file "$TMPDIR_BODIES/adr-${adr_num}.md" 2>&1)
+
+  # Extract issue number from URL (works with all gh versions)
+  number=$(echo "$create_output" | grep -oE 'https://github.com/[^/]+/[^/]+/issues/([0-9]+)' | grep -oE '[0-9]+$' || echo "?")
 
   echo "✅ Issue #$number: $title"
 }
