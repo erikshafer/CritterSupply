@@ -141,5 +141,44 @@ label "urgency:high"      "e4511b" "Fix next cycle — significant user impact"
 label "urgency:medium"    "fbca04" "Fix within 2-3 cycles — noticeable issue"
 label "urgency:low"       "0e8a16" "Fix when possible — minor inconvenience"
 
+
+# ---------------------------------------------------------------------------
+# Cleanup: Delete GitHub default labels that conflict with or duplicate
+# the CritterSupply label taxonomy. These 9 labels are created automatically
+# by GitHub when a new repository is initialized.
+#
+# Mapping to canonical equivalents:
+#   bug           → type:bug
+#   documentation → type:documentation
+#   enhancement   → type:feature
+#   duplicate, good first issue, help wanted, invalid, question, wontfix
+#                 → no equivalent; use structured taxonomy labels + comments
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Removing GitHub default labels (not part of CritterSupply taxonomy) ---"
+
+delete_default() {
+  local name="$1"
+
+  if [ "$DRY_RUN" = true ]; then
+    echo "[DRY RUN] gh label delete \"$name\" --repo \"$REPO\" --yes"
+    return
+  fi
+
+  gh label delete "$name" --repo "$REPO" --yes 2>/dev/null \
+    && echo "🗑️  Deleted: $name" \
+    || echo "⚪ Not found (already removed): $name"
+}
+
+delete_default "bug"
+delete_default "documentation"
+delete_default "duplicate"
+delete_default "enhancement"
+delete_default "good first issue"
+delete_default "help wanted"
+delete_default "invalid"
+delete_default "question"
+delete_default "wontfix"
+
 echo ""
 echo "🎉 Done! Verify with: gh label list --repo $REPO"
