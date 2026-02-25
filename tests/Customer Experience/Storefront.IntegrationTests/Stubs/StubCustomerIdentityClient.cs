@@ -31,4 +31,25 @@ public class StubCustomerIdentityClient : ICustomerIdentityClient
         var result = query.ToList();
         return Task.FromResult<IReadOnlyList<CustomerAddressDto>>(result);
     }
+
+    // Authentication methods (stubs for testing)
+    public Task<LoginResponse?> LoginAsync(string email, string password, CancellationToken ct = default)
+    {
+        // Stub: Return test user
+        var response = new LoginResponse(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), email, "Test", "User");
+        return Task.FromResult<LoginResponse?>(response);
+    }
+
+    public Task LogoutAsync(CancellationToken ct = default)
+    {
+        // Stub: No-op
+        return Task.CompletedTask;
+    }
+
+    public Task<CurrentUserResponse?> GetCurrentUserAsync(CancellationToken ct = default)
+    {
+        // Stub: Return test user
+        var response = new CurrentUserResponse(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), "test@critter.test", "Test", "User");
+        return Task.FromResult<CurrentUserResponse?>(response);
+    }
 }

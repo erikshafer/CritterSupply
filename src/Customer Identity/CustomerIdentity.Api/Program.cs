@@ -39,8 +39,30 @@ builder.Host.UseWolverine(opts =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Add health checks
+builder.Services.AddHealthChecks()
+    .AddNpgSql(connectionString, name: "postgres", tags: ["db", "ready"]);
+
 // Register address verification service (stub for development)
 builder.Services.AddSingleton<IAddressVerificationService, StubAddressVerificationService>();
+
+// Configure authentication (cookie-based sessions for dev mode)
+builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "CritterSupply.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.ExpireTimeSpan = TimeSpan.FromDays(7);
+        options.SlidingExpiration = true;
+        options.Events.OnRedirectToLogin = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 builder.Services.AddWolverineHttp();
 
@@ -67,6 +89,16 @@ if (app.Environment.IsDevelopment())
         opts.SwaggerEndpoint("/api/v1/swagger.json", "Customers API");
     });
 }
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Map health check endpoints
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
 
 app.MapWolverineEndpoints(opts =>
 {

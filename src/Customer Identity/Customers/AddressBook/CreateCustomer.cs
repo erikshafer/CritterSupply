@@ -85,7 +85,7 @@ public static class CreateCustomerHandler
     }
 
     [WolverinePost("/api/customers")]
-    public static async Task<CreationResponse> Handle(
+    public static async Task<CreationResponse<Guid>> Handle(
         CreateCustomer command,
         CustomerIdentityDbContext dbContext,
         CancellationToken ct)
@@ -99,6 +99,6 @@ public static class CreateCustomerHandler
         dbContext.Customers.Add(customer);
         await dbContext.SaveChangesAsync(ct);
 
-        return new CreationResponse($"/api/customers/{customer.Id}");
+        return new CreationResponse<Guid>($"/api/customers/{customer.Id}", customer.Id);
     }
 }

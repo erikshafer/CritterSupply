@@ -88,4 +88,12 @@ public class TestFixture : IAsyncLifetime
         await dbContext.Addresses.ExecuteDeleteAsync();
         await dbContext.Customers.ExecuteDeleteAsync();
     }
+
+    public async Task CleanAddressesAsync()
+    {
+        using var scope = Host.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<CustomerIdentityDbContext>();
+
+        await dbContext.Addresses.ExecuteDeleteAsync();
+    }
 }

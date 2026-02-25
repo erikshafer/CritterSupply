@@ -1,6 +1,10 @@
 @rendermode InteractiveServer
 @using System.Text.Json
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
 
 <MudAppBar Elevation="1">
@@ -10,6 +14,24 @@
     <MudBadge Content="@_cartItemCount" Color="Color.Secondary" Overlap="true" Visible="@(_cartItemCount > 0)">
         <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" />
     </MudBadge>
+
+    <AuthorizeView>
+        <Authorized>
+            <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                <MudText Typo="Typo.body2" Class="px-4 py-2">@context.User.FindFirst(ClaimTypes.GivenName)?.Value</MudText>
+                <MudDivider />
+                <MudMenuItem Icon="@Icons.Material.Filled.Person" Href="/account">My Account</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.Receipt" Href="/orders">Order History</MudMenuItem>
+                <MudDivider />
+                <MudMenuItem Icon="@Icons.Material.Filled.Logout" OnClick="HandleLogout">Logout</MudMenuItem>
+            </MudMenu>
+        </Authorized>
+        <NotAuthorized>
+            <MudButton Variant="Variant.Text" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Login" Href="/login">
+                Sign In
+            </MudButton>
+        </NotAuthorized>
+    </AuthorizeView>
 </MudAppBar>
 
 <MudDrawer @bind-Open="@DrawerOpen" Elevation="2">
@@ -33,28 +55,49 @@
 
     private int _cartItemCount = 0;
     private DotNetObjectReference<InteractiveAppBar>? _dotNetHelper;
-
-    // Stub customer ID - in real app this would come from authentication
-    private readonly Guid _customerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private Guid? _customerId;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await SubscribeToSSE();
+            // Get authenticated customer ID
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var customerIdClaim = authState.User.FindFirst("CustomerId")?.Value;
+            if (Guid.TryParse(customerIdClaim, out var customerId))
+            {
+                _customerId = customerId;
+                await SubscribeToSSE();
+            }
         }
     }
 
     private async Task SubscribeToSSE()
     {
+        if (!_customerId.HasValue) return;
+
         try
         {
             _dotNetHelper = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("sseClient.subscribe", _customerId.ToString(), _dotNetHelper);
+            await JS.InvokeVoidAsync("sseClient.subscribe", _customerId.Value.ToString(), _dotNetHelper);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Failed to subscribe to SSE in AppBar: {ex.Message}");
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        try
+        {
+            var client = new HttpClient { BaseAddress = new Uri("http://localhost:5235") };
+            await client.PostAsync("/api/auth/logout", null);
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Logout failed: {ex.Message}");
         }
     }
 

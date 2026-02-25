@@ -114,7 +114,7 @@ public static class AddAddressHandler
     }
 
     [WolverinePost("/api/customers/{customerId}/addresses")]
-    public static async Task<CreationResponse> Handle(
+    public static async Task<CreationResponse<Guid>> Handle(
         AddAddress command,
         CustomerIdentityDbContext dbContext,
         IAddressVerificationService verificationService,
@@ -171,6 +171,6 @@ public static class AddAddressHandler
         dbContext.Addresses.Add(address);
         await dbContext.SaveChangesAsync(ct);
 
-        return new CreationResponse($"/api/customers/{command.CustomerId}/addresses/{address.Id}");
+        return new CreationResponse<Guid>($"/api/customers/{command.CustomerId}/addresses/{address.Id}", address.Id);
     }
 }

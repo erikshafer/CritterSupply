@@ -1,5 +1,7 @@
 @page "/checkout"
+@attribute [Authorize]
 @rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
 @inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager Navigation
 

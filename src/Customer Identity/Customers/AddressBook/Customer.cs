@@ -10,6 +10,7 @@ public sealed class Customer
     public string Email { get; private set; } = string.Empty;
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
+    public string? Password { get; private set; } // Nullable for dev mode; plaintext for reference architecture
     public DateTimeOffset CreatedAt { get; private set; }
 
     // Navigation property (EF Core one-to-many)
@@ -18,7 +19,7 @@ public sealed class Customer
     // Required by EF Core
     private Customer() { }
 
-    public static Customer Create(Guid id, string email, string firstName, string lastName)
+    public static Customer Create(Guid id, string email, string firstName, string lastName, string? password = null)
     {
         return new Customer
         {
@@ -26,6 +27,7 @@ public sealed class Customer
             Email = email,
             FirstName = firstName,
             LastName = lastName,
+            Password = password,
             CreatedAt = DateTimeOffset.UtcNow
         };
     }
