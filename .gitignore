@@ -431,3 +431,10 @@ claude_desktop_config.json
 # - Cursor global: ~/.cursor/mcp.json (not in repo, but listed for safety)
 # - Claude Desktop: ~/Library/Application Support/Claude/claude_desktop_config.json
 # - VS Code global: User settings (not in repo)
+
+# ==============================================================================
+# Reqnroll / SpecFlow Generated Files
+# ==============================================================================
+# *.feature.cs files are auto-generated from *.feature files during build
+# Keep source .feature files, ignore generated codebehind
+*.feature.cs
