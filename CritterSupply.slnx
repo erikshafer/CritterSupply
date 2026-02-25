@@ -3,6 +3,7 @@
     <File Path=".editorconfig" />
     <File Path="CLAUDE.md" />
     <File Path="CONTEXTS.md" />
+    <File Path="CONTRIBUTING.md" />
     <File Path="DEVPROGRESS.md" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
@@ -37,12 +38,13 @@
     <File Path="skills\wolverine-message-handlers.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Decisions/">
+    <File Path="docs/decisions/0004-sse-over-signalr.md" />
+    <File Path="docs/decisions/0005-mudblazor-ui-framework.md" />
+    <File Path="docs/decisions/0006-reqnroll-bdd-framework.md" />
     <File Path="docs/decisions/0007-github-workflow-improvements.md" />
     <File Path="docs/decisions/0008-rabbitmq-configuration-consistency.md" />
     <File Path="docs/decisions/0009-aspire-integration.md" />
-    <File Path="docs\decisions\0004-sse-over-signalr.md" />
-    <File Path="docs\decisions\0005-mudblazor-ui-framework.md" />
-    <File Path="docs\decisions\0006-reqnroll-bdd-framework.md" />
+    <File Path="docs/decisions/0012-simple-session-based-authentication.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/">
     <File Path="docs/CYCLE-18-TESTING-SUMMARY.md" />

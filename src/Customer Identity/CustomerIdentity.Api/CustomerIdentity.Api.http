@@ -33,6 +33,119 @@ accept: */*
 ###
 
 ###############################################
+###   Authentication                       ###
+###############################################
+
+### 1. Login as Alice (Seeded Test User)
+POST {{HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@critter.test",
+  "password": "password"
+}
+
+> {%
+    client.test("Login successful", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.customerId !== undefined, "Customer ID not returned");
+        client.assert(response.body.email === "alice@critter.test", "Email mismatch");
+    });
+    client.global.set("AuthenticatedCustomerId", response.body.customerId);
+%}
+
+###
+
+### 2. Get Current User (Who Am I)
+GET {{HostAddress}}/api/auth/me
+accept: application/json
+
+> {%
+    client.test("Current user retrieved", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.email === "alice@critter.test", "Email mismatch");
+    });
+%}
+
+###
+
+### 3. Login with Invalid Email (401 Expected)
+POST {{HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "nonexistent@critter.test",
+  "password": "password"
+}
+
+> {%
+    client.test("Invalid login rejected", function() {
+        client.assert(response.status === 401, "Expected 401 for invalid email");
+    });
+%}
+
+###
+
+### 4. Logout
+POST {{HostAddress}}/api/auth/logout
+
+> {%
+    client.test("Logout successful", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### 5. Get Current User After Logout (401 Expected)
+GET {{HostAddress}}/api/auth/me
+accept: application/json
+
+> {%
+    client.test("Unauthenticated user returns 401", function() {
+        client.assert(response.status === 401, "Expected 401 after logout");
+    });
+%}
+
+###
+
+### 6. Login as Bob (Seeded Test User)
+POST {{HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "bob@critter.test",
+  "password": "password"
+}
+
+> {%
+    client.test("Login as Bob successful", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.firstName === "Bob", "First name mismatch");
+    });
+%}
+
+###
+
+### 7. Login as Charlie (Seeded Test User)
+POST {{HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "charlie@critter.test",
+  "password": "password"
+}
+
+> {%
+    client.test("Login as Charlie successful", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.firstName === "Charlie", "First name mismatch");
+    });
+%}
+
+###
+
+###############################################
 ###   Customer Management                  ###
 ###############################################
 
@@ -41,18 +154,19 @@ POST {{HostAddress}}/api/customers
 Content-Type: application/json
 
 {
-  "firstName": "Alice",
-  "lastName": "Johnson",
+  "customerId": "{{$uuid}}",
   "email": "alice.johnson@example.com",
-  "phone": "+1-206-555-0123"
+  "firstName": "Alice",
+  "lastName": "Johnson"
 }
 
 > {%
     client.test("Customer created successfully", function() {
-        client.assert(response.status === 200, "Response status is not 200");
-        client.assert(response.body.id !== undefined, "Customer ID not returned");
+        client.assert(response.status === 201, "Response status is not 201 Created");
+        client.assert(response.body.value !== undefined, "Customer ID not returned in response.body.value");
+        client.assert(response.headers.valueOf("Location") !== null, "Location header not set");
     });
-    client.global.set("TestCustomerId", response.body.id);
+    client.global.set("TestCustomerId", response.body.value);
 %}
 
 ###
@@ -86,17 +200,18 @@ Content-Type: application/json
   "city": "Seattle",
   "stateOrProvince": "WA",
   "postalCode": "98101",
-  "country": "USA",
+  "country": "US",
   "addressType": "Both",
   "isDefault": true
 }
 
 > {%
     client.test("Address added successfully", function() {
-        client.assert(response.status === 200, "Response status is not 200");
-        client.assert(response.body.addressId !== undefined, "Address ID not returned");
+        client.assert(response.status === 201, "Response status is not 201 Created");
+        client.assert(response.body.value !== undefined, "Address ID not returned in response.body.value");
+        client.assert(response.headers.valueOf("Location") !== null, "Location header not set");
     });
-    client.global.set("HomeAddressId", response.body.addressId);
+    client.global.set("HomeAddressId", response.body.value);
 %}
 
 ###
@@ -113,17 +228,17 @@ Content-Type: application/json
   "city": "Seattle",
   "stateOrProvince": "WA",
   "postalCode": "98102",
-  "country": "USA",
+  "country": "US",
   "addressType": "Shipping",
   "isDefault": false
 }
 
 > {%
     client.test("Second address added successfully", function() {
-        client.assert(response.status === 200, "Response status is not 200");
-        client.assert(response.body.addressId !== undefined, "Address ID not returned");
+        client.assert(response.status === 201, "Response status is not 201 Created");
+        client.assert(response.body.value !== undefined, "Address ID not returned");
     });
-    client.global.set("WorkAddressId", response.body.addressId);
+    client.global.set("WorkAddressId", response.body.value);
 %}
 
 ###
@@ -181,7 +296,7 @@ Content-Type: application/json
   "city": "Seattle",
   "stateOrProvince": "WA",
   "postalCode": "98101",
-  "country": "USA",
+  "country": "US",
   "addressType": "Both",
   "isDefault": true
 }
@@ -250,7 +365,7 @@ Content-Type: application/json
   "city": "Seattle",
   "stateOrProvince": "WA",
   "postalCode": "INVALID",
-  "country": "USA",
+  "country": "US",
   "addressType": "Shipping",
   "isDefault": false
 }
@@ -286,17 +401,18 @@ POST {{HostAddress}}/api/customers
 Content-Type: application/json
 
 {
-  "firstName": "Bob",
-  "lastName": "Smith",
+  "customerId": "{{$uuid}}",
   "email": "bob.smith@example.com",
-  "phone": "+1-206-555-9999"
+  "firstName": "Bob",
+  "lastName": "Smith"
 }
 
 > {%
     client.test("Customer created for integration test", function() {
-        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.status === 201, "Response status is not 201 Created");
+        client.assert(response.body.value !== undefined, "Customer ID not returned");
     });
-    client.global.set("IntegrationTestCustomerId", response.body.id);
+    client.global.set("IntegrationTestCustomerId", response.body.value);
 %}
 
 ###
@@ -312,16 +428,17 @@ Content-Type: application/json
   "city": "Portland",
   "stateOrProvince": "OR",
   "postalCode": "97201",
-  "country": "USA",
+  "country": "US",
   "addressType": "Shipping",
   "isDefault": true
 }
 
 > {%
     client.test("Default address added for integration test", function() {
-        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.status === 201, "Response status is not 201 Created");
+        client.assert(response.body.value !== undefined, "Address ID not returned");
     });
-    client.global.set("IntegrationTestAddressId", response.body.addressId);
+    client.global.set("IntegrationTestAddressId", response.body.value);
 %}
 
 ###
