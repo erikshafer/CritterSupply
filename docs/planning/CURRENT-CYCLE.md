@@ -13,10 +13,10 @@
 
 ---
 
-**Cycle:** 19 — Authentication & Authorization  
-**Status:** 📋 Planned (not yet started)  
-**GitHub Milestone:** *(to be created — see [GITHUB-MIGRATION-PLAN.md](./GITHUB-MIGRATION-PLAN.md))*  
-**GitHub Project:** *(to be created — see [GITHUB-MIGRATION-PLAN.md](./GITHUB-MIGRATION-PLAN.md))*
+**Cycle:** 19 — Authentication & Authorization
+**Status:** 📋 Planned (not yet started)
+**GitHub Milestone:** [Cycle 19](https://github.com/erikshafer/CritterSupply/milestone/1)
+**GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 
 ---
 
