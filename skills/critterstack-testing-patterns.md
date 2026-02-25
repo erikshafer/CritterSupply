@@ -17,13 +17,13 @@ This document is intended for integration and unit level tests, not end-to-end (
 
 ## Testing Tools
 
-| Tool | Purpose |
-|------|---------|
-| **xUnit** | Test framework |
-| **Shouldly** | Readable assertions |
-| **Alba** | HTTP integration testing |
+| Tool               | Purpose                          |
+|--------------------|----------------------------------|
+| **xUnit**          | Test framework                   |
+| **Shouldly**       | Readable assertions              |
+| **Alba**           | HTTP integration testing         |
 | **TestContainers** | Real Postgres/RabbitMQ in Docker |
-| **NSubstitute** | Mocking (only when necessary) |
+| **NSubstitute**    | Mocking (only when necessary)    |
 
 Simply put, xUnit is mature and proven as a test framework. Shouldly provides great error messages ontop of being declaritive. Alba is another open-source project from the JasperFx team, like Wolverine and Marten, enabling effortless usage and a declarative syntax for ASP.NET Core application testing. TestContainers allow us to use actual databases for testing our applications that we can spin-up and spin-down with ease. NSubstitute is the tool of choice if we absolutely need to mock something, as it provides a succinct syntax to focus on behavior instead of configuration.
 
@@ -271,6 +271,70 @@ public class TestFixture : IAsyncLifetime
 
         // Use EF Core's ExecuteDeleteAsync for bulk delete operations
         await dbContext.YourEntitySet.ExecuteDeleteAsync();
+    }
+}
+```
+
+## Test Isolation Checklist
+
+Before writing integration tests, ensure proper isolation by following this checklist:
+
+### ✅ TestFixture Setup
+- [ ] TestFixture does NOT seed data in `InitializeAsync()`
+- [ ] TestFixture provides `CleanAllDocumentsAsync()` helper (Marten) or `CleanAllDataAsync()` (EF Core)
+- [ ] TestFixture provides `GetDocumentSession()` helper (Marten) or `GetDbContext()` (EF Core)
+- [ ] Container has unique name: `$"{bc}-postgres-test-{Guid.NewGuid():N}"`
+- [ ] Collection fixture is defined for sequential execution
+
+### ✅ Test Class Setup
+- [ ] Test class implements `IAsyncLifetime`
+- [ ] `InitializeAsync()` calls `_fixture.CleanAllDocumentsAsync()` or `_fixture.CleanAllDataAsync()`
+- [ ] `DisposeAsync()` returns `Task.CompletedTask`
+- [ ] Test class has `[Collection(IntegrationTestCollection.Name)]` attribute
+
+### ✅ Test Method Setup
+- [ ] Each test seeds its own data inline (or uses test class seed for read-only scenarios)
+- [ ] Tests do NOT rely on data from other tests
+- [ ] Tests can run in any order
+
+### ✅ Warning Signs (Anti-Patterns)
+- ❌ Tests fail when run in isolation but pass when run together
+- ❌ Tests pass in one order, fail in another order
+- ❌ Test depends on data created by fixture
+- ❌ Test assumes database contains specific data without seeding it
+- ❌ `OperationCanceledException` during TestFixture disposal
+- ❌ Data leakage between tests (test B sees data from test A)
+
+### Example: Proper Test Isolation
+
+```csharp
+// ✅ GOOD: Complete isolation pattern
+[Collection(IntegrationTestCollection.Name)]
+public class OrderTests : IAsyncLifetime
+{
+    private readonly TestFixture _fixture;
+
+    public OrderTests(TestFixture fixture) => _fixture = fixture;
+
+    // Clean before EVERY test
+    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task PlaceOrder_CreatesNewOrder()
+    {
+        // Seed exactly what this test needs
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage();
+
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
+
+        // Assertions - verify against real database
+        using var session = _fixture.GetDocumentSession();
+        var orders = await session.Query<Order>().ToListAsync();
+
+        orders.ShouldNotBeEmpty();
+        orders.First().Status.ShouldBe(OrderStatus.Placed);
     }
 }
 ```

@@ -5,7 +5,7 @@ using Shouldly;
 namespace ProductCatalog.Api.IntegrationTests;
 
 [Collection(IntegrationTestCollection.Name)]
-public sealed class ChangeProductStatusTests : IClassFixture<TestFixture>
+public sealed class ChangeProductStatusTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;
 
@@ -14,10 +14,26 @@ public sealed class ChangeProductStatusTests : IClassFixture<TestFixture>
         _fixture = fixture;
     }
 
+    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
     [Fact]
     public async Task CanChangeProductStatusToDiscontinued()
     {
-        // Arrange
+        // Arrange - Seed test product first
+        var createProduct = Product.Create(
+            "DOG-BOWL-001",
+            "Premium Stainless Steel Dog Bowl",
+            "Stainless steel dog bowl, dishwasher safe",
+            "Dogs");
+
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Store(createProduct);
+            await session.SaveChangesAsync();
+        }
+
         var command = new ChangeProductStatus("DOG-BOWL-001", ProductStatus.Discontinued);
 
         // Act
@@ -42,7 +58,19 @@ public sealed class ChangeProductStatusTests : IClassFixture<TestFixture>
     [Fact]
     public async Task CanChangeProductStatusToComingSoon()
     {
-        // Arrange
+        // Arrange - Seed test product first
+        var createProduct = Product.Create(
+            "CAT-TREE-5FT",
+            "5ft Cat Tree",
+            "Multi-level cat tree with scratching posts",
+            "Cats");
+
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Store(createProduct);
+            await session.SaveChangesAsync();
+        }
+
         var command = new ChangeProductStatus("CAT-TREE-5FT", ProductStatus.ComingSoon);
 
         // Act
@@ -65,7 +93,19 @@ public sealed class ChangeProductStatusTests : IClassFixture<TestFixture>
     [Fact]
     public async Task CanChangeProductStatusToOutOfSeason()
     {
-        // Arrange
+        // Arrange - Seed test product first
+        var createProduct = Product.Create(
+            "XMAS-PET-SWEATER",
+            "Holiday Pet Sweater",
+            "Festive sweater for small to medium pets",
+            "Seasonal");
+
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Store(createProduct);
+            await session.SaveChangesAsync();
+        }
+
         var command = new ChangeProductStatus("XMAS-PET-SWEATER", ProductStatus.OutOfSeason);
 
         // Act

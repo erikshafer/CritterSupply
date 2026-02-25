@@ -4,7 +4,7 @@ using Shouldly;
 namespace ProductCatalog.Api.IntegrationTests;
 
 [Collection(IntegrationTestCollection.Name)]
-public sealed class AddProductTests : IClassFixture<TestFixture>
+public sealed class AddProductTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;
 
@@ -12,6 +12,10 @@ public sealed class AddProductTests : IClassFixture<TestFixture>
     {
         _fixture = fixture;
     }
+
+    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task CanAddNewProduct()

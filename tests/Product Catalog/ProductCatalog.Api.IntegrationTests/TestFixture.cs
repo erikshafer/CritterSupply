@@ -49,10 +49,8 @@ public class TestFixture : IAsyncLifetime
             });
         });
 
-        // Seed test data
-        using var scope = Host.Services.CreateScope();
-        var store = scope.ServiceProvider.GetRequiredService<IDocumentStore>();
-        await SeedData.SeedProductsAsync(store);
+        // NOTE: No seed data here - each test is responsible for setting up its own data
+        // This ensures test isolation and prevents data leakage between tests
     }
 
     public async Task DisposeAsync()

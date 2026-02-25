@@ -255,6 +255,190 @@ public class TestFixture : IAsyncLifetime
 - Disables external Wolverine transports (RabbitMQ) for isolated tests
 - Provides helper methods (`GetDocumentSession()`, `CleanAllDocumentsAsync()`) for test convenience
 
+## Data Cleanup Strategies
+
+**CRITICAL:** How you manage test data directly impacts test reliability and isolation. Follow these patterns to avoid common pitfalls.
+
+### ❌ Anti-Pattern: Seed Data in TestFixture.InitializeAsync()
+
+```csharp
+// BAD: Seeding data in fixture causes test coupling and data leakage
+public class TestFixture : IAsyncLifetime
+{
+    public async Task InitializeAsync()
+    {
+        await _postgres.StartAsync();
+        _connectionString = _postgres.GetConnectionString();
+
+        Host = await AlbaHost.For<Program>(/*...*/);
+
+        // ❌ DON'T DO THIS - Data persists across ALL tests
+        await SeedTestDataAsync();
+    }
+}
+
+// Tests become coupled and order-dependent
+public class ProductTests
+{
+    [Fact]
+    public async Task GetProduct_ReturnsSeededProduct()
+    {
+        // Relies on fixture seed data - fragile!
+        var product = await _fixture.Host.Scenario(/*...*/);
+    }
+}
+```
+
+**Problems:**
+- Data persists across all tests in the collection
+- Tests become dependent on fixture seed data
+- Test execution order matters (fragile)
+- Data accumulates over time
+- Hard to reason about test state
+- Cleanup issues during disposal (`OperationCanceledException`)
+
+### ✅ Best Practice: Clean Per-Test with IAsyncLifetime
+
+```csharp
+// GOOD: TestFixture has NO seed data
+public class TestFixture : IAsyncLifetime
+{
+    public async Task InitializeAsync()
+    {
+        await _postgres.StartAsync();
+        _connectionString = _postgres.GetConnectionString();
+
+        Host = await AlbaHost.For<Program>(/*...*/);
+
+        // ✅ NO seed data - tests are responsible for their own data
+    }
+
+    public async Task CleanAllDocumentsAsync()
+    {
+        var store = GetDocumentStore();
+        await store.Advanced.Clean.DeleteAllDocumentsAsync();
+    }
+}
+
+// GOOD: Test class cleans before each test
+[Collection(IntegrationTestCollection.Name)]
+public class ProductTests : IAsyncLifetime
+{
+    private readonly TestFixture _fixture;
+
+    public ProductTests(TestFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    // ✅ Clean before EVERY test for isolation
+    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task GetProduct_WithValidSku_ReturnsProduct()
+    {
+        // ✅ Each test seeds exactly what it needs
+        var product = Product.Create("TEST-SKU", "Test Product", "Description", "Category");
+
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Store(product);
+            await session.SaveChangesAsync();
+        }
+
+        // Test logic...
+    }
+}
+```
+
+**Benefits:**
+- ✅ Each test starts with a clean database
+- ✅ Tests are independent and can run in any order
+- ✅ Easy to reason about test state
+- ✅ No data leakage between tests
+- ✅ No cleanup issues during disposal
+
+### When to Seed Data in Test Classes (Not Fixture)
+
+**Use Case 1: List/Filter Tests**
+
+When testing queries that need multiple items:
+
+```csharp
+public class ListProductsTests : IAsyncLifetime
+{
+    private readonly TestFixture _fixture;
+
+    public async Task InitializeAsync()
+    {
+        await _fixture.CleanAllDocumentsAsync();
+
+        // Seed multiple products for list scenarios
+        var products = new[]
+        {
+            Product.Create("DOG-BOWL-001", "Dog Bowl", "Description", "Dogs"),
+            Product.Create("CAT-TREE-001", "Cat Tree", "Description", "Cats"),
+            Product.Create("BIRD-CAGE-001", "Bird Cage", "Description", "Birds")
+        };
+
+        using var session = _fixture.GetDocumentSession();
+        foreach (var product in products)
+        {
+            session.Store(product);
+        }
+        await session.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task CanFilterProductsByCategory()
+    {
+        // All tests in this class share the same seed data
+        // This is OK because they're read-only queries
+    }
+}
+```
+
+**Use Case 2: Single-Item Tests**
+
+When testing operations on a single item:
+
+```csharp
+public class UpdateProductTests : IAsyncLifetime
+{
+    private readonly TestFixture _fixture;
+
+    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+
+    [Fact]
+    public async Task CanUpdateProductName()
+    {
+        // Seed data inline per test - maximum clarity
+        var product = Product.Create("TEST-SKU", "Original Name", "Description", "Dogs");
+
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Store(product);
+            await session.SaveChangesAsync();
+        }
+
+        // Now test the update...
+    }
+}
+```
+
+### Cleanup Method Comparison
+
+| Data Store                | Cleanup Method                                   | Use Case                    |
+|---------------------------|--------------------------------------------------|-----------------------------|
+| **Marten Event Store**    | `store.Advanced.Clean.DeleteAllDocumentsAsync()` | Clears documents AND events |
+| **Marten Document Store** | `store.Advanced.Clean.DeleteAllDocumentsAsync()` | Clears documents only       |
+| **EF Core**               | `dbContext.EntitySet.ExecuteDeleteAsync()`       | Bulk delete via SQL         |
+| **Polecat (future)**      | `store.Advanced.Clean.DeleteAllDocumentsAsync()` | Same API as Marten          |
+
+**Key Insight:** Marten and Polecat share 99% of the same API surface. Cleanup patterns will be identical.
+
 ### Pattern 2: EF Core-Based BC
 
 ```csharp
@@ -804,9 +988,121 @@ Some CI environments require Docker-in-Docker setup. Consult your CI provider's 
 | **Parallel Execution** | Use collection fixtures to control parallelism |
 | **Helper Methods** | Provide `GetDocumentSession()`, `CleanAllDocumentsAsync()` for convenience |
 
+## Polecat (SQL Server Event Store) Support
+
+**Note:** Polecat is the SQL Server-backed event store from JasperFx (coming soon). It shares 99% of Marten's API surface.
+
+### Migrating from Marten to Polecat
+
+When Polecat is released, migrating tests from Marten (Postgres) to Polecat (SQL Server) will be straightforward due to API compatibility.
+
+**Container Setup:**
+
+```csharp
+// Marten (Postgres)
+private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
+    .WithDatabase("yourbc_test_db")
+    .WithName($"yourbc-postgres-test-{Guid.NewGuid():N}")
+    .WithCleanUp(true)
+    .Build();
+
+// Polecat (SQL Server) - Future
+private readonly MsSqlContainer _sqlServer = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
+    .WithDatabase("yourbc_test_db")
+    .WithName($"yourbc-sqlserver-test-{Guid.NewGuid():N}")
+    .WithPassword("YourStrong!Passw0rd") // SQL Server requires explicit password
+    .WithCleanUp(true)
+    .Build();
+```
+
+**Configuration:**
+
+```csharp
+// Marten
+services.ConfigureMarten(opts =>
+{
+    opts.Connection(_connectionString);
+    opts.DatabaseSchemaName = "yourbc";
+});
+
+// Polecat (API will be nearly identical)
+services.ConfigurePolecat(opts =>
+{
+    opts.Connection(_connectionString);
+    opts.DatabaseSchemaName = "yourbc";
+});
+```
+
+**Cleanup (Identical API):**
+
+```csharp
+// Both Marten and Polecat use the same cleanup API
+public async Task CleanAllDocumentsAsync()
+{
+    var store = GetDocumentStore();
+    await store.Advanced.Clean.DeleteAllDocumentsAsync();
+}
+```
+
+**Helper Methods (Identical API):**
+
+```csharp
+// Both Marten and Polecat
+public IDocumentSession GetDocumentSession()
+{
+    return Host.Services.GetRequiredService<IDocumentStore>().LightweightSession();
+}
+
+public IDocumentStore GetDocumentStore()
+{
+    return Host.Services.GetRequiredService<IDocumentStore>();
+}
+```
+
+**Test Patterns (100% Identical):**
+
+```csharp
+// Test isolation patterns work identically for both
+[Collection(IntegrationTestCollection.Name)]
+public class OrderTests : IAsyncLifetime
+{
+    private readonly TestFixture _fixture;
+
+    public OrderTests(TestFixture fixture) => _fixture = fixture;
+
+    // Same cleanup pattern for Marten and Polecat
+    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task PlaceOrder_CreatesNewOrder()
+    {
+        // Same test logic for both Marten and Polecat
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage();
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
+
+        // Same verification logic
+        using var session = _fixture.GetDocumentSession();
+        var order = await session.LoadAsync<Order>(checkoutCompleted.OrderId);
+        order.ShouldNotBeNull();
+    }
+}
+```
+
+**Key Takeaway:**
+
+Test patterns, cleanup strategies, and isolation techniques remain **100% identical** between Marten and Polecat. Only the container setup and DI configuration change. All skills documentation applies to both!
+
+**When Polecat is Released:**
+1. Update `TestFixture` to use `MsSqlContainer` instead of `PostgreSqlContainer`
+2. Change `ConfigureMarten()` to `ConfigurePolecat()`
+3. **All test code, cleanup patterns, and helper methods remain unchanged**
+
 ## References
 
 - **TestContainers for .NET:** [https://dotnet.testcontainers.org/](https://dotnet.testcontainers.org/)
 - **Alba:** [https://jasperfx.github.io/alba/](https://jasperfx.github.io/alba/)
 - **xUnit Collection Fixtures:** [https://xunit.net/docs/shared-context](https://xunit.net/docs/shared-context)
 - **Marten:** [https://martendb.io/](https://martendb.io/)
+- **Polecat:** [https://github.com/JasperFx/polecat](https://github.com/JasperFx/polecat) (coming soon)
