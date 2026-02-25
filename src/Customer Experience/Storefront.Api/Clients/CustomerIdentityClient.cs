@@ -32,4 +32,39 @@ public sealed class CustomerIdentityClient : ICustomerIdentityClient
 
         return (IReadOnlyList<CustomerAddressDto>)(list ?? new List<CustomerAddressDto>());
     }
+
+    public async Task<LoginResponse?> LoginAsync(string email, string password, CancellationToken ct = default)
+    {
+        var request = new { email, password };
+        var response = await _httpClient.PostAsJsonAsync("/api/auth/login", request, ct);
+
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        return JsonSerializer.Deserialize<LoginResponse>(content, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+    }
+
+    public async Task LogoutAsync(CancellationToken ct = default)
+    {
+        var response = await _httpClient.PostAsync("/api/auth/logout", null, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<CurrentUserResponse?> GetCurrentUserAsync(CancellationToken ct = default)
+    {
+        var response = await _httpClient.GetAsync("/api/auth/me", ct);
+
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        return JsonSerializer.Deserialize<CurrentUserResponse>(content, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+    }
 }

@@ -1,0 +1,150 @@
+@page "/login"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Sign In - CritterSupply</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudPaper Elevation="3" Class="pa-6">
+        <MudText Typo="Typo.h4" GutterBottom="true" Align="Align.Center">Sign In</MudText>
+        <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-6" Color="Color.Secondary">
+            Welcome back to CritterSupply!
+        </MudText>
+
+        <MudForm @ref="_form">
+            <MudTextField @bind-Value="_email"
+                          Label="Email"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          RequiredError="Email is required"
+                          Validation="@(new Func<string, string?>(ValidateEmail))"
+                          Class="mb-4" />
+
+            <MudTextField @bind-Value="_password"
+                          Label="Password"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Password"
+                          Required="true"
+                          RequiredError="Password is required"
+                          Class="mb-4" />
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       OnClick="HandleLogin"
+                       Disabled="_isLoading">
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Signing in...</span>
+                }
+                else
+                {
+                    <span>Sign In</span>
+                }
+            </MudButton>
+        </MudForm>
+
+        <MudDivider Class="my-4" />
+
+        <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+            Demo users: alice@critter.test, bob@critter.test, charlie@critter.test<br />
+            Password: <em>password</em>
+        </MudText>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private MudForm? _form;
+    private string _email = "";
+    private string _password = "";
+    private bool _isLoading = false;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private async Task HandleLogin()
+    {
+        if (_form == null) return;
+
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("CustomerIdentityApi");
+            var request = new { email = _email, password = _password };
+            var response = await client.PostAsJsonAsync("/api/auth/login", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var loginResponse = System.Text.Json.JsonSerializer.Deserialize<LoginResponse>(content, new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (loginResponse != null && HttpContext != null)
+                {
+                    // Create claims for session
+                    var claims = new[]
+                    {
+                        new Claim("CustomerId", loginResponse.CustomerId.ToString()),
+                        new Claim(ClaimTypes.Email, loginResponse.Email),
+                        new Claim(ClaimTypes.Name, $"{loginResponse.FirstName} {loginResponse.LastName}"),
+                        new Claim(ClaimTypes.GivenName, loginResponse.FirstName),
+                        new Claim(ClaimTypes.Surname, loginResponse.LastName)
+                    };
+
+                    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                    var principal = new ClaimsPrincipal(identity);
+
+                    await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+
+                    Snackbar.Add($"Welcome back, {loginResponse.FirstName}!", Severity.Success);
+
+                    // Redirect to return URL or home
+                    Navigation.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
+                }
+            }
+            else
+            {
+                Snackbar.Add("Invalid email or password", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Login failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string? ValidateEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return "Email is required";
+
+        if (!email.Contains("@"))
+            return "Please enter a valid email address";
+
+        return null;
+    }
+
+    private sealed record LoginResponse(Guid CustomerId, string Email, string FirstName, string LastName);
+}
