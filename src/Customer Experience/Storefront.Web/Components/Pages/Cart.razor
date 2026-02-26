@@ -1,6 +1,5 @@
 @page "/cart"
 @attribute [Authorize]
-@rendermode InteractiveServer
 @using System.Text.Json
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
@@ -122,8 +121,22 @@ else
             return;
         }
 
+        // Get cart ID from localStorage
+        var cartIdString = await JS.InvokeAsync<string?>("authHelper.getCartId");
+        if (!string.IsNullOrEmpty(cartIdString) && Guid.TryParse(cartIdString, out var cartId))
+        {
+            _cartId = cartId;
+        }
+
         await LoadCart();
-        await SubscribeToSSE();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _customerId != Guid.Empty)
+        {
+            await SubscribeToSSE();
+        }
     }
 
     private async Task LoadCart()
@@ -131,11 +144,24 @@ else
         _isLoading = true;
         try
         {
+            if (!_cartId.HasValue)
+            {
+                // No cart yet - show empty
+                _cartView = null;
+                return;
+            }
+
             var client = HttpClientFactory.CreateClient("StorefrontApi");
-            // Query BFF to get cart for authenticated customer
-            var response = await client.GetFromJsonAsync<CartView>($"/api/storefront/carts?customerId={_customerId}");
+            // Query BFF to get cart by cartId
+            var response = await client.GetFromJsonAsync<CartView>($"/api/storefront/carts/{_cartId.Value}");
             _cartView = response;
-            _cartId = response?.CartId;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            Console.WriteLine("Cart not found - clearing localStorage");
+            await JS.InvokeVoidAsync("authHelper.clearCartId");
+            _cartView = null;
+            _cartId = null;
         }
         catch (Exception ex)
         {

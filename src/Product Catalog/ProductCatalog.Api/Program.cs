@@ -42,13 +42,47 @@ builder.Services.AddWolverineHttp();
 // Register services
 builder.Services.AddSingleton<IImageValidator, StubImageValidator>();
 
+// Add Swagger/OpenAPI support
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 var app = builder.Build();
+
+// Seed product data in development
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var store = scope.ServiceProvider.GetRequiredService<IDocumentStore>();
+    await ProductCatalog.Products.SeedData.SeedProductsAsync(store);
+}
+
+// Configure Swagger UI (development only)
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.UseSwagger(options =>
+    {
+        options.RouteTemplate = "api/{documentName}/swagger.json";
+    });
+    app.UseSwaggerUI(opts =>
+    {
+        opts.RoutePrefix = "api";
+        opts.SwaggerEndpoint("/api/v1/swagger.json", "Product Catalog API");
+    });
+}
 
 // Wolverine HTTP endpoints with FluentValidation middleware
 app.MapWolverineEndpoints(opts =>
 {
     opts.UseFluentValidationProblemDetailMiddleware();
 });
+
+// Redirect root to Swagger/API documentation
+app.MapGet("/", (HttpResponse response) =>
+{
+    response.Headers.Append("Location", "/api");
+    response.StatusCode = StatusCodes.Status301MovedPermanently;
+}).ExcludeFromDescription();
 
 app.Run();
 

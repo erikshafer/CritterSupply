@@ -1,10 +1,11 @@
 @page "/products"
-@rendermode InteractiveServer
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.JSInterop
 @inject IHttpClientFactory HttpClientFactory
 @inject ISnackbar Snackbar
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JS
 
 <PageTitle>Products - CritterSupply</PageTitle>
 
@@ -113,14 +114,38 @@ else
 
         try
         {
+            // Check if cart ID already exists in localStorage
+            var existingCartId = await JS.InvokeAsync<string?>("authHelper.getCartId");
+            if (!string.IsNullOrEmpty(existingCartId) && Guid.TryParse(existingCartId, out var cachedCartId))
+            {
+                _cartId = cachedCartId;
+                Console.WriteLine($"Using existing cart: {_cartId}");
+                return;
+            }
+
+            // Create a new cart for this customer via Shopping BC
             var client = HttpClientFactory.CreateClient("StorefrontApi");
-            var response = await client.GetFromJsonAsync<CartView>($"/api/storefront/carts?customerId={_customerId.Value}");
-            _cartId = response?.CartId;
+            var response = await client.PostAsJsonAsync(
+                "/api/storefront/carts/initialize",
+                new { customerId = _customerId.Value });
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                // Response is the cartId GUID as a string
+                if (Guid.TryParse(content.Trim('"'), out var cartId))
+                {
+                    _cartId = cartId;
+                    // Store in localStorage for other pages
+                    await JS.InvokeVoidAsync("authHelper.setCartId", cartId.ToString());
+                    Console.WriteLine($"Cart initialized: {_cartId}");
+                }
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Failed to initialize cart: {ex.Message}");
-            // Cart will be null - show login prompt when user tries to add items
+            // Cart will be null - user can try again when adding items
         }
     }
 

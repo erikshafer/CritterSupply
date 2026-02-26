@@ -1,4 +1,3 @@
-@rendermode InteractiveServer
 @using System.Text.Json
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
@@ -91,9 +90,18 @@
     {
         try
         {
-            var client = new HttpClient { BaseAddress = new Uri("http://localhost:5235") };
-            await client.PostAsync("/api/auth/logout", null);
-            Navigation.NavigateTo("/", forceLoad: true);
+            // Use JavaScript fetch via browser to call server-side logout endpoint
+            // This ensures the browser properly clears the authentication cookie
+            var success = await JS.InvokeAsync<bool>("authHelper.logout");
+
+            if (success)
+            {
+                Navigation.NavigateTo("/", forceLoad: true);
+            }
+            else
+            {
+                Console.WriteLine("Logout failed");
+            }
         }
         catch (Exception ex)
         {
