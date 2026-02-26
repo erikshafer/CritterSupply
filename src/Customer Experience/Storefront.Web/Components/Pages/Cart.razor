@@ -109,7 +109,7 @@ else
     private bool _sseConnected = false;
     private DotNetObjectReference<Cart>? _dotNetHelper;
     private Guid _customerId;
-    private readonly Guid _cartId = Guid.Parse("019c5dd6-29d2-7fb9-9d90-cf760997d1c0");
+    private Guid? _cartId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -132,7 +132,10 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("StorefrontApi");
-            _cartView = await client.GetFromJsonAsync<CartView>($"/api/storefront/carts/{_cartId}");
+            // Query BFF to get cart for authenticated customer
+            var response = await client.GetFromJsonAsync<CartView>($"/api/storefront/carts?customerId={_customerId}");
+            _cartView = response;
+            _cartId = response?.CartId;
         }
         catch (Exception ex)
         {
@@ -184,11 +187,13 @@ else
 
     private async Task RemoveItem(string sku)
     {
+        if (!_cartId.HasValue) return;
+
         _isProcessing = true;
         try
         {
             var client = HttpClientFactory.CreateClient("StorefrontApi");
-            var response = await client.DeleteAsync($"/api/storefront/carts/{_cartId}/items/{sku}");
+            var response = await client.DeleteAsync($"/api/storefront/carts/{_cartId.Value}/items/{sku}");
 
             if (response.IsSuccessStatusCode)
             {
@@ -225,12 +230,14 @@ else
 
     private async Task ChangeQuantity(string sku, int newQuantity)
     {
+        if (!_cartId.HasValue) return;
+
         _isProcessing = true;
         try
         {
             var client = HttpClientFactory.CreateClient("StorefrontApi");
             var response = await client.PutAsJsonAsync(
-                $"/api/storefront/carts/{_cartId}/items/{sku}/quantity",
+                $"/api/storefront/carts/{_cartId.Value}/items/{sku}/quantity",
                 new { newQuantity });
 
             if (response.IsSuccessStatusCode)

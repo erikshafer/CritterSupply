@@ -1,9 +1,12 @@
 @page "/checkout"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Checkout - CritterSupply</PageTitle>
 
@@ -110,16 +113,24 @@ else
     private MudStepper? _stepper;
     private CheckoutView? _checkoutView;
     private bool _isLoading = true;
+    private Guid _customerId;
+    private Guid? _checkoutId;
 
     private Guid _selectedAddressId;
     private string _selectedShippingMethod = "Standard";
     private string _paymentToken = "";
 
-    // Stub checkout ID
-    private readonly Guid _checkoutId = Guid.Parse("33333333-3333-3333-3333-333333333333");
-
     protected override async Task OnInitializedAsync()
     {
+        // Get authenticated customer ID
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var customerIdClaim = authState.User.FindFirst("CustomerId")?.Value;
+        if (!Guid.TryParse(customerIdClaim, out _customerId))
+        {
+            // Should not happen due to [Authorize] but handle gracefully
+            return;
+        }
+
         await LoadCheckout();
     }
 
@@ -129,7 +140,9 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("StorefrontApi");
-            _checkoutView = await client.GetFromJsonAsync<CheckoutView>($"/api/storefront/checkouts/{_checkoutId}");
+            // Query BFF to get checkout for authenticated customer
+            _checkoutView = await client.GetFromJsonAsync<CheckoutView>($"/api/storefront/checkouts?customerId={_customerId}");
+            _checkoutId = _checkoutView?.CheckoutId;
         }
         catch (Exception ex)
         {
@@ -144,10 +157,12 @@ else
 
     private async Task PlaceOrder()
     {
+        if (!_checkoutId.HasValue) return;
+
         try
         {
             var client = HttpClientFactory.CreateClient("StorefrontApi");
-            var response = await client.PostAsync($"/api/storefront/checkouts/{_checkoutId}/complete", null);
+            var response = await client.PostAsync($"/api/storefront/checkouts/{_checkoutId.Value}/complete", null);
 
             if (response.IsSuccessStatusCode)
             {
@@ -168,13 +183,13 @@ else
             else
             {
                 Console.WriteLine($"Failed to place order: {response.StatusCode}");
-                // TODO: Show error toast (Task 7)
+                // TODO: Show error toast
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error placing order: {ex.Message}");
-            // TODO: Show error toast (Task 7)
+            // TODO: Show error toast
         }
     }
 
