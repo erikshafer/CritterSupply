@@ -160,7 +160,7 @@ flowchart LR
 | No integration events | Inventory doesn't know when products are discontinued | Cycle 20 |
 | No image upload | Admin must host images externally | Cycle 20 |
 | No category hierarchy | Cannot support drill-down navigation | Cycle 21 |
-| Price not stored in catalog | Shopping BC has no authoritative price source | Architectural decision needed |
+| Price not stored in catalog | Shopping BC has no authoritative price source — **decision needed:** embed price directly in the `Product` document (simple, denormalized) or introduce a separate Pricing BC (normalized, added latency). Both `Messages.Contracts.ProductCatalog` contracts and Shopping's `UnitPrice` field are affected. | Architectural decision needed |
 | No product variants | Separate SKUs required for each size/color | Cycle 22 |
 
 ## 📖 Detailed Documentation

@@ -109,9 +109,11 @@ sequenceDiagram
 | `Shopping.ItemRemoved` | Shopping | `CartUpdated` |
 | `Shopping.ItemQuantityChanged` | Shopping | `CartUpdated` |
 | `Orders.OrderPlaced` | Orders | `OrderStatusChanged` |
-| `Payments.PaymentAuthorized` | Orders (via RMQ) | `OrderStatusChanged` |
-| `Inventory.ReservationConfirmed` | Orders (via RMQ) | `OrderStatusChanged` |
-| `Fulfillment.ShipmentDispatched` | Fulfillment (via RMQ) | `ShipmentStatusChanged` |
+| `Payments.PaymentAuthorized` | Payments | `OrderStatusChanged` |
+| `Inventory.ReservationConfirmed` | Inventory | `OrderStatusChanged` |
+| `Fulfillment.ShipmentDispatched` | Fulfillment | `ShipmentStatusChanged` |
+
+> All events arrive via the shared `storefront-notifications` RabbitMQ queue. Each BC publishes directly to that queue — the BFF does not re-subscribe through Orders.
 
 ### StorefrontEvent Schema
 
@@ -173,7 +175,7 @@ flowchart TB
 
 | Gap | Impact | Planned Cycle |
 |-----|--------|---------------|
-| No customer isolation in SSE — Customer A sees Customer B's events | **Privacy breach** — blocker for production | Cycle 19 |
+| No customer isolation in SSE — Customer A sees Customer B's events | **🔴 PRODUCTION BLOCKER: Privacy breach** — must be resolved before any customer-facing deployment | Cycle 19 |
 | HTTP clients are stubs — query endpoints return fake data | Cannot test real view composition | Cycle 19 |
 | No authentication | Any caller can read any customer's data | Cycle 20 |
 | `CheckoutView` not implemented | Cannot render checkout screen from composed data | Cycle 20 |

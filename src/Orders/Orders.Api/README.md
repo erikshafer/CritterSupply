@@ -112,7 +112,8 @@ sequenceDiagram
 
 | Event | Queue | Subscribers |
 |-------|-------|-------------|
-| `Orders.OrderPlaced` | `storefront-notifications` + local queues | Customer Experience, Inventory, Payments |
+| `Orders.OrderPlaced` | `storefront-notifications` (RabbitMQ) | Customer Experience (for real-time UI) |
+| `Orders.OrderPlaced` | Local Wolverine queue ⚠️ | Inventory BC + Payments BC |
 | `Orders.ReservationCommitRequested` | Local queue ⚠️ | Inventory BC |
 | `Orders.ReservationReleaseRequested` | Local queue ⚠️ | Inventory BC |
 | `Orders.FulfillmentRequested` | Local queue ⚠️ | Fulfillment BC |

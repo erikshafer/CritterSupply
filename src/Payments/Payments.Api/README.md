@@ -80,10 +80,11 @@ sequenceDiagram
         GW-->>Payments: refundId
         Payments->>Payments: Append PaymentRefunded
         Payments->>Orders: RefundCompleted
-        Note over Orders: ❌ Saga doesn't handle RefundCompleted yet
+        Note over Orders: ❌ Orders saga has no handler for RefundCompleted — order stuck in InventoryFailed
     else Refund Failed
         GW-->>Payments: reason
         Payments->>Orders: RefundFailed
+        Note over Orders: ❌ Orders saga has no handler for RefundFailed either
     end
 ```
 

@@ -29,16 +29,16 @@ Shopping owns the full cart lifecycle: a customer starts a session, adds/removes
 ```mermaid
 stateDiagram-v2
     [*] --> Active : CartInitialized
-    Active --> Active : ItemAdded / ItemRemoved / ItemQuantityChanged / CartCleared*
+    Active --> Active : ItemAdded / ItemRemoved / ItemQuantityChanged
     Active --> CheckedOut : CheckoutInitiated (terminal)
-    Active --> Cleared : CartCleared (terminal)
+    Active --> Cleared : ClearCart command (terminal)
     Active --> Abandoned : Timeout — not yet implemented
     CheckedOut --> [*]
     Cleared --> [*]
     Abandoned --> [*]
 ```
 
-*Note: `CartCleared` mid-session resets items but keeps cart Active (the terminal `Cleared` state requires a separate ClearCart command on an empty cart.)
+> **Two distinct concepts:** A `CartCleared` domain event (appended by `ClearCart`) sets the cart to the terminal `Cleared` state. This is different from removing individual items mid-session (which fires `ItemRemoved` and keeps the cart `Active`).
 
 ### Add Item → Real-Time Cart Update
 
