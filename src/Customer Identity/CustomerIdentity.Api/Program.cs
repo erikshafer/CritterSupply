@@ -26,7 +26,7 @@ builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(opts =>
 
 builder.Host.UseWolverine(opts =>
 {
-    opts.Discovery.DisableConventionalDiscovery(); // TODO: Does this work?
+    opts.Discovery.DisableConventionalDiscovery();
     // Discover handlers from the CustomerIdentity assembly
     opts.Discovery.IncludeAssembly(typeof(CustomerAddress).Assembly);
 
