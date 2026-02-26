@@ -143,5 +143,4 @@
   <Folder Name="/Shared/">
     <Project Path="src/Shared/Messages.Contracts/Messages.Contracts.csproj" />
   </Folder>
-  <Folder Name="/.SolutionItems/Documentation/Decisions/" />
 </Solution>
