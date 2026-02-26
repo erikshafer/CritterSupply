@@ -1,8 +1,10 @@
 @page "/order-confirmation/{OrderId:guid}"
-@rendermode InteractiveServer
 @using System.Text.Json
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
 
 <PageTitle>Order Confirmation - CritterSupply</PageTitle>
@@ -109,14 +111,31 @@ else
     private string _currentStatus = "Placed";
     private string? _latestUpdate = null;
     private DotNetObjectReference<OrderConfirmation>? _dotNetHelper;
-
-    // Stub customer ID - in real app this would come from authentication
-    private readonly Guid _customerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private Guid? _customerId;
 
     protected override async Task OnInitializedAsync()
     {
+        // Get authenticated customer ID (optional - order confirmation page can be viewed by anyone with order ID)
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            var customerIdClaim = authState.User.FindFirst("CustomerId")?.Value;
+            if (Guid.TryParse(customerIdClaim, out var customerId))
+            {
+                _customerId = customerId;
+            }
+        }
+
         await LoadOrderStatus();
-        await SubscribeToSSE();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Only subscribe to SSE if authenticated and on first render
+        if (firstRender && _customerId.HasValue)
+        {
+            await SubscribeToSSE();
+        }
     }
 
     private async Task LoadOrderStatus()
@@ -151,10 +170,12 @@ else
 
     private async Task SubscribeToSSE()
     {
+        if (!_customerId.HasValue) return;
+
         try
         {
             _dotNetHelper = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("sseClient.subscribe", _customerId.ToString(), _dotNetHelper);
+            await JS.InvokeVoidAsync("sseClient.subscribe", _customerId.Value.ToString(), _dotNetHelper);
             _sseConnected = true;
         }
         catch (Exception ex)

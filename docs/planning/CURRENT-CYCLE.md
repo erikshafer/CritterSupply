@@ -13,34 +13,42 @@
 
 ---
 
-**Cycle:** 19 — Authentication & Authorization
-**Status:** 📋 Planned (not yet started)
-**GitHub Milestone:** [Cycle 19](https://github.com/erikshafer/CritterSupply/milestone/1)
+**Cycle:** TBD — (No active cycle)
+**Status:** 🎯 **PLANNING**
+**GitHub Milestone:** TBD
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 
 ---
 
-## Active Tasks
+## Current Status
 
-*Cycle 19 has not started yet. Tasks will be tracked in GitHub Issues once the milestone is created.*
+**Cycle 19 completed!** All authentication features implemented and merged (PR #148).
 
-**Planned deliverables (from backlog):**
-- [ ] Authentication strategy ADR (cookie vs JWT, session storage)
-- [ ] Login/Logout pages in Storefront.Web (MudBlazor forms)
-- [ ] Protected routes (cart, checkout require authenticated user)
-- [ ] Replace stub `customerId` with real session-based identity
-- [ ] "Sign In" / "My Account" in AppBar
-- [ ] Authorization policies
+**Next cycle candidates:**
+- **Cycle 20:** Automated Browser Testing (Playwright vs bUnit)
+- **Cycle 21:** Vendor Portal Phase 1
+- **Other:** Returns BC, Payment Gateway Integration, Multi-tenant support
 
 ---
 
 ## Recently Completed
 
+- ✅ **Cycle 19:** Authentication & Authorization (2026-02-25 to 2026-02-26)
+  - Cookie-based authentication (ASP.NET Core Authentication middleware)
+  - Login/Logout pages with MudBlazor
+  - Protected routes (Cart, Checkout)
+  - AppBar authentication UI (Sign In / My Account dropdown)
+  - Replaced all stub customerIds with authenticated session values
+  - Cart persistence via browser localStorage
+  - Swagger UI + seed data for ProductCatalog.Api
+  - Npgsql logging noise reduction
+  - [Plan](./cycles/cycle-19-authentication-authorization.md) | [Retrospective](./cycles/cycle-19-retrospective.md) | [Issues Export](./cycles/cycle-19-issues-export.md)
+
 - ✅ **Cycle 18:** Customer Experience Enhancement Phase 2 (2026-02-14)
   - Typed HTTP Clients pattern (IShoppingClient, IOrdersClient, ICatalogClient)
   - Real-time cart badge updates via SSE
   - Complete error handling with MudSnackbar toasts
-  - [Retrospective](../../docs/CYCLE-18-RETROSPECTIVE.md) | [Plan](./cycles/cycle-18-customer-experience-phase-2.md)
+  - [Plan](./cycles/cycle-18-customer-experience-phase-2.md)
 
 - ✅ **Cycle 17:** Customer Identity Integration (2026-02-13)
   - Customer CRUD + Address CRUD endpoints
@@ -69,5 +77,5 @@
 
 ---
 
-*Last Updated: 2026-02-23 (Migration planning session)*  
+*Last Updated: 2026-02-26 (Cycle 19 completed, milestone closed)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*

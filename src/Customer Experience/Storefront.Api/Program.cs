@@ -71,7 +71,26 @@ builder.Services.AddScoped<Storefront.Clients.IOrdersClient, Storefront.Api.Clie
 builder.Services.AddScoped<Storefront.Clients.ICustomerIdentityClient, Storefront.Api.Clients.CustomerIdentityClient>();
 builder.Services.AddScoped<Storefront.Clients.ICatalogClient, Storefront.Api.Clients.CatalogClient>();
 
+// Add Swagger/OpenAPI support
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 var app = builder.Build();
+
+// Configure Swagger UI (development only)
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.UseSwagger(options =>
+    {
+        options.RouteTemplate = "api/{documentName}/swagger.json";
+    });
+    app.UseSwaggerUI(opts =>
+    {
+        opts.RoutePrefix = "api";
+        opts.SwaggerEndpoint("/api/v1/swagger.json", "Storefront BFF API");
+    });
+}
 
 // Map Wolverine HTTP endpoints
 app.MapWolverineEndpoints();

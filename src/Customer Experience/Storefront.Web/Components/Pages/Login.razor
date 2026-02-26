@@ -1,9 +1,9 @@
 @page "/login"
-@rendermode InteractiveServer
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Authentication.Cookies
-@inject IHttpClientFactory HttpClientFactory
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
@@ -16,13 +16,14 @@
             Welcome back to CritterSupply!
         </MudText>
 
-        <MudForm @ref="_form">
+        <MudForm @ref="_form" @bind-IsValid="_formIsValid">
             <MudTextField @bind-Value="_email"
                           Label="Email"
                           Variant="Variant.Outlined"
                           Required="true"
                           RequiredError="Email is required"
                           Validation="@(new Func<string, string?>(ValidateEmail))"
+                          Immediate="true"
                           Class="mb-4" />
 
             <MudTextField @bind-Value="_password"
@@ -31,6 +32,7 @@
                           InputType="InputType.Password"
                           Required="true"
                           RequiredError="Password is required"
+                          Immediate="true"
                           Class="mb-4" />
 
             <MudButton Variant="Variant.Filled"
@@ -61,6 +63,7 @@
 
 @code {
     private MudForm? _form;
+    private bool _formIsValid = false;
     private string _email = "";
     private string _password = "";
     private bool _isLoading = false;
@@ -74,58 +77,51 @@
 
     private async Task HandleLogin()
     {
-        if (_form == null) return;
+        if (_form == null)
+        {
+            Console.WriteLine("Form is null!");
+            Snackbar.Add("Form not initialized", Severity.Error);
+            return;
+        }
 
+        // Trigger form validation
         await _form.Validate();
-        if (!_form.IsValid) return;
+
+        if (!_form.IsValid)
+        {
+            Console.WriteLine($"Form validation failed! IsValid: {_form.IsValid}");
+            Snackbar.Add("Please fix validation errors", Severity.Warning);
+            return;
+        }
 
         _isLoading = true;
         StateHasChanged();
 
         try
         {
-            var client = HttpClientFactory.CreateClient("CustomerIdentityApi");
-            var request = new { email = _email, password = _password };
-            var response = await client.PostAsJsonAsync("/api/auth/login", request);
+            // Use JavaScript fetch via browser to call server-side login endpoint
+            // This ensures the browser receives and stores the authentication cookie
+            var result = await JS.InvokeAsync<LoginResult>("authHelper.login", _email, _password);
 
-            if (response.IsSuccessStatusCode)
+            if (result != null && result.Success)
             {
-                var content = await response.Content.ReadAsStringAsync();
-                var loginResponse = System.Text.Json.JsonSerializer.Deserialize<LoginResponse>(content, new System.Text.Json.JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                Snackbar.Add($"Welcome back, {result.FirstName}!", Severity.Success);
 
-                if (loginResponse != null && HttpContext != null)
-                {
-                    // Create claims for session
-                    var claims = new[]
-                    {
-                        new Claim("CustomerId", loginResponse.CustomerId.ToString()),
-                        new Claim(ClaimTypes.Email, loginResponse.Email),
-                        new Claim(ClaimTypes.Name, $"{loginResponse.FirstName} {loginResponse.LastName}"),
-                        new Claim(ClaimTypes.GivenName, loginResponse.FirstName),
-                        new Claim(ClaimTypes.Surname, loginResponse.LastName)
-                    };
-
-                    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-                    var principal = new ClaimsPrincipal(identity);
-
-                    await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
-
-                    Snackbar.Add($"Welcome back, {loginResponse.FirstName}!", Severity.Success);
-
-                    // Redirect to return URL or home
-                    Navigation.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
-                }
+                // Force full page reload to reinitialize authentication state
+                Navigation.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
+            }
+            else if (result != null && !result.Success)
+            {
+                Snackbar.Add("Invalid email or password", Severity.Error);
             }
             else
             {
-                Snackbar.Add("Invalid email or password", Severity.Error);
+                Snackbar.Add("Login failed. Please try again.", Severity.Error);
             }
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"Login error: {ex}");
             Snackbar.Add($"Login failed: {ex.Message}", Severity.Error);
         }
         finally
@@ -146,5 +142,5 @@
         return null;
     }
 
-    private sealed record LoginResponse(Guid CustomerId, string Email, string FirstName, string LastName);
+    private sealed record LoginResult(bool Success, string FirstName);
 }
