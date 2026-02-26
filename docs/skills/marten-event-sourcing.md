@@ -235,4 +235,4 @@ var payment = await session.Events.AggregateStreamAsync<Payment>(paymentId, ct);
 - Read-heavy workloads
 - When current state is all that matters
 
-See `skills/marten-document-store.md` for document store patterns.
+See `docs/skills/marten-document-store.md` for document store patterns.

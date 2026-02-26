@@ -345,7 +345,7 @@ This directory contains comprehensive workflow documentation for CritterSupply's
 
 ### Skills
 
-- **[skills/](../../skills/)** - Pattern guides (Wolverine, Marten, EF Core, testing, etc.)
+- **[docs/skills/](../../skills/)** - Pattern guides (Wolverine, Marten, EF Core, testing, etc.)
 
 ---
 

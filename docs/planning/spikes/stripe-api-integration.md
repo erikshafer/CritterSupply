@@ -1193,7 +1193,7 @@ Key metrics to track:
 3. **Update CONTEXTS.md:** Add Stripe integration flows to Payments BC section
 4. **Prototype:** Build minimal `StripePaymentGateway` in feature branch
 5. **Test:** Validate with Stripe test mode + webhook CLI
-6. **Document:** Update `skills/external-service-integration.md` with Stripe examples
+6. **Document:** Update `docs/skills/external-service-integration.md` with Stripe examples
 
 ## References
 
@@ -1201,6 +1201,6 @@ Key metrics to track:
 - [Stripe Payment Intents](https://stripe.com/docs/payments/payment-intents) (conceptual reference)
 - [Stripe Webhooks](https://stripe.com/docs/webhooks) (conceptual reference)
 - [Stripe Testing](https://stripe.com/docs/testing) (conceptual reference)
-- Existing: `skills/external-service-integration.md`
+- Existing: `docs/skills/external-service-integration.md`
 - Existing: `src/Payments/Payments/Processing/IPaymentGateway.cs`
 - Existing: `CONTEXTS.md` (Payments BC section)

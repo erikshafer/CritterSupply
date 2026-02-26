@@ -25,17 +25,17 @@
     <File Path="docs/planning/infrastructure/ci-cd/visual-guide.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Skills/">
-    <File Path="skills/bff-realtime-patterns.md" />
-    <File Path="skills/critterstack-testing-patterns.md" />
-    <File Path="skills/modern-csharp-coding-standards.md" />
-    <File Path="skills/reqnroll-bdd-testing.md" />
-    <File Path="skills/testcontainers-integration-tests.md" />
-    <File Path="skills\efcore-wolverine-integration.md" />
-    <File Path="skills\external-service-integration.md" />
-    <File Path="skills\marten-document-store.md" />
-    <File Path="skills\marten-event-sourcing.md" />
-    <File Path="skills\vertical-slice-organization.md" />
-    <File Path="skills\wolverine-message-handlers.md" />
+    <File Path="docs/skills/bff-realtime-patterns.md" />
+    <File Path="docs/skills/critterstack-testing-patterns.md" />
+    <File Path="docs/skills/modern-csharp-coding-standards.md" />
+    <File Path="docs/skills/reqnroll-bdd-testing.md" />
+    <File Path="docs/skills/testcontainers-integration-tests.md" />
+    <File Path="docs/skills/efcore-wolverine-integration.md" />
+    <File Path="docs/skills/external-service-integration.md" />
+    <File Path="docs/skills/marten-document-store.md" />
+    <File Path="docs/skills/marten-event-sourcing.md" />
+    <File Path="docs/skills/vertical-slice-organization.md" />
+    <File Path="docs/skills/wolverine-message-handlers.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Decisions/">
     <File Path="docs/decisions/0004-sse-over-signalr.md" />

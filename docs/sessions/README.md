@@ -21,7 +21,7 @@ Session summaries serve as:
 - Fixed `InitializeCart` to return 201 Created with `(CreationResponse<Guid>, IStartStream)` pattern
 - Verified RabbitMQ message flow from Shopping BC → Storefront BFF
 - Established SSE connection at `/sse/storefront`
-- Documented Wolverine HTTP handler patterns in `skills/wolverine-message-handlers.md`
+- Documented Wolverine HTTP handler patterns in `docs/skills/wolverine-message-handlers.md`
 
 **Status:** Partial completion - SSE events not yet verified in browser, Customer ID mismatch identified
 
@@ -53,5 +53,5 @@ Examples:
 
 - **Planning:** See `docs/planning/CYCLES.md` and `docs/planning/cycles/`
 - **Architecture:** See `docs/decisions/` (ADRs)
-- **Patterns:** See `skills/` directory
+- **Patterns:** See `docs/skills/` directory
 - **Features:** See `docs/features/` (Gherkin BDD specs)

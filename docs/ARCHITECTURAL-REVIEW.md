@@ -748,7 +748,7 @@ This ensures **exactly-once delivery semantics** (no duplicate messages, no lost
 - **Checkout aggregate** encapsulates transactional consistency within Orders BC
 - **Cart aggregate** manages shopping session lifecycle within Shopping BC
 
-**Recommendation:** Document saga patterns in a skill guide (similar to `skills/marten-event-sourcing.md`).
+**Recommendation:** Document saga patterns in a skill guide (similar to `docs/skills/marten-event-sourcing.md`).
 
 ---
 

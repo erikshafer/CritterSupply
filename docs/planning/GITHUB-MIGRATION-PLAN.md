@@ -12,7 +12,7 @@ This plan migrates CritterSupply's planning and task tracking from markdown file
 
 The result is a **hybrid model**:
 - 🟦 **GitHub** = Live work tracking (issues, milestones, project boards)
-- 🟩 **Repo markdown** = AI context + long-form reference (CONTEXTS.md, skills/, ADRs)
+- 🟩 **Repo markdown** = AI context + long-form reference (CONTEXTS.md, docs/skills/, ADRs)
 
 ### Why This Works Across Every Machine You Own
 
@@ -317,7 +317,7 @@ Body:
 ## Tasks
 - [ ] Add FsCheck property tests for Order aggregate invariants
 - [ ] Add FsCheck property tests for Inventory reservation logic
-- [ ] Document property-based testing patterns in skills/
+- [ ] Document property-based testing patterns in docs/skills/
 
 ## Notes
 FsCheck is already in Directory.Packages.props ✅
@@ -542,7 +542,7 @@ docs: update CURRENT-CYCLE.md for Cycle 19 start
 **Files that are NEVER deprecated:**
 - `CONTEXTS.md` — AI architectural truth
 - `CLAUDE.md` — AI custom instructions
-- `skills/*.md` — AI skill guides
+- `docs/skills/*.md` — AI skill guides
 - `docs/decisions/NNNN-*.md` — ADR authoritative sources
 - `docs/features/**/*.feature` — BDD living documentation
 - `docs/planning/CURRENT-CYCLE.md` — AI fallback summary

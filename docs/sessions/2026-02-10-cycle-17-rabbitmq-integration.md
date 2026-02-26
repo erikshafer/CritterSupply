@@ -59,7 +59,7 @@ Content-Type: application/json
 
 **Files Changed:**
 - `src/Shopping/Shopping/Cart/InitializeCart.cs`
-- `skills/wolverine-message-handlers.md` (Pattern 3 - comprehensive documentation added)
+- `docs/skills/wolverine-message-handlers.md` (Pattern 3 - comprehensive documentation added)
 - `src/Shopping/Shopping.Api/Shopping.Api.http` (updated assertions for 201 + `response.body.value`)
 
 **Result:** ✅ Returns proper 201 Created with cart ID in body
@@ -243,7 +243,7 @@ curl http://localhost:5236/health
 - `tests/Product Catalog/ProductCatalog.Api.IntegrationTests/AddProductSteps.cs` - ScenarioContext fix
 
 ### Documentation
-- `skills/wolverine-message-handlers.md` - Added Pattern 3 comprehensive documentation
+- `docs/skills/wolverine-message-handlers.md` - Added Pattern 3 comprehensive documentation
 - `SESSION-SUMMARY-2026-02-10.md` - This file
 
 ### HTTP Files
@@ -254,7 +254,7 @@ curl http://localhost:5236/health
 ## 🧠 Key Learnings Documented
 
 ### Wolverine HTTP Response Pattern
-**Location:** `skills/wolverine-message-handlers.md` (Pattern 3)
+**Location:** `docs/skills/wolverine-message-handlers.md` (Pattern 3)
 
 **Critical Rule:** In Wolverine tuples, **the first item is ALWAYS the HTTP response**.
 

@@ -246,7 +246,7 @@ src/
   Shared/Messages.Contracts/
 ```
 
-See `skills/vertical-slice-organization.md` for complete file organization patterns.
+See `docs/skills/vertical-slice-organization.md` for complete file organization patterns.
 
 ## API Project Configuration
 
@@ -530,7 +530,7 @@ Skills provide detailed patterns and examples. Read the appropriate skill **befo
 
 For message handlers, HTTP endpoints, compound handlers, or aggregate workflows:
 
-**Read:** `skills/wolverine-message-handlers.md`
+**Read:** `docs/skills/wolverine-message-handlers.md`
 
 Covers:
 - Compound handler lifecycle (`Before`, `Validate`, `Load`, `Handle`)
@@ -542,7 +542,7 @@ Covers:
 
 For event-sourced aggregates, domain events, or the decider pattern:
 
-**Read:** `skills/marten-event-sourcing.md`
+**Read:** `docs/skills/marten-event-sourcing.md`
 
 Covers:
 - Immutable aggregate design with `Create()` and `Apply()` methods
@@ -554,7 +554,7 @@ Covers:
 
 For non-event-sourced persistence (like Product Catalog):
 
-**Read:** `skills/marten-document-store.md`
+**Read:** `docs/skills/marten-document-store.md`
 
 Covers:
 - Document model design with factory methods
@@ -566,7 +566,7 @@ Covers:
 
 For relational data (like Customer Identity BC):
 
-**Read:** `skills/efcore-wolverine-integration.md`
+**Read:** `docs/skills/efcore-wolverine-integration.md`
 
 Covers:
 - Entity model design with navigation properties
@@ -578,7 +578,7 @@ Covers:
 
 For payment gateways, address verification, shipping providers:
 
-**Read:** `skills/external-service-integration.md`
+**Read:** `docs/skills/external-service-integration.md`
 
 Covers:
 - Strategy pattern with dependency injection
@@ -590,7 +590,7 @@ Covers:
 
 For customer-facing frontends aggregating multiple BCs:
 
-**Read:** `skills/bff-realtime-patterns.md`
+**Read:** `docs/skills/bff-realtime-patterns.md`
 
 Covers:
 - View composition from multiple BCs
@@ -602,7 +602,7 @@ Covers:
 
 For file structure and vertical slice organization:
 
-**Read:** `skills/vertical-slice-organization.md`
+**Read:** `docs/skills/vertical-slice-organization.md`
 
 Covers:
 - Command/Handler/Validator colocation
@@ -613,7 +613,7 @@ Covers:
 
 For language features, code style, immutability patterns:
 
-**Read:** `skills/modern-csharp-coding-standards.md`
+**Read:** `docs/skills/modern-csharp-coding-standards.md`
 
 Covers:
 - Records and immutability
@@ -625,7 +625,7 @@ Covers:
 
 For unit and integration test patterns:
 
-**Read:** `skills/critterstack-testing-patterns.md`
+**Read:** `docs/skills/critterstack-testing-patterns.md`
 
 Covers:
 - Alba integration test fixtures
@@ -634,7 +634,7 @@ Covers:
 
 For TestContainers setup and infrastructure testing:
 
-**Read:** `skills/testcontainers-integration-tests.md`
+**Read:** `docs/skills/testcontainers-integration-tests.md`
 
 Covers:
 - Why TestContainers over mocks
@@ -644,7 +644,7 @@ Covers:
 
 For BDD testing with Gherkin and Reqnroll:
 
-**Read:** `skills/reqnroll-bdd-testing.md`
+**Read:** `docs/skills/reqnroll-bdd-testing.md`
 
 Covers:
 - When to use BDD vs Alba-only tests

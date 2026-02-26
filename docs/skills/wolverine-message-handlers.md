@@ -455,4 +455,4 @@ Features/
     PaymentProcessed.cs    # Domain event (separate file)
 ```
 
-See `skills/vertical-slice-organization.md` for complete file organization patterns.
+See `docs/skills/vertical-slice-organization.md` for complete file organization patterns.

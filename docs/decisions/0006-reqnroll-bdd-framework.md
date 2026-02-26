@@ -156,7 +156,7 @@ We will use **Reqnroll** as our BDD testing framework.
    - Verify integration with Alba and TestContainers
 
 2. **Documentation**
-   - Create `skills/reqnroll-bdd-testing.md` skill document
+   - Create `docs/skills/reqnroll-bdd-testing.md` skill document
    - Update CLAUDE.md to reference BDD workflow
    - Add examples to `docs/features/README.md`
 

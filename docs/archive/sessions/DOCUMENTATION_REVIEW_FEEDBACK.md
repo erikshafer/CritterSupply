@@ -169,7 +169,7 @@ CritterSupply's documentation represents **exceptional work** for an AI-assisted
    
    1. **CONTEXTS.md** — Bounded context definitions, integration contracts
    2. **ADRs (docs/decisions/)** — Architectural decisions (by date, newest wins)
-   3. **Skills (skills/*.md)** — Implementation patterns
+   3. **Skills (docs/skills/*.md)** — Implementation patterns
    4. **CLAUDE.md** — General guidance
    5. **Code** — When in doubt, code is source of truth (but likely needs update)
    ```
@@ -537,7 +537,7 @@ CritterSupply's documentation represents **exceptional work** for an AI-assisted
 6. **Create "Common Pitfalls" Master Doc**
    - Extract common pitfalls from all skills
    - Organize by category (Testing, Marten, Wolverine, EF Core)
-   - Add to skills/ directory as `common-pitfalls.md`
+   - Add to docs/skills/ directory as `common-pitfalls.md`
 
 ---
 
@@ -551,7 +551,7 @@ CritterSupply/
 ├── CLAUDE.md (587 lines) — AI development guide
 ├── CONTEXTS.md (94.2 KB) — Bounded context definitions
 ├── DEVPROGRESS.md (deprecated) — Historical progress
-├── skills/ (11 files) — Implementation patterns
+├── docs/skills/ (11 files) — Implementation patterns
 └── docs/
     ├── planning/ — Cycles, backlog
     ├── decisions/ — ADRs
@@ -574,7 +574,7 @@ CritterSupply/
 │   ├── features/ — Gherkin BDD specs
 │   └── patterns/ — (NEW) Pattern explanations
 │       └── README.md — Master pattern list with descriptions
-├── skills/
+├── docs/skills/
 │   ├── README.md — (NEW) Skill index/navigation
 │   ├── common-pitfalls.md — (NEW) Consolidated pitfalls
 │   ├── bff-composition-patterns.md — (NEW) Split from bff-realtime-patterns.md
@@ -594,7 +594,7 @@ CritterSupply/
 | 🔴 | **Shorten README to ~120-150 lines** | High (GitHub first impressions) | Medium (2-3 hours) |
 | 🔴 | **Add Visual Architecture Diagram** | High (Comprehension) | Medium (3-4 hours) |
 | 🔴 | **Deduplicate TestFixture Documentation** | High (Consistency) | Low (1 hour) |
-| 🔴 | **Create Skill Index (skills/README.md)** | High (Discoverability) | Low (1-2 hours) |
+| 🔴 | **Create Skill Index (docs/skills/README.md)** | High (Discoverability) | Low (1-2 hours) |
 | 🔴 | **Expand CONTEXTS.md Error Handling** | High (Production readiness) | High (4-6 hours) |
 
 ### 6.2 Important (Do Next)
@@ -643,7 +643,7 @@ CritterSupply/
 
 1. **Shorten README to ~120-150 lines** (move details to docs/)
 2. **Add visual architecture diagram** (BC interactions)
-3. **Create skills/README.md** (skill navigation index)
+3. **Create docs/skills/README.md** (skill navigation index)
 4. **Deduplicate TestFixture docs** (pick one canonical location)
 5. **Expand CONTEXTS.md error handling** (compensation, retries, timeouts)
 

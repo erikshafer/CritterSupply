@@ -103,7 +103,7 @@ This document tracks active and recent development cycles. For complete historic
 - 4 pages: Home, Cart (SSE-enabled), Checkout (MudStepper), Order History (MudTable)
 - JavaScript EventSource client for SSE subscriptions
 - Interactive component pattern (solving Blazor render mode limitation)
-- Comprehensive skills documentation (`skills/bff-realtime-patterns.md`)
+- Comprehensive skills documentation (`docs/skills/bff-realtime-patterns.md`)
 
 **Results:** 13/17 tests passing (4 deferred - real data integration). Manual browser testing passed all acceptance criteria.
 

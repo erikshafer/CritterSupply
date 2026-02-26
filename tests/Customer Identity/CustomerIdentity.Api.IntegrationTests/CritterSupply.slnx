@@ -10,9 +10,9 @@
     <File Path="README.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Skills/">
-    <File Path="skills/critterstack-testing-patterns.md" />
-    <File Path="skills/modern-csharp-coding-standards.md" />
-    <File Path="skills/testcontainers-integration-tests.md" />
+    <File Path="docs/skills/critterstack-testing-patterns.md" />
+    <File Path="docs/skills/modern-csharp-coding-standards.md" />
+    <File Path="docs/skills/testcontainers-integration-tests.md" />
   </Folder>
   <Folder Name="/Order Management/">
     <Project Path="src/Order Management/Orders.Api/Orders.Api.csproj" />

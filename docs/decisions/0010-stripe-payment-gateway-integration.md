@@ -145,7 +145,7 @@ Stripe's developer experience and comprehensive webhooks make it ideal for a ref
 ### Mitigation Strategies
 
 **Complexity:**
-- Comprehensive skill guide: `skills/stripe-payment-gateway.md` (TBD)
+- Comprehensive skill guide: `docs/skills/stripe-payment-gateway.md` (TBD)
 - Working code examples in spike document
 
 **Test Setup:**
@@ -233,7 +233,7 @@ Stripe's developer experience and comprehensive webhooks make it ideal for a ref
 
 ### Phase 4: Documentation (2026-03-11 to 2026-03-17)
 - Update `CONTEXTS.md` (Payments BC integration flows)
-- Create skill guide: `skills/stripe-payment-gateway.md`
+- Create skill guide: `docs/skills/stripe-payment-gateway.md`
 - Add Stripe setup to README
 - Manual test checklist for Stripe integration
 - BDD scenarios for payment workflows (optional)
@@ -244,6 +244,6 @@ Stripe's developer experience and comprehensive webhooks make it ideal for a ref
 - **Existing Interface:** `src/Payments/Payments/Processing/IPaymentGateway.cs`
 - **Existing Stub:** `src/Payments/Payments/Processing/StubPaymentGateway.cs`
 - **CONTEXTS.md:** Payments BC section (lines 289-362)
-- **External Service Pattern:** `skills/external-service-integration.md`
+- **External Service Pattern:** `docs/skills/external-service-integration.md`
 - [Stripe Payment Intents Docs](https://stripe.com/docs/payments/payment-intents) (conceptual)
 - [Stripe Webhooks Guide](https://stripe.com/docs/webhooks) (conceptual)

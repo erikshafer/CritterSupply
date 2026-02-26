@@ -118,7 +118,7 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - 'skills/**'
+      - 'docs/skills/**'
   
   pull_request:
     branches: [ "main" ]
@@ -132,7 +132,7 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - 'skills/**'
+      - 'docs/skills/**'
 ```
 
 ### Explanation
@@ -256,7 +256,7 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - 'skills/**'
+      - 'docs/skills/**'
   
   pull_request:
     branches: [ "main" ]
@@ -270,7 +270,7 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - 'skills/**'
+      - 'docs/skills/**'
 
 jobs:
   build:

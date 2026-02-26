@@ -1569,9 +1569,9 @@ graph LR
 - [CONTEXTS.md](../../../CONTEXTS.md) — Architectural source of truth; Shopping BC future events, Orders BC price-at-checkout
 - [polecat-candidates.md](./polecat-candidates.md) — Polecat candidate analysis; Promotions/Pricing Tier 2 recommendation
 - [ADR 0002 — EF Core for Customer Identity](../decisions/0002-efcore-for-customer-identity.md) — Precedent for EF Core in identity-adjacent domains
-- [skills/marten-event-sourcing.md](../../../skills/marten-event-sourcing.md) — Event sourcing patterns applicable to Polecat (near-identical API)
-- [skills/wolverine-message-handlers.md](../../../skills/wolverine-message-handlers.md) — Compound handler patterns for Pricing/Promotions handlers
-- [skills/critterstack-testing-patterns.md](../../../skills/critterstack-testing-patterns.md) — TestContainers patterns applicable to SQL Server (Testcontainers.MsSql)
+- [docs/skills/marten-event-sourcing.md](../../../skills/marten-event-sourcing.md) — Event sourcing patterns applicable to Polecat (near-identical API)
+- [docs/skills/wolverine-message-handlers.md](../../../skills/wolverine-message-handlers.md) — Compound handler patterns for Pricing/Promotions handlers
+- [docs/skills/critterstack-testing-patterns.md](../../../skills/critterstack-testing-patterns.md) — TestContainers patterns applicable to SQL Server (Testcontainers.MsSql)
 - [Evans, Eric — Domain-Driven Design (2003)](https://www.amazon.com/Domain-Driven-Design-Tackling-Complexity-Software/dp/0321125215) — Bounded context, ubiquitous language, context map patterns
 
 ---

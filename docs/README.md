@@ -100,7 +100,7 @@ _(Feature files for other BCs to be added over time)_
 - [DEVPROGRESS.md](../DEVPROGRESS.md) - **Deprecated** (see deprecation notice, migrated to `planning/CYCLES.md`)
 
 **Skills Documentation:**
-- [skills/](../skills/) - Pattern documentation for Wolverine, Marten, EF Core, BDD, testing, etc.
+- [docs/skills/](../skills/) - Pattern documentation for Wolverine, Marten, EF Core, BDD, testing, etc.
 
 ---
 

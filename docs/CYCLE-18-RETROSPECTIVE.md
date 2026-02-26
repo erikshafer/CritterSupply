@@ -324,7 +324,7 @@ public static (Events, OutgoingMessages) Handle(
 - **Always return `Events` collection (plural) from Wolverine aggregate handlers**
 - `[WriteAggregate]` pattern requires collection syntax: `return ([@event], ...);`
 - Integration tests with database assertions would catch this immediately
-- Update `skills/wolverine-message-handlers.md` with clear guidance on return types
+- Update `docs/skills/wolverine-message-handlers.md` with clear guidance on return types
 
 **Files Changed:**
 - `src/Shopping/Shopping/Cart/AddItemToCart.cs:26-41`
@@ -552,7 +552,7 @@ public async Task GetCartView_EnrichesItemsWithProductDetails()
 
 ### 2. Create Integration Test Checklist for Typed HTTP Clients ✅
 
-**Proposal:** Add to `skills/critterstack-testing-patterns.md`:
+**Proposal:** Add to `docs/skills/critterstack-testing-patterns.md`:
 
 ```markdown
 ## BFF Typed HTTP Client Integration Test Checklist
@@ -575,7 +575,7 @@ When creating typed HTTP clients (`IShoppingClient`, `ICatalogClient`, etc.), ve
 
 ### 3. Update Wolverine Skills with Event Collection Pattern ✅
 
-**Proposal:** Add to `skills/wolverine-message-handlers.md`:
+**Proposal:** Add to `docs/skills/wolverine-message-handlers.md`:
 
 ```markdown
 ## ⚠️ CRITICAL: Always Return Events Collection (Plural)
@@ -793,9 +793,9 @@ public async Task AddItemToCart_PersistsItemAddedEvent()
 ### 5. Update Skills Documentation with Lessons Learned ✅
 
 **Files to Update:**
-- `skills/wolverine-message-handlers.md` → Add Events collection pattern
-- `skills/critterstack-testing-patterns.md` → Add typed HTTP client test examples
-- `skills/bff-realtime-patterns.md` → Add SSE event handler testing patterns
+- `docs/skills/wolverine-message-handlers.md` → Add Events collection pattern
+- `docs/skills/critterstack-testing-patterns.md` → Add typed HTTP client test examples
+- `docs/skills/bff-realtime-patterns.md` → Add SSE event handler testing patterns
 
 **Action Items:**
 - Add "⚠️ CRITICAL" warnings for common pitfalls
@@ -865,8 +865,8 @@ public async Task ShoppingClient_GetCartAsync_MatchesShoppingBcContract()
 
 ### Immediate (Before Cycle 19)
 - [ ] Update `CLAUDE.md` with testing strategy pyramid
-- [ ] Update `skills/wolverine-message-handlers.md` with Events collection pattern
-- [ ] Update `skills/critterstack-testing-patterns.md` with typed HTTP client tests
+- [ ] Update `docs/skills/wolverine-message-handlers.md` with Events collection pattern
+- [ ] Update `docs/skills/critterstack-testing-patterns.md` with typed HTTP client tests
 - [ ] Create `docs/PRE-MANUAL-TESTING-CHECKLIST.md`
 - [ ] Update cycle plan template with "Test Coverage" section
 

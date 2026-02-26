@@ -256,7 +256,7 @@ Choose your strategy:
 - [ ] Update `Storefront.Api/Program.cs` to subscribe to exchanges (already done in Concern #1)
 
 **Phase 2: Document Pattern (~30 minutes)**
-- [ ] Add section to `skills/bff-realtime-patterns.md` documenting exchange-based subscriptions
+- [ ] Add section to `docs/skills/bff-realtime-patterns.md` documenting exchange-based subscriptions
 - [ ] Update `CONTEXTS.md` with new integration message flows
 
 **Acceptance Criteria:**

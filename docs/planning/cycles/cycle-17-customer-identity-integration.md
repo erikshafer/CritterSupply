@@ -207,7 +207,7 @@ When integrating BCs, identify and remove all stub/placeholder data early. Hardc
 
 ### Skills Documentation Updates Needed
 
-**Recommendation:** Update `skills/efcore-wolverine-integration.md` with:
+**Recommendation:** Update `docs/skills/efcore-wolverine-integration.md` with:
 
 1. **Route Parameter Binding Pattern**
    ```csharp

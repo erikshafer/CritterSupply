@@ -258,7 +258,7 @@ This ensures retries return cached responses (no duplicate charges).
 - **Research Spike:** `docs/planning/spikes/stripe-api-integration.md`
 - **ADR:** `docs/decisions/0010-stripe-payment-gateway-integration.md`
 - **Existing Interface:** `src/Payments/Payments/Processing/IPaymentGateway.cs`
-- **Skill Guide:** `skills/external-service-integration.md`
+- **Skill Guide:** `docs/skills/external-service-integration.md`
 - [Stripe API Docs](https://stripe.com/docs/api) (external)
 - [Stripe Webhooks Guide](https://stripe.com/docs/webhooks) (external)
 - [Stripe CLI](https://stripe.com/docs/stripe-cli) (external)

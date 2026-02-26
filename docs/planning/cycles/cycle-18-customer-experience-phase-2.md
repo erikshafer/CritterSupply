@@ -50,7 +50,7 @@ Complete the Customer Experience (Storefront) BFF by integrating real-time updat
 - ✅ Customer isolation working (Alice doesn't see Bob's updates)
 
 **References:**
-- Cycle 16 SSE infrastructure: `skills/bff-realtime-patterns.md`
+- Cycle 16 SSE infrastructure: `docs/skills/bff-realtime-patterns.md`
 - RabbitMQ config: Check Orders/Shopping/Payments for listener examples
 
 ---
@@ -405,7 +405,7 @@ public static class ItemAddedHandler
 **Risk 3: Blazor Render Mode Issues**
 - **Impact:** SSE updates don't trigger UI refresh (encountered in Cycle 16)
 - **Mitigation:** Use Interactive Server components for real-time pages (Cart, Checkout, Order History)
-- **Reference:** `skills/bff-realtime-patterns.md` - Interactive Component Pattern
+- **Reference:** `docs/skills/bff-realtime-patterns.md` - Interactive Component Pattern
 
 **Risk 4: HTTP Client Timeouts During Load**
 - **Impact:** UI freezes during slow API calls
@@ -649,7 +649,7 @@ Applied to: `AddItemToCart`, `RemoveItemFromCart`, `ChangeItemQuantity`
 - Example: `ShoppingApiTests.GetCart_ShouldDeserializeCorrectly()`
 
 **2. API Contract Documentation**
-- Document actual JSON response formats in `skills/` or OpenAPI specs
+- Document actual JSON response formats in `docs/skills/` or OpenAPI specs
 - Don't rely on assumptions about value objects vs primitives
 - Include example responses in `.http` files
 
@@ -660,7 +660,7 @@ Applied to: `AddItemToCart`, `RemoveItemFromCart`, `ChangeItemQuantity`
 
 **4. Wolverine Pattern Documentation**
 - Clarify that `[WriteAggregate]` requires returning `Events` (plural)
-- Add to `skills/wolverine-message-handlers.md` with examples
+- Add to `docs/skills/wolverine-message-handlers.md` with examples
 - Common mistake: Returning `(Event, OutgoingMessages)` instead of `(Events, OutgoingMessages)`
 
 **5. Hardcoded Test Data Strategy**

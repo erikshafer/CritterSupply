@@ -179,9 +179,9 @@ WHERE "Email" = 'test@example.com';
 
 ## References
 
-- [Reqnroll BDD Testing Skill](../../skills/reqnroll-bdd-testing.md)
-- [Critter Stack Testing Patterns](../../skills/critterstack-testing-patterns.md)
-- [TestContainers Integration Tests](../../skills/testcontainers-integration-tests.md)
+- [Reqnroll BDD Testing Skill](../../docs/skills/reqnroll-bdd-testing.md)
+- [Critter Stack Testing Patterns](../../docs/skills/critterstack-testing-patterns.md)
+- [TestContainers Integration Tests](../../docs/skills/testcontainers-integration-tests.md)
 - [CONTEXTS.md](../../CONTEXTS.md) — Integration contracts and bounded context definitions
 - [docs/features/](../../docs/features/) — Gherkin feature files by bounded context
 - [docs/MANUAL-TEST-CHECKLIST.md](../../docs/MANUAL-TEST-CHECKLIST.md) — Manual testing checklist

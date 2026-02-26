@@ -497,7 +497,7 @@ jobs:
 
 - **Current Workflow:** [.github/workflows/dotnet.yml](../../.github/workflows/dotnet.yml)
 - **Bounded Contexts:** [CONTEXTS.md](../../CONTEXTS.md)
-- **Test Infrastructure:** `skills/testcontainers-integration-tests.md`
+- **Test Infrastructure:** `docs/skills/testcontainers-integration-tests.md`
 - **Customer Experience Plan:** [docs/planning/cycles/cycle-16-customer-experience.md](../planning/cycles/cycle-16-customer-experience.md)
 - **GitHub Actions Best Practices:** https://docs.github.com/en/actions/learn-github-actions/best-practices-for-workflows
 - **Docker Multi-Stage Builds:** https://docs.docker.com/build/building/multi-stage/

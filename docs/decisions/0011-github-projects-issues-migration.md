@@ -40,7 +40,7 @@ Key elements of the decision:
 
 1. **GitHub Issues** become the single source of truth for all work items (cycles, backlog tasks, bugs, ADRs).
 2. **GitHub Projects (v2)** provides the board/roadmap/table view with automation.
-3. **Markdown files that serve as AI context** (`CONTEXTS.md`, `CLAUDE.md`, `skills/`, `docs/decisions/`) **stay in the repo** but reference GitHub Issues.
+3. **Markdown files that serve as AI context** (`CONTEXTS.md`, `CLAUDE.md`, `docs/skills/`, `docs/decisions/`) **stay in the repo** but reference GitHub Issues.
 4. **Cycle plan detail** migrates from long markdown files into Issue bodies + linked sub-issues.
 5. **CYCLES.md and BACKLOG.md** are deprecated in favor of GitHub Project views and Milestones.
 
@@ -127,7 +127,7 @@ Once those prerequisites are met, the AI agent's workflow is identical on every 
 
 **2. Context files must stay in-repo**
 
-*Con:* Files like `CONTEXTS.md`, `skills/`, and `docs/decisions/` are referenced directly in AI system prompts and custom instructions. Moving these to Issues would break AI context loading.
+*Con:* Files like `CONTEXTS.md`, `docs/skills/`, and `docs/decisions/` are referenced directly in AI system prompts and custom instructions. Moving these to Issues would break AI context loading.
 
 *Mitigation:* These files are **not migrated**. Only planning/tracking content (cycles, backlog, tasks) moves to GitHub. Architecture docs, skill guides, and ADR markdown files remain in the repo. ADRs get a *companion Issue* for discussion and linking, but the authoritative markdown document stays.
 
@@ -159,7 +159,7 @@ Once those prerequisites are met, the AI agent's workflow is identical on every 
 |---|---|
 | `CONTEXTS.md` | AI architectural source of truth; referenced in system prompts |
 | `CLAUDE.md` | AI agent custom instructions |
-| `skills/*.md` | AI skill reference documents |
+| `docs/skills/*.md` | AI skill reference documents |
 | `docs/decisions/NNNN-*.md` | ADR authoritative source; referenced by AI |
 | `docs/features/**/*.feature` | BDD living documentation; consumed by test tooling |
 | `docs/planning/CURRENT-CYCLE.md` | **New:** Lightweight AI-readable summary of active cycle |

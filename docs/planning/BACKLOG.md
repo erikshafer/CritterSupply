@@ -158,7 +158,7 @@ Add property-based tests using FsCheck for domain invariants.
 **Tasks:**
 1. Add FsCheck property tests for Order aggregate invariants
 2. Add FsCheck property tests for Inventory reservation logic
-3. Document property-based testing patterns in skills/
+3. Document property-based testing patterns in docs/skills/
 
 **Acceptance Criteria:**
 - Property tests catch edge cases not covered by example-based tests

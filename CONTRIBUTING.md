@@ -76,7 +76,7 @@ git checkout -b issue-99-refactor-handlers
 ### 4. Make Changes
 
 **Follow CritterSupply conventions:**
-- Read relevant skills from [skills/](./skills/) before implementing
+- Read relevant skills from [docs/skills/](./docs/skills/) before implementing
 - Consult [CONTEXTS.md](./CONTEXTS.md) for bounded context integration contracts
 - Check [CLAUDE.md](./CLAUDE.md) for coding standards and architecture decisions
 - Write integration tests (Alba + TestContainers)
@@ -215,7 +215,7 @@ Fixes #57"
 
 ### C# Style
 
-See [skills/modern-csharp-coding-standards.md](./skills/modern-csharp-coding-standards.md) for complete guide.
+See [docs/skills/modern-csharp-coding-standards.md](./docs/skills/modern-csharp-coding-standards.md) for complete guide.
 
 **Key rules:**
 - `sealed` by default for commands, queries, events, models
@@ -231,7 +231,7 @@ See [skills/modern-csharp-coding-standards.md](./skills/modern-csharp-coding-sta
 - Manual testing via `.http` files (JetBrains IDEs)
 - BDD scenarios in `docs/features/` when appropriate
 
-See [skills/critterstack-testing-patterns.md](./skills/critterstack-testing-patterns.md).
+See [docs/skills/critterstack-testing-patterns.md](./docs/skills/critterstack-testing-patterns.md).
 
 ### Project Structure
 
@@ -246,7 +246,7 @@ tests/
     <ProjectName>.IntegrationTests/
 ```
 
-See [skills/vertical-slice-organization.md](./skills/vertical-slice-organization.md).
+See [docs/skills/vertical-slice-organization.md](./docs/skills/vertical-slice-organization.md).
 
 ### Documentation
 
@@ -376,7 +376,7 @@ See [docs/HTTP-FILES-GUIDE.md](./docs/HTTP-FILES-GUIDE.md) for usage.
 
 1. **Read [CONTEXTS.md](./CONTEXTS.md)** — Source of truth for BC boundaries and integration contracts
 2. **Check existing ADRs** in [docs/decisions/](./docs/decisions/)
-3. **Consult relevant skill** in [skills/](./skills/)
+3. **Consult relevant skill** in [docs/skills/](./docs/skills/)
 
 **When to create an ADR:**
 - Technology selection (e.g., EF Core vs Marten for a BC)
@@ -399,7 +399,7 @@ See [CLAUDE.md Architectural Decision Records section](./CLAUDE.md#architectural
 **Before asking:**
 - Check [CLAUDE.md](./CLAUDE.md) for development guidelines
 - Search existing issues
-- Read relevant skills in [skills/](./skills/)
+- Read relevant skills in [docs/skills/](./docs/skills/)
 
 ---
 

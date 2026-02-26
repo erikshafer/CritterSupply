@@ -28,7 +28,7 @@
 **Documentation Created:**
 - `docs/planning/cycles/cycle-17-customer-identity-integration.md` - Full cycle retrospective
 - Updated `docs/planning/CYCLES.md` - Moved Cycle 17 to "Recently Completed"
-- Updated `skills/efcore-wolverine-integration.md` - Added "Common Pitfalls & Solutions" section
+- Updated `docs/skills/efcore-wolverine-integration.md` - Added "Common Pitfalls & Solutions" section
 - Updated `CONTEXTS.md` - Documented Customer Identity integration flows
 
 ---
@@ -65,7 +65,7 @@
 - `docs/planning/cycles/cycle-18-customer-experience-phase-2.md` ✨ NEW
 - `docs/planning/CYCLE-18-QUICKSTART.md` ✨ NEW
 - `docs/planning/CYCLES.md` - Updated current cycle status
-- `skills/efcore-wolverine-integration.md` - Added pitfalls section
+- `docs/skills/efcore-wolverine-integration.md` - Added pitfalls section
 - `CONTEXTS.md` - Added Customer Identity integration flows
 - `CritterSupply.slnx` - Added new cycle docs to Solution Explorer
 
@@ -211,9 +211,9 @@ docker-compose up -d
 **Quick-Start Guide:** `docs/planning/CYCLE-18-QUICKSTART.md`
 
 **Skills Docs:**
-- `skills/bff-realtime-patterns.md` - SSE, EventBroadcaster, Blazor integration
-- `skills/wolverine-message-handlers.md` - RabbitMQ subscriptions
-- `skills/efcore-wolverine-integration.md` - HTTP client patterns (newly updated!)
+- `docs/skills/bff-realtime-patterns.md` - SSE, EventBroadcaster, Blazor integration
+- `docs/skills/wolverine-message-handlers.md` - RabbitMQ subscriptions
+- `docs/skills/efcore-wolverine-integration.md` - HTTP client patterns (newly updated!)
 
 **Testing:**
 - `docs/DATA-SEEDING.http` - Manual API testing scripts (verified working!)
