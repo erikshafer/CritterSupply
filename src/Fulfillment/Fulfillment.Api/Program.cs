@@ -36,8 +36,7 @@ builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics =>
     {
         metrics
-            .AddMeter("Wolverine")            // Wolverine metrics (success/failure counters)
-            .AddOtlpExporter();               // Export metrics to Jaeger via OTLP
+            .AddMeter("Wolverine");           // Wolverine metrics (success/failure counters)
     });
 
 var martenConnectionString = builder.Configuration.GetConnectionString("marten")
