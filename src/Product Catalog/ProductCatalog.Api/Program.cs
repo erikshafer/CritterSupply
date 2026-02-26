@@ -1,4 +1,7 @@
 using Marten;
+using OpenTelemetry.Exporter;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using ProductCatalog.Products;
 using ProductCatalog.Shared;
 using Wolverine;
@@ -8,6 +11,22 @@ using Wolverine.Http.FluentValidation;
 using Wolverine.Marten;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// OpenTelemetry configuration for Wolverine tracing and metrics
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()  // HTTP request tracing
+            .AddSource("Wolverine")           // Wolverine message handler tracing
+            .AddOtlpExporter();               // Export to Jaeger via OTLP
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics
+            .AddMeter("Wolverine")            // Wolverine metrics (success/failure counters)
+            .AddOtlpExporter();               // Export metrics to Jaeger via OTLP
+    });
 
 // Marten document store configuration
 var connectionString = builder.Configuration.GetConnectionString("marten")

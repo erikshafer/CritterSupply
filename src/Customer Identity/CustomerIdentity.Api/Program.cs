@@ -3,6 +3,9 @@ using System.Text.Json.Serialization;
 using CustomerIdentity.AddressBook;
 using JasperFx;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Exporter;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using Wolverine;
 using Wolverine.FluentValidation;
 using Wolverine.Http;
@@ -10,6 +13,22 @@ using Wolverine.Http.FluentValidation;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.ApplyJasperFxExtensions();
+
+// OpenTelemetry configuration for Wolverine tracing and metrics
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()  // HTTP request tracing
+            .AddSource("Wolverine")           // Wolverine message handler tracing
+            .AddOtlpExporter();               // Export to Jaeger via OTLP
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics
+            .AddMeter("Wolverine")            // Wolverine metrics (success/failure counters)
+            .AddOtlpExporter();               // Export metrics to Jaeger via OTLP
+    });
 
 // Configure EF Core with Postgres
 var connectionString = builder.Configuration.GetConnectionString("postgres")

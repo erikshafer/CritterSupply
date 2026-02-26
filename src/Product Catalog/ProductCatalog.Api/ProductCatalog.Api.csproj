@@ -16,6 +16,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="OpenTelemetry" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../ProductCatalog/ProductCatalog.csproj" />
     <ProjectReference Include="../../Shared/Messages.Contracts/Messages.Contracts.csproj" />
   </ItemGroup>
