@@ -31,27 +31,34 @@
     <File Path="docs/planning/spikes/pricing-promotions-domain-spike.md" />
     <File Path="docs/planning/spikes/stripe-api-integration.md" />
   </Folder>
-  <Folder Name="/.SolutionItems/Skills/">
+  <Folder Name="/.SolutionItems/Documentation/Skills/">
     <File Path="docs/skills/bff-realtime-patterns.md" />
     <File Path="docs/skills/critterstack-testing-patterns.md" />
-    <File Path="docs/skills/modern-csharp-coding-standards.md" />
-    <File Path="docs/skills/reqnroll-bdd-testing.md" />
-    <File Path="docs/skills/testcontainers-integration-tests.md" />
     <File Path="docs/skills/efcore-wolverine-integration.md" />
     <File Path="docs/skills/external-service-integration.md" />
     <File Path="docs/skills/marten-document-store.md" />
     <File Path="docs/skills/marten-event-sourcing.md" />
+    <File Path="docs/skills/modern-csharp-coding-standards.md" />
+    <File Path="docs/skills/reqnroll-bdd-testing.md" />
+    <File Path="docs/skills/testcontainers-integration-tests.md" />
     <File Path="docs/skills/vertical-slice-organization.md" />
     <File Path="docs/skills/wolverine-message-handlers.md" />
   </Folder>
-  <Folder Name="/.SolutionItems/Decisions/">
-    <File Path="docs/decisions/0007-github-workflow-improvements.md" />
-    <File Path="docs/decisions/0008-rabbitmq-configuration-consistency.md" />
-    <File Path="docs/decisions/0009-aspire-integration.md" />
-    <File Path="docs/decisions/0012-simple-session-based-authentication.md" />
-    <File Path="docs\decisions\0004-sse-over-signalr.md" />
-    <File Path="docs\decisions\0005-mudblazor-ui-framework.md" />
-    <File Path="docs\decisions\0006-reqnroll-bdd-framework.md" />
+  <Folder Name="/.SolutionItems/Documentation/Workflows/">
+    <File Path="docs/workflows/customer-experience-workflows.md" />
+    <File Path="docs/workflows/customer-identity-workflows.md" />
+    <File Path="docs/workflows/DEVOPS-EXECUTIVE-SUMMARY.md" />
+    <File Path="docs/workflows/DEVOPS-INFRASTRUCTURE-REVIEW.md" />
+    <File Path="docs/workflows/fulfillment-workflows.md" />
+    <File Path="docs/workflows/inventory-workflows.md" />
+    <File Path="docs/workflows/orders-workflows.md" />
+    <File Path="docs/workflows/payments-workflows.md" />
+    <File Path="docs/workflows/PO-DECISIONS.md" />
+    <File Path="docs/workflows/PO-REVIEW-SUMMARY.md" />
+    <File Path="docs/workflows/product-catalog-workflows.md" />
+    <File Path="docs/workflows/README.md" />
+    <File Path="docs/workflows/shopping-workflows.md" />
+    <File Path="docs/workflows/WORKFLOW-AUDIT.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/">
     <File Path="docs/CYCLE-18-TESTING-SUMMARY.md" />
@@ -127,22 +134,6 @@
     <Project Path="src/Product Catalog/ProductCatalog/ProductCatalog.csproj" />
     <Project Path="tests/Product Catalog/ProductCatalog.Api.IntegrationTests/ProductCatalog.Api.IntegrationTests.csproj" />
   </Folder>
-  <Folder Name="/.SolutionItems/Workflows/">
-    <File Path="docs/workflows/customer-experience-workflows.md" />
-    <File Path="docs/workflows/customer-identity-workflows.md" />
-    <File Path="docs/workflows/DEVOPS-EXECUTIVE-SUMMARY.md" />
-    <File Path="docs/workflows/DEVOPS-INFRASTRUCTURE-REVIEW.md" />
-    <File Path="docs/workflows/fulfillment-workflows.md" />
-    <File Path="docs/workflows/inventory-workflows.md" />
-    <File Path="docs/workflows/orders-workflows.md" />
-    <File Path="docs/workflows/payments-workflows.md" />
-    <File Path="docs/workflows/PO-DECISIONS.md" />
-    <File Path="docs/workflows/PO-REVIEW-SUMMARY.md" />
-    <File Path="docs/workflows/product-catalog-workflows.md" />
-    <File Path="docs/workflows/README.md" />
-    <File Path="docs/workflows/shopping-workflows.md" />
-    <File Path="docs/workflows/WORKFLOW-AUDIT.md" />
-  </Folder>
   <Folder Name="/Customer Experience/">
     <Project Path="src/Customer Experience/Storefront.Api/Storefront.Api.csproj" />
     <Project Path="src/Customer Experience/Storefront.Web/Storefront.Web.csproj" />
@@ -152,4 +143,5 @@
   <Folder Name="/Shared/">
     <Project Path="src/Shared/Messages.Contracts/Messages.Contracts.csproj" />
   </Folder>
+  <Folder Name="/.SolutionItems/Documentation/Decisions/" />
 </Solution>
