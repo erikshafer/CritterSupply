@@ -59,6 +59,8 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
       RabbitMQ__hostname: rabbitmq
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: Orders.Api
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,6 +82,8 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
       RabbitMQ__hostname: rabbitmq
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: Payments.Api
     depends_on:
       postgres:
         condition: service_healthy
@@ -101,6 +105,8 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
       RabbitMQ__hostname: rabbitmq
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: Inventory.Api
     depends_on:
       postgres:
         condition: service_healthy
@@ -122,6 +128,8 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
       RabbitMQ__hostname: rabbitmq
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: Fulfillment.Api
     depends_on:
       postgres:
         condition: service_healthy
@@ -143,6 +151,8 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__postgres: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
       RabbitMQ__hostname: rabbitmq
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: CustomerIdentity.Api
     depends_on:
       postgres:
         condition: service_healthy
@@ -164,6 +174,8 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
       RabbitMQ__hostname: rabbitmq
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: Shopping.Api
     depends_on:
       postgres:
         condition: service_healthy
@@ -185,6 +197,8 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
       RabbitMQ__hostname: rabbitmq
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: ProductCatalog.Api
     depends_on:
       postgres:
         condition: service_healthy
@@ -206,6 +220,8 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
       RabbitMQ__hostname: rabbitmq
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: Storefront.Api
     depends_on:
       postgres:
         condition: service_healthy
