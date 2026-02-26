@@ -10,8 +10,8 @@ using Marten;
 using Marten.Events.Projections;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Weasel.Core;
 using Wolverine;
@@ -26,6 +26,7 @@ builder.Host.ApplyJasperFxExtensions();
 
 // OpenTelemetry configuration for Wolverine tracing and metrics
 builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("Fulfillment"))
     .WithTracing(tracing =>
     {
         tracing

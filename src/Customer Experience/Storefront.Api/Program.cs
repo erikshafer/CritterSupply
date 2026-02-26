@@ -1,6 +1,6 @@
 using Marten;
-using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Storefront.Notifications;
 using Wolverine;
@@ -11,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // OpenTelemetry configuration for Wolverine tracing and metrics
 builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("Storefront"))
     .WithTracing(tracing =>
     {
         tracing

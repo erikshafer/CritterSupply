@@ -3,8 +3,8 @@ using System.Text.Json.Serialization;
 using CustomerIdentity.AddressBook;
 using JasperFx;
 using Microsoft.EntityFrameworkCore;
-using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Wolverine;
 using Wolverine.FluentValidation;
@@ -16,6 +16,7 @@ builder.Host.ApplyJasperFxExtensions();
 
 // OpenTelemetry configuration for Wolverine tracing and metrics
 builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("CustomerIdentity"))
     .WithTracing(tracing =>
     {
         tracing
