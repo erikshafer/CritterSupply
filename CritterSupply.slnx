@@ -16,6 +16,7 @@
     <File Path="docs\planning\cycles\cycle-16-customer-experience.md" />
     <File Path="docs/planning/cycles/cycle-17-customer-identity-integration.md" />
     <File Path="docs/planning/cycles/cycle-18-customer-experience-phase-2.md" />
+    <File Path="docs/planning/cycles/CYCLE-18-QUICKSTART.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Planning/Infrastructure/" />
   <Folder Name="/.SolutionItems/Documentation/Planning/Infrastructure/CI-CD/">
@@ -23,6 +24,12 @@
     <File Path="docs/planning/infrastructure/ci-cd/README.md" />
     <File Path="docs/planning/infrastructure/ci-cd/roadmap.md" />
     <File Path="docs/planning/infrastructure/ci-cd/visual-guide.md" />
+  </Folder>
+  <Folder Name="/.SolutionItems/Documentation/Planning/Spikes/">
+    <File Path="docs/planning/spikes/payment-gateway-comparison.md" />
+    <File Path="docs/planning/spikes/polecat-candidates.md" />
+    <File Path="docs/planning/spikes/pricing-promotions-domain-spike.md" />
+    <File Path="docs/planning/spikes/stripe-api-integration.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Skills/">
     <File Path="docs/skills/bff-realtime-patterns.md" />
@@ -38,13 +45,13 @@
     <File Path="docs/skills/wolverine-message-handlers.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Decisions/">
-    <File Path="docs/decisions/0004-sse-over-signalr.md" />
-    <File Path="docs/decisions/0005-mudblazor-ui-framework.md" />
-    <File Path="docs/decisions/0006-reqnroll-bdd-framework.md" />
     <File Path="docs/decisions/0007-github-workflow-improvements.md" />
     <File Path="docs/decisions/0008-rabbitmq-configuration-consistency.md" />
     <File Path="docs/decisions/0009-aspire-integration.md" />
     <File Path="docs/decisions/0012-simple-session-based-authentication.md" />
+    <File Path="docs\decisions\0004-sse-over-signalr.md" />
+    <File Path="docs\decisions\0005-mudblazor-ui-framework.md" />
+    <File Path="docs\decisions\0006-reqnroll-bdd-framework.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/">
     <File Path="docs/CYCLE-18-TESTING-SUMMARY.md" />
@@ -59,10 +66,20 @@
   <Folder Name="/.SolutionItems/Documentation/Planning/">
     <File Path="docs/planning/BACKLOG.md" />
     <File Path="docs\planning\CYCLES.md" />
-    <File Path="docs/planning/CYCLE-18-QUICKSTART.md" />
+  </Folder>
+  <Folder Name="/.SolutionItems/Documentation/Archive/" />
+  <Folder Name="/.SolutionItems/Documentation/Archive/Sessions/">
+    <File Path="docs/archive/sessions/DEVOPS-REVIEW-SUMMARY.md" />
+    <File Path="docs/archive/sessions/DOCUMENTATION_REVIEW_FEEDBACK.md" />
+    <File Path="docs/archive/sessions/SESSION-SUMMARY-2026-02-13.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Decisions/">
     <File Path="docs/decisions/0007-github-workflow-improvements.md" />
+    <File Path="docs/decisions/0008-rabbitmq-configuration-consistency.md" />
+    <File Path="docs/decisions/0009-aspire-integration.md" />
+    <File Path="docs/decisions/0010-stripe-payment-gateway-integration.md" />
+    <File Path="docs/decisions/0011-github-projects-issues-migration.md" />
+    <File Path="docs/decisions/0012-simple-session-based-authentication.md" />
     <File Path="docs\decisions\0004-sse-over-signalr.md" />
     <File Path="docs\decisions\0005-mudblazor-ui-framework.md" />
     <File Path="docs\decisions\0006-reqnroll-bdd-framework.md" />

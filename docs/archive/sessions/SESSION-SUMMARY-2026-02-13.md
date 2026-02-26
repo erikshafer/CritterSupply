@@ -49,7 +49,7 @@
 
 **Documentation Created:**
 - `docs/planning/cycles/cycle-18-customer-experience-phase-2.md` - Full cycle plan (41 KB!)
-- `docs/planning/CYCLE-18-QUICKSTART.md` - Quick-start checklist for resuming work
+- `docs/planning/cycles/CYCLE-18-QUICKSTART.md` - Quick-start checklist for resuming work
 - Updated `docs/planning/CYCLES.md` - Added "Next Up" pointer to Cycle 18
 
 ---
@@ -63,7 +63,7 @@
 **Documentation Updates:**
 - `docs/planning/cycles/cycle-17-customer-identity-integration.md` ✨ NEW
 - `docs/planning/cycles/cycle-18-customer-experience-phase-2.md` ✨ NEW
-- `docs/planning/CYCLE-18-QUICKSTART.md` ✨ NEW
+- `docs/planning/cycles/CYCLE-18-QUICKSTART.md` ✨ NEW
 - `docs/planning/CYCLES.md` - Updated current cycle status
 - `docs/skills/efcore-wolverine-integration.md` - Added pitfalls section
 - `CONTEXTS.md` - Added Customer Identity integration flows
@@ -143,7 +143,7 @@ git pull origin customer-experience-enhancements-cycle-17
 ```
 
 **2. Read Quick-Start Guide:**
-- Open: `docs/planning/CYCLE-18-QUICKSTART.md`
+- Open: `docs/planning/cycles/CYCLE-18-QUICKSTART.md`
 - Follow pre-flight checklist
 - Review implementation order (6 phases)
 
@@ -208,7 +208,7 @@ docker-compose up -d
 ## Resources for Next Session
 
 **Cycle 18 Plan:** `docs/planning/cycles/cycle-18-customer-experience-phase-2.md`
-**Quick-Start Guide:** `docs/planning/CYCLE-18-QUICKSTART.md`
+**Quick-Start Guide:** `docs/planning/cycles/CYCLE-18-QUICKSTART.md`
 
 **Skills Docs:**
 - `docs/skills/bff-realtime-patterns.md` - SSE, EventBroadcaster, Blazor integration
