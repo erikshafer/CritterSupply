@@ -31,13 +31,17 @@ builder.Services.AddOpenTelemetry()
         tracing
             .AddAspNetCoreInstrumentation()  // HTTP request tracing
             .AddSource("Wolverine")           // Wolverine message handler tracing
-            .AddOtlpExporter();               // Export to Jaeger via OTLP
+            .AddOtlpExporter(options =>
+            {
+                var endpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+                if (!string.IsNullOrWhiteSpace(endpoint))
+                    options.Endpoint = new Uri(endpoint);
+            });                               // Export to Jaeger via OTLP
     })
     .WithMetrics(metrics =>
     {
         metrics
-            .AddMeter("Wolverine")            // Wolverine metrics (success/failure counters)
-            .AddOtlpExporter();               // Export metrics to Jaeger via OTLP
+            .AddMeter("Wolverine");           // Wolverine metrics (success/failure counters)
     });
 
 var martenConnectionString = builder.Configuration.GetConnectionString("marten")
