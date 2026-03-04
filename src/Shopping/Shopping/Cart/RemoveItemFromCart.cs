@@ -1,4 +1,3 @@
-using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -6,24 +5,11 @@ using Wolverine.Marten;
 
 namespace Shopping.Cart;
 
-public sealed record RemoveItemFromCart(
-    [property: FromRoute] Guid CartId,
-    [property: FromRoute] string Sku)
-{
-    public class RemoveItemFromCartValidator : AbstractValidator<RemoveItemFromCart>
-    {
-        public RemoveItemFromCartValidator()
-        {
-            RuleFor(x => x.CartId).NotEmpty();
-            RuleFor(x => x.Sku).NotEmpty().MaximumLength(50);
-        }
-    }
-}
-
 public static class RemoveItemFromCartHandler
 {
     public static ProblemDetails Before(
-        RemoveItemFromCart command,
+        Guid cartId,
+        string sku,
         Cart? cart)
     {
         if (cart is null)
@@ -36,10 +22,10 @@ public static class RemoveItemFromCartHandler
                 Status = 400
             };
 
-        if (!cart.Items.ContainsKey(command.Sku))
+        if (!cart.Items.ContainsKey(sku))
             return new ProblemDetails
             {
-                Detail = $"Item {command.Sku} not found in cart",
+                Detail = $"Item {sku} not found in cart",
                 Status = 404
             };
 
@@ -48,16 +34,17 @@ public static class RemoveItemFromCartHandler
 
     [WolverineDelete("/api/carts/{cartId}/items/{sku}")]
     public static (Events, OutgoingMessages) Handle(
-        RemoveItemFromCart command,
+        [FromRoute] Guid cartId,
+        [FromRoute] string sku,
         [WriteAggregate] Cart cart)
     {
-        var @event = new ItemRemoved(command.Sku, DateTimeOffset.UtcNow);
+        var @event = new ItemRemoved(sku, DateTimeOffset.UtcNow);
 
         var outgoing = new OutgoingMessages();
         outgoing.Add(new Messages.Contracts.Shopping.ItemRemoved(
             cart.Id,
             cart.CustomerId ?? Guid.Empty, // Anonymous carts use Guid.Empty
-            command.Sku,
+            sku,
             DateTimeOffset.UtcNow));
 
         return ([@event], outgoing);

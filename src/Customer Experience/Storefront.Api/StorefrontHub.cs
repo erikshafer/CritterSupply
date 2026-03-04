@@ -1,32 +1,39 @@
-using System.Runtime.CompilerServices;
-using Storefront.Notifications;
-using Wolverine.Http;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Storefront.Api;
 
 /// <summary>
-/// SSE endpoint for real-time storefront updates.
-/// Returns IAsyncEnumerable for native .NET 10 Server-Sent Events support.
+/// SignalR hub for real-time storefront updates.
+/// Receives messages from Wolverine's SignalR transport and pushes to connected clients.
+/// Messages are wrapped in CloudEvents envelope by Wolverine.
 /// </summary>
-public static class StorefrontHub
+public sealed class StorefrontHub : Hub
 {
     /// <summary>
-    /// Subscribe to real-time updates for a customer.
-    /// Multiplexes cart updates, order status changes, and shipment tracking over single SSE stream.
+    /// Called when a client connects to the hub.
+    /// Adds connection to customer-specific group for targeted message delivery.
     /// </summary>
-    /// <param name="customerId">Customer to subscribe to updates for</param>
-    /// <param name="broadcaster">Event broadcaster (injected by Wolverine)</param>
-    /// <param name="ct">Cancellation token (client disconnect)</param>
-    /// <returns>Async stream of StorefrontEvent for SSE</returns>
-    [WolverineGet("/sse/storefront")]
-    public static async IAsyncEnumerable<StorefrontEvent> SubscribeToUpdates(
-        Guid customerId,
-        IEventBroadcaster broadcaster,
-        [EnumeratorCancellation] CancellationToken ct)
+    public override async Task OnConnectedAsync()
     {
-        await foreach (var @event in broadcaster.SubscribeAsync(customerId, ct))
+        // Extract customerId from query string
+        var customerId = Context.GetHttpContext()?.Request.Query["customerId"].ToString();
+
+        if (!string.IsNullOrEmpty(customerId) && Guid.TryParse(customerId, out var customerGuid))
         {
-            yield return @event;
+            // Add connection to customer-specific group
+            // Wolverine will target messages to this group based on IStorefrontWebSocketMessage.CustomerId
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"customer:{customerGuid}");
         }
+
+        await base.OnConnectedAsync();
+    }
+
+    /// <summary>
+    /// Called when a client disconnects from the hub.
+    /// Cleanup happens automatically via SignalR group management.
+    /// </summary>
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        await base.OnDisconnectedAsync(exception);
     }
 }

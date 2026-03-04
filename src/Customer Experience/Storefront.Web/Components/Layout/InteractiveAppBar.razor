@@ -39,6 +39,7 @@
     </MudDrawerHeader>
     <MudNavMenu>
         <MudNavLink Href="/" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+        <MudNavLink Href="/products" Icon="@Icons.Material.Filled.Storefront">Browse Products</MudNavLink>
         <MudNavLink Href="/cart" Icon="@Icons.Material.Filled.ShoppingCart">Cart</MudNavLink>
         <MudNavLink Href="/checkout" Icon="@Icons.Material.Filled.Payment">Checkout</MudNavLink>
         <MudNavLink Href="/orders" Icon="@Icons.Material.Filled.Receipt">Order History</MudNavLink>
@@ -78,11 +79,11 @@
         try
         {
             _dotNetHelper = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("sseClient.subscribe", _customerId.Value.ToString(), _dotNetHelper);
+            await JS.InvokeVoidAsync("signalrClient.subscribe", _customerId.Value.ToString(), _dotNetHelper);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to subscribe to SSE in AppBar: {ex.Message}");
+            Console.WriteLine($"Failed to subscribe to SignalR in AppBar: {ex.Message}");
         }
     }
 
@@ -139,7 +140,7 @@
     {
         try
         {
-            await JS.InvokeVoidAsync("sseClient.unsubscribe");
+            await JS.InvokeVoidAsync("signalrClient.unsubscribe");
             _dotNetHelper?.Dispose();
         }
         catch

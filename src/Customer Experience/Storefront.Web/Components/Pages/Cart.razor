@@ -109,6 +109,7 @@ else
     private DotNetObjectReference<Cart>? _dotNetHelper;
     private Guid _customerId;
     private Guid? _cartId;
+    private bool _hasRendered = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -120,22 +121,29 @@ else
             // Should not happen due to [Authorize] but handle gracefully
             return;
         }
-
-        // Get cart ID from localStorage
-        var cartIdString = await JS.InvokeAsync<string?>("authHelper.getCartId");
-        if (!string.IsNullOrEmpty(cartIdString) && Guid.TryParse(cartIdString, out var cartId))
-        {
-            _cartId = cartId;
-        }
-
-        await LoadCart();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && _customerId != Guid.Empty)
+        if (firstRender && !_hasRendered)
         {
-            await SubscribeToSSE();
+            _hasRendered = true;
+
+            // Get cart ID from localStorage (must be after render for JS interop)
+            var cartIdString = await JS.InvokeAsync<string?>("authHelper.getCartId");
+            if (!string.IsNullOrEmpty(cartIdString) && Guid.TryParse(cartIdString, out var cartId))
+            {
+                _cartId = cartId;
+            }
+
+            await LoadCart();
+
+            if (_customerId != Guid.Empty)
+            {
+                await SubscribeToSSE();
+            }
+
+            StateHasChanged(); // Trigger re-render with cart data
         }
     }
 
@@ -179,12 +187,12 @@ else
         try
         {
             _dotNetHelper = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("sseClient.subscribe", _customerId.ToString(), _dotNetHelper);
+            await JS.InvokeVoidAsync("signalrClient.subscribe", _customerId.ToString(), _dotNetHelper);
             _sseConnected = true;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to subscribe to SSE: {ex.Message}");
+            Console.WriteLine($"Failed to subscribe to SignalR: {ex.Message}");
             _sseConnected = false;
         }
     }
@@ -192,22 +200,19 @@ else
     [JSInvokable]
     public async Task OnSseEvent(JsonElement eventData)
     {
-        Console.WriteLine($"SSE event received: {eventData}");
+        Console.WriteLine($"SignalR event received: {eventData}");
 
         // Parse event type
         if (eventData.TryGetProperty("eventType", out var eventType))
         {
             var eventTypeName = eventType.GetString();
 
+            // Reload cart for all cart-related events
             if (eventTypeName == "cart-updated")
             {
-                // Reload cart data from BFF
                 await LoadCart();
                 StateHasChanged();
             }
-            // TODO (Cycle 19): Add handlers for "item-quantity-changed" and "item-removed" SSE events
-            // Currently only "cart-updated" (from AddItem) triggers real-time refresh
-            // User must manually refresh page after clicking +/- quantity buttons
         }
     }
 
@@ -224,7 +229,9 @@ else
             if (response.IsSuccessStatusCode)
             {
                 Snackbar.Add("Item removed from cart", Severity.Success);
-                // SSE will trigger cart reload automatically
+                // Reload cart immediately (SignalR will also trigger reload, but this ensures it happens)
+                await LoadCart();
+                StateHasChanged();
             }
             else
             {
@@ -269,7 +276,9 @@ else
             if (response.IsSuccessStatusCode)
             {
                 Snackbar.Add("Quantity updated", Severity.Success);
-                // SSE will trigger cart reload automatically
+                // Reload cart immediately (SignalR will also trigger reload, but this ensures it happens)
+                await LoadCart();
+                StateHasChanged();
             }
             else
             {
@@ -290,7 +299,7 @@ else
     {
         try
         {
-            await JS.InvokeVoidAsync("sseClient.unsubscribe");
+            await JS.InvokeVoidAsync("signalrClient.unsubscribe");
             _dotNetHelper?.Dispose();
         }
         catch

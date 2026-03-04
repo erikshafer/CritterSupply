@@ -3,10 +3,11 @@ using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Storefront.Notifications;
+using Storefront.RealTime;
 using Wolverine;
 using Wolverine.Http;
 using Wolverine.RabbitMQ;
+using Wolverine.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,15 +38,25 @@ builder.Services.AddMarten(opts =>
 // Add Wolverine HTTP support (required for Wolverine.HTTP endpoints)
 builder.Services.AddWolverineHttp();
 
-// Register EventBroadcaster as singleton (in-memory pub/sub for SSE)
-builder.Services.AddSingleton<IEventBroadcaster, EventBroadcaster>();
+// Add SignalR for real-time communication
+builder.Services.AddSignalR();
 
 // Add Wolverine with message handler discovery
 builder.Host.UseWolverine(opts =>
 {
     // Discover handlers in both API and Domain assemblies
-    opts.Discovery.IncludeAssembly(typeof(Program).Assembly); // Storefront.Api (Queries)
-    opts.Discovery.IncludeAssembly(typeof(Storefront.Notifications.IEventBroadcaster).Assembly); // Storefront (Notifications)
+    opts.Discovery.IncludeAssembly(typeof(Program).Assembly); // Storefront.Api (Queries, Hub)
+    opts.Discovery.IncludeAssembly(typeof(IStorefrontWebSocketMessage).Assembly); // Storefront (Notifications)
+
+    // Configure SignalR transport
+    opts.UseSignalR();
+
+    // Configure publishing rules: route all IStorefrontWebSocketMessage to SignalR
+    opts.Publish(x =>
+    {
+        x.MessagesImplementing<IStorefrontWebSocketMessage>();
+        x.ToSignalR();
+    });
 
     // Configure RabbitMQ for subscribing to integration messages
     var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");
@@ -118,6 +129,9 @@ if (app.Environment.IsDevelopment())
 
 // Map Wolverine HTTP endpoints
 app.MapWolverineEndpoints();
+
+// Map SignalR hub
+app.MapHub<Storefront.Api.StorefrontHub>("/hub/storefront");
 
 // Redirect root to Swagger/API documentation
 app.MapGet("/", (HttpResponse response) =>

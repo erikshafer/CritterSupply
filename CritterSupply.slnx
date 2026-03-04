@@ -90,6 +90,7 @@
     <File Path="docs\decisions\0004-sse-over-signalr.md" />
     <File Path="docs\decisions\0005-mudblazor-ui-framework.md" />
     <File Path="docs\decisions\0006-reqnroll-bdd-framework.md" />
+    <File Path="docs\decisions\0013-signalr-migration-from-sse.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Features/">
     <File Path="docs\features\customer-experience\cart-real-time-updates.feature" />

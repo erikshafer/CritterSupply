@@ -12,6 +12,7 @@
     <PackageVersion Include="WolverineFx.Http.FluentValidation" Version="5.17.0" />
     <PackageVersion Include="WolverineFx.Http.Marten" Version="5.17.0" />
     <PackageVersion Include="WolverineFx.RabbitMQ" Version="5.17.0" />
+    <PackageVersion Include="WolverineFx.SignalR" Version="5.17.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.3" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />

@@ -1,10 +1,11 @@
 using System.Text.Json.Serialization;
 
-namespace Storefront.Notifications;
+namespace Storefront.RealTime;
 
 /// <summary>
-/// Discriminated union for SSE events pushed to Blazor frontend.
-/// Base type allows multiplexing multiple event types over single SSE stream.
+/// Discriminated union for real-time events pushed to Blazor frontend via SignalR.
+/// Base type allows multiplexing multiple event types over single SignalR connection.
+/// Wrapped in CloudEvents envelope by Wolverine's SignalR transport.
 /// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "eventType")]
 [JsonDerivedType(typeof(CartUpdated), typeDiscriminator: "cart-updated")]
@@ -20,7 +21,7 @@ public sealed record CartUpdated(
     Guid CustomerId,
     int ItemCount,
     decimal TotalAmount,
-    DateTimeOffset OccurredAt) : StorefrontEvent(OccurredAt);
+    DateTimeOffset OccurredAt) : StorefrontEvent(OccurredAt), IStorefrontWebSocketMessage;
 
 /// <summary>
 /// Order status progressed (placed → payment captured → shipped).
@@ -29,7 +30,7 @@ public sealed record OrderStatusChanged(
     Guid OrderId,
     Guid CustomerId,
     string NewStatus,
-    DateTimeOffset OccurredAt) : StorefrontEvent(OccurredAt);
+    DateTimeOffset OccurredAt) : StorefrontEvent(OccurredAt), IStorefrontWebSocketMessage;
 
 /// <summary>
 /// Shipment tracking update (dispatched → in transit → delivered).
@@ -40,4 +41,4 @@ public sealed record ShipmentStatusChanged(
     Guid CustomerId,
     string NewStatus,
     string? TrackingNumber,
-    DateTimeOffset OccurredAt) : StorefrontEvent(OccurredAt);
+    DateTimeOffset OccurredAt) : StorefrontEvent(OccurredAt), IStorefrontWebSocketMessage;

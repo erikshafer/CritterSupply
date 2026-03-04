@@ -175,12 +175,12 @@ else
         try
         {
             _dotNetHelper = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("sseClient.subscribe", _customerId.Value.ToString(), _dotNetHelper);
+            await JS.InvokeVoidAsync("signalrClient.subscribe", _customerId.Value.ToString(), _dotNetHelper);
             _sseConnected = true;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to subscribe to SSE: {ex.Message}");
+            Console.WriteLine($"Failed to subscribe to SignalR: {ex.Message}");
             _sseConnected = false;
         }
     }
@@ -244,7 +244,7 @@ else
     {
         try
         {
-            await JS.InvokeVoidAsync("sseClient.unsubscribe");
+            await JS.InvokeVoidAsync("signalrClient.unsubscribe");
             _dotNetHelper?.Dispose();
         }
         catch
