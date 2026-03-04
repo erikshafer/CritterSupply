@@ -136,13 +136,56 @@ RuleFor(x => x.Category)
 
 ### Lessons Learned from Product Catalog BC
 
-During implementation, we experienced:
+**Cycle 14 - Value Object vs Primitive Queryable Fields:**
+
+During initial implementation, we experienced:
 1. Tests passed for CRUD operations ✅
 2. Tests failed for category filtering ❌ (Marten LINQ translation error)
 3. Changed `CategoryName` value object → `string` primitive
 4. All tests passed ✅
 
 **The signal:** When 22/24 tests pass, then you change a value object to a primitive and get 24/24, that's an **architecture signal**, not a test problem.
+
+---
+
+**Cycle 19 - Test Flakiness from Seed Data in Program.cs:**
+
+After Cycle 18, Product Catalog tests became "flaky" (passing sometimes, failing other times):
+
+**Root Cause:**
+- `Program.cs` was seeding data at startup when `app.Environment.IsDevelopment()` was true
+- Alba creates the test host in "Development" environment
+- Seed data ran ONCE when TestFixture initialized the AlbaHost
+- Tests called `CleanAllDocumentsAsync()` which deleted the seed data
+- Subsequent tests had inconsistent state depending on execution order
+
+**Solution:**
+```csharp
+// BAD - Seeds data during test runs
+if (app.Environment.IsDevelopment())
+{
+    await SeedData.SeedProductsAsync(store);
+}
+
+// GOOD - Skip seed data when running in test context
+if (app.Environment.IsDevelopment() && !IsRunningInTests())
+{
+    await SeedData.SeedProductsAsync(store);
+}
+
+static bool IsRunningInTests()
+{
+    return AppDomain.CurrentDomain.GetAssemblies()
+        .Any(a => a.FullName?.StartsWith("xunit") == true);
+}
+```
+
+**Alternative Approaches:**
+1. Create explicit seed endpoint: `POST /api/_seed` (only called during manual testing)
+2. Use environment variable: `SKIP_SEED_DATA=true` (set in test configuration)
+3. Seed via HTTP file in development: `docs/DATA-SEEDING.http`
+
+**Key Takeaway:** Seed data in `Program.cs` breaks test isolation. Tests must seed their own data per-test.
 
 ## Document Model Design
 

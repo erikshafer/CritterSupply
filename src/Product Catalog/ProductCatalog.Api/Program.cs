@@ -68,12 +68,20 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Seed product data in development
-if (app.Environment.IsDevelopment())
+// Seed product data in development (but NOT during test runs)
+// Test runs should seed their own data per-test for isolation
+if (app.Environment.IsDevelopment() && !IsRunningInTests())
 {
     using var scope = app.Services.CreateScope();
     var store = scope.ServiceProvider.GetRequiredService<IDocumentStore>();
     await ProductCatalog.Products.SeedData.SeedProductsAsync(store);
+}
+
+static bool IsRunningInTests()
+{
+    // Detect if we're running inside xUnit test runner
+    return AppDomain.CurrentDomain.GetAssemblies()
+        .Any(a => a.FullName?.StartsWith("xunit") == true);
 }
 
 // Configure Swagger UI (development only)
