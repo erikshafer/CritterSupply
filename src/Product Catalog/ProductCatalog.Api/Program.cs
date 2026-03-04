@@ -1,6 +1,7 @@
 using Marten;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using ProductCatalog.Products;
 using ProductCatalog.Shared;
@@ -14,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // OpenTelemetry configuration for Wolverine tracing and metrics
 builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("ProductCatalog"))
     .WithTracing(tracing =>
     {
         tracing
@@ -27,7 +29,6 @@ builder.Services.AddOpenTelemetry()
             .AddMeter("Wolverine")            // Wolverine metrics (success/failure counters)
             .AddOtlpExporter();               // Export metrics to Jaeger via OTLP
     });
-
 // Marten document store configuration
 var connectionString = builder.Configuration.GetConnectionString("marten")
     ?? "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=postgres";

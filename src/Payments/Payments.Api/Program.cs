@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Payments;
 using Payments.Processing;
@@ -26,6 +27,7 @@ builder.Host.ApplyJasperFxExtensions();
 
 // OpenTelemetry configuration for Wolverine tracing and metrics
 builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("Payments"))
     .WithTracing(tracing =>
     {
         tracing
@@ -39,7 +41,6 @@ builder.Services.AddOpenTelemetry()
             .AddMeter("Wolverine")            // Wolverine metrics (success/failure counters)
             .AddOtlpExporter();               // Export metrics to Jaeger via OTLP
     });
-
 var martenConnectionString = builder.Configuration.GetConnectionString("marten")
                              ?? throw new Exception("The connection string for Marten was not found");
 

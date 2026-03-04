@@ -5,6 +5,7 @@ using JasperFx;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Wolverine;
 using Wolverine.FluentValidation;
@@ -16,6 +17,7 @@ builder.Host.ApplyJasperFxExtensions();
 
 // OpenTelemetry configuration for Wolverine tracing and metrics
 builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("CustomerIdentity"))
     .WithTracing(tracing =>
     {
         tracing
@@ -29,7 +31,6 @@ builder.Services.AddOpenTelemetry()
             .AddMeter("Wolverine")            // Wolverine metrics (success/failure counters)
             .AddOtlpExporter();               // Export metrics to Jaeger via OTLP
     });
-
 // Configure EF Core with Postgres
 var connectionString = builder.Configuration.GetConnectionString("postgres")
                        ?? throw new Exception("The connection string for the PostgreSQL database was not found");

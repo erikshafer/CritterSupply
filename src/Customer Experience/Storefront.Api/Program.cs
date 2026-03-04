@@ -1,6 +1,7 @@
 using Marten;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Storefront.Notifications;
 using Wolverine;
@@ -11,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // OpenTelemetry configuration for Wolverine tracing and metrics
 builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("Storefront"))
     .WithTracing(tracing =>
     {
         tracing
@@ -24,7 +26,6 @@ builder.Services.AddOpenTelemetry()
             .AddMeter("Wolverine")            // Wolverine metrics (success/failure counters)
             .AddOtlpExporter();               // Export metrics to Jaeger via OTLP
     });
-
 // Add Marten for document store (not event sourcing - BFF doesn't own domain data)
 builder.Services.AddMarten(opts =>
 {
