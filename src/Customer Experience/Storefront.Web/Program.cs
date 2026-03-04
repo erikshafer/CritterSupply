@@ -32,13 +32,15 @@ builder.Services.AddCascadingAuthenticationState();
 // Add HttpClient for Storefront.Api BFF
 builder.Services.AddHttpClient("StorefrontApi", client =>
 {
-    client.BaseAddress = new Uri("http://localhost:5237");
+    var url = builder.Configuration["ApiClients:StorefrontApiUrl"] ?? "http://localhost:5237";
+    client.BaseAddress = new Uri(url);
 });
 
 // Add HttpClient for Customer Identity API (for authentication)
 builder.Services.AddHttpClient("CustomerIdentityApi", client =>
 {
-    client.BaseAddress = new Uri("http://localhost:5235");
+    var url = builder.Configuration["ApiClients:CustomerIdentityApiUrl"] ?? "http://localhost:5235";
+    client.BaseAddress = new Uri(url);
 });
 
 var app = builder.Build();

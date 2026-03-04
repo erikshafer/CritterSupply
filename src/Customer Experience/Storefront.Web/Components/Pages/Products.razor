@@ -90,6 +90,7 @@ else
     private int _pageSize = 20;
     private Guid? _customerId;
     private Guid? _cartId;
+    private bool _hasRendered = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -101,11 +102,20 @@ else
             if (Guid.TryParse(customerIdClaim, out var customerId))
             {
                 _customerId = customerId;
-                await InitializeCart();
             }
         }
 
         await LoadProducts();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _customerId.HasValue && !_hasRendered)
+        {
+            _hasRendered = true;
+            await InitializeCart();
+            StateHasChanged(); // Trigger re-render if cart state changed
+        }
     }
 
     private async Task InitializeCart()

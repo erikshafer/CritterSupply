@@ -222,11 +222,23 @@ services:
       RabbitMQ__hostname: rabbitmq
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_SERVICE_NAME: Storefront.Api
+      ApiClients__ShoppingApiUrl: http://shopping-api:8080
+      ApiClients__OrdersApiUrl: http://orders-api:8080
+      ApiClients__CustomerIdentityApiUrl: http://customeridentity-api:8080
+      ApiClients__CatalogApiUrl: http://productcatalog-api:8080
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      shopping-api:
+        condition: service_started
+      orders-api:
+        condition: service_started
+      customeridentity-api:
+        condition: service_started
+      productcatalog-api:
+        condition: service_started
     networks:
       - backend
     profiles: [all, storefront]
@@ -245,7 +257,9 @@ services:
       ApiClients__OrdersApiUrl: http://orders-api:8080
       ApiClients__CatalogApiUrl: http://productcatalog-api:8080
       ApiClients__StorefrontApiUrl: http://storefront-api:8080
+      ApiClients__CustomerIdentityApiUrl: http://customeridentity-api:8080
     depends_on:
+      - customeridentity-api
       - orders-api
       - shopping-api
       - productcatalog-api

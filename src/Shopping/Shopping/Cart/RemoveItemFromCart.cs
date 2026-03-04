@@ -7,8 +7,8 @@ using Wolverine.Marten;
 namespace Shopping.Cart;
 
 public sealed record RemoveItemFromCart(
-    Guid CartId,
-    string Sku)
+    [property: FromRoute] Guid CartId,
+    [property: FromRoute] string Sku)
 {
     public class RemoveItemFromCartValidator : AbstractValidator<RemoveItemFromCart>
     {

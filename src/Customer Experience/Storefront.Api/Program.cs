@@ -67,22 +67,26 @@ builder.Host.UseWolverine(opts =>
 // Add HTTP clients for downstream BC queries
 builder.Services.AddHttpClient("ShoppingClient", client =>
 {
-    client.BaseAddress = new Uri("http://localhost:5236"); // Shopping BC
+    var url = builder.Configuration["ApiClients:ShoppingApiUrl"] ?? "http://localhost:5236";
+    client.BaseAddress = new Uri(url);
 });
 
 builder.Services.AddHttpClient("OrdersClient", client =>
 {
-    client.BaseAddress = new Uri("http://localhost:5231"); // Orders BC
+    var url = builder.Configuration["ApiClients:OrdersApiUrl"] ?? "http://localhost:5231";
+    client.BaseAddress = new Uri(url);
 });
 
 builder.Services.AddHttpClient("CustomerIdentityClient", client =>
 {
-    client.BaseAddress = new Uri("http://localhost:5235"); // Customer Identity BC
+    var url = builder.Configuration["ApiClients:CustomerIdentityApiUrl"] ?? "http://localhost:5235";
+    client.BaseAddress = new Uri(url);
 });
 
 builder.Services.AddHttpClient("CatalogClient", client =>
 {
-    client.BaseAddress = new Uri("http://localhost:5133"); // Product Catalog BC
+    var url = builder.Configuration["ApiClients:CatalogApiUrl"] ?? "http://localhost:5133";
+    client.BaseAddress = new Uri(url);
 });
 
 // Register HTTP client implementations
