@@ -1,6 +1,6 @@
 # ADR 0004: Use Server-Sent Events (SSE) over SignalR for Real-Time Updates
 
-**Status:** ✅ Accepted
+**Status:** ✅ Accepted — ⚠️ Supersession Proposed by [ADR 0013](./0013-signalr-migration-from-sse.md)
 
 **Date:** 2026-02-04
 
@@ -285,6 +285,18 @@ public static class StorefrontHub
 - [SignalR vs SSE Comparison (Stack Overflow)](https://stackoverflow.com/questions/28582935/what-is-the-difference-between-websocket-and-server-sent-events)
 - [Cycle 16 Plan](../planning/cycles/cycle-16-customer-experience.md)
 - [CONTEXTS.md - Customer Experience](../../CONTEXTS.md#customer-experience)
+
+---
+
+## ⚠️ Proposed Supersession Note
+
+**Date:** 2026-03-04
+
+This decision is proposed for supersession by [ADR 0013: Migrate from SSE to SignalR](./0013-signalr-migration-from-sse.md).
+
+**Why:** Since Cycle 16, CritterSupply's real-time interaction surface has grown to require bidirectional communication — Vendor Portal submissions, Storefront checkout validation, and live inventory feedback cannot be served by SSE's server→client-only model. Additionally, Wolverine 5.x now ships a native SignalR transport that replaces the hand-rolled `EventBroadcaster` abstraction with framework-level routing. ADR 0013 provides full pros/cons, migration cost estimates, and a phased migration plan.
+
+This ADR remains valid for its original Cycle 16 scope. It will be formally superseded upon completion of the Phase 1 migration described in ADR 0013.
 
 ---
 
