@@ -85,9 +85,10 @@ CritterSupply includes specialized GitHub Copilot agents with domain expertise t
 ## 🛠️ Technology Stack <a id='1.4'></a>
 
 - **Core:** C# 14+ (.NET 10), [Wolverine](https://wolverine.netlify.app/), [Marten](https://martendb.io/), [EF Core](https://learn.microsoft.com/en-us/ef/core/)
-- **Infrastructure:** PostgreSQL, RabbitMQ, Docker
+- **Infrastructure:** PostgreSQL, RabbitMQ, Docker, [.NET Aspire](https://learn.microsoft.com/en-us/dotnet/aspire/)
 - **Testing:** [Alba](https://jasperfx.github.io/alba/), [Testcontainers](https://dotnet.testcontainers.org/), xUnit, [Reqnroll](https://reqnroll.net/)
 - **UI:** [Blazor Server](https://learn.microsoft.com/en-us/aspnet/core/blazor/), [MudBlazor](https://mudblazor.com/), Server-Sent Events (SSE)
+- **Observability:** OpenTelemetry, Jaeger (distributed tracing)
 
 See [CLAUDE.md](./CLAUDE.md) for complete technology details and development guidelines.
 
@@ -195,10 +196,12 @@ This software solution has multiple dependencies that need to be running locally
 
 ### 🛠️ Local Development <a id='5.3'></a>
 
-#### Quick Start (Native Development - Recommended)
+#### Option 1: Docker Compose (⭐ Recommended - Simplest)
+
+**The default workflow for CritterSupply:**
 
 ```bash
-# 1. Start infrastructure only (Postgres + RabbitMQ)
+# 1. Start infrastructure (Postgres, RabbitMQ, Jaeger)
 docker-compose --profile infrastructure up -d
 
 # 2. Build the solution
@@ -212,29 +215,62 @@ dotnet run --project "src/Customer Experience/Storefront.Web/Storefront.Web.cspr
 # Navigate to http://localhost:5238
 ```
 
-**Why native development?**
-- Faster hot reload during code changes
-- Easier debugging (F5 in Rider/Visual Studio)
-- Lower memory footprint
-- IDE tooling works seamlessly
+**Why this is the default:**
+- ✅ **Zero additional setup** - Just Docker Desktop + .NET 10
+- ✅ **Fastest hot reload** - Native .NET process, not containerized
+- ✅ **Best debugging** - F5 in Rider/Visual Studio works seamlessly
+- ✅ **Lower memory** - Only infrastructure in containers (~300MB vs ~2GB)
+- ✅ **Full IDE tooling** - Profilers, diagnostics, live unit testing all work
 
-#### Fully Containerized Development
+**See [QUICKSTART.md](./QUICKSTART.md) for step-by-step guide.**
 
-Run all services (infrastructure + 8 APIs + Blazor web) in Docker containers:
+---
+
+#### Option 2: .NET Aspire (Optional - Enhanced Observability)
+
+**.NET Aspire** provides a unified dashboard for all 9 .NET services. **For developers who want enhanced observability:**
 
 ```bash
-# Start entire stack
-docker-compose --profile all up --build
+# Step 1: Start infrastructure (Postgres, RabbitMQ, Jaeger) with fixed ports
+docker-compose --profile infrastructure up -d
 
-# Navigate to http://localhost:5238 (Storefront.Web)
-# API endpoints available at their respective ports (5231-5238, 5133)
+# Step 2: Start all 8 APIs + Blazor Web via Aspire
+dotnet run --project src/CritterSupply.AppHost
+
+# 🚀 Aspire Dashboard: https://localhost:17265
+# 🛍️ Storefront Web:   http://localhost:5238
 ```
 
-**When to use containerized development:**
-- Onboarding new developers (no .NET SDK required)
+**What Aspire adds:**
+- ✅ **Unified dashboard** - Live logs, traces, metrics, health checks for all .NET services
+- ✅ **One command** - Starts all 9 .NET services (vs 9 manual `dotnet run` commands)
+- ✅ **Service discovery** - Automatic HTTP endpoint discovery for service-to-service calls
+- ✅ **Demo-friendly** - Polished UI for showcasing system to stakeholders
+
+**Why Aspire is optional (not required):**
+- Docker Compose provides all functionality needed for development
+- Aspire adds learning curve and additional concepts
+- Most developers prefer native debugging over containerized orchestration
+
+**See [docs/ASPIRE-GUIDE.md](./docs/ASPIRE-GUIDE.md) for Aspire setup or [ADR 0009](./docs/decisions/0009-aspire-integration.md) for architecture details.**
+
+---
+
+#### Option 3: Fully Containerized (Demos & Onboarding)
+
+**Run entire stack in Docker containers** (useful for demos, onboarding, or integration testing):
+
+```bash
+# Start infrastructure + all 8 APIs + Blazor web in containers
+docker-compose --profile all up --build
+
+# 🛍️ Storefront Web: http://localhost:5238
+```
+
+**When to use:**
+- Onboarding new developers (no .NET SDK required on host)
 - Demonstrating full system to stakeholders
-- Integration testing across multiple BCs
-- Simulating production-like networking
+- Cross-BC integration testing without running services natively
 
 **Selective service startup:**
 

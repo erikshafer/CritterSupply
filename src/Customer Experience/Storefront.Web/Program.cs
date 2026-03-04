@@ -6,6 +6,9 @@ using Storefront.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -56,6 +59,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseAntiforgery();
+
+// Map Aspire default endpoints (/health, /alive)
+app.MapDefaultEndpoints();
 
 // Map authentication endpoints (server-side, not interactive)
 app.MapPost("/api/auth/login", async (LoginRequest request, IHttpClientFactory httpClientFactory, HttpContext httpContext) =>

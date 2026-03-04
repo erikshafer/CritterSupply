@@ -13,22 +13,9 @@ using Wolverine.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// OpenTelemetry configuration for Wolverine tracing and metrics
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("Storefront"))
-    .WithTracing(tracing =>
-    {
-        tracing
-            .AddAspNetCoreInstrumentation()  // HTTP request tracing
-            .AddSource("Wolverine")           // Wolverine message handler tracing
-            .AddOtlpExporter();               // Export to Jaeger via OTLP
-    })
-    .WithMetrics(metrics =>
-    {
-        metrics
-            .AddMeter("Wolverine")            // Wolverine metrics (success/failure counters)
-            .AddOtlpExporter();               // Export metrics to Jaeger via OTLP
-    });
+// Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
 // Add Marten for document store (not event sourcing - BFF doesn't own domain data)
 builder.Services.AddMarten(opts =>
 {
@@ -131,6 +118,9 @@ if (app.Environment.IsDevelopment())
         opts.SwaggerEndpoint("/api/v1/swagger.json", "Storefront BFF API");
     });
 }
+
+// Map Aspire default endpoints (/health, /alive)
+app.MapDefaultEndpoints();
 
 // Map Wolverine HTTP endpoints
 app.MapWolverineEndpoints(opts =>

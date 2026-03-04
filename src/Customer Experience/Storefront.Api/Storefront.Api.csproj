@@ -29,6 +29,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Storefront\Storefront.csproj" />
     <ProjectReference Include="..\..\Shared\Messages.Contracts\Messages.Contracts.csproj" />
+    <ProjectReference Include="..\..\CritterSupply.ServiceDefaults\CritterSupply.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

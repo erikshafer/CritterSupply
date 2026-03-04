@@ -13,24 +13,12 @@ using Wolverine.Http;
 using Wolverine.Http.FluentValidation;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
 builder.Host.ApplyJasperFxExtensions();
 
-// OpenTelemetry configuration for Wolverine tracing and metrics
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("CustomerIdentity"))
-    .WithTracing(tracing =>
-    {
-        tracing
-            .AddAspNetCoreInstrumentation()  // HTTP request tracing
-            .AddSource("Wolverine")           // Wolverine message handler tracing
-            .AddOtlpExporter();               // Export to Jaeger via OTLP
-    })
-    .WithMetrics(metrics =>
-    {
-        metrics
-            .AddMeter("Wolverine")            // Wolverine metrics (success/failure counters)
-            .AddOtlpExporter();               // Export metrics to Jaeger via OTLP
-    });
 // Configure EF Core with Postgres
 var connectionString = builder.Configuration.GetConnectionString("postgres")
                        ?? throw new Exception("The connection string for the PostgreSQL database was not found");
@@ -59,10 +47,6 @@ builder.Host.UseWolverine(opts =>
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
-// Add health checks
-builder.Services.AddHealthChecks()
-    .AddNpgSql(connectionString, name: "postgres", tags: ["db", "ready"]);
 
 // Register address verification service (stub for development)
 builder.Services.AddSingleton<IAddressVerificationService, StubAddressVerificationService>();
@@ -114,12 +98,8 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map health check endpoints
-app.MapHealthChecks("/health");
-app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
-{
-    Predicate = check => check.Tags.Contains("ready")
-});
+// Map Aspire default endpoints (/health, /alive)
+app.MapDefaultEndpoints();
 
 app.MapWolverineEndpoints(opts =>
 {

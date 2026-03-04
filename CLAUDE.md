@@ -203,6 +203,8 @@ docs/features/
 - **Event Sourcing / Document Store**: Marten 8+
 - **Message Handling**: Wolverine 5+
 - **Messaging**: RabbitMQ (AMQP)
+- **Local Orchestration**: Docker Compose (primary), .NET Aspire 13.1+ (optional)
+- **Observability**: OpenTelemetry, Jaeger
 
 ### Manual Testing
 
@@ -392,32 +394,71 @@ builder.Host.UseWolverine(opts =>
 
 ---
 
-## Docker Development
+## Local Development Options
 
-CritterSupply supports both **native** and **containerized** development workflows.
+CritterSupply supports **three development workflows**: Docker Compose + dotnet run (primary), .NET Aspire (optional), and fully containerized (Docker Compose only).
 
-### Native Development (Default - Recommended)
+### Docker Compose + dotnet run (⭐ Recommended)
 
-**Start infrastructure only:**
+**The default workflow for CritterSupply:**
+
 ```bash
+# Start infrastructure only
 docker-compose --profile infrastructure up -d
+
+# Run individual services as needed
+dotnet run --project "src/Customer Experience/Storefront.Web/Storefront.Web.csproj"
 ```
 
-**Why native development?**
-- ✅ Faster hot reload during code changes
-- ✅ Easier debugging (F5 in Rider/Visual Studio)
-- ✅ Lower memory footprint (~200MB per API vs ~100-200MB base + app overhead in container)
-- ✅ IDE tooling works seamlessly (profilers, diagnostics, live unit testing)
-- ✅ No Docker volume mount performance issues on Windows
+**Why this is the default:**
+- ✅ **Zero additional setup** - Just Docker Desktop + .NET 10
+- ✅ **Fastest hot reload** - Native .NET process, not containerized
+- ✅ **Best debugging** - F5 in Rider/Visual Studio works seamlessly
+- ✅ **Lower memory** - Only infrastructure in containers (~300MB vs ~2GB)
+- ✅ **Full IDE tooling** - Profilers, diagnostics, live unit testing all work
 
 **When to use:** Daily feature development, debugging, iterative coding
 
 ---
 
-### Containerized Development
+### .NET Aspire (Optional - Enhanced Observability)
 
-**Start all services (infrastructure + 8 APIs + Blazor web):**
+**For developers who want unified observability:**
+
 ```bash
+# Step 1: Start infrastructure with fixed ports
+docker-compose --profile infrastructure up -d
+
+# Step 2: Start all 9 services via Aspire
+dotnet run --project src/CritterSupply.AppHost
+
+# Aspire Dashboard: http://localhost:15000
+# Storefront Web: http://localhost:5238
+```
+
+**What Aspire adds:**
+- ✅ **Unified dashboard** - Live logs, traces, metrics, health checks for all .NET services
+- ✅ **One command** - Starts all 9 .NET services (vs 9 manual `dotnet run` commands)
+- ✅ **Service discovery** - Automatic HTTP endpoint discovery for service-to-service calls
+- ✅ **Demo-friendly** - Polished UI for showcasing system to stakeholders
+
+**Why Aspire is optional:**
+- Docker Compose provides all functionality needed for development
+- Aspire adds learning curve and additional concepts
+- Most developers prefer native debugging over containerized orchestration
+
+**When to use:** Demos, exploring OpenTelemetry patterns, unified observability
+
+**See [docs/ASPIRE-GUIDE.md](./docs/ASPIRE-GUIDE.md) for complete Aspire documentation.**
+
+---
+
+### Fully Containerized (Demos & Onboarding)
+
+**Run entire stack in Docker containers:**
+
+```bash
+# Start infrastructure + all 8 APIs + Blazor web in containers
 docker-compose --profile all up --build
 ```
 
@@ -430,14 +471,11 @@ docker-compose --profile infrastructure --profile orders --profile shopping up
 docker-compose --profile infrastructure --profile orders --profile payments --profile inventory --profile fulfillment --profile customeridentity --profile shopping --profile catalog --profile storefront up
 ```
 
-**Why containerized development?**
-- ✅ Onboarding new developers (no .NET SDK required on host)
-- ✅ Demonstrating full system to stakeholders
-- ✅ Integration testing across multiple BCs
-- ✅ Simulating production-like networking
-- ✅ CI/CD pipeline consistency (same containers in dev/staging/prod)
-
-**When to use:** Onboarding, demos, cross-BC integration testing, CI/CD validation
+**When to use:**
+- Onboarding new developers (no .NET SDK required on host)
+- Demonstrating full system to stakeholders
+- Cross-BC integration testing without running services natively
+- Simulating production-like networking
 
 ---
 
