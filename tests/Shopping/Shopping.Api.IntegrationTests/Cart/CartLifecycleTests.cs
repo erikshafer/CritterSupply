@@ -112,16 +112,18 @@ public class CartLifecycleTests : IAsyncLifetime
         var customerId = Guid.CreateVersion7();
         var initCommand = new InitializeCart(customerId, null);
         await _fixture.ExecuteAndWaitAsync(initCommand);
-        
+
         using var session = _fixture.GetDocumentSession();
         var cart = (await session.Query<Shopping.Cart.Cart>().ToListAsync()).Single();
-        
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
-        
-        var removeCommand = new RemoveItemFromCart(cart.Id, "SKU-001");
 
-        // Act
-        await _fixture.ExecuteAndWaitAsync(removeCommand);
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
+
+        // Act - RemoveItemFromCart is now HTTP-only (no command record)
+        var (tracked, result) = await _fixture.TrackedHttpCall(x =>
+        {
+            x.Delete.Url($"/api/carts/{cart.Id}/items/SKU-001");
+            x.StatusCodeShouldBe(204);
+        });
 
         // Assert
         var updatedCart = await session.Events.AggregateStreamAsync<Shopping.Cart.Cart>(cart.Id);

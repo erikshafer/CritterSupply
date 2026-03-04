@@ -16,7 +16,7 @@ namespace Storefront.IntegrationTests;
 /// - "Product listing page composes data from multiple BCs" (product-browsing.feature line 210)
 /// </summary>
 [Collection("Storefront Integration Tests")]
-public class ProductListingCompositionTests : IClassFixture<TestFixture>
+public class ProductListingCompositionTests : IClassFixture<TestFixture>, IAsyncLifetime
 {
     private readonly TestFixture _fixture;
 
@@ -25,7 +25,15 @@ public class ProductListingCompositionTests : IClassFixture<TestFixture>
         _fixture = fixture;
     }
 
-    [Fact(Skip = "Test isolation issue with StubCatalogClient - pagination test proves handler works correctly")]
+    public Task InitializeAsync()
+    {
+        // Each test clears and seeds its own data - no shared setup needed
+        return Task.CompletedTask;
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
     public async Task GetProductListing_ReturnsAllActiveProducts()
     {
         _fixture.StubCatalogClient.Clear();
@@ -80,7 +88,7 @@ public class ProductListingCompositionTests : IClassFixture<TestFixture>
         firstProduct.IsInStock.ShouldBeTrue();
     }
 
-    [Fact(Skip = "Test isolation issue with StubCatalogClient - pagination test proves handler works correctly")]
+    [Fact]
     public async Task GetProductListing_FiltersByCategory()
     {
         _fixture.StubCatalogClient.Clear();
@@ -170,7 +178,7 @@ public class ProductListingCompositionTests : IClassFixture<TestFixture>
         listingView.TotalCount.ShouldBe(0);
     }
 
-    [Fact(Skip = "Test isolation issue with StubCatalogClient - pagination test proves handler works correctly")]
+    [Fact]
     public async Task GetProductListing_UsesDefaultPaginationWhenNotSpecified()
     {
         _fixture.StubCatalogClient.Clear();

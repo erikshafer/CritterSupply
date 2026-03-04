@@ -109,4 +109,13 @@ public class StubOrdersClient : IOrdersClient
 
         return Task.FromResult(orderId);
     }
+
+    /// <summary>
+    /// Clear all configured test data (for test isolation)
+    /// </summary>
+    public void Clear()
+    {
+        _checkouts.Clear();
+        _orders.Clear();
+    }
 }

@@ -1,36 +1,33 @@
 using Storefront.Clients;
+using Storefront.RealTime;
 
 namespace Storefront.Notifications;
 
 /// <summary>
-/// Handles Shopping.ItemQuantityChanged integration message and broadcasts SSE update to connected clients.
+/// Handles Shopping.ItemQuantityChanged integration message and publishes SignalR update via Wolverine.
 /// </summary>
 public static class ItemQuantityChangedHandler
 {
-    public static async Task Handle(
+    public static async Task<CartUpdated?> Handle(
         Messages.Contracts.Shopping.ItemQuantityChanged message,
         IShoppingClient shoppingClient,
-        IEventBroadcaster broadcaster,
         CancellationToken ct)
     {
         // Query Shopping BC for updated cart state
         var cart = await shoppingClient.GetCartAsync(message.CartId, ct);
 
         if (cart is null)
-            return; // Cart not found (race condition or deleted)
+            return null; // Cart not found (race condition or deleted)
 
         // Calculate total from items
         var totalAmount = cart.Items.Sum(item => item.Quantity * item.UnitPrice);
 
-        // Compose SSE event
-        var @event = new CartUpdated(
+        // Return SignalR message — Wolverine routes to hub based on IStorefrontWebSocketMessage
+        return new CartUpdated(
             cart.Id,
             message.CustomerId,
             cart.Items.Count,
             totalAmount,
             message.ChangedAt);
-
-        // Broadcast to all connected clients for this customer
-        await broadcaster.BroadcastAsync(message.CustomerId, @event, ct);
     }
 }

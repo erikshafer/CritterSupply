@@ -194,10 +194,21 @@ else
     private async Task AddToCart(string sku, decimal unitPrice)
     {
         // Check if user is authenticated
-        if (!_customerId.HasValue || !_cartId.HasValue)
+        if (!_customerId.HasValue)
         {
             Snackbar.Add("Please sign in to add items to cart", Severity.Warning);
             return;
+        }
+
+        // Initialize cart if needed (handles race condition)
+        if (!_cartId.HasValue)
+        {
+            await InitializeCart();
+            if (!_cartId.HasValue)
+            {
+                Snackbar.Add("Failed to initialize cart. Please try again.", Severity.Error);
+                return;
+            }
         }
 
         try

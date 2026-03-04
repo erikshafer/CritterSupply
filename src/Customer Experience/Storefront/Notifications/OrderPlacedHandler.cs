@@ -1,23 +1,19 @@
+using Storefront.RealTime;
+
 namespace Storefront.Notifications;
 
 /// <summary>
-/// Handles Orders.OrderPlaced integration message and broadcasts SSE update to connected clients.
+/// Handles Orders.OrderPlaced integration message and publishes SignalR update via Wolverine.
 /// </summary>
 public static class OrderPlacedHandler
 {
-    public static async Task Handle(
-        Messages.Contracts.Orders.OrderPlaced message,
-        IEventBroadcaster broadcaster,
-        CancellationToken ct)
+    public static OrderStatusChanged Handle(Messages.Contracts.Orders.OrderPlaced message)
     {
-        // Compose SSE event
-        var @event = new OrderStatusChanged(
+        // Return SignalR message — Wolverine routes to hub based on IStorefrontWebSocketMessage
+        return new OrderStatusChanged(
             message.OrderId,
             message.CustomerId,
             "Placed",
             DateTimeOffset.UtcNow);
-
-        // Broadcast to all connected clients for this customer
-        await broadcaster.BroadcastAsync(message.CustomerId, @event, ct);
     }
 }

@@ -11,6 +11,10 @@ public sealed record GetProductListing(string? Category, int Page, int PageSize)
 
 public static class GetProductListingHandler
 {
+    private const int DefaultPageSize = 20;
+    private const int MaxPageSize = 100;
+    private const int MinPage = 1;
+
     [WolverineGet("/api/storefront/products")]
     public static async Task<ProductListingView> Handle(
         ICatalogClient catalogClient,
@@ -19,8 +23,17 @@ public static class GetProductListingHandler
         int pageSize = 20,
         CancellationToken ct = default)
     {
+        // Apply pagination constraints
+        var normalizedPage = page < MinPage ? MinPage : page;
+        var normalizedPageSize = pageSize switch
+        {
+            <= 0 => DefaultPageSize,
+            > MaxPageSize => MaxPageSize,
+            _ => pageSize
+        };
+
         // Query Catalog BC for product listing
-        var pagedResult = await catalogClient.GetProductsAsync(category, page, pageSize, ct);
+        var pagedResult = await catalogClient.GetProductsAsync(category, normalizedPage, normalizedPageSize, ct);
 
         // Map to ProductCardView
         var productCards = pagedResult.Items.Select(p => new ProductCardView(

@@ -56,3 +56,11 @@ public static class ChangeItemQuantityHandler
 /// Request body for changing item quantity
 /// </summary>
 public sealed record ChangeItemQuantityRequest(int NewQuantity);
+
+public sealed class ChangeItemQuantityRequestValidator : AbstractValidator<ChangeItemQuantityRequest>
+{
+    public ChangeItemQuantityRequestValidator()
+    {
+        RuleFor(x => x.NewQuantity).GreaterThan(0).WithMessage("Quantity must be greater than zero");
+    }
+}
