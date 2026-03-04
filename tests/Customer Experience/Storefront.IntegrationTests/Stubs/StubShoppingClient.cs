@@ -42,51 +42,57 @@ public class StubShoppingClient : IShoppingClient
 
     public Task AddItemAsync(Guid cartId, string sku, int quantity, decimal unitPrice, CancellationToken ct = default)
     {
-        if (_carts.TryGetValue(cartId, out var cart))
+        if (!_carts.TryGetValue(cartId, out var cart))
         {
-            var items = cart.Items.ToList();
-            var existingItem = items.FirstOrDefault(i => i.Sku == sku);
-
-            if (existingItem != null)
-            {
-                items.Remove(existingItem);
-                items.Add(existingItem with { Quantity = existingItem.Quantity + quantity });
-            }
-            else
-            {
-                items.Add(new CartItemDto(sku, quantity, unitPrice));
-            }
-
-            _carts[cartId] = cart with { Items = items };
+            throw new HttpRequestException($"Cart {cartId} not found", null, System.Net.HttpStatusCode.NotFound);
         }
+
+        var items = cart.Items.ToList();
+        var existingItem = items.FirstOrDefault(i => i.Sku == sku);
+
+        if (existingItem != null)
+        {
+            items.Remove(existingItem);
+            items.Add(existingItem with { Quantity = existingItem.Quantity + quantity });
+        }
+        else
+        {
+            items.Add(new CartItemDto(sku, quantity, unitPrice));
+        }
+
+        _carts[cartId] = cart with { Items = items };
 
         return Task.CompletedTask;
     }
 
     public Task RemoveItemAsync(Guid cartId, string sku, CancellationToken ct = default)
     {
-        if (_carts.TryGetValue(cartId, out var cart))
+        if (!_carts.TryGetValue(cartId, out var cart))
         {
-            var items = cart.Items.Where(i => i.Sku != sku).ToList();
-            _carts[cartId] = cart with { Items = items };
+            throw new HttpRequestException($"Cart {cartId} not found", null, System.Net.HttpStatusCode.NotFound);
         }
+
+        var items = cart.Items.Where(i => i.Sku != sku).ToList();
+        _carts[cartId] = cart with { Items = items };
 
         return Task.CompletedTask;
     }
 
     public Task ChangeQuantityAsync(Guid cartId, string sku, int newQuantity, CancellationToken ct = default)
     {
-        if (_carts.TryGetValue(cartId, out var cart))
+        if (!_carts.TryGetValue(cartId, out var cart))
         {
-            var items = cart.Items.ToList();
-            var existingItem = items.FirstOrDefault(i => i.Sku == sku);
+            throw new HttpRequestException($"Cart {cartId} not found", null, System.Net.HttpStatusCode.NotFound);
+        }
 
-            if (existingItem != null)
-            {
-                items.Remove(existingItem);
-                items.Add(existingItem with { Quantity = newQuantity });
-                _carts[cartId] = cart with { Items = items };
-            }
+        var items = cart.Items.ToList();
+        var existingItem = items.FirstOrDefault(i => i.Sku == sku);
+
+        if (existingItem != null)
+        {
+            items.Remove(existingItem);
+            items.Add(existingItem with { Quantity = newQuantity });
+            _carts[cartId] = cart with { Items = items };
         }
 
         return Task.CompletedTask;

@@ -140,4 +140,67 @@ public class TestFixture : IAsyncLifetime
 
         return (tracked, result);
     }
+
+    /// <summary>
+    /// Clear all stub client data (for test isolation between tests)
+    /// </summary>
+    public void ClearAllStubs()
+    {
+        StubShoppingClient.Clear();
+        StubCatalogClient.Clear();
+        StubOrdersClient.Clear();
+        StubCustomerIdentityClient.Clear();
+    }
+
+    /// <summary>
+    /// Seed common test products into Catalog stub
+    /// </summary>
+    public void SeedCommonProducts()
+    {
+        StubCatalogClient.AddProduct(new Storefront.Clients.ProductDto(
+            "DOG-BOWL-001",
+            "Ceramic Dog Bowl (Large)",
+            "High-quality ceramic dog bowl",
+            "Dogs",
+            19.99m,
+            "Active",
+            [new Storefront.Clients.ProductImageDto("https://example.com/dog-bowl.jpg", "Ceramic Dog Bowl", 1)]));
+
+        StubCatalogClient.AddProduct(new Storefront.Clients.ProductDto(
+            "CAT-TOY-001",
+            "Interactive Cat Laser",
+            "Fun laser toy for cats",
+            "Cats",
+            29.99m,
+            "Active",
+            [new Storefront.Clients.ProductImageDto("https://example.com/cat-laser.jpg", "Cat Laser", 1)]));
+
+        StubCatalogClient.AddProduct(new Storefront.Clients.ProductDto(
+            "DOG-FOOD-001",
+            "Premium Dog Food (50lb)",
+            "Nutritious dog food",
+            "Dogs",
+            45.00m,
+            "Active",
+            [new Storefront.Clients.ProductImageDto("https://example.com/dog-food.jpg", "Dog Food", 1)]));
+    }
+
+    /// <summary>
+    /// Create a cart with items (helper for multi-step tests)
+    /// </summary>
+    public async Task<Guid> CreateCartWithItemsAsync(
+        Guid customerId,
+        params (string sku, int quantity, decimal unitPrice)[] items)
+    {
+        // Initialize cart via Shopping BC stub
+        var cartId = await StubShoppingClient.InitializeCartAsync(customerId);
+
+        // Add items to cart
+        foreach (var (sku, quantity, unitPrice) in items)
+        {
+            await StubShoppingClient.AddItemAsync(cartId, sku, quantity, unitPrice);
+        }
+
+        return cartId;
+    }
 }

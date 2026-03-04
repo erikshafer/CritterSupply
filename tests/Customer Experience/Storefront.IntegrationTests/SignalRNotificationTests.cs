@@ -207,4 +207,117 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
         message.ShouldBeAssignableTo<IStorefrontWebSocketMessage>();
         message.CustomerId.ShouldNotBe(Guid.Empty);
     }
+
+    [Fact]
+    public async Task PaymentAuthorized_IntegrationMessage_ReturnsOrderStatusChangedMessage()
+    {
+        // Arrange
+        var paymentId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+
+        // Act - Publish Payments.PaymentAuthorized integration message
+        var message = new Messages.Contracts.Payments.PaymentAuthorized(
+            paymentId,
+            orderId,
+            99.99m,
+            "auth_12345",
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddHours(1));
+
+        var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+
+        // Assert - Verify handler returned OrderStatusChanged message
+        var published = tracked.Sent.MessagesOf<OrderStatusChanged>();
+        published.ShouldNotBeEmpty();
+
+        var orderStatusChanged = published.Single();
+        orderStatusChanged.OrderId.ShouldBe(orderId);
+        orderStatusChanged.NewStatus.ShouldBe("PaymentAuthorized");
+        // Note: CustomerId is Guid.Empty (stub until Orders BC query implemented)
+    }
+
+    [Fact]
+    public async Task ReservationConfirmed_IntegrationMessage_ReturnsOrderStatusChangedMessage()
+    {
+        // Arrange
+        var orderId = Guid.NewGuid();
+        var inventoryId = Guid.NewGuid();
+        var reservationId = Guid.NewGuid();
+
+        // Act - Publish Inventory.ReservationConfirmed integration message
+        var message = new Messages.Contracts.Inventory.ReservationConfirmed(
+            orderId,
+            inventoryId,
+            reservationId,
+            "DOG-BOWL-001",
+            "WAREHOUSE-001",
+            2,
+            DateTimeOffset.UtcNow);
+
+        var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+
+        // Assert - Verify handler returned OrderStatusChanged message
+        var published = tracked.Sent.MessagesOf<OrderStatusChanged>();
+        published.ShouldNotBeEmpty();
+
+        var orderStatusChanged = published.Single();
+        orderStatusChanged.OrderId.ShouldBe(orderId);
+        orderStatusChanged.NewStatus.ShouldBe("InventoryReserved");
+        // Note: CustomerId is Guid.Empty (stub until Orders BC query implemented)
+    }
+
+    [Fact]
+    public async Task ShipmentDispatched_IntegrationMessage_ReturnsShipmentStatusChangedMessage()
+    {
+        // Arrange
+        var shipmentId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+
+        // Act - Publish Fulfillment.ShipmentDispatched integration message
+        var message = new Messages.Contracts.Fulfillment.ShipmentDispatched(
+            orderId,
+            shipmentId,
+            "UPS",
+            "TRACK123",
+            DateTimeOffset.UtcNow);
+
+        var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+
+        // Assert - Verify handler returned ShipmentStatusChanged message
+        var published = tracked.Sent.MessagesOf<ShipmentStatusChanged>();
+        published.ShouldNotBeEmpty();
+
+        var shipmentStatusChanged = published.Single();
+        shipmentStatusChanged.ShipmentId.ShouldBe(shipmentId);
+        shipmentStatusChanged.OrderId.ShouldBe(orderId);
+        shipmentStatusChanged.NewStatus.ShouldBe("Dispatched");
+        shipmentStatusChanged.TrackingNumber.ShouldBe("TRACK123");
+        // Note: CustomerId is Guid.Empty (stub until Orders BC query implemented)
+    }
+
+    [Fact]
+    public async Task ItemAddedHandler_WhenCartNotFound_ReturnsNull()
+    {
+        // Arrange
+        var nonExistentCartId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+
+        // Note: StubShoppingClient returns null for non-existent cart
+        // DO NOT configure stub - testing null case
+
+        // Act - Publish Shopping.ItemAdded for non-existent cart
+        var message = new Messages.Contracts.Shopping.ItemAdded(
+            nonExistentCartId,
+            customerId,
+            "DOG-BOWL-001",
+            1,
+            19.99m,
+            DateTimeOffset.UtcNow);
+
+        var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+
+        // Assert - Handler returns null, no SignalR message published
+        var published = tracked.Sent.MessagesOf<CartUpdated>();
+        published.ShouldBeEmpty(); // No message sent when cart not found
+    }
 }

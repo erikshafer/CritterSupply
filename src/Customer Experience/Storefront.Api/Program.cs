@@ -5,7 +5,9 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Storefront.RealTime;
 using Wolverine;
+using Wolverine.FluentValidation;
 using Wolverine.Http;
+using Wolverine.Http.FluentValidation;
 using Wolverine.RabbitMQ;
 using Wolverine.SignalR;
 
@@ -44,6 +46,9 @@ builder.Services.AddSignalR();
 // Add Wolverine with message handler discovery
 builder.Host.UseWolverine(opts =>
 {
+    // Enable FluentValidation for all Wolverine handlers
+    opts.UseFluentValidation();
+
     // Discover handlers in both API and Domain assemblies
     opts.Discovery.IncludeAssembly(typeof(Program).Assembly); // Storefront.Api (Queries, Hub)
     opts.Discovery.IncludeAssembly(typeof(IStorefrontWebSocketMessage).Assembly); // Storefront (Notifications)
@@ -128,7 +133,10 @@ if (app.Environment.IsDevelopment())
 }
 
 // Map Wolverine HTTP endpoints
-app.MapWolverineEndpoints();
+app.MapWolverineEndpoints(opts =>
+{
+    opts.UseFluentValidationProblemDetailMiddleware();
+});
 
 // Map SignalR hub
 app.MapHub<Storefront.Api.StorefrontHub>("/hub/storefront");

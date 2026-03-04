@@ -52,4 +52,12 @@ public class StubCustomerIdentityClient : ICustomerIdentityClient
         var response = new CurrentUserResponse(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), "test@critter.test", "Test", "User");
         return Task.FromResult<CurrentUserResponse?>(response);
     }
+
+    /// <summary>
+    /// Clear all configured test data (for test isolation)
+    /// </summary>
+    public void Clear()
+    {
+        _addresses.Clear();
+    }
 }
