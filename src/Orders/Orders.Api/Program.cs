@@ -25,24 +25,12 @@ using Wolverine.Marten;
 using Wolverine.RabbitMQ;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
 builder.Host.ApplyJasperFxExtensions();
 
-// OpenTelemetry configuration for Wolverine tracing and metrics
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("Orders"))
-    .WithTracing(tracing =>
-    {
-        tracing
-            .AddAspNetCoreInstrumentation()  // HTTP request tracing
-            .AddSource("Wolverine")           // Wolverine message handler tracing
-            .AddOtlpExporter();               // Export to Jaeger via OTLP
-    })
-    .WithMetrics(metrics =>
-    {
-        metrics
-            .AddMeter("Wolverine")            // Wolverine metrics (success/failure counters)
-            .AddOtlpExporter();               // Export metrics to Jaeger via OTLP
-    });
 var martenConnectionString = builder.Configuration.GetConnectionString("marten")
                              ?? throw new Exception("The connection string for Marten was not found");
 
@@ -121,8 +109,6 @@ builder.Host.UseWolverine(opts =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddHealthChecks().AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
-
 builder.Services.AddWolverineHttp();
 
 var app = builder.Build();
@@ -141,14 +127,12 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// Map Aspire default endpoints (/health, /alive)
+app.MapDefaultEndpoints();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapHealthChecks("/api/v1/health").AllowAnonymous();
-    app.MapHealthChecks("/health");
-    app.MapHealthChecks("/alive", new HealthCheckOptions
-    {
-        Predicate = r => r.Tags.Contains("live")
-    }).AllowAnonymous();
 }
 
 app.MapWolverineEndpoints(opts =>

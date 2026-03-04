@@ -1,0 +1,32 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.1.2">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>e70639a8-427e-4789-aa25-6a446b7c1453</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Aspire Hosting Components -->
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <PackageReference Include="Aspire.Hosting.RabbitMQ" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Bounded Context API Projects -->
+    <ProjectReference Include="../Orders/Orders.Api/Orders.Api.csproj" />
+    <ProjectReference Include="../Payments/Payments.Api/Payments.Api.csproj" />
+    <ProjectReference Include="../Inventory/Inventory.Api/Inventory.Api.csproj" />
+    <ProjectReference Include="../Fulfillment/Fulfillment.Api/Fulfillment.Api.csproj" />
+    <ProjectReference Include="../Customer Identity/CustomerIdentity.Api/CustomerIdentity.Api.csproj" />
+    <ProjectReference Include="../Shopping/Shopping.Api/Shopping.Api.csproj" />
+    <ProjectReference Include="../Product Catalog/ProductCatalog.Api/ProductCatalog.Api.csproj" />
+    <ProjectReference Include="../Customer Experience/Storefront.Api/Storefront.Api.csproj" />
+
+    <!-- Blazor Web App -->
+    <ProjectReference Include="../Customer Experience/Storefront.Web/Storefront.Web.csproj" />
+  </ItemGroup>
+
+</Project>

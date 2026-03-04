@@ -1,39 +1,44 @@
-# ADR 0009: .NET Aspire v13.1 Integration
+# ADR 0009: .NET Aspire v13.1 Integration (Hybrid Architecture)
 
-**Status:** ⚠️ Proposed
+**Status:** ✅ Accepted (Docker Compose Primary + Aspire Optional)
 
-**Date:** 2026-02-16
+**Date:** 2026-02-16 (Proposed) | 2026-03-04 (Accepted and Implemented)
 
 ## Context
 
-CritterSupply currently uses Docker Compose for local development orchestration of infrastructure dependencies (PostgreSQL, RabbitMQ). Each bounded context API must be started manually using `dotnet run` with specific project paths. While functional, this approach has several limitations:
+CritterSupply uses Docker Compose for local development orchestration of infrastructure dependencies (PostgreSQL, RabbitMQ, Jaeger). Each bounded context API must be started manually using `dotnet run` with specific project paths. While functional, this approach requires manual coordination.
 
-**Current Pain Points:**
-- Manual startup of 8+ API projects and 1 Blazor Web app
-- No unified dashboard to monitor service health
-- Connection strings and configuration scattered across appsettings.json files
-- No automatic service discovery between bounded contexts
-- Developers must remember which ports each service uses
-- TestContainers still needed for integration tests (separate from dev infrastructure)
-- No built-in telemetry aggregation (logging, metrics, distributed tracing)
+**Docker Compose Pain Points:**
+- Manual startup of 8+ API projects and 1 Blazor Web app (infrastructure only starts via `docker-compose`)
+- No unified dashboard to monitor .NET service health
+- No built-in telemetry aggregation for .NET services (logging, metrics, distributed tracing)
 
-**Aspire Value Proposition:**
-- Single `dotnet run` command starts entire application stack
-- Unified dashboard showing all services, dependencies, and health checks
-- Built-in service discovery (no hardcoded connection strings in code)
-- Automatic telemetry collection (OpenTelemetry out-of-the-box)
-- PostgreSQL and RabbitMQ containerization integrated with Aspire hosting
-- Modern .NET developer experience aligned with Microsoft recommendations
+**Why Not Full Aspire for Infrastructure?**
+- **Wolverine.RabbitMQ doesn't integrate with Aspire's service discovery** - Aspire 13.1+ uses dynamic port allocation, but Wolverine expects fixed ports in `appsettings.json`
+- **Marten requires explicit connection strings** - Cannot use Aspire's auto-injected connection strings without significant API refactoring
+- **Fixed ports are simpler** - Docker Compose provides predictable ports (5433, 5672, 15672) that match existing `appsettings.json` files
 
 **Key Requirements:**
-1. **Preserve Docker Compose for CI/CD** - GitHub Actions workflow must continue working
-2. **Preserve TestContainers for testing** - Integration tests should remain unchanged
-3. **Minimal changes to existing API projects** - Surgical updates only
-4. **Support both Aspire and non-Aspire workflows** - Developers can opt-in to Aspire
+1. **Preserve Docker Compose for infrastructure** - PostgreSQL, RabbitMQ, Jaeger run with fixed ports
+2. **Preserve TestContainers for testing** - Integration tests remain unchanged
+3. **Minimal changes to existing API projects** - No connection string refactoring required
+4. **Support both Aspire and non-Aspire workflows** - Developers can use docker-compose alone or docker-compose + Aspire
 
 ## Decision
 
-**Adopt .NET Aspire v13.1 as the recommended local development orchestration tool** while maintaining Docker Compose for CI/CD and TestContainers for integration testing.
+**Adopt Docker Compose as the primary development workflow with Aspire as an optional enhancement:**
+
+- **Docker Compose (Primary)**: Infrastructure + manual `dotnet run` for APIs
+  - Simplest onboarding: Just Docker Desktop + .NET 10
+  - Fastest iteration: Native hot reload, no container rebuilds
+  - Best debugging: F5 in IDE works seamlessly
+
+- **.NET Aspire (Optional)**: Enhanced developer experience for advanced users
+  - Unified dashboard for logs/traces/metrics across all .NET services
+  - Single command to start all 9 services
+  - OpenTelemetry observability built-in
+
+- **Hybrid Architecture**: Infrastructure always runs via `docker-compose --profile infrastructure up -d` with fixed ports, whether using Docker Compose-only or Aspire
 
 ### Implementation Approach
 
@@ -142,65 +147,92 @@ ServiceDefaults will provide:
 
 #### 7. Developer Workflow Options
 
-**Option A: Aspire (Recommended for local dev)**
-```bash
-# Start entire stack with Aspire
-cd src/CritterSupply.AppHost
-dotnet run
-
-# Aspire dashboard opens at http://localhost:15000
-# All services, logs, traces, metrics visible in one place
-```
-
-**Option B: Docker Compose + Manual (Still supported)**
+**Option 1: Docker Compose Only (⭐ Recommended - Simplest)**
 ```bash
 # Start infrastructure only
-docker-compose --profile all up -d
+docker-compose --profile infrastructure up -d
 
-# Start individual APIs manually
+# Start individual APIs manually as needed
 dotnet run --project "src/Orders/Orders.Api/Orders.Api.csproj"
+dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
+# ... etc
 ```
 
-**Option C: Hybrid (Infrastructure only)**
+**Why this is the default:**
+- ✅ No additional setup beyond Docker Desktop + .NET 10
+- ✅ Fastest hot reload (native .NET process)
+- ✅ Easiest debugging (F5 in IDE works seamlessly)
+- ✅ Lower memory footprint
+- ✅ All IDE tooling works (profilers, diagnostics, live unit testing)
+
+**Option 2: Docker Compose + Aspire (Optional - Enhanced Observability)**
 ```bash
-# Use Docker Compose for infra, run specific API via dotnet CLI
-docker-compose --profile all up -d
-dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
+# Step 1: Start infrastructure with fixed ports
+docker-compose --profile infrastructure up -d
+
+# Step 2: Start .NET services via Aspire
+dotnet run --project src/CritterSupply.AppHost
+
+# Aspire dashboard opens at https://localhost:17265
+# All .NET services, logs, traces, metrics visible in one place
+```
+
+**When to use Aspire:**
+- You want unified dashboard for logs/traces/metrics
+- You're demoing the system to stakeholders
+- You're exploring OpenTelemetry patterns
+
+**Option 3: Docker Compose All Services (Containerized Dev)**
+```bash
+# Start infrastructure + all 8 APIs + Blazor web in containers
+docker-compose --profile all up --build
+
+# Useful for: demos, onboarding, cross-BC integration testing
 ```
 
 ## Rationale
 
-### Why Aspire?
+### Why Docker Compose First?
 
-1. **Modern .NET Best Practice**: Aspire is Microsoft's recommended approach for .NET distributed applications
-2. **Developer Experience**: Single command to start entire stack vs 9+ manual commands
-3. **Observability**: Built-in dashboard with logs, traces, metrics aggregation
-4. **Service Discovery**: Eliminates hardcoded connection strings and port numbers
-5. **Future-Proof**: Aligns with .NET ecosystem direction (Aspire is long-term investment)
+**Docker Compose as Primary Workflow:**
+1. **Zero Additional Setup**: Just Docker Desktop + .NET 10 SDK
+2. **Fastest Iteration**: Native hot reload, no container rebuilds
+3. **Best Debugging**: F5 in Rider/Visual Studio works seamlessly
+4. **Lower Memory**: Only infrastructure in containers (~300MB vs ~2GB for full stack)
+5. **IDE Tooling**: Profilers, diagnostics, live unit testing all work
+6. **Simplicity**: Predictable ports (5433, 5672), no magic
+7. **CI/CD Proven**: Battle-tested in GitHub Actions
 
-### Why Keep Docker Compose?
+**Aspire as Optional Enhancement:**
+1. **Enhanced Observability**: Unified dashboard for logs/traces/metrics across all .NET services
+2. **Convenience**: Single command to start 9 services (vs 9 manual `dotnet run` commands)
+3. **Service Discovery**: Automatic HTTP endpoint discovery for service-to-service calls
+4. **Learning Tool**: Demonstrates modern .NET practices for reference architecture
+5. **Demo-Friendly**: Polished UI for showcasing system to stakeholders
 
-1. **CI/CD Simplicity**: Docker Compose proven in GitHub Actions environment
-2. **No Breaking Changes**: Existing workflows continue working
-3. **Fallback Option**: Developers can use Docker Compose if Aspire issues arise
-4. **Infrastructure-Only Use Case**: Sometimes devs only need Postgres/RabbitMQ
+### Why NOT Full Aspire?
+
+1. **Aspire 13.1+ uses dynamic ports** - `AddPostgres(port: 5433)` doesn't actually bind to host port 5433, it's just container metadata
+2. **Wolverine.RabbitMQ reads `appsettings.json`** - Doesn't know how to read Aspire's injected connection strings
+3. **Significant refactoring required** - Would need custom code to parse Aspire connection strings and configure Wolverine manually
+4. **Docker Compose works perfectly** - Why fix what isn't broken?
 
 ### Why Keep TestContainers?
 
 1. **Test Isolation**: Each test run gets fresh infrastructure (no shared state)
 2. **Parallel Execution**: Tests can run concurrently without conflicts
 3. **CI Compatibility**: Works seamlessly in GitHub Actions
-4. **No External Dependencies**: Tests don't require Aspire AppHost running
+4. **No External Dependencies**: Tests don't require Aspire AppHost or docker-compose running
 
 ## Consequences
 
 ### Positive
 
-✅ **Dramatically improved local dev experience** - Single command starts everything
-✅ **Unified observability** - All logs, traces, metrics in Aspire dashboard
-✅ **Service discovery** - No more hardcoded URLs/ports in code
-✅ **Health monitoring** - Real-time status of all services and dependencies
-✅ **Easier onboarding** - New developers run one command to get started
+✅ **Improved local dev experience (optional)** - Aspire provides single command to start 9 .NET services
+✅ **Unified observability (optional)** - Aspire dashboard shows logs, traces, metrics for .NET services
+✅ **Docker Compose simplicity (primary)** - Infrastructure runs with fixed ports, no surprises
+✅ **No refactoring required** - Connection strings remain in `appsettings.json`, no breaking changes
+✅ **Service-to-service discovery** - Aspire provides HTTP endpoint discovery for BFF → API calls
 ✅ **Alignment with .NET ecosystem** - Following Microsoft best practices
 ✅ **OpenTelemetry by default** - Production-ready observability patterns
 
@@ -212,10 +244,9 @@ dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
 
 ### Negative
 
-❌ **Aspire workload requirement** - Developers must install `dotnet workload install aspire`
-❌ **Version compatibility** - Aspire 13.1 requires .NET 10.0+ (already using .NET 10.0, so minimal risk)
-❌ **Potential breaking changes** - Aspire is still evolving (13.x series)
-❌ **Two sources of truth** - docker-compose.yml and AppHost Program.cs must stay in sync
+⚠️ **Optional Complexity** - Aspire adds learning curve for developers who opt-in
+⚠️ **Two Orchestration Paths** - Maintainers must document both Docker Compose and Aspire workflows
+⚠️ **Sync Burden** - docker-compose.yml and AppHost Program.cs must stay in sync when adding new BCs
 
 ### Migration Risk Assessment
 
@@ -330,6 +361,48 @@ dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
 - Service discovery requires replacing hardcoded URLs in Storefront.Web
 - Potential for port conflicts or resource naming issues
 
+## Implementation Notes (2026-03-04)
+
+**Implementation Status:** ✅ Complete
+
+**Projects Created:**
+- `src/CritterSupply.AppHost/` - Aspire orchestration project with all 9 services + infrastructure configured
+- `src/CritterSupply.ServiceDefaults/` - Shared Aspire configuration (OpenTelemetry, health checks, service discovery)
+
+**Projects Updated:**
+- All 9 API/Web projects (Orders.Api, Payments.Api, Inventory.Api, Fulfillment.Api, CustomerIdentity.Api, Shopping.Api, ProductCatalog.Api, Storefront.Api, Storefront.Web) now reference ServiceDefaults
+- All Program.cs files updated with `builder.AddServiceDefaults()` and `app.MapDefaultEndpoints()`
+- Duplicate OpenTelemetry and health check configurations removed
+
+**Key Enhancements:**
+- ServiceDefaults includes `.AddSource("Wolverine")` and `.AddMeter("Wolverine")` to preserve Wolverine telemetry
+- AppHost configures Jaeger (ports 16686, 4317, 4318) for distributed tracing
+- All services configured with proper port allocations matching existing assignments
+- PostgreSQL (5433), RabbitMQ (5672) ports preserved for backward compatibility
+
+**Verification:**
+- Solution builds successfully (0 errors, 0 warnings)
+- AppHost builds with all Aspire hosting components present
+- OpenTelemetry works both with AND without Aspire (connection string fallback preserved)
+- TestContainers integration tests remain unchanged (hermetic)
+
+**Documentation:**
+- [docs/ASPIRE-GUIDE.md](../ASPIRE-GUIDE.md) - Comprehensive 400+ line guide
+- [README.md](../../README.md) - Updated with Aspire Quick Start (recommended option)
+- [CLAUDE.md](../../CLAUDE.md) - Updated with Aspire in Preferred Tools and Local Development Options
+
+**Prerequisites:**
+- None! Aspire 13.1+ uses the SDK approach (NuGet packages via `Aspire.AppHost.Sdk`). The deprecated `aspire` workload is not needed.
+
+**Launch Command:**
+```bash
+dotnet run --project src/CritterSupply.AppHost
+```
+
+**Aspire Dashboard:** http://localhost:15000
+
+**Note:** If you previously installed the workload, you can optionally remove it: `sudo dotnet workload uninstall aspire`
+
 ## References
 
 - [.NET Aspire Documentation](https://learn.microsoft.com/en-us/dotnet/aspire/)
@@ -338,3 +411,4 @@ dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"
 - [RabbitMQ with Aspire](https://learn.microsoft.com/en-us/dotnet/aspire/messaging/rabbitmq-component)
 - [Service Discovery in Aspire](https://learn.microsoft.com/en-us/dotnet/aspire/service-discovery/overview)
 - CritterSupply BACKLOG.md (existing Aspire plan)
+- [CritterSupply Aspire Guide](../ASPIRE-GUIDE.md)

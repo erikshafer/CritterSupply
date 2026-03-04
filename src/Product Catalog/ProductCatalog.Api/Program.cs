@@ -13,22 +13,9 @@ using Wolverine.Marten;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// OpenTelemetry configuration for Wolverine tracing and metrics
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("ProductCatalog"))
-    .WithTracing(tracing =>
-    {
-        tracing
-            .AddAspNetCoreInstrumentation()  // HTTP request tracing
-            .AddSource("Wolverine")           // Wolverine message handler tracing
-            .AddOtlpExporter();               // Export to Jaeger via OTLP
-    })
-    .WithMetrics(metrics =>
-    {
-        metrics
-            .AddMeter("Wolverine")            // Wolverine metrics (success/failure counters)
-            .AddOtlpExporter();               // Export metrics to Jaeger via OTLP
-    });
+// Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
 // Marten document store configuration
 var connectionString = builder.Configuration.GetConnectionString("marten")
     ?? "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=postgres";
@@ -98,6 +85,9 @@ if (app.Environment.IsDevelopment())
         opts.SwaggerEndpoint("/api/v1/swagger.json", "Product Catalog API");
     });
 }
+
+// Map Aspire default endpoints (/health, /alive)
+app.MapDefaultEndpoints();
 
 // Wolverine HTTP endpoints with FluentValidation middleware
 app.MapWolverineEndpoints(opts =>

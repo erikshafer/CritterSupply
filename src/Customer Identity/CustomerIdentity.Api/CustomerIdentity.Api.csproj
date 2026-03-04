@@ -26,6 +26,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Customers\CustomerIdentity.csproj" />
+        <ProjectReference Include="..\..\CritterSupply.ServiceDefaults\CritterSupply.ServiceDefaults.csproj" />
     </ItemGroup>
 
 </Project>

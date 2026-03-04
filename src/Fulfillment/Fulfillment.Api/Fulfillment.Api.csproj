@@ -23,6 +23,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Fulfillment\Fulfillment.csproj" />
+        <ProjectReference Include="..\..\CritterSupply.ServiceDefaults\CritterSupply.ServiceDefaults.csproj" />
     </ItemGroup>
 
 </Project>
