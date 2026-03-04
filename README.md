@@ -271,6 +271,43 @@ dotnet run --project "src/Product Catalog/ProductCatalog.Api/ProductCatalog.Api.
 
 Each BC includes `.http` files for manual testing. See [docs/HTTP-FILES-GUIDE.md](./docs/HTTP-FILES-GUIDE.md) for usage instructions.
 
+#### 🔭 Distributed Tracing with Jaeger
+
+CritterSupply ships with [Jaeger](https://www.jaegertracing.io/) for distributed tracing across all bounded contexts. All API projects are instrumented with OpenTelemetry and export traces via OTLP to Jaeger.
+
+**Access Jaeger UI:** http://localhost:16686
+
+Jaeger starts automatically with the `infrastructure` profile:
+
+```bash
+# Start infrastructure (Postgres + RabbitMQ + Jaeger)
+docker-compose --profile infrastructure up -d
+
+# Then run an API natively, e.g.:
+dotnet run --project "src/Orders/Orders.Api/Orders.Api.csproj"
+
+# Open Jaeger UI to view traces
+# http://localhost:16686
+```
+
+**Trace coverage:**
+- HTTP request spans (ASP.NET Core instrumentation)
+- Wolverine message handler spans (via `AddSource("Wolverine")`)
+- Cross-service message flows (HTTP → Wolverine → RabbitMQ)
+
+**Service names in Jaeger UI:**
+
+| Service | Port |
+|---------|------|
+| Orders | 5231 |
+| Payments | 5232 |
+| Inventory | 5233 |
+| Fulfillment | 5234 |
+| CustomerIdentity | 5235 |
+| Shopping | 5236 |
+| ProductCatalog | 5133 |
+| Storefront | 5237 |
+
 ## 🏫 Resources <a id='9.0'></a>
 
 - **Blog:** [event-sourcing.dev](https://www.event-sourcing.dev)
