@@ -72,4 +72,19 @@ public sealed class ShoppingClient : IShoppingClient
         var response = await _httpClient.DeleteAsync(url, ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<Guid> InitiateCheckoutAsync(Guid cartId, CancellationToken ct = default)
+    {
+        var payload = new { cartId };
+        var response = await _httpClient.PostAsJsonAsync($"/api/carts/{cartId}/checkout", payload, ct);
+        response.EnsureSuccessStatusCode();
+
+        // Extract checkout ID from Location header (e.g., "/api/checkouts/abc-123")
+        var location = response.Headers.Location?.ToString();
+        if (location is null)
+            throw new InvalidOperationException("Location header missing from initiate checkout response");
+
+        var checkoutIdString = location.Split('/').Last();
+        return Guid.Parse(checkoutIdString);
+    }
 }

@@ -7,6 +7,7 @@
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
+@inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
 
@@ -86,8 +87,20 @@ else
                     <MudText Typo="Typo.h6">Total</MudText>
                     <MudText Typo="Typo.h6">@_cartView.Subtotal.ToString("C")</MudText>
                 </div>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Href="/checkout">
-                    Proceed to Checkout
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           OnClick="@ProceedToCheckout"
+                           Disabled="@_isProcessing">
+                    @if (_isProcessing)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Proceeding...</span>
+                    }
+                    else
+                    {
+                        <span>Proceed to Checkout</span>
+                    }
                 </MudButton>
             </MudPaper>
 
@@ -295,6 +308,53 @@ else
         }
     }
 
+    private async Task ProceedToCheckout()
+    {
+        if (!_cartId.HasValue)
+        {
+            Snackbar.Add("No cart found", Severity.Error);
+            return;
+        }
+
+        _isProcessing = true;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("StorefrontApi");
+            var response = await client.PostAsync($"/api/storefront/carts/{_cartId.Value}/checkout", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Parse checkoutId from response
+                var result = await response.Content.ReadFromJsonAsync<InitiateCheckoutResponse>();
+
+                if (result?.CheckoutId != null)
+                {
+                    // Store checkoutId in localStorage
+                    await JS.InvokeVoidAsync("authHelper.setCheckoutId", result.CheckoutId.ToString());
+
+                    // Navigate to checkout page
+                    Navigation.NavigateTo("/checkout");
+                }
+                else
+                {
+                    Snackbar.Add("Failed to initiate checkout (no checkout ID returned)", Severity.Error);
+                }
+            }
+            else
+            {
+                Snackbar.Add($"Failed to initiate checkout: {response.StatusCode}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error initiating checkout: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         try
@@ -308,7 +368,7 @@ else
         }
     }
 
-    // View model matching BFF CartView
+    // View models matching BFF CartView
     private sealed record CartView(
         Guid CartId,
         Guid CustomerId,
@@ -322,4 +382,6 @@ else
         int Quantity,
         decimal UnitPrice,
         decimal LineTotal);
+
+    private sealed record InitiateCheckoutResponse(Guid? CheckoutId);
 }

@@ -14,6 +14,7 @@ public interface IShoppingClient
     Task RemoveItemAsync(Guid cartId, string sku, CancellationToken ct = default);
     Task ChangeQuantityAsync(Guid cartId, string sku, int newQuantity, CancellationToken ct = default);
     Task ClearCartAsync(Guid cartId, string? reason = null, CancellationToken ct = default);
+    Task<Guid> InitiateCheckoutAsync(Guid cartId, CancellationToken ct = default);
 }
 
 /// <summary>

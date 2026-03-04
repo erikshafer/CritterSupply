@@ -109,6 +109,23 @@ public class StubShoppingClient : IShoppingClient
         return Task.CompletedTask;
     }
 
+    public Task<Guid> InitiateCheckoutAsync(Guid cartId, CancellationToken ct = default)
+    {
+        if (!_carts.TryGetValue(cartId, out var cart))
+        {
+            throw new HttpRequestException($"Cart {cartId} not found", null, System.Net.HttpStatusCode.NotFound);
+        }
+
+        if (!cart.Items.Any())
+        {
+            throw new HttpRequestException("Cannot checkout an empty cart", null, System.Net.HttpStatusCode.BadRequest);
+        }
+
+        // Return a new checkoutId (in real implementation, this would create a checkout stream)
+        var checkoutId = Guid.CreateVersion7();
+        return Task.FromResult(checkoutId);
+    }
+
     /// <summary>
     /// Clear all configured cart data (for test isolation)
     /// </summary>
