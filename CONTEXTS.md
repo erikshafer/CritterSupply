@@ -511,46 +511,53 @@ Warehouse/FC selection uses routing logic to select the optimal location—neare
 
 The Returns context owns the reverse logistics flow—handling customer return requests, validating eligibility, receiving items back, and determining disposition. It picks up after delivery when a customer wants to send something back.
 
+> **Domain Specification:** See [`docs/returns/RETURNS-BC-SPEC.md`](docs/returns/RETURNS-BC-SPEC.md) for the comprehensive domain specification including requirements, risks, use cases, and full event/integration contracts.
+
 ### What it receives
 
-- `ReturnInitiated` from customer-facing UI — order reference, line items to return, reason
-- `ShipmentDelivered` from Fulfillment (via Orders) — establishes return eligibility window
-- `ReturnShipmentReceived` from Fulfillment or warehouse systems — physical items arrived
+- `Fulfillment.ShipmentDelivered` — establishes return eligibility window; triggers one-time Orders HTTP query to snapshot eligible line items
+- `Fulfillment.ReturnShipmentInTransit` — carrier tracking updates for inbound return shipments
 
 ### Internal lifecycle
 
 - Requested — customer initiated, awaiting validation
-- Approved — eligible for return, return label generated
-- Denied — outside window, non-returnable item, etc.
-- InTransit — customer shipped it back
+- Approved — eligible for return, return label generated; 30-day ship-by deadline scheduled
+- Denied — outside window, non-returnable item, etc. (terminal)
+- LabelGenerated — return shipping label created and provided to customer
+- InTransit — carrier scan received; package on its way back
 - Received — items arrived at warehouse/FC
-- Inspecting — verifying condition
-- Completed — inspection passed, ready for refund/exchange (includes restockable disposition)
-- Rejected — inspection failed (damaged, wrong item, etc.)
+- Inspecting — verifying condition and determining disposition
+- Completed — inspection passed; `ReturnCompleted` published (terminal)
+- Rejected — inspection failed; disposition applied (terminal)
+- Expired — customer never shipped within approval window (terminal)
 
 ### What it publishes
 
-- `ReturnApproved` — includes return label, instructions
-- `ReturnDenied` — reason code
-- `ReturnReceived` — items physically at FC
-- `ReturnCompleted` — inspection passed, includes restockable flag for Inventory
-- `ReturnRejected` — inspection failed
+- `ReturnRequested` — return request submitted; Customer Experience BC updates UI
+- `ReturnApproved` — return authorized; includes return label, ship-by deadline
+- `ReturnDenied` — request rejected; reason code included
+- `ReturnExpired` — approval window closed; customer never shipped
+- `ReturnCompleted` — inspection passed; **carries full item disposition** (SKU, qty, IsRestockable, warehouse, condition) for Orders BC (refund) and Inventory BC (restocking)
+- `ReturnRejected` — inspection failed; disposition applied (Dispose, ReturnToCustomer, Quarantine)
 
 ### Core Invariants
 
-- A return cannot be approved outside the eligibility window
-- A return cannot be approved for non-returnable items
-- A return cannot be marked completed without physical receipt and inspection
-- A return cannot be processed for an order that was never delivered
+- A return cannot be approved outside the 30-day eligibility window (established from `ShipmentDelivered`)
+- A return cannot be approved for non-returnable items (personalized, opened consumables, final sale)
+- A return cannot transition to Received without prior approval
+- A return cannot be marked Completed without physical receipt and passed inspection
+- A return cannot be processed for an order that has no `ReturnEligibilityWindow` record
 - Restockable disposition requires inspection completion
 
 ### What it doesn't own
 
-- Refund processing (Payments, triggered by Orders)
-- Deciding refund amount or restocking fees (Orders or policy service)
-- Inventory restocking (publishes completion with disposition, Inventory reacts)
-- Customer communication (Notifications)
+- Refund processing (Payments, orchestrated by Orders — Orders holds the PaymentId)
+- Refund amount calculation disputes (Orders or policy service)
+- Inventory restocking execution (Inventory BC reacts to `ReturnCompleted`)
+- Customer communication (Notifications BC reacts to Returns integration events)
 - Original order state management (Orders saga tracks return status)
+- Carrier API integration (Fulfillment BC owns all carrier interactions)
+- Store credit ledger (future dedicated BC)
 
 ---
 
