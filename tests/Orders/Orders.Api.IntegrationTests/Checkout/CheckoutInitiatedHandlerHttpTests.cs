@@ -1,5 +1,3 @@
-using Alba;
-using Orders.Checkout;
 using ShoppingContracts = Messages.Contracts.Shopping;
 
 namespace Orders.Api.IntegrationTests.Checkout;
