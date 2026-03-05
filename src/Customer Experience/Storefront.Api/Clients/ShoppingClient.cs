@@ -79,12 +79,15 @@ public sealed class ShoppingClient : IShoppingClient
         var response = await _httpClient.PostAsJsonAsync($"/api/carts/{cartId}/checkout", payload, ct);
         response.EnsureSuccessStatusCode();
 
-        // Extract checkout ID from Location header (e.g., "/api/checkouts/abc-123")
-        var location = response.Headers.Location?.ToString();
-        if (location is null)
-            throw new InvalidOperationException("Location header missing from initiate checkout response");
+        // Wolverine CreationResponse<Guid> returns: {"value": "guid", "url": "/api/checkouts/guid"}
+        var content = await response.Content.ReadAsStringAsync(ct);
+        var result = JsonSerializer.Deserialize<CreationResponseDto>(content, JsonOptions);
 
-        var checkoutIdString = location.Split('/').Last();
-        return Guid.Parse(checkoutIdString);
+        if (result?.Value == null)
+            throw new InvalidOperationException("Checkout ID missing from initiate checkout response");
+
+        return result.Value.Value;
     }
+
+    private sealed record CreationResponseDto(Guid? Value, string? Url);
 }

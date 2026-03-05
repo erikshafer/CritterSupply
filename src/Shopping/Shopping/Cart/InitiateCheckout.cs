@@ -8,8 +8,7 @@ using IntegrationMessages = Messages.Contracts.Shopping;
 
 namespace Shopping.Cart;
 
-public sealed record InitiateCheckout(
-    Guid CartId)
+public sealed record InitiateCheckout(Guid CartId)
 {
     public class InitiateCheckoutValidator : AbstractValidator<InitiateCheckout>
     {
@@ -36,7 +35,7 @@ public static class InitiateCheckoutHandler
                 Status = 400
             };
 
-        if (!cart.Items.Any())
+        if (cart.Items.Count == 0)
             return new ProblemDetails
             {
                 Detail = "Cannot checkout an empty cart",
@@ -47,7 +46,7 @@ public static class InitiateCheckoutHandler
     }
 
     [WolverinePost("/api/carts/{cartId}/checkout")]
-    public static (CheckoutInitiated, OutgoingMessages, CreationResponse) Handle(
+    public static (CreationResponse<Guid>, Events, OutgoingMessages, IStartStream) Handle(
         InitiateCheckout command,
         [WriteAggregate] Cart cart,
         IDocumentSession session)
@@ -62,6 +61,9 @@ public static class InitiateCheckoutHandler
             cart.CustomerId,
             cart.Items.Values.ToList(),
             now);
+
+        var events = new Events();
+        events.Add(cartEvent);
 
         // Start Checkout stream in Shopping BC
         var checkoutLineItems = cart.Items.Values
@@ -78,7 +80,7 @@ public static class InitiateCheckoutHandler
             checkoutLineItems,
             now);
 
-        session.Events.StartStream<Checkout.Checkout>(checkoutId, checkoutStarted);
+        var checkoutStream = MartenOps.StartStream<Checkout.Checkout>(checkoutId, checkoutStarted);
 
         // Publish integration message to Orders BC
         var integrationLineItems = cart.Items.Values
@@ -98,6 +100,8 @@ public static class InitiateCheckoutHandler
         var outgoing = new OutgoingMessages();
         outgoing.Add(integrationMessage);
 
-        return (cartEvent, outgoing, new CreationResponse($"/api/checkouts/{checkoutId}"));
+        // CRITICAL: CreationResponse<T> must be FIRST in tuple to be used as HTTP response
+        var response = new CreationResponse<Guid>($"/api/checkouts/{checkoutId}", checkoutId);
+        return (response, events, outgoing, checkoutStream);
     }
 }
