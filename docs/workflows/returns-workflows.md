@@ -1,5 +1,7 @@
 # Returns BC Workflows
 
+> ⚠️ **Architectural Corrections Applied (2026-03-05):** This document has been updated based on Principal Architect review. Key changes: removed refund coordination from Returns scope (Orders BC owns this), renamed events for clarity (`InspectionPassed`/`InspectionFailed`, `ReturnLabelGenerated`), added `ReturnEligibilityEstablished` event, corrected state machine. See [`docs/returns/RETURNS-BC-SPEC.md`](../returns/RETURNS-BC-SPEC.md) for the authoritative domain specification.
+
 **Bounded Context:** Returns  
 **Implementation Status:** 🚧 Planned (Not Yet Implemented)  
 **Priority:** Medium (Cycle 21+)  
@@ -36,6 +38,8 @@ The Returns BC manages the complete return lifecycle from customer request throu
 
 ### Domain Events
 
+> ⚠️ **Naming updates applied (2026-03-05):** `ReturnShipmentCreated` → `ReturnLabelGenerated`; `ReturnApprovedAfterInspection` → `InspectionPassed`; `ReturnRejectedAfterInspection` → `InspectionFailed`. Refund and inventory events (`RefundInitiated`, `RefundCompleted`, `RefundFailed`, `InventoryRestocked`) removed — those belong to Orders BC and Inventory BC respectively. See domain spec for full rationale.
+
 **Initialization:**
 - `ReturnRequested` — Customer submits return request
   - ReturnId (Guid)
@@ -47,15 +51,25 @@ The Returns BC manages the complete return lifecycle from customer request throu
     - Quantity (int)
     - ReturnReason (enum: Defective, WrongItem, Unwanted, DamagedInTransit, Other)
     - ReturnReasonDetails (string) — Customer explanation
+  - InitiatedBy (string) — CustomerId or CS agent ID
   - RequestedAt (DateTimeOffset)
-  - ReturnWindowExpiresAt (DateTimeOffset) — Calculated from order delivery date
+
+**Eligibility Window (separate stream, keyed by OrderId):**
+- `ReturnEligibilityEstablished` — Delivery confirmed; return window opens; eligible line items snapshotted
+  - OrderId (Guid)
+  - CustomerId (Guid)
+  - EligibleItems (List<EligibleLineItem>) — Snapshotted from Orders BC at delivery time
+  - DeliveredAt (DateTimeOffset)
+  - WindowExpiresAt (DateTimeOffset) — DeliveredAt + 30 days
 
 **Authorization Phase:**
-- `ReturnApproved` — Customer service approves return
+- `ReturnApproved` — Customer service (or system) approves return
   - ReturnId
-  - ApprovedBy (string) — Customer service agent ID or "System" for auto-approval
+  - ApprovedBy (string) — CS agent ID or "System" for auto-approval
   - ApprovedAt (DateTimeOffset)
-  - ReturnShippingLabel (ReturnShippingLabel) — RMA number, tracking URL, prepaid label URL (if merchant pays)
+  - ShipByDate (DateTimeOffset) — Customer must ship by this date (Wolverine schedules expiry at this time)
+  - ReturnLabelUrl (string) — Prepaid label URL (if merchant pays)
+  - TrackingNumber (string)
   - ExpectedRefundAmount (Money) — Calculated refund (may include restocking fee deduction)
   - RestockingFeeApplied (bool)
   - RestockingFeeAmount (Money, nullable)
@@ -69,11 +83,12 @@ The Returns BC manages the complete return lifecycle from customer request throu
   - DeniedAt (DateTimeOffset)
 
 **Return Shipment Tracking:**
-- `ReturnShipmentCreated` — Customer prints label and ships item
+- `ReturnLabelGenerated` — Return shipping label created and provided to customer (previously `ReturnShipmentCreated`)
   - ReturnId
   - TrackingNumber (string)
   - Carrier (string) — USPS, UPS, FedEx
-  - ShippedAt (DateTimeOffset, nullable) — When customer drops off package
+  - LabelUrl (string)
+  - GeneratedAt (DateTimeOffset)
 
 - `ReturnShipmentInTransit` — Carrier scans package
   - ReturnId
@@ -92,7 +107,7 @@ The Returns BC manages the complete return lifecycle from customer request throu
   - InspectorId (string)
   - StartedAt (DateTimeOffset)
 
-- `ReturnInspectionCompleted` — Inspection finished, items evaluated
+- `ReturnInspectionCompleted` — Inspection process finished; per-item results recorded
   - ReturnId
   - InspectorId
   - CompletedAt (DateTimeOffset)
@@ -101,61 +116,41 @@ The Returns BC manages the complete return lifecycle from customer request throu
     - Condition (enum: AsExpected, BetterThanExpected, WorseThanExpected, NotReceived)
     - ConditionNotes (string)
     - Restockable (bool)
-    - RestockingLocation (string, nullable) — Warehouse bin location
+    - WarehouseLocation (string, nullable)
 
-- `ReturnApprovedAfterInspection` — Items in acceptable condition, refund authorized
+- `InspectionPassed` — Items in acceptable condition; disposition and refund amount recorded (previously `ReturnApprovedAfterInspection`)
   - ReturnId
+  - InspectorId
+  - PassedAt (DateTimeOffset)
   - FinalRefundAmount (Money) — May differ from initial estimate if condition worse than expected
-  - RestockingDetails (List<RestockingDetail>)
-    - Sku
-    - Quantity
-    - WarehouseLocation
+  - Items (List<InspectedItem>)
+    - Sku, Quantity, IsRestockable, WarehouseLocation, RestockCondition
 
-- `ReturnRejectedAfterInspection` — Items not in acceptable condition
+- `InspectionFailed` — Items not in acceptable condition (previously `ReturnRejectedAfterInspection`)
   - ReturnId
-  - RejectionReason (enum: DamagedByCustomer, NotAsDescribed, UsedBeyondReturn, Other)
-  - RejectionDetails (string)
-  - CustomerNotified (bool)
-  - OfferStoreCredit (bool) — Goodwill gesture
-  - StoreCreditAmount (Money, nullable)
-
-**Refund Processing:**
-- `RefundInitiated` — Refund payment triggered (integration with Payments BC)
-  - ReturnId
-  - RefundAmount (Money)
-  - RefundMethod (enum: OriginalPaymentMethod, StoreCredit, GiftCard)
-  - RefundInitiatedAt (DateTimeOffset)
-
-- `RefundCompleted` — Refund successfully processed (received from Payments BC)
-  - ReturnId
-  - RefundTransactionId (Guid) — Payments BC refund ID
-  - RefundCompletedAt (DateTimeOffset)
-
-- `RefundFailed` — Refund failed (received from Payments BC)
-  - ReturnId
+  - InspectorId
+  - FailedAt (DateTimeOffset)
   - FailureReason (string)
-  - RetryScheduled (bool)
-
-**Restocking:**
-- `InventoryRestocked` — Items returned to available inventory (integration with Inventory BC)
-  - ReturnId
-  - LineItems (List<RestockedLineItem>)
-    - Sku
-    - Quantity
-    - WarehouseLocation
-  - RestockedAt (DateTimeOffset)
+  - FailedItems (List<FailedItem>)
+  - Disposition (enum: ReturnToCustomer, Dispose, Quarantine)
 
 **Terminal States:**
-- `ReturnCompleted` — Full return lifecycle finished
+- `ReturnCompleted` — Full return lifecycle finished; downstream BCs (Orders, Inventory) react to this event
+  - ReturnId
+  - OrderId
+  - CustomerId
+  - FinalRefundAmount (Money) — Used by Orders BC to initiate the correct refund amount
+  - Items (List<ReturnedItem>) — Used by Inventory BC to restock eligible items
+    - Sku, Quantity, IsRestockable, WarehouseId, RestockCondition
+  - CompletedAt (DateTimeOffset)
+
+- `ReturnRejected` — Items failed inspection; no refund
   - ReturnId
   - CompletedAt (DateTimeOffset)
-  - FinalRefundAmount (Money)
-  - ItemsRestocked (bool)
 
-- `ReturnExpired` — Customer never shipped return within window (7 days typical)
+- `ReturnExpired` — Customer never shipped return within 30-day approval window
   - ReturnId
   - ExpiredAt (DateTimeOffset)
-  - Reason (string)
 
 ---
 
@@ -184,11 +179,11 @@ The Returns BC manages the complete return lifecycle from customer request throu
    Event: ReturnApproved
    Integration: Generate prepaid return label via Fulfillment BC carrier integration
 
-4. Customer: Ship Return Package
-   Command: RecordReturnShipment
+4. Customer: Prepare Return Package
+   Command: RecordReturnLabel (label generated by Fulfillment BC carrier integration)
      - ReturnId
      - TrackingNumber: "1Z999AA10123456784"
-   Event: ReturnShipmentCreated
+   Event: ReturnLabelGenerated
 
 5. Carrier: Package Scanned
    Integration: Carrier webhook → Fulfillment BC → Returns BC
@@ -208,31 +203,26 @@ The Returns BC manages the complete return lifecycle from customer request throu
      - ReturnId
      - LineItemInspectionResults: [{ Condition: AsExpected, Restockable: true }]
    Event: ReturnInspectionCompleted
-   Event: ReturnApprovedAfterInspection
+   Event: InspectionPassed
 
-8. System: Initiate Refund
-   Command: InitiateRefund (to Payments BC)
-     - ReturnId
-     - RefundAmount: $19.99
-     - OriginalPaymentTransactionId
-   Event: RefundInitiated
-   Integration: Payments.RefundRequested → Payments BC
+8. System: Publish ReturnCompleted (Orders BC orchestrates refund; Inventory BC restocks)
+   Event: ReturnCompleted
+     - FinalRefundAmount: $19.99
+     - Items: [{ Sku: "DOG-BOWL-01", Qty: 1, IsRestockable: false }]
+   Integration: Returns.ReturnCompleted → Orders BC (triggers RefundRequested to Payments)
+   Integration: Returns.ReturnCompleted → Inventory BC (triggers dispose of defective item)
 
-9. Payments BC: Process Refund
-   Event: Payments.RefundCompleted (integration message)
-   Handler: Handle RefundCompleted
-   Event: RefundCompleted
+9. Orders BC: Orchestrate Refund (separate BC; Returns has no visibility into this)
+   Orders holds PaymentId from original order placement
+   Orders publishes RefundRequested → Payments BC
+   Payments processes refund → publishes RefundCompleted → Orders saga
 
-10. System: Restock Inventory
-    Command: RestockInventory (to Inventory BC)
-      - Sku: "DOG-BOWL-01"
-      - Quantity: 1
-      - WarehouseLocation: "A-12-3"
-    Event: InventoryRestocked
-    Integration: Inventory.InventoryRestocked → Inventory BC
+10. Inventory BC: React to ReturnCompleted (separate BC; Returns has no visibility into this)
+    Inventory reads IsRestockable flag from ReturnCompleted
+    Defective item: dispose (not restocked)
 
-11. System: Complete Return
-    Event: ReturnCompleted
+11. System: Return Lifecycle Complete
+    Return stream is in terminal "Completed" state
 
 TOTAL DURATION: 7-10 days (3 days shipping + 1-2 days inspection + 5-7 days refund processing)
 ```
@@ -260,21 +250,18 @@ TOTAL DURATION: 7-10 days (3 days shipping + 1-2 days inspection + 5-7 days refu
 
 3-7. [Same as Happy Path: Customer ships, warehouse receives/inspects]
 
-8. System: Issue Partial Refund
-   Command: InitiateRefund
-     - RefundAmount: $25.49 (restocking fee deducted)
-   Event: RefundInitiated
-   Integration: Payments.RefundRequested
+8. System: Publish ReturnCompleted with Restocking Fee Applied
+   Event: ReturnCompleted
+     - FinalRefundAmount: $25.49 (restocking fee already deducted)
+     - Items: [{ Sku: "CAT-TOY-05", Qty: 1, IsRestockable: true }]
+   Integration: Returns.ReturnCompleted → Orders BC (issues partial refund via Payments)
+   Integration: Returns.ReturnCompleted → Inventory BC (restocks the item)
 
-9. Payments BC: Process Partial Refund
-   Event: Payments.RefundCompleted
-   Event: RefundCompleted
+9. Orders BC: Orchestrate Partial Refund (separate BC)
 
-10. System: Restock Inventory
-    Event: InventoryRestocked
+10. Inventory BC: Restock Item (separate BC)
 
-11. System: Complete Return
-    Event: ReturnCompleted
+11. System: Return Lifecycle Complete
 
 CUSTOMER IMPACT: Pays $4.50 restocking fee + return shipping cost (~$7-$10)
 ```
@@ -324,10 +311,9 @@ CUSTOMER IMPACT: No refund, but may contact customer service for exception (stor
    Command: CompleteReturnInspection
      - LineItemInspectionResults: [{ Condition: WorseThanExpected, ConditionNotes: "Screen cracked, water damage visible", Restockable: false }]
    Event: ReturnInspectionCompleted
-   Event: ReturnRejectedAfterInspection
-     - RejectionReason: DamagedByCustomer
-     - OfferStoreCredit: true (goodwill gesture)
-     - StoreCreditAmount: $15.00 (50% of product value)
+   Event: InspectionFailed
+     - Disposition: Dispose
+     - FailureReason: "DamagedByCustomer"
 
 9. System: Notify Customer
    Integration: Email with photos of damage
@@ -433,12 +419,8 @@ CUSTOMER IMPACT: Must submit new return request if still within 30-day window
 
 | Integration Message | Published By | Handler | Outcome |
 |---|---|---|---|
-| `Orders.OrderPlaced` | Orders BC | Update order reference (for future return eligibility validation) | Store order metadata for return window calculation |
-| `Fulfillment.ShipmentDelivered` | Fulfillment BC | Start return window clock (30 days from delivery) | Enable return requests for this order |
-| `Payments.RefundCompleted` | Payments BC | Handle refund success | Transition return to "Completed" state |
-| `Payments.RefundFailed` | Payments BC | Handle refund failure | Retry refund or escalate to manual review |
-| `Inventory.InventoryRestocked` | Inventory BC | Confirm inventory returned to available stock | Update return status, log restocking confirmation |
-| `Fulfillment.ReturnShipmentInTransit` | Fulfillment BC | Track return package in transit | Update return with tracking milestones |
+| `Fulfillment.ShipmentDelivered` | Fulfillment BC | Establish return eligibility window; one-time HTTP query to Orders BC for line item snapshot; schedule 30-day expiry | Project `ReturnEligibilityWindow` read model |
+| `Fulfillment.ReturnShipmentInTransit` | Fulfillment BC | Track return package in transit | Append `ReturnShipmentInTransit` event to return stream |
 
 ---
 
@@ -449,9 +431,9 @@ CUSTOMER IMPACT: Must submit new return request if still within 30-day window
 | `Returns.ReturnRequested` | Customer Experience BC | Real-time UI update: "Return request submitted" |
 | `Returns.ReturnApproved` | Customer Experience BC, Notifications BC | UI update + email customer with return label |
 | `Returns.ReturnDenied` | Customer Experience BC, Notifications BC | UI update + email customer with denial reason |
-| `Returns.RefundInitiated` | Payments BC | Trigger refund processing |
-| `Returns.InventoryRestocked` | Inventory BC | Update available stock after return inspection |
-| `Returns.ReturnCompleted` | Orders BC, Customer Experience BC | Update order history with return details, UI refresh |
+| `Returns.ReturnExpired` | Notifications BC | Email customer: return approval expired |
+| `Returns.ReturnCompleted` | **Orders BC** (orchestrates refund via Payments), **Inventory BC** (restocks eligible items), Customer Experience BC | Terminal success event; carries full item disposition |
+| `Returns.ReturnRejected` | Customer Experience BC, Notifications BC | UI update + email customer with rejection reason |
 
 ---
 
@@ -460,34 +442,28 @@ CUSTOMER IMPACT: Must submit new return request if still within 30-day window
 ```mermaid
 stateDiagram-v2
     [*] --> Requested: ReturnRequested
-    
+
     Requested --> Approved: ReturnApproved
     Requested --> Denied: ReturnDenied
-    
+
     Denied --> [*]
-    
-    Approved --> Expired: ReturnExpired (7 days, no shipment)
-    Approved --> InTransit: ReturnShipmentCreated
-    
+
+    Approved --> Expired: ReturnExpired (30-day Wolverine scheduled command)
+    Approved --> LabelGenerated: ReturnLabelGenerated
+
     Expired --> [*]
-    
+
+    LabelGenerated --> InTransit: ReturnShipmentInTransit
+
     InTransit --> Received: ReturnShipmentReceived
-    
+
     Received --> Inspecting: ReturnInspectionStarted
-    
-    Inspecting --> RefundPending: ReturnApprovedAfterInspection
-    Inspecting --> Rejected: ReturnRejectedAfterInspection
-    
-    Rejected --> [*]
-    
-    RefundPending --> Restocking: RefundCompleted
-    RefundPending --> RefundFailed: RefundFailed (retry)
-    
-    RefundFailed --> RefundPending: Retry
-    
-    Restocking --> Completed: InventoryRestocked
-    
+
+    Inspecting --> Completed: InspectionPassed
+    Inspecting --> Rejected: InspectionFailed
+
     Completed --> [*]
+    Rejected --> [*]
 ```
 
 ---
@@ -498,20 +474,21 @@ stateDiagram-v2
 
 1. `ReturnRequested` — Customer submits return
 2. `ReturnApproved` — Authorization granted
-3. `ReturnDenied` — Authorization denied
-4. `ReturnShipmentCreated` — Customer ships package
+3. `ReturnDenied` — Authorization denied (terminal)
+4. `ReturnLabelGenerated` — Label created and provided to customer
 5. `ReturnShipmentInTransit` — Carrier scans package
 6. `ReturnShipmentReceived` — Warehouse receives package
 7. `ReturnInspectionStarted` — Inspection begins
-8. `ReturnInspectionCompleted` — Inspection finished
-9. `ReturnApprovedAfterInspection` — Items acceptable
-10. `ReturnRejectedAfterInspection` — Items not acceptable
-11. `RefundInitiated` — Refund payment triggered
-12. `RefundCompleted` — Refund processed successfully
-13. `RefundFailed` — Refund failed (retry scheduled)
-14. `InventoryRestocked` — Items returned to inventory
-15. `ReturnCompleted` — Terminal state (success)
-16. `ReturnExpired` — Terminal state (customer never shipped)
+8. `ReturnInspectionCompleted` — Inspection process finished
+9. `InspectionPassed` — Items acceptable; disposition recorded
+10. `InspectionFailed` — Items not acceptable; disposition recorded
+11. `ReturnCompleted` — Terminal state (success; triggers Orders refund + Inventory restock)
+12. `ReturnRejected` — Terminal state (inspection failed; no refund)
+13. `ReturnExpired` — Terminal state (customer never shipped)
+
+### Eligibility Window Events (Separate Stream, keyed by OrderId)
+
+14. `ReturnEligibilityEstablished` — Delivery confirmed; 30-day window opens
 
 ---
 
@@ -522,18 +499,16 @@ stateDiagram-v2
 - `Returns.ReturnRequested`
 - `Returns.ReturnApproved`
 - `Returns.ReturnDenied`
-- `Returns.RefundInitiated`
-- `Returns.InventoryRestocked`
-- `Returns.ReturnCompleted`
+- `Returns.ReturnExpired`
+- `Returns.ReturnCompleted` ← primary integration event; carries full item disposition for Orders (refund) and Inventory (restock)
+- `Returns.ReturnRejected`
 
 ### Consumed by Returns BC
 
-- `Orders.OrderPlaced`
-- `Fulfillment.ShipmentDelivered`
-- `Payments.RefundCompleted`
-- `Payments.RefundFailed`
-- `Inventory.InventoryRestocked`
-- `Fulfillment.ReturnShipmentInTransit`
+- `Fulfillment.ShipmentDelivered` ← establishes return eligibility window; triggers one-time Orders HTTP query to snapshot line items
+- `Fulfillment.ReturnShipmentInTransit` ← carrier tracking updates for inbound return shipments
+
+> **Note:** Returns BC does NOT consume `Orders.OrderPlaced`, `Payments.RefundCompleted`, `Payments.RefundFailed`, or `Inventory.InventoryRestocked`. Refund coordination is owned by Orders BC (it holds the PaymentId). Inventory restocking is owned by Inventory BC (it reacts to `ReturnCompleted`).
 
 ---
 
@@ -632,11 +607,10 @@ public enum ReturnStatus
     Requested,
     Approved,
     Denied,
+    LabelGenerated,
     InTransit,
     Received,
     Inspecting,
-    RefundPending,
-    Restocking,
     Completed,
     Rejected,
     Expired
@@ -655,35 +629,43 @@ public sealed record ApproveReturn(
 
 public static class ApproveReturnHandler
 {
-    public static (IStartStream, OutgoingMessages) Handle(
+    public static (Events, OutgoingMessages) Handle(
         ApproveReturn command,
-        IOrdersClient ordersClient) // Query Orders BC for return eligibility
+        Return returnAggregate)
     {
-        // Validate return eligibility
-        var order = await ordersClient.GetOrderAsync(command.ReturnId);
-        if (!order.IsEligibleForReturn())
-            throw new InvalidOperationException("Order not eligible for return");
-        
+        // Guard: only Requested returns can be approved
+        if (returnAggregate.Status != ReturnStatus.Requested)
+            throw new InvalidOperationException($"Cannot approve return in {returnAggregate.Status} state");
+
         // Calculate refund amount
-        var refundAmount = CalculateRefundAmount(order, command.RestockingFeeApplied, command.RestockingFeeAmount);
-        
-        // Generate return shipping label
-        var shippingLabel = GenerateReturnLabel(command.MerchantPaysShipping);
-        
+        var refundAmount = CalculateRefundAmount(returnAggregate, command.RestockingFeeApplied, command.RestockingFeeAmount);
+
+        var shipByDate = DateTimeOffset.UtcNow.AddDays(30);
+
         var @event = new ReturnApproved(
             command.ReturnId,
             "System",
             DateTimeOffset.UtcNow,
-            shippingLabel,
+            shipByDate,
+            labelUrl: "https://carrier.example/label/xyz",
+            trackingNumber: "1Z999AA10123456784",
             refundAmount,
             command.RestockingFeeApplied,
             command.RestockingFeeAmount,
             command.MerchantPaysShipping
         );
-        
+
+        var integrationEvent = new Messages.Contracts.Returns.ReturnApproved(
+            command.ReturnId, returnAggregate.OrderId, returnAggregate.CustomerId,
+            @event.ReturnLabelUrl, @event.TrackingNumber, @event.ApprovedAt, shipByDate);
+
+        // Schedule expiry using Wolverine's durable scheduling
+        var expiry = new ScheduledMessage<ExpireReturn>(
+            new ExpireReturn(command.ReturnId), shipByDate);
+
         return (
-            StreamAction.Start(command.ReturnId, @event),
-            [new Returns.ReturnApproved(...)] // Integration message
+            Events.Append(@event),
+            new OutgoingMessages(integrationEvent, expiry)
         );
     }
 }
@@ -708,19 +690,18 @@ public static class ApproveReturnHandler
    - Return expired (customer never shipped)
 
 3. **Integration Message Tests:**
-   - Returns.ReturnApproved triggers email via Notifications BC
-   - Returns.RefundInitiated triggers Payments BC refund
-   - Returns.InventoryRestocked updates Inventory BC available stock
+   - Returns.ReturnCompleted triggers Orders BC refund flow
+   - Returns.ReturnCompleted triggers Inventory BC restock flow
 
 ### BDD Feature Files
 
 Location: `docs/features/returns/`
 
 Recommended feature files:
-- `return-request.feature` — Happy path + denial scenarios
-- `return-inspection.feature` — Inspection approval/rejection
-- `return-refund.feature` — Refund processing + failures
-- `return-restocking.feature` — Inventory restocking flows
+- `return-request.feature` — ✅ Exists: Happy path + denial scenarios
+- `return-inspection.feature` — ✅ Exists: Inspection approval/rejection, disposition decisions
+- `return-eligibility.feature` — ✅ Exists: Window boundaries, non-returnable items
+- `return-expiration.feature` — ✅ Exists: Approval timeout, expiry notification
 
 ---
 
@@ -753,11 +734,11 @@ Recommended feature files:
 - Integration with Fulfillment BC for carrier updates
 - Integration tests for inspection approval/rejection
 
-**Session 4:** Refund & Restocking Integration
-- Integration with Payments BC (RefundInitiated → RefundCompleted)
-- Integration with Inventory BC (InventoryRestocked)
-- Integration tests for cross-BC flows
-- RabbitMQ integration message handlers
+**Session 4:** Cross-BC Integration
+- `Returns.ReturnCompleted` verifies Orders BC receives it and triggers refund
+- `Returns.ReturnCompleted` verifies Inventory BC receives it and restocks
+- Integration tests for cross-BC flows via RabbitMQ
+- Return expiry (Wolverine-scheduled `ExpireReturn` command)
 
 **Session 5:** Edge Cases & Polish
 - Return expiration (background job)
@@ -772,15 +753,17 @@ Recommended feature files:
 
 ## Success Criteria
 
-- [ ] All 16 aggregate events implemented with Apply methods
-- [ ] 6+ integration messages published (ReturnRequested, ReturnApproved, etc.)
-- [ ] 6+ integration messages consumed (Orders.OrderPlaced, Payments.RefundCompleted, etc.)
-- [ ] 15+ integration tests passing (happy path + 5 edge cases)
+- [ ] All 13 aggregate events implemented with Apply methods (+ 1 eligibility window event)
+- [ ] `ReturnEligibilityWindow` read model projected from `Fulfillment.ShipmentDelivered`
+- [ ] 6 integration messages published (ReturnRequested, ReturnApproved, ReturnDenied, ReturnExpired, ReturnCompleted, ReturnRejected)
+- [ ] 2 integration messages consumed (Fulfillment.ShipmentDelivered, Fulfillment.ReturnShipmentInTransit)
+- [ ] 15+ integration tests passing (happy path + edge cases)
 - [ ] State transition diagram validated with tests
-- [ ] Cross-BC integration verified with TestContainers (RabbitMQ + Postgres)
-- [ ] BDD feature files written for key workflows
-- [ ] ADR created for orchestration vs choreography decision
-- [ ] CONTEXTS.md updated with Returns BC integration contracts
+- [ ] Cross-BC integration verified: `ReturnCompleted` → Orders and Inventory BCs
+- [ ] Wolverine-scheduled `ExpireReturn` command works correctly
+- [ ] BDD feature files written and linked to integration tests
+- [ ] ADR created: carrier integration ownership (Fulfillment vs Returns)
+- [ ] CONTEXTS.md updated with finalized Returns BC integration contracts
 
 ---
 
