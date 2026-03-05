@@ -1,7 +1,6 @@
 using Marten;
 using Shopping.Cart;
 using System.Net;
-using System.Net.Http.Json;
 using Shopping.Api.Cart;
 
 namespace Shopping.Api.IntegrationTests.Cart;
