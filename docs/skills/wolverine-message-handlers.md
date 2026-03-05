@@ -144,10 +144,56 @@ public static class InitializeCartHandler
 
 **⚠️ CRITICAL: Tuple Order Matters!**
 
-In Wolverine, **the first item in a return tuple is ALWAYS treated as the HTTP response**.
+**🚨 THIS IS ONE OF THE MOST COMMON WOLVERINE MISTAKES 🚨**
 
-- ✅ **Correct:** `(CreationResponse<Guid>, IStartStream)` → Returns 201 Created with JSON body
-- ❌ **Wrong:** `(IStartStream, CreationResponse)` → Returns 204 No Content (no body!)
+In Wolverine HTTP handlers, **the FIRST item in a return tuple is ALWAYS treated as the HTTP response**.
+
+All other items in the tuple (events, messages, streams, etc.) are processed by Wolverine but NOT serialized as the HTTP response body.
+
+**Correct Order:**
+- ✅ `(CreationResponse<Guid>, IStartStream)` → Returns 201 Created with JSON body
+- ✅ `(CreationResponse<Guid>, Events, OutgoingMessages)` → Returns 201 Created with JSON body + applies events + publishes messages
+- ✅ `(UpdatedAggregate, Events)` → Returns 200 OK with aggregate state + applies events
+
+**Wrong Order (Common Mistakes):**
+- ❌ `(IStartStream, CreationResponse)` → Returns 204 No Content (no body!)
+- ❌ `(Events, OutgoingMessages, CreationResponse)` → Returns 200 OK with the EVENT serialized as JSON (not the CreationResponse!)
+- ❌ `(CheckoutInitiated, OutgoingMessages, IResult)` → Returns 200 OK with CheckoutInitiated event as JSON (IResult ignored!)
+
+**Real-World Example from CritterSupply:**
+
+```csharp
+// ❌ WRONG - This will serialize the CheckoutInitiated event as the response body
+public static (CheckoutInitiated, OutgoingMessages, IResult) Handle(
+    InitiateCheckout command,
+    [WriteAggregate] Cart cart,
+    IDocumentSession session)
+{
+    var checkoutId = Guid.CreateVersion7();
+    var cartEvent = new CheckoutInitiated(...);
+    var outgoing = new OutgoingMessages();
+    outgoing.Add(new IntegrationMessages.CheckoutInitiated(...));
+
+    // IResult is ignored because it's not first!
+    return (cartEvent, outgoing, Results.Ok(new { url = $"/api/checkouts/{checkoutId}" }));
+}
+
+// ✅ CORRECT - Response comes first, then events, then outgoing messages
+public static (CreationResponse<Guid>, CheckoutInitiated, OutgoingMessages) Handle(
+    InitiateCheckout command,
+    [WriteAggregate] Cart cart,
+    IDocumentSession session)
+{
+    var checkoutId = Guid.CreateVersion7();
+    var cartEvent = new CheckoutInitiated(...);
+    var outgoing = new OutgoingMessages();
+    outgoing.Add(new IntegrationMessages.CheckoutInitiated(...));
+
+    // CRITICAL: Response MUST be first!
+    var response = new CreationResponse<Guid>($"/api/checkouts/{checkoutId}", checkoutId);
+    return (response, cartEvent, outgoing);
+}
+```
 
 **Using `CreationResponse<T>`:**
 
@@ -158,14 +204,24 @@ In Wolverine, **the first item in a return tuple is ALWAYS treated as the HTTP r
 **Example response:**
 ```http
 HTTP/1.1 201 Created
-Location: /api/carts/019c49bf-9852-73c1-bb67-da545727eca4
+Location: /api/checkouts/019c49bf-9852-73c1-bb67-da545727eca4
 Content-Type: application/json
 
 {
   "value": "019c49bf-9852-73c1-bb67-da545727eca4",
-  "url": "/api/carts/019c49bf-9852-73c1-bb67-da545727eca4"
+  "url": "/api/checkouts/019c49bf-9852-73c1-bb67-da545727eca4"
 }
 ```
+
+**Why This Matters:**
+
+When tuple order is wrong, you'll see symptoms like:
+- HTTP clients receiving unexpected JSON (domain events instead of DTOs)
+- "Property 'xyz' missing from response" errors
+- 204 No Content when you expected 201 Created with a body
+- Integration tests failing with "Cannot deserialize JSON" errors
+
+**Rule of Thumb:** If your handler returns an HTTP response type (`CreationResponse`, `IResult`, `UpdatedAggregate`, etc.), it MUST be the FIRST item in the tuple.
 
 > **References:**
 > - [Wolverine HTTP + Marten](https://wolverinefx.net/guide/http/marten.html)
