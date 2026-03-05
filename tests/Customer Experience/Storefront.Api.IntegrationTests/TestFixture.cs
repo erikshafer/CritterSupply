@@ -2,12 +2,12 @@ using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
 using Storefront.Clients;
-using Storefront.IntegrationTests.Stubs;
+using Storefront.Api.IntegrationTests.Stubs;
 using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.Tracking;
 
-namespace Storefront.IntegrationTests;
+namespace Storefront.Api.IntegrationTests;
 
 /// <summary>
 /// Test fixture for BFF integration tests

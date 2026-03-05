@@ -1,10 +1,8 @@
-using Alba;
-using Shouldly;
 using Storefront.Clients;
 using Storefront.RealTime;
 using Wolverine.Tracking;
 
-namespace Storefront.IntegrationTests;
+namespace Storefront.Api.IntegrationTests;
 
 /// <summary>
 /// Tests for SignalR real-time notifications.

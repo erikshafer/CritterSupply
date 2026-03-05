@@ -1,10 +1,7 @@
-using Alba;
-using Shouldly;
 using Storefront.Composition;
 using System.Net;
-using System.Net.Http.Json;
 
-namespace Storefront.IntegrationTests;
+namespace Storefront.Api.IntegrationTests;
 
 /// <summary>
 /// Tests realistic multi-step cart workflows (integration scenarios)

@@ -1,9 +1,6 @@
-using Alba;
-using Shouldly;
 using System.Net;
-using System.Net.Http.Json;
 
-namespace Storefront.IntegrationTests;
+namespace Storefront.Api.IntegrationTests;
 
 /// <summary>
 /// Tests for cart mutation commands via BFF → Shopping BC delegation

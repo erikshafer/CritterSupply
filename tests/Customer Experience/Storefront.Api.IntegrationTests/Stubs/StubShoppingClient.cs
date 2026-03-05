@@ -1,6 +1,6 @@
 using Storefront.Clients;
 
-namespace Storefront.IntegrationTests.Stubs;
+namespace Storefront.Api.IntegrationTests.Stubs;
 
 /// <summary>
 /// Stub implementation of IShoppingClient for testing
