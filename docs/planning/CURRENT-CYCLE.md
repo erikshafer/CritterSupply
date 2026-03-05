@@ -13,21 +13,26 @@
 
 ---
 
-**Cycle:** TBD — (No active cycle)
-**Status:** 🎯 **PLANNING**
-**GitHub Milestone:** TBD
+**Cycle:** 19.5 — Complete Checkout Workflow
+**Status:** 🚀 **IN PROGRESS**
+**GitHub Milestone:** [Cycle 19.5](https://github.com/erikshafer/CritterSupply/milestone/13)
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
+**Epic Issue:** [#166](https://github.com/erikshafer/CritterSupply/issues/166)
 
 ---
 
 ## Current Status
 
-**Cycle 19 completed!** All authentication features implemented and merged (PR #148).
+**Cycle 19.5 started (2026-03-04)!** Wiring up the checkout stepper to call backend APIs for a complete, interactive checkout flow.
 
-**Next cycle candidates:**
-- **Cycle 20:** Automated Browser Testing (Playwright vs bUnit)
-- **Cycle 21:** Vendor Portal Phase 1
-- **Other:** Returns BC, Payment Gateway Integration, Multi-tenant support
+**Active Tasks:**
+- [#162](https://github.com/erikshafer/CritterSupply/issues/162): Wire up checkout stepper to call backend APIs
+- [#163](https://github.com/erikshafer/CritterSupply/issues/163): Handle checkout initialization and CheckoutId persistence
+- [#164](https://github.com/erikshafer/CritterSupply/issues/164): Add error handling and validation toasts
+- [#165](https://github.com/erikshafer/CritterSupply/issues/165): Manual end-to-end testing and documentation
+
+**Next cycle:**
+- **Cycle 20:** Automated Browser Testing (depends on Cycle 19.5 completion — [Issue #58](https://github.com/erikshafer/CritterSupply/issues/58) updated)
 
 ---
 
@@ -77,5 +82,5 @@
 
 ---
 
-*Last Updated: 2026-02-26 (Cycle 19 completed, milestone closed)*
+*Last Updated: 2026-03-04 (Cycle 19.5 started, GitHub issues created)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*

@@ -46,6 +46,13 @@ builder.Services.AddHttpClient("CustomerIdentityApi", client =>
     client.BaseAddress = new Uri(url);
 });
 
+// Add HttpClient for Orders API (for checkout steps)
+builder.Services.AddHttpClient("OrdersClient", client =>
+{
+    var url = builder.Configuration["ApiClients:OrdersApiUrl"] ?? "http://localhost:5231";
+    client.BaseAddress = new Uri(url);
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

@@ -101,6 +101,10 @@ builder.Host.UseWolverine(opts =>
     })
     .AutoProvision();
 
+    // Listen for CheckoutInitiated from Shopping BC
+    opts.ListenToRabbitQueue("orders-checkout-initiated")
+        .ProcessInline();
+
     // Publish OrderPlaced to storefront-notifications queue
     opts.PublishMessage<Messages.Contracts.Orders.OrderPlaced>()
         .ToRabbitQueue("storefront-notifications");

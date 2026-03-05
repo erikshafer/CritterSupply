@@ -115,7 +115,7 @@ InitiateCheckout (command)
 
 ## Orders (Folder: Order Management)
 
-The Orders context owns the commercial commitment and **orchestrates** the order lifecycle across Payments, Inventory, and Fulfillment using a stateful saga. It coordinates multi-step workflows from checkout through delivery or cancellation, ensuring eventual consistency across bounded contexts. This BC contains two key aggregates: **Checkout** (order finalization) and **Order** (order lifecycle saga). Checkout was migrated from Shopping BC in Cycle 8 to establish clearer bounded context boundaries—Shopping focuses on exploration, Orders focuses on transaction commitment.
+The Orders context owns the commercial commitment and **orchestrates** the order lifecycle across Payments, Inventory, and Fulfillment using a stateful saga. It coordinates multi-step workflows from checkout through delivery or cancellation, ensuring eventual consistency across bounded contexts. This BC contains two key aggregates: **Checkout** (order finalization) and **Order** (order lifecycle saga). Checkout was migrated from Shopping BC in Cycle 8 to establish clearer bounded context boundaries—Shopping focuses on exploration, Orders focuses on transaction commitment. **Cycle 19.5 completed this migration** by implementing the integration handler (`CheckoutInitiatedHandler`) and RabbitMQ routing, and removing the now-obsolete `Shopping.Checkout` aggregate.
 
 **Naming Note:** The folder is currently `Order Management/` but the BC is conceptually "Orders" (simpler, industry standard). See `docs/BC-NAMING-ANALYSIS.md` for naming rationale.
 

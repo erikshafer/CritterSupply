@@ -1,9 +1,6 @@
-using Alba;
-using Shouldly;
 using System.Net;
-using System.Net.Http.Json;
 
-namespace Storefront.IntegrationTests;
+namespace Storefront.Api.IntegrationTests;
 
 /// <summary>
 /// Tests for cart mutation commands via BFF → Shopping BC delegation
@@ -182,4 +179,56 @@ public class CartCommandTests(TestFixture fixture) : IClassFixture<TestFixture>,
         cart.ShouldNotBeNull();
         cart.Items.Single().Quantity.ShouldBe(2); // Original quantity
     }
+
+    [Fact]
+    public async Task InitiateCheckout_ReturnsCheckoutId()
+    {
+        // GIVEN: A cart with items
+        var customerId = Guid.NewGuid();
+        var cartId = await fixture.CreateCartWithItemsAsync(customerId, ("DOG-BOWL-001", 2, 19.99m));
+
+        // WHEN: The BFF initiates checkout
+        var result = await fixture.Host.Scenario(scenario =>
+        {
+            scenario.Post.Url($"/api/storefront/carts/{cartId}/checkout");
+            scenario.StatusCodeShouldBe(HttpStatusCode.OK);
+        });
+
+        // THEN: A checkout ID should be returned
+        var response = await result.ReadAsJsonAsync<InitiateCheckoutResponse>();
+        response.ShouldNotBeNull();
+        response.CheckoutId.ShouldNotBeNull();
+        response.CheckoutId.Value.ShouldNotBe(Guid.Empty);
+    }
+
+    [Fact]
+    public async Task InitiateCheckout_WhenCartNotFound_Returns404()
+    {
+        // GIVEN: A cart ID that does not exist
+        var nonExistentCartId = Guid.NewGuid();
+
+        // WHEN: The BFF attempts to initiate checkout
+        await fixture.Host.Scenario(scenario =>
+        {
+            scenario.Post.Url($"/api/storefront/carts/{nonExistentCartId}/checkout");
+            scenario.StatusCodeShouldBe(HttpStatusCode.NotFound); // 404
+        });
+    }
+
+    [Fact]
+    public async Task InitiateCheckout_WhenCartEmpty_Returns400()
+    {
+        // GIVEN: An empty cart
+        var customerId = Guid.NewGuid();
+        var cartId = await fixture.StubShoppingClient.InitializeCartAsync(customerId);
+
+        // WHEN: The BFF attempts to initiate checkout
+        await fixture.Host.Scenario(scenario =>
+        {
+            scenario.Post.Url($"/api/storefront/carts/{cartId}/checkout");
+            scenario.StatusCodeShouldBe(HttpStatusCode.BadRequest); // 400 - Cannot checkout empty cart
+        });
+    }
+
+    private sealed record InitiateCheckoutResponse(Guid? CheckoutId);
 }

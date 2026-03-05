@@ -15,7 +15,6 @@ using OpenTelemetry.Trace;
 using Shopping;
 using Shopping.Cart;
 using Weasel.Core;
-using CheckoutAggregate = Shopping.Checkout.Checkout;
 using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.FluentValidation;
@@ -44,7 +43,6 @@ builder.Services.AddMarten(opts =>
 
         // Register aggregates for event sourcing
         opts.Projections.Snapshot<Cart>(SnapshotLifecycle.Inline);
-        opts.Projections.Snapshot<CheckoutAggregate>(SnapshotLifecycle.Inline);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()
@@ -96,6 +94,10 @@ builder.Host.UseWolverine(opts =>
         .ToRabbitQueue("storefront-notifications");
     opts.PublishMessage<Messages.Contracts.Shopping.ItemQuantityChanged>()
         .ToRabbitQueue("storefront-notifications");
+
+    // Publish CheckoutInitiated to Orders BC
+    opts.PublishMessage<Messages.Contracts.Shopping.CheckoutInitiated>()
+        .ToRabbitQueue("orders-checkout-initiated");
 });
 
 builder.Services.AddEndpointsApiExplorer();

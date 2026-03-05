@@ -74,5 +74,27 @@ window.authHelper = {
      */
     clearCartId: function() {
         localStorage.removeItem('cartId');
+    },
+
+    /**
+     * Store checkout ID in localStorage
+     */
+    setCheckoutId: function(checkoutId) {
+        localStorage.setItem('checkoutId', checkoutId);
+    },
+
+    /**
+     * Get checkout ID from localStorage
+     * Returns checkoutId string or null
+     */
+    getCheckoutId: function() {
+        return localStorage.getItem('checkoutId');
+    },
+
+    /**
+     * Clear checkout ID from localStorage
+     */
+    clearCheckoutId: function() {
+        localStorage.removeItem('checkoutId');
     }
 };

@@ -9,7 +9,7 @@ namespace Orders.Api.IntegrationTests;
 
 /// <summary>
 /// Test fixture providing PostgreSQL via TestContainers and Alba host for integration tests.
-/// Uses collection fixture pattern to ensure sequential test execution and proper resource sharing.
+/// Uses the collection fixture pattern to ensure sequential test execution and proper resource sharing.
 /// </summary>
 public class TestFixture : IAsyncLifetime
 {
@@ -76,7 +76,7 @@ public class TestFixture : IAsyncLifetime
 
     /// <summary>
     /// Gets a Marten document session for direct database operations.
-    /// Caller is responsible for disposing the session.
+    /// Caller is responsible for disposing of the session.
     /// </summary>
     public IDocumentSession GetDocumentSession()
     {
