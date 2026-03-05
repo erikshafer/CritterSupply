@@ -46,10 +46,9 @@ public static class InitiateCheckoutHandler
     }
 
     [WolverinePost("/api/carts/{cartId}/checkout")]
-    public static (CreationResponse<Guid>, Events, OutgoingMessages, IStartStream) Handle(
+    public static (CreationResponse<Guid>, Events, OutgoingMessages) Handle(
         InitiateCheckout command,
-        [WriteAggregate] Cart cart,
-        IDocumentSession session)
+        [WriteAggregate] Cart cart)
     {
         var checkoutId = Guid.CreateVersion7();
         var now = DateTimeOffset.UtcNow;
@@ -65,24 +64,8 @@ public static class InitiateCheckoutHandler
         var events = new Events();
         events.Add(cartEvent);
 
-        // Start Checkout stream in Shopping BC
-        var checkoutLineItems = cart.Items.Values
-            .Select(item => new Checkout.CheckoutLineItem(
-                item.Sku,
-                item.Quantity,
-                item.UnitPrice))
-            .ToList();
-
-        var checkoutStarted = new Checkout.CheckoutStarted(
-            checkoutId,
-            cart.Id,
-            cart.CustomerId,
-            checkoutLineItems,
-            now);
-
-        var checkoutStream = MartenOps.StartStream<Checkout.Checkout>(checkoutId, checkoutStarted);
-
         // Publish integration message to Orders BC
+        // Orders BC will create the Checkout aggregate via CheckoutInitiatedHandler
         var integrationLineItems = cart.Items.Values
             .Select(item => new IntegrationMessages.CheckoutLineItem(
                 item.Sku,
@@ -102,6 +85,6 @@ public static class InitiateCheckoutHandler
 
         // CRITICAL: CreationResponse<T> must be FIRST in tuple to be used as HTTP response
         var response = new CreationResponse<Guid>($"/api/checkouts/{checkoutId}", checkoutId);
-        return (response, events, outgoing, checkoutStream);
+        return (response, events, outgoing);
     }
 }
