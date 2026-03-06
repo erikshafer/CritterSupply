@@ -13,7 +13,7 @@ public class StubOrdersClient : IOrdersClient
 
     public void AddCheckout(Guid checkoutId, Guid customerId, params CheckoutItemDto[] items)
     {
-        _checkouts[checkoutId] = new CheckoutDto(checkoutId, customerId, items.ToList(), "Active");
+        _checkouts[checkoutId] = new CheckoutDto(checkoutId, customerId, items.ToList(), IsCompleted: false);
     }
 
     public void AddOrder(OrderDto order)
