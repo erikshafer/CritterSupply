@@ -309,8 +309,9 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 | Product Catalog               | 5133     | ✅ Assigned  | Product Catalog/               |
 | **Customer Experience (BFF)** | **5237** | ✅ Assigned  | Customer Experience/Storefront.Api/ |
 | **Customer Experience (Web)** | **5238** | ✅ Assigned  | Customer Experience/Storefront.Web/ |
-| Vendor Portal                 | 5239     | 📋 Reserved | (future)                       |
-| Vendor Identity               | 5240     | 📋 Reserved | (future)                       |
+| Vendor Portal                 | 5239     | 📋 Reserved | Vendor Portal API (future)     |
+| Vendor Identity               | 5240     | 📋 Reserved | Vendor Identity API (future)   |
+| **Vendor Portal (Web/Blazor)**| **5241** | 📋 Reserved | Vendor Blazor frontend (future)|
 
 **Why this matters:**
 - Allows running multiple APIs simultaneously during development
