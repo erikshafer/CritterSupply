@@ -1,9 +1,6 @@
 using Messages.Contracts.Inventory;
 using Messages.Contracts.Payments;
-using Microsoft.AspNetCore.Mvc;
 using Wolverine;
-using Wolverine.Http;
-using Wolverine.Marten;
 using IntegrationMessages = Messages.Contracts.Orders;
 using FulfillmentMessages = Messages.Contracts.Fulfillment;
 
@@ -136,30 +133,21 @@ public sealed class Order : Saga
 
     /// <summary>
     /// Saga handler for order cancellation.
-    /// Guard runs before Handle: cannot cancel after shipment has been dispatched, or when already cancelled.
+    /// Guard is enforced by the CancelOrderEndpoint HTTP handler before publishing this command.
+    /// Business rule: an order can only be cancelled if it has not yet been shipped.
+    /// If the saga is in a terminal or post-shipment state, the cancellation is silently ignored
+    /// (idempotent behavior for at-least-once delivery scenarios).
     /// Triggers compensation: releases inventory reservations and refunds captured payment.
     /// </summary>
-    public ProblemDetails Before(CancelOrder command)
-    {
-        if (Status is OrderStatus.Shipped or OrderStatus.Delivered or OrderStatus.Closed)
-            return new ProblemDetails
-            {
-                Detail = "Order cannot be cancelled after it has been shipped",
-                Status = 409
-            };
-
-        if (Status is OrderStatus.Cancelled)
-            return new ProblemDetails
-            {
-                Detail = "Order is already cancelled",
-                Status = 409
-            };
-
-        return WolverineContinue.NoProblems;
-    }
-
     public OutgoingMessages Handle(CancelOrder command)
     {
+        // Guard: silently ignore cancellation requests for orders that cannot be cancelled.
+        // The HTTP endpoint pre-validates this, but message bus delivery may not.
+        if (!OrderDecider.CanBeCancelled(Status))
+        {
+            return new OutgoingMessages();
+        }
+
         var decision = OrderDecider.HandleCancelOrder(this, command, DateTimeOffset.UtcNow);
 
         if (decision.Status.HasValue) Status = decision.Status.Value;

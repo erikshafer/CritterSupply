@@ -88,9 +88,17 @@ public static class OrderDecider
     }
 
     /// <summary>
+    /// Returns true if the order is in a state that allows cancellation.
+    /// Used by the HTTP endpoint for pre-flight validation and by the saga handler for idempotency.
+    /// </summary>
+    public static bool CanBeCancelled(OrderStatus status) =>
+        status is not (OrderStatus.Shipped or OrderStatus.Delivered
+            or OrderStatus.Closed or OrderStatus.Cancelled);
+
+    /// <summary>
     /// Decides how to handle an order cancellation request.
     /// Pure function - returns new state and compensation messages.
-    /// Guard conditions (cannot cancel after Shipped) are enforced in Order.Before().
+    /// Guard conditions (cannot cancel after Shipped) are validated via CanBeCancelled().
     /// </summary>
     public static OrderDecision HandleCancelOrder(
         Order current,

@@ -165,9 +165,9 @@ public class CancellationIntegrationTests : IAsyncLifetime
         var shippedOrder = await shippedSession.LoadAsync<Order>(order.Id);
         shippedOrder!.Status.ShouldBe(OrderStatus.Shipped);
 
-        // Act: Attempt to cancel (should be rejected by the Before guard)
-        // The saga handler's Before() guard will return ProblemDetails with status 409.
-        // ExecuteAndWaitAsync will still execute without exception (DoNotAssertOnExceptionsDetected).
+        // Act: Attempt to cancel — saga handler silently ignores invalid state transitions.
+        // The HTTP endpoint would return 409, but here we test saga-level idempotency by
+        // publishing the command directly (bypassing the HTTP layer).
         await _fixture.ExecuteAndWaitAsync(new CancelOrder(order.Id, "Too late to cancel"));
 
         // Assert: Order status is still Shipped (cancellation was rejected)
