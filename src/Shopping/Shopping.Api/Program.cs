@@ -29,12 +29,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 builder.Host.ApplyJasperFxExtensions();
-var martenConnectionString = builder.Configuration.GetConnectionString("marten")
-                             ?? throw new Exception("The connection string for Marten was not found");
+var connectionString = builder.Configuration.GetConnectionString("postgres")
+                             ?? throw new Exception("The connection string 'postgres' was not found");
 
 builder.Services.AddMarten(opts =>
     {
-        opts.Connection(martenConnectionString);
+        opts.Connection(connectionString);
         opts.AutoCreateSchemaObjects = AutoCreate.All;
         opts.UseSystemTextJsonForSerialization(EnumStorage.AsString);
 
