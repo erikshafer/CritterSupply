@@ -1,5 +1,7 @@
 /* CritterSupply - Customer Experience Web UI */
-/* MudBlazor provides all component styling */
+/* Design inspired by the Critter Stack presentation:                          */
+/*   Dark warm-brown backgrounds · Amber/gold primary · Orange section accents */
+/* MudBlazor provides all component styling                                    */
 
 html, body {
     font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -25,22 +27,26 @@ html, body {
 }
 
 /* ============================================================
-   Card Hover Lift Effect
+   Card Hover Lift + Amber Glow
    ============================================================ */
 .mud-card {
-    transition: box-shadow 0.25s ease, transform 0.25s ease;
+    border: 1px solid rgba(232, 160, 32, 0.10);
+    transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
 }
 
 .mud-card:hover {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.13) !important;
+    border-color: rgba(232, 160, 32, 0.42);
+    box-shadow: 0 8px 28px rgba(232, 160, 32, 0.14) !important;
     transform: translateY(-3px);
 }
 
 /* ============================================================
-   Hero Section
+   Hero Section — dark amber, Critter Stack palette
    ============================================================ */
 .cs-hero {
-    background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 55%, #388E3C 100%);
+    background: linear-gradient(135deg, #0F0900 0%, #1E1400 50%, #2D2000 100%);
+    border: 1px solid rgba(232, 160, 32, 0.28);
+    box-shadow: 0 0 48px rgba(232, 160, 32, 0.07);
     padding: 3.5rem 2rem;
     border-radius: 16px;
     text-align: center;
@@ -55,7 +61,7 @@ html, body {
     right: -40px;
     width: 260px;
     height: 260px;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(232, 160, 32, 0.05);
     border-radius: 50%;
     pointer-events: none;
 }
@@ -67,13 +73,13 @@ html, body {
     left: -40px;
     width: 200px;
     height: 200px;
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(232, 160, 32, 0.04);
     border-radius: 50%;
     pointer-events: none;
 }
 
 .cs-hero-icon {
-    color: rgba(255, 255, 255, 0.92) !important;
+    color: #E8A020 !important;
     display: block;
     font-size: 3.5rem !important;
     width: 3.5rem !important;
@@ -82,9 +88,9 @@ html, body {
 }
 
 .cs-hero-title {
-    color: #ffffff !important;
+    color: #E8A020 !important;
     font-weight: 700 !important;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    text-shadow: 0 2px 12px rgba(232, 160, 32, 0.25);
 }
 
 .cs-hero-subtitle {
@@ -104,6 +110,22 @@ html, body {
 }
 
 /* ============================================================
+   Section Badge — orange pill, inspired by slide section labels
+   ============================================================ */
+.cs-section-badge {
+    display: inline-block;
+    background-color: #E07820;
+    color: #ffffff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+
+/* ============================================================
    App Bar Brand
    ============================================================ */
 .cs-brand {
@@ -119,33 +141,34 @@ html, body {
 }
 
 /* ============================================================
-   Drawer Header
+   Drawer Header — amber bottom border
    ============================================================ */
 .cs-drawer-header {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 1rem 1.25rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    border-bottom: 1px solid rgba(232, 160, 32, 0.22);
 }
 
 /* ============================================================
-   Footer
+   Footer — near-black warm brown with amber top accent
    ============================================================ */
 .cs-footer {
-    background-color: #1B5E20;
-    color: rgba(255, 255, 255, 0.82);
+    background-color: #0F0900;
+    border-top: 1px solid rgba(232, 160, 32, 0.25);
+    color: rgba(255, 255, 255, 0.65);
     padding: 1.25rem 2rem;
     text-align: center;
     margin-top: 3rem;
 }
 
 .cs-footer .mud-typography {
-    color: rgba(255, 255, 255, 0.82);
+    color: rgba(255, 255, 255, 0.65);
 }
 
 /* ============================================================
-   Scrollbar (Webkit)
+   Scrollbar (Webkit) — amber themed
    ============================================================ */
 ::-webkit-scrollbar {
     width: 7px;
@@ -153,16 +176,16 @@ html, body {
 }
 
 ::-webkit-scrollbar-track {
-    background: #f1f1ee;
+    background: #1A1400;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #81C784;
+    background: #C4820A;
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #2E7D32;
+    background: #E8A020;
 }
 
 /* ============================================================
