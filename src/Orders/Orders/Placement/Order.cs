@@ -81,6 +81,13 @@ public sealed class Order : Saga
     public int CommittedReservationCount { get; set; }
 
     /// <summary>
+    /// Tracks which reservation IDs have already been committed (hard-allocated).
+    /// Used as an idempotency guard to prevent double-counting duplicate ReservationCommitted messages
+    /// under at-least-once delivery.
+    /// </summary>
+    public HashSet<Guid> CommittedReservationIds { get; set; } = [];
+
+    /// <summary>
     /// True when all expected SKU reservations have been confirmed by Inventory BC.
     /// Derived from reservation counts; not stored separately.
     /// </summary>
@@ -269,6 +276,7 @@ public sealed class Order : Saga
         if (decision.Status.HasValue) Status = decision.Status.Value;
         if (decision.CommittedReservationCount.HasValue)
             CommittedReservationCount = decision.CommittedReservationCount.Value;
+        if (decision.CommittedReservationIds != null) CommittedReservationIds = decision.CommittedReservationIds;
 
         // Return outgoing messages
         var outgoing = new OutgoingMessages();
@@ -312,6 +320,12 @@ public sealed class Order : Saga
     /// <returns>Scheduled ReturnWindowExpired message to close the saga after the return window.</returns>
     public OutgoingMessages Handle(FulfillmentMessages.ShipmentDelivered message)
     {
+        // Idempotency guard: if the saga is already Delivered or Closed, a duplicate delivery
+        // message must not schedule an additional ReturnWindowExpired, which would re-open
+        // the return window and/or call MarkCompleted() a second time.
+        if (Status is OrderStatus.Delivered or OrderStatus.Closed)
+            return new OutgoingMessages();
+
         var decision = OrderDecider.HandleShipmentDelivered(this, message);
 
         if (decision.Status.HasValue) Status = decision.Status.Value;

@@ -253,18 +253,28 @@ public static class OrderDecider
     /// <summary>
     /// Decides how to handle inventory reservation confirmation (per SKU).
     /// Tracks per-SKU confirmations; only signals InventoryReserved when ALL SKUs are confirmed.
-    /// Triggers ReservationCommitRequested for the confirmed SKU only if payment is already captured.
+    /// Idempotent: duplicate confirmations for the same ReservationId are ignored.
+    /// When payment is already captured, issues commit requests for ALL confirmed reservations to
+    /// handle the race where payment arrived between individual reservation confirmations.
     /// </summary>
     public static OrderDecision HandleReservationConfirmed(
         Order current,
         ReservationConfirmed message,
         DateTimeOffset timestamp)
     {
+        // Idempotency guard: if this reservation was already confirmed, return a no-op.
+        // Without this, a redelivered ReservationConfirmed would increment ConfirmedReservationCount
+        // beyond the expected count, causing IsInventoryReserved to trigger prematurely.
+        if (current.ReservationIds.ContainsKey(message.ReservationId))
+            return new OrderDecision();
+
         var newReservations = new Dictionary<Guid, string>(current.ReservationIds)
         {
             [message.ReservationId] = message.Sku
         };
 
+        // Defensive fallback: if ExpectedReservationCount was not set at saga start (e.g., legacy
+        // in-flight documents), derive from line item count so orchestration gates still work.
         var effectiveExpectedReservationCount =
             current.ExpectedReservationCount == 0
                 ? current.LineItems.Count
@@ -275,15 +285,22 @@ public static class OrderDecider
 
         var messages = new List<object>();
 
-        // Orchestration: If payment is already captured, commit this specific reservation immediately.
-        // When allReserved is also true, HandlePaymentCaptured would have already issued commit
-        // requests for the other reservations — so only commit the newly confirmed one here.
+        // Orchestration: If payment is already captured, commit ALL confirmed reservations.
+        // This covers the race where payment arrived between individual reservation confirmations:
+        // e.g., R1 confirmed (no payment) → payment captured (IsInventoryReserved=false, no commits issued yet)
+        //        → R2 confirmed (payment already captured, only R2 committed) → R1 stuck uncommitted.
+        // By committing all entries in newReservations.Keys here, we ensure every prior reservation
+        // also gets a commit request. The Inventory BC must handle duplicate commit requests idempotently,
+        // and HandleReservationCommitted guards against double-counting via CommittedReservationIds.
         if (current.IsPaymentCaptured)
         {
-            messages.Add(new IntegrationMessages.ReservationCommitRequested(
-                current.Id,
-                message.ReservationId,
-                timestamp));
+            foreach (var reservationId in newReservations.Keys)
+            {
+                messages.Add(new IntegrationMessages.ReservationCommitRequested(
+                    current.Id,
+                    reservationId,
+                    timestamp));
+            }
         }
 
         return new OrderDecision
@@ -336,23 +353,32 @@ public static class OrderDecider
 
     /// <summary>
     /// Decides how to handle inventory commitment (hard allocation, per SKU).
-    /// Tracks per-SKU commits; only dispatches FulfillmentRequested when ALL SKUs are committed
-    /// and payment has been captured. Idempotency guard prevents duplicate dispatch.
+    /// Tracks per-SKU commits via CommittedReservationIds; only dispatches FulfillmentRequested
+    /// when ALL SKUs are committed and payment has been captured.
+    /// Idempotent: duplicate ReservationCommitted messages for the same ReservationId are ignored,
+    /// preventing premature fulfillment dispatch or over-incrementing of the committed count.
     /// </summary>
     public static OrderDecision HandleReservationCommitted(
         Order current,
         ReservationCommitted message,
         DateTimeOffset timestamp)
     {
-        var newCommittedCount = current.CommittedReservationCount + 1;
+        // Idempotency guard: ignore duplicate ReservationCommitted for a reservation we already processed.
+        // This can happen naturally under at-least-once delivery, and also because HandleReservationConfirmed
+        // (with IsPaymentCaptured=true) re-issues commit requests for ALL confirmed reservations to
+        // handle the payment-between-reservations race condition.
+        if (current.CommittedReservationIds.Contains(message.ReservationId))
+            return new OrderDecision();
+
+        var newCommittedIds = new HashSet<Guid>(current.CommittedReservationIds) { message.ReservationId };
+        var newCommittedCount = newCommittedIds.Count;
         var allCommitted = newCommittedCount >= current.ExpectedReservationCount;
 
         var messages = new List<object>();
 
         // Dispatch fulfillment only when ALL reservations are committed and payment is captured.
-        // Idempotency guard: only allow dispatch from pre-fulfillment states and explicitly
-        // exclude Fulfilling, Shipped, Delivered, Closed, Cancelled, and OutOfStock to
-        // prevent duplicate FulfillmentRequested messages from late/duplicate events.
+        // Idempotency guards: exclude all terminal and post-fulfillment states to prevent
+        // duplicate FulfillmentRequested messages from late or duplicate events.
         if (allCommitted
             && current.IsPaymentCaptured
             && current.Status != OrderStatus.Fulfilling
@@ -393,6 +419,7 @@ public static class OrderDecider
         {
             Status = newStatus,
             CommittedReservationCount = newCommittedCount,
+            CommittedReservationIds = newCommittedIds,
             Messages = messages
         };
     }
@@ -464,6 +491,7 @@ public sealed record OrderDecision
     public int? ConfirmedReservationCount { get; init; }
     public int? CommittedReservationCount { get; init; }
     public Dictionary<Guid, string>? ReservationIds { get; init; }
+    public HashSet<Guid>? CommittedReservationIds { get; init; }
     public bool ShouldComplete { get; init; }
     public IReadOnlyList<object> Messages { get; init; } = [];
 }
