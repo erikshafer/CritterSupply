@@ -6,9 +6,12 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
 
-<MudAppBar Elevation="1">
+<MudAppBar Elevation="2">
     <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
-    <MudText Typo="Typo.h6">CritterSupply</MudText>
+    <span class="cs-brand">
+        <MudIcon Icon="@Icons.Material.Filled.Pets" Size="Size.Small" Class="cs-brand-icon" />
+        <MudText Typo="Typo.h6" Style="font-weight: 700; letter-spacing: -0.01em;">CritterSupply</MudText>
+    </span>
     <MudSpacer />
     <MudBadge Content="@_cartItemCount" Color="Color.Secondary" Overlap="true" Visible="@(_cartItemCount > 0)">
         <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" />
@@ -33,15 +36,16 @@
     </AuthorizeView>
 </MudAppBar>
 
-<MudDrawer @bind-Open="@DrawerOpen" Elevation="2">
-    <MudDrawerHeader>
-        <MudText Typo="Typo.h6">Navigation</MudText>
-    </MudDrawerHeader>
-    <MudNavMenu>
-        <MudNavLink Href="/" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+<MudDrawer @bind-Open="@DrawerOpen" Elevation="1" Breakpoint="Breakpoint.Md" ClipMode="DrawerClipMode.Always">
+    <div class="cs-drawer-header">
+        <MudIcon Icon="@Icons.Material.Filled.Pets" Color="Color.Primary" />
+        <MudText Typo="Typo.h6" Style="font-weight: 700;">CritterSupply</MudText>
+    </div>
+    <MudNavMenu Class="mt-2">
+        <MudNavLink Href="/" Icon="@Icons.Material.Filled.Home" Match="NavLinkMatch.All">Home</MudNavLink>
         <MudNavLink Href="/products" Icon="@Icons.Material.Filled.Storefront">Browse Products</MudNavLink>
         <MudNavLink Href="/cart" Icon="@Icons.Material.Filled.ShoppingCart">Cart</MudNavLink>
-        <MudNavLink Href="/checkout" Icon="@Icons.Material.Filled.Payment">Checkout</MudNavLink>
+        <MudNavLink Href="/checkout" Icon="@Icons.Material.Filled.CreditCard">Checkout</MudNavLink>
         <MudNavLink Href="/orders" Icon="@Icons.Material.Filled.Receipt">Order History</MudNavLink>
     </MudNavMenu>
 </MudDrawer>

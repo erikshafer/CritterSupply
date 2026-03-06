@@ -4,9 +4,14 @@
     <InteractiveAppBar @bind-DrawerOpen="@_drawerOpen" />
 
     <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+        <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4 mb-6">
             @Body
         </MudContainer>
+        <footer class="cs-footer">
+            <MudText Typo="Typo.body2" Align="Align.Center">
+                &copy; @DateTime.Now.Year CritterSupply &mdash; Stocked for every season 🐾
+            </MudText>
+        </footer>
     </MudMainContent>
 </MudLayout>
 

@@ -2,13 +2,12 @@
 
 <PageTitle>Order History - CritterSupply</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Order History</MudText>
+<MudText Typo="Typo.h4" Class="mb-1">Order History</MudText>
+<MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+    Track your past orders and shipment status
+</MudText>
 
-<MudAlert Severity="Severity.Info">
-    Order History page - placeholder for Phase 3. Will display customer's past orders with real-time shipment updates.
-</MudAlert>
-
-<MudTable Items="@_orders" Hover="true" Striped="true" Class="mt-4">
+<MudTable Items="@_orders" Hover="true" Striped="true" Class="mt-2">
     <HeaderContent>
         <MudTh>Order ID</MudTh>
         <MudTh>Date</MudTh>
