@@ -98,9 +98,9 @@ public sealed class Order : Saga
     /// </summary>
     public bool IsPaymentCaptured { get; set; }
 
-    // NOTE: Saga initialization moved to PlaceOrderHandler.cs (uses IStartStream pattern)
-    // This keeps the saga class focused on state transitions, not initialization logic
-
+    // NOTE: Saga initialization is performed in PlaceOrderHandler.cs, which constructs the initial
+    // Order state and corresponding OrderPlaced event and returns them as a tuple (Order, OrderPlaced)
+    // to start the saga. This keeps the saga class focused on state transitions, not initialization logic.
     /// <summary>
     /// Saga handler for order cancellation.
     /// Guard is enforced by the CancelOrderEndpoint HTTP handler before publishing this command.
