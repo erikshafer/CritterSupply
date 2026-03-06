@@ -1,6 +1,5 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
-using Wolverine;
 using Wolverine.Http;
 using Wolverine.Marten;
 using Messages.Contracts.CustomerIdentity;
@@ -61,7 +60,7 @@ public static class CompleteCheckoutHandler
     }
 
     [WolverinePost("/api/checkouts/{checkoutId}/complete")]
-    public static (CheckoutCompleted, OutgoingMessages) Handle(
+    public static (CheckoutCompleted, ShoppingContracts.CheckoutCompleted) Handle(
         CompleteCheckout command,
         [WriteAggregate] Checkout checkout)
     {
@@ -71,9 +70,9 @@ public static class CompleteCheckoutHandler
         // Terminal event for Checkout stream
         var checkoutEvent = new CheckoutCompleted(orderId, now);
 
-        // Prepare integration message to Orders
-        var messages = new OutgoingMessages();
-        messages.Add(new ShoppingContracts.CheckoutCompleted(
+        // Prepare integration message to start Order saga
+        // Wolverine will automatically cascade this message (no OutgoingMessages wrapper needed)
+        var integrationMessage = new ShoppingContracts.CheckoutCompleted(
             orderId,
             checkout.Id,
             checkout.CustomerId,
@@ -91,8 +90,9 @@ public static class CompleteCheckoutHandler
             checkout.ShippingMethod!,
             checkout.ShippingCost!.Value,
             checkout.PaymentMethodToken!,
-            now));
+            now);
 
-        return (checkoutEvent, messages);
+        // Wolverine cascades both the domain event and integration message
+        return (checkoutEvent, integrationMessage);
     }
 }

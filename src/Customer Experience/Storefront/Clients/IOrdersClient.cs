@@ -44,10 +44,10 @@ public interface IOrdersClient
 /// Checkout DTO from Orders BC
 /// </summary>
 public sealed record CheckoutDto(
-    Guid Id,
+    Guid CheckoutId,
     Guid CustomerId,
     IReadOnlyList<CheckoutItemDto> Items,
-    string Status);
+    bool IsCompleted);
 
 /// <summary>
 /// Checkout item DTO from Orders BC

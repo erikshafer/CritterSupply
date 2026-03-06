@@ -85,9 +85,10 @@ builder.Host.UseWolverine(opts =>
 
     opts.UseFluentValidation();
 
-    // Explicitly include the Order saga and Checkout namespace for handler discovery
-    opts.Discovery.IncludeType<Order>();
-    opts.Discovery.IncludeType<Checkout>();
+    // Discover all handlers in the Orders domain assembly (Order saga, Checkout, PlaceOrderHandler, etc.)
+    // The assembly is decorated with [assembly: WolverineModule] in AssemblyAttributes.cs,
+    // consistent with all other bounded context assemblies in CritterSupply.
+    opts.Discovery.IncludeAssembly(typeof(Order).Assembly);
 
     // Configure RabbitMQ for publishing integration messages
     var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");
@@ -104,6 +105,12 @@ builder.Host.UseWolverine(opts =>
     // Listen for CheckoutInitiated from Shopping BC
     opts.ListenToRabbitQueue("orders-checkout-initiated")
         .ProcessInline();
+
+    // Route CheckoutCompleted internally to start Order saga
+    // (CompleteCheckout handler publishes this after checkout finalization)
+    opts.PublishMessage<Messages.Contracts.Shopping.CheckoutCompleted>()
+        .ToLocalQueue("order-placement")
+        .UseDurableInbox();
 
     // Publish OrderPlaced to storefront-notifications queue
     opts.PublishMessage<Messages.Contracts.Orders.OrderPlaced>()

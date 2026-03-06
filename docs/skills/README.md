@@ -11,6 +11,7 @@ This directory contains implementation patterns and best practices for building 
 
 **Creating Commands & Handlers:**
 - 🎯 [Wolverine Message Handlers](./wolverine-message-handlers.md) - Command/query handlers, HTTP endpoints, compound handlers, return patterns
+- 🔄 [Wolverine Sagas](./wolverine-sagas.md) - Stateful orchestration sagas, multi-BC coordination, compensation chains, idempotency
 
 **Working with Aggregates:**
 - 📝 [Marten Event Sourcing](./marten-event-sourcing.md) - Event-sourced aggregates, decider pattern, factory methods
@@ -42,7 +43,8 @@ This directory contains implementation patterns and best practices for building 
 ## 🛠️ By Technology
 
 ### Wolverine
-- [Wolverine Message Handlers](./wolverine-message-handlers.md) - Command/query handling, HTTP endpoints, sagas
+- [Wolverine Message Handlers](./wolverine-message-handlers.md) - Command/query handling, HTTP endpoints
+- [Wolverine Sagas](./wolverine-sagas.md) - Stateful orchestration, multi-BC coordination, compensation chains
 
 ### Marten
 - [Marten Event Sourcing](./marten-event-sourcing.md) - Event-sourced aggregates, projections
@@ -71,6 +73,7 @@ This directory contains implementation patterns and best practices for building 
    - Event sourcing? → [Marten Event Sourcing](./marten-event-sourcing.md)
    - Document store? → [Marten Document Store](./marten-document-store.md)
    - Traditional relational? → [EF Core + Wolverine Integration](./efcore-wolverine-integration.md)
+   - Multi-BC orchestration over time? → [Wolverine Sagas](./wolverine-sagas.md)
 
 ### Implementation Phase
 1. Write handlers → [Wolverine Message Handlers](./wolverine-message-handlers.md)
@@ -121,10 +124,11 @@ Each skill document follows this structure:
 - *"How do I create a new command handler?"* → [Wolverine Message Handlers](./wolverine-message-handlers.md)
 - *"How do I test my handler?"* → [CritterStack Testing Patterns](./critterstack-testing-patterns.md)
 - *"Should I use event sourcing or document store?"* → Compare [Marten Event Sourcing](./marten-event-sourcing.md) vs [Marten Document Store](./marten-document-store.md)
+- *"How do I build a saga that coordinates multiple BCs?"* → [Wolverine Sagas](./wolverine-sagas.md)
 - *"How do I organize my code?"* → [Vertical Slice Organization](./vertical-slice-organization.md)
 - *"When should I use EF Core?"* → [EF Core + Wolverine Integration](./efcore-wolverine-integration.md)
 - *"How do I add a new bounded context?"* → [Adding a New Bounded Context](./adding-new-bounded-context.md)
 
 ---
 
-**Last Updated:** 2026-02-14
+**Last Updated:** 2026-03-06

@@ -1,6 +1,6 @@
 ﻿@rendermode InteractiveServer
 
-<MudThemeProvider />
+<MudThemeProvider Theme="_theme" IsDarkMode="true" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
@@ -11,3 +11,45 @@
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>
+
+@code {
+    // Color palette inspired by the Critter Stack presentation:
+    // Dark warm-brown backgrounds, amber/gold primary, orange secondary.
+    private readonly MudTheme _theme = new()
+    {
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#E8A020",
+            PrimaryContrastText = "#0F0900",
+            PrimaryDarken = "#C4820A",
+            PrimaryLighten = "#F0B84A",
+            Secondary = "#E07820",
+            SecondaryContrastText = "#FFFFFF",
+            SecondaryDarken = "#B85A00",
+            SecondaryLighten = "#F09040",
+            AppbarBackground = "#0F0900",
+            AppbarText = "#FFFFFF",
+            Background = "#1A1400",
+            Surface = "#231900",
+            DrawerBackground = "#141000",
+            DrawerText = "#E8D8A0",
+            DrawerIcon = "#E8A020",
+            TextPrimary = "#FFFFFF",
+            TextSecondary = "#C8A050",
+            Success = "#4CAF50",
+            SuccessContrastText = "#FFFFFF",
+            Error = "#EF5350",
+            ErrorContrastText = "#FFFFFF",
+            Warning = "#E8A020",
+            WarningContrastText = "#0F0900",
+            Info = "#7CB6CC",
+            InfoContrastText = "#0F0900",
+            Divider = "rgba(232,160,32,0.15)",
+        },
+        LayoutProperties = new LayoutProperties()
+        {
+            DefaultBorderRadius = "8px",
+            DrawerWidthLeft = "240px",
+        },
+    };
+}

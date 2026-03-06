@@ -2,24 +2,73 @@
 
 <PageTitle>Home - CritterSupply</PageTitle>
 
-<MudText Typo="Typo.h3" Align="Align.Center" Class="my-8">Welcome to CritterSupply</MudText>
-<MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Secondary" Class="mb-8">
-    Stocked for every season
-</MudText>
+<!-- Hero Banner -->
+<div class="cs-hero mb-6">
+    <MudIcon Icon="@Icons.Material.Filled.Pets" Class="cs-hero-icon" />
+    <MudText Typo="Typo.h3" Class="cs-hero-title mb-2">
+        Everything Your Pet Needs
+    </MudText>
+    <MudText Typo="Typo.h6" Class="cs-hero-subtitle mb-5">
+        Stocked for every season &mdash; quality supplies for dogs, cats, fish, birds, and beyond
+    </MudText>
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Secondary"
+               Size="Size.Large"
+               Href="/products"
+               StartIcon="@Icons.Material.Filled.Storefront">
+        Shop Now
+    </MudButton>
+</div>
 
-<MudGrid Justify="Justify.Center">
-    <MudItem xs="12" sm="6" md="4">
-        <MudCard>
-            <MudCardContent>
-                <div class="d-flex justify-center mb-4">
-                    <MudIcon Icon="@Icons.Material.Filled.Pets" Size="Size.Large" Color="Color.Primary" />
-                </div>
+<!-- Trust Strip -->
+<MudPaper Elevation="0" Class="pa-3 mb-6" Style="border-radius: 12px; border: 1px solid rgba(232,160,32,0.18);">
+    <MudGrid Justify="Justify.Center">
+        <MudItem xs="6" sm="3">
+            <div class="cs-trust-item">
+                <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Color="Color.Primary" />
+                <MudText Typo="Typo.body2"><strong>Free Shipping</strong></MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">On orders over $49</MudText>
+            </div>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <div class="cs-trust-item">
+                <MudIcon Icon="@Icons.Material.Filled.Replay" Color="Color.Primary" />
+                <MudText Typo="Typo.body2"><strong>Easy Returns</strong></MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">30-day guarantee</MudText>
+            </div>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <div class="cs-trust-item">
+                <MudIcon Icon="@Icons.Material.Filled.Lock" Color="Color.Primary" />
+                <MudText Typo="Typo.body2"><strong>Secure Checkout</strong></MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">SSL encrypted</MudText>
+            </div>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <div class="cs-trust-item">
+                <MudIcon Icon="@Icons.Material.Filled.Headset" Color="Color.Primary" />
+                <MudText Typo="Typo.body2"><strong>Expert Support</strong></MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Pet care advice</MudText>
+            </div>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<!-- Quick Links -->
+<span class="cs-section-badge">Shop</span>
+<MudText Typo="Typo.h5" Class="mb-4">Get Started</MudText>
+
+<MudGrid>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Style="height: 100%;">
+            <MudCardContent Class="d-flex flex-column align-center py-6">
+                <MudIcon Icon="@Icons.Material.Filled.Storefront" Size="Size.Large" Color="Color.Primary" Class="mb-3" />
                 <MudText Typo="Typo.h6" Align="Align.Center">Browse Products</MudText>
-                <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-2">
-                    Shop our full catalog of pet supplies
+                <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary" Class="mt-2">
+                    Explore our full catalog of premium pet supplies
                 </MudText>
             </MudCardContent>
-            <MudCardActions Class="justify-center">
+            <MudCardActions Class="justify-center pb-4">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/products">
                     Browse Products
                 </MudButton>
@@ -27,37 +76,33 @@
         </MudCard>
     </MudItem>
 
-    <MudItem xs="12" sm="6" md="4">
-        <MudCard>
-            <MudCardContent>
-                <div class="d-flex justify-center mb-4">
-                    <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Size="Size.Large" Color="Color.Primary" />
-                </div>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Style="height: 100%;">
+            <MudCardContent Class="d-flex flex-column align-center py-6">
+                <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Size="Size.Large" Color="Color.Primary" Class="mb-3" />
                 <MudText Typo="Typo.h6" Align="Align.Center">Shopping Cart</MudText>
-                <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-2">
-                    View your cart with real-time updates
+                <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary" Class="mt-2">
+                    Review your items and proceed to checkout
                 </MudText>
             </MudCardContent>
-            <MudCardActions Class="justify-center">
+            <MudCardActions Class="justify-center pb-4">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/cart">
-                    Go to Cart
+                    View Cart
                 </MudButton>
             </MudCardActions>
         </MudCard>
     </MudItem>
 
-    <MudItem xs="12" sm="6" md="4">
-        <MudCard>
-            <MudCardContent>
-                <div class="d-flex justify-center mb-4">
-                    <MudIcon Icon="@Icons.Material.Filled.Payment" Size="Size.Large" Color="Color.Primary" />
-                </div>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Style="height: 100%;">
+            <MudCardContent Class="d-flex flex-column align-center py-6">
+                <MudIcon Icon="@Icons.Material.Filled.CreditCard" Size="Size.Large" Color="Color.Primary" Class="mb-3" />
                 <MudText Typo="Typo.h6" Align="Align.Center">Checkout</MudText>
-                <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-2">
-                    Complete your order in 4 easy steps
+                <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary" Class="mt-2">
+                    Complete your order in a few simple steps
                 </MudText>
             </MudCardContent>
-            <MudCardActions Class="justify-center">
+            <MudCardActions Class="justify-center pb-4">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/checkout">
                     Go to Checkout
                 </MudButton>
@@ -65,18 +110,16 @@
         </MudCard>
     </MudItem>
 
-    <MudItem xs="12" sm="6" md="4">
-        <MudCard>
-            <MudCardContent>
-                <div class="d-flex justify-center mb-4">
-                    <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Large" Color="Color.Primary" />
-                </div>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Style="height: 100%;">
+            <MudCardContent Class="d-flex flex-column align-center py-6">
+                <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Large" Color="Color.Primary" Class="mb-3" />
                 <MudText Typo="Typo.h6" Align="Align.Center">Order History</MudText>
-                <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-2">
-                    Track your past orders
+                <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary" Class="mt-2">
+                    Track your past orders and deliveries
                 </MudText>
             </MudCardContent>
-            <MudCardActions Class="justify-center">
+            <MudCardActions Class="justify-center pb-4">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/orders">
                     View Orders
                 </MudButton>
@@ -85,6 +128,6 @@
     </MudItem>
 </MudGrid>
 
-<MudAlert Severity="Severity.Info" Class="mt-8">
+<MudAlert Severity="Severity.Info" Class="mt-8" Dense="true">
     <strong>Demo Mode:</strong> This is a reference architecture demonstrating Backend-for-Frontend (BFF) patterns with Server-Sent Events (SSE) real-time updates.
 </MudAlert>
