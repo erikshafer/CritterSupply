@@ -1784,39 +1784,59 @@ public static class ProductSeeder
 
 ## Vendor Identity
 
-The Vendor Identity context manages authentication, authorization, and user lifecycle for vendor personnel accessing CritterSupply systems. Structurally similar to Customer Identity, but serving a distinct user population with potentially different authentication requirements (SSO with vendor's corporate IdP, different MFA policies, etc.).
+The Vendor Identity context manages authentication, authorization, and user lifecycle for vendor personnel accessing CritterSupply systems. Structurally similar to Customer Identity, but serving a distinct user population with **JWT Bearer authentication** (diverges from Customer Identity's session cookies — required for SignalR hub security and cross-service tenant claim propagation).
 
-**Status**: 🔜 Planned (Future Cycles)
+**Status**: 🔜 Planned (Phase 1 of Vendor implementation)
 
 **Persistence Strategy**: Entity Framework Core (following Customer Identity pattern)
 
+**Authentication**: JWT Bearer tokens — see [ADR 0015: JWT for Vendor Identity](docs/decisions/0015-jwt-for-vendor-identity.md)
+
+**Event Modeling Session**: See [docs/planning/vendor-portal-event-modeling.md](docs/planning/vendor-portal-event-modeling.md) for full planning output.
+
 ### Purpose
 
-Authenticate vendor users, manage their lifecycle, and provide tenant-scoped claims for downstream contexts. Each vendor organization is a separate tenant with isolated user management.
+Authenticate vendor users, manage their lifecycle, and issue tenant-scoped JWT claims for downstream contexts. Each vendor organization is a separate tenant with isolated user management.
 
 ### Multi-Tenancy Model
 
-One tenant per vendor organization. User records are scoped to their vendor tenant. The issued claims include tenant identifier (`VendorTenantId`) for downstream authorization in Vendor Portal and potentially other contexts (e.g., Catalog for product associations).
+One tenant per vendor organization. User records are scoped to their vendor tenant. The issued JWT carries `VendorTenantId` as a cryptographically-verified claim — **`VendorTenantId` must NEVER come from request parameters**; it is extracted from the JWT only.
 
 ### Aggregates
 
 **VendorTenant (Aggregate Root):**
 - `Id` (Guid) - Canonical tenant identifier used throughout Vendor Identity and Vendor Portal
-- `OrganizationName` (string) - Vendor company name
-- `Status` (TenantStatus enum) - Onboarding, Active, Suspended, Deactivated
+- `OrganizationName` (string) - Vendor company name; unique across all tenants
+- `Status` (VendorTenantStatus enum) - `Onboarding`, `Active`, `Suspended`, `Terminated`
 - `OnboardedAt` (DateTimeOffset) - When vendor was added to CritterSupply
 - `ContactEmail` (string) - Primary contact for vendor organization
+- `SuspendedAt` (DateTimeOffset?) - Set on suspension; displayed to users attempting login
+- `SuspensionReason` (string?) - Shown to suspended users at login
+- `TerminatedAt` (DateTimeOffset?) - Set on permanent termination
 
 **VendorUser (Entity):**
 - `Id` (Guid) - User identifier
 - `VendorTenantId` (Guid) - Foreign key to VendorTenant
-- `Email` (string) - Login email, unique across all vendor users
-- `PasswordHash` (string) - Bcrypt/Argon2 hash
+- `Email` (string) - Login email, unique across ALL vendor users (system-wide index)
+- `PasswordHash` (string) - **Argon2id** hash via `Microsoft.AspNetCore.Identity.PasswordHasher<T>`
 - `FirstName`, `LastName` (string) - User profile
-- `Status` (VendorUserStatus enum) - Invited, Active, Deactivated
-- `MfaEnabled` (bool) - Multi-factor authentication enrollment
-- `InvitedAt`, `ActivatedAt` (DateTimeOffset?) - Lifecycle timestamps
+- `Role` (VendorRole enum) - `Admin`, `CatalogManager`, `ReadOnly`
+- `Status` (VendorUserStatus enum) - `Invited`, `Active`, `Deactivated`
+- `InvitedAt`, `ActivatedAt`, `DeactivatedAt` (DateTimeOffset?) - Lifecycle timestamps
 - `LastLoginAt` (DateTimeOffset?) - Audit trail
+
+**VendorUserInvitation (separate EF Core table — critical for invitation lifecycle):**
+- `Id` (Guid) - Invitation identifier
+- `VendorUserId` (Guid) - FK to VendorUser
+- `VendorTenantId` (Guid)
+- `Token` (string) - **Cryptographic hash** of the token sent in email (raw token never stored)
+- `InvitedRole` (VendorRole)
+- `Status` (InvitationStatus enum) - `Pending`, `Accepted`, `Expired`, `Revoked`
+- `InvitedAt` (DateTimeOffset)
+- `ExpiresAt` (DateTimeOffset) - `InvitedAt + 72 hours`; enforced as background job
+- `AcceptedAt` (DateTimeOffset?)
+- `RevokedAt` (DateTimeOffset?)
+- `ResendCount` (int) - Each resend issues new token, increments this
 
 ### What it receives
 
@@ -1824,26 +1844,45 @@ None from other bounded contexts. Vendor Identity initiates identity flows based
 
 ### What it publishes
 
-**Integration Events:**
-- `VendorTenantCreated` - New vendor organization onboarded (includes `VendorTenantId`, `OrganizationName`, timestamp)
-- `VendorUserInvited` - Invitation sent to vendor personnel (includes `UserId`, `VendorTenantId`, `Email`)
-- `VendorUserActivated` - User completed registration (includes `UserId`, `VendorTenantId`, activation timestamp)
-- `VendorUserDeactivated` - User access revoked (includes `UserId`, `VendorTenantId`, reason)
-- `VendorUserPasswordReset` - Password changed, for audit trail (includes `UserId`, timestamp)
+**Integration Events (all published via Wolverine transactional outbox):**
+
+Tenant lifecycle:
+- `VendorTenantCreated` - New vendor organization onboarded (`VendorTenantId`, `OrganizationName`, timestamp)
+- `VendorTenantSuspended` - Tenant suspended (`VendorTenantId`, `Reason`, `SuspendedAt`)
+- `VendorTenantReinstated` - Suspension lifted (`VendorTenantId`, `ReinstatedAt`)
+- `VendorTenantTerminated` - Permanent contract termination (`VendorTenantId`, `TerminatedAt`)
+
+User lifecycle:
+- `VendorUserInvited` - Invitation sent (`UserId`, `VendorTenantId`, `Email`, `Role`, `ExpiresAt`)
+- `VendorUserInvitationExpired` - TTL passed without acceptance (`InvitationId`, `UserId`, `VendorTenantId`)
+- `VendorUserInvitationResent` - Admin resent invitation (`InvitationId`, `UserId`, `ResendCount`, `NewExpiresAt`)
+- `VendorUserInvitationRevoked` - Admin cancelled before acceptance (`InvitationId`, `Reason`)
+- `VendorUserActivated` - User completed registration (`UserId`, `VendorTenantId`, `Role`, `ActivatedAt`)
+- `VendorUserDeactivated` - User access revoked (`UserId`, `VendorTenantId`, `Reason`, `DeactivatedAt`)
+- `VendorUserReactivated` - Deactivated user restored (`UserId`, `VendorTenantId`, `ReactivatedAt`)
+- `VendorUserRoleChanged` - Role updated (`UserId`, `VendorTenantId`, `OldRole`, `NewRole`)
+- `VendorUserPasswordReset` - Password changed, for audit trail (`UserId`, `VendorTenantId`, timestamp)
 
 ### Core Invariants
 
 **Tenant Invariants:**
 - Vendor tenant IDs are immutable once created (canonical identifier)
 - Organization names must be unique across all vendor tenants
-- Tenants can only be deactivated, never deleted (preserve historical data)
+- Tenants can only be Suspended or Terminated, never deleted (preserve historical data)
+- A Terminated tenant cannot be reinstated
 
 **User Invariants:**
-- Email addresses must be unique across all vendor users
+- Email addresses must be unique across ALL vendor users (system-wide, not per-tenant)
 - Users belong to exactly one vendor tenant (no multi-tenancy for users)
-- Users can only be activated after invitation
-- Deactivated users cannot be reactivated (must create new user)
-- MFA enrollment cannot be disabled once enabled (security policy)
+- Users can only be activated after a valid, non-expired invitation
+- Deactivated users **can** be reactivated (`Deactivated → Active` is allowed)
+- Each tenant must always have at least one Admin user (cannot deactivate the last Admin)
+- Invitation tokens are stored as cryptographic hashes — raw tokens are never persisted
+
+**Role Invariants:**
+- `Admin` — can invite/deactivate/reactivate users, change roles, submit change requests, view analytics
+- `CatalogManager` — can submit/withdraw change requests, acknowledge alerts, view analytics; cannot manage users
+- `ReadOnly` — can view analytics and change request history only; cannot submit or acknowledge
 
 ### What it doesn't own
 
@@ -1856,8 +1895,8 @@ None from other bounded contexts. Vendor Identity initiates identity flows based
 
 | Context | Relationship | Notes |
 |---------|--------------|-------|
-| Vendor Portal | Downstream | Consumes identity events (`VendorUserActivated`, `VendorUserDeactivated`), relies on tenant claims (`VendorTenantId`) for data isolation |
-| Catalog | Downstream (Future) | May consume `VendorTenantCreated` to associate products with vendors (design deferred, placeholder integration point) |
+| Vendor Portal | Downstream | Consumes all Vendor Identity events for access control and SignalR force-logout |
+| Catalog | Downstream (Future) | May consume `VendorTenantCreated` to associate products with vendors |
 
 ### Integration Flows
 
@@ -1865,81 +1904,134 @@ None from other bounded contexts. Vendor Identity initiates identity flows based
 ```
 CreateVendorTenant (command from admin UI)
   └─> CreateVendorTenantHandler
-      ├─> VendorTenant entity persisted
-      └─> Publish VendorTenantCreated → Vendor Portal, Catalog
+      ├─> VendorTenant entity persisted (Status=Onboarding)
+      └─> Publish VendorTenantCreated → Vendor Portal (initialize projections), Catalog
 
-VendorTenantCreated (integration message)
-  └─> Vendor Portal: Initialize tenant-scoped projections
-  └─> [Future] Catalog: Create vendor-product association records
+AssignProductToVendorTenant (command in Catalog BC admin)
+  └─> Catalog BC publishes VendorProductAssociated → Vendor Portal
+      (Vendor Portal builds VendorProductCatalog projection — prerequisite for all analytics)
 ```
 
 **User Invitation and Activation:**
 ```
 InviteVendorUser (command from admin UI)
   └─> InviteVendorUserHandler
-      ├─> VendorUser entity created with Status=Invited
+      ├─> VendorUser entity created (Status=Invited)
+      ├─> VendorUserInvitation persisted (token stored as hash, ExpiresAt=now+72h)
       ├─> Send invitation email (external service)
       └─> Publish VendorUserInvited → Vendor Portal
 
-CompleteVendorUserRegistration (command from user)
+[72-hour Wolverine scheduled message fires]
+  └─> VendorUserInvitationExpiryJob
+      ├─> VendorUserInvitation.Status → Expired
+      └─> Publish VendorUserInvitationExpired → Vendor Portal
+
+CompleteVendorUserRegistration (command from user — uses token from email link)
   └─> CompleteVendorUserRegistrationHandler
+      ├─> Validate token hash matches invitation
+      ├─> Validate invitation is not Expired or Revoked
       ├─> VendorUser.Status → Active
-      ├─> Set password hash
+      ├─> Set Argon2id password hash
       └─> Publish VendorUserActivated → Vendor Portal
 
-DeactivateVendorUser (command from admin UI)
+DeactivateVendorUser (command from Admin)
   └─> DeactivateVendorUserHandler
+      ├─> Validate not the last Admin in tenant
       ├─> VendorUser.Status → Deactivated
-      └─> Publish VendorUserDeactivated → Vendor Portal
+      └─> Publish VendorUserDeactivated → Vendor Portal (triggers force-logout via SignalR)
+
+ReactivateVendorUser (command from Admin)
+  └─> ReactivateVendorUserHandler
+      ├─> VendorUser.Status → Active
+      └─> Publish VendorUserReactivated → Vendor Portal
 ```
 
-**Authentication Flow:**
+**Authentication Flow (JWT issuance):**
 ```
 AuthenticateVendorUser (command from login page)
   └─> AuthenticateVendorUserHandler
       ├─> Query VendorUser by email
-      ├─> Verify password hash
+      ├─> Verify Argon2id password hash
+      ├─> Verify VendorTenant.Status is Active
       ├─> Issue JWT with claims:
-      │   ├─> UserId
-      │   ├─> VendorTenantId (for tenant isolation)
+      │   ├─> VendorUserId
+      │   ├─> VendorTenantId (for tenant isolation — JWT claim only, never from request)
+      │   ├─> VendorTenantStatus (Active/Suspended/Terminated)
       │   ├─> Email
-      │   └─> Roles (Admin, Viewer, Editor)
+      │   ├─> Role (Admin | CatalogManager | ReadOnly)
+      │   └─> exp = now + 15 minutes
+      ├─> Issue 7-day refresh token (stored in HttpOnly cookie)
       └─> Update LastLoginAt timestamp
+```
+
+**Tenant Suspension:**
+```
+SuspendVendorTenant (command from admin)
+  └─> SuspendVendorTenantHandler
+      ├─> VendorTenant.Status → Suspended
+      └─> Publish VendorTenantSuspended → Vendor Portal
+          (Vendor Portal triggers ForceLogout for all tenant users via SignalR)
+          (In-flight change requests remain frozen in their current state)
+
+ReinstateVendorTenant (command from admin)
+  └─> ReinstateVendorTenantHandler
+      ├─> VendorTenant.Status → Active
+      └─> Publish VendorTenantReinstated → Vendor Portal
+
+TerminateVendorTenant (command from admin — permanent)
+  └─> TerminateVendorTenantHandler
+      ├─> VendorTenant.Status → Terminated
+      └─> Publish VendorTenantTerminated → Vendor Portal
+          (Vendor Portal auto-rejects all in-flight change requests)
 ```
 
 ### HTTP Endpoints (Planned)
 
 **Authentication:**
-- `POST /api/vendor-auth/login` - Authenticate vendor user
-- `POST /api/vendor-auth/logout` - Invalidate session
+- `POST /api/vendor-auth/login` - Authenticate vendor user, issue JWT + refresh token cookie
+- `POST /api/vendor-auth/refresh` - Exchange refresh token for new access JWT
+- `POST /api/vendor-auth/logout` - Invalidate refresh token
 - `POST /api/vendor-auth/reset-password` - Initiate password reset
 
 **Admin (Tenant Management):**
 - `POST /api/admin/vendor-tenants` - Create new vendor organization
 - `GET /api/admin/vendor-tenants` - List all vendor tenants
 - `GET /api/admin/vendor-tenants/{tenantId}` - Get tenant details
-- `PATCH /api/admin/vendor-tenants/{tenantId}/status` - Change tenant status
+- `POST /api/admin/vendor-tenants/{tenantId}/suspend` - Suspend tenant
+- `POST /api/admin/vendor-tenants/{tenantId}/reinstate` - Reinstate suspended tenant
+- `POST /api/admin/vendor-tenants/{tenantId}/terminate` - Terminate tenant (permanent)
 
 **Admin (User Management):**
-- `POST /api/admin/vendor-tenants/{tenantId}/users/invite` - Invite vendor user
+- `POST /api/admin/vendor-tenants/{tenantId}/users/invite` - Invite vendor user (carries Role)
+- `POST /api/admin/vendor-tenants/{tenantId}/users/{userId}/invitation/resend` - Resend expired/pending invitation
+- `POST /api/admin/vendor-tenants/{tenantId}/users/{userId}/invitation/revoke` - Revoke pending invitation
 - `GET /api/admin/vendor-tenants/{tenantId}/users` - List users for tenant
 - `PATCH /api/admin/vendor-users/{userId}/deactivate` - Deactivate user
+- `PATCH /api/admin/vendor-users/{userId}/reactivate` - Reactivate deactivated user
+- `PATCH /api/admin/vendor-users/{userId}/role` - Change user role
 
 **User Self-Service:**
 - `POST /api/vendor-users/complete-registration` - Complete invited user registration
 - `POST /api/vendor-users/change-password` - Change password (authenticated)
-- `POST /api/vendor-users/enroll-mfa` - Enable multi-factor authentication
 
-### Structural Similarity to Customer Identity
+### Comparison with Customer Identity
 
-Vendor Identity follows the same patterns established in Customer Identity BC:
-- Same aggregate root pattern (Tenant/User entities with navigation properties)
-- Same authentication flows (or parallel implementations if vendor auth differs, e.g., SSO)
-- Same event shapes where applicable (e.g., `UserActivated` pattern)
-- Same persistence strategy (EF Core with PostgreSQL)
-- Opportunity to extract shared infrastructure if patterns converge (e.g., password hashing, JWT issuance)
+Vendor Identity follows many patterns established in Customer Identity, but diverges on authentication:
 
-The separation exists because vendors and customers are distinct populations with different lifecycles, access patterns, and potentially different auth requirements (e.g., corporate SSO for vendors vs. social login for customers). Keeping them separate in the reference architecture demonstrates the bounded context pattern more clearly.
+| Aspect | Customer Identity | Vendor Identity |
+|--------|------------------|-----------------|
+| Persistence | EF Core | EF Core ✅ Same |
+| Schema | `customeridentity` | `vendoridentity` ✅ Same |
+| EF Core patterns | DbContext + navigation properties | DbContext + navigation properties ✅ Same |
+| Auth mechanism | Session cookies (ADR 0012) | **JWT Bearer** (ADR 0015) ❌ Diverges |
+| Password hashing | Plaintext (dev convenience) | **Argon2id from day one** |
+| Multi-tenant model | N/A (single user type) | VendorTenantId on every entity |
+| Invitation flow | N/A | VendorUserInvitation table with TTL |
+| Roles | N/A | VendorRole enum (Admin/CatalogManager/ReadOnly) |
+| Published events | None | All lifecycle events via RabbitMQ |
+| User reactivation | N/A | Allowed (Deactivated → Active) |
+
+The divergence on authentication (JWT vs cookies) is **intentional** — required for SignalR hub security and cross-service claim propagation. See ADR 0015 for rationale.
 
 ### Privacy and Compliance Considerations
 
@@ -1958,113 +2050,181 @@ The separation exists because vendors and customers are distinct populations wit
 
 ## Vendor Portal
 
-The Vendor Portal context provides partnered vendors with a private, tenant-isolated view into how their products perform within CritterSupply. Vendors can see sales analytics across configurable time periods, monitor inventory levels, and submit change requests for their product data. The portal captures vendor intent and displays status—actual approval decisions live in other contexts (primarily Catalog).
+The Vendor Portal context provides partnered vendors with a private, tenant-isolated view into how their products perform within CritterSupply. Vendors can see real-time sales analytics, monitor inventory levels, and submit product change requests. The portal uses **SignalR** (via Wolverine's native transport) for bidirectional real-time communication — live analytics updates, change request decisions, and inventory alerts.
 
-**Status**: 🔜 Planned (Future Cycles)
+**Status**: 🔜 Planned (Phase 2 of Vendor implementation — Phase 1 is Vendor Identity + VendorProductCatalog foundation)
 
 **Persistence Strategy**: Marten (document store for accounts/requests, projections for read models)
 
+**Real-Time**: SignalR via Wolverine (`opts.UseSignalR()`) — dual hub groups: `vendor:{tenantId}` (shared tenant notifications) and `user:{userId}` (individual notifications)
+
+**Event Modeling Session**: See [docs/planning/vendor-portal-event-modeling.md](docs/planning/vendor-portal-event-modeling.md) for full planning output including event diagrams, risks, and phased roadmap.
+
 ### Purpose
 
-Present pre-aggregated sales and inventory analytics scoped to the vendor's products, allow vendors to save custom filters and views for their dashboards, accept and track product change requests, and display request status based on events from downstream contexts.
+Present pre-aggregated sales and inventory analytics scoped to the vendor's products, provide real-time notifications via SignalR, accept and track product change requests (full 7-state lifecycle), and allow vendors to save custom dashboard views.
 
 ### Multi-Tenancy Model
 
-One tenant per vendor organization (`VendorTenantId` from Vendor Identity BC). Each vendor's data is fully isolated using Marten's multi-tenancy capabilities. Users belong to a single tenant, though the model supports a list of tenant associations to accommodate future scenarios (acquisitions, portfolio companies, regional splits).
+One tenant per vendor organization (`VendorTenantId` from Vendor Identity JWT claims). Each vendor's data is fully isolated using Marten's `ForTenant(tenantId)`. `VendorTenantId` is extracted from JWT claims only — never from request parameters.
+
+**Critical exception:** `VendorProductCatalog` (SKU→Tenant lookup) is intentionally NOT tenant-isolated. It is the system-wide lookup that tells handlers which tenant to query. All other projections use `session.ForTenant(tenantId)`.
+
+### The Load-Bearing Pillar: VendorProductCatalog
+
+**This projection must exist before any analytics or change request invariants can work.**
+
+`VendorProductCatalog` is populated by `VendorProductAssociated` events published by Catalog BC when an admin assigns a SKU to a vendor tenant. It provides the SKU→VendorTenantId lookup that all handlers use for tenant routing.
+
+```
+VendorProductCatalog document:
+  Id: {Sku}                  (document ID is the SKU)
+  Sku: string
+  VendorTenantId: Guid
+  AssociatedAt: DateTimeOffset
+  IsActive: bool
+```
+
+A bulk-assignment backfill admin command must exist alongside the individual assignment endpoint to handle existing SKUs when the portal first deploys.
 
 ### Aggregates and Projections
 
-**Aggregates (Write Models):**
+**Aggregates (Write Models, event-sourced in Marten):**
 
-- `VendorAccount` - Portal-specific settings, saved views, notification preferences
-  - `VendorTenantId` (Guid) - Tenant identifier from Vendor Identity
-  - `SavedViews` (IReadOnlyList<SavedDashboardView>) - Custom filter configurations
-  - `NotificationPreferences` (NotificationSettings) - Email/SMS alert preferences
-  - `ContactInfo` (VendorContactInfo) - Portal-specific contact (may differ from Vendor Identity)
+- `VendorAccount` - Portal-specific settings, saved views, notification preferences (initialized by `VendorTenantCreated`)
+  - `VendorTenantId` (Guid)
+  - `SavedViews` (IReadOnlyList<SavedDashboardView>)
+  - `NotificationPreferences` - **Default: all notifications ON** (vendor opts out, not opts in)
 
-- `ChangeRequest` - Tracks lifecycle of submitted product corrections (event-sourced)
-  - `Id` (Guid) - Request identifier
-  - `VendorTenantId` (Guid) - Tenant scope
-  - `ProductSku` (string) - Target product
-  - `RequestType` (ChangeRequestType enum) - DescriptionChange, ImageUpload, ProductCorrection
-  - `Status` (ChangeRequestStatus enum) - Pending, Approved, Rejected
-  - `SubmittedAt`, `ResolvedAt` (DateTimeOffset?) - Lifecycle timestamps
+- `ChangeRequest` - Full 7-state lifecycle (event-sourced)
+  - `Id` (Guid)
+  - `VendorTenantId` (Guid)
+  - `Sku` (string)
+  - `Type` (ChangeRequestType enum) - `DescriptionUpdate`, `ImageUpload`, `DataCorrection`
+  - `Status` (ChangeRequestStatus enum) - see state machine below
+  - `LatestContent` (string?) - description text or correction details
+  - `ImageStorageKeys` (IReadOnlyList<string>) - object storage references (claim-check pattern)
+  - `ReplacedByRequestId` (Guid?) - set when Status = `Replaced`; enables UI linkage
+  - `SubmittedAt`, `ResolvedAt` (DateTimeOffset?)
+
+**ChangeRequest State Machine:**
+```
+Draft ──────────────────────→ Submitted    (SubmitChangeRequest command)
+Draft ──────────────────────→ Withdrawn    (WithdrawChangeRequest command)
+
+Submitted ──────────────────→ NeedsMoreInfo (MoreInfoRequestedForChangeRequest from Catalog)
+Submitted ──────────────────→ Approved      (DescriptionChangeApproved from Catalog)
+Submitted ──────────────────→ Rejected      (DescriptionChangeRejected from Catalog)
+Submitted ──────────────────→ Withdrawn     (WithdrawChangeRequest command)
+
+NeedsMoreInfo ──────────────→ Submitted     (ProvideAdditionalInfo command)
+NeedsMoreInfo ──────────────→ Withdrawn     (WithdrawChangeRequest command)
+
+Approved ───────────────────→ Replaced      (system: newer request approved for same Sku+Type)
+
+Rejected, Withdrawn, Replaced = TERMINAL (no further transitions)
+```
+
+**Key ChangeRequest invariant:** Only one active (Draft, Submitted, or NeedsMoreInfo) request per `VendorTenantId` + `Sku` + `Type` combination. Submitting a new one auto-withdraws any existing active request.
 
 **Projections (Read Models, Pre-Aggregated):**
 
-- `ProductPerformanceSummary` - Sales metrics by SKU, bucketed by time period
-  - `VendorTenantId`, `ProductSku` (partition keys)
-  - `DailySales`, `WeeklySales`, `MonthlySales`, `QuarterlySales`, `YearlySales` (aggregated metrics)
+- `VendorProductCatalog` - SKU→Tenant mapping (NOT tenant-isolated; system-wide lookup)
+  - `Id/Sku` (string), `VendorTenantId` (Guid), `AssociatedAt`, `IsActive`
+
+- `ProductPerformanceSummary` - Sales metrics by SKU, bucketed by time period (tenant-isolated)
+  - `VendorTenantId`, `Sku` (partition keys)
+  - `DailySales`, `WeeklySales`, `MonthlySales`, `QuarterlySales`, `YearlySales`
   - `Revenue`, `UnitsSold`, `AverageOrderValue` (per time bucket)
+  - Populated by `OrderPlacedHandler` fan-out via internal `UpdateTenantSalesSummary` command
 
-- `InventorySnapshot` - Current stock levels and recent movement
-  - `VendorTenantId`, `ProductSku` (partition keys)
+- `InventorySnapshot` - Current stock levels (tenant-isolated)
+  - `VendorTenantId`, `Sku` (partition keys)
   - `AvailableQuantity`, `ReservedQuantity`, `WarehouseId`
-  - `LastRestockedAt`, `LastSoldAt` (timestamps)
+  - `LastRestockedAt`, `LastSoldAt`, `LastCalculatedAt` (shown in UI for data freshness)
 
-- `ChangeRequestStatus` - Current state of all pending and resolved requests
+- `LowStockAlert` - Active unacknowledged low-stock alerts (tenant-isolated)
+  - `AlertId`, `VendorTenantId`, `Sku`, `CurrentQuantity`, `Threshold`
+  - `Status` (Active | Acknowledged)
+  - Deduplication: one active alert per Sku per tenant
+
+- `ChangeRequestSummary` - Current state of all change requests (tenant-isolated)
   - `VendorTenantId` (partition key)
-  - `RequestId`, `ProductSku`, `RequestType`, `Status`, `SubmittedAt`, `ResolvedAt`
+  - `RequestId`, `Sku`, `Type`, `Status`, `SubmittedAt`, `ResolvedAt`
 
-- `SavedDashboardView` - Vendor-configured filters and display preferences
-  - `VendorTenantId`, `ViewId` (partition keys)
-  - `Name`, `FilterCriteria` (JSON), `SortOrder`
+- `SavedDashboardView` - Vendor-configured filter preferences (tenant-isolated)
+  - `VendorTenantId`, `ViewId` (partition keys); `Name`, `FilterCriteria` (JSON)
 
 ### What it receives
 
 **Integration Messages:**
 
+From **Catalog** (prerequisite — must be set up first):
+- `VendorProductAssociated` - **Load-bearing pillar**: establishes SKU→VendorTenant mapping in `VendorProductCatalog`
+- `ProductCreated` - Maintains product reference data
+- `ProductUpdated` - Updates product reference data
+- `ProductDiscontinued` - Marks products as inactive in `VendorProductCatalog`
+- `DescriptionChangeApproved` - Updates ChangeRequest status + triggers SignalR notification
+- `DescriptionChangeRejected` - Updates ChangeRequest status + triggers SignalR notification
+- `ImageChangeApproved` - Updates ChangeRequest status + triggers SignalR notification
+- `ImageChangeRejected` - Updates ChangeRequest status + triggers SignalR notification
+- `DataCorrectionApproved` - Updates ChangeRequest status + triggers SignalR notification
+- `DataCorrectionRejected` - Updates ChangeRequest status + triggers SignalR notification
+- `MoreInfoRequestedForChangeRequest` - Transitions ChangeRequest to NeedsMoreInfo + SignalR notification
+
 From **Orders**:
-- `OrderPlaced` - Feeds sales aggregation (includes line items, order total, timestamp)
-- `OrderItemShipped` - Updates sales metrics (shipped units)
-- `OrderItemReturned` - Adjusts sales metrics (returned units, refunds)
+- `OrderPlaced` - Fan-out via `VendorProductCatalog` lookup; updates `ProductPerformanceSummary` per tenant
 
 From **Inventory**:
-- `InventoryAdjusted` - Updates inventory snapshots (quantity changes)
-- `StockReplenished` - Feeds inventory snapshots (restock events)
-- `LowStockDetected` - Alerts vendors of low inventory (threshold crossed)
-
-From **Catalog**:
-- `ProductCreated` - Maintains product reference data (new products)
-- `ProductUpdated` - Updates product reference data (description changes)
-- `ProductDiscontinued` - Marks products as discontinued in projections
-- `DescriptionChangeApproved` - Updates change request status (approval)
-- `DescriptionChangeRejected` - Updates change request status (rejection)
-- `ImageChangeApproved` - Updates change request status (approval)
-- `ImageChangeRejected` - Updates change request status (rejection)
+- `InventoryAdjusted` - Updates `InventorySnapshot` projections (via `VendorProductCatalog` lookup)
+- `StockReplenished` - Updates `InventorySnapshot` projections
+- `LowStockDetected` - Creates `LowStockAlert` (with deduplication) + triggers SignalR notification
 
 From **Vendor Identity**:
-- `VendorUserActivated` - Grants portal access to new users
-- `VendorUserDeactivated` - Revokes portal access
-- `VendorTenantCreated` - Initializes tenant-scoped projections
+- `VendorTenantCreated` - Initializes `VendorAccount` aggregate (default-on notification preferences)
+- `VendorUserActivated` - Sends welcome notification to `user:{userId}` hub group
+- `VendorUserDeactivated` - Sends `ForceLogout` to `user:{userId}` hub group
+- `VendorUserReactivated` - Restores portal access
+- `VendorTenantSuspended` - Sends `TenantSuspended` to `vendor:{tenantId}` hub group; freezes in-flight change requests
+- `VendorTenantReinstated` - Sends `TenantReinstated` to hub; resumes frozen change requests
+- `VendorTenantTerminated` - Auto-rejects all in-flight change requests; sends `TenantTerminated` to hub
 
 ### What it publishes
 
-**Integration Messages:**
+**Integration Messages (to Catalog BC via Wolverine transactional outbox):**
 
-- `DescriptionChangeRequested` - Vendor proposes updated description or bullet points (includes `ProductSku`, `NewDescription`, `RequestId`, `VendorTenantId`)
-- `ImageUploadRequested` - Vendor submits new product images for review (includes `ProductSku`, `ImageUrls`, `RequestId`, `VendorTenantId`)
-- `ProductCorrectionRequested` - Vendor flags an error (wrong weight, incorrect ingredients, etc.) (includes `ProductSku`, `CorrectionType`, `CorrectionDetails`, `RequestId`, `VendorTenantId`)
-- `DashboardViewSaved` - Vendor saves custom filter/view configuration (includes `VendorTenantId`, `ViewId`, `FilterCriteria`)
+- `DescriptionChangeRequested` - Vendor proposes updated description (`RequestId`, `Sku`, `NewDescription`, `VendorTenantId`, `SubmittedAt`)
+- `ImageUploadRequested` - Vendor submits new product images (`RequestId`, `Sku`, `ImageStorageKeys` — object storage keys via claim-check pattern, NOT raw bytes)
+- `DataCorrectionRequested` - Vendor flags a product data error (`RequestId`, `Sku`, `CorrectionType`, `CorrectionDetails`, `VendorTenantId`)
+
+**Note:** `DashboardViewSaved` is **NOT** published as an integration event. It is an internal domain event on the `VendorAccount` event stream only — no other BC consumes it.
 
 ### Core Invariants
 
 **Multi-Tenancy Invariants:**
-- All queries and projections must be scoped to `VendorTenantId`
-- Vendors can only see data for products associated with their tenant (enforced by Marten tenant isolation)
-- Change requests must reference products belonging to the requesting vendor's tenant
+- All queries and projections must use `session.ForTenant(tenantId)` — except `VendorProductCatalog` (system-wide lookup)
+- `VendorTenantId` comes from JWT claims only — never from request parameters or body
+- Vendors can only see data for products in their `VendorProductCatalog`
+- Change requests must reference a Sku present in the vendor's `VendorProductCatalog`
 
 **Change Request Invariants:**
-- A change request cannot be submitted without a valid `ProductSku`
-- A change request can only be in one state at a time (Pending, Approved, Rejected)
-- Change requests cannot be edited after submission (immutable once created)
-- Only pending requests can transition to approved/rejected
-- Approved/rejected requests are terminal states (no further transitions)
+- Only one active (Draft, Submitted, NeedsMoreInfo) request per `VendorTenantId` + `Sku` + `Type`
+- Submitting a new request for same Sku+Type auto-withdraws any existing active request
+- Change requests are immutable after submission (must withdraw and resubmit to change)
+- `Replaced` state carries `ReplacedByRequestId` for UI linkage
+- Image uploads use claim-check pattern: `ImageStorageKeys` (not raw bytes) in both aggregate and integration event
 
 **Dashboard View Invariants:**
 - View names must be unique per vendor tenant
-- View configurations must be valid JSON
-- Vendors can have unlimited saved views
+- `DashboardViewSaved` is a domain event only (not an integration event)
+
+**Alert Invariants:**
+- One active `LowStockAlert` per Sku per tenant (deduplication enforced)
+- Explicit `AcknowledgeLowStockAlert` command required to clear; not auto-dismissed on restock
+
+**Suspension Invariants:**
+- Suspended tenants: in-flight change requests freeze in current state (not rejected)
+- Terminated tenants: all in-flight change requests are auto-rejected (compensating action)
 
 ### What it doesn't own
 
@@ -2085,128 +2245,174 @@ From **Vendor Identity**:
 
 ### Integration Flows
 
-**Read-Only Analytics (Sales Performance):**
+**OrderPlaced Fan-Out (Analytics):**
 ```
-[Orders BC domain logic]
 OrderPlaced (integration message from Orders)
   └─> OrderPlacedHandler (Vendor Portal)
-      ├─> Extract line items for vendor's products
-      ├─> Update ProductPerformanceSummary projection (daily/weekly/monthly buckets)
-      └─> Increment revenue, units sold, order count
+      ├─> Query VendorProductCatalog (NOT tenant-isolated) for all SKUs in order
+      ├─> Group line items by VendorTenantId
+      └─> Publish UpdateTenantSalesSummary (internal command) per tenant
+          └─> UpdateTenantSalesSummaryHandler
+              ├─> session.ForTenant(tenantId)
+              ├─> Upsert ProductPerformanceSummary per SKU (daily/weekly/monthly buckets)
+              └─> Wolverine outbox guarantees per-tenant delivery
 
-GetProductPerformance (query from vendor dashboard)
-  └─> GetProductPerformanceHandler
-      ├─> Query ProductPerformanceSummary projection (scoped to VendorTenantId)
-      ├─> Filter by date range (last 30 days, last quarter, etc.)
-      └─> Return aggregated sales metrics
+SKU with no VendorProductCatalog entry → silently skipped (log warning, do not throw)
 ```
 
-**Read-Only Analytics (Inventory Snapshot):**
+**LowStockDetected → SignalR:**
 ```
-[Inventory BC domain logic]
-InventoryAdjusted (integration message from Inventory)
-  └─> InventoryAdjustedHandler (Vendor Portal)
-      ├─> Update InventorySnapshot projection (scoped to VendorTenantId)
-      └─> Set AvailableQuantity, ReservedQuantity, LastRestockedAt
-
-GetInventorySnapshot (query from vendor dashboard)
-  └─> GetInventorySnapshotHandler
-      ├─> Query InventorySnapshot projection (scoped to VendorTenantId)
-      ├─> Filter by ProductSku, WarehouseId
-      └─> Return current stock levels
+LowStockDetected (integration message from Inventory)
+  └─> LowStockDetectedHandler (Vendor Portal)
+      ├─> Lookup VendorProductCatalog for SKU → tenantId
+      ├─> If no mapping: silently return (internal product, no vendor to notify)
+      ├─> Check deduplication: active LowStockAlert exists for this SKU+tenant?
+      │   └─> If yes: update CurrentQuantity only, no new alert
+      ├─> Create LowStockAlert document (session.ForTenant(tenantId))
+      └─> Publish LowStockAlertRaised → IVendorTenantMessage → "vendor:{tenantId}" hub group
+          [Vendor sees: toast notification + badge increment]
 ```
 
-**Change Request Flow (Description Update):**
+**Change Request Full Lifecycle:**
 ```
-SubmitDescriptionChange (command from vendor dashboard)
-  └─> SubmitDescriptionChangeHandler
-      ├─> Create ChangeRequest aggregate (Status=Pending)
-      ├─> Persist to Marten
-      └─> Publish DescriptionChangeRequested → Catalog BC
+DraftChangeRequest (command from vendor)
+  └─> DraftChangeRequestHandler
+      ├─> Validate SKU is in VendorProductCatalog (session.ForTenant not needed for lookup)
+      ├─> Check: active request for same SKU+Type exists? → auto-withdraw + warn user
+      ├─> IStartStream<ChangeRequest>(ChangeRequestDrafted) → Status=Draft
+      └─> Return new RequestId
 
-[Catalog BC processes approval workflow]
+SubmitChangeRequest (command from vendor)
+  └─> [Load] ChangeRequest via [ReadAggregate]
+  └─> [Before] Validate CanSubmit (Status must be Draft)
+  └─> [Handle] Returns:
+      ├─> ChangeRequestSubmitted domain event → Status=Submitted
+      └─> DescriptionChangeRequested / ImageUploadRequested / DataCorrectionRequested
+          → Catalog BC via Wolverine transactional outbox
+
+[Catalog BC processes: approve / reject / needs-more-info]
 
 DescriptionChangeApproved (integration message from Catalog)
   └─> DescriptionChangeApprovedHandler (Vendor Portal)
-      ├─> Update ChangeRequest aggregate (Status=Approved, ResolvedAt=now)
-      └─> Update ChangeRequestStatus projection
+      ├─> Load ChangeRequest aggregate (session.ForTenant)
+      ├─> Append ChangeRequestApproved event → Status=Approved (terminal)
+      ├─> Check: other Approved requests for same SKU+Type → mark as Replaced
+      └─> Publish ChangeRequestStatusUpdated → IVendorTenantMessage → "vendor:{tenantId}"
+          Publish ChangeRequestDecisionPersonal → IVendorUserMessage → "user:{submitterUserId}"
+          [Toast: "✅ Description update for SKU-1001 approved!"]
 
-GetChangeRequestStatus (query from vendor dashboard)
-  └─> GetChangeRequestStatusHandler
-      ├─> Query ChangeRequestStatus projection (scoped to VendorTenantId)
-      └─> Return list of pending/approved/rejected requests
+MoreInfoRequestedForChangeRequest (integration message from Catalog)
+  └─> MoreInfoRequestedHandler
+      ├─> Append MoreInfoRequested event → Status=NeedsMoreInfo
+      └─> Publish notification → "user:{submitterUserId}"
+          [Toast: "📋 Catalog team has a question about your request"]
+
+ProvideAdditionalInfo (command from vendor)
+  └─> [Load] ChangeRequest → validate Status=NeedsMoreInfo
+  └─> [Handle] Returns AdditionalInfoProvided event → Status=Submitted (re-enters review)
+
+WithdrawChangeRequest (command from vendor)
+  └─> [Load] ChangeRequest → validate CanWithdraw (Draft, Submitted, or NeedsMoreInfo)
+  └─> [Handle] Returns ChangeRequestWithdrawn event → Status=Withdrawn (terminal)
 ```
 
-**Saved Dashboard Views:**
+**Vendor Identity Events → SignalR:**
 ```
-SaveDashboardView (command from vendor dashboard)
-  └─> SaveDashboardViewHandler
-      ├─> Update VendorAccount aggregate (add to SavedViews collection)
-      ├─> Persist to Marten
-      └─> Publish DashboardViewSaved (optional, for analytics)
+VendorUserDeactivated (from Vendor Identity)
+  └─> VendorUserDeactivatedHandler
+      ├─> Revoke VendorUserAccess read model (ForTenant)
+      └─> IHubContext.Clients.Group("user:{userId}").SendAsync("ForceLogout", ...)
+          [Client: disconnect hub, clear JWT, redirect to "Access Revoked" page]
 
-GetSavedViews (query from vendor dashboard)
-  └─> GetSavedViewsHandler
-      ├─> Query VendorAccount aggregate (scoped to VendorTenantId)
-      └─> Return list of saved view configurations
+VendorTenantSuspended (from Vendor Identity)
+  └─> VendorTenantSuspendedHandler
+      ├─> Freeze: in-flight change requests remain in current state
+      └─> IHubContext.Clients.Group("vendor:{tenantId}").SendAsync("TenantSuspended", ...)
+          { reason, vendorSupportContact }
+
+VendorTenantTerminated (from Vendor Identity)
+  └─> VendorTenantTerminatedHandler
+      ├─> Auto-reject all Submitted/NeedsMoreInfo change requests
+      │   └─> Append ChangeRequestRejected (reason="Vendor contract ended") per request
+      └─> IHubContext.Clients.Group("vendor:{tenantId}").SendAsync("TenantTerminated", ...)
 ```
 
 ### HTTP Endpoints (Planned)
 
-**Analytics Queries:**
+**Analytics Queries (all require JWT auth; VendorTenantId from token):**
 - `GET /api/vendor-portal/performance?sku={sku}&period={period}` - Sales metrics by SKU and time period
 - `GET /api/vendor-portal/inventory?sku={sku}` - Current inventory snapshot
-- `GET /api/vendor-portal/dashboard` - Aggregated dashboard data (top products, alerts)
+- `GET /api/vendor-portal/dashboard` - Aggregated dashboard data (top products, alerts, pending requests count)
+
+**Alerts:**
+- `GET /api/vendor-portal/alerts` - List active low-stock alerts for tenant
+- `POST /api/vendor-portal/alerts/{alertId}/acknowledge` - Acknowledge a low-stock alert
 
 **Change Requests:**
-- `POST /api/vendor-portal/change-requests/description` - Submit description change
-- `POST /api/vendor-portal/change-requests/images` - Submit image upload
-- `POST /api/vendor-portal/change-requests/correction` - Submit product correction
-- `GET /api/vendor-portal/change-requests` - List all change requests (paginated, filterable)
-- `GET /api/vendor-portal/change-requests/{requestId}` - Get change request details
+- `POST /api/vendor-portal/change-requests/description` - Start a description update (Draft)
+- `POST /api/vendor-portal/change-requests/images/upload-url` - Get pre-signed upload URL (claim-check)
+- `POST /api/vendor-portal/change-requests/images` - Submit image change with `ImageStorageKeys`
+- `POST /api/vendor-portal/change-requests/data-correction` - Submit a data correction
+- `POST /api/vendor-portal/change-requests/{requestId}/submit` - Submit a Draft for review
+- `POST /api/vendor-portal/change-requests/{requestId}/withdraw` - Withdraw a pending request
+- `POST /api/vendor-portal/change-requests/{requestId}/respond` - Respond to NeedsMoreInfo
+- `GET /api/vendor-portal/change-requests` - List change requests (filter by status)
+- `GET /api/vendor-portal/change-requests/{requestId}` - Get request detail with full audit trail
 
 **Account Management:**
 - `GET /api/vendor-portal/account` - Get vendor account settings
-- `PUT /api/vendor-portal/account/notifications` - Update notification preferences
+- `PUT /api/vendor-portal/account/notifications` - Update notification preferences (default: all on)
 - `POST /api/vendor-portal/account/views` - Save dashboard view configuration
 - `GET /api/vendor-portal/account/views` - List saved views
 - `DELETE /api/vendor-portal/account/views/{viewId}` - Delete saved view
 
+**SignalR Hub:**
+- `WS /hub/vendor-portal?access_token={jwt}` - SignalR WebSocket connection
+  - Hub groups established from JWT claims only: `vendor:{tenantId}` + `user:{userId}`
+
 ### Phased Roadmap
 
-**Phase 1 — Vendor Identity Foundation**
-- `VendorTenant` and `VendorUser` aggregates
-- Basic registration/authentication flow
-- Tenant-scoped claim issuance
-- Events: `VendorTenantCreated`, `VendorUserActivated`
+**Phase 1 — The Load-Bearing Foundation** (no vendor UI yet; internal name: "Vendor Infrastructure Foundation")
+- `VendorProductAssociated` event + `AssignProductToVendor` command in Catalog BC
+- Bulk-assignment backfill command in Catalog BC
+- `VendorProductCatalog` projection in VendorPortal domain project
+- VendorIdentity EF Core: entities, migrations, create/invite commands
+- `VendorTenantCreated` + `VendorUserInvited` events published to RabbitMQ
+- VendorPortal.Api skeleton with `VendorProductAssociatedHandler`
 
-**Phase 2 — Read-Only Analytics (Portal)**
-- Subscribe to Orders and Inventory events
-- Build `ProductPerformanceSummary` and `InventorySnapshot` projections
-- Basic dashboard displaying sales by time period
-- Tenant isolation via Marten multi-tenancy, driven by Vendor Identity claims
+**Phase 2 — JWT Auth + SignalR Hub + Static Analytics Dashboard** (first vendor-visible value)
+- `CompleteVendorUserRegistration` + `AuthenticateVendorUser` with JWT issuance (Argon2id)
+- Refresh token endpoint (HttpOnly cookie, 7-day)
+- `VendorPortalHub` with `[Authorize]` + dual group membership
+- `IVendorTenantMessage` + `IVendorUserMessage` marker interfaces + Wolverine publish rules
+- Force-logout on deactivation; tenant suspension notifications
+- `OrderPlacedHandler` fan-out + `ProductPerformanceSummary` projection
+- `LowStockAlert` document with deduplication + `AcknowledgeLowStockAlert` command
+- Static analytics dashboard in VendorPortal.Web (HTTP queries, no real-time yet)
+- SignalR from day one (welcome notification on activation) — do not defer
 
-**Phase 3 — Saved Views (Portal)**
-- `VendorAccount` aggregate with preferences
-- `SavedDashboardView` projection
-- Vendor can save and switch between custom filter configurations
+**Phase 3 — Live Analytics via SignalR**
+- `LowStockAlertRaised`, `SalesMetricUpdated`, `InventoryLevelUpdated` SignalR messages
+- Hub reconnection: catch-up query for missed alerts on reconnect
+- Visual "Live" connection indicator in portal header
+- Blazor components wired to `HubConnectionBuilder`
 
-**Phase 4 — Change Requests (Portal + Catalog)**
-- `ChangeRequest` aggregate with saga-style lifecycle tracking
-- Image upload flow (emit `ImageUploadRequested`, listen for approval)
-- Description/correction request flow
-- Request history and status display
-- Catalog-side handlers for approval workflow
+**Phase 4 — Change Request Full Lifecycle**
+- `ChangeRequest` aggregate (7 states, all commands and transitions)
+- Image claim-check: pre-signed URL + `ImageStorageKeys`
+- Subscribe to Catalog BC: approve/reject/moreInfo
+- `ChangeRequestStatusUpdated` → `vendor:{tenantId}` + `ChangeRequestDecisionPersonal` → `user:{userId}`
+- Catalog BC stubs for approval workflow
+- VendorPortal.Web: change request pages
 
-**Phase 5 — Full Identity Lifecycle**
-- User invitation flow
-- Password reset, MFA enrollment
-- User deactivation
-- Audit events
+**Phase 5 — Saved Views + VendorAccount**
+- `VendorAccount` aggregate; `SaveDashboardView` / `UpdateNotificationPreferences` commands
+- VendorPortal.Web: saved views selector, notification preferences
 
-**Phase 6 — Account Management (Portal)**
-- Vendor-editable account settings (notification preferences, contact info)
-- Integration with Vendor Identity for user management visibility
+**Phase 6 — Full Identity Lifecycle + Admin Tools**
+- Invitation expiry job, resend/revoke, reactivation, role changes
+- Tenant suspension/reinstatement/termination with compensation
+- Last-admin protection; VendorPortal.Web user management page
 
 ---
 
@@ -2214,15 +2420,14 @@ GetSavedViews (query from vendor dashboard)
 
 **Type:** Backend-for-Frontend (BFF) Composition Layer
 
-**Purpose:** Aggregate data from multiple bounded contexts for customer-facing UI, provide real-time updates via Server-Sent Events (SSE)
+**Purpose:** Aggregate data from multiple bounded contexts for customer-facing UI, provide real-time updates via **SignalR** (via Wolverine's native transport — migrated from SSE, see ADR 0013)
 
 ### Bounded Context Boundary
 
 **In Scope:**
 - View composition (aggregating data from multiple domain BCs)
-- SSE notification delivery (pushing real-time updates to connected clients)
+- SignalR notification delivery (pushing real-time updates to connected Blazor clients)
 - HTTP client coordination (querying downstream BCs)
-- Client connection management (tracking active SSE connections)
 
 **Out of Scope:**
 - Domain logic (all business rules live in upstream BCs)
@@ -2240,21 +2445,21 @@ GetSavedViews (query from vendor dashboard)
 - Inventory BC: `GET /api/inventory/availability?skus={skus}` → stock levels (future Phase 3 enhancement)
 
 **Receives (Integration Messages via RabbitMQ):**
-- `Shopping.ItemAdded` → triggers SSE push `cart-updated` to connected clients
-- `Shopping.ItemRemoved` → triggers SSE push `cart-updated` to connected clients
-- `Shopping.ItemQuantityChanged` → triggers SSE push `cart-updated` to connected clients
-- `Orders.OrderPlaced` → triggers SSE push `order-status-changed` to connected clients
-- `Payments.PaymentCaptured` → triggers SSE push `order-status-changed` to connected clients
-- `Fulfillment.ShipmentDispatched` → triggers SSE push `shipment-status-changed` to connected clients
-- `Fulfillment.ShipmentDelivered` → triggers SSE push `shipment-status-changed` to connected clients
+- `Shopping.ItemAdded` → triggers SignalR push `CartUpdated` to `customer:{customerId}` group
+- `Shopping.ItemRemoved` → triggers SignalR push `CartUpdated` to `customer:{customerId}` group
+- `Shopping.ItemQuantityChanged` → triggers SignalR push `CartUpdated` to `customer:{customerId}` group
+- `Orders.OrderPlaced` → triggers SignalR push `OrderStatusChanged` to `customer:{customerId}` group
+- `Payments.PaymentCaptured` → triggers SignalR push `OrderStatusChanged` to `customer:{customerId}` group
+- `Fulfillment.ShipmentDispatched` → triggers SignalR push `ShipmentStatusChanged` to `customer:{customerId}` group
+- `Fulfillment.ShipmentDelivered` → triggers SignalR push `ShipmentStatusChanged` to `customer:{customerId}` group
 
 **Publishes (Integration Messages):**
 - None (BFF is read-only, commands sent via HTTP POST to domain BCs)
 
-**Publishes (SSE Events to Connected Clients):**
-- `cart-updated` → Blazor client re-renders cart with updated line items/totals
-- `order-status-changed` → Blazor client updates order status display (pending → paid → shipped)
-- `shipment-status-changed` → Blazor client updates tracking info (dispatched → in transit → delivered)
+**Publishes (SignalR Messages via `IStorefrontWebSocketMessage`):**
+- `CartUpdated` → Blazor client re-renders cart with updated line items/totals
+- `OrderStatusChanged` → Blazor client updates order status display
+- `ShipmentStatusChanged` → Blazor client updates tracking info
 
 ### View Models (Composition)
 
@@ -2276,7 +2481,11 @@ GetSavedViews (query from vendor dashboard)
 
 ### Integration Pattern
 
-**Pattern:** HTTP (query) + RabbitMQ (notifications) + SSE (push to clients)
+**Pattern:** HTTP (query) + RabbitMQ (notifications) + SignalR (push to clients via Wolverine)
+
+**SignalR hub:** `StorefrontHub` at `/hub/storefront` — group: `customer:{customerId}`  
+**Marker interface:** `IStorefrontWebSocketMessage` with `CustomerId` property  
+**Wolverine config:** `opts.UseSignalR()` + `opts.Publish(x => x.MessagesImplementing<IStorefrontWebSocketMessage>().ToSignalR())`
 
 **Flow Example (Cart Update with Real-Time Notification):**
 ```
@@ -2287,40 +2496,26 @@ AddItemToCart (command) → AddItemToCartHandler
 
 [Customer Experience BFF - Notification Handler]
 Shopping.ItemAdded (integration message from RabbitMQ)
-  └─> ItemAddedNotificationHandler
+  └─> ItemAddedHandler
       ├─> Query Shopping BC: GET /api/carts/{cartId}
-      ├─> Query Catalog BC: GET /api/products?skus={skus} (enrich with product details)
-      ├─> Compose CartSummaryView (aggregated data)
-      └─> SSE Push: StorefrontHub.PushCartUpdate(cartId, cartSummary)
+      ├─> Compose CartUpdated (typed SignalR message implementing IStorefrontWebSocketMessage)
+      └─> Return CartUpdated → Wolverine routes to StorefrontHub → "customer:{customerId}" group
 
-[Blazor Frontend - SSE Client]
-SSE Event Received ("cart-updated")
+[Blazor Frontend - SignalR Client]
+SignalR message received (CartUpdated)
   └─> Blazor component re-renders with updated cart data
 ```
 
 ### Key Architectural Decisions
 
-**[ADR 0004: SSE over SignalR](./docs/decisions/0004-sse-over-signalr.md)**
-- **Decision:** Use .NET 10's native Server-Sent Events (SSE) instead of SignalR
-- **Rationale:** Simpler one-way server→client push, native HTTP/2 support, no WebSocket complexity
-- **Trade-off:** SSE is one-way only (but we don't need client→server push beyond HTTP POST commands)
+**[ADR 0013: SignalR Migration from SSE](./docs/decisions/0013-signalr-migration-from-sse.md)**
+- **Decision:** Migrated from SSE to SignalR (via Wolverine's native transport) in Cycle 18+
+- **Rationale:** Bidirectional capabilities needed; Wolverine's `opts.UseSignalR()` eliminates boilerplate; better integration with the rest of the stack
+- **Note:** ADR 0004 (SSE over SignalR) is superseded by ADR 0013
 
 **[ADR 0005: MudBlazor UI Framework](./docs/decisions/0005-mudblazor-ui-framework.md)**
 - **Decision:** Use MudBlazor for Blazor UI components
-- **Rationale:** Material Design, polished components, active community, aligns with future client work
-
-### Current Status (Cycle 16)
-
-**Phase 1: BFF Infrastructure - ✅ Complete (2026-02-05)**
-- BFF project created (`Storefront/`) with Wolverine + Marten
-- 3 composition handlers implemented (CartView, CheckoutView, ProductListing)
-- 9 integration tests passing (3 deferred to Phase 3)
-- HTTP client stub pattern established for testing
-
-**Phase 2: SSE Real-Time Integration - 🚧 Next**
-- SSE endpoint (`/sse/storefront`) to be implemented
-- Integration message handlers for cart/order notifications
-- RabbitMQ subscriptions for real-time updates
+- **Rationale:** Material Design, polished components, active community
 
 **Phase 3: Blazor Frontend - 📋 Planned**
 - Blazor Server app (`Storefront.Web/`)

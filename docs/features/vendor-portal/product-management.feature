@@ -1,93 +1,71 @@
 Feature: Vendor Product Management
-  As a vendor
-  I want to manage my products through the vendor portal
-  So that I can sell items on the CritterSupply marketplace
+  As a vendor user with CatalogManager or Admin role
+  I want to manage my product catalog and submit corrections through the vendor portal
+  So that my product data on CritterSupply marketplace stays accurate and current
 
   Background:
-    Given I am logged in as vendor "Acme Pet Supplies" (tenant ID "acme-tenant-123")
-    And I have "Owner" role permissions
+    Given I am authenticated as vendor "Acme Pet Supplies" (tenant "acme-pet-supplies")
+    And my JWT carries VendorTenantId from the Vendor Identity service
+    And the following products are associated with my vendor tenant:
+      | SKU         | Product Name           |
+      | ACME-TOY-01 | Squeaky Bone Toy       |
+      | ACME-TRT-01 | Salmon Training Treats |
     And the Vendor Portal BC is running
-    And the Product Catalog BC is running
+    And the Catalog BC is running
 
-  Scenario: Vendor adds new product (no approval required for Draft)
-    When I navigate to "Products" → "Add New Product"
-    And I fill in the product form:
-      | Field       | Value                                    |
-      | SKU         | ACME-TOY-01                              |
-      | Name        | Squeaky Bone Toy                         |
-      | Category    | Dogs > Toys                              |
-      | Price       | $12.99                                   |
-      | Description | Durable rubber bone toy for dogs...     |
-      | Status      | Draft                                    |
-    And I upload 3 product images
-    And I submit the product form
-    Then the product should be created in Product Catalog BC
-    And the product should appear in my vendor product list
-    And the product status should be "Draft" (not visible to customers)
+  Scenario: Vendor views their product catalog (VendorProductCatalog projection)
+    When I navigate to "My Products"
+    Then I see the following products associated with my account:
+      | SKU         | Product Name           | Status |
+      | ACME-TOY-01 | Squeaky Bone Toy       | Active |
+      | ACME-TRT-01 | Salmon Training Treats | Active |
+    And I do NOT see products from other vendor tenants
 
-  Scenario: Vendor publishes product (makes visible to customers)
-    Given I have a product "Squeaky Bone Toy" with status "Draft"
-    When I click "Publish Product"
-    Then the product status should change to "Active"
-    And the product should become visible in customer storefront
-    And customers should be able to add it to cart
+  Scenario: Vendor submits a product description change request
+    Given I am on the "Request Change" page for SKU "ACME-TOY-01"
+    When I select request type "Description Update"
+    And I enter the new description: "Durable rubber squeaky bone toy for dogs. BPA-free and non-toxic."
+    And I click "Save as Draft"
+    Then a ChangeRequest is created with Status "Draft" for ACME-TOY-01
+    When I click "Submit for Review"
+    Then the ChangeRequest Status changes to "Submitted"
+    And a "DescriptionChangeRequested" integration event is published to the Catalog BC
+    And the original product description remains unchanged until approval
 
-  Scenario: Vendor updates published product (requires approval)
-    Given I have a product "Squeaky Bone Toy" with status "Active"
-    When I click "Edit Description"
-    And I change the description to include safety information
-    And I provide reason: "Added BPA-free information per customer requests"
-    And I submit the change request
-    Then a change request should be created with status "Pending"
-    And platform admins should be notified of pending review
-    And the original product description should remain unchanged until approved
+  Scenario: Catalog admin approves a change request
+    Given a ChangeRequest for ACME-TOY-01 with Status "Submitted" exists
+    When the Catalog BC publishes a "DescriptionChangeApproved" event for this request
+    Then the ChangeRequest Status changes to "Approved"
+    And a "ChangeRequestStatusUpdated" SignalR message is sent to the "vendor:{tenantId}" hub group
+    And a "ChangeRequestDecisionPersonal" SignalR message is sent to "user:{submittingUserId}"
+    And the vendor sees a toast notification: "✅ Your description update for ACME-TOY-01 was approved!"
 
-  Scenario: Platform admin approves change request
-    Given a change request "change-req-123" exists with status "Pending"
-    When the platform admin reviews the change request
-    And the admin clicks "Approve"
-    Then the change request status should change to "Approved"
-    And the changes should be applied to the product in Product Catalog BC
-    And the vendor should receive notification: "Your change request has been approved"
+  Scenario: Vendor submits new images using claim-check pattern (no raw bytes in events)
+    Given I am on the "Request Image Change" page for ACME-TOY-01
+    When I select 2 product images for upload
+    And the images are uploaded directly to object storage via pre-signed URL
+    And I click "Submit Image Change Request"
+    Then a ChangeRequest is created with ImageStorageKeys (not raw image bytes)
+    And the "ImageUploadRequested" integration event carries ImageStorageKeys only
 
-  Scenario: Vendor updates inventory via CSV bulk import
-    Given I have 500 products in my catalog
-    When I navigate to "Inventory" → "Bulk Update"
-    And I click "Download Current Inventory CSV"
-    Then I should receive a CSV file with all 500 products and their stock levels
-    
-    When I update quantities in the CSV
-    And I upload the modified CSV
-    Then the system should validate all SKUs and quantities
-    And I should see a preview of changes (50 increased, 40 decreased)
-    When I confirm the changes
-    Then all 500 products should be updated in Inventory BC
-    And I should see confirmation: "Inventory updated successfully"
+  Scenario: Vendor views sales analytics dashboard
+    When I navigate to "Analytics"
+    Then I see sales metrics for my products:
+      | Metric               | Filter       |
+      | Total Revenue (30d)  | All products |
+      | Units Sold (30d)     | All products |
+      | Top Product by Units | This month   |
+    And I see a "Last updated" timestamp on the analytics panels
+    And the data is scoped to MY products only (not other vendors' products)
 
-  Scenario: Vendor receives order notification
-    Given a customer places an order containing my product "Squeaky Bone Toy"
-    When the Orders BC publishes "OrderPlaced" integration message
-    Then I should see a new order in my vendor dashboard
-    And the order should show "Ready to Ship" status
-    And I should receive email notification of new order
+  Scenario: Vendor receives a real-time order sale metric update via SignalR
+    Given I am viewing the Analytics Dashboard with SignalR connected
+    When a customer places an order containing my product "ACME-TOY-01"
+    And the OrderPlaced event is processed by the Vendor Portal fan-out handler
+    Then I receive a "SalesMetricUpdated" notification via the "vendor:{tenantId}" hub group
+    And my dashboard updates without requiring a page refresh
 
-  Scenario: Vendor marks order as shipped
-    Given I have an order "order-abc-123" with status "Ready to Ship"
-    When I click "Mark as Shipped"
-    And I enter tracking number "1Z999AA10123456784"
-    And I select carrier "UPS"
-    Then the Fulfillment BC should be notified
-    And "ShipmentDispatched" integration message should be published
-    And the customer should receive tracking number via email
-    And my dashboard should show order status: "Shipped"
-
-  Scenario: Vendor views sales analytics
-    When I navigate to "Analytics" dashboard
-    Then I should see sales metrics for last 30 days:
-      | Metric               | Value     |
-      | Total Orders         | 142       |
-      | Total Revenue        | $4,256.78 |
-      | Average Order Value  | $29.98    |
-      | Top Product          | Squeaky Bone Toy (32 units) |
-    And I should see low stock alerts for 3 products
-    And I should see a sales trend chart (daily revenue graph)
+  Scenario: Vendor cannot access another tenant's data
+    When I attempt to query analytics with a different vendor's tenantId in the request
+    Then the request is rejected with 403 Forbidden
+    And I only ever see data scoped to my VendorTenantId from my JWT claims
