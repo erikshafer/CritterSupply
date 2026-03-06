@@ -350,8 +350,17 @@ public static class OrderDecider
         var messages = new List<object>();
 
         // Dispatch fulfillment only when ALL reservations are committed and payment is captured.
-        // Idempotency guard: Status != Fulfilling prevents duplicate FulfillmentRequested messages.
-        if (allCommitted && current.IsPaymentCaptured && current.Status != OrderStatus.Fulfilling)
+        // Idempotency guard: only allow dispatch from pre-fulfillment states and explicitly
+        // exclude Fulfilling, Shipped, Delivered, Closed, Cancelled, and OutOfStock to
+        // prevent duplicate FulfillmentRequested messages from late/duplicate events.
+        if (allCommitted
+            && current.IsPaymentCaptured
+            && current.Status != OrderStatus.Fulfilling
+            && current.Status != OrderStatus.Shipped
+            && current.Status != OrderStatus.Delivered
+            && current.Status != OrderStatus.Closed
+            && current.Status != OrderStatus.Cancelled
+            && current.Status != OrderStatus.OutOfStock)
         {
             var fulfillmentLineItems = current.LineItems
                 .Select(li => new FulfillmentMessages.FulfillmentLineItem(
