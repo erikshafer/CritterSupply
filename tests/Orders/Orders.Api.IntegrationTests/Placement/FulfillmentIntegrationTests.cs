@@ -147,10 +147,12 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Integration test: Order transitions to Delivered and saga completes when ShipmentDelivered received.
+    /// Integration test: Order transitions to Delivered when ShipmentDelivered received.
+    /// Saga remains open (return window) to handle potential returns.
+    /// The saga only closes when ReturnWindowExpired fires (30 days later, not tested here).
     /// </summary>
     [Fact]
-    public async Task Order_Transitions_To_Delivered_And_Saga_Completes_When_Shipment_Delivered()
+    public async Task Order_Transitions_To_Delivered_When_Shipment_Delivered()
     {
         // Arrange: Create order and get it to Shipped status
         var customerId = Guid.NewGuid();
@@ -207,12 +209,13 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
             DateTimeOffset.UtcNow,
             "John Doe"));
 
-        // Assert: Verify saga was completed and deleted (MarkCompleted() deletes the saga document)
+        // Assert: Verify order transitioned to Delivered — saga remains open for the return window.
+        // The saga will close (MarkCompleted) when ReturnWindowExpired fires after 30 days.
         await using var session = _fixture.GetDocumentSession();
         var deliveredOrder = await session.LoadAsync<Order>(order.Id);
-        deliveredOrder.ShouldBeNull(); // Saga is deleted after MarkCompleted() is called
-
-        // Note: TotalAmount would have been 35.96m (29.97 + 5.99 shipping) if saga still existed
+        deliveredOrder.ShouldNotBeNull();
+        deliveredOrder.Status.ShouldBe(OrderStatus.Delivered);
+        deliveredOrder.TotalAmount.ShouldBe(35.96m); // 29.97 + 5.99 shipping
     }
 
     /// <summary>
@@ -273,5 +276,66 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         shippedOrder.TotalAmount.ShouldBe(55.98m); // 49.99 + 5.99 shipping
 
         // Future enhancement: Verify delivery failure metadata is tracked
+    }
+
+    /// <summary>
+    /// Regression test: Duplicate ShipmentDelivered messages must be idempotent.
+    /// Under at-least-once delivery, ShipmentDelivered may arrive more than once.
+    /// Without the guard, multiple ReturnWindowExpired messages would be scheduled,
+    /// causing multiple saga close attempts after the return window.
+    /// </summary>
+    [Fact]
+    public async Task ShipmentDelivered_Duplicate_Is_Idempotent()
+    {
+        // Arrange: Get order to Shipped status
+        var customerId = Guid.NewGuid();
+        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            customerId,
+            [new CheckoutLineItem("SKU-FUL-005", 1, 19.99m)],
+            new OrdersShippingAddress("99 Duplicate Ave", null, "Portland", "OR", "97201", "USA"),
+            "Standard",
+            5.99m,
+            "tok_visa",
+            DateTimeOffset.UtcNow);
+
+        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
+
+        Order order;
+        await using (var getSession = _fixture.GetDocumentSession())
+        {
+            order = (await getSession.Query<Order>()
+                .Where(o => o.CustomerId == customerId)
+                .ToListAsync()).FirstOrDefault()!;
+            order.ShouldNotBeNull();
+        }
+
+        await _fixture.ExecuteAndWaitAsync(new Messages.Contracts.Payments.PaymentCaptured(
+            Guid.NewGuid(), order.Id, 25.98m, "txn_dup_test", DateTimeOffset.UtcNow));
+
+        var reservationId = Guid.NewGuid();
+        await _fixture.ExecuteAndWaitAsync(new Messages.Contracts.Inventory.ReservationConfirmed(
+            order.Id, Guid.NewGuid(), reservationId, "SKU-FUL-005", "WH-01", 1, DateTimeOffset.UtcNow));
+
+        await _fixture.ExecuteAndWaitAsync(new Messages.Contracts.Inventory.ReservationCommitted(
+            order.Id, Guid.NewGuid(), reservationId, "SKU-FUL-005", "WH-01", 1, DateTimeOffset.UtcNow));
+
+        var shipmentId = Guid.NewGuid();
+        await _fixture.ExecuteAndWaitAsync(new ShipmentDispatched(
+            order.Id, shipmentId, "FedEx", "774899172137", DateTimeOffset.UtcNow));
+
+        // Act: Send ShipmentDelivered twice (duplicate)
+        var delivered = new ShipmentDelivered(order.Id, shipmentId, DateTimeOffset.UtcNow, "Jane Doe");
+        await _fixture.ExecuteAndWaitAsync(delivered);
+        await _fixture.ExecuteAndWaitAsync(delivered); // duplicate — must be a no-op
+
+        // Assert: Status is Delivered and saga is still open (return window active).
+        // If MarkCompleted() had been called, Marten would have deleted the saga document,
+        // and LoadAsync would return null — so ShouldNotBeNull() implicitly verifies the saga is alive.
+        await using var querySession = _fixture.GetDocumentSession();
+        var deliveredOrder = await querySession.LoadAsync<Order>(order.Id);
+        deliveredOrder.ShouldNotBeNull(); // null would mean MarkCompleted() was called — it must not be
+        deliveredOrder.Status.ShouldBe(OrderStatus.Delivered);
     }
 }

@@ -21,7 +21,7 @@ Orders owns two closely related workflows. First, a **multi-step checkout wizard
 |---------|------|-------------|
 | `Checkout` | Event-sourced aggregate | Multi-step wizard state (`CheckoutStarted` → `CheckoutCompleted`) |
 | `Order` | Saga (Marten document) | Coordinates Inventory + Payments + Fulfillment; tracks saga state |
-| `OrderStatus` | Enum | Full lifecycle from `Placed` through `Delivered` / `Cancelled` |
+| `OrderStatus` | Enum | Full lifecycle from `Placed` through `Delivered` / `Cancelled` / `Closed` |
 | `CheckoutLineItem` | Value object | Snapshot of cart items at checkout time (price-at-checkout guarantee) |
 
 ## Workflows
@@ -59,46 +59,43 @@ sequenceDiagram
 stateDiagram-v2
     [*] --> Placed : CheckoutCompleted → OrderPlaced
 
-    Placed --> InventoryReserved : ReservationConfirmed (inventory ✅)
-    Placed --> PaymentAuthorized : PaymentAuthorized (payment ✅)
-    Placed --> InventoryFailed : ReservationFailed ❌
+    Placed --> InventoryReserved : ReservationConfirmed (all SKUs ✅)
+    Placed --> PendingPayment : PaymentAuthorized (two-phase flow)
+    Placed --> OutOfStock : ReservationFailed ❌ → RefundRequested (if payment captured)
 
-    InventoryFailed --> Cancelled : ReservationReleaseRequested (inventory already failed)
-    note right of InventoryFailed
-        ⚠️ If payment was already authorized,
-        RefundRequested must be sent.
-        Orders saga currently does NOT handle
-        RefundCompleted — order stays stuck here.
-    end note
+    PendingPayment --> PaymentConfirmed : PaymentCaptured ✅
+    PendingPayment --> PaymentFailed : PaymentFailed ❌
 
     InventoryReserved --> PaymentConfirmed : PaymentCaptured ✅
-    PaymentAuthorized --> PaymentConfirmed : ReservationConfirmed + PaymentCaptured ✅
-    InventoryReserved --> Cancelled : PaymentFailed ❌ → release inventory
-    PaymentAuthorized --> Cancelled : PaymentFailed ❌
+    InventoryReserved --> PaymentFailed : PaymentFailed ❌ → release inventory
 
-    PaymentConfirmed --> InventoryCommitted : ReservationCommitted ✅
+    PaymentFailed --> [*] : Terminal — inventory released
+
+    OutOfStock --> Closed : RefundCompleted ✅ → MarkCompleted()
+    note right of OutOfStock
+        RefundCompleted closes OutOfStock orders.
+        Both Cancelled and OutOfStock go through
+        the same HandleRefundCompleted path.
+    end note
+
+    PaymentConfirmed --> InventoryCommitted : ReservationCommitted (all SKUs ✅)
     InventoryCommitted --> Fulfilling : FulfillmentRequested sent
 
     Fulfilling --> Shipped : ShipmentDispatched
-    Shipped --> Delivered : ShipmentDelivered ✅ terminal
-    Shipped --> DeliveryFailed : ShipmentDeliveryFailed ⚠️ not published yet
+    Shipped --> Delivered : ShipmentDelivered ✅
+    Shipped --> Shipped : ShipmentDeliveryFailed ⚠️ (carrier retries)
 
-    Placed --> OnHold : Fraud flag (planned)
-    OnHold --> Placed : Hold released (planned)
-    Delivered --> ReturnRequested : Customer requests return (planned)
+    Delivered --> Closed : ReturnWindowExpired (30 days) → MarkCompleted()
 
-    Delivered --> Closed : Terminal ✅
-    Cancelled --> [*] : Terminal (with reason)
-    DeliveryFailed --> [*] : ⚠️ currently terminal — no retry or return flow
+    Placed --> Cancelled : CancelOrder (before shipment)
+    PendingPayment --> Cancelled : CancelOrder
+    PaymentConfirmed --> Cancelled : CancelOrder
+    InventoryCommitted --> Cancelled : CancelOrder
 
-    note right of Cancellation
-        Cancellation reasons (planned):
-        - customer_request
-        - payment_failed
-        - inventory_failed
-        - fraud_hold
-        - saga_timeout
-    end note
+    Cancelled --> [*] : Terminal (no payment captured) — MarkCompleted() immediately
+    Cancelled --> Closed : RefundCompleted ✅ → MarkCompleted()
+
+    Closed --> [*] : Terminal ✅
 
     note right of OnHold
         ⚠️ OnHold state planned (fraud detection)
@@ -113,34 +110,35 @@ sequenceDiagram
     participant Orders as Orders Saga
     participant Inventory as Inventory BC
     participant Payments as Payments BC
-    participant Customer as Customer (via SSE)
 
-    Note over Orders: Scenario: Payment failed AFTER inventory reserved
+    Note over Orders: Scenario 1: Payment failed AFTER inventory reserved
     Orders->>Inventory: OrderPlaced → ReserveStock
     Orders->>Payments: OrderPlaced → AuthorizePayment
     Inventory->>Orders: ReservationConfirmed ✅
     Payments->>Orders: PaymentFailed ❌
 
     Note over Orders: BEGIN COMPENSATION CHAIN
-    Orders->>Inventory: ReservationReleaseRequested (compensation command)
-    Inventory->>Inventory: Append ReservationReleased ← compensation event in inventory stream
+    Orders->>Inventory: ReservationReleaseRequested (compensation)
     Inventory->>Orders: ReservationReleased
+    Note over Orders: Status = PaymentFailed → saga terminal (MarkCompleted via no awaited refund)
 
-    Orders->>Orders: Append OrderCancelled {reason: payment_failed} ← compensation event in order saga
-    Orders->>Customer: SSE: OrderStatusChanged {status: Cancelled}
-
-    Note over Orders: Scenario: Inventory failed AFTER payment authorized (⚠️ incomplete)
+    Note over Orders: Scenario 2: Inventory failed AFTER payment captured
     Orders->>Inventory: OrderPlaced → ReserveStock
     Orders->>Payments: OrderPlaced → AuthorizePayment
-    Payments->>Orders: PaymentAuthorized ✅
+    Payments->>Orders: PaymentCaptured ✅
     Inventory->>Orders: ReservationFailed ❌
 
     Note over Orders: BEGIN COMPENSATION CHAIN
-    Orders->>Payments: RefundRequested (compensation command)
-    Payments->>Payments: Append PaymentRefunded ← compensation event in payment stream
-    Payments->>Orders: RefundCompleted
-    Note over Orders: ❌ BUG: Orders saga has NO handler for RefundCompleted
-    Note over Orders: Order stuck in InventoryFailed state forever
+    Orders->>Payments: RefundRequested (compensation — payment was captured)
+    Payments->>Orders: RefundCompleted ✅
+    Note over Orders: Status = Closed → MarkCompleted() ✅ (bug fixed)
+
+    Note over Orders: Scenario 3: Customer cancels before shipment
+    Note over Orders: POST /api/orders/{id}/cancel
+    Orders->>Inventory: ReservationReleaseRequested (all reserved SKUs)
+    Orders->>Payments: RefundRequested (if payment captured)
+    Payments->>Orders: RefundCompleted ✅
+    Note over Orders: Status = Closed → MarkCompleted() ✅
 ```
 
 ## Commands & Events
@@ -153,6 +151,7 @@ sequenceDiagram
 | `SelectShippingMethod` | `SelectShippingMethodHandler` | Choose Standard / Express / Overnight |
 | `ProvidePaymentMethod` | `ProvidePaymentMethodHandler` | Supply payment token |
 | `CompleteCheckout` | `CompleteCheckoutHandler` | Resolve address snapshot, trigger Order saga |
+| `CancelOrder` | `Order.Handle(CancelOrder)` | Cancel an order before shipment |
 
 ### Domain Events
 
@@ -172,36 +171,57 @@ sequenceDiagram
 |-------|-------|-------------|
 | `Orders.OrderPlaced` | `storefront-notifications` (RabbitMQ) | Customer Experience (for real-time UI) |
 | `Orders.OrderPlaced` | Local Wolverine queue ⚠️ | Inventory BC + Payments BC |
+| `Orders.OrderCancelled` | Local queue ⚠️ | Downstream notification |
 | `Orders.ReservationCommitRequested` | Local queue ⚠️ | Inventory BC |
 | `Orders.ReservationReleaseRequested` | Local queue ⚠️ | Inventory BC |
 | `Orders.FulfillmentRequested` | Local queue ⚠️ | Fulfillment BC |
+| `Payments.RefundRequested` | Local queue ⚠️ | Payments BC (for cancellation / OutOfStock compensation) |
 
 #### Received
 
 | Event | From | Effect |
 |-------|------|--------|
 | `Shopping.CheckoutInitiated` | Shopping BC | Creates Checkout stream |
-| `Inventory.ReservationConfirmed` | Inventory BC | Saga: `InventoryReserved` |
-| `Inventory.ReservationFailed` | Inventory BC | Saga: trigger compensation |
-| `Inventory.ReservationCommitted` | Inventory BC | Saga: `InventoryCommitted` → request fulfillment |
-| `Inventory.ReservationReleased` | Inventory BC | Saga: `Cancelled` |
+| `Inventory.ReservationConfirmed` | Inventory BC | Saga: tracks per-SKU reservation; transitions to `InventoryReserved` when all SKUs confirmed |
+| `Inventory.ReservationFailed` | Inventory BC | Saga: transitions to `OutOfStock`; triggers compensation |
+| `Inventory.ReservationCommitted` | Inventory BC | Saga: tracks per-SKU commits; dispatches fulfillment when all committed |
+| `Inventory.ReservationReleased` | Inventory BC | Saga: compensation acknowledgement (no status change) |
 | `Payments.PaymentAuthorized` | Payments BC | Saga: `PendingPayment` |
 | `Payments.PaymentCaptured` | Payments BC | Saga: `PaymentConfirmed` → commit inventory |
 | `Payments.PaymentFailed` | Payments BC | Saga: release inventory |
+| `Payments.RefundCompleted` | Payments BC | Saga: closes `Cancelled` or `OutOfStock` orders → `MarkCompleted()` |
+| `Payments.RefundFailed` | Payments BC | Saga: tracked for investigation (no status change) |
 | `Fulfillment.ShipmentDispatched` | Fulfillment BC | Saga: `Shipped` |
-| `Fulfillment.ShipmentDelivered` | Fulfillment BC | Saga: `Delivered` |
+| `Fulfillment.ShipmentDelivered` | Fulfillment BC | Saga: `Delivered` → schedules `ReturnWindowExpired` (30 days) |
+| `Fulfillment.ShipmentDeliveryFailed` | Fulfillment BC | Saga: tracked; order remains `Shipped` (carrier retries) |
 
 ## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/checkouts/{id}/shipping-address` | Select shipping address |
-| `POST` | `/api/checkouts/{id}/shipping-method` | Choose shipping method |
-| `POST` | `/api/checkouts/{id}/payment-method` | Provide payment token |
-| `POST` | `/api/checkouts/{id}/complete` | Complete checkout |
-| `GET` | `/api/checkouts/{id}` | Get checkout state |
-| `GET` | `/api/orders/{id}` | Get order details |
-| `GET` | `/api/orders?customerId=...` | List orders for customer |
+| Method | Path | Description | Status Codes |
+|--------|------|-------------|-------------|
+| `POST` | `/api/checkouts/{id}/shipping-address` | Select shipping address | 200, 404 |
+| `POST` | `/api/checkouts/{id}/shipping-method` | Choose shipping method | 200, 404 |
+| `POST` | `/api/checkouts/{id}/payment-method` | Provide payment token | 200, 404 |
+| `POST` | `/api/checkouts/{id}/complete` | Complete checkout | 200, 404 |
+| `GET` | `/api/checkouts/{id}` | Get checkout state | 200, 404 |
+| `GET` | `/api/orders/{id}` | Get order details | 200, 404 |
+| `GET` | `/api/orders?customerId=...` | List orders for customer | 200 |
+| `POST` | `/api/orders/{id}/cancel` | Cancel an order (before shipment) | 202, 404, 409 |
+
+### `POST /api/orders/{id}/cancel`
+
+Cancels an order if it is in a cancellable state. Returns `409 Conflict` if the order is already shipped, delivered, closed, cancelled, out-of-stock, or payment-failed.
+
+```json
+// Request body
+{ "reason": "Customer changed their mind" }
+
+// 202 Accepted — cancellation command published to saga
+// 409 Conflict — order cannot be cancelled at this stage
+// 404 Not Found — order does not exist
+```
+
+The endpoint pre-validates the state before publishing `CancelOrder` to the saga. The saga also guards against duplicate cancellation messages (at-least-once delivery safety).
 
 ## Integration Map
 
@@ -212,9 +232,10 @@ flowchart TD
     Orders -->|OrderPlaced| Payments[Payments BC :5232]
     Orders -->|FulfillmentRequested| Fulfillment[Fulfillment BC :5234]
     Orders -->|OrderPlaced via RabbitMQ| CE[Customer Experience :5237]
+    Orders -->|RefundRequested| Payments
     CI[Customer Identity :5235] -->|AddressSnapshot| Orders
     Inventory -->|Reservation events| Orders
-    Payments -->|Payment events| Orders
+    Payments -->|Payment events + RefundCompleted| Orders
     Fulfillment -->|Shipment events| Orders
 ```
 
@@ -225,16 +246,20 @@ flowchart TD
 | Checkout wizard (4-step) | ✅ Complete |
 | Address snapshot from Customer Identity | ✅ Complete |
 | Order saga creation | ✅ Complete |
+| Multi-SKU inventory tracking (`ExpectedReservationCount`) | ✅ Complete |
 | Inventory orchestration (reserve/commit/release) | ✅ Complete |
-| Payment orchestration (authorize/capture) | ✅ Complete |
+| Payment orchestration (authorize/capture/refund) | ✅ Complete |
 | Fulfillment orchestration (request/dispatch/deliver) | ✅ Complete |
 | `OrderPlaced` → RabbitMQ (storefront-notifications) | ✅ Complete |
-| Integration tests (32 passing) | ✅ Complete |
+| Integration tests (45 passing) | ✅ Complete |
 | Compensation: inventory release on payment failure | ✅ Complete |
-| Compensation: refund on inventory failure | ❌ Incomplete — saga doesn't handle `RefundCompleted` |
+| Compensation: refund on inventory/OutOfStock failure | ✅ Complete |
+| Compensation: refund on cancellation | ✅ Complete |
+| Order cancellation endpoint (`POST /api/orders/{id}/cancel`) | ✅ Complete |
+| Return window lifecycle (30-day expiry → `Closed`) | ✅ Complete |
+| Idempotency guards (duplicate message handling) | ✅ Complete |
 | Inventory/Payments/Fulfillment → RabbitMQ (durable) | ❌ Local queues only |
 | Saga timeout / OnHold state | ❌ Not implemented |
-| Retry logic for transient failures | ❌ Not implemented |
 
 ## Compensation Event Registry
 
@@ -242,12 +267,12 @@ Compensation events are **first-class events appended to event stores / saga doc
 
 | Compensation Event | Recorded In | Triggered By | What It Restores |
 |-------------------|-------------|-------------|-----------------|
-| `OrderCancelled` | Order saga document (Marten) | Payment failure / inventory failure / customer request / fraud hold | Terminal state with reason code; triggers downstream compensation |
+| `OrderCancelled` | Order saga document (Marten) | Customer request / payment failure / inventory failure | Terminal state with reason code; triggers downstream compensation |
 | `ReservationReleased` | ProductInventory event stream (Inventory BC) | `ReservationReleaseRequested` from Orders | Returns soft-held stock to available pool |
 | `PaymentRefunded` | Payment event stream (Payments BC) | `RefundRequested` from Orders | Reverses captured charge; `TotalRefunded` incremented |
-| `ShipmentDeliveryFailed` | Shipment event stream (Fulfillment BC) | Carrier webhook — delivery attempt failed | Records failure reason; currently terminal (no retry) |
+| `ShipmentDeliveryFailed` | Shipment event stream (Fulfillment BC) | Carrier webhook — delivery attempt failed | Records failure reason; order remains `Shipped` (carrier retries) |
 
-> **The compensation chain is ordered:** Order Cancelled → Inventory Released → Payment Refunded. Each step publishes an event that triggers the next. The full chain is not yet complete — see implementation status.
+> **The compensation chain is fully implemented:** Order `Cancelled`/`OutOfStock` → Inventory Released → Payment Refunded → `RefundCompleted` → saga closes (`Closed` + `MarkCompleted()`).
 
 ## Off-Path Scenarios
 
@@ -263,13 +288,18 @@ sequenceDiagram
 
     Note over Orders: Order is in PaymentConfirmed or InventoryCommitted state
     Customer->>BFF: "Cancel Order" button
-    BFF->>Orders: POST /api/orders/{id}/cancel
-    Note over Orders: ❌ NO ENDPOINT EXISTS TODAY
-    Orders-->>BFF: 404 Not Found
-    Note over Customer: Customer cannot cancel — must call support
+    BFF->>Orders: POST /api/orders/{id}/cancel {"reason": "Changed my mind"}
+    Orders->>Orders: Validate: CanBeCancelled(status) = true
+    Orders-->>BFF: 202 Accepted
+
+    Orders->>Inventory: ReservationReleaseRequested (all reserved SKUs)
+    Orders->>Payments: RefundRequested (payment was captured)
+    Inventory->>Orders: ReservationReleased
+    Payments->>Orders: RefundCompleted ✅
+    Note over Orders: Status = Closed → MarkCompleted() ✅
 ```
 
-**Current behavior:** No cancellation endpoint exists. Customers cannot self-serve cancel, even before fulfillment begins. Support must manually intervene.
+**Current behavior:** ✅ Implemented. `POST /api/orders/{id}/cancel` validates state, publishes `CancelOrder` command. Saga triggers compensation chain. `RefundCompleted` closes the saga.
 
 ### Scenario 2: Inventory Fails After Payment Captured (Worst Case)
 
@@ -280,22 +310,19 @@ sequenceDiagram
     participant Payments as Payments BC
 
     Note over Orders: Payment already CAPTURED (money taken from customer)
-    Orders->>Inventory: ReservationCommitRequested
     Inventory-->>Orders: ReservationFailed (warehouse stock mismatch)
 
     Note over Orders: BEGIN COMPENSATION
     Orders->>Payments: RefundRequested {amount: full order amount}
-    Payments->>Payments: Append PaymentRefunded ← compensation event
-    Payments->>Orders: RefundCompleted
+    Payments->>Orders: RefundCompleted ✅
 
-    Note over Orders: ❌ BUG: No handler for RefundCompleted in saga
-    Note over Orders: Saga stuck. Order never reaches Cancelled state.
-    Note over Orders: Customer was charged and refunded but order shows "Processing"
+    Note over Orders: Status = Closed → MarkCompleted() ✅
+    Note over Orders: Customer receives money back; order closes cleanly
 ```
 
-**Current behavior:** `RefundCompleted` event arrives at Orders saga but no handler exists. The saga document is left in `InventoryFailed` state indefinitely. Customer money is returned (Payments BC works), but Order status is wrong.
+**Current behavior:** ✅ Fixed. `RefundCompleted` is handled; `OutOfStock` orders with a captured payment close to `Closed` state after refund completes.
 
-### Scenario 3: Both Inventory AND Payment Fail Simultaneously
+### Scenario 3: Both Inventory AND Payment Fail (Race Condition)
 
 ```mermaid
 sequenceDiagram
@@ -309,16 +336,15 @@ sequenceDiagram
     Payments->>Orders: PaymentFailed ❌
     Inventory->>Orders: ReservationFailed ❌ (arrives shortly after)
 
-    Note over Orders: First handler: PaymentFailed → send ReservationReleaseRequested
-    Orders->>Inventory: ReservationReleaseRequested
-    Note over Inventory: ❌ No reservation exists to release — ReservationFailed already
-    Inventory->>Orders: ReservationReleased (no-op or error?)
-    Note over Orders: Second handler: ReservationFailed arrives
-    Note over Orders: ⚠️ Double-cancel risk — saga may process both failure events
-    Note over Orders: Idempotency not implemented
+    Note over Orders: PaymentFailed handler: release inventory (ReservationIds empty → no-op)
+    Note over Orders: Status = PaymentFailed
+
+    Note over Orders: ReservationFailed handler: terminal-state guard fires
+    Note over Orders: Status is PaymentFailed → return OrderDecision() (no-op) ✅
+    Note over Orders: No double-compensation — terminal-state guard prevents re-processing
 ```
 
-**Current behavior:** Race condition between simultaneous failure events. No idempotency guard — duplicate cancellation handling possible.
+**Current behavior:** ✅ Handled. Terminal-state guards in `HandleReservationConfirmed` and `HandleReservationFailed` prevent duplicate compensation when both failure messages arrive.
 
 ### Scenario 4: Delivery Failure — Package Returned to Warehouse
 
@@ -327,32 +353,24 @@ sequenceDiagram
     participant Carrier as Carrier (Webhook)
     participant Fulfillment as Fulfillment BC
     participant Orders as Orders BC
-    participant Customer as Customer
 
     Note over Carrier: 3 delivery attempts — no one home
     Carrier->>Fulfillment: POST /webhook/delivery-failed
     Fulfillment->>Fulfillment: Append ShipmentDeliveryFailed {reason: "3 attempts"}
-    Note over Fulfillment: ❌ ShipmentDeliveryFailed NOT published to Orders
-    Note over Orders: Order stuck in "Shipped" state forever
-    Note over Customer: ❌ Never notified. Package being returned to warehouse.
-    Note over Customer: No refund triggered. No re-delivery option offered.
+    Fulfillment->>Orders: ShipmentDeliveryFailed (tracked in saga)
+    Note over Orders: Order remains Shipped — carrier will retry
+    Note over Orders: No automated refund or re-delivery yet (see Open Questions Q4)
 ```
 
-**Current behavior:** `ShipmentDeliveryFailed` event is appended to the Shipment stream but never published to Orders. Order saga is stuck in `Shipped` state.
+**Current behavior:** `ShipmentDeliveryFailed` is now received and tracked by the saga. Order remains in `Shipped` state; no automated escalation or refund yet. See Open Questions Q4 for planned behavior.
 
 ## 🤔 Open Questions for Product Owner & UX
 
 ---
 
 **Q1: Can customers cancel their own order, and if so, when?**
-- **Option A: Cancel any time before shipment** — Customer can cancel up until `FulfillmentRequested` is sent. Triggers full compensation chain.  
-  *Engineering: Medium — new cancellation endpoint + saga handler + compensation*
-- **Option B: Cancel only before payment** — Window is very narrow (seconds). Practically never usable.  
-  *Engineering: Low — simple state check*
-- **Option C: No self-serve cancel (current)** — Support team only.  
-  *Engineering: Zero*
-- **Current behavior:** Option C — no endpoint.
-- **Business risk if unresolved:** High customer frustration. Amazon allows cancellation until "Preparing for shipment." This is table stakes for e-commerce.
+
+✅ **Resolved** — Cancellation endpoint implemented (`POST /api/orders/{id}/cancel`). Customers can cancel any order that has not yet been shipped. Guard states: `Shipped`, `Delivered`, `Closed`, `Cancelled`, `OutOfStock`, `PaymentFailed` all return 409 Conflict.
 
 ---
 
@@ -389,7 +407,7 @@ sequenceDiagram
   *Engineering: Medium — notification system required*
 - **Option C: Auto-reship** — Re-attempt delivery after customer confirms new address.  
   *Engineering: High — new address capture flow + new FulfillmentRequested*
-- **Current behavior:** System gets stuck in `Shipped` state. Nothing happens. No customer notification.
+- **Current behavior:** `ShipmentDeliveryFailed` is tracked; order stays `Shipped`. No automated escalation or customer notification.
 - **Business risk if unresolved:** Customer thinks package is still in transit. Disputes charge 30 days later. Support burden high.
 
 ---
@@ -408,12 +426,12 @@ sequenceDiagram
 
 | Gap | Impact | Planned Cycle |
 |-----|--------|---------------|
-| Refund compensation incomplete — `RefundCompleted` not handled | Order stuck in `InventoryFailed`; customer charged without delivery | Cycle 19 |
-| Inventory/Payment/Fulfillment messages on local queues | Data loss on restart | Cycle 19 |
-| No saga timeout | Stuck sagas accumulate indefinitely | Cycle 19 |
-| No idempotency keys | Duplicate events create duplicate reservations | Cycle 20 |
-| No order cancellation endpoint | Customers cannot cancel placed orders | Cycle 21 |
+| Inventory/Payment/Fulfillment messages on local queues | Data loss on restart | Future |
+| No saga timeout / escalation | Stuck sagas accumulate on transient infra failures | Future |
+| OnHold state (fraud detection) | All orders process automatically | Future |
 
 ## 📖 Detailed Documentation
 
+→ [`docs/skills/wolverine-sagas.md`](../../../docs/skills/wolverine-sagas.md) — Saga patterns, Decider pattern, idempotency, lifecycle  
+→ [`docs/decisions/0015-order-saga-design-decisions.md`](../../../docs/decisions/0015-order-saga-design-decisions.md) — ADR: why document-based saga, Decider pattern, HashSet for committed IDs  
 → [`docs/workflows/orders-workflows.md`](../../../docs/workflows/orders-workflows.md)

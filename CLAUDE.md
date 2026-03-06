@@ -564,6 +564,24 @@ docker-compose --profile all build --no-cache
 
 Skills provide detailed patterns and examples. Read the appropriate skill **before** implementing.
 
+### When Building Wolverine Sagas
+
+For stateful orchestration sagas that coordinate multiple bounded contexts over time:
+
+**Read:** `docs/skills/wolverine-sagas.md`
+
+Covers:
+- When to use a saga vs. event-sourced aggregate vs. message handler
+- `Saga` base class, `Guid Id` convention, message correlation, `MarkCompleted()`
+- Saga initialization pattern (`PlaceOrderHandler` returning `(Order, Event)` tuple)
+- Marten document configuration for sagas (`UseNumericRevisions`, optimistic concurrency)
+- Decider pattern for pure-function business logic
+- Multi-SKU / multi-entity race condition handling
+- At-least-once idempotency guards
+- Scheduling delayed messages (`outgoing.Delay()`)
+- Saga lifecycle completion — all terminal paths must call `MarkCompleted()`
+- Common pitfalls (orphaned sagas, dead validators, `IncludeType` vs `IncludeAssembly`)
+
 ### When Implementing Wolverine Handlers
 
 For message handlers, HTTP endpoints, compound handlers, or aggregate workflows:

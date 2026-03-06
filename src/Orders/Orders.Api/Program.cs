@@ -85,9 +85,10 @@ builder.Host.UseWolverine(opts =>
 
     opts.UseFluentValidation();
 
-    // Explicitly include the Order saga and Checkout namespace for handler discovery
-    opts.Discovery.IncludeType<Order>();
-    opts.Discovery.IncludeType<Checkout>();
+    // Discover all handlers in the Orders domain assembly (Order saga, Checkout, PlaceOrderHandler, etc.)
+    // The assembly is decorated with [assembly: WolverineModule] in AssemblyAttributes.cs,
+    // consistent with all other bounded context assemblies in CritterSupply.
+    opts.Discovery.IncludeAssembly(typeof(Order).Assembly);
 
     // Configure RabbitMQ for publishing integration messages
     var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");

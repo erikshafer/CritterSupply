@@ -2,48 +2,48 @@ namespace Orders.Placement;
 
 /// <summary>
 /// Saga states representing the order lifecycle.
+/// These states are used for internal saga coordination and are also surfaced to customers
+/// via the Orders API. Internal coordination details (e.g., how many reservations are confirmed)
+/// are tracked via separate saga properties rather than enum variants.
 /// </summary>
 public enum OrderStatus
 {
     /// <summary>Order created, awaiting payment and inventory confirmation.</summary>
     Placed,
-    
-    /// <summary>Awaiting async payment confirmation.</summary>
+
+    /// <summary>Awaiting async payment confirmation (authorization received, capture pending).</summary>
     PendingPayment,
-    
-    /// <summary>Funds captured successfully.</summary>
+
+    /// <summary>Payment captured successfully.</summary>
     PaymentConfirmed,
-    
-    /// <summary>Payment declined (terminal or retry branch).</summary>
+
+    /// <summary>Payment declined.</summary>
     PaymentFailed,
 
-    /// <summary>Inventory reservation confirmed.</summary>
+    /// <summary>All inventory reservations confirmed across all SKUs.</summary>
     InventoryReserved,
 
-    /// <summary>Inventory reservation failed (insufficient stock).</summary>
-    InventoryFailed,
+    /// <summary>Inventory unavailable — order will be cancelled and any payment refunded.</summary>
+    OutOfStock,
 
-    /// <summary>Inventory committed (hard allocation).</summary>
+    /// <summary>Inventory hard-allocated; awaiting fulfillment handoff.</summary>
     InventoryCommitted,
 
     /// <summary>Flagged for fraud review or inventory issues.</summary>
     OnHold,
 
-    /// <summary>Handed off to Fulfillment BC.</summary>
+    /// <summary>Handed off to Fulfillment BC for picking, packing, and shipping.</summary>
     Fulfilling,
-    
-    /// <summary>Integration event from Fulfillment.</summary>
+
+    /// <summary>Shipment dispatched by carrier.</summary>
     Shipped,
-    
-    /// <summary>Integration event from Fulfillment.</summary>
+
+    /// <summary>Order delivered to customer; return window now open.</summary>
     Delivered,
-    
-    /// <summary>Compensation triggered.</summary>
+
+    /// <summary>Order cancelled; compensation flows (inventory release, refund) triggered.</summary>
     Cancelled,
-    
-    /// <summary>Customer initiated return.</summary>
-    ReturnRequested,
-    
-    /// <summary>Terminal state.</summary>
+
+    /// <summary>Terminal state — return window expired or return fully resolved.</summary>
     Closed
 }

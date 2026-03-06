@@ -1,11 +1,11 @@
-using Wolverine.Marten;
 using IntegrationMessages = Messages.Contracts.Orders;
 
 namespace Orders.Placement;
 
 /// <summary>
 /// Message handler that receives CheckoutCompleted integration message and starts the Order saga.
-/// Uses IStartStream pattern for idiomatic Wolverine saga initialization.
+/// Separated from the Order saga class to keep state-transition handlers focused.
+/// The return type of (Order, ...) is recognized by Wolverine as a saga start handler.
 /// </summary>
 public static class PlaceOrderHandler
 {
@@ -13,9 +13,9 @@ public static class PlaceOrderHandler
     /// Handles CheckoutCompleted integration message by starting a new Order saga.
     /// This is the ONLY way to create Order sagas in production.
     /// </summary>
-    /// <param name="message">The checkout completed integration message (internal to Orders BC).</param>
-    /// <returns>Stream start operation for the Order saga + OrderPlaced cascading message.</returns>
-    public static (IStartStream, IntegrationMessages.OrderPlaced) Handle(
+    /// <param name="message">The checkout completed integration message from Shopping BC.</param>
+    /// <returns>The new Order saga instance + OrderPlaced cascading message.</returns>
+    public static (Order, IntegrationMessages.OrderPlaced) Handle(
         Messages.Contracts.Shopping.CheckoutCompleted message)
     {
         // Map integration message to domain command
@@ -37,12 +37,6 @@ public static class PlaceOrderHandler
             message.CompletedAt);
 
         // Delegate to pure Decider function for business logic
-        var (saga, orderPlaced) = OrderDecider.Start(command, DateTimeOffset.UtcNow);
-
-        // Start saga stream using idiomatic Wolverine pattern
-        var stream = MartenOps.StartStream<Order>(saga.Id, saga);
-
-        // Return stream start + cascading message (both processed by Wolverine)
-        return (stream, orderPlaced);
+        return OrderDecider.Start(command, DateTimeOffset.UtcNow);
     }
 }
