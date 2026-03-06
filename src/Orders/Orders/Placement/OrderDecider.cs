@@ -265,8 +265,13 @@ public static class OrderDecider
             [message.ReservationId] = message.Sku
         };
 
+        var effectiveExpectedReservationCount =
+            current.ExpectedReservationCount == 0
+                ? current.LineItems.Count
+                : current.ExpectedReservationCount;
+
         var newConfirmedCount = current.ConfirmedReservationCount + 1;
-        var allReserved = newConfirmedCount >= current.ExpectedReservationCount;
+        var allReserved = newConfirmedCount >= effectiveExpectedReservationCount;
 
         var messages = new List<object>();
 
