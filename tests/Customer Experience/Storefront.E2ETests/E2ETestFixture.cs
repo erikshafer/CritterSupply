@@ -164,7 +164,8 @@ public sealed class E2ETestFixture : IAsyncLifetime
             WellKnownTestData.Addresses.AliceHomePostalCode,
             WellKnownTestData.Addresses.AliceHomeCountry,
             AddressType: "Shipping",
-            IsDefault: true));
+            IsDefault: true,
+            DisplayLine: WellKnownTestData.Addresses.AliceHomeDisplayLine));
 
         StubCustomerIdentityClient.AddAddress(new Storefront.Clients.CustomerAddressDto(
             WellKnownTestData.Addresses.AliceWork,
@@ -177,7 +178,8 @@ public sealed class E2ETestFixture : IAsyncLifetime
             WellKnownTestData.Addresses.AliceWorkPostalCode,
             WellKnownTestData.Addresses.AliceWorkCountry,
             AddressType: "Shipping",
-            IsDefault: false));
+            IsDefault: false,
+            DisplayLine: WellKnownTestData.Addresses.AliceWorkDisplayLine));
     }
 }
 
