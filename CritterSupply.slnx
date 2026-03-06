@@ -149,4 +149,6 @@
     <Project Path="src/CritterSupply.AppHost/CritterSupply.AppHost.csproj" />
     <Project Path="src/CritterSupply.ServiceDefaults/CritterSupply.ServiceDefaults.csproj" />
   </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Orders/" />
 </Solution>
