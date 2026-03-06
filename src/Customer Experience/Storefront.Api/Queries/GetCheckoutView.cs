@@ -55,11 +55,11 @@ public static class GetCheckoutViewHandler
             var addressSummaries = addresses.Select(addr => new AddressSummary(
                 addr.Id,
                 addr.Nickname,
-                $"{addr.AddressLine1}, {addr.City}, {addr.StateOrProvince} {addr.PostalCode}"
+                addr.DisplayLine
             )).ToList();
 
             var checkoutView = new CheckoutView(
-                checkout.Id,
+                checkout.CheckoutId,
                 checkout.CustomerId,
                 CheckoutStep.ShippingAddress, // TODO: Track actual step in Orders BC
                 enrichedItems,
