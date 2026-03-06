@@ -90,11 +90,11 @@ public class InventoryIntegrationTests : IAsyncLifetime
 
     /// <summary>
     /// Integration test for ReservationFailed handler.
-    /// Creates an order, sends ReservationFailed, verifies order transitions to InventoryFailed.
+    /// Creates an order, sends ReservationFailed, verifies order transitions to OutOfStock.
     /// **Validates: Requirement 2.2 - Order fails when inventory cannot be reserved**
     /// </summary>
     [Fact]
-    public async Task ReservationFailed_Transitions_Order_To_InventoryFailed()
+    public async Task ReservationFailed_Transitions_Order_To_OutOfStock()
     {
         // Arrange: Create an order first
         var customerId = Guid.NewGuid();
@@ -150,7 +150,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
         var updatedOrder = await querySession.LoadAsync<Order>(order.Id);
 
         updatedOrder.ShouldNotBeNull();
-        updatedOrder.Status.ShouldBe(OrderStatus.InventoryFailed);
+        updatedOrder.Status.ShouldBe(OrderStatus.OutOfStock);
         updatedOrder.CustomerId.ShouldBe(customerId);
         updatedOrder.TotalAmount.ShouldBe(2004.99m); // 1999.00 + 5.99 shipping
     }
@@ -241,7 +241,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
 
     /// <summary>
     /// Integration test for ReservationReleased handler.
-    /// Creates an order, transitions to InventoryFailed, then releases reservation.
+    /// Creates an order, transitions to OutOfStock, then releases reservation.
     /// Reservation release is a compensation operation and doesn't change order status.
     /// **Validates: Requirement 2.4 - Order tracks inventory release for compensation**
     /// </summary>
@@ -283,7 +283,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
 
         order.Status.ShouldBe(OrderStatus.Placed);
 
-        // Transition to InventoryFailed
+        // Transition to OutOfStock
         var reservationId = Guid.NewGuid();
         var reservationFailed = new ReservationFailed(
             order.Id,
@@ -300,7 +300,7 @@ public class InventoryIntegrationTests : IAsyncLifetime
         // Verify failure
         await using var failedSession = _fixture.GetDocumentSession();
         var failedOrder = await failedSession.LoadAsync<Order>(order.Id);
-        failedOrder!.Status.ShouldBe(OrderStatus.InventoryFailed);
+        failedOrder!.Status.ShouldBe(OrderStatus.OutOfStock);
 
         // Act: Send ReservationReleased message (compensation)
         var inventoryId = Guid.NewGuid();
@@ -316,12 +316,12 @@ public class InventoryIntegrationTests : IAsyncLifetime
 
         await _fixture.ExecuteAndWaitAsync(reservationReleased);
 
-        // Assert: Verify order status remains InventoryFailed (release is compensation, not state change)
+        // Assert: Verify order status remains OutOfStock (release is compensation, not state change)
         await using var querySession = _fixture.GetDocumentSession();
         var updatedOrder = await querySession.LoadAsync<Order>(order.Id);
 
         updatedOrder.ShouldNotBeNull();
-        updatedOrder.Status.ShouldBe(OrderStatus.InventoryFailed);
+        updatedOrder.Status.ShouldBe(OrderStatus.OutOfStock);
         updatedOrder.CustomerId.ShouldBe(customerId);
         updatedOrder.TotalAmount.ShouldBe(105.98m); // 99.99 + 5.99 shipping
     }

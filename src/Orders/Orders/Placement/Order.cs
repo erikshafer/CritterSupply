@@ -1,6 +1,9 @@
 using Messages.Contracts.Inventory;
 using Messages.Contracts.Payments;
+using Microsoft.AspNetCore.Mvc;
 using Wolverine;
+using Wolverine.Http;
+using Wolverine.Marten;
 using IntegrationMessages = Messages.Contracts.Orders;
 using FulfillmentMessages = Messages.Contracts.Fulfillment;
 
@@ -64,9 +67,35 @@ public sealed class Order : Saga
     public Dictionary<Guid, string> ReservationIds { get; set; } = new();
 
     /// <summary>
-    /// Tracks whether inventory has been reserved (for orchestration logic).
+    /// Number of distinct SKUs expected to produce inventory reservations.
+    /// Set at saga start to enable multi-SKU reservation tracking.
     /// </summary>
-    public bool IsInventoryReserved { get; set; }
+    public int ExpectedReservationCount { get; set; }
+
+    /// <summary>
+    /// Number of individual SKU reservations that have been confirmed by Inventory BC.
+    /// When this equals ExpectedReservationCount, all inventory is reserved.
+    /// </summary>
+    public int ConfirmedReservationCount { get; set; }
+
+    /// <summary>
+    /// Number of individual SKU reservations that have been committed (hard-allocated) by Inventory BC.
+    /// When this equals ExpectedReservationCount and payment is captured, fulfillment can be requested.
+    /// </summary>
+    public int CommittedReservationCount { get; set; }
+
+    /// <summary>
+    /// True when all expected SKU reservations have been confirmed by Inventory BC.
+    /// Derived from reservation counts; not stored separately.
+    /// </summary>
+    public bool IsInventoryReserved => ExpectedReservationCount > 0
+        && ConfirmedReservationCount >= ExpectedReservationCount;
+
+    /// <summary>
+    /// True when all confirmed reservations have been committed (hard-allocated) by Inventory BC.
+    /// </summary>
+    public bool IsAllInventoryCommitted => ExpectedReservationCount > 0
+        && CommittedReservationCount >= ExpectedReservationCount;
 
     /// <summary>
     /// Tracks whether payment has been captured (for orchestration logic).
@@ -103,6 +132,41 @@ public sealed class Order : Saga
 
         // Delegate to pure Decider function (pass current timestamp)
         return OrderDecider.Start(command, DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>
+    /// Saga handler for order cancellation.
+    /// Guard runs before Handle: cannot cancel after shipment has been dispatched, or when already cancelled.
+    /// Triggers compensation: releases inventory reservations and refunds captured payment.
+    /// </summary>
+    public ProblemDetails Before(CancelOrder command)
+    {
+        if (Status is OrderStatus.Shipped or OrderStatus.Delivered or OrderStatus.Closed)
+            return new ProblemDetails
+            {
+                Detail = "Order cannot be cancelled after it has been shipped",
+                Status = 409
+            };
+
+        if (Status is OrderStatus.Cancelled)
+            return new ProblemDetails
+            {
+                Detail = "Order is already cancelled",
+                Status = 409
+            };
+
+        return WolverineContinue.NoProblems;
+    }
+
+    public OutgoingMessages Handle(CancelOrder command)
+    {
+        var decision = OrderDecider.HandleCancelOrder(this, command, DateTimeOffset.UtcNow);
+
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+        return outgoing;
     }
 
     /// <summary>
@@ -162,8 +226,7 @@ public sealed class Order : Saga
 
     /// <summary>
     /// Saga handler for successful refund completion.
-    /// Refunds are a financial operation and don't necessarily change the order's fulfillment status.
-    /// The order remains in its current state (e.g., Shipped, Delivered, Closed).
+    /// When the order was previously cancelled, a completed refund closes the order lifecycle.
     /// **Validates: Requirement 1.5 - Order tracks refund completion for financial reconciliation**
     /// </summary>
     /// <param name="message">Refund completed integration message from Payments BC.</param>
@@ -171,14 +234,13 @@ public sealed class Order : Saga
     {
         var decision = OrderDecider.HandleRefundCompleted(this, message);
 
-        // Apply state changes from decision (none expected for refunds)
         if (decision.Status.HasValue) Status = decision.Status.Value;
+        if (decision.ShouldComplete) MarkCompleted();
     }
 
     /// <summary>
     /// Saga handler for failed refund processing.
     /// Refund failures are logged but don't change the order's fulfillment status.
-    /// The order remains in its current state (e.g., Shipped, Delivered, Closed).
     /// **Validates: Requirement 1.6 - Order tracks refund failures for investigation and retry**
     /// </summary>
     /// <param name="message">Refund failed integration message from Payments BC.</param>
@@ -186,58 +248,69 @@ public sealed class Order : Saga
     {
         var decision = OrderDecider.HandleRefundFailed(this, message);
 
-        // Apply state changes from decision (none expected for refund failures)
         if (decision.Status.HasValue) Status = decision.Status.Value;
     }
 
     /// <summary>
-    /// Saga handler for successful inventory reservation.
-    /// Transitions order to InventoryReserved status and tracks reservation for future orchestration.
+    /// Saga handler for successful inventory reservation (per SKU).
+    /// Tracks per-SKU reservation; transitions to InventoryReserved only when ALL SKUs are confirmed.
+    /// Orchestrates inventory commitment if payment is already captured and all SKUs reserved.
     /// **Validates: Requirement 2.1 - Order tracks inventory reservation confirmation**
     /// </summary>
     /// <param name="message">Reservation confirmed integration message from Inventory BC.</param>
-    /// <returns>Orchestration message if payment is already captured and ready to commit.</returns>
-    public IntegrationMessages.ReservationCommitRequested? Handle(ReservationConfirmed message)
+    /// <returns>Orchestration message(s) if payment is already captured and all inventory is reserved.</returns>
+    public OutgoingMessages Handle(ReservationConfirmed message)
     {
         var decision = OrderDecider.HandleReservationConfirmed(this, message, DateTimeOffset.UtcNow);
 
         // Apply state changes from decision
         if (decision.Status.HasValue) Status = decision.Status.Value;
-        if (decision.IsInventoryReserved.HasValue) IsInventoryReserved = decision.IsInventoryReserved.Value;
+        if (decision.ConfirmedReservationCount.HasValue)
+            ConfirmedReservationCount = decision.ConfirmedReservationCount.Value;
         if (decision.ReservationIds != null) ReservationIds = decision.ReservationIds;
 
-        // Return single orchestration message (if any)
-        return decision.Messages.FirstOrDefault() as IntegrationMessages.ReservationCommitRequested;
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+        return outgoing;
     }
 
     /// <summary>
-    /// Saga handler for inventory reservation failure.
-    /// Transitions order to InventoryFailed status (insufficient stock).
+    /// Saga handler for inventory reservation failure (insufficient stock).
+    /// Transitions order to OutOfStock status and triggers compensation:
+    /// - Refunds captured payment (if applicable)
+    /// - Releases any other successfully-reserved inventory
     /// **Validates: Requirement 2.2 - Order fails when inventory cannot be reserved**
     /// </summary>
     /// <param name="message">Reservation failed integration message from Inventory BC.</param>
-    public void Handle(ReservationFailed message)
+    /// <returns>Compensation messages (refund + release other reservations).</returns>
+    public OutgoingMessages Handle(ReservationFailed message)
     {
-        var decision = OrderDecider.HandleReservationFailed(this, message);
+        var decision = OrderDecider.HandleReservationFailed(this, message, DateTimeOffset.UtcNow);
 
-        // Apply state changes from decision
         if (decision.Status.HasValue) Status = decision.Status.Value;
+
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+        return outgoing;
     }
 
     /// <summary>
-    /// Saga handler for inventory commitment (hard allocation).
-    /// Transitions order to InventoryCommitted status and proceeds to fulfillment if payment is captured.
+    /// Saga handler for inventory commitment (hard allocation, per SKU).
+    /// Tracks per-SKU commits; proceeds to fulfillment only when ALL SKUs committed and payment captured.
+    /// Idempotency guard prevents duplicate FulfillmentRequested messages.
     /// **Validates: Requirement 2.3 - Order proceeds after inventory is committed**
     /// **Validates: Requirement 3.1 - Order cannot proceed to fulfillment without confirmed payment**
     /// </summary>
     /// <param name="message">Reservation committed integration message from Inventory BC.</param>
-    /// <returns>Orchestration message to start fulfillment if both payment and inventory are confirmed.</returns>
+    /// <returns>Orchestration message to start fulfillment if all conditions are met.</returns>
     public OutgoingMessages Handle(ReservationCommitted message)
     {
         var decision = OrderDecider.HandleReservationCommitted(this, message, DateTimeOffset.UtcNow);
 
         // Apply state changes from decision
         if (decision.Status.HasValue) Status = decision.Status.Value;
+        if (decision.CommittedReservationCount.HasValue)
+            CommittedReservationCount = decision.CommittedReservationCount.Value;
 
         // Return outgoing messages
         var outgoing = new OutgoingMessages();
@@ -246,8 +319,8 @@ public sealed class Order : Saga
     }
 
     /// <summary>
-    /// Saga handler for inventory reservation release.
-    /// Tracks that inventory has been returned to available pool (compensation).
+    /// Saga handler for inventory reservation release (compensation acknowledgement).
+    /// No status change - release is a side effect of cancellation or failure compensation.
     /// **Validates: Requirement 2.4 - Order tracks inventory release for compensation**
     /// </summary>
     /// <param name="message">Reservation released integration message from Inventory BC.</param>
@@ -255,7 +328,6 @@ public sealed class Order : Saga
     {
         var decision = OrderDecider.HandleReservationReleased(this, message);
 
-        // Apply state changes from decision (none expected for compensation)
         if (decision.Status.HasValue) Status = decision.Status.Value;
     }
 
@@ -269,30 +341,36 @@ public sealed class Order : Saga
     {
         var decision = OrderDecider.HandleShipmentDispatched(this, message);
 
-        // Apply state changes from decision
         if (decision.Status.HasValue) Status = decision.Status.Value;
     }
 
     /// <summary>
     /// Saga handler for successful delivery from Fulfillment BC.
-    /// Transitions order to Delivered status - terminal success state.
+    /// Transitions order to Delivered status and schedules a ReturnWindowExpired message.
+    /// The saga remains open during the return window to handle potential return requests.
     /// **Validates: Requirement 3.3 - Order completes when delivery confirmed**
     /// </summary>
     /// <param name="message">Shipment delivered integration message from Fulfillment BC.</param>
-    public void Handle(FulfillmentMessages.ShipmentDelivered message)
+    /// <returns>Scheduled ReturnWindowExpired message to close the saga after the return window.</returns>
+    public OutgoingMessages Handle(FulfillmentMessages.ShipmentDelivered message)
     {
         var decision = OrderDecider.HandleShipmentDelivered(this, message);
 
-        // Apply state changes from decision
         if (decision.Status.HasValue) Status = decision.Status.Value;
 
-        // Mark saga as complete if decider signals completion
-        if (decision.ShouldComplete) MarkCompleted();
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+
+        // Schedule the return window timeout. The saga stays open to handle return requests;
+        // when the window expires with no return, Handle(ReturnWindowExpired) closes the saga.
+        outgoing.Delay(new ReturnWindowExpired(Id), OrderDecider.ReturnWindowDuration);
+
+        return outgoing;
     }
 
     /// <summary>
     /// Saga handler for delivery failure from Fulfillment BC.
-    /// Tracks delivery issues - may require customer service intervention.
+    /// Tracks delivery issues - order remains in Shipped status (carrier will retry).
     /// **Validates: Requirement 3.4 - Order tracks delivery failures**
     /// </summary>
     /// <param name="message">Shipment delivery failed integration message from Fulfillment BC.</param>
@@ -300,7 +378,19 @@ public sealed class Order : Saga
     {
         var decision = OrderDecider.HandleShipmentDeliveryFailed(this, message);
 
-        // Apply state changes from decision (none expected - remains Shipped)
         if (decision.Status.HasValue) Status = decision.Status.Value;
+    }
+
+    /// <summary>
+    /// Saga handler for return window expiration.
+    /// The return window is scheduled at delivery time. When it fires, the order
+    /// moves to Closed status and the saga completes — no return was requested.
+    /// If a return was requested before expiry, the return process in the Returns BC handles it.
+    /// </summary>
+    /// <param name="message">Return window expired scheduled message.</param>
+    public void Handle(ReturnWindowExpired message)
+    {
+        Status = OrderStatus.Closed;
+        MarkCompleted();
     }
 }

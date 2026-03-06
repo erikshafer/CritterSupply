@@ -13,6 +13,11 @@ namespace Orders.Placement;
 public static class OrderDecider
 {
     /// <summary>
+    /// How long after delivery the return window stays open before the saga closes automatically.
+    /// </summary>
+    public static readonly TimeSpan ReturnWindowDuration = TimeSpan.FromDays(30);
+
+    /// <summary>
     /// Decides to create a new Order saga from PlaceOrder command.
     /// Pure function - accepts time as parameter for true purity.
     /// </summary>
@@ -36,6 +41,13 @@ public static class OrderDecider
         var subtotal = lineItems.Sum(x => x.LineTotal);
         var totalAmount = subtotal + command.ShippingCost;
 
+        // Track how many distinct SKUs expect an individual reservation response.
+        // Inventory BC creates one reservation per distinct SKU in OrderPlacedHandler.
+        var expectedReservationCount = command.LineItems
+            .Select(li => li.Sku)
+            .Distinct()
+            .Count();
+
         // Create the saga instance (write model)
         var saga = new Order
         {
@@ -47,7 +59,8 @@ public static class OrderDecider
             PaymentMethodToken = command.PaymentMethodToken,
             TotalAmount = totalAmount,
             Status = OrderStatus.Placed,
-            PlacedAt = timestamp
+            PlacedAt = timestamp,
+            ExpectedReservationCount = expectedReservationCount
         };
 
         // Create the integration event to publish
@@ -75,6 +88,52 @@ public static class OrderDecider
     }
 
     /// <summary>
+    /// Decides how to handle an order cancellation request.
+    /// Pure function - returns new state and compensation messages.
+    /// Guard conditions (cannot cancel after Shipped) are enforced in Order.Before().
+    /// </summary>
+    public static OrderDecision HandleCancelOrder(
+        Order current,
+        CancelOrder command,
+        DateTimeOffset timestamp)
+    {
+        var messages = new List<object>();
+
+        // Compensation: Release all reserved inventory
+        foreach (var reservationId in current.ReservationIds.Keys)
+        {
+            messages.Add(new IntegrationMessages.ReservationReleaseRequested(
+                current.Id,
+                reservationId,
+                command.Reason,
+                timestamp));
+        }
+
+        // Compensation: Refund if payment was captured
+        if (current.IsPaymentCaptured)
+        {
+            messages.Add(new Messages.Contracts.Payments.RefundRequested(
+                current.Id,
+                current.TotalAmount,
+                command.Reason,
+                timestamp));
+        }
+
+        // Publish OrderCancelled integration event for downstream BCs
+        messages.Add(new IntegrationMessages.OrderCancelled(
+            current.Id,
+            current.CustomerId,
+            command.Reason,
+            timestamp));
+
+        return new OrderDecision
+        {
+            Status = OrderStatus.Cancelled,
+            Messages = messages
+        };
+    }
+
+    /// <summary>
     /// Decides how to handle successful payment capture.
     /// Pure function - returns new state and messages.
     /// </summary>
@@ -83,25 +142,26 @@ public static class OrderDecider
         PaymentCaptured message,
         DateTimeOffset timestamp)
     {
-        var decision = new OrderDecision
-        {
-            Status = OrderStatus.PaymentConfirmed,
-            IsPaymentCaptured = true
-        };
+        var messages = new List<object>();
 
-        // Orchestration: If inventory is already reserved, tell Inventory to commit all reservations
+        // Orchestration: If ALL inventory is already reserved, tell Inventory to commit all reservations
         if (current.IsInventoryReserved)
         {
             foreach (var reservationId in current.ReservationIds.Keys)
             {
-                decision.Messages.Add(new IntegrationMessages.ReservationCommitRequested(
+                messages.Add(new IntegrationMessages.ReservationCommitRequested(
                     current.Id,
                     reservationId,
                     timestamp));
             }
         }
 
-        return decision;
+        return new OrderDecision
+        {
+            Status = OrderStatus.PaymentConfirmed,
+            IsPaymentCaptured = true,
+            Messages = messages
+        };
     }
 
     /// <summary>
@@ -113,17 +173,14 @@ public static class OrderDecider
         PaymentFailed message,
         DateTimeOffset timestamp)
     {
-        var decision = new OrderDecision
-        {
-            Status = OrderStatus.PaymentFailed
-        };
+        var messages = new List<object>();
 
         // Compensation: Release any reserved inventory
         if (current.IsInventoryReserved)
         {
             foreach (var reservationId in current.ReservationIds.Keys)
             {
-                decision.Messages.Add(new IntegrationMessages.ReservationReleaseRequested(
+                messages.Add(new IntegrationMessages.ReservationReleaseRequested(
                     current.Id,
                     reservationId,
                     "Payment failed",
@@ -131,7 +188,11 @@ public static class OrderDecider
             }
         }
 
-        return decision;
+        return new OrderDecision
+        {
+            Status = OrderStatus.PaymentFailed,
+            Messages = messages
+        };
     }
 
     /// <summary>
@@ -150,14 +211,23 @@ public static class OrderDecider
 
     /// <summary>
     /// Decides how to handle refund completion.
-    /// Pure function - maintains current status (refund is a financial operation, not order lifecycle).
+    /// When the order was cancelled, a completed refund signals the financial lifecycle is closed.
     /// </summary>
     public static OrderDecision HandleRefundCompleted(
         Order current,
         RefundCompleted message)
     {
-        // Refund completed - no order status change, just acknowledge
-        return new OrderDecision(); // No state changes
+        // If the order was cancelled, a completed refund closes the lifecycle
+        if (current.Status == OrderStatus.Cancelled)
+        {
+            return new OrderDecision
+            {
+                Status = OrderStatus.Closed,
+                ShouldComplete = true
+            };
+        }
+
+        return new OrderDecision(); // No state changes for refunds on non-cancelled orders
     }
 
     /// <summary>
@@ -168,13 +238,14 @@ public static class OrderDecider
         Order current,
         RefundFailed message)
     {
-        // Refund failed - no order status change, failure is tracked elsewhere
-        return new OrderDecision(); // No state changes
+        // Refund failed - no order status change, failure is tracked by Payments BC for retry
+        return new OrderDecision();
     }
 
     /// <summary>
-    /// Decides how to handle inventory reservation confirmation.
-    /// Pure function - returns new state and orchestration messages.
+    /// Decides how to handle inventory reservation confirmation (per SKU).
+    /// Tracks per-SKU confirmations; only signals InventoryReserved when ALL SKUs are confirmed.
+    /// Triggers ReservationCommitRequested for the confirmed SKU only if payment is already captured.
     /// </summary>
     public static OrderDecision HandleReservationConfirmed(
         Order current,
@@ -186,60 +257,89 @@ public static class OrderDecider
             [message.ReservationId] = message.Sku
         };
 
-        var decision = new OrderDecision
-        {
-            Status = OrderStatus.InventoryReserved,
-            IsInventoryReserved = true,
-            ReservationIds = newReservations
-        };
+        var newConfirmedCount = current.ConfirmedReservationCount + 1;
+        var allReserved = newConfirmedCount >= current.ExpectedReservationCount;
 
-        // Orchestration: If payment is already captured, tell Inventory to commit this reservation
+        var messages = new List<object>();
+
+        // Orchestration: If payment is already captured, commit this specific reservation immediately.
+        // When allReserved is also true, HandlePaymentCaptured would have already issued commit
+        // requests for the other reservations — so only commit the newly confirmed one here.
         if (current.IsPaymentCaptured)
         {
-            decision.Messages.Add(new IntegrationMessages.ReservationCommitRequested(
+            messages.Add(new IntegrationMessages.ReservationCommitRequested(
                 current.Id,
                 message.ReservationId,
                 timestamp));
         }
 
-        return decision;
-    }
-
-    /// <summary>
-    /// Decides how to handle inventory reservation failure.
-    /// Pure function - returns new state.
-    /// </summary>
-    public static OrderDecision HandleReservationFailed(
-        Order current,
-        ReservationFailed message)
-    {
         return new OrderDecision
         {
-            Status = OrderStatus.InventoryFailed
-            // TODO: Future enhancement - trigger compensation (release payment, cancel order)
+            Status = allReserved ? OrderStatus.InventoryReserved : current.Status,
+            ConfirmedReservationCount = newConfirmedCount,
+            ReservationIds = newReservations,
+            Messages = messages
         };
     }
 
     /// <summary>
-    /// Decides how to handle inventory commitment (hard allocation).
-    /// Pure function - returns new state and fulfillment orchestration if ready.
+    /// Decides how to handle inventory reservation failure (insufficient stock).
+    /// Triggers compensation: cancels the order, refunds captured payment, and releases
+    /// any reservations that did succeed before the failure was reported.
+    /// </summary>
+    public static OrderDecision HandleReservationFailed(
+        Order current,
+        ReservationFailed message,
+        DateTimeOffset timestamp)
+    {
+        var messages = new List<object>();
+
+        // Compensation: Refund captured payment — we cannot fulfill, so money must be returned
+        if (current.IsPaymentCaptured)
+        {
+            messages.Add(new Messages.Contracts.Payments.RefundRequested(
+                current.Id,
+                current.TotalAmount,
+                $"Inventory unavailable for SKU {message.Sku}: {message.Reason}",
+                timestamp));
+        }
+
+        // Compensation: Release any other reservations that did succeed
+        foreach (var reservationId in current.ReservationIds.Keys)
+        {
+            messages.Add(new IntegrationMessages.ReservationReleaseRequested(
+                current.Id,
+                reservationId,
+                $"Order cancelled due to inventory unavailability: {message.Reason}",
+                timestamp));
+        }
+
+        return new OrderDecision
+        {
+            Status = OrderStatus.OutOfStock,
+            Messages = messages
+        };
+    }
+
+    /// <summary>
+    /// Decides how to handle inventory commitment (hard allocation, per SKU).
+    /// Tracks per-SKU commits; only dispatches FulfillmentRequested when ALL SKUs are committed
+    /// and payment has been captured. Idempotency guard prevents duplicate dispatch.
     /// </summary>
     public static OrderDecision HandleReservationCommitted(
         Order current,
         ReservationCommitted message,
         DateTimeOffset timestamp)
     {
-        var decision = new OrderDecision
-        {
-            Status = OrderStatus.InventoryCommitted
-        };
+        var newCommittedCount = current.CommittedReservationCount + 1;
+        var allCommitted = newCommittedCount >= current.ExpectedReservationCount;
 
-        // Orchestration: If payment is captured, proceed to fulfillment
-        if (current.IsPaymentCaptured)
-        {
-            // Update status to Fulfilling when requesting fulfillment
-            decision = decision with { Status = OrderStatus.Fulfilling };
+        var messages = new List<object>();
 
+        // Dispatch fulfillment only when ALL reservations are committed and payment is captured.
+        // Idempotency guard: Status != Fulfilling prevents duplicate FulfillmentRequested messages.
+        if (allCommitted && current.IsPaymentCaptured && current.Status != OrderStatus.Fulfilling)
+        {
             var fulfillmentLineItems = current.LineItems
                 .Select(li => new FulfillmentMessages.FulfillmentLineItem(
                     li.Sku,
@@ -254,7 +354,7 @@ public static class OrderDecider
                 current.ShippingAddress.PostalCode,
                 current.ShippingAddress.Country);
 
-            decision.Messages.Add(new FulfillmentMessages.FulfillmentRequested(
+            messages.Add(new FulfillmentMessages.FulfillmentRequested(
                 current.Id,
                 current.CustomerId,
                 shippingAddress,
@@ -263,7 +363,16 @@ public static class OrderDecider
                 timestamp));
         }
 
-        return decision;
+        var newStatus = allCommitted && current.IsPaymentCaptured
+            ? OrderStatus.Fulfilling
+            : OrderStatus.InventoryCommitted;
+
+        return new OrderDecision
+        {
+            Status = newStatus,
+            CommittedReservationCount = newCommittedCount,
+            Messages = messages
+        };
     }
 
     /// <summary>
@@ -275,7 +384,7 @@ public static class OrderDecider
         ReservationReleased message)
     {
         // Compensation acknowledged - no status change needed
-        return new OrderDecision(); // No state changes
+        return new OrderDecision();
     }
 
     /// <summary>
@@ -294,7 +403,8 @@ public static class OrderDecider
 
     /// <summary>
     /// Decides how to handle shipment delivery.
-    /// Pure function - returns new state and saga completion signal.
+    /// Transitions to Delivered. The saga remains open after delivery to allow returns;
+    /// the ReturnWindowExpired message is scheduled by the saga handler via OutgoingMessages.Delay().
     /// </summary>
     public static OrderDecision HandleShipmentDelivered(
         Order current,
@@ -302,21 +412,22 @@ public static class OrderDecider
     {
         return new OrderDecision
         {
-            Status = OrderStatus.Delivered,
-            ShouldComplete = true // Signal saga completion
+            Status = OrderStatus.Delivered
+            // Note: ReturnWindowExpired is scheduled in the saga handler using OutgoingMessages.Delay()
+            // to keep the Decider free of infrastructure concerns (scheduling duration, delivery mechanism).
         };
     }
 
     /// <summary>
     /// Decides how to handle shipment delivery failure.
-    /// Pure function - maintains Shipped status (no backward transition).
+    /// Pure function - maintains Shipped status (carrier will retry delivery).
     /// </summary>
     public static OrderDecision HandleShipmentDeliveryFailed(
         Order current,
         FulfillmentMessages.ShipmentDeliveryFailed message)
     {
-        // Order remains in Shipped status - delivery failures don't reverse shipment
-        return new OrderDecision(); // No state changes
+        // Order remains in Shipped status - carrier retries delivery
+        return new OrderDecision();
     }
 }
 
@@ -328,8 +439,9 @@ public sealed record OrderDecision
 {
     public OrderStatus? Status { get; init; }
     public bool? IsPaymentCaptured { get; init; }
-    public bool? IsInventoryReserved { get; init; }
+    public int? ConfirmedReservationCount { get; init; }
+    public int? CommittedReservationCount { get; init; }
     public Dictionary<Guid, string>? ReservationIds { get; init; }
     public bool ShouldComplete { get; init; }
-    public List<object> Messages { get; init; } = new();
+    public IReadOnlyList<object> Messages { get; init; } = [];
 }

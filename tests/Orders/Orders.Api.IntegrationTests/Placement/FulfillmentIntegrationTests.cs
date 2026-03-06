@@ -147,10 +147,12 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Integration test: Order transitions to Delivered and saga completes when ShipmentDelivered received.
+    /// Integration test: Order transitions to Delivered when ShipmentDelivered received.
+    /// Saga remains open (return window) to handle potential returns.
+    /// The saga only closes when ReturnWindowExpired fires (30 days later, not tested here).
     /// </summary>
     [Fact]
-    public async Task Order_Transitions_To_Delivered_And_Saga_Completes_When_Shipment_Delivered()
+    public async Task Order_Transitions_To_Delivered_When_Shipment_Delivered()
     {
         // Arrange: Create order and get it to Shipped status
         var customerId = Guid.NewGuid();
@@ -207,12 +209,13 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
             DateTimeOffset.UtcNow,
             "John Doe"));
 
-        // Assert: Verify saga was completed and deleted (MarkCompleted() deletes the saga document)
+        // Assert: Verify order transitioned to Delivered — saga remains open for the return window.
+        // The saga will close (MarkCompleted) when ReturnWindowExpired fires after 30 days.
         await using var session = _fixture.GetDocumentSession();
         var deliveredOrder = await session.LoadAsync<Order>(order.Id);
-        deliveredOrder.ShouldBeNull(); // Saga is deleted after MarkCompleted() is called
-
-        // Note: TotalAmount would have been 35.96m (29.97 + 5.99 shipping) if saga still existed
+        deliveredOrder.ShouldNotBeNull();
+        deliveredOrder.Status.ShouldBe(OrderStatus.Delivered);
+        deliveredOrder.TotalAmount.ShouldBe(35.96m); // 29.97 + 5.99 shipping
     }
 
     /// <summary>
