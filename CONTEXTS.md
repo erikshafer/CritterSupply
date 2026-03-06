@@ -769,7 +769,9 @@ When Shopping BC completes checkout, it doesn't pass an `AddressId` to Orders BC
 
 ## Customer Experience
 
-The Customer Experience context is a **stateless BFF (Backend-for-Frontend)** that composes views from multiple domain BCs (Shopping, Orders, Catalog, Customer Identity). It does NOT contain domain logic or persist data—all state lives in upstream BCs. Real-time updates are pushed to Blazor clients via Server-Sent Events (SSE). This BC optimizes UI performance and provides a cohesive customer experience across web and future mobile channels.
+The Customer Experience context is a **stateless BFF (Backend-for-Frontend)** that composes views from multiple domain BCs (Shopping, Orders, Catalog, Customer Identity). It does NOT contain domain logic or persist data—all state lives in upstream BCs. Real-time updates are pushed to Blazor clients via **SignalR** (via Wolverine's native transport — migrated from SSE in Cycle 18, see ADR 0013).
+
+> ⚠️ **Documentation Note:** This section contains historical implementation details from Cycles 16-18. Some references to "SSE" in this section reflect the original implementation that was subsequently migrated to SignalR (ADR 0013). The authoritative architecture description for the current SignalR-based implementation is in the second Customer Experience section below and in ADR 0013.
 
 **Status**: 🚧 In Progress (Cycle 16 - Phase 3 Complete, Backend Integration Next)
 
@@ -786,11 +788,11 @@ The Customer Experience context is a **stateless BFF (Backend-for-Frontend)** th
 
 **Storefront (Web):**
 
-Customer-facing web store built with Blazor Server, demonstrating full-stack C# development with real-time updates via Server-Sent Events (SSE) and Wolverine integration.
+Customer-facing web store built with Blazor Server, demonstrating full-stack C# development with real-time updates via **SignalR** (Wolverine native transport, ADR 0013) and Wolverine integration.
 
 **Implemented Pages (Phase 3):**
 - ✅ Home page (navigation cards)
-- ✅ Shopping cart view (SSE-enabled for real-time updates)
+- ✅ Shopping cart view (SignalR-enabled for real-time updates)
 - ✅ Checkout flow (MudStepper wizard with 4 steps)
 - ✅ Order history (MudTable with order list)
 
@@ -801,10 +803,9 @@ Customer-facing web store built with Blazor Server, demonstrating full-stack C# 
 **Technology Stack:**
 - **Blazor Server** - C# full-stack, component model, interactive render modes
 - **MudBlazor** - Material Design component library (ADR 0005)
-- **Server-Sent Events (SSE)** - Real-time cart/order updates pushed from domain BCs (ADR 0004)
+- **SignalR** (via Wolverine transport) - Real-time cart/order updates pushed from domain BCs (ADR 0013, supersedes ADR 0004)
 - **Wolverine HTTP** - BFF endpoints for view composition
 - **Alba** - Integration testing for BFF composition endpoints
-- **JavaScript Interop** - EventSource API for SSE subscriptions
 
 **Future Expansion:**
 - Mobile BFF (different composition needs than web)
