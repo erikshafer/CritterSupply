@@ -19,7 +19,7 @@ builder.AddServiceDefaults();
 // Add Marten for document store (not event sourcing - BFF doesn't own domain data)
 builder.Services.AddMarten(opts =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("marten")!;
+    var connectionString = builder.Configuration.GetConnectionString("postgres")!;
     opts.Connection(connectionString);
     opts.DatabaseSchemaName = "storefront"; // Isolated schema for BFF
 });
