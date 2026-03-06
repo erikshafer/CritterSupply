@@ -887,6 +887,33 @@ docker-compose --profile infrastructure up -d
 
 ---
 
+### ❌ `create-databases.sh` fails with "cannot execute: required file not found" on Windows
+
+**Symptom:** Postgres container crashes on first start with:
+```
+/docker-entrypoint-initdb.d/create-databases.sh: cannot execute: required file not found
+```
+
+**Why:** On Windows, git defaults to `core.autocrlf=true`, which silently converts Unix line endings (LF) to Windows line endings (CRLF) on checkout. The shebang line becomes `#!/bin/bash\r`, and the Linux kernel looks for the interpreter `/bin/bash\r` — a path that does not exist.
+
+This is guarded against in `.gitattributes` (`*.sh text eol=lf`), which forces shell scripts to always use LF line endings regardless of git client configuration.
+
+**If you encounter this despite `.gitattributes`:** The file may have been committed before the attribute was added, or was edited with a Windows editor that did not honour `.gitattributes`. Fix it by running:
+```bash
+# Re-normalise line endings for all tracked shell scripts
+git add --renormalize .
+git commit -m "Fix CRLF line endings in shell scripts"
+```
+
+Then recreate the volume:
+```bash
+docker-compose down
+docker volume rm crittersupply_postgres
+docker-compose --profile infrastructure up -d
+```
+
+---
+
 ## See Also
 
 - [Vertical Slice Organization](./vertical-slice-organization.md) — File and folder structure inside a BC

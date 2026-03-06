@@ -5,3 +5,10 @@
 *.dll binary
 *.exe binary
 *.pdb binary
+
+# Shell scripts must always use Unix (LF) line endings.
+# Without this, git on Windows (core.autocrlf=true) converts LF→CRLF on checkout,
+# making the shebang #!/bin/bash\r, which causes Docker to fail with
+# "cannot execute: required file not found" when mounting the script into
+# /docker-entrypoint-initdb.d/.
+*.sh text eol=lf
