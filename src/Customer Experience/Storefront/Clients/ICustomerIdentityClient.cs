@@ -31,7 +31,8 @@ public sealed record CustomerAddressDto(
     string PostalCode,
     string Country,
     string AddressType,  // "Shipping", "Billing", "Both"
-    bool IsDefault);
+    bool IsDefault,
+    string DisplayLine);  // Formatted address string from API
 
 /// <summary>
 /// Response from Customer Identity BC login endpoint

@@ -184,7 +184,30 @@ else
             if (!_checkoutId.HasValue) return;
 
             var client = HttpClientFactory.CreateClient("StorefrontApi");
-            _checkoutView = await client.GetFromJsonAsync<CheckoutView>($"/api/storefront/checkouts/{_checkoutId.Value}");
+
+            // Retry logic to handle async message processing delay
+            // The checkout may not be queryable immediately after creation
+            const int maxRetries = 3;
+            const int delayMs = 500;
+
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
+            {
+                try
+                {
+                    _checkoutView = await client.GetFromJsonAsync<CheckoutView>($"/api/storefront/checkouts/{_checkoutId.Value}");
+                    return; // Success - exit retry loop
+                }
+                catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound && attempt < maxRetries)
+                {
+                    // Wait before retrying (checkout might still be processing)
+                    await Task.Delay(delayMs);
+                }
+            }
+
+            // If we get here, all retries failed
+            Snackbar.Add("Checkout not found. Please start checkout from your cart.", Severity.Error);
+            await JS.InvokeVoidAsync("authHelper.clearCheckoutId");
+            Navigation.NavigateTo("/cart");
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {

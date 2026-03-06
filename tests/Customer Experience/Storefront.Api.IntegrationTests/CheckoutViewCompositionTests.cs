@@ -43,7 +43,8 @@ public class CheckoutViewCompositionTests : IClassFixture<TestFixture>
             "98101",
             "US",
             "Shipping",
-            true));
+            true,
+            "123 Main St, Seattle, WA 98101, US"));
 
         // AND: Catalog BC has product data for enrichment
         _fixture.StubCatalogClient.AddProduct(new Storefront.Clients.ProductDto(
@@ -168,11 +169,11 @@ public class CheckoutViewCompositionTests : IClassFixture<TestFixture>
 
         // AND: Customer Identity BC has 2 shipping addresses and 1 billing address
         _fixture.StubCustomerIdentityClient.AddAddress(new Storefront.Clients.CustomerAddressDto(
-            Guid.NewGuid(), customerId, "Home", "123 Main St", "", "Seattle", "WA", "98101", "US", "Shipping", true));
+            Guid.NewGuid(), customerId, "Home", "123 Main St", "", "Seattle", "WA", "98101", "US", "Shipping", true, "123 Main St, Seattle, WA 98101, US"));
         _fixture.StubCustomerIdentityClient.AddAddress(new Storefront.Clients.CustomerAddressDto(
-            Guid.NewGuid(), customerId, "Work", "456 Office Blvd", "", "Seattle", "WA", "98102", "US", "Shipping", false));
+            Guid.NewGuid(), customerId, "Work", "456 Office Blvd", "", "Seattle", "WA", "98102", "US", "Shipping", false, "456 Office Blvd, Seattle, WA 98102, US"));
         _fixture.StubCustomerIdentityClient.AddAddress(new Storefront.Clients.CustomerAddressDto(
-            Guid.NewGuid(), customerId, "Billing", "789 Billing Ave", "", "Seattle", "WA", "98103", "US", "Billing", false));
+            Guid.NewGuid(), customerId, "Billing", "789 Billing Ave", "", "Seattle", "WA", "98103", "US", "Billing", false, "789 Billing Ave, Seattle, WA 98103, US"));
 
         // WHEN: The BFF queries for the checkout view
         var result = await _fixture.Host.Scenario(scenario =>
