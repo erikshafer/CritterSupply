@@ -17,7 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 // Marten document store configuration
-var connectionString = builder.Configuration.GetConnectionString("marten")
+var connectionString = builder.Configuration.GetConnectionString("postgres")
     ?? "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=postgres";
 
 builder.Services.AddMarten(opts =>
