@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JS
+@inject IConfiguration Configuration
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
 
@@ -175,7 +176,11 @@ else
         try
         {
             _dotNetHelper = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("signalrClient.subscribe", _customerId.Value.ToString(), _dotNetHelper);
+            // Build the hub URL from configuration so E2E tests can point to their test API server.
+            // Falls back to the default local port when the config key is absent.
+            var apiBaseUrl = Configuration["ApiClients:StorefrontApiUrl"] ?? "http://localhost:5237";
+            var hubUrl = $"{apiBaseUrl}/hub/storefront";
+            await JS.InvokeVoidAsync("signalrClient.subscribe", _customerId.Value.ToString(), _dotNetHelper, hubUrl);
             _sseConnected = true;
         }
         catch (Exception ex)
@@ -203,9 +208,33 @@ else
                     StateHasChanged();
                     break;
 
+                case "order-status-changed":
+                    // Handles OrderStatusChanged events routed via Wolverine SignalR transport
+                    if (eventData.TryGetProperty("NewStatus", out var newStatus))
+                    {
+                        _currentStatus = newStatus.GetString() ?? _currentStatus;
+                        _latestUpdate = $"Order status updated to {_currentStatus}";
+                    }
+                    StateHasChanged();
+                    break;
+
                 case "payment-confirmed":
                     _currentStatus = "Payment Confirmed";
                     _latestUpdate = "Payment processed successfully";
+                    StateHasChanged();
+                    break;
+
+                case "shipment-status-changed":
+                    // Handles ShipmentStatusChanged events routed via Wolverine SignalR transport
+                    _currentStatus = "Shipped";
+                    if (eventData.TryGetProperty("TrackingNumber", out var trackingSignalR))
+                    {
+                        _latestUpdate = $"Order shipped! Tracking: {trackingSignalR.GetString()}";
+                    }
+                    else
+                    {
+                        _latestUpdate = "Order has been shipped";
+                    }
                     StateHasChanged();
                     break;
 

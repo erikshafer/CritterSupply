@@ -15,7 +15,7 @@ public sealed class LoginPage(IPage page)
 
     public async Task NavigateAsync()
     {
-        await page.GotoAsync("/account/login");
+        await page.GotoAsync("/login");
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
     }
 
@@ -36,8 +36,8 @@ public sealed class LoginPage(IPage page)
 
     public async Task<bool> IsLoggedInAsync()
     {
-        // After successful login, the user is redirected away from /account/login
-        return !page.Url.Contains("/account/login");
+        // After successful login, the user is redirected away from /login
+        return !page.Url.Contains("/login");
     }
 
     public async Task<string> GetErrorMessageAsync()

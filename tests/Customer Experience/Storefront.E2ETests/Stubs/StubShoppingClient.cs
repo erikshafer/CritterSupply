@@ -9,8 +9,15 @@ namespace Storefront.E2ETests.Stubs;
 public sealed class StubShoppingClient : IShoppingClient
 {
     private readonly Dictionary<Guid, CartDto> _carts = new();
+    private readonly Dictionary<Guid, Guid> _checkoutIds = new();
 
     public void ConfigureCart(Guid cartId, CartDto cart) => _carts[cartId] = cart;
+
+    /// <summary>
+    /// Pre-registers a deterministic checkout ID for a specific cart.
+    /// Used by E2ETestFixture.SeedStandardCheckoutScenarioAsync to coordinate stubs.
+    /// </summary>
+    public void SetCheckoutId(Guid cartId, Guid checkoutId) => _checkoutIds[cartId] = checkoutId;
 
     public Task<CartDto?> GetCartAsync(Guid cartId, CancellationToken ct = default)
     {
@@ -86,8 +93,15 @@ public sealed class StubShoppingClient : IShoppingClient
         if (!cart.Items.Any())
             throw new HttpRequestException("Cannot checkout an empty cart", null, System.Net.HttpStatusCode.BadRequest);
 
-        return Task.FromResult(Guid.CreateVersion7());
+        // Return the pre-registered deterministic ID if one was set (for E2E stub coordination),
+        // otherwise generate a random one.
+        var checkoutId = _checkoutIds.TryGetValue(cartId, out var id) ? id : Guid.CreateVersion7();
+        return Task.FromResult(checkoutId);
     }
 
-    public void Clear() => _carts.Clear();
+    public void Clear()
+    {
+        _carts.Clear();
+        _checkoutIds.Clear();
+    }
 }

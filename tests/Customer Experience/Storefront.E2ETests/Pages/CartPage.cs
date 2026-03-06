@@ -28,6 +28,9 @@ public sealed class CartPage(IPage page)
 
     public async Task<bool> IsProceedToCheckoutEnabledAsync()
     {
+        // When cart is empty, the button is not rendered — treat as disabled rather than timing out
+        if (!await ProceedToCheckoutButton.IsVisibleAsync())
+            return false;
         return !await ProceedToCheckoutButton.IsDisabledAsync();
     }
 

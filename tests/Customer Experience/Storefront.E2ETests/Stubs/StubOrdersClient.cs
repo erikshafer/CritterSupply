@@ -62,7 +62,8 @@ public sealed class StubOrdersClient : IOrdersClient
             throw new HttpRequestException($"Checkout {checkoutId} not found", null, System.Net.HttpStatusCode.NotFound);
 
         var orderId = Guid.CreateVersion7();
-        _orders.Add(new OrderDto(orderId, checkout.CustomerId, "Placed", DateTimeOffset.UtcNow, 0m));
+        var total = checkout.Items.Sum(i => i.Quantity * i.UnitPrice);
+        _orders.Add(new OrderDto(orderId, checkout.CustomerId, "Placed", DateTimeOffset.UtcNow, total));
         _checkouts.Remove(checkoutId);
         return Task.FromResult(orderId);
     }

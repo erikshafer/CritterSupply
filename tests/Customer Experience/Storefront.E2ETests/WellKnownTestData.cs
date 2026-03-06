@@ -79,6 +79,12 @@ internal static class WellKnownTestData
         public const string DeclinedToken = "tok_declined_test";
     }
 
+    internal static class Checkouts
+    {
+        /// <summary>Deterministic checkout ID for Alice's E2E checkout scenario.</summary>
+        public static readonly Guid AliceCheckoutId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    }
+
     /// <summary>
     /// Expected order totals for the standard E2E checkout scenario:
     /// 2x Ceramic Dog Bowl ($19.99) + 1x Interactive Cat Laser ($29.99) = $69.97

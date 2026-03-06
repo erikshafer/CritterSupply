@@ -42,6 +42,15 @@ public sealed class CheckoutFlowStepDefinitions
         await LoginPage.LoginAsync(email, WellKnownTestData.Customers.AlicePassword);
         var isLoggedIn = await LoginPage.IsLoggedInAsync();
         isLoggedIn.ShouldBeTrue($"Login as '{email}' should succeed");
+
+        // Inject the seeded cartId into the browser's localStorage so Cart.razor can read it.
+        // The cartId is seeded by DataHooks.SeedCheckoutScenarioData before the page is created.
+        if (_fixture.SeededCartId.HasValue)
+        {
+            await Page.EvaluateAsync(
+                "cartId => localStorage.setItem('cartId', cartId)",
+                _fixture.SeededCartId.Value.ToString());
+        }
     }
 
     [Given(@"I have an active cart with the following items:")]
@@ -192,16 +201,15 @@ public sealed class CheckoutFlowStepDefinitions
         var orderIdStr = _scenarioContext.Get<string>(ScenarioContextKeys.OrderId);
         var orderId = Guid.Parse(orderIdStr);
 
-        // Inject the message directly into Wolverine — bypasses RabbitMQ for test isolation
-        // This is the same pattern as SignalRNotificationTests.cs (the existing integration tests)
+        // Inject OrderStatusChanged directly into Wolverine so the SignalR hub routes it to Alice's group.
+        // PaymentAuthorizedHandler currently uses Guid.Empty for customerId (TODO: resolve via OrderId→CustomerId
+        // lookup when completing checkout). The E2E test focuses on SignalR delivery, not the handler transformation.
         await _fixture.StorefrontApiHost.InvokeMessageAndWaitAsync(
-            new Messages.Contracts.Payments.PaymentAuthorized(
-                Guid.NewGuid(),
+            new Storefront.RealTime.OrderStatusChanged(
                 orderId,
-                WellKnownTestData.ExpectedTotals.TotalWithStandardShipping,
-                "auth_test_12345",
-                DateTimeOffset.UtcNow,
-                DateTimeOffset.UtcNow.AddHours(1)));
+                WellKnownTestData.Customers.Alice,
+                "PaymentAuthorized",
+                DateTimeOffset.UtcNow));
     }
 
     [When(@"the Fulfillment BC publishes a shipment dispatched event for my order with tracking ""(.*)""")]
@@ -211,11 +219,13 @@ public sealed class CheckoutFlowStepDefinitions
         var orderId = Guid.Parse(orderIdStr);
         var shipmentId = Guid.NewGuid();
 
+        // Inject ShipmentStatusChanged directly — same reasoning as PaymentAuthorized above.
         await _fixture.StorefrontApiHost.InvokeMessageAndWaitAsync(
-            new Messages.Contracts.Fulfillment.ShipmentDispatched(
-                orderId,
+            new Storefront.RealTime.ShipmentStatusChanged(
                 shipmentId,
-                "UPS",
+                orderId,
+                WellKnownTestData.Customers.Alice,
+                "Shipped",
                 trackingNumber,
                 DateTimeOffset.UtcNow));
     }

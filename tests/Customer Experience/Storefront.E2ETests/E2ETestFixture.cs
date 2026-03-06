@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Marten;
@@ -57,6 +58,12 @@ public sealed class E2ETestFixture : IAsyncLifetime
     /// <summary>Direct access to Storefront.Api host for Wolverine message injection (Phase 2 SignalR tests).</summary>
     public IHost StorefrontApiHost { get; private set; } = null!;
 
+    /// <summary>
+    /// Cart ID seeded for the standard E2E checkout scenario.
+    /// Expose so step definitions can inject it into the browser's localStorage after login.
+    /// </summary>
+    public Guid? SeededCartId { get; private set; }
+
     public async Task InitializeAsync()
     {
         // Step 1: Start TestContainers PostgreSQL
@@ -112,6 +119,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
         StubCatalogClient.Clear();
         StubOrdersClient.Clear();
         StubCustomerIdentityClient.Clear();
+        SeededCartId = null;
     }
 
     /// <summary>
@@ -151,6 +159,19 @@ public sealed class E2ETestFixture : IAsyncLifetime
             WellKnownTestData.Products.InteractiveCatLaserSku,
             quantity: 1,
             unitPrice: WellKnownTestData.Products.InteractiveCatLaserPrice);
+
+        // Coordinate stubs: register a deterministic checkoutId so that when the browser
+        // POSTs /carts/{cartId}/checkout, InitiateCheckoutAsync returns a known ID,
+        // and GetCheckoutAsync will find the pre-seeded checkout in StubOrdersClient.
+        StubShoppingClient.SetCheckoutId(cartId, WellKnownTestData.Checkouts.AliceCheckoutId);
+        StubOrdersClient.AddCheckout(
+            WellKnownTestData.Checkouts.AliceCheckoutId,
+            WellKnownTestData.Customers.Alice,
+            new Storefront.Clients.CheckoutItemDto(WellKnownTestData.Products.CeramicDogBowlSku, 2, WellKnownTestData.Products.CeramicDogBowlPrice),
+            new Storefront.Clients.CheckoutItemDto(WellKnownTestData.Products.InteractiveCatLaserSku, 1, WellKnownTestData.Products.InteractiveCatLaserPrice));
+
+        // Expose cartId so step definitions can inject it into browser localStorage after login
+        SeededCartId = cartId;
 
         // Seed Alice's saved addresses via Customer Identity stub
         StubCustomerIdentityClient.AddAddress(new Storefront.Clients.CustomerAddressDto(
@@ -272,6 +293,16 @@ internal sealed class StorefrontWebKestrelFactory(string storefrontApiBaseUrl)
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Inject the test Storefront.Api URL as configuration so both the HttpClient factory
+        // and OrderConfirmation.razor's SignalR JS call use the same test server address.
+        builder.ConfigureAppConfiguration(config =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ApiClients:StorefrontApiUrl"] = storefrontApiBaseUrl
+            });
+        });
+
         builder.ConfigureServices(services =>
         {
             // Override the StorefrontApi HttpClient base address to point at our test API server
