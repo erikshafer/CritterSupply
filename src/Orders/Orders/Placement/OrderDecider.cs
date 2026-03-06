@@ -90,10 +90,13 @@ public static class OrderDecider
     /// <summary>
     /// Returns true if the order is in a state that allows cancellation.
     /// Used by the HTTP endpoint for pre-flight validation and by the saga handler for idempotency.
+    /// Orders in self-compensating terminal states (OutOfStock, PaymentFailed) are excluded to
+    /// prevent duplicate compensation messages (e.g., double RefundRequested).
     /// </summary>
     public static bool CanBeCancelled(OrderStatus status) =>
         status is not (OrderStatus.Shipped or OrderStatus.Delivered
-            or OrderStatus.Closed or OrderStatus.Cancelled);
+            or OrderStatus.Closed or OrderStatus.Cancelled
+            or OrderStatus.OutOfStock or OrderStatus.PaymentFailed);
 
     /// <summary>
     /// Decides how to handle an order cancellation request.
@@ -219,14 +222,16 @@ public static class OrderDecider
 
     /// <summary>
     /// Decides how to handle refund completion.
-    /// When the order was cancelled, a completed refund signals the financial lifecycle is closed.
+    /// When the order was cancelled or went out of stock (both trigger RefundRequested if payment
+    /// was captured), a completed refund signals the financial lifecycle is closed.
     /// </summary>
     public static OrderDecision HandleRefundCompleted(
         Order current,
         RefundCompleted message)
     {
-        // If the order was cancelled, a completed refund closes the lifecycle
-        if (current.Status == OrderStatus.Cancelled)
+        // Cancelled orders and OutOfStock orders both emit RefundRequested when payment was captured.
+        // A completed refund for either closes the financial lifecycle and deletes the saga.
+        if (current.Status is OrderStatus.Cancelled or OrderStatus.OutOfStock)
         {
             return new OrderDecision
             {
@@ -235,7 +240,7 @@ public static class OrderDecider
             };
         }
 
-        return new OrderDecision(); // No state changes for refunds on non-cancelled orders
+        return new OrderDecision(); // No state changes for refunds on non-cancelled/non-failed orders
     }
 
     /// <summary>
@@ -262,6 +267,14 @@ public static class OrderDecider
         ReservationConfirmed message,
         DateTimeOffset timestamp)
     {
+        // Terminal-state guard: don't process reservation confirmations for orders that have already
+        // self-compensated or been cancelled. Without this, a late-arriving ReservationConfirmed on a
+        // cancelled order with IsPaymentCaptured=true would issue spurious ReservationCommitRequested
+        // messages, directing Inventory BC to hard-allocate stock for a cancelled order.
+        if (current.Status is OrderStatus.Cancelled or OrderStatus.OutOfStock
+            or OrderStatus.PaymentFailed or OrderStatus.Closed)
+            return new OrderDecision();
+
         // Idempotency guard: if this reservation was already confirmed, return a no-op.
         // Without this, a redelivered ReservationConfirmed would increment ConfirmedReservationCount
         // beyond the expected count, causing IsInventoryReserved to trigger prematurely.
@@ -418,7 +431,6 @@ public static class OrderDecider
         return new OrderDecision
         {
             Status = newStatus,
-            CommittedReservationCount = newCommittedCount,
             CommittedReservationIds = newCommittedIds,
             Messages = messages
         };
@@ -489,7 +501,6 @@ public sealed record OrderDecision
     public OrderStatus? Status { get; init; }
     public bool? IsPaymentCaptured { get; init; }
     public int? ConfirmedReservationCount { get; init; }
-    public int? CommittedReservationCount { get; init; }
     public Dictionary<Guid, string>? ReservationIds { get; init; }
     public HashSet<Guid>? CommittedReservationIds { get; init; }
     public bool ShouldComplete { get; init; }

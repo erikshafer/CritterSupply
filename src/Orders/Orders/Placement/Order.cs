@@ -76,9 +76,10 @@ public sealed class Order : Saga
 
     /// <summary>
     /// Number of individual SKU reservations that have been committed (hard-allocated) by Inventory BC.
+    /// Derived from CommittedReservationIds to keep a single source of truth and prevent drift.
     /// When this equals ExpectedReservationCount and payment is captured, fulfillment can be requested.
     /// </summary>
-    public int CommittedReservationCount { get; set; }
+    public int CommittedReservationCount => CommittedReservationIds.Count;
 
     /// <summary>
     /// Tracks which reservation IDs have already been committed (hard-allocated).
@@ -131,6 +132,13 @@ public sealed class Order : Saga
 
         var outgoing = new OutgoingMessages();
         foreach (var msg in decision.Messages) outgoing.Add(msg);
+
+        // If no payment was captured, there is no RefundCompleted to await.
+        // Close the saga immediately. Any late-arriving ReservationReleased messages will be
+        // silently discarded by Wolverine (ReservationReleased cannot start a new Order saga).
+        if (!IsPaymentCaptured)
+            MarkCompleted();
+
         return outgoing;
     }
 
@@ -274,8 +282,6 @@ public sealed class Order : Saga
 
         // Apply state changes from decision
         if (decision.Status.HasValue) Status = decision.Status.Value;
-        if (decision.CommittedReservationCount.HasValue)
-            CommittedReservationCount = decision.CommittedReservationCount.Value;
         if (decision.CommittedReservationIds != null) CommittedReservationIds = decision.CommittedReservationIds;
 
         // Return outgoing messages
