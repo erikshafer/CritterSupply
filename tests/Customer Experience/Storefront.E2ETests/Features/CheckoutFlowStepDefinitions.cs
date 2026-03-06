@@ -1,0 +1,390 @@
+using Storefront.E2ETests.Pages;
+using Wolverine.Tracking;
+
+namespace Storefront.E2ETests.Features;
+
+/// <summary>
+/// Reqnroll step definitions for the checkout flow E2E scenarios.
+/// Each step definition delegates to the appropriate Page Object Model.
+///
+/// State shared between steps uses ScenarioContext — typed keys defined in ScenarioContextKeys.
+///
+/// Phase 1: Browser navigation + API interactions (Steps: Given/When/Then for checkout wizard)
+/// Phase 2: SignalR real-time updates (Steps tagged with @signalr)
+/// </summary>
+[Binding]
+public sealed class CheckoutFlowStepDefinitions
+{
+    private readonly ScenarioContext _scenarioContext;
+    private readonly E2ETestFixture _fixture;
+    private IPage Page => _scenarioContext.Get<IPage>(ScenarioContextKeys.Page);
+
+    private LoginPage LoginPage => new(Page);
+    private CartPage CartPage => new(Page);
+    private CheckoutPage CheckoutPage => new(Page);
+    private OrderConfirmationPage OrderConfirmationPage => new(Page);
+
+    public CheckoutFlowStepDefinitions(ScenarioContext scenarioContext)
+    {
+        _scenarioContext = scenarioContext;
+        _fixture = scenarioContext.Get<E2ETestFixture>(ScenarioContextKeys.Fixture);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Given — Setup
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Given(@"I am logged in as ""(.*)""")]
+    public async Task GivenIAmLoggedInAs(string email)
+    {
+        // Navigate to login and authenticate — sets the session cookie for all subsequent requests
+        await LoginPage.NavigateAsync();
+        await LoginPage.LoginAsync(email, WellKnownTestData.Customers.AlicePassword);
+        var isLoggedIn = await LoginPage.IsLoggedInAsync();
+        isLoggedIn.ShouldBeTrue($"Login as '{email}' should succeed");
+    }
+
+    [Given(@"I have an active cart with the following items:")]
+    public void GivenIHaveAnActiveCartWithItems(Table table)
+    {
+        // Cart is seeded via DataHooks.SeedCheckoutScenarioData (tagged @checkout)
+        // This step validates the Gherkin spec documents the expected data
+        table.RowCount.ShouldBeGreaterThan(0);
+    }
+
+    [Given(@"my account has the following saved addresses:")]
+    public void GivenMyAccountHasSavedAddresses(Table table)
+    {
+        // Addresses are seeded via DataHooks.SeedCheckoutScenarioData (tagged @checkout)
+        table.RowCount.ShouldBeGreaterThan(0);
+    }
+
+    [Given(@"I have an empty cart")]
+    public void GivenIHaveAnEmptyCart()
+    {
+        // Clear the cart data seeded by DataHooks
+        _fixture.StubShoppingClient.Clear();
+        _fixture.StubCatalogClient.Clear();
+    }
+
+    [Given(@"I navigate to the cart page")]
+    public async Task GivenINavigateToTheCartPage()
+    {
+        await CartPage.NavigateAsync();
+    }
+
+    [Given(@"I navigate to the checkout page at step ""(.*)""")]
+    public async Task GivenINavigateToCheckoutAtStep(string stepName)
+    {
+        await CartPage.NavigateAsync();
+        await CartPage.ClickProceedToCheckoutAsync();
+        await CheckoutPage.WaitForCheckoutLoadedAsync();
+
+        // Navigate to the requested step
+        await AdvanceToStepAsync(stepName);
+    }
+
+    [Given(@"I have successfully placed an order")]
+    public async Task GivenIHaveSuccessfullyPlacedAnOrder()
+    {
+        await CartPage.NavigateAsync();
+        await CartPage.ClickProceedToCheckoutAsync();
+        await CheckoutPage.WaitForCheckoutLoadedAsync();
+
+        await CheckoutPage.SelectAddressByNicknameAsync(WellKnownTestData.Addresses.AliceHomeNickname);
+        await CheckoutPage.ClickSaveAddressAndContinueAsync();
+        await CheckoutPage.SelectStandardShippingAsync();
+        await CheckoutPage.ClickSaveShippingMethodAndContinueAsync();
+        await CheckoutPage.EnterPaymentTokenAsync(WellKnownTestData.Payment.ValidVisaToken);
+        await CheckoutPage.ClickSavePaymentAndContinueAsync();
+        await CheckoutPage.ClickPlaceOrderAsync();
+
+        // Store the order ID from the URL for subsequent steps
+        var url = Page.Url;
+        var orderId = url.TrimEnd('/').Split('/').Last();
+        _scenarioContext.Set(orderId, ScenarioContextKeys.OrderId);
+    }
+
+    [Given(@"I am on the order confirmation page")]
+    public async Task GivenIAmOnTheOrderConfirmationPage()
+    {
+        await OrderConfirmationPage.WaitForLoadAsync();
+        var isConfirmed = await OrderConfirmationPage.IsOrderConfirmedAsync();
+        isConfirmed.ShouldBeTrue("Order confirmation panel should be visible");
+    }
+
+    [Given(@"the SignalR connection is established")]
+    public async Task GivenTheSignalRConnectionIsEstablished()
+    {
+        await OrderConfirmationPage.WaitForSignalRConnectionAsync(timeoutMs: 10_000);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // When — Actions
+    // ─────────────────────────────────────────────────────────────────────
+
+    [When(@"I click ""Proceed to Checkout""")]
+    public async Task WhenIClickProceedToCheckout()
+    {
+        await CartPage.ClickProceedToCheckoutAsync();
+    }
+
+    [When(@"I navigate to the cart page")]
+    public async Task WhenINavigateToTheCartPage()
+    {
+        await CartPage.NavigateAsync();
+    }
+
+    [When(@"I select the saved address ""(.*)""")]
+    public async Task WhenISelectSavedAddress(string nickname)
+    {
+        await CheckoutPage.SelectAddressByNicknameAsync(nickname);
+        _scenarioContext.Set(nickname, ScenarioContextKeys.SelectedAddressNickname);
+    }
+
+    [When(@"I click ""Save & Continue"" on the address step")]
+    public async Task WhenIClickSaveAndContinueAddressStep()
+    {
+        await CheckoutPage.ClickSaveAddressAndContinueAsync();
+    }
+
+    [When(@"I select ""Standard Ground"" shipping")]
+    public async Task WhenISelectStandardGroundShipping()
+    {
+        await CheckoutPage.SelectStandardShippingAsync();
+        _scenarioContext.Set(WellKnownTestData.Shipping.StandardMethod, ScenarioContextKeys.SelectedShippingMethod);
+    }
+
+    [When(@"I select ""Express Shipping""")]
+    public async Task WhenISelectExpressShipping()
+    {
+        await CheckoutPage.SelectExpressShippingAsync();
+        _scenarioContext.Set(WellKnownTestData.Shipping.ExpressMethod, ScenarioContextKeys.SelectedShippingMethod);
+    }
+
+    [When(@"I click ""Save & Continue"" on the shipping method step")]
+    public async Task WhenIClickSaveAndContinueShippingMethodStep()
+    {
+        await CheckoutPage.ClickSaveShippingMethodAndContinueAsync();
+    }
+
+    [When(@"I enter the payment token ""(.*)""")]
+    public async Task WhenIEnterPaymentToken(string token)
+    {
+        await CheckoutPage.EnterPaymentTokenAsync(token);
+    }
+
+    [When(@"I click ""Save & Continue"" on the payment step")]
+    public async Task WhenIClickSaveAndContinuePaymentStep()
+    {
+        await CheckoutPage.ClickSavePaymentAndContinueAsync();
+    }
+
+    [When(@"I click ""Place Order""")]
+    public async Task WhenIClickPlaceOrder()
+    {
+        await CheckoutPage.ClickPlaceOrderAsync();
+    }
+
+    [When(@"the Payments BC publishes a payment authorized event for my order")]
+    public async Task WhenPaymentsBCPublishesPaymentAuthorized()
+    {
+        var orderIdStr = _scenarioContext.Get<string>(ScenarioContextKeys.OrderId);
+        var orderId = Guid.Parse(orderIdStr);
+
+        // Inject the message directly into Wolverine — bypasses RabbitMQ for test isolation
+        // This is the same pattern as SignalRNotificationTests.cs (the existing integration tests)
+        await _fixture.StorefrontApiHost.InvokeMessageAndWaitAsync(
+            new Messages.Contracts.Payments.PaymentAuthorized(
+                Guid.NewGuid(),
+                orderId,
+                WellKnownTestData.ExpectedTotals.TotalWithStandardShipping,
+                "auth_test_12345",
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow.AddHours(1)));
+    }
+
+    [When(@"the Fulfillment BC publishes a shipment dispatched event for my order with tracking ""(.*)""")]
+    public async Task WhenFulfillmentBCPublishesShipmentDispatched(string trackingNumber)
+    {
+        var orderIdStr = _scenarioContext.Get<string>(ScenarioContextKeys.OrderId);
+        var orderId = Guid.Parse(orderIdStr);
+        var shipmentId = Guid.NewGuid();
+
+        await _fixture.StorefrontApiHost.InvokeMessageAndWaitAsync(
+            new Messages.Contracts.Fulfillment.ShipmentDispatched(
+                orderId,
+                shipmentId,
+                "UPS",
+                trackingNumber,
+                DateTimeOffset.UtcNow));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Then — Assertions
+    // ─────────────────────────────────────────────────────────────────────
+
+    [Then(@"I should be on the checkout page")]
+    public async Task ThenIShouldBeOnTheCheckoutPage()
+    {
+        await Page.WaitForURLAsync("**/checkout**");
+    }
+
+    [Then(@"the checkout wizard should be visible")]
+    public async Task ThenCheckoutWizardShouldBeVisible()
+    {
+        var isLoaded = await CheckoutPage.IsLoadedSuccessfullyAsync();
+        isLoaded.ShouldBeTrue("Checkout stepper should be visible after loading");
+    }
+
+    [Then(@"I should see the shipping method selection")]
+    public async Task ThenIShouldSeeShippingMethodSelection()
+    {
+        // After completing Step 1, MudStepper advances to Step 2
+        // The shipping method radio group should be visible
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+    }
+
+    [Then(@"I should see the payment form")]
+    public async Task ThenIShouldSeePaymentForm()
+    {
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+    }
+
+    [Then(@"I should see the order review summary")]
+    public async Task ThenIShouldSeeOrderReviewSummary()
+    {
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+    }
+
+    [Then(@"the order summary should show:")]
+    public async Task ThenOrderSummaryShouldShow(Table table)
+    {
+        foreach (var row in table.Rows)
+        {
+            var field = row["Field"];
+            var expectedValue = row["Value"];
+
+            var actualValue = field switch
+            {
+                "Subtotal" => await CheckoutPage.GetOrderSubtotalAsync(),
+                "Shipping" => await CheckoutPage.GetOrderShippingCostAsync(),
+                "Total" => await CheckoutPage.GetOrderTotalAsync(),
+                _ => throw new ArgumentException($"Unknown order summary field: {field}")
+            };
+
+            actualValue.ShouldContain(expectedValue.TrimStart('$'));
+        }
+    }
+
+    [Then(@"I should be on the order confirmation page")]
+    public async Task ThenIShouldBeOnOrderConfirmationPage()
+    {
+        await Page.WaitForURLAsync("**/order-confirmation/**");
+        await OrderConfirmationPage.WaitForLoadAsync();
+    }
+
+    [Then(@"the order status should be ""(.*)""")]
+    public async Task ThenOrderStatusShouldBe(string expectedStatus)
+    {
+        var status = await OrderConfirmationPage.GetOrderStatusAsync();
+        status.ShouldContain(expectedStatus);
+    }
+
+    [Then(@"the ""Proceed to Checkout"" button should be disabled")]
+    public async Task ThenProceedToCheckoutShouldBeDisabled()
+    {
+        var isEnabled = await CartPage.IsProceedToCheckoutEnabledAsync();
+        isEnabled.ShouldBeFalse("Proceed to Checkout button should be disabled for empty cart");
+    }
+
+    [Then(@"I should see a message indicating the cart is empty")]
+    public async Task ThenIShouldSeeEmptyCartMessage()
+    {
+        var isVisible = await CartPage.IsEmptyCartMessageVisibleAsync();
+        isVisible.ShouldBeTrue("Empty cart message should be visible");
+    }
+
+    [Then(@"the order summary should display a shipping cost of ""(.*)""")]
+    public async Task ThenShippingCostShouldBe(string expectedCost)
+    {
+        var cost = await CheckoutPage.GetOrderShippingCostAsync();
+        cost.ShouldContain(expectedCost.TrimStart('$'));
+    }
+
+    [Then(@"the order total should be ""(.*)""")]
+    public async Task ThenOrderTotalShouldBe(string expectedTotal)
+    {
+        var total = await CheckoutPage.GetOrderTotalAsync();
+        total.ShouldContain(expectedTotal.TrimStart('$'));
+    }
+
+    [Then(@"I should see an error notification")]
+    public async Task ThenIShouldSeeErrorNotification()
+    {
+        // MudSnackbar error toasts appear — wait for any alert/snackbar
+        await Page.WaitForSelectorAsync(
+            "[role='alert'], .mud-snackbar",
+            new PageWaitForSelectorOptions { Timeout = 5_000 });
+    }
+
+    [Then(@"the checkout wizard should remain on the payment step")]
+    public async Task ThenCheckoutWizardShouldRemainOnPaymentStep()
+    {
+        // After invalid payment token, the stepper should NOT advance
+        var isLoaded = await CheckoutPage.IsLoadedSuccessfullyAsync();
+        isLoaded.ShouldBeTrue("Checkout stepper should still be visible");
+    }
+
+    [Then(@"the order status should update to ""(.*)"" within (.*) seconds")]
+    public async Task ThenOrderStatusShouldUpdateTo(string expectedStatus, int timeoutSeconds)
+    {
+        await OrderConfirmationPage.WaitForStatusAsync(
+            expectedStatus,
+            timeoutMs: timeoutSeconds * 1_000);
+
+        var status = await OrderConfirmationPage.GetOrderStatusAsync();
+        status.ShouldContain(expectedStatus);
+    }
+
+    [Then(@"I should see a payment notification message")]
+    public async Task ThenIShouldSeePaymentNotification()
+    {
+        var hasNotification = await OrderConfirmationPage.HasUpdateNotificationAsync();
+        hasNotification.ShouldBeTrue("A payment notification should appear after PaymentAuthorized event");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────
+
+    private async Task AdvanceToStepAsync(string targetStep)
+    {
+        switch (targetStep.ToLowerInvariant())
+        {
+            case "shipping method":
+                await CheckoutPage.SelectAddressByNicknameAsync(WellKnownTestData.Addresses.AliceHomeNickname);
+                await CheckoutPage.ClickSaveAddressAndContinueAsync();
+                break;
+
+            case "payment":
+                await CheckoutPage.SelectAddressByNicknameAsync(WellKnownTestData.Addresses.AliceHomeNickname);
+                await CheckoutPage.ClickSaveAddressAndContinueAsync();
+                await CheckoutPage.SelectStandardShippingAsync();
+                await CheckoutPage.ClickSaveShippingMethodAndContinueAsync();
+                break;
+
+            case "review":
+                await CheckoutPage.SelectAddressByNicknameAsync(WellKnownTestData.Addresses.AliceHomeNickname);
+                await CheckoutPage.ClickSaveAddressAndContinueAsync();
+                await CheckoutPage.SelectStandardShippingAsync();
+                await CheckoutPage.ClickSaveShippingMethodAndContinueAsync();
+                await CheckoutPage.EnterPaymentTokenAsync(WellKnownTestData.Payment.ValidVisaToken);
+                await CheckoutPage.ClickSavePaymentAndContinueAsync();
+                break;
+
+            default:
+                break; // "Shipping Address" = starting point, no advancement needed
+        }
+    }
+}

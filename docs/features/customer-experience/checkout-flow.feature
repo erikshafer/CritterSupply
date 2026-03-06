@@ -190,21 +190,21 @@ Feature: Checkout Flow
     And I should be redirected to the order confirmation page
 
   # ========================================
-  # Real-Time Order Status Updates
+  # Real-Time Order Status Updates (SignalR)
   # ========================================
 
-  Scenario: Order confirmation page shows real-time status updates via SSE
+  Scenario: Order confirmation page shows real-time status updates via SignalR
     Given I have successfully placed an order
     And I am on the order confirmation page
-    And I have subscribed to order status updates via SSE
+    And I have subscribed to order status updates via SignalR
     When Payments BC publishes "Payments.PaymentCaptured" for my order
     Then the order confirmation page should update within 2 seconds
     And the order status should change from "Placed" to "Payment Confirmed"
-    And I should see a notification "Payment successful!"
+    And I should see a notification "Payment processed successfully"
 
-  Scenario: Order status updates pushed via SSE during fulfillment
+  Scenario: Order status updates pushed via SignalR during fulfillment
     Given I am on the order confirmation page for order "order-xyz-789"
-    And I have subscribed to order status updates via SSE
+    And I have subscribed to order status updates via SignalR
     When Inventory BC publishes "Inventory.ReservationCommitted" for my order
     Then the order status should update to "Preparing for Shipment"
     When Fulfillment BC publishes "Fulfillment.ShipmentDispatched" for my order

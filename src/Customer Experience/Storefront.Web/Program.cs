@@ -129,3 +129,6 @@ app.Run();
 // Records for login
 record LoginRequest(string Email, string Password);
 record LoginResponse(Guid CustomerId, string Email, string FirstName, string LastName);
+
+// Make Program accessible for WebApplicationFactory in test projects
+public partial class Program;
