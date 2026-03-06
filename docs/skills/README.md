@@ -6,6 +6,9 @@ This directory contains implementation patterns and best practices for building 
 
 ### By Use Case
 
+**Starting from Scratch:**
+- 🏗️ [Adding a New Bounded Context](./adding-new-bounded-context.md) - Complete checklist: projects, Docker, Postgres database, Aspire, CONTEXTS.md, tests
+
 **Creating Commands & Handlers:**
 - 🎯 [Wolverine Message Handlers](./wolverine-message-handlers.md) - Command/query handlers, HTTP endpoints, compound handlers, return patterns
 
@@ -27,6 +30,9 @@ This directory contains implementation patterns and best practices for building 
 **Code Organization & Style:**
 - 📂 [Vertical Slice Organization](./vertical-slice-organization.md) - File structure, colocation, project naming conventions
 - 💎 [Modern C# Coding Standards](./modern-csharp-coding-standards.md) - Records, immutability, value objects, collection patterns
+
+**Infrastructure & Setup:**
+- 🏗️ [Adding a New Bounded Context](./adding-new-bounded-context.md) - Complete step-by-step guide: .NET projects, Docker, Postgres, Aspire, CONTEXTS.md, tests
 
 **External Integrations:**
 - 🔌 [External Service Integration](./external-service-integration.md) - Strategy pattern, stub vs production, graceful degradation
@@ -58,9 +64,10 @@ This directory contains implementation patterns and best practices for building 
 ## 🎯 By Development Phase
 
 ### Planning Phase
-1. Review [Vertical Slice Organization](./vertical-slice-organization.md) for file structure
-2. Write Gherkin features (see [Reqnroll BDD Testing](./reqnroll-bdd-testing.md))
-3. Choose persistence strategy:
+1. **New BC?** → Start with [Adding a New Bounded Context](./adding-new-bounded-context.md) for the full checklist
+2. Review [Vertical Slice Organization](./vertical-slice-organization.md) for file structure
+3. Write Gherkin features (see [Reqnroll BDD Testing](./reqnroll-bdd-testing.md))
+4. Choose persistence strategy:
    - Event sourcing? → [Marten Event Sourcing](./marten-event-sourcing.md)
    - Document store? → [Marten Document Store](./marten-document-store.md)
    - Traditional relational? → [EF Core + Wolverine Integration](./efcore-wolverine-integration.md)
@@ -116,6 +123,7 @@ Each skill document follows this structure:
 - *"Should I use event sourcing or document store?"* → Compare [Marten Event Sourcing](./marten-event-sourcing.md) vs [Marten Document Store](./marten-document-store.md)
 - *"How do I organize my code?"* → [Vertical Slice Organization](./vertical-slice-organization.md)
 - *"When should I use EF Core?"* → [EF Core + Wolverine Integration](./efcore-wolverine-integration.md)
+- *"How do I add a new bounded context?"* → [Adding a New Bounded Context](./adding-new-bounded-context.md)
 
 ---
 
