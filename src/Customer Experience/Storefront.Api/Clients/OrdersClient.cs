@@ -27,6 +27,17 @@ public sealed class OrdersClient : IOrdersClient
                ?? throw new InvalidOperationException($"Checkout {checkoutId} not found");
     }
 
+    public async Task<OrderDto?> GetOrderAsync(Guid orderId, CancellationToken ct = default)
+    {
+        var response = await _httpClient.GetAsync($"/api/orders/{orderId}", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return null;
+        response.EnsureSuccessStatusCode();
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        return JsonSerializer.Deserialize<OrderDto>(content, JsonOptions);
+    }
+
     public async Task<PagedResult<OrderDto>> GetOrdersAsync(
         Guid customerId,
         int page = 1,
@@ -107,9 +118,10 @@ public sealed class OrdersClient : IOrdersClient
         var response = await _httpClient.PostAsJsonAsync($"/api/checkouts/{checkoutId}/complete", payload, ct);
         response.EnsureSuccessStatusCode();
 
-        // The CompleteCheckout handler returns a CheckoutCompleted event with OrderId
-        // For now, we'll return the checkoutId (in real implementation, parse response for orderId)
-        // TODO: Parse response to extract OrderId from CheckoutCompleted event
-        return checkoutId;
+        // Parse the orderId returned by the Orders BC CompleteCheckout handler
+        var result = await response.Content.ReadFromJsonAsync<CompleteCheckoutResponse>(cancellationToken: ct);
+        return result?.OrderId ?? throw new InvalidOperationException("CompleteCheckout response did not contain an orderId");
     }
+
+    private sealed record CompleteCheckoutResponse(Guid OrderId);
 }

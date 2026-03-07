@@ -7,6 +7,7 @@ public interface IOrdersClient
 {
     // Queries
     Task<CheckoutDto> GetCheckoutAsync(Guid checkoutId, CancellationToken ct = default);
+    Task<OrderDto?> GetOrderAsync(Guid orderId, CancellationToken ct = default);
     Task<PagedResult<OrderDto>> GetOrdersAsync(
         Guid customerId,
         int page = 1,

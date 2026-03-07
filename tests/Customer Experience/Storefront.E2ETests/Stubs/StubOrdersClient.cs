@@ -23,6 +23,12 @@ public sealed class StubOrdersClient : IOrdersClient
         throw new HttpRequestException($"Checkout {checkoutId} not found", null, System.Net.HttpStatusCode.NotFound);
     }
 
+    public Task<OrderDto?> GetOrderAsync(Guid orderId, CancellationToken ct = default)
+    {
+        var order = _orders.FirstOrDefault(o => o.Id == orderId);
+        return Task.FromResult<OrderDto?>(order);
+    }
+
     public Task<PagedResult<OrderDto>> GetOrdersAsync(
         Guid customerId,
         int page = 1,
@@ -53,6 +59,11 @@ public sealed class StubOrdersClient : IOrdersClient
     {
         if (!_checkouts.ContainsKey(checkoutId))
             throw new HttpRequestException($"Checkout {checkoutId} not found", null, System.Net.HttpStatusCode.NotFound);
+
+        // Reject the well-known invalid test token so the "invalid payment" scenario works
+        if (paymentMethodToken == WellKnownTestData.Payment.InvalidToken)
+            throw new HttpRequestException("Invalid payment token", null, System.Net.HttpStatusCode.BadRequest);
+
         return Task.CompletedTask;
     }
 
