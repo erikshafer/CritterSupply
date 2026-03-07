@@ -286,42 +286,58 @@ public sealed class CheckoutPage(IPage page)
 
 ## Pattern 3: MudBlazor `MudSelect` Interaction
 
-MudBlazor's `MudSelect` renders options in an animated popover that opens asynchronously. The popup has a CSS transition — during the animation, the `[role='option']` elements may be in the DOM but not yet "visible" in Playwright's strict sense (non-zero dimensions, not hidden by parent opacity/visibility).
+MudBlazor's `MudSelect` renders a layered HTML structure. The outer `data-testid` wrapper is a **layout container** — clicking it in headless Chromium is unreliable because Playwright clicks the bounding-box center, which may land on padding/non-interactive regions. The actual interactive element that carries MudBlazor's `@onclick` handler is the inner `.mud-select-input` div.
 
-### Correct Pattern — Locator `ClickAsync` with Built-In Auto-Wait
+Options render inside a **portal popover** at the document `<body>` level (outside the select container) and only appear in the DOM after the dropdown opens. Waiting for the `[role='listbox']` to appear before querying options synchronises the option click with the popover render.
+
+### Correct Pattern — Scoped Trigger Click + Explicit Listbox Wait + data-testid Option
 
 ```csharp
 public async Task SelectAddressByNicknameAsync(string nickname)
 {
-    // Wait for the dropdown to become interactable
+    // Wait for the outer MudSelect wrapper to be visible (present and rendered).
     await AddressSelect.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-    await AddressSelect.ClickAsync();
 
-    // Use Playwright's Locator.ClickAsync() with built-in actionability checks.
-    // This retries until the element is visible, stable, enabled, and not covered —
-    // handling MudBlazor's CSS animation delay without a fragile WaitForSelectorAsync call.
-    //
-    // :has-text() matches the full display string (e.g., "Home - 123 Main St, Seattle, WA 98101"),
-    // not just the nickname, so partial matches work correctly.
-    await page.Locator($"[role='option']:has-text('{nickname}')")
-              .ClickAsync(new LocatorClickOptions { Timeout = 15_000 });
+    // Click the INNER .mud-select-input — the interactive element that carries MudBlazor's
+    // @onclick handler. Scoped through AddressSelect to guard against multi-select pages.
+    await AddressSelect.Locator(".mud-select-input").ClickAsync();
+
+    // Wait explicitly for the MudBlazor listbox popover to appear in the DOM.
+    // Uses page scope because the popover renders at document body level (outside AddressSelect).
+    await page.WaitForSelectorAsync("[role='listbox']",
+        new PageWaitForSelectorOptions { Timeout = MudSelectPopoverTimeoutMs });
+
+    // Target the option by data-testid for stable selection.
+    // data-testid="address-option-{nickname.ToLowerInvariant()}" is set on each MudSelectItem
+    // in Checkout.razor and forwarded to the rendered <li> via MudBlazor UserAttributes spread.
+    var optionLocator = page.Locator($"[data-testid='address-option-{nickname.ToLowerInvariant()}']");
+    await optionLocator.ClickAsync(new LocatorClickOptions { Timeout = MudSelectPopoverTimeoutMs });
 }
 ```
 
-### Why Not `WaitForSelectorAsync` + `ClickAsync`?
+### Why Not Click the Outer Wrapper + `:has-text()` Option?
 
-The two-step pattern is fragile under CI load and MudBlazor's CSS animations:
+Both patterns are fragile in headless CI Chromium:
 
 ```csharp
-// FRAGILE — can time out when run as the Nth scenario in a long test run.
-// WaitForSelectorAsync checks visibility at the moment of evaluation; if the
-// popup animation has briefly made [role='option'] non-visible, the check fails
-// even though the popup is opening correctly.
-await page.WaitForSelectorAsync("[role='option']", new PageWaitForSelectorOptions { Timeout = 10_000 });
-await page.Locator($"[role='option']:has-text('{nickname}')").ClickAsync();
+// FRAGILE — clicking the layout container is unreliable; center click can land on
+// padding. Also, [role='option']:has-text() depends on exact text formatting
+// and fails when the MudBlazor option text includes extra address details.
+await AddressSelect.ClickAsync();
+await page.Locator($"[role='option']:has-text('{nickname}')")
+          .ClickAsync(new LocatorClickOptions { Timeout = 15_000 });
 ```
 
-**Root cause of CI failures:** In a longer test run (5th+ scenario), Blazor Server's SignalR circuit latency can delay the popover render enough to miss the 10 s `WaitForSelectorAsync` window. Playwright's `Locator.ClickAsync()` retries internally until the element is actionable, which is more tolerant of transient animation/render delays.
+**Fix:** Click `.mud-select-input` (scoped through the select locator), wait for `[role='listbox']` explicitly, then use `[data-testid='address-option-*']` for option targeting.
+
+### Why Scope `.mud-select-input` Through `AddressSelect`?
+
+A bare `page.Locator(".mud-select-input")` matches the **first** `.mud-select-input` on the page. If a second `MudSelect` is added before the address dropdown in a future refactor, the unscoped locator silently hits the wrong field. Always scope through the known parent locator:
+
+```csharp
+await AddressSelect.Locator(".mud-select-input").ClickAsync();  // ✅ scoped
+await page.Locator(".mud-select-input").ClickAsync();           // ❌ unscoped — fragile
+```
 
 ### Anti-Pattern: `GetByRole` with Exact Name Match
 
@@ -885,25 +901,29 @@ pwsh playwright.ps1 show-trace playwright-traces/<scenario-name>.zip
 
 **Cause:** `GetByRole` matches on the **exact** accessible name. MudBlazor renders the full display text (e.g., `"Home - 123 Main St, Seattle, WA 98101"`), so `{ Name = "Home" }` never matches.
 
-**Fix:** Use `Locator($"[role='option']:has-text('{nickname}')").ClickAsync(new LocatorClickOptions { Timeout = 15_000 })`. Playwright's `Locator.ClickAsync` retries through CSS animation delays automatically.
+**Fix:** Use `Locator($"[role='option']:has-text('{nickname}')").ClickAsync(new LocatorClickOptions { Timeout = 15_000 })`. Playwright's `Locator.ClickAsync` retries through CSS animation delays automatically. For a fully robust implementation, see Pattern 3 (click `.mud-select-input`, wait for `[role='listbox']`, target option by `data-testid`).
 
 ---
 
-### 4. `WaitForSelectorAsync("[role='option']")` Times Out in Later Scenarios
+### 4. Clicking Outer `MudSelect` Wrapper Times Out on All Scenarios
 
-**Symptom:** `TimeoutException: waiting for Locator("[role='option']") to be visible` — but only in the 5th or 6th scenario; earlier scenarios pass fine.
+**Symptom:** `TimeoutException` on `SelectAddressByNicknameAsync` across ALL scenarios (not just later ones). No options ever appear.
 
-**Cause:** Blazor Server's SignalR circuit (the framework circuit, not the CritterSupply hub) processes events from the browser through a round-trip to the .NET server. Under CI load or after several Kestrel circuits have been created, this round-trip can take longer. `WaitForSelectorAsync` evaluates visibility **at a single moment** — if the popup animation is mid-render at that moment, it fails. `Locator.ClickAsync` retries internally until the element is actionable.
+**Cause:** MudBlazor's `MudSelect` has a layered HTML structure. The outer `data-testid` wrapper (e.g., `[data-testid='address-select']`) is a **layout container**, not the interactive trigger. Playwright's `ClickAsync` clicks the element's bounding-box center; under headless Chromium this can land on padding/non-interactive areas and fail to open the dropdown. Without the dropdown opening, `[role='option']` elements are never rendered in the portal popover, so any subsequent option locator times out.
 
-**Fix:** Replace the two-step pattern with a single `Locator.ClickAsync`:
+**Fix:** Scope the click to `.mud-select-input` (the actual interactive trigger), wait for `[role='listbox']` to confirm the popover is rendered, then target the option by `data-testid`:
 ```csharp
-// Before (fragile):
-await page.WaitForSelectorAsync("[role='option']", new PageWaitForSelectorOptions { Timeout = 10_000 });
-await page.Locator($"[role='option']:has-text('{nickname}')").ClickAsync();
-
-// After (robust):
+// Before (unreliable — clicks layout container, uses text-based option selector):
+await AddressSelect.ClickAsync();
 await page.Locator($"[role='option']:has-text('{nickname}')")
           .ClickAsync(new LocatorClickOptions { Timeout = 15_000 });
+
+// After (robust — clicks interactive trigger, waits for popover, uses data-testid):
+await AddressSelect.Locator(".mud-select-input").ClickAsync();
+await page.WaitForSelectorAsync("[role='listbox']",
+    new PageWaitForSelectorOptions { Timeout = MudSelectPopoverTimeoutMs });
+await page.Locator($"[data-testid='address-option-{nickname.ToLowerInvariant()}']")
+          .ClickAsync(new LocatorClickOptions { Timeout = MudSelectPopoverTimeoutMs });
 ```
 
 ---
@@ -918,13 +938,57 @@ await page.Locator($"[role='option']:has-text('{nickname}')")
 
 ---
 
-### 6. SignalR Negotiation Fails With 400
+### 6. SignalR Connection Failures in E2E Tests
 
-**Symptom:** SignalR connection on the order confirmation page fails during the WebSocket upgrade.
+Two distinct failure modes affect SignalR in E2E tests:
+
+#### 6a. Negotiate Returns 400 (Antiforgery)
+
+**Symptom:** `Status code '400'` with "A valid antiforgery token was not provided…" on the negotiate endpoint.
 
 **Cause:** ASP.NET Core 10+ antiforgery middleware blocks the SignalR negotiate endpoint by default.
 
 **Fix:** Add `.DisableAntiforgery()` to the hub mapping in `Storefront.Api/Program.cs`.
+
+#### 6b. `TypeError: Failed to fetch` on Negotiate (CORS)
+
+**Symptom:** `TypeError: Failed to fetch` in the SignalR client when attempting to connect. The negotiate POST is blocked silently by the browser.
+
+**Cause:** Storefront.Web and Storefront.Api run on different ports in E2E tests (e.g., `localhost:5238` vs `localhost:5237`). Under the browser Same-Origin Policy, **different ports = different origins**, so the negotiate HTTP POST is a cross-origin request. Without CORS headers, the browser blocks the response.
+
+**Fix (belt-and-suspenders — apply both):**
+
+1. Add CORS to `Storefront.Api/Program.cs` so negotiate responses include `Access-Control-Allow-Origin` headers:
+```csharp
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+});
+// ...
+app.UseCors(); // before MapWolverineEndpoints + MapHub
+```
+
+2. In `signalr-client.js`, set `skipNegotiation: true` to skip the HTTP negotiate POST entirely and connect directly via WebSocket. Safe because transport is already hardcoded to `WebSockets`:
+```javascript
+.withUrl(url, {
+    transport: signalR.HttpTransportType.WebSockets,
+    skipNegotiation: true   // bypass the CORS-triggering negotiate POST
+})
+```
+
+#### 6c. Missing `hubUrl` Argument to `signalrClient.subscribe`
+
+**Symptom:** `Failed to complete negotiation with the server: TypeError: Failed to fetch` but the hub URL in the error reads `undefined?customerId=...`.
+
+**Cause:** The JS `subscribe` function signature is `(customerId, dotNetHelper, hubUrl)`. If the Blazor component calls it with only 2 arguments, `hubUrl` is `undefined` in JavaScript, so the client tries to connect to `"undefined?customerId=..."` which resolves to the Blazor Web server (not the API), producing a 400 or CORS error.
+
+**Fix:** Always pass all three arguments:
+```csharp
+var apiBaseUrl = Configuration["ApiClients:StorefrontApiUrl"] ?? "http://localhost:5237";
+var hubUrl = $"{apiBaseUrl}/hub/storefront";
+await JS.InvokeVoidAsync("signalrClient.subscribe", customerId, dotNetHelper, hubUrl);
+```
 
 ---
 

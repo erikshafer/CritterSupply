@@ -11,6 +11,10 @@ namespace Storefront.E2ETests.Pages;
 /// </summary>
 public sealed class CheckoutPage(IPage page)
 {
+    // Timeout for MudBlazor popover interactions: waiting for the listbox to appear and
+    // waiting for a specific option to be clickable after the dropdown opens.
+    private const int MudSelectPopoverTimeoutMs = 10_000;
+
     // Loading state
     private ILocator LoadingSpinner => page.Locator("[data-testid='checkout-loading']");
     private ILocator ErrorAlert => page.Locator("[data-testid='checkout-error']");
@@ -75,21 +79,29 @@ public sealed class CheckoutPage(IPage page)
 
     public async Task SelectAddressByNicknameAsync(string nickname)
     {
-        // Wait for the select to be interactable before clicking
+        // Wait for the outer MudSelect wrapper to be visible (present and rendered).
         await AddressSelect.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-        await AddressSelect.ClickAsync();
 
-        // Wait for the MudBlazor popup option to be ready, then click it.
-        //
-        // Playwright's Locator.ClickAsync() uses built-in actionability checks that retry
-        // through CSS transitions and animations — more reliable than the two-step
-        // WaitForSelectorAsync (visibility check) + ClickAsync pattern, which can miss the
-        // option when MudBlazor's popover animation temporarily makes elements non-visible.
-        //
-        // Use :has-text() so the match works even when the option text includes the full display
-        // line (e.g. "Home - 123 Main St, Seattle, WA 98101") not just the nickname alone.
-        var optionLocator = page.Locator($"[role='option']:has-text('{nickname}')");
-        await optionLocator.ClickAsync(new LocatorClickOptions { Timeout = 15_000 });
+        // Click the inner .mud-select-input — the interactive element that carries MudBlazor's
+        // @onclick handler. The outer [data-testid='address-select'] wrapper is a layout container;
+        // clicking it is unreliable in headless Chromium because Playwright's ClickAsync targets
+        // the bounding-box center, which may fall on padding/non-interactive regions.
+        // Scoped through AddressSelect to guard against future multi-select pages.
+        await AddressSelect.Locator(".mud-select-input").ClickAsync();
+
+        // Wait explicitly for the MudBlazor listbox popover to appear in the DOM.
+        // MudBlazor renders options in a portal at the document body level (outside AddressSelect),
+        // so this uses page scope. Waiting here synchronises option-click with dropdown-open,
+        // avoiding the race where the option locator is queried before the popover renders.
+        await page.WaitForSelectorAsync("[role='listbox']",
+            new PageWaitForSelectorOptions { Timeout = MudSelectPopoverTimeoutMs });
+
+        // Target the option by its data-testid for stable, animation-resistant selection.
+        // data-testid="address-option-{nickname.ToLowerInvariant()}" is set on each MudSelectItem
+        // in Checkout.razor and forwarded to the rendered <li> via MudBlazor UserAttributes spread.
+        // More reliable than [role='option']:has-text() which depends on text formatting.
+        var optionLocator = page.Locator($"[data-testid='address-option-{nickname.ToLowerInvariant()}']");
+        await optionLocator.ClickAsync(new LocatorClickOptions { Timeout = MudSelectPopoverTimeoutMs });
     }
 
     public async Task ClickSaveAddressAndContinueAsync()
