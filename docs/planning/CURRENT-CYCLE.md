@@ -68,8 +68,9 @@
 
 - **Cycle 20:** Automated Browser Testing (Playwright + Reqnroll — depends on Cycle 19.5 completion — [Issue #58](https://github.com/erikshafer/CritterSupply/issues/58); [Cycle 20 Plan](./cycles/cycle-20-automated-browser-testing.md); [ADR 0015](../decisions/0015-playwright-e2e-browser-testing.md))
 - **Cycle 21+:** Vendor Portal Phase 1, Returns BC
-- **Future BCs (prioritized):** Notifications 🔴 → Pricing 🔴 → Promotions 🔴 → Search 🟡 → Recommendations 🟡 → Store Credit 🟢 → Analytics 🟢
-  - Priority key: 🔴 High (customer-facing gaps), 🟡 Medium (catalog/commerce scaling), 🟢 Low (strategic/retention)
+- **Future BCs (prioritized):** Notifications 🔴 → Pricing 🔴 → Promotions 🔴 → Search 🟡 → Recommendations 🟡 → Admin Portal 🟡 → Store Credit 🟢 → Analytics 🟢 → Operations Dashboard 🟢
+  - Priority key: 🔴 High (customer-facing gaps), 🟡 Medium (catalog/commerce scaling + internal tooling), 🟢 Low (strategic/retention/DevEx)
+  - Internal tooling: **Admin Portal** (exec/ops real-time dashboards, React/Vue + SignalR), **Operations Dashboard** (developer/SRE event stream + saga state visualization, React + SignalR)
   - See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specs
 
 ---
@@ -85,5 +86,5 @@
 
 ---
 
-*Last Updated: 2026-03-07 (Future BC roadmap added to CONTEXTS.md — Notifications, Pricing, Promotions, Search, Recommendations, Store Credit, Analytics)*
+*Last Updated: 2026-03-07 (Future BC roadmap expanded — added Admin Portal and Operations Dashboard for internal tooling; SignalR + React/Vue/SSR frontend patterns documented)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*

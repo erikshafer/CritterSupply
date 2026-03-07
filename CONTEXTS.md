@@ -2534,9 +2534,9 @@ SignalR message received (CartUpdated)
 
 ## Future Considerations
 
-The following bounded contexts have been identified as high-value additions for CritterSupply's next phase of growth. They are ordered by business priority: customer-facing gaps first, then commercial infrastructure, then operational intelligence.
+The following bounded contexts have been identified as high-value additions for CritterSupply's next phase of growth. They are ordered by business priority: customer-facing gaps first, then commercial infrastructure, then operational intelligence and internal tooling.
 
-> **Note:** The first four (Notifications, Pricing, Promotions, Search) are recommended for the near-term roadmap. Recommendations, Store Credit, and Analytics follow once foundational commercial infrastructure is in place. Reviews, Procurement/Supply Chain, and Shipping/Logistics round out the long-term vision.
+> **Note:** The first four (Notifications, Pricing, Promotions, Search) are recommended for the near-term roadmap. Recommendations, Store Credit, and Analytics follow once foundational commercial infrastructure is in place. **Admin Portal** and **Operations Dashboard** address internal tooling needs for the executive team and engineering team — both leveraging the richness of our event-sourced data streams via SignalR and SSR-capable frontends. Reviews, Procurement/Supply Chain, and Shipping/Logistics round out the long-term vision.
 
 ---
 
@@ -2941,7 +2941,306 @@ The Analytics context aggregates the event streams from all bounded contexts int
 
 ---
 
-## Reviews
+## Admin Portal
+
+The Admin Portal context is an **internal-facing BFF** (Backend-for-Frontend) for CritterSupply's operations and executive team. It composes real-time business dashboards — order pipeline status, revenue metrics, inventory health, fulfillment throughput — from the event streams already flowing through the system. Unlike the customer-facing Customer Experience BC, this context is scoped to authenticated internal users (operations managers, merchandising team, customer service representatives, executives).
+
+**Why this matters:** CritterSupply's event-sourced architecture captures every meaningful business event with a granularity that most traditional e-commerce stacks cannot match. `OrderPlaced`, `ReservationFailed`, `ShipmentDeliveryFailed`, `ReturnRequested`, `PaymentFailed` — these are not just audit logs, they are real-time signals about what is happening in the business *right now*. An Admin Portal surfaces these signals as actionable dashboards and operational tools, enabling the team to spot issues, manage escalations, and make decisions without waiting for a nightly batch report.
+
+This context is also a natural incubator for exploring **non-Blazor frontend technology**: because internal users typically run on desktop browsers in a managed environment, it is well-suited to a React or Vue.js Single-Page Application with SSR (Server-Side Rendering via Next.js or Nuxt.js), while still benefiting from Wolverine's SignalR transport for real-time metric pushes. This allows the CritterSupply reference architecture to demonstrate polyglot frontend patterns alongside its C#/.NET backend.
+
+**Priority:** 🟡 Medium — unlocks significant operational value once Analytics BC is providing projections; doubles as a reference architecture showcase for non-Blazor + SignalR patterns.
+
+### Architecture Pattern: Internal BFF with Real-Time Push
+
+**Analogous to:** Customer Experience BC (BFF pattern) — but for internal users rather than customers.
+
+**Frontend technology options (choose per audience):**
+- **Blazor Server** — consistent with existing stack; good for teams that want full C# end-to-end
+- **React (Next.js) with SSR** — preferred if UX/UI richness is a priority; SSR improves initial load time for data-heavy dashboards; connects to SignalR hub via `@microsoft/signalr` npm package
+- **Vue.js (Nuxt.js) with SSR** — alternative SPA framework with SSR; similar trade-offs to React/Next.js
+- **Decision note:** The backend API and SignalR hub are framework-agnostic — switching the frontend technology does not change the Admin Portal API or message contracts
+
+### Dashboard Views (Internal Users)
+
+**Executive Dashboard (read-only, high-level):**
+- Revenue today / this week / this month (live counter via SignalR)
+- Orders placed, fulfilled, cancelled (pipeline view)
+- Top-selling SKUs (from Analytics BC `ProductPerformance` projection)
+- Inventory alerts — SKUs at or below reorder threshold
+- Active fulfillment issues (delivery failures, stuck orders)
+
+**Operations Dashboard (interactive, drill-down):**
+- Live order queue: current status distribution across all Order saga states
+- Reservation failures (insufficient stock events) — identify demand outpacing supply
+- Payment failure rate — flag provider issues or fraud spikes
+- Fulfillment throughput: picked/packed/shipped per hour
+- Return request queue with reason codes
+
+**Customer Service Tooling:**
+- Customer lookup: search by email → full order history, active carts, return history
+- Order detail: current saga state, all saga transitions, linked payments/shipments
+- Manual saga intervention: trigger `CancelOrder`, issue `StoreCredit` (when Store Credit BC is live)
+- Address history for a customer (queries Customer Identity BC)
+
+**Inventory Management View:**
+- Stock levels per SKU per warehouse (from Inventory BC read model)
+- Reservation pipeline: how much of each SKU is soft-held vs. committed vs. available
+- `InventoryLow` alert history and acknowledgement log
+
+**Merchandising View:**
+- Product catalog management (CRUD interface to Product Catalog BC admin endpoints)
+- Pricing rule management (when Pricing BC is live)
+- Promotion lifecycle management (when Promotions BC is live)
+
+### What it receives
+
+**Integration Messages (for real-time dashboard updates via SignalR):**
+- `OrderPlaced` from Orders — increment live order counter
+- `OrderCancelled` from Orders — decrement active order count, flag if high rate
+- `PaymentFailed` from Payments — alert to operations team
+- `ReservationFailed` from Inventory — alert to merchandising (potential stockout)
+- `InventoryLow` from Inventory — surface reorder alert
+- `ShipmentDeliveryFailed` from Fulfillment — surface to customer service queue
+- `ReturnRequested` from Returns — add to return review queue
+- `RefundFailed` from Payments — alert requiring manual intervention
+- All events consumed by Analytics BC (same event bus subscription — different projections)
+
+**HTTP Queries to Downstream BCs:**
+- Orders BC: order detail, saga state history, order search
+- Customer Identity BC: customer lookup, address history
+- Inventory BC: stock levels, reservation summary
+- Product Catalog BC: product list and detail (admin endpoints)
+- Payments BC: payment history for an order (future)
+- Analytics BC: aggregated projections (SalesFunnel, ProductPerformance, InventoryVelocity)
+
+### What it publishes
+
+**Commands (mutations via HTTP POST to domain BCs):**
+- `CancelOrder` → Orders BC (customer service tooling)
+- `IssueStoreCredit` → Store Credit BC (goodwill credit for customer service)
+- `AcknowledgeLowStockAlert` → Inventory BC (already planned in Inventory BC)
+- `AddProduct`, `UpdateProduct`, `ChangeProductStatus` → Product Catalog BC (merchandising tools)
+- `SetBasePrice`, `SchedulePriceChange` → Pricing BC (when live)
+- `CreatePromotion`, `DeactivatePromotion` → Promotions BC (when live)
+
+**SignalR Messages (to connected internal clients via `IAdminPortalMessage`):**
+- `LiveMetricUpdated` — revenue counter, order count, fulfillment throughput
+- `AlertRaised` — payment failure spike, inventory stockout, delivery failure cluster
+- `OrderQueueChanged` — saga state distribution update (for operations dashboard pipeline view)
+
+### Core Invariants
+
+- Admin Portal does NOT contain business logic — all mutations are delegated to domain BCs
+- Role-based access control: Executive users see dashboards only; Operations users can intervene; Administrators can access all tooling
+- All user actions (cancellations, credits) must be attributed to the internal user who performed them (audit trail)
+- SignalR connection must be authenticated (JWT or session cookie); admin hub must not be accessible without valid internal credentials
+- Admin Portal does not persist its own state — all data lives in upstream BCs and Analytics projections
+
+### What it doesn't own
+
+- Business domain logic (all in respective domain BCs)
+- Analytics projections (Analytics BC — Admin Portal consumes them)
+- Customer-facing UI (Customer Experience BC)
+- Vendor-facing portal (Vendor Portal BC)
+
+### Integration Flows
+
+**Real-Time Executive Dashboard (Revenue + Order Pipeline):**
+```
+[Orders BC domain logic]
+CheckoutCompleted → Order saga starts → OrderPlaced published
+
+[Admin Portal notification handler]
+OrderPlaced (from RabbitMQ)
+  └─> OrderPlacedAdminHandler
+      ├─> Increment LiveOrderCount projection
+      └─> Publish LiveMetricUpdated → admin:{tenantGroup} via SignalR
+          └─> React/Vue dashboard updates revenue counter + order pipeline bar
+
+[Admin Portal query]
+GET /api/admin/dashboard/live
+  └─> Compose: Analytics.SalesFunnel + Analytics.ProductPerformance + Inventory.LowStockAlerts
+      └─> Return AdminDashboardView (no second query to domain BCs for static metrics)
+```
+
+**Customer Service Order Lookup:**
+```
+GET /api/admin/customers?email={email}
+  └─> Query Customer Identity BC: GET /api/customers?email={email}
+      └─> Return customer summary
+
+GET /api/admin/orders?customerId={customerId}
+  └─> Query Orders BC: GET /api/orders?customerId={customerId}
+      └─> Return order history with saga state per order
+
+POST /api/admin/orders/{orderId}/cancel
+  └─> CancelOrderAdminCommand (includes adminUserId for audit)
+      └─> Send CancelOrder → Orders BC
+          └─> Order saga handles cancellation and compensation
+```
+
+### Project Structure (Planned)
+
+```
+src/
+  Admin Portal/
+    AdminPortal/                      # Domain project (regular SDK)
+      AdminPortal.csproj              # References: Messages.Contracts only
+      Clients/                        # HTTP client interfaces
+        IOrdersAdminClient.cs
+        IInventoryAdminClient.cs
+        IAnalyticsClient.cs
+        ICustomerIdentityAdminClient.cs
+      Composition/                    # Admin view models
+        AdminDashboardView.cs
+        OrderQueueView.cs
+        CustomerDetailView.cs
+        InventoryAlertView.cs
+      Notifications/                  # Integration message handlers
+        IAdminPortalMessage.cs        # Marker interface for SignalR routing
+        OrderPlacedAdminHandler.cs
+        PaymentFailedAdminHandler.cs
+        ReservationFailedAdminHandler.cs
+        ShipmentDeliveryFailedAdminHandler.cs
+
+    AdminPortal.Api/                  # API project (Web SDK)
+      AdminPortal.Api.csproj          # References: AdminPortal, Messages.Contracts
+      Program.cs                      # Wolverine + Marten + SignalR + auth setup
+      appsettings.json
+      Properties/launchSettings.json  # Port: 5242 (AdminPortal.Api)
+      Queries/                        # Admin HTTP endpoints
+        GetDashboardView.cs
+        GetOrderQueue.cs
+        GetCustomerDetail.cs
+        GetInventoryAlerts.cs
+      Commands/                       # Admin mutation endpoints
+        CancelOrderAdmin.cs
+        AcknowledgeAlert.cs
+      AdminPortalHub.cs               # SignalR hub at /hub/admin
+
+    AdminPortal.Web/                  # Frontend app
+      # Option A: Blazor Server (consistent with existing stack)
+      # Option B: React (Next.js with SSR) — recommended for richer dashboard UX
+      # Option C: Vue.js (Nuxt.js with SSR)
+      # Frontend connects to AdminPortal.Api SignalR hub
+```
+
+### Key Design Decisions
+
+- **SignalR from day one:** Real-time metric updates are the primary value proposition of this BC. Unlike the Customer Experience BC which started with SSE and migrated, Admin Portal should use Wolverine's `opts.UseSignalR()` from the start (lesson learned from ADR 0013).
+- **Single hub group model:** Admin Portal uses role-scoped hub groups (`role:executive`, `role:operations`, `role:customerservice`) rather than per-user groups. Broadcast metrics to all users with appropriate role.
+- **SSR for initial load:** Executive dashboards are data-heavy; SSR (Next.js/Nuxt.js) ensures meaningful content renders before JavaScript hydrates, avoiding blank-screen flash on navigation.
+- **Authentication:** Internal users authenticate via a separate auth mechanism from Customer Identity BC (could reuse the same ASP.NET Core auth middleware with different user store, or integrate with a corporate IdP — e.g., Microsoft Entra/Azure AD for enterprise feel).
+
+---
+
+## Operations Dashboard
+
+The Operations Dashboard context provides **developer-facing and SRE-facing observability** into the event-driven system itself — not the business metrics (that's Admin Portal / Analytics), but the *technical health* of the platform: message processing rates, saga state distribution, dead-letter queues, handler failure rates, and event replay tooling.
+
+**Why this matters:** As CritterSupply grows, the engineering team needs visibility into how the event-driven infrastructure is behaving — not just whether services are up, but whether messages are flowing, sagas are completing, and compensating transactions are working as expected. Wolverine and Marten already expose rich instrumentation via OpenTelemetry; this context is the UI layer that makes that data actionable for on-call engineers, not just a Jaeger trace dump.
+
+This is also a developer experience (DevEx) investment: giving new engineers joining the team a live view of the event flow helps them learn the system faster. Watching an order saga progress in real-time — `OrderPlaced` → `ReservationConfirmed` → `PaymentCaptured` → `ReservationCommitted` → `FulfillmentRequested` — is far more instructive than reading documentation.
+
+**Priority:** 🟢 Low — primarily a DevEx and operational maturity concern; Jaeger + OpenTelemetry covers immediate observability needs. Build when the team is large enough that on-call rotation needs better tooling.
+
+### Architecture Pattern: Event Stream Visualization + System Health BFF
+
+**Frontend technology:**
+- **React (Next.js) recommended** — real-time event stream visualization benefits from a rich component ecosystem (recharts, d3) that is more mature in React/Vue than Blazor; SSR ensures the dashboard renders quickly on load
+- **SignalR** for live event stream feed (push events from Wolverine message bus to the dashboard as they process)
+
+### Dashboard Views (Engineering / DevEx Audience)
+
+**Event Stream Monitor:**
+- Live feed of integration messages flowing through RabbitMQ, annotated with handler name and processing result
+- Filter by BC, message type, or correlation ID (e.g., trace a specific `orderId` through all handlers)
+- Color-coded: success (green), retry (yellow), dead-letter (red)
+
+**Saga State Explorer:**
+- Visual state machine diagram for Order saga, showing current state distribution (how many sagas are in each state right now)
+- Drill into a specific saga by orderId: full state transition history with timestamps
+- Flag sagas that have been in a non-terminal state longer than expected (configurable threshold; suggested default: 1 hour for most states, 24 hours for `PendingPayment`)
+
+**Dead Letter Queue (DLQ) Dashboard:**
+- List of messages in Wolverine's dead-letter queue (failed after all retries)
+- View message content, failure reason, retry history
+- Manual replay trigger (requeue a dead-lettered message for reprocessing)
+- Alert when DLQ depth exceeds threshold
+
+**Handler Performance:**
+- P50/P95/P99 handler processing latency per message type
+- Handler error rate over time (rolling 1h, 24h, 7d)
+- Message throughput per queue (messages/second)
+
+**Database Health (Marten / EF Core):**
+- Marten event store stream counts per BC
+- EF Core migration status per bounded context
+- Projection rebuild status (if a projection is being rebuilt, show progress)
+
+### What it receives
+
+**OpenTelemetry spans (from Wolverine / Marten instrumentation):**
+- Wolverine message processing spans (handler name, message type, processing time, success/failure)
+- Marten event store write spans (stream id, event type, sequence number)
+- RabbitMQ publish/consume spans
+
+**Wolverine Dead Letter Events:**
+- Dead-lettered message notifications from Wolverine's persistence layer
+
+### What it publishes
+
+**SignalR Messages (to connected engineers):**
+- `MessageProcessed` — a handler completed (success or failure); stream to the live event feed
+- `SagaStateChanged` — an Order saga transitioned state; update the state machine visualization
+- `DlqMessageAdded` — a new dead-letter appeared; alert the engineer on duty
+- `AlertRaised` — DLQ depth, handler error rate, or saga stuck threshold exceeded
+
+### Core Invariants
+
+- This context is **read-only** for most operations; only DLQ replay is a write operation
+- DLQ replay requires elevated role (on-call engineer or SRE) — not available to all developers
+- Event stream data is ephemeral (no long-term storage in this BC) — historical data lives in OpenTelemetry backends (Jaeger, Prometheus)
+- This BC must not have a meaningful performance footprint on the production message bus — use a separate subscription or tap
+
+### What it doesn't own
+
+- OpenTelemetry data storage (Jaeger, Prometheus — external infrastructure)
+- Alerting and on-call routing (PagerDuty, OpsGenie — external)
+- Business metrics (Admin Portal BC, Analytics BC)
+- Wolverine persistence or dead-letter policy (those are Wolverine configuration concerns)
+
+### Integration Flows
+
+```
+[Wolverine middleware / OpenTelemetry instrumentation]
+Every handler invocation
+  └─> OTel span emitted → Jaeger (persisted tracing)
+      └─> Operations Dashboard subscribes to OTel span events (or Wolverine's ISagaListener)
+          └─> MessageProcessedHandler
+              └─> Publish MessageProcessed → SignalR → live event stream feed
+
+[DLQ polling or Wolverine event hook]
+DeadLetteredMessageDetected
+  └─> DlqMessageHandler
+      ├─> Store in Operations Dashboard ephemeral read model (last 24h)
+      └─> Publish DlqMessageAdded → SignalR → DLQ dashboard alert
+
+[Engineer triggers replay from dashboard]
+POST /api/ops/dlq/{messageId}/replay
+  └─> RequeueDlqMessage (Wolverine API call to requeue message)
+      └─> MessageRequeuedConfirmation → dashboard UI
+```
+
+### Key Design Decisions
+
+- **React (Next.js) strongly preferred** for this BC: the data visualization ecosystem (recharts, d3, react-flow for state machine diagrams) is significantly more mature than what's available in Blazor's component libraries
+- **SSR for initial state:** On page load, the dashboard renders the current DLQ contents and saga state distribution from a server-rendered snapshot, then hydrates with live SignalR updates — no loading spinner on the critical-path on-call view
+- **Separate deployment from Admin Portal:** Operations Dashboard is a developer tool, not a business tool. Different auth requirements (engineer credentials vs. business user credentials), different deployment cadence, different audience.
+- **OpenTelemetry integration:** Wolverine 5+ and Marten 8+ emit OTel spans natively. This BC can subscribe to those spans via an OTel collector pipeline rather than intercepting the message bus directly.
+
+---
 
 The Reviews context owns customer product ratings and reviews — the social proof layer that influences purchase decisions and surfaces quality signals about products and vendors.
 
