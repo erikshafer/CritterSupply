@@ -10,7 +10,7 @@ Feature: Order History
   # E2E coverage is blocked on:
   #   - Multi-order test data seeding strategy
   #   - Order detail page (planned for Cycle 21 Product Catalog Phase 2)
-  # See GitHub Issue: TODO — create tracking issue
+  # Tracking: Create a Cycle 21 GitHub Issue to implement these scenarios.
   # ──────────────────────────────────────────────────
 
   Background:

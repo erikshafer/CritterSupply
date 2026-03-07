@@ -40,8 +40,9 @@ public sealed class ProtectedRoutesStepDefinitions
     [Given(@"I have no active cart in localStorage")]
     public async Task GivenIHaveNoActiveCartInLocalStorage()
     {
-        // Clear any cartId from localStorage so Checkout.razor redirects to /cart
-        await Page.EvaluateAsync("() => localStorage.removeItem('cartId')");
+        // Clear cart and checkout IDs from localStorage so Checkout.razor redirects to /cart.
+        // authHelper.getCheckoutId reads 'checkoutId'; authHelper.getCartId reads 'cartId'.
+        await Page.EvaluateAsync("() => { localStorage.removeItem('cartId'); localStorage.removeItem('checkoutId'); }");
     }
 
     // ─────────────────────────────────────────────────────────────────────
