@@ -43,7 +43,7 @@ Feature: Scheduled Price Changes
   Scenario: Pricing Manager cancels a pending scheduled change
     Given I have scheduled a price change for "DOG-FOOD-5LB" to $19.99 in 7 days (ScheduleId: "schedule-guid-A")
     When I cancel the scheduled change "schedule-guid-A" for "DOG-FOOD-5LB"
-    Then a "PriceChangeScheduleCancelled" event should be appended
+    Then a "ScheduledPriceChangeCancelled" event should be appended
     And the CurrentPriceView should show "HasPendingSchedule: false"
     And the ScheduledChangesView entry should have Status "Cancelled"
     And the current price should remain $24.99

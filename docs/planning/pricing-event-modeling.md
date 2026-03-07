@@ -1,10 +1,11 @@
 # Pricing Bounded Context: Event Modeling Session
 
 **Date:** 2026-03-07
-**Participants:** Product Owner, Principal Architect
+**Participants:** Product Owner, Principal Architect (+ UX Engineer review 2026-03-07)
 **Status:** 🟡 Design Complete — Awaiting Implementation Cycle Assignment
 **Related CONTEXTS.md Sections:** [Pricing](../../CONTEXTS.md#pricing), [Product Catalog](../../CONTEXTS.md#product-catalog), [Shopping](../../CONTEXTS.md#shopping)
-**Related ADRs:** See ADRs needed below
+**Related ADRs:** [ADR 0016: UUID v5 for Natural-Key Stream IDs](../decisions/0016-uuid-v5-for-natural-key-stream-ids.md) | See additional ADRs needed below
+**UX Review:** [`docs/planning/pricing-ux-review.md`](pricing-ux-review.md) — DX analysis, event naming recommendations, `Pricing.Web` UI vision, risks
 
 ---
 
@@ -66,12 +67,17 @@ Mashing it into Product Catalog — which is read-heavy, rarely changes, and ser
 
 **What it owns:** The authoritative price record for a single SKU — current base price, floor, ceiling, pending scheduled changes, and the full append-only history of everything that happened to that SKU's price.
 
-**Stream key:** Deterministic `Guid` using UUID v5 from the SKU string (not MD5):
+**Stream key:** Deterministic `Guid` using UUID v5 from the SKU string (not MD5, not UUID v7). See **[ADR 0016](../decisions/0016-uuid-v5-for-natural-key-stream-ids.md)** for the full rationale.
+
+**Why not UUID v7?** UUID v7 is a timestamp-random generator — it cannot produce the same value twice from the same input. Multiple handlers in the Pricing BC must derive the same stream ID from just the SKU string without a lookup table. UUID v7 would require persisting the generated ID and performing an extra database round-trip on every write — adding latency and a new failure mode. UUID v5 (SHA-1 + namespace, RFC 4122 §4.3) provides determinism, RFC compliance, namespace isolation, and explicit case normalization.
 
 ```csharp
 public static Guid StreamId(string sku)
 {
-    // UUID v5: SHA-1 of namespace + name, RFC 4122 §4.3
+    // UUID v5 (RFC 4122 §4.3): deterministic, namespaced SHA-1 of SKU string.
+    // WHY NOT UUID v7: v7 cannot produce the same value twice from the same input.
+    // WHY NOT MD5: not RFC 4122-compliant; no namespace isolation. See ADR 0016.
+    // NORMALIZATION: ToUpperInvariant() ensures "dog-food-5lb" == "DOG-FOOD-5LB".
     var namespaceBytes = new Guid("6ba7b810-9dad-11d1-80b4-00c04fd430c8").ToByteArray(); // URL namespace
     var nameBytes = Encoding.UTF8.GetBytes($"pricing:{sku.ToUpperInvariant()}");
     var hash = SHA1.HashData([.. namespaceBytes, .. nameBytes]);
@@ -167,19 +173,25 @@ public sealed record ProductRegistered(
     DateTimeOffset RegisteredAt);
 
 // First time a price is set — Unpriced → Published (Phase 1: no Draft)
-// ProductPriced captures distinct business intent: "this SKU now has a price."
-// PriceChanged is only for subsequent mutations. Do not merge these events.
+// UX RECOMMENDATION: Consider renaming to `InitialPriceSet` for stream readability.
+// ProductPriced vs PriceChanged looks like the same event category to new developers.
+// InitialPriceSet makes the stream tell a clear story:
+//   ProductRegistered → InitialPriceSet → PriceChanged → PriceChangeScheduled → ScheduledPriceActivated
+// If renaming: MUST happen before first production write — event types cannot be renamed
+// without a data migration or [EventType] alias. Team decision pending — see Event Naming Decision section.
 public sealed record ProductPriced(
     Guid ProductPriceId,
     string Sku,
     Money Price,
     Money? FloorPrice,
     Money? CeilingPrice,
-    Guid SetBy,
+    Guid SetBy,              // Required — FluentValidation rejects Guid.Empty
     DateTimeOffset PricedAt);
 
 // Subsequent price mutations — Published → Published (price value changes)
 // PreviousPriceSetAt enables Was/Now display in the BFF
+// ChangedBy is required on ALL mutating events for audit trail (FluentValidation enforced)
+// SourceBulkJobId / SourceSuggestionId: traceability from bulk job or vendor suggestion → price change
 public sealed record PriceChanged(
     Guid ProductPriceId,
     string Sku,
@@ -187,9 +199,10 @@ public sealed record PriceChanged(
     Money NewPrice,
     DateTimeOffset PreviousPriceSetAt,
     string? Reason,
-    Guid ChangedBy,
+    Guid ChangedBy,                    // Required — who made this change?
     DateTimeOffset ChangedAt,
-    Guid? BulkPricingJobId);   // null for manual changes; set for bulk job changes
+    Guid? BulkPricingJobId,           // null for manual changes; set for bulk job changes
+    Guid? SourceSuggestionId);        // null for manual changes; set when triggered by vendor suggestion approval
 
 // Scheduled future change registered — creates Wolverine durable scheduled message
 public sealed record PriceChangeScheduled(
@@ -198,15 +211,17 @@ public sealed record PriceChangeScheduled(
     Guid ScheduleId,           // Correlation ID for the Wolverine scheduled message
     Money ScheduledPrice,
     DateTimeOffset ScheduledFor,
-    Guid ScheduledBy,
+    Guid ScheduledBy,          // Required — who scheduled this?
     DateTimeOffset ScheduledAt);
 
 // Scheduled change cancelled. NOTE: does not cancel Wolverine message —
 // stale-message guard in handler discards it when it fires.
-public sealed record PriceChangeScheduleCancelled(
+// UX NOTE: Renamed from PriceChangeScheduleCancelled to align with ScheduledPriceActivated naming.
+public sealed record ScheduledPriceChangeCancelled(
     Guid ProductPriceId,
     string Sku,
     Guid ScheduleId,
+    string? CancellationReason,
     Guid CancelledBy,
     DateTimeOffset CancelledAt);
 
@@ -221,13 +236,15 @@ public sealed record ScheduledPriceActivated(
 
 // Floor price set or changed by Merchandising Manager (Phase 1)
 // Phase 2: separate MapPrice for vendor MAP obligations
+// ExpiresAt: nullable — policy bounds may have time limits ("floor price until end of Q3")
 public sealed record FloorPriceSet(
     Guid ProductPriceId,
     string Sku,
     Money? OldFloorPrice,
     Money FloorPrice,
     Guid SetBy,
-    DateTimeOffset SetAt);
+    DateTimeOffset SetAt,
+    DateTimeOffset? ExpiresAt);    // null = permanent until manually changed
 
 // Ceiling / MAP set or changed
 public sealed record CeilingPriceSet(
@@ -236,7 +253,8 @@ public sealed record CeilingPriceSet(
     Money? OldCeilingPrice,
     Money CeilingPrice,
     Guid SetBy,
-    DateTimeOffset SetAt);
+    DateTimeOffset SetAt,
+    DateTimeOffset? ExpiresAt);    // null = permanent until manually changed
 
 // Retroactive correction — append-only audit record.
 // DOES update CurrentPriceView and publishes PriceUpdated integration event.
@@ -292,6 +310,84 @@ public sealed record VendorPriceSuggestionExpired(
     DateTimeOffset ExpiredAt);
 ```
 
+### Domain Events — `BulkPricingJob` Saga
+
+The saga states are `Draft | AwaitingApproval | Processing | Completed | CompletedWithErrors | Cancelled | Failed`. The following events must be specified before the bulk job UI (`BulkJobDetail.razor`) can be built. `BulkJobItemProcessed` is the most critical — without it, progress tracking is impossible.
+
+```csharp
+public sealed record BulkJobSubmitted(
+    Guid JobId,
+    Guid SubmittedBy,
+    int TotalSkuCount,
+    DateTimeOffset SubmittedAt);
+
+// Transition to AwaitingApproval (triggered when TotalSkuCount > 100)
+public sealed record BulkJobSubmittedForApproval(
+    Guid JobId,
+    Guid SubmittedBy,
+    int TotalSkuCount,
+    DateTimeOffset SubmittedAt);
+
+// Merchandising Manager approves the job (required when TotalSkuCount > 100)
+public sealed record BulkJobApproved(
+    Guid JobId,
+    Guid ApprovedBy,
+    DateTimeOffset ApprovedAt);
+
+// Merchandising Manager rejects the job
+public sealed record BulkJobRejected(
+    Guid JobId,
+    string RejectionReason,
+    Guid RejectedBy,
+    DateTimeOffset RejectedAt);
+
+// Processing has begun — fired after approval (or immediately if ≤ 100 SKUs)
+public sealed record BulkJobStarted(
+    Guid JobId,
+    DateTimeOffset StartedAt);
+
+// ⭐ Critical for progress tracking and CompletedWithErrors detail
+// Each successful SKU price change fires this event
+public sealed record BulkJobItemProcessed(
+    Guid JobId,
+    string Sku,
+    Money NewPrice,
+    DateTimeOffset ProcessedAt);
+
+// Each failed SKU fires this event — required for CompletedWithErrors UI
+public sealed record BulkJobItemFailed(
+    Guid JobId,
+    string Sku,
+    string FailureReason,
+    DateTimeOffset FailedAt);
+
+// Terminal success (all SKUs processed, zero failures)
+public sealed record BulkJobCompleted(
+    Guid JobId,
+    int ProcessedCount,
+    DateTimeOffset CompletedAt);
+
+// Terminal partial success (some SKUs failed)
+public sealed record BulkJobCompletedWithErrors(
+    Guid JobId,
+    int ProcessedCount,
+    int FailedCount,
+    DateTimeOffset CompletedAt);
+
+// Terminal cancellation
+public sealed record BulkJobCancelled(
+    Guid JobId,
+    string? CancellationReason,
+    Guid CancelledBy,
+    DateTimeOffset CancelledAt);
+
+// Terminal failure (job-level error, not individual SKU failures)
+public sealed record BulkJobFailed(
+    Guid JobId,
+    string FailureReason,
+    DateTimeOffset FailedAt);
+```
+
 ### Integration Messages — `Messages.Contracts.Pricing`
 
 ```csharp
@@ -329,11 +425,21 @@ public sealed record VendorPriceSuggestionSubmitted(
 
 `ProductPriced`, `PriceChanged`, and `ScheduledPriceActivated` are kept as separate events:
 
-- **`ProductPriced`**: "For the first time, someone decided what this SKU costs." Transition from `Unpriced` → `Published`. Sets floor and ceiling atomically. A distinct business operation — not just changing a number.
+- **`ProductPriced`** (or `InitialPriceSet` — see UX review): "For the first time, someone decided what this SKU costs." Transition from `Unpriced` → `Published`. Sets floor and ceiling atomically. A distinct business operation — not just changing a number.
 - **`PriceChanged`**: "Someone changed an already-priced product's price." Carries `OldPrice` and `PreviousPriceSetAt` (meaningless on first-price event). User-driven.
 - **`ScheduledPriceActivated`**: "The system fired a previously scheduled change." System-driven (Wolverine delivered a scheduled message). Queryable separately from manual changes.
 
 **Do not merge these three into one event. The semantic clarity is worth the extra types.**
+
+**⚠️ Open naming decision:** The UX Engineer recommends renaming `ProductPriced` → `InitialPriceSet` for stream readability. `InitialPriceSet` makes the stream tell a clearer story to developers who have never seen this domain:
+
+```
+ProductRegistered → InitialPriceSet → PriceChanged → PriceChangeScheduled → ScheduledPriceActivated
+```
+
+This rename **must happen before any production writes** — event types in Marten event streams cannot be renamed without a data migration (or Marten's `[EventType]` alias pattern). Team decision required before the implementation sprint begins. See [`docs/planning/pricing-ux-review.md`](pricing-ux-review.md) Section 1.1 for the full analysis.
+
+Similarly, `PriceChangeScheduleCancelled` has been renamed to `ScheduledPriceChangeCancelled` in the event definitions above to align with `ScheduledPriceActivated` naming.
 
 ---
 
@@ -344,6 +450,8 @@ public sealed record VendorPriceSuggestionSubmitted(
 **Pattern:** `SingleStreamProjection` registered as `ProjectionLifecycle.Inline`. Runs in the same transaction as the command handler. Zero async lag.
 
 **Marten document key:** SKU string (not Guid) — enables `session.LoadAsync<CurrentPriceView>("DOG-FOOD-5LB")` directly. Marten's `LoadManyAsync` issues a single `WHERE id = ANY(@ids)` query for bulk lookups.
+
+**⚠️ SKU normalization is critical.** Marten string document IDs are case-sensitive. `"fido-123"` and `"FIDO-123"` are different documents. All inbound SKU strings must be normalized to `ToUpperInvariant()` at the API boundary — in a single `PricingSkuNormalizationMiddleware` or model binder, not scattered throughout handlers. See [`docs/planning/pricing-ux-review.md`](pricing-ux-review.md) Section 1.4 for the three concrete developer pitfalls.
 
 ```csharp
 public sealed record CurrentPriceView
@@ -375,7 +483,7 @@ Rule: 30 days from price drop date, or until next price change, whichever is fir
 
 ### `ScheduledChangesView` — Upcoming Price Changes Calendar
 
-**Pattern:** `MultiStreamProjection` listening to `PriceChangeScheduled`, `PriceChangeScheduleCancelled`, `ScheduledPriceActivated`. Async daemon (`ProjectionLifecycle.Async`).
+**Pattern:** `MultiStreamProjection` listening to `PriceChangeScheduled`, `ScheduledPriceChangeCancelled`, `ScheduledPriceActivated`. Async daemon (`ProjectionLifecycle.Async`).
 
 ```csharp
 public sealed record ScheduledChangesView
@@ -531,7 +639,7 @@ outgoing.Delay(
     command.ScheduledFor - DateTimeOffset.UtcNow);
 ```
 
-**Cancellation strategy:** Append `PriceChangeScheduleCancelled` to the stream. Do NOT attempt to cancel the Wolverine scheduled message. When it fires, the handler's `Before()` guard checks `PendingSchedule?.ScheduleId != command.ScheduleId` → silently discards. This is the stale-message discard pattern: robust, simple, idiomatic.
+**Cancellation strategy:** Append `ScheduledPriceChangeCancelled` to the stream. Do NOT attempt to cancel the Wolverine scheduled message. When it fires, the handler's `Before()` guard checks `PendingSchedule?.ScheduleId != command.ScheduleId` → silently discards. This is the stale-message discard pattern: robust, simple, idiomatic.
 
 **Recovery after restart:** `AddAsyncDaemon(DaemonMode.Solo)` — Wolverine queries `wolverine_incoming_envelopes` on startup and delivers all pending scheduled messages. Late-firing schedules (system was down during scheduled time) are delivered immediately on restart; the `Before()` guard handles stale schedules correctly.
 
@@ -647,10 +755,10 @@ src/Pricing/
 │   │   │
 │   │   ├── Events/
 │   │   │   ├── ProductRegistered.cs
-│   │   │   ├── ProductPriced.cs
+│   │   │   ├── ProductPriced.cs              # Consider renaming to InitialPriceSet.cs (see UX review)
 │   │   │   ├── PriceChanged.cs
 │   │   │   ├── PriceChangeScheduled.cs
-│   │   │   ├── PriceChangeScheduleCancelled.cs
+│   │   │   ├── ScheduledPriceChangeCancelled.cs
 │   │   │   ├── ScheduledPriceActivated.cs
 │   │   │   ├── FloorPriceSet.cs
 │   │   │   ├── CeilingPriceSet.cs
@@ -911,7 +1019,7 @@ Day -7:
 
 Day -3 (business decision: cancel):
 🔵 CancelScheduledPriceChange {Sku: "DOG-FOOD-5LB", ScheduleId: guid-A}
-🟢 PriceChangeScheduleCancelled {ScheduleId: guid-A}
+🟢 ScheduledPriceChangeCancelled {ScheduleId: guid-A}
    → ProductPrice.PendingSchedule = null
    → CurrentPriceView: HasPendingSchedule: false
    → ScheduledChangesView: guid-A → Status: Cancelled
@@ -998,12 +1106,15 @@ Pricing BC:
 
 Before any implementation code is written:
 
-- [x] **ADR written:** Add-to-cart vs. checkout-time price freeze policy
-- [x] **ADR written:** `Money` value object as canonical monetary representation
-- [x] **ADR written:** `BulkPricingJob` audit trail approach
-- [x] **ADR written:** MAP vs. Floor price distinction
+- [x] **ADR 0016 written:** UUID v5 for deterministic natural-key stream IDs ([docs/decisions/0016-uuid-v5-for-natural-key-stream-ids.md](../decisions/0016-uuid-v5-for-natural-key-stream-ids.md))
+- [ ] **ADR written:** Add-to-cart vs. checkout-time price freeze policy
+- [ ] **ADR written:** `Money` value object as canonical monetary representation
+- [ ] **ADR written:** `BulkPricingJob` audit trail approach
+- [ ] **ADR written:** MAP vs. Floor price distinction
 - [x] **CONTEXTS.md updated:** Add Pricing BC section, update Future Considerations, update Shopping/Orders integration notes
 - [x] **Port 5242** registered in CLAUDE.md port allocation table
+- [x] **UX Engineer review complete** ([docs/planning/pricing-ux-review.md](pricing-ux-review.md)) — action items must be resolved before implementation sprint
+- [ ] **Event naming decision:** `ProductPriced` → `InitialPriceSet`? Team decision required before first production write
 - [ ] **`pricing` schema** added to database init scripts (implementation cycle)
 - [ ] **PO confirms:** Cart price TTL — what is the configured default (suggested: 1 hour)?
 - [x] **Gherkin feature files** written and reviewed by PO (`docs/features/pricing/`)

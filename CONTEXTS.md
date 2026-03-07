@@ -2566,7 +2566,7 @@ The authoritative price record for a single SKU. Created when `ProductAdded` arr
 - `ProductPriced` — first price set (Unpriced → Published); carries price, floor, ceiling atomically
 - `PriceChanged` — subsequent price mutations; carries `OldPrice`, `PreviousPriceSetAt` (for Was/Now)
 - `PriceChangeScheduled` — scheduled future change; Wolverine durable message queued
-- `PriceChangeScheduleCancelled` — schedule cancelled; stale-message guard discards the Wolverine message when it fires
+- `ScheduledPriceChangeCancelled` — schedule cancelled (renamed from `PriceChangeScheduleCancelled` for naming consistency with `ScheduledPriceActivated`); stale-message guard discards the Wolverine message when it fires
 - `ScheduledPriceActivated` — Wolverine delivers the scheduled message; system-driven (distinct from user-driven `PriceChanged`)
 - `FloorPriceSet` — minimum allowed retail price (Merchandising Manager only)
 - `CeilingPriceSet` — maximum allowed retail price (MAP compliance)
@@ -2765,9 +2765,13 @@ See [`docs/planning/pricing-event-modeling.md`](docs/planning/pricing-event-mode
 
 ### ADRs Required Before Implementation
 
-1. **ADR: Add-to-cart vs. checkout-time price freeze** — resolves contradiction with current CONTEXTS.md "price-at-checkout immutability" wording; defines cart price TTL
-2. **ADR: `Money` value object as canonical monetary representation** — establishes `Money` across all CritterSupply BCs; references Shopping BC `decimal UnitPrice` as technical debt
-3. **ADR: `BulkPricingJob` audit trail approach** — event-sourced saga vs. explicit `BulkApprovalRecord` document
+1. **[ADR 0016](docs/decisions/0016-uuid-v5-for-natural-key-stream-ids.md) ✅ Written** — UUID v5 for deterministic natural-key event stream IDs (vs. UUID v7 used elsewhere)
+2. **ADR: Add-to-cart vs. checkout-time price freeze** — resolves contradiction with current CONTEXTS.md "price-at-checkout immutability" wording; defines cart price TTL
+3. **ADR: `Money` value object as canonical monetary representation** — establishes `Money` across all CritterSupply BCs; references Shopping BC `decimal UnitPrice` as technical debt
+4. **ADR: `BulkPricingJob` audit trail approach** — event-sourced saga vs. explicit `BulkApprovalRecord` document
+5. **ADR: MAP vs. Floor price distinction** — deferred to Phase 2+, but documents the design decision to keep them separate
+
+**UX Review:** See [`docs/planning/pricing-ux-review.md`](docs/planning/pricing-ux-review.md) for the UX Engineer's DX analysis, `Pricing.Web` UI vision, component decisions, and risk register for the web build.
 
 ---
 
