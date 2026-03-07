@@ -77,6 +77,18 @@ Playwright requires a one-time browser download after build. Add a build target 
 
 Set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` if browsers are pre-installed (e.g., cached in CI).
 
+**GitHub Actions browser caching:** Playwright browsers are stored in `~/.cache/ms-playwright` on Linux. Use `actions/cache` with the key `playwright-chromium-${{ hashFiles('**/packages.lock.json') }}` to avoid re-downloading on every run. Alternatively, use the `microsoft/playwright-github-action` action which handles caching automatically.
+
+```yaml
+- name: Cache Playwright browsers
+  uses: actions/cache@v4
+  with:
+    path: ~/.cache/ms-playwright
+    key: playwright-${{ runner.os }}-${{ hashFiles('**/Storefront.E2ETests.csproj') }}
+- name: Install Playwright browsers
+  run: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 || pwsh ./bin/Debug/net10.0/playwright.ps1 install chromium
+```
+
 ### Project References
 
 The E2E test project references all three Customer Experience projects so it can use their `Program.cs` as the `WebApplicationFactory` entry point:
@@ -505,7 +517,7 @@ public sealed class DataHooks
         _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
             Headless = headless,
-            SlowMo = headless ? 0 : 100 // visual debugging aid when headless=false
+            SlowMo = headless ? 0 : 100 // visual debugging aid when headless=false; increase to 300-500ms for slower step-through
         });
     }
 
