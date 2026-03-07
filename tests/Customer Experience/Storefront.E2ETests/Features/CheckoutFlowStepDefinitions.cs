@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
+using Storefront.Api;
 using Storefront.E2ETests.Pages;
-using Wolverine.Tracking;
 
 namespace Storefront.E2ETests.Features;
 
@@ -205,15 +207,37 @@ public sealed class CheckoutFlowStepDefinitions
         var orderIdStr = _scenarioContext.Get<string>(ScenarioContextKeys.OrderId);
         var orderId = Guid.Parse(orderIdStr);
 
-        // Inject OrderStatusChanged directly into Wolverine so the SignalR hub routes it to Alice's group.
-        // PaymentAuthorizedHandler currently uses Guid.Empty for customerId (TODO: resolve via OrderId→CustomerId
-        // lookup when completing checkout). The E2E test focuses on SignalR delivery, not the handler transformation.
-        await _fixture.StorefrontApiHost.InvokeMessageAndWaitAsync(
-            new Storefront.RealTime.OrderStatusChanged(
-                orderId,
-                WellKnownTestData.Customers.Alice,
-                "PaymentAuthorized",
-                DateTimeOffset.UtcNow));
+        // IHubContext is the correct injection mechanism for E2E SignalR tests.
+        // InvokeMessageAndWaitAsync requires a Wolverine local handler — OrderStatusChanged
+        // has none (it is published directly to the SignalR transport via x.ToSignalR() in
+        // Program.cs). Wolverine's TrackedSession cannot observe browser WebSocket delivery
+        // and times out unconditionally waiting for a terminal state that never fires.
+        //
+        // We send a CloudEvents-shaped payload matching Wolverine's SignalR transport format.
+        // SignalR serializes with camelCase (System.Text.Json web defaults), so the JS client
+        // receives camelCase properties in cloudEvent.data. signalr-client.js spreads
+        // cloudEvent.data and adds eventType before calling OnSseEvent on the Blazor component.
+        var hubContext = _fixture.StorefrontApiHost.Services
+            .GetRequiredService<IHubContext<StorefrontHub>>();
+
+        await hubContext.Clients
+            .Group($"customer:{WellKnownTestData.Customers.Alice}")
+            .SendAsync("ReceiveMessage", new
+            {
+                specversion = "1.0",
+                type = "CritterSupply.Storefront.RealTime.OrderStatusChanged",
+                source = "storefront-api",
+                id = Guid.NewGuid().ToString(),
+                time = DateTimeOffset.UtcNow,
+                datacontenttype = "application/json",
+                data = new
+                {
+                    orderId = orderId,
+                    customerId = WellKnownTestData.Customers.Alice,
+                    newStatus = "PaymentAuthorized",
+                    occurredAt = DateTimeOffset.UtcNow
+                }
+            });
     }
 
     [When(@"the Fulfillment BC publishes a shipment dispatched event for my order with tracking ""(.*)""")]
@@ -223,15 +247,31 @@ public sealed class CheckoutFlowStepDefinitions
         var orderId = Guid.Parse(orderIdStr);
         var shipmentId = Guid.NewGuid();
 
-        // Inject ShipmentStatusChanged directly — same reasoning as PaymentAuthorized above.
-        await _fixture.StorefrontApiHost.InvokeMessageAndWaitAsync(
-            new Storefront.RealTime.ShipmentStatusChanged(
-                shipmentId,
-                orderId,
-                WellKnownTestData.Customers.Alice,
-                "Shipped",
-                trackingNumber,
-                DateTimeOffset.UtcNow));
+        // Same reasoning as WhenPaymentsBCPublishesPaymentAuthorized: ShipmentStatusChanged
+        // has no local Wolverine handler — it is SignalR-transport-only. Use IHubContext directly.
+        var hubContext = _fixture.StorefrontApiHost.Services
+            .GetRequiredService<IHubContext<StorefrontHub>>();
+
+        await hubContext.Clients
+            .Group($"customer:{WellKnownTestData.Customers.Alice}")
+            .SendAsync("ReceiveMessage", new
+            {
+                specversion = "1.0",
+                type = "CritterSupply.Storefront.RealTime.ShipmentStatusChanged",
+                source = "storefront-api",
+                id = Guid.NewGuid().ToString(),
+                time = DateTimeOffset.UtcNow,
+                datacontenttype = "application/json",
+                data = new
+                {
+                    shipmentId = shipmentId,
+                    orderId = orderId,
+                    customerId = WellKnownTestData.Customers.Alice,
+                    newStatus = "Shipped",
+                    trackingNumber = trackingNumber,
+                    occurredAt = DateTimeOffset.UtcNow
+                }
+            });
     }
 
     // ─────────────────────────────────────────────────────────────────────

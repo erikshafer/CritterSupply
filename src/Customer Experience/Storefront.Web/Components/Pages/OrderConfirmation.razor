@@ -214,8 +214,11 @@ else
                     break;
 
                 case "order-status-changed":
-                    // Handles OrderStatusChanged events routed via Wolverine SignalR transport
-                    if (eventData.TryGetProperty("NewStatus", out var newStatus))
+                    // Handles OrderStatusChanged events routed via Wolverine SignalR transport.
+                    // SignalR serializes with camelCase (System.Text.Json web defaults), and
+                    // signalr-client.js spreads cloudEvent.data before invoking OnSseEvent —
+                    // so property names arrive here in camelCase.
+                    if (eventData.TryGetProperty("newStatus", out var newStatus))
                     {
                         _currentStatus = newStatus.GetString() ?? _currentStatus;
                         _latestUpdate = $"Order status updated to {_currentStatus}";
@@ -230,9 +233,10 @@ else
                     break;
 
                 case "shipment-status-changed":
-                    // Handles ShipmentStatusChanged events routed via Wolverine SignalR transport
+                    // Handles ShipmentStatusChanged events routed via Wolverine SignalR transport.
+                    // Properties arrive in camelCase — see order-status-changed comment above.
                     _currentStatus = "Shipped";
-                    if (eventData.TryGetProperty("TrackingNumber", out var trackingSignalR))
+                    if (eventData.TryGetProperty("trackingNumber", out var trackingSignalR))
                     {
                         _latestUpdate = $"Order shipped! Tracking: {trackingSignalR.GetString()}";
                     }

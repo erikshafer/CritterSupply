@@ -82,12 +82,13 @@ public sealed class CheckoutPage(IPage page)
         // Wait for the outer MudSelect wrapper to be visible (present and rendered).
         await AddressSelect.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
 
-        // Click the inner .mud-select-input — the interactive element that carries MudBlazor's
-        // @onclick handler. The outer [data-testid='address-select'] wrapper is a layout container;
-        // clicking it is unreliable in headless Chromium because Playwright's ClickAsync targets
-        // the bounding-box center, which may fall on padding/non-interactive regions.
-        // Scoped through AddressSelect to guard against future multi-select pages.
-        await AddressSelect.Locator(".mud-select-input").ClickAsync();
+        // Click the outer [data-testid='address-select'] wrapper directly.
+        // MudBlazor renders a transparent overlay on top of .mud-select-input to handle pointer
+        // events. Playwright's actionability hit-test fails against that overlay in headless
+        // Chromium — it waits 30s for .mud-select-input to be "hittable" and times out.
+        // The outer wrapper is reliably hittable at its bounding-box center; MudBlazor
+        // delegates the click inward to open the dropdown.
+        await AddressSelect.ClickAsync();
 
         // Wait explicitly for the MudBlazor listbox popover to appear in the DOM.
         // MudBlazor renders options in a portal at the document body level (outside AddressSelect),
