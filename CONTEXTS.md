@@ -2532,12 +2532,254 @@ SignalR message received (CartUpdated)
 
 ---
 
+## Pricing
+
+The Pricing context owns the authoritative retail price for every SKU — including setting and changing prices, scheduling future price changes, maintaining a complete price history for audit, enforcing floor/ceiling policies, and accepting vendor-submitted price suggestions.
+
+**Status:** 🟡 Event Modeling Complete — Awaiting Implementation Cycle Assignment
+**Event Modeling Doc:** [`docs/planning/pricing-event-modeling.md`](docs/planning/pricing-event-modeling.md)
+**Architecture:** Event-sourced domain (one `ProductPrice` stream per SKU)
+
+### Why Event-Sourced (Not CRUD)
+
+Pricing decisions are a historical stream of business facts. Unlike Product Catalog (which is read-heavy master data), prices change constantly for competitive, promotional, vendor, and regulatory reasons. Event sourcing gives us:
+- Complete audit trail of every price change (who, when, from what, to what, why)
+- Temporal queries ("what was the price at a specific point in time?")
+- Scheduled price changes that survive process restarts via Wolverine durable scheduling
+- Safe compensation if a price correction is needed (append `PriceCorrected`, never mutate history)
+
+### Aggregates
+
+**`ProductPrice` (Event-Sourced, One Per SKU):**
+
+The authoritative price record for a single SKU. Created when `ProductAdded` arrives from Catalog BC.
+
+**Stream key:** Deterministic UUID v5 derived from the SKU string (not MD5 — see pricing-event-modeling.md for implementation).
+
+**Status lifecycle:**
+- `Unpriced` — stream created from `ProductAdded`; no price set yet; unavailable for purchase
+- `Published` — price is live; storefront can display it; Shopping BC can accept add-to-cart
+- `Discontinued` — terminal; fires when `ProductDiscontinued` arrives from Catalog
+
+**Domain Events:**
+- `ProductRegistered` — stream created (from `ProductAdded` integration event)
+- `ProductPriced` — first price set (Unpriced → Published); carries price, floor, ceiling atomically
+- `PriceChanged` — subsequent price mutations; carries `OldPrice`, `PreviousPriceSetAt` (for Was/Now)
+- `PriceChangeScheduled` — scheduled future change; Wolverine durable message queued
+- `ScheduledPriceChangeCancelled` — schedule cancelled (renamed from `PriceChangeScheduleCancelled` for naming consistency with `ScheduledPriceActivated`); stale-message guard discards the Wolverine message when it fires
+- `ScheduledPriceActivated` — Wolverine delivers the scheduled message; system-driven (distinct from user-driven `PriceChanged`)
+- `FloorPriceSet` — minimum allowed retail price (Merchandising Manager only)
+- `CeilingPriceSet` — maximum allowed retail price (MAP compliance)
+- `PriceCorrected` — retroactive correction; updates `CurrentPriceView` immediately and publishes `PriceUpdated` integration event (does NOT trigger marketing notifications)
+- `PriceDiscontinued` — terminal; clears pending schedules
+
+**`VendorPriceSuggestion` (Event-Sourced, One Per Suggestion):**
+
+Lifecycle of a single vendor-submitted price suggestion, from submission through approval or rejection.
+
+**States:** `Pending | Approved | Rejected | Expired`
+
+**Domain Events:** `VendorPriceSuggestionReceived`, `VendorPriceSuggestionApproved`, `VendorPriceSuggestionRejected`, `VendorPriceSuggestionExpired`
+
+**Auto-expiry:** 7 business days with no review action → `VendorPriceSuggestionExpired` fired by background job.
+
+**`BulkPricingJob` (Wolverine Saga):**
+
+Stateful orchestration of bulk price updates (many SKUs in one job). Approval gate required for jobs exceeding 100 SKUs. Each SKU's price change is recorded on that SKU's own `ProductPrice` event stream. Approval events must be persisted durably with approver identity and timestamp.
+
+### Read Models (Projections)
+
+**`CurrentPriceView`** — Hot path. `ProjectionLifecycle.Inline` (zero lag). Keyed by SKU string for direct O(1) lookup. Serves `GET /api/pricing/products/{sku}` and bulk endpoint. Fields: `Sku`, `BasePrice`, `Currency`, `FloorPrice`, `CeilingPrice`, `PreviousBasePrice`, `PreviousPriceSetAt`, `Status`, `HasPendingSchedule`, `ScheduledChangeAt`, `LastUpdatedAt`.
+
+**`ScheduledChangesView`** — Upcoming price changes calendar. Async daemon. Keyed by `ScheduleId`. Status: `Pending | Activated | Cancelled`.
+
+**`PendingPriceSuggestionsView`** — Pricing Manager review queue. Async daemon. Includes `SuggestedPriceBelowFloor` flag.
+
+**Price History** — Phase 1: raw event stream query (`FetchStreamAsync`). Phase 2: `PriceHistoryView` projection.
+
+### What it receives
+
+**Integration Messages (inbound via RabbitMQ):**
+- `ProductAdded` from Product Catalog — creates `ProductPrice` stream in `Unpriced` status
+- `ProductDiscontinued` from Product Catalog — transitions to `Discontinued` (terminal), cancels pending schedules
+- `VendorPriceSuggestionSubmitted` from Vendor Portal — creates `VendorPriceSuggestion` stream for manager review
+
+### What it publishes
+
+**Integration Messages (outbound via RabbitMQ):**
+- `PricePublished` — first price published for a SKU; Shopping BC can now accept add-to-cart; BFF can display price
+- `PriceUpdated` — price changed (includes corrections); Shopping BC refreshes cart prices; BFF invalidates cache
+
+### Core Invariants
+
+| Invariant | Type |
+|---|---|
+| Price > $0.00 | Hard block — no bypass at any entry point |
+| Price ≥ FloorPrice (when set) | Hard block |
+| Price ≤ CeilingPrice (when set) | Hard block |
+| FloorPrice < CeilingPrice (when both set) | Hard block |
+| ScheduledFor > UtcNow | Hard block |
+| SKU must be registered (ProductRegistered received) before SetPrice | 404 otherwise |
+| Price history is append-only | Never mutate historical events; corrections are new events |
+| Actor identity on every command | `Guid ChangedBy` required; `Guid.Empty` rejected by FluentValidation |
+| >30% price change requires explicit confirmation | HTTP 202 with `requiresConfirmation: true`; re-submit with `ConfirmedAnomaly: true` |
+
+### What it doesn't own
+
+- Product master data — names, descriptions, images, categories (Product Catalog)
+- Promotional discounts, campaign rules, BOGO, coupon codes (Promotions BC — future)
+- Inventory levels or stock availability (Inventory BC)
+- Vendor credentials and tenant management (Vendor Identity BC)
+
+### The Price Snapshot for Orders (Critical Contract)
+
+**Price is frozen at add-to-cart time**, not at checkout time. This is the industry-standard approach (Amazon, Shopify, WooCommerce). Key design decisions:
+
+- **Phase 1:** `CheckoutLineItem.UnitPrice` = price captured when item was added to cart (no changes to existing contract)
+- **Phase 2:** Shopping BC calls `IPricingClient.GetCurrentPriceAsync(sku)` internally on `AddItemToCart` (server-authoritative pricing). Client-supplied `UnitPrice` becomes informational only.
+- **Cart price TTL:** Cart price snapshots are valid for a configurable window (default: 1 hour). After TTL, BFF refreshes via Pricing BC. Shopping BC fires `PriceRefreshed` event.
+- **ADR required:** Price freeze policy contradicts current "price-at-checkout immutability" wording — see ADR for resolution.
+
+Current `AddItemToCart` accepts client-supplied `UnitPrice` — this is a security gap that Phase 1 Pricing BC closes.
+
+### Was/Now Strikethrough Display
+
+`CurrentPriceView` exposes `PreviousBasePrice` and `PreviousPriceSetAt`. The BFF applies display logic:
+- Show strikethrough if current price < previous price AND previous price was set within last **30 days**
+- Clear strikethrough immediately if price goes back up
+- Reset 30-day clock on each subsequent drop
+- Log first-shown date per SKU (FTC compliance for reference pricing claims)
+
+The BFF owns the display decision. Pricing BC owns the data.
+
+### Integration with Promotions BC (Future)
+
+- Promotions is a **separate bounded context** — not a sub-domain of Pricing
+- Promotions queries Pricing synchronously (`GET /api/pricing/products/{sku}`) for `BasePrice` and `FloorPrice`
+- Promotions **cannot** cause effective price to go below `FloorPrice` (hard reject, not silent clip)
+- Effective price displayed to customer = BasePrice − PromotionalDiscount (computed by BFF)
+- Promotions re-validates floor price at redemption time (not only at promotion creation time)
+
+### Integration Flows
+
+```
+[Catalog BC publishes ProductAdded]
+  └─> ProductAddedHandler
+      └─> ProductRegistered (creates ProductPrice stream, Status: Unpriced)
+
+[Catalog BC publishes ProductDiscontinued]
+  └─> ProductDiscontinuedHandler
+      └─> PriceDiscontinued (terminal event, cancels pending schedule)
+
+[Pricing Manager — Admin UI]
+SetPrice (command)
+  └─> SetPriceHandler
+      ├─> ProductPriced (Unpriced → Published)
+      └─> PricePublished integration event → Shopping BC, BFF, search index
+
+ChangePrice (command)
+  └─> ChangePriceHandler
+      ├─> [If >30% change and not confirmed] → HTTP 202 requiresConfirmation
+      ├─> PriceChanged
+      └─> PriceUpdated integration event → Shopping BC, BFF
+
+SchedulePriceChange (command)
+  └─> SchedulePriceChangeHandler
+      ├─> PriceChangeScheduled
+      └─> outgoing.Delay(ActivateScheduledPriceChange, scheduledFor - now)
+                     → stored in wolverine_incoming_envelopes (survives restart)
+
+[At scheduled time — Wolverine delivers]
+ActivateScheduledPriceChange (internal Wolverine scheduled message)
+  └─> ActivateScheduledPriceChangeHandler
+      ├─> [Guard: PendingSchedule.ScheduleId == command.ScheduleId? else discard]
+      ├─> ScheduledPriceActivated
+      └─> PriceUpdated integration event → Shopping BC, BFF
+
+[Vendor Portal publishes VendorPriceSuggestionSubmitted]
+  └─> VendorPriceSuggestionSubmittedHandler
+      └─> VendorPriceSuggestionReceived (creates VendorPriceSuggestion stream)
+
+[Pricing Manager — Admin UI]
+ReviewPriceSuggestion (command — Approve)
+  └─> ReviewPriceSuggestionHandler
+      ├─> VendorPriceSuggestionApproved
+      ├─> Cascades into ChangePrice → PriceChanged + PriceUpdated
+      └─> Notification to Vendor Portal (Phase 1: integration event)
+
+ReviewPriceSuggestion (command — Reject)
+  └─> ReviewPriceSuggestionHandler
+      ├─> VendorPriceSuggestionRejected
+      └─> Notification to Vendor Portal (Phase 1: integration event)
+
+[Storefront BFF — query]
+GET /api/pricing/products/{sku}
+  └─> session.LoadAsync<CurrentPriceView>(sku)
+      └─> Returns CurrentPriceView directly (inline projection, zero lag)
+
+GET /api/pricing/products?skus=...
+  └─> session.LoadManyAsync<CurrentPriceView>(skuList)
+      └─> Single PostgreSQL WHERE id = ANY(@ids) query
+          → Sub-100ms p95 for 50 SKUs
+```
+
+### HTTP Endpoints
+
+**Query endpoints (hot path — < 100ms p95):**
+- `GET /api/pricing/products/{sku}` — single SKU price lookup
+- `GET /api/pricing/products?skus=...` — bulk price lookup (comma-separated, 20-50 SKUs)
+- `GET /api/pricing/products/{sku}/history` — admin audit trail
+
+**Admin command endpoints:**
+- `POST /api/pricing/products/{sku}/price` — set initial price
+- `PUT /api/pricing/products/{sku}/price` — change price
+- `POST /api/pricing/products/{sku}/scheduled-changes` — schedule future change
+- `DELETE /api/pricing/products/{sku}/scheduled-changes/{scheduleId}` — cancel scheduled change
+- `PUT /api/pricing/products/{sku}/floor-price` — set floor price
+- `PUT /api/pricing/products/{sku}/ceiling-price` — set ceiling price
+- `POST /api/pricing/products/{sku}/correct` — retroactive correction
+
+**Vendor suggestions:**
+- `GET /api/pricing/suggestions?status=pending` — Pricing Manager review queue
+- `POST /api/pricing/suggestions/{suggestionId}/review` — approve or reject
+
+**Bulk pricing:**
+- `POST /api/pricing/bulk-jobs` — submit bulk pricing job
+- `POST /api/pricing/bulk-jobs/{jobId}/approve` — approve bulk job (≥100 SKUs require this)
+- `GET /api/pricing/bulk-jobs/{jobId}` — job status
+
+### Project Structure (Planned)
+
+```
+src/
+  Pricing/
+    Pricing/          # Domain logic (aggregates, events, commands, handlers, projections)
+    Pricing.Api/      # HTTP hosting (port 5242)
+
+tests/
+  Pricing/
+    Pricing.IntegrationTests/
+```
+
+See [`docs/planning/pricing-event-modeling.md`](docs/planning/pricing-event-modeling.md) for complete project structure, event definitions, and implementation guidance.
+
+### ADRs Required Before Implementation
+
+1. **[ADR 0016](docs/decisions/0016-uuid-v5-for-natural-key-stream-ids.md) ✅ Written** — UUID v5 for deterministic natural-key event stream IDs (vs. UUID v7 used elsewhere)
+2. **ADR: Add-to-cart vs. checkout-time price freeze** — resolves contradiction with current CONTEXTS.md "price-at-checkout immutability" wording; defines cart price TTL
+3. **ADR: `Money` value object as canonical monetary representation** — establishes `Money` across all CritterSupply BCs; references Shopping BC `decimal UnitPrice` as technical debt
+4. **ADR: `BulkPricingJob` audit trail approach** — event-sourced saga vs. explicit `BulkApprovalRecord` document
+5. **ADR: MAP vs. Floor price distinction** — deferred to Phase 2+, but documents the design decision to keep them separate
+
+**UX Review:** See [`docs/planning/pricing-ux-review.md`](docs/planning/pricing-ux-review.md) for the UX Engineer's DX analysis, `Pricing.Web` UI vision, component decisions, and risk register for the web build.
+
+---
+
 ## Future Considerations
 
 The following contexts are acknowledged but not yet defined:
 
-- **Pricing** — price rules, promotional pricing, regional pricing
-- **Promotions** — buy-one-get-one, percentage discounts, coupon codes
+- **Promotions** — buy-one-get-one, percentage discounts, coupon codes (depends on Pricing BC Phase 2 — specifically floor/ceiling enforcement, which Promotions requires for safe promotion activation)
 - **Reviews** — customer product reviews, ratings, moderation
 - **Notifications** — email, SMS, push notifications (may move to Customer Experience)
 - **Procurement/Supply Chain** — purchasing, vendor management, forecasting
