@@ -24,118 +24,138 @@ else if (_checkoutView == null)
 }
 else
 {
-    <MudStepper @ref="_stepper" Linear="true" data-testid="checkout-stepper">
-        <!-- Step 1: Shipping Address -->
-        <MudStep Title="Shipping Address">
-            <ChildContent>
-                <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Select Shipping Address</MudText>
+    <MudGrid>
+        <!-- Left column: 4-step checkout wizard -->
+        <MudItem xs="12" md="8">
+            <MudStepper @ref="_stepper" Linear="true" data-testid="checkout-stepper">
+                <!-- Step 1: Shipping Address -->
+                <MudStep Title="Shipping Address">
+                    <ChildContent>
+                        <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Select Shipping Address</MudText>
 
-                @if (_checkoutView.SavedAddresses.Any())
-                {
-                    <MudSelect T="Guid" Label="Saved Addresses" Variant="Variant.Outlined" @bind-Value="_selectedAddressId" Disabled="@_isProcessing" data-testid="address-select">
-                        @foreach (var address in _checkoutView.SavedAddresses)
+                        @if (_checkoutView.SavedAddresses.Any())
                         {
-                            <MudSelectItem T="Guid" Value="@address.AddressId" data-testid="@($"address-option-{address.Nickname.ToLowerInvariant()}")">@address.Nickname - @address.DisplayLine</MudSelectItem>
+                            <MudSelect T="Guid" Label="Saved Addresses" Variant="Variant.Outlined" @bind-Value="_selectedAddressId" Disabled="@_isProcessing" data-testid="address-select">
+                                @foreach (var address in _checkoutView.SavedAddresses)
+                                {
+                                    <MudSelectItem T="Guid" Value="@address.AddressId" data-testid="@($"address-option-{address.Nickname.ToLowerInvariant()}")">@address.Nickname - @address.DisplayLine</MudSelectItem>
+                                }
+                            </MudSelect>
                         }
-                    </MudSelect>
-                }
-                else
-                {
-                    <MudAlert Severity="Severity.Info" data-testid="no-saved-addresses">No saved addresses. Add an address to continue.</MudAlert>
-                }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Info" data-testid="no-saved-addresses">No saved addresses. Add an address to continue.</MudAlert>
+                        }
 
-                @if (_isProcessing)
-                {
-                    <MudProgressLinear Indeterminate="true" Class="mt-4" data-testid="checkout-processing" />
-                }
+                        @if (_isProcessing)
+                        {
+                            <MudProgressLinear Indeterminate="true" Class="mt-4" data-testid="checkout-processing" />
+                        }
 
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveShippingAddressAndContinue" Disabled="@_isProcessing" Class="mt-4" data-testid="btn-save-address">
-                    Save & Continue
-                </MudButton>
-            </ChildContent>
-        </MudStep>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveShippingAddressAndContinue" Disabled="@_isProcessing" Class="mt-4" data-testid="btn-save-address">
+                            Save & Continue
+                        </MudButton>
+                    </ChildContent>
+                </MudStep>
 
-        <!-- Step 2: Shipping Method -->
-        <MudStep Title="Shipping Method">
-            <ChildContent>
-                <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Select Shipping Method</MudText>
+                <!-- Step 2: Shipping Method -->
+                <MudStep Title="Shipping Method">
+                    <ChildContent>
+                        <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Select Shipping Method</MudText>
 
-                <MudRadioGroup @bind-Value="_selectedShippingMethod" Disabled="@_isProcessing" data-testid="shipping-method-group">
-                    <MudRadio Value="@("Standard")" data-testid="shipping-method-standard">Standard Ground (5-7 days) - $5.99</MudRadio>
-                    <MudRadio Value="@("Express")" data-testid="shipping-method-express">Express Shipping (2-3 days) - $12.99</MudRadio>
-                    <MudRadio Value="@("NextDay")" data-testid="shipping-method-nextday">Next Day Air (1 day) - $24.99</MudRadio>
-                </MudRadioGroup>
+                        <MudRadioGroup @bind-Value="_selectedShippingMethod" Disabled="@_isProcessing" data-testid="shipping-method-group">
+                            <MudRadio Value="@("Standard")" data-testid="shipping-method-standard">Standard Ground (5-7 days) - $5.99</MudRadio>
+                            <MudRadio Value="@("Express")" data-testid="shipping-method-express">Express Shipping (2-3 days) - $12.99</MudRadio>
+                            <MudRadio Value="@("NextDay")" data-testid="shipping-method-nextday">Next Day Air (1 day) - $24.99</MudRadio>
+                        </MudRadioGroup>
 
-                @if (_isProcessing)
-                {
-                    <MudProgressLinear Indeterminate="true" Class="mt-4" data-testid="checkout-processing" />
-                }
+                        @if (_isProcessing)
+                        {
+                            <MudProgressLinear Indeterminate="true" Class="mt-4" data-testid="checkout-processing" />
+                        }
 
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveShippingMethodAndContinue" Disabled="@_isProcessing" Class="mt-4" data-testid="btn-save-shipping-method">
-                    Save & Continue
-                </MudButton>
-            </ChildContent>
-        </MudStep>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveShippingMethodAndContinue" Disabled="@_isProcessing" Class="mt-4" data-testid="btn-save-shipping-method">
+                            Save & Continue
+                        </MudButton>
+                    </ChildContent>
+                </MudStep>
 
-        <!-- Step 3: Payment -->
-        <MudStep Title="Payment">
-            <ChildContent>
-                <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Provide Payment Method</MudText>
+                <!-- Step 3: Payment -->
+                <MudStep Title="Payment">
+                    <ChildContent>
+                        <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Provide Payment Method</MudText>
 
-                <MudTextField @bind-Value="_paymentToken" Label="Payment Token (stub)" Variant="Variant.Outlined" Placeholder="tok_visa_test_12345" Disabled="@_isProcessing" data-testid="payment-token-input" />
-                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-                    In production, this would integrate with Stripe/PayPal for tokenized payment processing.
-                </MudText>
+                        <MudTextField @bind-Value="_paymentToken" Label="Payment Token (stub)" Variant="Variant.Outlined" Placeholder="tok_visa_test_12345" Disabled="@_isProcessing" data-testid="payment-token-input" />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                            In production, this would integrate with Stripe/PayPal for tokenized payment processing.
+                        </MudText>
 
-                @if (_isProcessing)
-                {
-                    <MudProgressLinear Indeterminate="true" Class="mt-4" data-testid="checkout-processing" />
-                }
+                        @if (_isProcessing)
+                        {
+                            <MudProgressLinear Indeterminate="true" Class="mt-4" data-testid="checkout-processing" />
+                        }
 
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SavePaymentMethodAndContinue" Disabled="@_isProcessing" Class="mt-4" data-testid="btn-save-payment">
-                    Save & Continue
-                </MudButton>
-            </ChildContent>
-        </MudStep>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SavePaymentMethodAndContinue" Disabled="@_isProcessing" Class="mt-4" data-testid="btn-save-payment">
+                            Save & Continue
+                        </MudButton>
+                    </ChildContent>
+                </MudStep>
 
-        <!-- Step 4: Review & Submit -->
-        <MudStep Title="Review & Submit">
-            <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Order Summary</MudText>
+                <!-- Step 4: Review & Submit -->
+                <MudStep Title="Review & Submit">
+                    <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Order Summary</MudText>
 
-            <MudPaper Class="pa-4 mb-4" data-testid="order-summary">
-                <MudText Typo="Typo.h6" Class="mb-2">Line Items</MudText>
+                    <MudPaper Class="pa-4 mb-4">
+                        <MudText Typo="Typo.h6" Class="mb-2">Line Items</MudText>
+                        @foreach (var item in _checkoutView.Items)
+                        {
+                            <div class="d-flex justify-space-between mb-2" data-testid="@($"line-item-{item.Sku}")">
+                                <MudText>@item.ProductName (x@item.Quantity)</MudText>
+                                <MudText data-testid="@($"line-item-total-{item.Sku}")">@item.LineTotal.ToString("C")</MudText>
+                            </div>
+                        }
+                    </MudPaper>
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@PlaceOrder" Class="mt-4" data-testid="btn-place-order">
+                        Place Order
+                    </MudButton>
+                </MudStep>
+            </MudStepper>
+        </MudItem>
+
+        <!-- Right column: always-visible order summary sidebar -->
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">Order Summary</MudText>
+
                 @foreach (var item in _checkoutView.Items)
                 {
-                    <div class="d-flex justify-space-between mb-2" data-testid="@($"line-item-{item.Sku}")">
-                        <MudText>@item.ProductName (x@item.Quantity)</MudText>
-                        <MudText data-testid="@($"line-item-total-{item.Sku}")">@item.LineTotal.ToString("C")</MudText>
+                    <div class="d-flex justify-space-between mb-1">
+                        <MudText Typo="Typo.body2">@item.ProductName × @item.Quantity</MudText>
+                        <MudText Typo="Typo.body2">@item.LineTotal.ToString("C")</MudText>
                     </div>
                 }
 
                 <MudDivider Class="my-3" />
 
                 <div class="d-flex justify-space-between mb-2">
-                    <MudText>Subtotal</MudText>
-                    <MudText data-testid="order-subtotal">@_checkoutView.Subtotal.ToString("C")</MudText>
+                    <MudText Typo="Typo.body1">Subtotal</MudText>
+                    <MudText Typo="Typo.body1" data-testid="order-subtotal">@_checkoutView.Subtotal.ToString("C")</MudText>
                 </div>
                 <div class="d-flex justify-space-between mb-2">
-                    <MudText>Shipping</MudText>
-                    <MudText data-testid="order-shipping-cost">@_checkoutView.ShippingCost.ToString("C")</MudText>
+                    <MudText Typo="Typo.body1">Shipping</MudText>
+                    <MudText Typo="Typo.body1" data-testid="order-shipping-cost">@CurrentShippingCost.ToString("C")</MudText>
                 </div>
 
                 <MudDivider Class="my-3" />
 
                 <div class="d-flex justify-space-between">
                     <MudText Typo="Typo.h6">Total</MudText>
-                    <MudText Typo="Typo.h6" data-testid="order-total">@_checkoutView.Total.ToString("C")</MudText>
+                    <MudText Typo="Typo.h6" data-testid="order-total">@(_checkoutView.Subtotal + CurrentShippingCost).ToString("C")</MudText>
                 </div>
             </MudPaper>
-
-            <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@PlaceOrder" Class="mt-4" data-testid="btn-place-order">
-                Place Order
-            </MudButton>
-        </MudStep>
-    </MudStepper>
+        </MudItem>
+    </MudGrid>
 }
 
 @code {
@@ -150,19 +170,34 @@ else
     private string _selectedShippingMethod = "Standard";
     private string _paymentToken = "";
 
+    /// <summary>
+    /// Computes the current shipping cost from the selected shipping method.
+    /// Updates the order summary sidebar reactively as the user selects a method.
+    /// </summary>
+    private decimal CurrentShippingCost => _selectedShippingMethod switch
+    {
+        "Standard" => 5.99m,
+        "Express" => 12.99m,
+        "NextDay" => 24.99m,
+        _ => 5.99m
+    };
+
     protected override async Task OnInitializedAsync()
     {
         // Get authenticated customer ID
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var customerIdClaim = authState.User.FindFirst("CustomerId")?.Value;
+        Console.WriteLine($"[Checkout] OnInitializedAsync: customerIdClaim='{customerIdClaim}', isAuthenticated={authState.User.Identity?.IsAuthenticated}");
         if (!Guid.TryParse(customerIdClaim, out _customerId))
         {
+            Console.WriteLine("[Checkout] CustomerId parse failed - returning early");
             // Should not happen due to [Authorize] but handle gracefully
             return;
         }
 
         // Get checkoutId from localStorage (stored when user clicked "Proceed to Checkout")
         var checkoutIdString = await JS.InvokeAsync<string?>("authHelper.getCheckoutId");
+        Console.WriteLine($"[Checkout] checkoutIdString from localStorage='{checkoutIdString}'");
         if (!string.IsNullOrEmpty(checkoutIdString) && Guid.TryParse(checkoutIdString, out var checkoutId))
         {
             _checkoutId = checkoutId;
@@ -170,6 +205,7 @@ else
         }
         else
         {
+            Console.WriteLine("[Checkout] No checkoutId in localStorage - redirecting to cart");
             // No checkoutId - redirect back to cart
             Snackbar.Add("No active checkout found. Please start checkout from your cart.", Severity.Warning);
             Navigation.NavigateTo("/cart");
@@ -186,7 +222,6 @@ else
             var client = HttpClientFactory.CreateClient("StorefrontApi");
 
             // Retry logic to handle async message processing delay
-            // The checkout may not be queryable immediately after creation
             const int maxRetries = 3;
             const int delayMs = 500;
 
@@ -195,16 +230,14 @@ else
                 try
                 {
                     _checkoutView = await client.GetFromJsonAsync<CheckoutView>($"/api/storefront/checkouts/{_checkoutId.Value}");
-                    return; // Success - exit retry loop
+                    return;
                 }
                 catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound && attempt < maxRetries)
                 {
-                    // Wait before retrying (checkout might still be processing)
                     await Task.Delay(delayMs);
                 }
             }
 
-            // If we get here, all retries failed
             Snackbar.Add("Checkout not found. Please start checkout from your cart.", Severity.Error);
             await JS.InvokeVoidAsync("authHelper.clearCheckoutId");
             Navigation.NavigateTo("/cart");
@@ -226,38 +259,88 @@ else
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Step continuation handlers: save step data then auto-advance stepper.
+    // The try/catch ensures the stepper only advances on success, and the
+    // exception is swallowed at this level because the inner save methods
+    // already show Snackbar error messages and update _isProcessing.
+    // Swallowing here keeps the Blazor circuit healthy and allows re-render.
+    // ─────────────────────────────────────────────────────────────────────
+
     private async Task SaveShippingAddressAndContinue()
     {
-        await SaveShippingAddress();
-        // User can manually navigate to next step in stepper after saving
+        try
+        {
+            await SaveShippingAddress();
+            await _stepper!.NextStepAsync();
+        }
+        catch (Exception)
+        {
+            // Save method owns error display; swallow here to prevent Blazor circuit disruption
+        }
     }
 
     private async Task SaveShippingMethodAndContinue()
     {
-        await SaveShippingMethod();
-        // User can manually navigate to next step in stepper after saving
+        try
+        {
+            await SaveShippingMethod();
+            await _stepper!.NextStepAsync();
+        }
+        catch (Exception)
+        {
+            // Save method owns error display; swallow here to prevent Blazor circuit disruption
+        }
     }
 
     private async Task SavePaymentMethodAndContinue()
     {
-        await SavePaymentMethod();
-        // User can manually navigate to next step in stepper after saving
+        try
+        {
+            await SavePaymentMethod();
+            await _stepper!.NextStepAsync();
+        }
+        catch (Exception)
+        {
+            // Save method owns error display; swallow here to prevent Blazor circuit disruption
+        }
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Step save methods: call BFF endpoints (all routed through StorefrontApi).
+    // Each method throws on failure so the continuation handler knows not to advance.
+    // ─────────────────────────────────────────────────────────────────────
 
     private async Task SaveShippingAddress()
     {
         if (_selectedAddressId == Guid.Empty)
         {
             Snackbar.Add("Please select a shipping address to continue", Severity.Warning);
-            throw new InvalidOperationException();
+            throw new InvalidOperationException("No address selected");
+        }
+
+        // Resolve full address details from the selected address ID
+        var selected = _checkoutView!.SavedAddresses.FirstOrDefault(a => a.AddressId == _selectedAddressId);
+        if (selected == null)
+        {
+            Snackbar.Add("Selected address not found. Please try again.", Severity.Error);
+            throw new InvalidOperationException("Address not found");
         }
 
         _isProcessing = true;
         try
         {
-            var ordersClient = HttpClientFactory.CreateClient("OrdersClient");
-            var payload = new { checkoutId = _checkoutId!.Value, addressLine1 = "123 Main St", addressLine2 = (string?)null, city = "Seattle", stateOrProvince = "WA", postalCode = "98101", country = "USA" };
-            var response = await ordersClient.PostAsJsonAsync($"/api/checkouts/{_checkoutId!.Value}/shipping-address", payload);
+            var client = HttpClientFactory.CreateClient("StorefrontApi");
+            var payload = new
+            {
+                addressLine1 = selected.AddressLine1,
+                addressLine2 = (string?)null,
+                city = selected.City,
+                stateOrProvince = selected.StateOrProvince,
+                postalCode = selected.PostalCode,
+                country = selected.Country
+            };
+            var response = await client.PostAsJsonAsync($"/api/storefront/checkouts/{_checkoutId!.Value}/shipping-address", payload);
 
             if (response.IsSuccessStatusCode)
             {
@@ -272,9 +355,9 @@ else
         }
         catch (HttpRequestException)
         {
-            throw; // Re-throw to prevent step navigation
+            throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not InvalidOperationException)
         {
             Console.WriteLine($"Error saving shipping address: {ex.Message}");
             Snackbar.Add("Network error. Please check your connection and try again.", Severity.Error);
@@ -291,16 +374,15 @@ else
         if (string.IsNullOrEmpty(_selectedShippingMethod))
         {
             Snackbar.Add("Please select a shipping method to continue", Severity.Warning);
-            throw new InvalidOperationException();
+            throw new InvalidOperationException("No shipping method selected");
         }
 
         _isProcessing = true;
         try
         {
-            var shippingCost = _selectedShippingMethod switch { "Standard" => 5.99m, "Express" => 12.99m, "NextDay" => 24.99m, _ => 5.99m };
-            var ordersClient = HttpClientFactory.CreateClient("OrdersClient");
-            var payload = new { checkoutId = _checkoutId!.Value, shippingMethod = _selectedShippingMethod, shippingCost };
-            var response = await ordersClient.PostAsJsonAsync($"/api/checkouts/{_checkoutId!.Value}/shipping-method", payload);
+            var client = HttpClientFactory.CreateClient("StorefrontApi");
+            var payload = new { shippingMethod = _selectedShippingMethod, shippingCost = CurrentShippingCost };
+            var response = await client.PostAsJsonAsync($"/api/storefront/checkouts/{_checkoutId!.Value}/shipping-method", payload);
 
             if (response.IsSuccessStatusCode)
             {
@@ -317,7 +399,7 @@ else
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not InvalidOperationException)
         {
             Console.WriteLine($"Error saving shipping method: {ex.Message}");
             Snackbar.Add("Network error. Please check your connection and try again.", Severity.Error);
@@ -334,15 +416,15 @@ else
         if (string.IsNullOrWhiteSpace(_paymentToken))
         {
             Snackbar.Add("Please enter a payment token to continue", Severity.Warning);
-            throw new InvalidOperationException();
+            throw new InvalidOperationException("No payment token entered");
         }
 
         _isProcessing = true;
         try
         {
-            var ordersClient = HttpClientFactory.CreateClient("OrdersClient");
-            var payload = new { checkoutId = _checkoutId!.Value, paymentMethodToken = _paymentToken };
-            var response = await ordersClient.PostAsJsonAsync($"/api/checkouts/{_checkoutId!.Value}/payment-method", payload);
+            var client = HttpClientFactory.CreateClient("StorefrontApi");
+            var payload = new { paymentMethodToken = _paymentToken };
+            var response = await client.PostAsJsonAsync($"/api/storefront/checkouts/{_checkoutId!.Value}/payment-method", payload);
 
             if (response.IsSuccessStatusCode)
             {
@@ -359,7 +441,7 @@ else
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not InvalidOperationException)
         {
             Console.WriteLine($"Error saving payment method: {ex.Message}");
             Snackbar.Add("Network error. Please check your connection and try again.", Severity.Error);
@@ -376,14 +458,17 @@ else
         try
         {
             var content = await response.Content.ReadAsStringAsync();
-            // Try to parse ProblemDetails format
             if (content.Contains("\"detail\""))
             {
                 var json = JsonDocument.Parse(content);
                 if (json.RootElement.TryGetProperty("detail", out var detail))
-                {
                     return detail.GetString() ?? response.ReasonPhrase ?? "Unknown error";
-                }
+            }
+            if (content.Contains("\"message\""))
+            {
+                var json = JsonDocument.Parse(content);
+                if (json.RootElement.TryGetProperty("message", out var message))
+                    return message.GetString() ?? response.ReasonPhrase ?? "Unknown error";
             }
             return response.ReasonPhrase ?? $"Error {response.StatusCode}";
         }
@@ -410,11 +495,7 @@ else
                 if (result?.OrderId != null)
                 {
                     Snackbar.Add("Order placed successfully! Redirecting...", Severity.Success);
-
-                    // Clear checkoutId from localStorage
                     await JS.InvokeVoidAsync("authHelper.clearCheckoutId");
-
-                    // Navigate to order confirmation page
                     Navigation.NavigateTo($"/order-confirmation/{result.OrderId}");
                 }
                 else
@@ -480,6 +561,11 @@ else
     private sealed record AddressSummary(
         Guid AddressId,
         string Nickname,
+        string AddressLine1,
+        string City,
+        string StateOrProvince,
+        string PostalCode,
+        string Country,
         string DisplayLine);
 
     private sealed record CartLineItemView(

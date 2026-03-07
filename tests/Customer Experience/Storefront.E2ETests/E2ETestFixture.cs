@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Marten;
 using Storefront.Clients;
 using Storefront.E2ETests.Stubs;
+using System.Net.Http.Json;
 using Testcontainers.PostgreSql;
 using Wolverine;
 
@@ -78,14 +79,14 @@ public sealed class E2ETestFixture : IAsyncLifetime
             StubOrdersClient,
             StubCustomerIdentityClient);
 
-        // Triggering CreateDefaultClient forces the server to start and bind to its port
-        _apiFactory.CreateDefaultClient();
+        // UseKestrel + CreateDefaultClient — starts the real Kestrel server and captures the bound port
+        _apiFactory.StartKestrel();
         StorefrontApiBaseUrl = _apiFactory.ServerAddress;
         StorefrontApiHost = _apiFactory.Services.GetRequiredService<IHost>();
 
         // Step 3: Start Storefront.Web pointing at the test Storefront.Api
         _webFactory = new StorefrontWebKestrelFactory(StorefrontApiBaseUrl);
-        _webFactory.CreateDefaultClient();
+        _webFactory.StartKestrel();
         StorefrontWebBaseUrl = _webFactory.ServerAddress;
     }
 
@@ -204,10 +205,12 @@ public sealed class E2ETestFixture : IAsyncLifetime
     }
 }
 
+
 /// <summary>
 /// WebApplicationFactory for Storefront.Api that binds to a real Kestrel TCP port.
 /// This is required because Playwright's browser must connect over real HTTP,
 /// and SignalR's WebSocket upgrade requires a real server (not TestServer).
+/// Uses the built-in WebApplicationFactory.UseKestrel() support (ASP.NET Core 10+).
 /// </summary>
 internal sealed class StorefrontApiKestrelFactory(
     string connectionString,
@@ -218,30 +221,6 @@ internal sealed class StorefrontApiKestrelFactory(
     : WebApplicationFactory<Storefront.Api.StorefrontHub>
 {
     public string ServerAddress { get; private set; } = string.Empty;
-
-    protected override IHost CreateHost(IHostBuilder builder)
-    {
-        // Bind to a random available port on localhost so Playwright's browser
-        // can connect over real HTTP (TestServer doesn't bind a TCP port).
-        builder.ConfigureWebHost(webHostBuilder =>
-        {
-            webHostBuilder.UseKestrel();
-            webHostBuilder.UseUrls("http://127.0.0.1:0");
-        });
-
-        var host = base.CreateHost(builder);
-
-        // Capture the actual bound address from IServerAddressesFeature after startup.
-        // WebApplicationFactory's EnsureServer() is triggered by CreateDefaultClient().
-        var serverAddresses = host.Services
-            .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
-            .Features
-            .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
-
-        ServerAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
-
-        return host;
-    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -260,36 +239,33 @@ internal sealed class StorefrontApiKestrelFactory(
             services.DisableAllExternalWolverineTransports();
         });
     }
-}
 
-/// <summary>
-/// WebApplicationFactory for Storefront.Web that binds to a real Kestrel TCP port
-/// and is configured to call the test Storefront.Api instance.
-/// </summary>
-internal sealed class StorefrontWebKestrelFactory(string storefrontApiBaseUrl)
-    : WebApplicationFactory<Storefront.Web.StorefrontWebMarker>
-{
-    public string ServerAddress { get; private set; } = string.Empty;
-
-    protected override IHost CreateHost(IHostBuilder builder)
+    internal void StartKestrel()
     {
-        builder.ConfigureWebHost(webHostBuilder =>
-        {
-            webHostBuilder.UseKestrel();
-            webHostBuilder.UseUrls("http://127.0.0.1:0");
-        });
+        // UseKestrel must be called BEFORE the server is initialized (before CreateDefaultClient).
+        // Port=0 lets the OS pick a random available port — avoids conflicts in parallel test runs.
+        UseKestrel(0);
+        CreateDefaultClient(); // triggers Kestrel server startup
 
-        var host = base.CreateHost(builder);
-
-        var serverAddresses = host.Services
+        // Read the actual bound address from the server's feature collection after startup.
+        var serverAddresses = Services
             .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
             .Features
             .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
 
         ServerAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
-
-        return host;
     }
+}
+
+/// <summary>
+/// WebApplicationFactory for Storefront.Web that binds to a real Kestrel TCP port
+/// and is configured to call the test Storefront.Api instance.
+/// Uses the built-in WebApplicationFactory.UseKestrel() support (ASP.NET Core 10+).
+/// </summary>
+internal sealed class StorefrontWebKestrelFactory(string storefrontApiBaseUrl)
+    : WebApplicationFactory<Storefront.Web.StorefrontWebMarker>
+{
+    public string ServerAddress { get; private set; } = string.Empty;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -305,10 +281,59 @@ internal sealed class StorefrontWebKestrelFactory(string storefrontApiBaseUrl)
 
         builder.ConfigureServices(services =>
         {
-            // Override the StorefrontApi HttpClient base address to point at our test API server
+            // Override the StorefrontApi HttpClient base address to point at our test API server.
+            // All Checkout.razor calls now flow through StorefrontApi (not OrdersClient directly).
             services.ConfigureHttpClientBaseAddress("StorefrontApi", storefrontApiBaseUrl);
-            services.ConfigureHttpClientBaseAddress("OrdersClient", storefrontApiBaseUrl);
+
+            // Stub CustomerIdentityApi so Storefront.Web's /api/auth/login endpoint does not
+            // call out to the real Customer Identity service (which is not running in E2E tests).
+            // Always returns Alice's login data — intentional for single-user Cycle 20 scenarios.
+            // TODO: Add credential-checking logic here if multi-user E2E scenarios are added.
+            services.Configure<Microsoft.Extensions.Http.HttpClientFactoryOptions>("CustomerIdentityApi", opts =>
+            {
+                opts.HttpMessageHandlerBuilderActions.Add(b =>
+                    b.PrimaryHandler = new StubCustomerIdentityApiHandler());
+            });
         });
+    }
+
+    internal void StartKestrel()
+    {
+        // UseKestrel must be called BEFORE the server is initialized (before CreateDefaultClient).
+        UseKestrel(0);
+        CreateDefaultClient();
+
+        var serverAddresses = Services
+            .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
+            .Features
+            .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
+
+        ServerAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
+    }
+}
+
+/// <summary>
+/// Stub HttpMessageHandler for the CustomerIdentityApi named HTTP client used by Storefront.Web.
+/// Storefront.Web's /api/auth/login endpoint calls CustomerIdentityApi internally.
+/// This handler intercepts those calls and returns Alice's credentials without hitting a real service.
+/// Always-Alice is intentional for Cycle 20's single-user test scope.
+/// TODO: Add credential-checking logic here if multi-user E2E scenarios are added in a later cycle.
+/// </summary>
+internal sealed class StubCustomerIdentityApiHandler : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var response = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(new
+            {
+                customerId = WellKnownTestData.Customers.Alice.ToString(),
+                email = WellKnownTestData.Customers.AliceEmail,
+                firstName = WellKnownTestData.Customers.AliceFirstName,
+                lastName = WellKnownTestData.Customers.AliceLastName
+            })
+        };
+        return Task.FromResult(response);
     }
 }
 

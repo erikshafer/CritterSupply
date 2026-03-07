@@ -27,6 +27,7 @@ This directory contains implementation patterns and best practices for building 
 - 🧪 [CritterStack Testing Patterns](./critterstack-testing-patterns.md) - Alba integration tests, pure function testing, TestFixture patterns
 - 🐳 [TestContainers Integration Tests](./testcontainers-integration-tests.md) - Why real infrastructure, container setup, performance tips
 - 🥒 [Reqnroll BDD Testing](./reqnroll-bdd-testing.md) - Gherkin features, step definitions, when to use BDD
+- 🎭 [E2E Testing with Playwright](./e2e-playwright-testing.md) - Browser E2E tests, real Kestrel, POM, MudBlazor patterns
 
 **Code Organization & Style:**
 - 📂 [Vertical Slice Organization](./vertical-slice-organization.md) - File structure, colocation, project naming conventions
@@ -57,6 +58,7 @@ This directory contains implementation patterns and best practices for building 
 - [CritterStack Testing Patterns](./critterstack-testing-patterns.md) - Alba, Wolverine, Marten integration tests
 - [TestContainers Integration Tests](./testcontainers-integration-tests.md) - Real infrastructure testing
 - [Reqnroll BDD Testing](./reqnroll-bdd-testing.md) - Behavior-driven development with Gherkin
+- [E2E Testing with Playwright](./e2e-playwright-testing.md) - Browser E2E with real Kestrel servers
 
 ### UI Frameworks
 - [BFF Real-time Patterns](./bff-realtime-patterns.md) - Blazor Server, MudBlazor, SSE
@@ -85,6 +87,7 @@ This directory contains implementation patterns and best practices for building 
 1. Write integration tests → [CritterStack Testing Patterns](./critterstack-testing-patterns.md)
 2. Set up TestContainers → [TestContainers Integration Tests](./testcontainers-integration-tests.md)
 3. Implement BDD scenarios → [Reqnroll BDD Testing](./reqnroll-bdd-testing.md)
+4. Write browser E2E tests → [E2E Testing with Playwright](./e2e-playwright-testing.md)
 
 ---
 

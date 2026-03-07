@@ -51,10 +51,16 @@ public static class GetCheckoutViewHandler
             var shippingCost = 5.99m; // Hardcoded for now (future: calculate based on shipping method)
             var total = subtotal + shippingCost;
 
-            // Map addresses to AddressSummary
+            // Map addresses to AddressSummary (includes full address fields so Checkout.razor
+            // can resolve the selected address without a second API call)
             var addressSummaries = addresses.Select(addr => new AddressSummary(
                 addr.Id,
                 addr.Nickname,
+                addr.AddressLine1,
+                addr.City,
+                addr.StateOrProvince,
+                addr.PostalCode,
+                addr.Country,
                 addr.DisplayLine
             )).ToList();
 

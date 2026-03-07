@@ -31,4 +31,9 @@ public enum CheckoutStep
 public sealed record AddressSummary(
     Guid AddressId,
     string Nickname,
+    string AddressLine1,
+    string City,
+    string StateOrProvince,
+    string PostalCode,
+    string Country,
     string DisplayLine);  // "123 Main St, Seattle, WA 98101"

@@ -31,6 +31,12 @@ public class StubOrdersClient : IOrdersClient
         throw new HttpRequestException($"Checkout {checkoutId} not found", null, System.Net.HttpStatusCode.NotFound);
     }
 
+    public Task<OrderDto?> GetOrderAsync(Guid orderId, CancellationToken ct = default)
+    {
+        var order = _orders.FirstOrDefault(o => o.Id == orderId);
+        return Task.FromResult<OrderDto?>(order);
+    }
+
     public Task<PagedResult<OrderDto>> GetOrdersAsync(
         Guid customerId,
         int page = 1,

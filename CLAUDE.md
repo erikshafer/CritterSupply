@@ -709,6 +709,19 @@ Covers:
 - Step definition patterns
 - Integration with TestFixture and Alba
 
+For browser-level E2E testing with Playwright (full UI + SignalR):
+
+**Read:** `docs/skills/e2e-playwright-testing.md`
+
+Covers:
+- Real Kestrel servers via WebApplicationFactory (not TestServer)
+- Page Object Model with data-testid selectors
+- MudBlazor MudSelect interaction patterns
+- Stub coordination for deterministic IDs
+- Playwright tracing for CI failure diagnosis
+- SignalR antiforgery configuration
+- Test lifecycle with Reqnroll hooks
+
 ---
 
 ## Project Creation Workflow

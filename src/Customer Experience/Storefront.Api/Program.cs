@@ -129,7 +129,11 @@ app.MapWolverineEndpoints(opts =>
 });
 
 // Map SignalR hub
-app.MapHub<Storefront.Api.StorefrontHub>("/hub/storefront");
+// DisableAntiforgery: ASP.NET Core 10+ enables antiforgery protection on SignalR hubs by default.
+// WebSocket connections are CSRF-safe by design (browsers enforce same-origin on WS upgrades),
+// so antiforgery tokens do not add security here and blocking the negotiation handshake breaks E2E tests.
+app.MapHub<Storefront.Api.StorefrontHub>("/hub/storefront")
+    .DisableAntiforgery();
 
 // Redirect root to Swagger/API documentation
 app.MapGet("/", (HttpResponse response) =>

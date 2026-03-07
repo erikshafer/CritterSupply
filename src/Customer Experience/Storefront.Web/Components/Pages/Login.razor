@@ -87,8 +87,8 @@
             return;
         }
 
-        // Trigger form validation
-        await _form.Validate();
+        // Trigger form validation (ValidateAsync is the non-obsolete replacement for Validate())
+        await _form.ValidateAsync();
 
         if (!_form.IsValid)
         {
