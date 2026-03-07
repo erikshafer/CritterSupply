@@ -1,5 +1,5 @@
 Feature: Storefront Protected Routes
-  As a visitor
+  As a visitor or customer
   I want protected pages to redirect me to login when I am not authenticated
   So that my account information and purchase flow remain secure
 

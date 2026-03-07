@@ -270,7 +270,17 @@ internal sealed class StorefrontApiKestrelFactory(
             .Features
             .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
 
-        ServerAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
+        var rawAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
+
+        // On Linux, Kestrel with port=0 may bind to a wildcard address such as
+        // http://[::]:PORT (IPv6 any) or http://0.0.0.0:PORT (IPv4 any).
+        // Wildcard addresses are not routable from within the browser — the browser
+        // needs a concrete host (localhost / 127.0.0.1) to open a connection.
+        // This is specifically required for the SignalR WebSocket upgrade from the
+        // Playwright browser to the Storefront.Api hub.
+        ServerAddress = rawAddress
+            .Replace("//[::]:","//localhost:")
+            .Replace("//0.0.0.0:","//localhost:");
     }
 }
 
@@ -325,7 +335,11 @@ internal sealed class StorefrontWebKestrelFactory(string storefrontApiBaseUrl)
             .Features
             .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
 
-        ServerAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
+        // Normalize wildcard addresses to localhost (same reason as StorefrontApiKestrelFactory).
+        var rawAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
+        ServerAddress = rawAddress
+            .Replace("//[::]:","//localhost:")
+            .Replace("//0.0.0.0:","//localhost:");
     }
 }
 

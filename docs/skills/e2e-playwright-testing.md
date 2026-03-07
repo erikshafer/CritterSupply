@@ -982,7 +982,7 @@ StateHasChanged();
 
 **Rule of thumb:** If state changes in `OnAfterRenderAsync` or inside a `try/catch` wrapping a JS interop call, add `StateHasChanged()`. If you're unsure, adding it is safe — it is idempotent and just queues one additional render pass.
 
-
+## Checklist for New E2E Scenarios
 
 Use this checklist when adding a new Gherkin scenario to `checkout-flow.feature` or a new feature file.
 
