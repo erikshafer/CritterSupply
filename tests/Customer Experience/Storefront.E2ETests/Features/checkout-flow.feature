@@ -98,13 +98,13 @@ Feature: Checkout Flow (E2E)
   # Future: Mobile & Accessibility (tagged, deferred)
   # ──────────────────────────────────────────────────
 
-  @mobile @wip
+  @mobile @wip @ignore
   Scenario: Checkout wizard adapts to mobile screen size
     Given I am viewing the checkout page on a mobile device
     Then the checkout wizard should display in single-column layout
     And the order summary should be collapsible
 
-  @accessibility @wip
+  @accessibility @wip @ignore
   Scenario: Checkout wizard is keyboard navigable
     Given I am on the checkout page at step "Shipping Address"
     When I navigate the page using only the keyboard

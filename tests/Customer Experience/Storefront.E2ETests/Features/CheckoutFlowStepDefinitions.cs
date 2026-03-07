@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
+using Storefront.Api;
 using Storefront.E2ETests.Pages;
-using Wolverine.Tracking;
 
 namespace Storefront.E2ETests.Features;
 
@@ -96,22 +98,26 @@ public sealed class CheckoutFlowStepDefinitions
     [Given(@"I have successfully placed an order")]
     public async Task GivenIHaveSuccessfullyPlacedAnOrder()
     {
-        await CartPage.NavigateAsync();
-        await CartPage.ClickProceedToCheckoutAsync();
-        await CheckoutPage.WaitForCheckoutLoadedAsync();
+        // Navigate directly to the order confirmation page using the pre-seeded deterministic order.
+        //
+        // Per the E2E testing principle documented in docs/skills/e2e-playwright-testing.md:
+        //   "The browser only touches what the test is testing. Everything else is done via
+        //    API or stub — never via browser UI navigation."
+        //
+        // The SignalR scenarios test real-time hub delivery to the browser — NOT the checkout
+        // flow. The full browser checkout flow is already covered by Scenario 1 (happy path).
+        // Running the entire checkout UI as setup for SignalR tests couples two concerns,
+        // and makes the SignalR tests brittle against MudBlazor rendering timing issues
+        // that have nothing to do with SignalR.
+        //
+        // The order is pre-seeded in E2ETestFixture.SeedStandardCheckoutScenarioAsync via
+        // StubOrdersClient so GET /api/storefront/orders/{AliceOrderId} returns a valid order.
+        var orderId = WellKnownTestData.Orders.AliceOrderId;
+        await Page.GotoAsync($"/order-confirmation/{orderId}");
+        await OrderConfirmationPage.WaitForLoadAsync();
 
-        await CheckoutPage.SelectAddressByNicknameAsync(WellKnownTestData.Addresses.AliceHomeNickname);
-        await CheckoutPage.ClickSaveAddressAndContinueAsync();
-        await CheckoutPage.SelectStandardShippingAsync();
-        await CheckoutPage.ClickSaveShippingMethodAndContinueAsync();
-        await CheckoutPage.EnterPaymentTokenAsync(WellKnownTestData.Payment.ValidVisaToken);
-        await CheckoutPage.ClickSavePaymentAndContinueAsync();
-        await CheckoutPage.ClickPlaceOrderAsync();
-
-        // Store the order ID from the URL for subsequent steps
-        var url = Page.Url;
-        var orderId = url.TrimEnd('/').Split('/').Last();
-        _scenarioContext.Set(orderId, ScenarioContextKeys.OrderId);
+        // Store the order ID for subsequent steps (SignalR message injection targets this ID)
+        _scenarioContext.Set(orderId.ToString(), ScenarioContextKeys.OrderId);
     }
 
     [Given(@"I am on the order confirmation page")]
@@ -125,7 +131,7 @@ public sealed class CheckoutFlowStepDefinitions
     [Given(@"the SignalR connection is established")]
     public async Task GivenTheSignalRConnectionIsEstablished()
     {
-        await OrderConfirmationPage.WaitForSignalRConnectionAsync(timeoutMs: 10_000);
+        await OrderConfirmationPage.WaitForSignalRConnectionAsync(timeoutMs: 15_000);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -201,15 +207,37 @@ public sealed class CheckoutFlowStepDefinitions
         var orderIdStr = _scenarioContext.Get<string>(ScenarioContextKeys.OrderId);
         var orderId = Guid.Parse(orderIdStr);
 
-        // Inject OrderStatusChanged directly into Wolverine so the SignalR hub routes it to Alice's group.
-        // PaymentAuthorizedHandler currently uses Guid.Empty for customerId (TODO: resolve via OrderId→CustomerId
-        // lookup when completing checkout). The E2E test focuses on SignalR delivery, not the handler transformation.
-        await _fixture.StorefrontApiHost.InvokeMessageAndWaitAsync(
-            new Storefront.RealTime.OrderStatusChanged(
-                orderId,
-                WellKnownTestData.Customers.Alice,
-                "PaymentAuthorized",
-                DateTimeOffset.UtcNow));
+        // IHubContext is the correct injection mechanism for E2E SignalR tests.
+        // InvokeMessageAndWaitAsync requires a Wolverine local handler — OrderStatusChanged
+        // has none (it is published directly to the SignalR transport via x.ToSignalR() in
+        // Program.cs). Wolverine's TrackedSession cannot observe browser WebSocket delivery
+        // and times out unconditionally waiting for a terminal state that never fires.
+        //
+        // We send a CloudEvents-shaped payload matching Wolverine's SignalR transport format.
+        // SignalR serializes with camelCase (System.Text.Json web defaults), so the JS client
+        // receives camelCase properties in cloudEvent.data. signalr-client.js spreads
+        // cloudEvent.data and adds eventType before calling OnSseEvent on the Blazor component.
+        var hubContext = _fixture.StorefrontApiHost.Services
+            .GetRequiredService<IHubContext<StorefrontHub>>();
+
+        await hubContext.Clients
+            .Group($"customer:{WellKnownTestData.Customers.Alice}")
+            .SendAsync("ReceiveMessage", new
+            {
+                specversion = "1.0",
+                type = "CritterSupply.Storefront.RealTime.OrderStatusChanged",
+                source = "storefront-api",
+                id = Guid.NewGuid().ToString(),
+                time = DateTimeOffset.UtcNow,
+                datacontenttype = "application/json",
+                data = new
+                {
+                    orderId = orderId,
+                    customerId = WellKnownTestData.Customers.Alice,
+                    newStatus = "PaymentAuthorized",
+                    occurredAt = DateTimeOffset.UtcNow
+                }
+            });
     }
 
     [When(@"the Fulfillment BC publishes a shipment dispatched event for my order with tracking ""(.*)""")]
@@ -219,15 +247,31 @@ public sealed class CheckoutFlowStepDefinitions
         var orderId = Guid.Parse(orderIdStr);
         var shipmentId = Guid.NewGuid();
 
-        // Inject ShipmentStatusChanged directly — same reasoning as PaymentAuthorized above.
-        await _fixture.StorefrontApiHost.InvokeMessageAndWaitAsync(
-            new Storefront.RealTime.ShipmentStatusChanged(
-                shipmentId,
-                orderId,
-                WellKnownTestData.Customers.Alice,
-                "Shipped",
-                trackingNumber,
-                DateTimeOffset.UtcNow));
+        // Same reasoning as WhenPaymentsBCPublishesPaymentAuthorized: ShipmentStatusChanged
+        // has no local Wolverine handler — it is SignalR-transport-only. Use IHubContext directly.
+        var hubContext = _fixture.StorefrontApiHost.Services
+            .GetRequiredService<IHubContext<StorefrontHub>>();
+
+        await hubContext.Clients
+            .Group($"customer:{WellKnownTestData.Customers.Alice}")
+            .SendAsync("ReceiveMessage", new
+            {
+                specversion = "1.0",
+                type = "CritterSupply.Storefront.RealTime.ShipmentStatusChanged",
+                source = "storefront-api",
+                id = Guid.NewGuid().ToString(),
+                time = DateTimeOffset.UtcNow,
+                datacontenttype = "application/json",
+                data = new
+                {
+                    shipmentId = shipmentId,
+                    orderId = orderId,
+                    customerId = WellKnownTestData.Customers.Alice,
+                    newStatus = "Shipped",
+                    trackingNumber = trackingNumber,
+                    occurredAt = DateTimeOffset.UtcNow
+                }
+            });
     }
 
     // ─────────────────────────────────────────────────────────────────────

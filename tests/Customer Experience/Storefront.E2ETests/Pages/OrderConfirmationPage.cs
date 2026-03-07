@@ -53,8 +53,10 @@ public sealed class OrderConfirmationPage(IPage page)
     /// <summary>
     /// Waits for the SignalR connection indicator to appear.
     /// This confirms the Blazor component successfully connected to the SignalR hub.
+    /// Timeout is intentionally generous: SignalR needs a full WebSocket handshake round-trip
+    /// to the Kestrel API server, which can be slow on a loaded CI runner.
     /// </summary>
-    public async Task WaitForSignalRConnectionAsync(int timeoutMs = 5_000)
+    public async Task WaitForSignalRConnectionAsync(int timeoutMs = 15_000)
     {
         await SignalRConnectedAlert.WaitForAsync(new LocatorWaitForOptions
         {

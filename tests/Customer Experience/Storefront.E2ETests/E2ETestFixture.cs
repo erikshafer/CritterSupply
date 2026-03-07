@@ -202,6 +202,23 @@ public sealed class E2ETestFixture : IAsyncLifetime
             AddressType: "Shipping",
             IsDefault: false,
             DisplayLine: WellKnownTestData.Addresses.AliceWorkDisplayLine));
+
+        // Seed a pre-placed order for SignalR E2E scenarios.
+        // SignalR tests navigate directly to /order-confirmation/{AliceOrderId} rather than
+        // driving the full browser checkout UI — following the principle:
+        //   "The browser only touches what the test is testing.
+        //    Everything else is done via API or stub."
+        // The full browser checkout flow is already covered by the happy-path scenario (Scenario 1).
+        var orderTotal = (WellKnownTestData.Products.CeramicDogBowlPrice * 2)
+                       + WellKnownTestData.Products.InteractiveCatLaserPrice
+                       + WellKnownTestData.Shipping.StandardCost;
+
+        StubOrdersClient.AddOrder(new Storefront.Clients.OrderDto(
+            WellKnownTestData.Orders.AliceOrderId,
+            WellKnownTestData.Customers.Alice,
+            "Placed",
+            DateTimeOffset.UtcNow,
+            orderTotal));
     }
 }
 
@@ -253,7 +270,17 @@ internal sealed class StorefrontApiKestrelFactory(
             .Features
             .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
 
-        ServerAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
+        var rawAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
+
+        // On Linux, Kestrel with port=0 may bind to a wildcard address such as
+        // http://[::]:PORT (IPv6 any) or http://0.0.0.0:PORT (IPv4 any).
+        // Wildcard addresses are not routable from within the browser — the browser
+        // needs a concrete host (localhost / 127.0.0.1) to open a connection.
+        // This is specifically required for the SignalR WebSocket upgrade from the
+        // Playwright browser to the Storefront.Api hub.
+        ServerAddress = rawAddress
+            .Replace("//[::]:","//localhost:")
+            .Replace("//0.0.0.0:","//localhost:");
     }
 }
 
@@ -308,7 +335,11 @@ internal sealed class StorefrontWebKestrelFactory(string storefrontApiBaseUrl)
             .Features
             .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
 
-        ServerAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
+        // Normalize wildcard addresses to localhost (same reason as StorefrontApiKestrelFactory).
+        var rawAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
+        ServerAddress = rawAddress
+            .Replace("//[::]:","//localhost:")
+            .Replace("//0.0.0.0:","//localhost:");
     }
 }
 

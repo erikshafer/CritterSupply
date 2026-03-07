@@ -312,6 +312,7 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 | Vendor Portal                 | 5239     | 📋 Reserved | Vendor Portal API (future)     |
 | Vendor Identity               | 5240     | 📋 Reserved | Vendor Identity API (future)   |
 | **Vendor Portal (Web/Blazor)**| **5241** | 📋 Reserved | Vendor Blazor frontend (future)|
+| **Pricing**                   | **5242** | 📋 Reserved | Pricing API (future)           |
 | **Admin Portal (API)**        | **5242** | 📋 Reserved | Admin Portal API (future)      |
 | **Admin Portal (Web)**        | **5243** | 📋 Reserved | Admin Portal frontend (future; React/Vue/Blazor) |
 

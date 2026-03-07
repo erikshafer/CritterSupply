@@ -2,6 +2,7 @@
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
 @inject IJSRuntime JS
+@inject IConfiguration Configuration
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
@@ -83,7 +84,11 @@
         try
         {
             _dotNetHelper = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("signalrClient.subscribe", _customerId.Value.ToString(), _dotNetHelper);
+            // Build the hub URL from configuration so E2E tests point to the test API server.
+            // Falls back to the default local port when the config key is absent.
+            var apiBaseUrl = Configuration["ApiClients:StorefrontApiUrl"] ?? "http://localhost:5237";
+            var hubUrl = $"{apiBaseUrl}/hub/storefront";
+            await JS.InvokeVoidAsync("signalrClient.subscribe", _customerId.Value.ToString(), _dotNetHelper, hubUrl);
         }
         catch (Exception ex)
         {
