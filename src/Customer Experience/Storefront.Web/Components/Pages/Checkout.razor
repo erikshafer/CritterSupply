@@ -187,14 +187,17 @@ else
         // Get authenticated customer ID
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var customerIdClaim = authState.User.FindFirst("CustomerId")?.Value;
+        Console.WriteLine($"[Checkout] OnInitializedAsync: customerIdClaim='{customerIdClaim}', isAuthenticated={authState.User.Identity?.IsAuthenticated}");
         if (!Guid.TryParse(customerIdClaim, out _customerId))
         {
+            Console.WriteLine("[Checkout] CustomerId parse failed - returning early");
             // Should not happen due to [Authorize] but handle gracefully
             return;
         }
 
         // Get checkoutId from localStorage (stored when user clicked "Proceed to Checkout")
         var checkoutIdString = await JS.InvokeAsync<string?>("authHelper.getCheckoutId");
+        Console.WriteLine($"[Checkout] checkoutIdString from localStorage='{checkoutIdString}'");
         if (!string.IsNullOrEmpty(checkoutIdString) && Guid.TryParse(checkoutIdString, out var checkoutId))
         {
             _checkoutId = checkoutId;
@@ -202,6 +205,7 @@ else
         }
         else
         {
+            Console.WriteLine("[Checkout] No checkoutId in localStorage - redirecting to cart");
             // No checkoutId - redirect back to cart
             Snackbar.Add("No active checkout found. Please start checkout from your cart.", Severity.Warning);
             Navigation.NavigateTo("/cart");

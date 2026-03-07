@@ -24,7 +24,23 @@ public sealed class LoginPage(IPage page)
         await EmailInput.FillAsync(email);
         await PasswordInput.FillAsync(password);
         await LoginButton.ClickAsync();
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        // forceLoad: true in Login.razor's Navigation.NavigateTo fires a SECOND full-page navigation
+        // after the fetch completes. WaitForLoadStateAsync(NetworkIdle) can return between the fetch
+        // completing and the hard reload starting — meaning page.Url is still "/login" when read.
+        // WaitForURL waits for the navigation away from /login to be fully committed first.
+        try
+        {
+            await page.WaitForURLAsync(
+                url => !url.Contains("/login"),
+                new() { Timeout = 10_000 });
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        }
+        catch (TimeoutException)
+        {
+            // Login may have failed — page stayed at /login.
+            // IsLoggedInAsync() will surface the assertion failure.
+        }
     }
 
     public async Task LoginAsAliceAsync()
