@@ -2534,11 +2534,736 @@ SignalR message received (CartUpdated)
 
 ## Future Considerations
 
-The following contexts are acknowledged but not yet defined:
+The following bounded contexts have been identified as high-value additions for CritterSupply's next phase of growth. They are ordered by business priority: customer-facing gaps first, then commercial infrastructure, then operational intelligence and internal tooling.
 
-- **Pricing** — price rules, promotional pricing, regional pricing
-- **Promotions** — buy-one-get-one, percentage discounts, coupon codes
-- **Reviews** — customer product reviews, ratings, moderation
-- **Notifications** — email, SMS, push notifications (may move to Customer Experience)
-- **Procurement/Supply Chain** — purchasing, vendor management, forecasting
-- **Shipping/Logistics** — carrier management, rate shopping
+> **Note:** The first four (Notifications, Pricing, Promotions, Search) are recommended for the near-term roadmap. Recommendations, Store Credit, and Analytics follow once foundational commercial infrastructure is in place. **Admin Portal** and **Operations Dashboard** address internal tooling needs for the executive team and engineering team — both leveraging the richness of our event-sourced data streams via SignalR and SSR-capable frontends. Reviews, Procurement/Supply Chain, and Shipping/Logistics round out the long-term vision.
+
+---
+
+## Notifications
+
+The Notifications context owns all customer-facing transactional communication — order confirmations, shipping updates, delivery confirmations, return status changes, and refund notices. It reacts to integration events already published by existing BCs and delivers messages through the customer's preferred channel (email, SMS, push notification).
+
+**Why this matters:** CritterSupply's saga already fires every event a Notifications BC needs (`OrderPlaced`, `ShipmentDispatched`, `ShipmentDelivered`, `RefundCompleted`). Without this BC, customers receive zero communication after checkout unless they are actively watching the Blazor storefront — a gap that drives support tickets and erodes trust. Transactional emails see 40–50% open rates. This is the single highest-impact gap in the current customer experience.
+
+**Priority:** 🔴 High — implement immediately after Returns BC is live. Pure choreography: no orchestration needed.
+
+### What it receives
+
+- `OrderPlaced` from Orders — trigger order confirmation message
+- `OrderCancelled` from Orders — notify customer of cancellation + refund details
+- `ShipmentDispatched` from Fulfillment — send tracking number and carrier link
+- `ShipmentDelivered` from Fulfillment — confirm delivery, invite product review
+- `ShipmentDeliveryFailed` from Fulfillment — alert customer, initiate re-delivery flow
+- `RefundCompleted` from Payments — confirm refund amount and timeline
+- `ReturnApproved` from Returns — send return label and instructions
+- `ReturnDenied` from Returns — explain rejection reason
+- `ReturnCompleted` from Returns — confirm return received and refund triggered
+- `ReturnExpired` from Returns — remind customer the return window has closed
+
+### What it publishes
+
+- `NotificationQueued` — notification scheduled for delivery (internal tracking)
+- `NotificationDelivered` — message successfully delivered by provider
+- `NotificationFailed` — delivery failed; includes reason and retry count
+
+### Core Invariants
+
+- A notification cannot be sent to an opted-out channel (check preferences before dispatch)
+- Notification delivery must be idempotent — re-processing an event must not send duplicate messages
+- Failed notifications must be retried with exponential backoff before marking as permanently failed
+- Notification content must never include raw payment details (PCI compliance)
+
+### What it doesn't own
+
+- Real-time in-app updates (Customer Experience BC via SignalR — see ADR 0013)
+- Marketing/promotional email campaigns (Promotions BC or a future Marketing BC)
+- Notification preference storage — preferences live in Customer Identity BC
+- Template content management (could be a future content management concern)
+
+### Integration Flows
+
+```
+OrderPlaced (from Orders via RabbitMQ)
+  └─> OrderPlacedNotificationHandler
+      ├─> Query Customer Identity: GET /api/customers/{customerId} (email address + prefs)
+      ├─> Compose order confirmation email (order summary, items, shipping address)
+      └─> Send via email provider (SendGrid, Postmark, etc.)
+          └─> NotificationDelivered OR NotificationFailed
+
+ShipmentDispatched (from Fulfillment via RabbitMQ)
+  └─> ShipmentDispatchedNotificationHandler
+      ├─> Query Customer Identity: GET /api/customers/{customerId}
+      ├─> Compose shipping notification (carrier, tracking number, estimated delivery)
+      └─> Send via email + optional SMS (if customer opted in)
+```
+
+### Key Design Decisions
+
+- **Idempotency:** Handler stores `MessageId` to prevent duplicate sends (at-least-once delivery guarantee from Wolverine)
+- **Channel abstraction:** `INotificationChannel` interface (email, SMS, push) — swap providers without changing handlers
+- **Template rendering:** Razor templates or external template service (Sendgrid Dynamic Templates) for rich HTML emails
+- **Preference check:** Always consult Customer Identity BC before dispatching — never cache preferences
+
+---
+
+## Pricing
+
+The Pricing context owns the rules that determine what customers pay for a product. It separates *commercial truth* (what something costs) from *product truth* (what something is) — a distinction that becomes essential the moment you need to run a sale, apply a volume discount, enforce a vendor's Minimum Advertised Price (MAP) contract, or offer loyalty pricing to repeat customers.
+
+**Why this matters:** Currently, price is a field on the Product Catalog document. This means running a flash sale requires direct database edits, and there is no audit trail of price history. Pricing BC is also the prerequisite for Promotions BC — you cannot calculate a percentage discount without knowing the authoritative base price.
+
+**Priority:** 🔴 High — foundational commercial infrastructure; blocks Promotions BC. Requires Product Catalog BC to be publishing `ProductAdded` integration events (already implemented).
+
+### What it receives
+
+- `ProductAdded` from Product Catalog — create an initial base price record for the new SKU
+- `ProductDiscontinued` from Product Catalog — archive pricing rules for the SKU
+- Price rule commands from internal merchandising tooling: `SetBasePrice`, `SetMAPFloor`, `SchedulePriceChange`, `ExpirePriceRule`
+
+### Internal lifecycle (per PriceRule)
+
+- Draft — price rule created but not yet active
+- Active — currently applied to matching SKUs
+- Scheduled — will become active at a future timestamp
+- Expired — past its effective window (retained for audit history)
+
+### What it publishes
+
+- `PricePublished` — a new effective price is active for a SKU (other BCs should reflect this)
+- `PriceExpired` — a time-limited price has lapsed; base price resumes
+- `MAPViolationDetected` — a proposed price is below the vendor's MAP floor (alert to merchandising)
+
+### Core Invariants
+
+- A SKU must have exactly one active base price at any point in time
+- Promotional prices cannot be set below the MAP floor (if one is configured for that SKU)
+- Price history must be immutable — past prices are never modified, only superseded
+- Price changes must take effect at the scheduled time, regardless of system load (use durable scheduling)
+
+### What it doesn't own
+
+- Product descriptions, images, or catalog data (Product Catalog BC)
+- Coupon codes or promotion eligibility (Promotions BC)
+- Vendor cost basis or margin targets (Vendor Portal BC)
+- Display of prices in the storefront (Customer Experience queries Pricing BC)
+
+### Integration Flows
+
+```
+SetBasePrice (command from merchandising admin)
+  └─> SetBasePriceHandler
+      ├─> PriceRule persisted (event-sourced recommended — full audit trail)
+      └─> PricePublished → Product Catalog (update displayed price), Shopping (PriceRefreshed for in-cart items)
+
+SchedulePriceChange (command: "set DOG-BOWL-001 to $12.99 starting Friday 00:00 UTC")
+  └─> SchedulePriceChangeHandler
+      ├─> PriceRule persisted with effective window
+      └─> Wolverine delayed message: PriceActivationDue scheduled for effective date
+          └─> PricePublished at scheduled time
+
+GetCurrentPrice (query from Shopping / Checkout / Customer Experience)
+  └─> Returns: PriceResponse(Sku, BasePrice, EffectivePrice, MAPFloor?, EffectiveFrom, EffectiveTo?)
+```
+
+### Key Design Decisions
+
+- **Event sourcing recommended:** Price history has strong audit requirements — every price change should be a persisted event (who changed it, when, why)
+- **Price snapshot on cart add:** Shopping BC captures `ItemAdded.UnitPrice` from this BC at the time the item is added (already planned in existing Cart design)
+- **Temporal pricing:** Support `EffectiveFrom` / `EffectiveTo` windows for scheduled sales without manual intervention
+
+---
+
+## Promotions
+
+The Promotions context owns the rules for business incentives that influence customer purchase behavior — coupon codes, percentage discounts, fixed-dollar discounts, buy-one-get-one deals, and free shipping thresholds. It validates and applies promotion logic at checkout time, and tracks usage to enforce per-customer and global limits.
+
+**Why this matters:** Promotions are the primary lever for customer acquisition and retention in competitive e-commerce. The Shopping BC already anticipates this BC: `CouponApplied`, `CouponRemoved`, `PromotionApplied`, and `PromotionRemoved` are pre-defined future events on the Cart aggregate (see Shopping BC "Future Events" above). The hooks are already in the domain model — Promotions BC is what gives them authority.
+
+**Priority:** 🔴 High — direct revenue impact; requires Pricing BC to be live first (Promotions BC reads authoritative base prices for discount calculations).
+
+### What it receives
+
+- `CouponApplied` from Shopping — validate the coupon code (is it valid? has this customer used it?)
+- `CheckoutInitiated` from Shopping — evaluate which auto-applied promotions are eligible for this cart
+- Commands from merchandising tooling: `CreatePromotion`, `CreateCoupon`, `DeactivatePromotion`, `SetUsageLimit`
+
+### Internal lifecycle (per Promotion)
+
+- Draft — promotion configured but not yet live
+- Active — currently applicable to eligible carts
+- Paused — temporarily suspended (e.g., budget cap reached)
+- Expired — past its effective end date (terminal)
+
+### What it publishes
+
+- `PromotionActivated` — promotion is now live (Shopping BC may apply automatically to existing carts)
+- `PromotionExpired` — promotion has ended (remove from any active cart applications)
+- `CouponValidated` — specific coupon code confirmed valid for this customer and cart
+- `CouponRejected` — coupon invalid, expired, already used, or not applicable (includes reason code)
+- `DiscountCalculated` — response to cart discount query (which promotions apply, final discount amount)
+
+### Core Invariants
+
+- A coupon code can only be redeemed once per customer (unless explicitly configured for multi-use)
+- Promotional discounts cannot reduce item price below MAP floor (requires coordination with Pricing BC)
+- Stacking rules must be enforced: some promotions are mutually exclusive (coupon cannot combine with sale price)
+- Usage limits must be enforced atomically — high-traffic flash sales can create race conditions
+- Promotions must respect their effective date windows precisely
+
+### What it doesn't own
+
+- Base price authority (Pricing BC)
+- Coupon delivery or marketing campaign orchestration (future Marketing BC)
+- Payment processing of the discounted amount (Payments BC)
+- Customer loyalty point accrual (future Loyalty BC)
+
+### Integration Flows
+
+```
+CouponApplied (from Shopping via RabbitMQ)
+  └─> CouponAppliedHandler
+      ├─> Validate: exists, not expired, usage limit not reached
+      ├─> Validate: customer eligibility (not already redeemed)
+      ├─> CouponValidated → Shopping (apply discount to cart display)
+      └─> CouponRejected → Shopping (remove from cart, show error)
+
+CheckoutInitiated (from Shopping via RabbitMQ)
+  └─> CheckoutInitiatedPromotionHandler
+      ├─> Evaluate all Active promotions for cart contents + customer segment
+      ├─> Resolve stacking conflicts (only best promotion, or all stackable ones)
+      └─> DiscountCalculated → Orders (embed in CheckoutCompleted for audit trail)
+```
+
+---
+
+## Search
+
+The Search context provides fast, relevant product discovery with full-text search and faceted filtering. It owns a denormalized read-model optimized for search queries — separate from the Product Catalog write model — and keeps it eventually consistent by subscribing to product lifecycle events.
+
+**Why this matters:** As the Vendor Portal brings more suppliers and SKUs into the catalog, browse-by-category navigation stops scaling. Customers buying pet products search by natural language ("grain-free puppy food", "self-cleaning litter box"), life stage, dietary need, brand, and price range. Search abandonment (searching, finding nothing, leaving) is one of the highest-cost failure modes in e-commerce. The good news: this BC is nearly pure read-side — it consumes events already published by Product Catalog and Pricing BC, builds a search index, and serves queries.
+
+**Priority:** 🟡 Medium — grows in urgency as the product catalog expands through the Vendor Portal. Sequencing note: integration message contracts (`ProductAdded`, `ProductUpdated`, `ProductDiscontinued`) are already defined in `Messages.Contracts/ProductCatalog/`; Product Catalog handlers will need to publish them before Search BC can subscribe. Optionally depends on Pricing BC for price facets.
+
+### What it receives
+
+- `ProductAdded` from Product Catalog — add new document to search index
+- `ProductUpdated` from Product Catalog — refresh existing document in search index
+- `ProductDiscontinued` from Product Catalog — remove from search index (or mark as unavailable)
+- `PricePublished` from Pricing — update price facet in search index
+- `InventoryAvailabilityChanged` from Inventory — update in-stock facet (future Phase 2)
+
+### What it publishes
+
+None. Search BC is a pure read-side BC. It serves `SearchResults` in response to queries but publishes no integration events.
+
+### Core Invariants
+
+- Search index must reflect catalog changes within a bounded staleness window (e.g., < 30 seconds after event)
+- Search results must only return Active products (Discontinued products must be excluded)
+- Facet counts must reflect the current filtered result set, not the entire catalog
+- Search BC must degrade gracefully — if the index is unavailable, fall back to Product Catalog direct query
+
+### What it doesn't own
+
+- Product master data (Product Catalog BC)
+- Pricing authority (Pricing BC)
+- Inventory levels (Inventory BC — provides data, Search BC projects it)
+- Recommendation ranking (Recommendations BC)
+
+### Integration Flows
+
+```
+ProductAdded (from Product Catalog via RabbitMQ)
+  └─> ProductIndexingHandler
+      ├─> Fetch full product details: GET /api/products/{sku}
+      ├─> Fetch current price: GET /api/pricing/products/{sku}
+      └─> Upsert SearchDocument (Meilisearch / Elasticsearch / Marten full-text)
+          Fields: sku, name, description, category, subcategory, brand, tags,
+                  price, petType[], lifeStage[], dietaryClaims[], inStock, status
+
+SearchProducts (query from Customer Experience BFF)
+  └─> SearchProductsHandler
+      ├─> Full-text search + facet filters → SearchIndex query
+      └─> Returns: SearchResults(products: SearchDocument[], facets: Facet[], totalCount)
+```
+
+### Key Design Decisions
+
+- **Separate search index:** Meilisearch or Elasticsearch recommended for production full-text search with typo tolerance; Marten full-text indexes acceptable for MVP
+- **Projection pattern:** Search documents are projections — rebuilt by replaying product events if the index is corrupted or stale
+- **Faceted search:** Pet type (Dogs, Cats, Fish, Birds, Reptiles, Small Animals), brand, price range, dietary claims, life stage — all critical for pet supply discovery
+
+---
+
+## Recommendations
+
+The Recommendations context increases average order value by surfacing products that other customers commonly bought alongside the items a customer is viewing or has in their cart. It learns from order co-occurrence patterns — no ML required for an effective initial implementation.
+
+**Why this matters:** In pet supply, cross-sell patterns are highly predictable. A customer buying dry dog food also needs treats, dental chews, and eventually a new bowl. A kitten food buyer needs litter, a litter box, and toys. Surfacing these associations at the right moment (product page, cart sidebar, post-purchase email via Notifications BC) drives measurable revenue lift. Industry benchmarks consistently show recommendations as a top revenue driver for e-commerce platforms — notably for driving cart attachment rate on repeat-purchase consumable categories like pet food.
+
+**Priority:** 🟡 Medium — implement once there is enough order history to produce meaningful associations (typically after first few hundred orders).
+
+### What it receives
+
+- `OrderPlaced` from Orders — extract item co-occurrence pairs from line items (strong purchase signal)
+- `ItemAdded` from Shopping — extract cart co-occurrence pairs (weaker browse signal)
+
+### What it publishes
+
+None. Recommendations BC is a pure read-side BC serving synchronous queries.
+
+### Core Invariants
+
+- Recommendations must not surface Discontinued products
+- Association scores must decay over time (older orders count less than recent ones)
+- Minimum co-occurrence threshold before surfacing a recommendation (avoid spurious associations from single orders)
+
+### What it doesn't own
+
+- Product master data (Product Catalog BC)
+- Personalization based on individual customer history (future ML/personalization layer)
+- A/B testing of recommendation placement (future experimentation platform)
+
+### Integration Flows
+
+```
+OrderPlaced (from Orders via RabbitMQ)
+  └─> OrderCoOccurrenceHandler
+      ├─> Extract all item pairs from order line items
+      └─> Increment co-occurrence score for each pair in ProductAssociation projection
+
+GetRecommendations (query from Customer Experience BFF)
+  └─> GetRecommendationsHandler
+      ├─> Look up ProductAssociation for given SKU(s)
+      ├─> Rank by co-occurrence score (descending)
+      ├─> Filter out Discontinued products
+      └─> Returns: RecommendationList(sku, recommendations: [{sku, score, name, thumbnail}])
+```
+
+---
+
+## Store Credit
+
+The Store Credit context maintains an immutable ledger of credit balances per customer and applies them as a first-class payment instrument at checkout. Credit can originate from return resolutions, order cancellations, promotional grants, or gift card purchases.
+
+**Why this matters:** Offering store credit instead of a cash refund on returns tends to have strong acceptance rates in e-commerce (industry benchmarks suggest the majority of customers will accept store credit when the amount is at or above refund parity). This keeps money in the CritterSupply ecosystem, drives repeat purchases, and reduces the net cost of the returns program. It also unlocks gift cards and referral bonuses as growth mechanics. The Returns BC spec already identifies store credit as a future feature — this BC is the logical next step after Returns is live.
+
+**Priority:** 🟢 Low — high retention value; requires Returns BC to be live first. Lower priority than acquiring new customers (Notifications, Pricing, Promotions) but high impact on repeat-purchase retention.
+
+### What it receives
+
+- `ReturnCompleted` from Returns — issue credit when customer chose store credit resolution
+- `OrderCancelled` from Orders — optionally issue store credit instead of triggering a Payments refund
+- Commands: `IssueStoreCredit` (from customer service tooling), `RedeemStoreCredit` (from checkout), `ExpireStoreCredit` (scheduled job for credits with expiry)
+
+### Internal lifecycle (per CreditTransaction)
+
+- Issued — credit granted to customer account
+- Applied — credit used against a checkout
+- Expired — reached expiry date without being applied (terminal)
+- Reversed — credit reversed due to order cancellation or fraud (terminal)
+
+### What it publishes
+
+- `StoreCreditIssued` — credit added to customer account (Customer Experience may notify customer)
+- `StoreCreditApplied` — credit deducted at checkout (Orders uses to adjust Payments charge)
+- `StoreCreditExpired` — credit lapsed; customer may be notified by Notifications BC
+- `StoreCreditBalanceUpdated` — current balance changed (Customer Experience may display)
+
+### Core Invariants
+
+- Credit balance cannot go negative (cannot over-redeem)
+- Each credit transaction must carry an immutable source reference (return ID, order ID, promo ID)
+- Credit redemption must be atomic with checkout — partial redemption (credit + payment card split) must be handled
+- The ledger must be append-only — corrections are new transactions, not edits (event sourcing ideal)
+
+### What it doesn't own
+
+- Refund processing to original payment method (Payments BC)
+- Return eligibility or inspection (Returns BC)
+- Checkout orchestration (Orders BC — Store Credit is a payment instrument it can include)
+
+### Integration Flows
+
+```
+ReturnCompleted (from Returns via RabbitMQ, with resolution = StoreCredit)
+  └─> ReturnCompletedStoreCreditHandler
+      ├─> IssueStoreCredit (internal command: customerId, amount, sourceReturnId)
+      └─> StoreCreditIssued → Customer Experience (notify customer of credit)
+
+RedeemStoreCredit (command from Orders BC at checkout)
+  └─> RedeemStoreCreditHandler
+      ├─> Validate: sufficient balance available
+      ├─> Deduct from ledger (append CreditApplied transaction)
+      └─> StoreCreditApplied → Orders (reduce amount owed to Payments BC)
+```
+
+---
+
+## Analytics
+
+The Analytics context aggregates the event streams from all bounded contexts into business intelligence: conversion funnel performance, product sales velocity, inventory demand forecasting, and customer lifetime value signals. It is the operational nervous system that helps CritterSupply make data-driven decisions as volume grows.
+
+**Why this matters:** Your event-driven architecture is already capturing every meaningful business signal — `CartAbandoned`, `CheckoutInitiated`, `ReservationFailed`, `OrderCancelled`, `ReturnRequested`. Without Analytics BC, this data lives only in event streams and never becomes actionable intelligence. As the business grows, gut-feel decision-making stops working. The buying team needs to know which SKUs are moving, the marketing team needs funnel conversion rates, and the ops team needs to know where orders are failing.
+
+**Priority:** 🟢 Low — high strategic value but invisible to customers; build once there is real order history to learn from. No time-sensitive business loss if deferred — event data is already being captured in existing BC streams.
+
+### What it receives
+
+- Integration events from **all BCs**: Shopping, Orders, Payments, Inventory, Fulfillment, Returns, Customer Experience
+
+### Key read-side projections
+
+- **SalesFunnel** — Cart → Checkout initiated → Order placed → Delivered conversion rates
+- **ProductPerformance** — units sold, revenue, return rate, average return reason per SKU
+- **InventoryVelocity** — units sold per day per SKU (feeds reorder point calculations)
+- **AbandonmentSummary** — cart abandonment rate, checkout abandonment rate, and cart value at abandonment
+- **CustomerLifetimeValue** — total spend, order frequency, churn risk signal per customer
+
+### What it publishes
+
+- `TopSellingProductsUpdated` — refreshed list for homepage merchandising (future)
+- `InventoryVelocityUpdated` — velocity metrics for Procurement/Supply Chain reorder decisions
+- `ReorderPointReached` — SKU velocity indicates stock will run out; triggers Procurement workflow (future)
+
+### Core Invariants
+
+- Analytics projections are eventually consistent — acceptable lag of minutes to hours
+- Analytics never becomes a source of truth for transactional decisions (read-only, advisory)
+- Customer-level analytics must respect GDPR/CCPA deletion requests (aggregate data survives, PII does not)
+
+### What it doesn't own
+
+- Any transactional data (all state lives in source BCs)
+- ML model training (future dedicated data science platform)
+- Vendor-specific analytics (Vendor Portal BC owns vendor-scoped views)
+
+---
+
+## Admin Portal
+
+The Admin Portal context is an **internal-facing BFF** (Backend-for-Frontend) for CritterSupply's operations and executive team. It composes real-time business dashboards — order pipeline status, revenue metrics, inventory health, fulfillment throughput — from the event streams already flowing through the system. Unlike the customer-facing Customer Experience BC, this context is scoped to authenticated internal users (operations managers, merchandising team, customer service representatives, executives).
+
+**Why this matters:** CritterSupply's event-sourced architecture captures every meaningful business event with a granularity that most traditional e-commerce stacks cannot match. `OrderPlaced`, `ReservationFailed`, `ShipmentDeliveryFailed`, `ReturnRequested`, `PaymentFailed` — these are not just audit logs, they are real-time signals about what is happening in the business *right now*. An Admin Portal surfaces these signals as actionable dashboards and operational tools, enabling the team to spot issues, manage escalations, and make decisions without waiting for a nightly batch report.
+
+This context is also a natural incubator for exploring **non-Blazor frontend technology**: because internal users typically run on desktop browsers in a managed environment, it is well-suited to a React or Vue.js Single-Page Application with SSR (Server-Side Rendering via Next.js or Nuxt.js), while still benefiting from Wolverine's SignalR transport for real-time metric pushes. This allows the CritterSupply reference architecture to demonstrate polyglot frontend patterns alongside its C#/.NET backend.
+
+**Priority:** 🟡 Medium — unlocks significant operational value once Analytics BC is providing projections; doubles as a reference architecture showcase for non-Blazor + SignalR patterns.
+
+### Architecture Pattern: Internal BFF with Real-Time Push
+
+**Analogous to:** Customer Experience BC (BFF pattern) — but for internal users rather than customers.
+
+**Frontend technology options (choose per audience):**
+- **Blazor Server** — consistent with existing stack; good for teams that want full C# end-to-end
+- **React (Next.js) with SSR** — preferred if UX/UI richness is a priority; SSR improves initial load time for data-heavy dashboards; connects to SignalR hub via `@microsoft/signalr` npm package
+- **Vue.js (Nuxt.js) with SSR** — alternative SPA framework with SSR; similar trade-offs to React/Next.js
+- **Decision note:** The backend API and SignalR hub are framework-agnostic — switching the frontend technology does not change the Admin Portal API or message contracts
+
+### Dashboard Views (Internal Users)
+
+**Executive Dashboard (read-only, high-level):**
+- Revenue today / this week / this month (live counter via SignalR)
+- Orders placed, fulfilled, cancelled (pipeline view)
+- Top-selling SKUs (from Analytics BC `ProductPerformance` projection)
+- Inventory alerts — SKUs at or below reorder threshold
+- Active fulfillment issues (delivery failures, stuck orders)
+
+**Operations Dashboard (interactive, drill-down):**
+- Live order queue: current status distribution across all Order saga states
+- Reservation failures (insufficient stock events) — identify demand outpacing supply
+- Payment failure rate — flag provider issues or fraud spikes
+- Fulfillment throughput: picked/packed/shipped per hour
+- Return request queue with reason codes
+
+**Customer Service Tooling:**
+- Customer lookup: search by email → full order history, active carts, return history
+- Order detail: current saga state, all saga transitions, linked payments/shipments
+- Manual saga intervention: trigger `CancelOrder`, issue `StoreCredit` (when Store Credit BC is live)
+- Address history for a customer (queries Customer Identity BC)
+
+**Inventory Management View:**
+- Stock levels per SKU per warehouse (from Inventory BC read model)
+- Reservation pipeline: how much of each SKU is soft-held vs. committed vs. available
+- `InventoryLow` alert history and acknowledgement log
+
+**Merchandising View:**
+- Product catalog management (CRUD interface to Product Catalog BC admin endpoints)
+- Pricing rule management (when Pricing BC is live)
+- Promotion lifecycle management (when Promotions BC is live)
+
+### What it receives
+
+**Integration Messages (for real-time dashboard updates via SignalR):**
+- `OrderPlaced` from Orders — increment live order counter
+- `OrderCancelled` from Orders — decrement active order count, flag if high rate
+- `PaymentFailed` from Payments — alert to operations team
+- `ReservationFailed` from Inventory — alert to merchandising (potential stockout)
+- `InventoryLow` from Inventory — surface reorder alert
+- `ShipmentDeliveryFailed` from Fulfillment — surface to customer service queue
+- `ReturnRequested` from Returns — add to return review queue
+- `RefundFailed` from Payments — alert requiring manual intervention
+- All events consumed by Analytics BC (same event bus subscription — different projections)
+
+**HTTP Queries to Downstream BCs:**
+- Orders BC: order detail, saga state history, order search
+- Customer Identity BC: customer lookup, address history
+- Inventory BC: stock levels, reservation summary
+- Product Catalog BC: product list and detail (admin endpoints)
+- Payments BC: payment history for an order (future)
+- Analytics BC: aggregated projections (SalesFunnel, ProductPerformance, InventoryVelocity)
+
+### What it publishes
+
+**Commands (mutations via HTTP POST to domain BCs):**
+- `CancelOrder` → Orders BC (customer service tooling)
+- `IssueStoreCredit` → Store Credit BC (goodwill credit for customer service)
+- `AcknowledgeLowStockAlert` → Inventory BC (already planned in Inventory BC)
+- `AddProduct`, `UpdateProduct`, `ChangeProductStatus` → Product Catalog BC (merchandising tools)
+- `SetBasePrice`, `SchedulePriceChange` → Pricing BC (when live)
+- `CreatePromotion`, `DeactivatePromotion` → Promotions BC (when live)
+
+**SignalR Messages (to connected internal clients via `IAdminPortalMessage`):**
+- `LiveMetricUpdated` — revenue counter, order count, fulfillment throughput
+- `AlertRaised` — payment failure spike, inventory stockout, delivery failure cluster
+- `OrderQueueChanged` — saga state distribution update (for operations dashboard pipeline view)
+
+### Core Invariants
+
+- Admin Portal does NOT contain business logic — all mutations are delegated to domain BCs
+- Role-based access control: Executive users see dashboards only; Operations users can intervene; Administrators can access all tooling
+- All user actions (cancellations, credits) must be attributed to the internal user who performed them (audit trail)
+- SignalR connection must be authenticated (JWT or session cookie); admin hub must not be accessible without valid internal credentials
+- Admin Portal does not persist its own state — all data lives in upstream BCs and Analytics projections
+
+### What it doesn't own
+
+- Business domain logic (all in respective domain BCs)
+- Analytics projections (Analytics BC — Admin Portal consumes them)
+- Customer-facing UI (Customer Experience BC)
+- Vendor-facing portal (Vendor Portal BC)
+
+### Integration Flows
+
+**Real-Time Executive Dashboard (Revenue + Order Pipeline):**
+```
+[Orders BC domain logic]
+CheckoutCompleted → Order saga starts → OrderPlaced published
+
+[Admin Portal notification handler]
+OrderPlaced (from RabbitMQ)
+  └─> OrderPlacedAdminHandler
+      ├─> Increment LiveOrderCount projection
+      └─> Publish LiveMetricUpdated → admin:{tenantGroup} via SignalR
+          └─> React/Vue dashboard updates revenue counter + order pipeline bar
+
+[Admin Portal query]
+GET /api/admin/dashboard/live
+  └─> Compose: Analytics.SalesFunnel + Analytics.ProductPerformance + Inventory.LowStockAlerts
+      └─> Return AdminDashboardView (no second query to domain BCs for static metrics)
+```
+
+**Customer Service Order Lookup:**
+```
+GET /api/admin/customers?email={email}
+  └─> Query Customer Identity BC: GET /api/customers?email={email}
+      └─> Return customer summary
+
+GET /api/admin/orders?customerId={customerId}
+  └─> Query Orders BC: GET /api/orders?customerId={customerId}
+      └─> Return order history with saga state per order
+
+POST /api/admin/orders/{orderId}/cancel
+  └─> CancelOrderAdminCommand (includes adminUserId for audit)
+      └─> Send CancelOrder → Orders BC
+          └─> Order saga handles cancellation and compensation
+```
+
+### Project Structure (Planned)
+
+```
+src/
+  Admin Portal/
+    AdminPortal/                      # Domain project (regular SDK)
+      AdminPortal.csproj              # References: Messages.Contracts only
+      Clients/                        # HTTP client interfaces
+        IOrdersAdminClient.cs
+        IInventoryAdminClient.cs
+        IAnalyticsClient.cs
+        ICustomerIdentityAdminClient.cs
+      Composition/                    # Admin view models
+        AdminDashboardView.cs
+        OrderQueueView.cs
+        CustomerDetailView.cs
+        InventoryAlertView.cs
+      Notifications/                  # Integration message handlers
+        IAdminPortalMessage.cs        # Marker interface for SignalR routing
+        OrderPlacedAdminHandler.cs
+        PaymentFailedAdminHandler.cs
+        ReservationFailedAdminHandler.cs
+        ShipmentDeliveryFailedAdminHandler.cs
+
+    AdminPortal.Api/                  # API project (Web SDK)
+      AdminPortal.Api.csproj          # References: AdminPortal, Messages.Contracts
+      Program.cs                      # Wolverine + Marten + SignalR + auth setup
+      appsettings.json
+      Properties/launchSettings.json  # Port: 5242 (AdminPortal.Api)
+      Queries/                        # Admin HTTP endpoints
+        GetDashboardView.cs
+        GetOrderQueue.cs
+        GetCustomerDetail.cs
+        GetInventoryAlerts.cs
+      Commands/                       # Admin mutation endpoints
+        CancelOrderAdmin.cs
+        AcknowledgeAlert.cs
+      AdminPortalHub.cs               # SignalR hub at /hub/admin
+
+    AdminPortal.Web/                  # Frontend app
+      # Option A: Blazor Server (consistent with existing stack)
+      # Option B: React (Next.js with SSR) — recommended for richer dashboard UX
+      # Option C: Vue.js (Nuxt.js with SSR)
+      # Frontend connects to AdminPortal.Api SignalR hub
+```
+
+### Key Design Decisions
+
+- **SignalR from day one:** Real-time metric updates are the primary value proposition of this BC. Unlike the Customer Experience BC which started with SSE and migrated, Admin Portal should use Wolverine's `opts.UseSignalR()` from the start (lesson learned from ADR 0013).
+- **Single hub group model:** Admin Portal uses role-scoped hub groups (`role:executive`, `role:operations`, `role:customerservice`) rather than per-user groups. Broadcast metrics to all users with appropriate role.
+- **SSR for initial load:** Executive dashboards are data-heavy; SSR (Next.js/Nuxt.js) ensures meaningful content renders before JavaScript hydrates, avoiding blank-screen flash on navigation.
+- **Authentication:** Internal users authenticate via a separate auth mechanism from Customer Identity BC (could reuse the same ASP.NET Core auth middleware with different user store, or integrate with a corporate IdP — e.g., Microsoft Entra/Azure AD for enterprise feel).
+
+---
+
+## Operations Dashboard
+
+The Operations Dashboard context provides **developer-facing and SRE-facing observability** into the event-driven system itself — not the business metrics (that's Admin Portal / Analytics), but the *technical health* of the platform: message processing rates, saga state distribution, dead-letter queues, handler failure rates, and event replay tooling.
+
+**Why this matters:** As CritterSupply grows, the engineering team needs visibility into how the event-driven infrastructure is behaving — not just whether services are up, but whether messages are flowing, sagas are completing, and compensating transactions are working as expected. Wolverine and Marten already expose rich instrumentation via OpenTelemetry; this context is the UI layer that makes that data actionable for on-call engineers, not just a Jaeger trace dump.
+
+This is also a developer experience (DevEx) investment: giving new engineers joining the team a live view of the event flow helps them learn the system faster. Watching an order saga progress in real-time — `OrderPlaced` → `ReservationConfirmed` → `PaymentCaptured` → `ReservationCommitted` → `FulfillmentRequested` — is far more instructive than reading documentation.
+
+**Priority:** 🟢 Low — primarily a DevEx and operational maturity concern; Jaeger + OpenTelemetry covers immediate observability needs. Build when the team is large enough that on-call rotation needs better tooling.
+
+### Architecture Pattern: Event Stream Visualization + System Health BFF
+
+**Frontend technology:**
+- **React (Next.js) recommended** — real-time event stream visualization benefits from a rich component ecosystem (recharts, d3) that is more mature in React/Vue than Blazor; SSR ensures the dashboard renders quickly on load
+- **SignalR** for live event stream feed (push events from Wolverine message bus to the dashboard as they process)
+
+### Dashboard Views (Engineering / DevEx Audience)
+
+**Event Stream Monitor:**
+- Live feed of integration messages flowing through RabbitMQ, annotated with handler name and processing result
+- Filter by BC, message type, or correlation ID (e.g., trace a specific `orderId` through all handlers)
+- Color-coded: success (green), retry (yellow), dead-letter (red)
+
+**Saga State Explorer:**
+- Visual state machine diagram for Order saga, showing current state distribution (how many sagas are in each state right now)
+- Drill into a specific saga by orderId: full state transition history with timestamps
+- Flag sagas that have been in a non-terminal state longer than expected (configurable threshold; suggested default: 1 hour for most states, 24 hours for `PendingPayment`)
+
+**Dead Letter Queue (DLQ) Dashboard:**
+- List of messages in Wolverine's dead-letter queue (failed after all retries)
+- View message content, failure reason, retry history
+- Manual replay trigger (requeue a dead-lettered message for reprocessing)
+- Alert when DLQ depth exceeds threshold
+
+**Handler Performance:**
+- P50/P95/P99 handler processing latency per message type
+- Handler error rate over time (rolling 1h, 24h, 7d)
+- Message throughput per queue (messages/second)
+
+**Database Health (Marten / EF Core):**
+- Marten event store stream counts per BC
+- EF Core migration status per bounded context
+- Projection rebuild status (if a projection is being rebuilt, show progress)
+
+### What it receives
+
+**OpenTelemetry spans (from Wolverine / Marten instrumentation):**
+- Wolverine message processing spans (handler name, message type, processing time, success/failure)
+- Marten event store write spans (stream id, event type, sequence number)
+- RabbitMQ publish/consume spans
+
+**Wolverine Dead Letter Events:**
+- Dead-lettered message notifications from Wolverine's persistence layer
+
+### What it publishes
+
+**SignalR Messages (to connected engineers):**
+- `MessageProcessed` — a handler completed (success or failure); stream to the live event feed
+- `SagaStateChanged` — an Order saga transitioned state; update the state machine visualization
+- `DlqMessageAdded` — a new dead-letter appeared; alert the engineer on duty
+- `AlertRaised` — DLQ depth, handler error rate, or saga stuck threshold exceeded
+
+### Core Invariants
+
+- This context is **read-only** for most operations; only DLQ replay is a write operation
+- DLQ replay requires elevated role (on-call engineer or SRE) — not available to all developers
+- Event stream data is ephemeral (no long-term storage in this BC) — historical data lives in OpenTelemetry backends (Jaeger, Prometheus)
+- This BC must not have a meaningful performance footprint on the production message bus — use a separate subscription or tap
+
+### What it doesn't own
+
+- OpenTelemetry data storage (Jaeger, Prometheus — external infrastructure)
+- Alerting and on-call routing (PagerDuty, OpsGenie — external)
+- Business metrics (Admin Portal BC, Analytics BC)
+- Wolverine persistence or dead-letter policy (those are Wolverine configuration concerns)
+
+### Integration Flows
+
+```
+[Wolverine middleware / OpenTelemetry instrumentation]
+Every handler invocation
+  └─> OTel span emitted → Jaeger (persisted tracing)
+      └─> Operations Dashboard subscribes to OTel span events (or Wolverine's ISagaListener)
+          └─> MessageProcessedHandler
+              └─> Publish MessageProcessed → SignalR → live event stream feed
+
+[DLQ polling or Wolverine event hook]
+DeadLetteredMessageDetected
+  └─> DlqMessageHandler
+      ├─> Store in Operations Dashboard ephemeral read model (last 24h)
+      └─> Publish DlqMessageAdded → SignalR → DLQ dashboard alert
+
+[Engineer triggers replay from dashboard]
+POST /api/ops/dlq/{messageId}/replay
+  └─> RequeueDlqMessage (Wolverine API call to requeue message)
+      └─> MessageRequeuedConfirmation → dashboard UI
+```
+
+### Key Design Decisions
+
+- **React (Next.js) strongly preferred** for this BC: the data visualization ecosystem (recharts, d3, react-flow for state machine diagrams) is significantly more mature than what's available in Blazor's component libraries
+- **SSR for initial state:** On page load, the dashboard renders the current DLQ contents and saga state distribution from a server-rendered snapshot, then hydrates with live SignalR updates — no loading spinner on the critical-path on-call view
+- **Separate deployment from Admin Portal:** Operations Dashboard is a developer tool, not a business tool. Different auth requirements (engineer credentials vs. business user credentials), different deployment cadence, different audience.
+- **OpenTelemetry integration:** Wolverine 5+ and Marten 8+ emit OTel spans natively. This BC can subscribe to those spans via an OTel collector pipeline rather than intercepting the message bus directly.
+
+---
+
+The Reviews context owns customer product ratings and reviews — the social proof layer that influences purchase decisions and surfaces quality signals about products and vendors.
+
+**Status:** 📋 Future — lower priority than transactional and commercial infrastructure.
+
+**Key concepts:** `ReviewSubmitted`, `ReviewApproved` / `ReviewRejected` (moderation), `ReviewFlagged`, star rating aggregate per SKU. Integration with Notifications BC (trigger review request after `ShipmentDelivered`), Product Catalog BC (display average rating on listings).
+
+---
+
+## Procurement / Supply Chain
+
+The Procurement context owns the inbound supply chain — purchase orders to vendors, receiving inventory at warehouses, and reorder automation triggered by Analytics BC velocity signals.
+
+**Status:** 📋 Future — becomes relevant once Vendor Portal is live and Analytics BC provides velocity data.
+
+**Key concepts:** `PurchaseOrderCreated`, `PurchaseOrderConfirmed` (vendor accepts), `GoodsReceived` → triggers `InventoryReceived` in Inventory BC. Integrates with Vendor Portal (vendors see and acknowledge POs), Inventory BC (replenishment).
+
+---
+
+## Shipping / Logistics
+
+The Shipping context owns carrier relationship management, rate shopping (comparing UPS vs FedEx vs USPS in real time), and shipping label procurement. Currently, Fulfillment BC contains stub carrier integration — this BC would own that concern properly.
+
+**Status:** 📋 Future — extract from Fulfillment BC once carrier complexity warrants a dedicated context.
+
+**Key concepts:** `RateQuoteRequested` / `RateQuoteReceived`, `ShippingLabelPurchased`, carrier API adapters (UPS, FedEx, USPS, DHL). Fulfillment BC delegates to Shipping BC for label generation instead of implementing it directly.
