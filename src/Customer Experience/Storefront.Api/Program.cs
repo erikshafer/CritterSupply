@@ -129,7 +129,8 @@ app.MapWolverineEndpoints(opts =>
 });
 
 // Map SignalR hub
-app.MapHub<Storefront.Api.StorefrontHub>("/hub/storefront");
+app.MapHub<Storefront.Api.StorefrontHub>("/hub/storefront")
+    .DisableAntiforgery();
 
 // Redirect root to Swagger/API documentation
 app.MapGet("/", (HttpResponse response) =>
