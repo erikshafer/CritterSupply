@@ -30,6 +30,30 @@ builder.Services.AddWolverineHttp();
 // Add SignalR for real-time communication
 builder.Services.AddSignalR();
 
+// Add CORS — required for browser-side SignalR negotiate.
+// Storefront.Web and Storefront.Api run on different ports, making them different origins
+// under the browser Same-Origin Policy (e.g., http://localhost:5238 vs http://localhost:5237).
+// Without CORS, the browser blocks the HTTP POST to /hub/storefront/negotiate, causing
+// "TypeError: Failed to fetch" and preventing the SignalR WebSocket from being established.
+builder.Services.AddCors(options =>
+{
+    // In production the BFF and web app are served from the same origin (reverse proxy),
+    // so CORS is rarely needed there. In development and E2E tests each service runs on its
+    // own port, making them different origins. We read allowed origins from configuration
+    // so CI/dev environments can use "*" while a production appsettings can be restrictive.
+    var allowedOrigins = builder.Configuration
+        .GetSection("Cors:AllowedOrigins")
+        .Get<string[]>();
+
+    options.AddDefaultPolicy(policy =>
+    {
+        if (allowedOrigins is { Length: > 0 })
+            policy.WithOrigins(allowedOrigins).AllowAnyMethod().AllowAnyHeader();
+        else
+            policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+    });
+});
+
 // Add Wolverine with message handler discovery
 builder.Host.UseWolverine(opts =>
 {
@@ -121,6 +145,10 @@ if (app.Environment.IsDevelopment())
 
 // Map Aspire default endpoints (/health, /alive)
 app.MapDefaultEndpoints();
+
+// Enable CORS — must be placed before MapWolverineEndpoints and MapHub so that
+// the negotiate POST to /hub/storefront/negotiate includes CORS response headers.
+app.UseCors();
 
 // Map Wolverine HTTP endpoints
 app.MapWolverineEndpoints(opts =>

@@ -9,6 +9,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IConfiguration Configuration
 @implements IAsyncDisposable
 
 <PageTitle>Shopping Cart - CritterSupply</PageTitle>
@@ -200,7 +201,9 @@ else
         try
         {
             _dotNetHelper = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("signalrClient.subscribe", _customerId.ToString(), _dotNetHelper);
+            var apiBaseUrl = Configuration["ApiClients:StorefrontApiUrl"] ?? "http://localhost:5237";
+            var hubUrl = $"{apiBaseUrl}/hub/storefront";
+            await JS.InvokeVoidAsync("signalrClient.subscribe", _customerId.ToString(), _dotNetHelper, hubUrl);
             _sseConnected = true;
         }
         catch (Exception ex)

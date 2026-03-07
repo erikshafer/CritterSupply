@@ -85,6 +85,17 @@ internal static class WellKnownTestData
         public static readonly Guid AliceCheckoutId = Guid.Parse("44444444-4444-4444-4444-444444444444");
     }
 
+    internal static class Orders
+    {
+        /// <summary>
+        /// Deterministic order ID pre-seeded for SignalR E2E scenarios.
+        /// SignalR scenarios navigate directly to /order-confirmation/{AliceOrderId}
+        /// rather than going through the full browser checkout flow — following the
+        /// principle: "the browser only touches what the test is testing."
+        /// </summary>
+        public static readonly Guid AliceOrderId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+    }
+
     /// <summary>
     /// Expected order totals for the standard E2E checkout scenario:
     /// 2x Ceramic Dog Bowl ($19.99) + 1x Interactive Cat Laser ($29.99) = $69.97

@@ -25,7 +25,9 @@ window.signalrClient = {
         this.connection = new signalR.HubConnectionBuilder()
             .withUrl(url, {
                 transport: signalR.HttpTransportType.WebSockets,
-                skipNegotiation: false
+                skipNegotiation: true  // Skip the HTTP negotiate POST (cross-origin) and connect
+                                       // directly via WebSocket. Safe because transport is already
+                                       // locked to WebSockets — no fallback is needed.
             })
             .withAutomaticReconnect({
                 nextRetryDelayInMilliseconds: retryContext => {
