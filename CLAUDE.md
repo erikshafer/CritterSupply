@@ -667,7 +667,7 @@ For real-time hub communication — bidirectional WebSocket messaging, group-bas
 Covers:
 - `opts.UseSignalR()` configuration and publish rules
 - Marker interface pattern for message routing
-- Custom hub design (`WolverineHub` subclass)
+- Custom hub design (`WolverineHub` for bidirectional, plain `Hub` for push-only)
 - Group management (`vendor:{tenantId}`, `user:{userId}`, `customer:{id}`)
 - Authentication: session cookies (Storefront) vs JWT Bearer (Vendor Portal)
 - JavaScript and Blazor client integration

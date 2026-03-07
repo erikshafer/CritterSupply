@@ -84,7 +84,13 @@ public sealed class VendorPortalHub : WolverineHub
 }
 ```
 
-> **Critical:** Custom hubs **must** inherit from `WolverineHub`, not plain ASP.NET Core `Hub`. The `ReceiveMessage` override lives in `WolverineHub`. Bypassing `base.OnConnectedAsync()` will break message routing.
+> **Inheritance requirement depends on your use case:**
+> - **Client→server Wolverine routing** (clients send messages that Wolverine dispatches to handlers): your custom hub **must** inherit from `WolverineHub`, not plain `Hub`. The `ReceiveMessage` override that feeds the Wolverine pipeline lives in `WolverineHub`.
+> - **Server→client push only** (Wolverine publishes to the hub; clients only receive): a plain `Hub` subclass with `app.MapHub<T>()` is sufficient. Wolverine delivers via `IHubContext<T>` and does not require `WolverineHub` for outbound-only flows.
+>
+> The current Storefront `StorefrontHub : Hub` is server→client only — notification handlers return typed messages that Wolverine routes via `IHubContext`. The Vendor Portal `VendorPortalHub` will inherit `WolverineHub` when client→server routing (e.g., bidirectional change requests) is needed.
+>
+> Always call `await base.OnConnectedAsync()` — skipping it will break group tracking.
 
 ---
 
@@ -133,21 +139,30 @@ app.MapWolverineSignalRHub("/hub/storefront")
 //    .DisableAntiforgery();
 ```
 
-> **Do NOT call `builder.Services.AddSignalR()` yourself** when using `opts.UseSignalR()` — Wolverine does it internally. Calling it twice can cause subtle DI registration issues.
+> **`AddSignalR()` and `opts.UseSignalR()` together:** `opts.UseSignalR()` calls `IServiceCollection.AddSignalR()` internally, so you do not need an explicit `builder.Services.AddSignalR()` call *unless* you need additional configuration such as a Redis backplane or custom `HubOptions`. Calling both is safe because `AddSignalR()` uses `TryAdd` internally and is idempotent — the Storefront.Api does this today to keep CORS and backplane options co-located. The important rule is: **don't register the full SignalR services twice with conflicting options**.
 
 ### Anti-Forgery on Hub Routes (ASP.NET Core 10+)
 
-ASP.NET Core 10 enables anti-forgery protection on SignalR hub endpoints by default. WebSocket connections are CSRF-safe by design (browsers enforce same-origin policies on WebSocket upgrades), so the anti-forgery token is unnecessary and will break the SignalR negotiation handshake in E2E tests and cross-origin configurations.
+ASP.NET Core 10 enables anti-forgery protection on SignalR hub endpoints by default. Whether to disable it depends on your authentication strategy:
 
-**Always call `.DisableAntiforgery()` on `MapWolverineSignalRHub()`:**
+**For hubs using JWT/bearer-only authentication** (e.g., Vendor Portal), anti-forgery protection can safely be disabled. JWT tokens are not sent automatically by browsers, so there is no ambient credential for a cross-site request to exploit:
 
 ```csharp
-// ✅ Correct
-app.MapWolverineSignalRHub("/hub/storefront").DisableAntiforgery();
-
-// ❌ Broken in ASP.NET Core 10+ — negotiation handshake fails
-app.MapWolverineSignalRHub("/hub/storefront");
+// ✅ JWT-authenticated hub — safe to disable antiforgery (no ambient browser credentials)
+app.MapWolverineSignalRHub<VendorPortalHub>("/hub/vendor-portal")
+   .DisableAntiforgery();
 ```
+
+**For hubs using session-cookie authentication** (e.g., Storefront), consider the tradeoffs carefully. WebSocket upgrade requests are CSRF-safe in most modern browsers (browsers enforce same-origin restrictions on WebSocket upgrades), but the SignalR negotiation handshake involves an initial HTTP POST that *can* carry cookies cross-site. Disabling anti-forgery on the negotiation endpoint is what ASP.NET Core requires in many cross-origin dev setups; however, if you rely on cookies, ensure you have cross-origin restrictions in place (see the CORS configuration above):
+
+```csharp
+// ✅ Cookie-authenticated hub — disabling antiforgery is required in cross-origin dev/E2E setups
+// Mitigate CSRF risk with strict CORS policy (AllowedOrigins, not AllowAnyOrigin)
+app.MapHub<StorefrontHub>("/hub/storefront")
+   .DisableAntiforgery();
+```
+
+The bottom line: **do not leave this decision on autopilot**. Pair `.DisableAntiforgery()` with the appropriate authentication mechanism and CORS policy for your hub.
 
 ---
 
@@ -251,10 +266,16 @@ Groups are enrolled in `OnConnectedAsync`. Group names follow a `{scope}:{id}` c
 | Tenant-wide | `vendor:{tenantId}` | Vendor Portal — all users in a tenant |
 | Per-user | `user:{userId}` | Vendor Portal — individual notifications |
 
-**Storefront example (customerId from query string — session-cookie auth):**
+**Storefront example (server→client push only — uses plain `Hub`, identity from session):**
 
 ```csharp
-public sealed class StorefrontHub : WolverineHub
+// StorefrontHub uses plain Hub (not WolverineHub) because it only needs server→client push.
+// Wolverine delivers outbound messages via IHubContext<StorefrontHub>.
+// Note: customerId in query string is acceptable here because the Storefront Blazor app
+// derives it from the server-side session cookie — the value is tied to the authenticated
+// session, not accepted as a trust anchor in its own right. For vendor-facing BCs that hold
+// commercially sensitive data, always use JWT claims (see VendorPortalHub below).
+public sealed class StorefrontHub : Hub
 {
     public override async Task OnConnectedAsync()
     {
@@ -371,14 +392,15 @@ CritterSupply uses two different authentication mechanisms for SignalR hubs, del
 
 ### Pattern A: Session Cookies (Storefront BC)
 
-The Storefront uses session-cookie auth. The hub does **not** use `[Authorize]`. Instead, the `customerId` is passed as a query string parameter on the WebSocket upgrade request. This works because:
-- Blazor Server's built-in SignalR circuit *already* carries the authenticated session context
-- The customer's identity is verified server-side before the Blazor page renders
+The Storefront uses session-cookie auth. The hub does **not** use `[Authorize]`. The `customerId` is passed as a query string parameter on the WebSocket upgrade request and used to enroll the connection in the correct group. This is acceptable because:
+- The Blazor app sets `customerId` from the server-side session (a claim the user cannot forge)
+- Session-backed identity provides the actual trust; the GUID is an identifier, not a secret
 
 ```csharp
-// No [Authorize] attribute — hub is open, but group enrollment is
-// conditional on a valid customerId being present.
-public sealed class StorefrontHub : WolverineHub
+// Plain Hub (not WolverineHub) — server→client push only.
+// No [Authorize] attribute — hub is open, but group enrollment is conditional on a valid
+// customerId being present.
+public sealed class StorefrontHub : Hub
 {
     public override async Task OnConnectedAsync()
     {
@@ -394,7 +416,7 @@ public sealed class StorefrontHub : WolverineHub
 }
 ```
 
-> **Security note:** Passing `customerId` in the query string is acceptable for the Storefront because the identity is session-backed — an unauthenticated user cannot know another customer's GUID. For vendor-facing contexts with commercially sensitive data, this approach is **not** acceptable. See Pattern B.
+> **Security note:** Passing `customerId` in the query string is only acceptable when the *source* of that value is server-side authenticated identity (e.g., a claim extracted from the session cookie before the Blazor page renders). GUIDs are identifiers, not secrets — do not rely on "hard to guess" as a security property. For vendor-facing contexts where the `VendorTenantId` must be cryptographically verified, always derive group keys from JWT claims server-side (Pattern B).
 
 ### Pattern B: JWT Bearer (Vendor Portal BC)
 
@@ -422,7 +444,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             OnMessageReceived = context =>
             {
-                var accessToken = context.Request.Query["access_token"];
+                // Query["access_token"] returns StringValues — call .ToString() to get a
+                // single string value (empty string if absent, not null).
+                var accessToken = context.Request.Query["access_token"].ToString();
                 var path = context.HttpContext.Request.Path;
 
                 if (!string.IsNullOrEmpty(accessToken) &&
@@ -547,7 +571,10 @@ window.signalrClient = {
         this.connection = new signalR.HubConnectionBuilder()
             .withUrl(url, {
                 transport: signalR.HttpTransportType.WebSockets,
-                skipNegotiation: false
+                // Skip the HTTP negotiate POST and connect directly via WebSocket.
+                // Required for cross-origin setups (Blazor.Web on port 5238, API on port 5237).
+                // Safe because transport is already locked to WebSockets — no fallback needed.
+                skipNegotiation: true
             })
             .withAutomaticReconnect({
                 nextRetryDelayInMilliseconds: retryContext => {
@@ -563,9 +590,22 @@ window.signalrClient = {
         // WolverineHub sends all messages to the "ReceiveMessage" client method
         this.connection.on("ReceiveMessage", (cloudEvent) => {
             try {
-                // Unwrap the CloudEvents envelope — data is the actual payload
-                const typeName = (cloudEvent.type || "").split(".").pop();
-                const unwrapped = { eventType: toKebabCase(typeName), ...cloudEvent.data };
+                // Unwrap the CloudEvents envelope — data is the actual payload.
+                // Use explicit type mapping (not a generic kebab-case converter) so that
+                // the Blazor components receive a consistent eventType discriminator.
+                const messageType = cloudEvent.type || "";
+                const typeName = messageType.split(".").pop(); // e.g. "CartUpdated"
+
+                let eventType = "";
+                if (typeName === "CartUpdated") {
+                    eventType = "cart-updated";
+                } else if (typeName === "OrderStatusChanged") {
+                    eventType = "order-status-changed";
+                } else if (typeName === "ShipmentStatusChanged") {
+                    eventType = "shipment-status-changed";
+                }
+
+                const unwrapped = { eventType: eventType, ...cloudEvent.data };
                 this.dotNetHelper.invokeMethodAsync("OnSseEvent", unwrapped);
             } catch (err) {
                 console.error("Failed to process SignalR message:", err);
@@ -606,6 +646,7 @@ CritterSupply's Blazor pages use JS interop to drive the JavaScript client. The 
 // Components/Pages/Cart.razor (relevant lifecycle + SignalR code)
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
+@inject IConfiguration Configuration
 @implements IAsyncDisposable
 
 @code {
@@ -617,14 +658,24 @@ CritterSupply's Blazor pages use JS interop to drive the JavaScript client. The 
         if (!firstRender) return;
 
         _dotNetHelper = DotNetObjectReference.Create(this);
-        var hubUrl = Navigation.ToAbsoluteUri("/hub/storefront").ToString()
-                     // Or read from configuration for cross-origin Blazor + API
-                     ?? "http://localhost:5237/hub/storefront";
+
+        // For cross-origin deployments (Blazor.Web on a different port than Storefront.Api),
+        // read the hub URL from configuration instead of using NavigationManager, which
+        // would resolve to the Blazor host origin, not the API origin.
+        var hubUrl = Configuration["ApiClients:StorefrontApiUrl"] is { } apiUrl
+            ? $"{apiUrl.TrimEnd('/')}/hub/storefront"
+            : Navigation.ToAbsoluteUri("/hub/storefront").ToString();
+
+        if (!_customerId.HasValue)
+        {
+            Console.WriteLine("Cannot subscribe to SignalR: customerId not yet resolved.");
+            return;
+        }
 
         try
         {
             await JS.InvokeVoidAsync("signalrClient.subscribe",
-                _customerId.ToString(), _dotNetHelper, hubUrl);
+                _customerId.Value.ToString(), _dotNetHelper, hubUrl);
         }
         catch (Exception ex)
         {
@@ -700,23 +751,30 @@ The key constraint (from official Wolverine docs):
 > If you want to use the .NET SignalR Client for test automation, you will need to bootstrap the service that actually hosts SignalR with **full Kestrel** — `WebApplicationFactory` will not work.
 
 ```csharp
-// In your test fixture — start the app with real Kestrel on a specific port
+// In your test fixture — start the app with real Kestrel on a dynamically assigned port
 public class StorefrontSignalRTestFixture : IAsyncLifetime
 {
     private WebApplication? _app;
     protected IHost? ClientHost;
-    private readonly int _port = PortFinder.GetAvailablePort();
+    private int _port;  // assigned after Kestrel starts
 
     public async Task InitializeAsync()
     {
-        // Boot the real app on a real port
+        // Boot the real app and let the OS pick an available port (port 0)
         var builder = WebApplication.CreateBuilder();
-        builder.WebHost.ConfigureKestrel(opts => opts.ListenLocalhost(_port));
+        builder.WebHost.ConfigureKestrel(opts => opts.ListenLocalhost(0));
 
         // ... Full app configuration ...
 
         _app = builder.Build();
         await _app.StartAsync();
+
+        // Discover the actual port Kestrel bound to
+        var url = _app.Urls.Single();
+        _port = new Uri(url
+            .Replace("//[::]:","//localhost:")      // IPv6 wildcard → localhost
+            .Replace("//0.0.0.0:","//localhost:")   // IPv4 wildcard → localhost
+        ).Port;
 
         // Boot a Wolverine host with the SignalR Client transport
         ClientHost = await Host.CreateDefaultBuilder()
@@ -753,7 +811,7 @@ public async Task order_placed_sends_order_status_changed_to_hub()
         .TrackActivity()
         .IncludeExternalTransports()
         .AlsoTrack(_app)  // Track the server-side app too
-        .Timeout(10.Seconds())
+        .Timeout(TimeSpan.FromSeconds(10))
         .ExecuteAndWaitAsync(c =>
             c.PublishAsync(new OrderPlaced(OrderId: Guid.NewGuid(), CustomerId: Guid.NewGuid())));
 
