@@ -95,7 +95,7 @@ CritterSupply includes specialized GitHub Copilot agents with domain expertise t
 - **Core:** C# 14+ (.NET 10), [Wolverine](https://wolverine.netlify.app/), [Marten](https://martendb.io/), [EF Core](https://learn.microsoft.com/en-us/ef/core/)
 - **Infrastructure:** PostgreSQL, RabbitMQ, Docker, [.NET Aspire](https://learn.microsoft.com/en-us/dotnet/aspire/)
 - **Testing:** [Alba](https://jasperfx.github.io/alba/), [Testcontainers](https://dotnet.testcontainers.org/), xUnit, [Reqnroll](https://reqnroll.net/)
-- **UI:** [Blazor Server](https://learn.microsoft.com/en-us/aspnet/core/blazor/), [MudBlazor](https://mudblazor.com/), Server-Sent Events (SSE)
+- **UI:** [Blazor Server](https://learn.microsoft.com/en-us/aspnet/core/blazor/), [MudBlazor](https://mudblazor.com/), SignalR
 - **Observability:** OpenTelemetry, Jaeger (distributed tracing)
 
 See [CLAUDE.md](./CLAUDE.md) for complete technology details and development guidelines.
@@ -120,7 +120,7 @@ graph TB
     
     %% Supporting Contexts
     CustomerID[👤 Customer Identity<br/>Addresses & Profiles]
-    Catalog[📦 Product Catalog<br/>Products & Pricing]
+    Catalog[📦 Product Catalog<br/>Products & Catalog Data]
     
     %% Customer Experience interactions
     CE -->|Get Cart| Shopping
@@ -171,10 +171,16 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 | 🚚 **Fulfillment** | Picking, packing, shipping                     | ✅ Complete |
 | 👤 **Customer Identity**   | Addresses and saved payment methods            | ✅ Complete |
 | 📦 **Product Catalog**     | Product definitions and pricing                | ✅ Complete |
-| 🎁 **Customer Experience** | Storefront BFF (Blazor + SSE)                  | ✅ Complete |
+| 🎁 **Customer Experience** | Storefront BFF (Blazor + SignalR)              | ✅ Complete |
 | 🏢 **Vendor Identity**     | Vendor user authentication & tenant management | 🔜 Planned |
 | 📊 **Vendor Portal**       | Vendor analytics, insights, change requests    | 🔜 Planned |
 | 🔄 **Returns**             | Return authorization and processing            | 🔜 Planned |
+| 💰 **Pricing**             | Server-authoritative pricing, scheduled price changes | 🔜 Planned |
+| 🖥️ **Admin Portal**        | Internal operations portal (gateway BFF)       | 🔜 Planned |
+| 🔔 **Notifications**       | Customer email/SMS notifications               | 🔜 Planned |
+| 🏷️ **Promotions**          | Coupon codes, discount rules                   | 🔜 Planned |
+| 📈 **Analytics**           | Business intelligence projections              | 🔜 Planned |
+| 🔧 **Operations Dashboard** | Engineering/SRE observability tooling         | 🔜 Planned |
 
 For detailed responsibilities, interactions, and event flows between contexts, see [CONTEXTS.md](./CONTEXTS.md).
 

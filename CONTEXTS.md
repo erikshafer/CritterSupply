@@ -3216,7 +3216,7 @@ This context is also an opportunity to explore **non-Blazor frontend technology*
                         │ HTTPS
 ┌───────────────────────▼─────────────────────────────┐
 │           AdminPortal.Api  (Gateway / BFF)           │
-│                Port: 5242                            │
+│                Port: 5244                            │
 │                                                      │
 │  Authentication: JWT Bearer (AdminIdentity BC)       │
 │  Authorization: Role-based (RBAC policy per route)   │
@@ -3659,7 +3659,7 @@ src/
       AdminPortal.Api.csproj              # References: AdminPortal, Messages.Contracts
       Program.cs                          # Wolverine + Marten + SignalR + RBAC auth setup
       appsettings.json                    # connection strings, downstream BC base URLs
-      Properties/launchSettings.json      # Port: 5242
+      Properties/launchSettings.json      # Port: 5244
       Authorization/
         AdminRoles.cs                     # role name constants
         AdminPolicies.cs                  # ASP.NET Core policy definitions per role
@@ -3694,7 +3694,7 @@ src/
       # Option A: Blazor Server — consistent with existing C# stack
       # Option B: React (Next.js SSR) — recommended; richer component ecosystem for dashboards
       # Option C: Vue.js (Nuxt.js SSR) — strong alternative to React
-      # Port: 5243
+      # Port: 5245
       # Connects to AdminPortal.Api SignalR hub at /hub/admin
       # Uses @microsoft/signalr npm package (Options B/C) or Microsoft.AspNetCore.SignalR.Client (Option A)
 ```
