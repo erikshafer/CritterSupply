@@ -75,11 +75,18 @@ public sealed class CheckoutPage(IPage page)
 
     public async Task SelectAddressByNicknameAsync(string nickname)
     {
-        // MudSelect requires: click to open → find option by text → click option
+        // Wait for the select to be interactable before clicking
+        await AddressSelect.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await AddressSelect.ClickAsync();
-        await page.GetByRole(AriaRole.Option, new() { Name = nickname }).ClickAsync();
-        // Dismiss the dropdown
-        await page.Keyboard.PressAsync("Escape");
+
+        // Wait for at least one option to appear in the MudBlazor popup before interacting.
+        // MudBlazor renders options in an animated popover — we must confirm the popup is open
+        // before querying options, otherwise the locator resolves against a closed (hidden) state.
+        await page.WaitForSelectorAsync("[role='option']", new PageWaitForSelectorOptions { Timeout = 10_000 });
+
+        // Use :has-text() so the match works even when the option text includes the full display
+        // line (e.g. "Home - 123 Main St, Seattle, WA 98101") not just the nickname alone.
+        await page.Locator($"[role='option']:has-text('{nickname}')").ClickAsync();
     }
 
     public async Task ClickSaveAddressAndContinueAsync()
