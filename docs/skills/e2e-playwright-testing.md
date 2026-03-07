@@ -286,25 +286,67 @@ public sealed class CheckoutPage(IPage page)
 
 ## Pattern 3: MudBlazor `MudSelect` Interaction
 
-MudBlazor's `MudSelect` renders options in an animated popover that opens asynchronously. Native Playwright auto-waiting is not enough — the popup DOM is populated after the click.
+MudBlazor's `MudSelect` renders a layered HTML structure. Getting the click right in headless Chromium requires `Force = true` on the inner `.mud-select-input` element. Two timeout constants model the two distinct wait phases.
 
-### Correct Pattern
+**Why `Force = true` is required:**  
+MudBlazor 9.x renders a transparent `.mud-input-mask` div _above_ `.mud-select-input` in z-order. This mask intercepts real pointer events so MudBlazor's JavaScript can manage dropdown state. Playwright's actionability check calls `elementFromPoint()` at the element's centre — the mask is returned, not `.mud-select-input` — so Playwright waits 30 s for `.mud-select-input` to be "hittable" (it never will be). `Force = true` skips the hit-test entirely and dispatches a synthetic `MouseEvent` directly to `.mud-select-input`, where Blazor's delegated `@onclick` handler is registered. The event bubbles normally and MudBlazor opens the dropdown.
+
+**Why not click the outer wrapper directly?**  
+`AddressSelect.ClickAsync()` fires a centre-click on the outer `[data-testid='address-select']` layout container. Under headless Chromium the bounding-box centre frequently lands on the rendered `<label>` text or surrounding padding — MudBlazor receives no "open" event there, so the listbox portal never renders.
+
+Options render inside a **portal popover** at `document.body` level (outside the select container) and only appear in the DOM after the dropdown opens. The `[role='listbox']` wait synchronises the option click with popover render.
+
+### Correct Pattern — Force-click Inner Trigger + Explicit Listbox Wait + data-testid Option
 
 ```csharp
+// Two-phase timeout: popover appearance (slow) vs option click (fast once popover is open).
+private const int MudSelectListboxTimeoutMs = 15_000; // popover open + animation + CI headroom
+private const int MudSelectOptionTimeoutMs  = 10_000; // option already in DOM when listbox visible
+
 public async Task SelectAddressByNicknameAsync(string nickname)
 {
-    // Wait for the dropdown to become interactable
+    // Waits for async data load: the wrapper is only rendered when SavedAddresses.Any() is true.
     await AddressSelect.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-    await AddressSelect.ClickAsync();
 
-    // Wait for the popover to open and render options.
-    // Without this wait, the locator resolves against a closed/hidden state.
-    await page.WaitForSelectorAsync("[role='option']", new PageWaitForSelectorOptions { Timeout = 10_000 });
+    // Force = true bypasses Playwright's hit-test (blocked by MudBlazor's transparent mask).
+    // Scoped through AddressSelect to guard against multiple MudSelects on the page.
+    // NOTE: .mud-select-input is an internal MudBlazor class (verified: MudBlazor 9.1.0).
+    //       Confirm it still exists before upgrading the MudBlazor package version.
+    await AddressSelect.Locator(".mud-select-input").ClickAsync(new LocatorClickOptions { Force = true });
 
-    // Use :has-text() — options render the full display string,
-    // e.g. "Home - 123 Main St, Seattle, WA 98101", not just "Home".
-    await page.Locator($"[role='option']:has-text('{nickname}')").ClickAsync();
+    // Wait for the MudBlazor listbox portal (rendered at document.body, not inside AddressSelect).
+    await page.WaitForSelectorAsync("[role='listbox']",
+        new PageWaitForSelectorOptions { Timeout = MudSelectListboxTimeoutMs });
+
+    // Target by data-testid — stable across text formatting changes.
+    // data-testid="address-option-{nickname.ToLowerInvariant()}" forwarded via MudBlazor UserAttributes.
+    var optionLocator = page.Locator($"[data-testid='address-option-{nickname.ToLowerInvariant()}']");
+    await optionLocator.ClickAsync(new LocatorClickOptions { Timeout = MudSelectOptionTimeoutMs });
 }
+```
+
+### Anti-Patterns
+
+```csharp
+// ❌ FRAGILE — outer wrapper centre click lands on <label>/padding in headless Chromium;
+//              no "open" event reaches MudBlazor; [role='listbox'] never appears.
+await AddressSelect.ClickAsync();
+
+// ❌ FRAGILE — Playwright hit-test returns the .mud-input-mask overlay; waits 30s for
+//              .mud-select-input to be "hittable" — it never is because the mask is structural.
+await AddressSelect.Locator(".mud-select-input").ClickAsync();
+
+// ❌ FRAGILE — text-based: fails when MudBlazor renders full address in the option label.
+await page.Locator($"[role='option']:has-text('{nickname}')").ClickAsync();
+```
+
+### Why Scope `.mud-select-input` Through `AddressSelect`?
+
+A bare `page.Locator(".mud-select-input")` matches the **first** `.mud-select-input` on the page. Always scope through the known parent locator:
+
+```csharp
+await AddressSelect.Locator(".mud-select-input").ClickAsync(new LocatorClickOptions { Force = true });  // ✅ scoped
+await page.Locator(".mud-select-input").ClickAsync(new LocatorClickOptions { Force = true });           // ❌ unscoped — fragile
 ```
 
 ### Anti-Pattern: `GetByRole` with Exact Name Match
@@ -451,7 +493,72 @@ app.MapHub<StorefrontHub>("/hub/storefront")
     .DisableAntiforgery(); // Required: ASP.NET Core 10+ default breaks WebSocket negotiation
 ```
 
-## Test Lifecycle
+## Pattern 9: Setup-via-Stub for Multi-Concern Scenarios
+
+When a Gherkin step is **setup** rather than the thing being tested, bypass browser UI and seed data directly into stubs. Navigating through UI for setup purposes couples unrelated concerns and creates fragile dependencies on components that are already covered elsewhere.
+
+**The Principle:**
+> "The browser only touches what the test is testing. Everything else (login, cart population, address seeding) is done via API or stub — never via browser UI navigation."
+>
+> *Exception: login must use the real Blazor auth flow to set the session cookie correctly.*
+
+### Bad: Setup via browser checkout for a SignalR test
+
+```csharp
+// WRONG — runs the full 4-step checkout wizard just to get an orderId.
+// If MudBlazor's address dropdown has a timing issue (unrelated to SignalR),
+// this SignalR test fails, masking what's actually being tested.
+[Given(@"I have successfully placed an order")]
+public async Task GivenIHaveSuccessfullyPlacedAnOrder()
+{
+    await CartPage.NavigateAsync();
+    await CartPage.ClickProceedToCheckoutAsync();
+    await CheckoutPage.SelectAddressByNicknameAsync("Home");
+    await CheckoutPage.ClickSaveAddressAndContinueAsync();
+    // ... 4 more steps ...
+    await CheckoutPage.ClickPlaceOrderAsync();
+    // Now finally on the confirmation page — but any of those steps could fail!
+}
+```
+
+### Good: Setup via stub + direct navigation
+
+```csharp
+// CORRECT — seed the order in the fixture, navigate directly.
+// The SignalR test focuses on what it's testing: hub delivery to the browser.
+// The full checkout UI flow is already covered by Scenario 1 (happy path).
+[Given(@"I have successfully placed an order")]
+public async Task GivenIHaveSuccessfullyPlacedAnOrder()
+{
+    // Order is pre-seeded in SeedStandardCheckoutScenarioAsync via StubOrdersClient
+    var orderId = WellKnownTestData.Orders.AliceOrderId;
+    await Page.GotoAsync($"/order-confirmation/{orderId}");
+    await OrderConfirmationPage.WaitForLoadAsync();
+    _scenarioContext.Set(orderId.ToString(), ScenarioContextKeys.OrderId);
+}
+```
+
+**In the fixture (`SeedStandardCheckoutScenarioAsync`):**
+
+```csharp
+// Seed a pre-placed order for SignalR scenarios
+var total = (WellKnownTestData.Products.CeramicDogBowlPrice * 2)
+          + WellKnownTestData.Products.InteractiveCatLaserPrice
+          + WellKnownTestData.Shipping.StandardCost;
+
+StubOrdersClient.AddOrder(new OrderDto(
+    WellKnownTestData.Orders.AliceOrderId,
+    WellKnownTestData.Customers.Alice,
+    "Placed",
+    DateTimeOffset.UtcNow,
+    total));
+```
+
+**Key benefits:**
+- SignalR test is isolated from checkout UI timing issues
+- Faster execution (no 4-step browser checkout per SignalR test)
+- Clearer test intent: *"Given an order exists, when a payment event arrives, the page updates"*
+
 
 ### Hooks Overview
 
@@ -615,6 +722,13 @@ internal static class WellKnownTestData
     internal static class Checkouts
     {
         public static readonly Guid AliceCheckoutId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    }
+
+    internal static class Orders
+    {
+        // Pre-seeded in SeedStandardCheckoutScenarioAsync for SignalR scenarios.
+        // See Pattern 9 for the setup-via-stub principle.
+        public static readonly Guid AliceOrderId = Guid.Parse("55555555-5555-5555-5555-555555555555");
     }
 
     internal static class ExpectedTotals
@@ -797,11 +911,41 @@ pwsh playwright.ps1 show-trace playwright-traces/<scenario-name>.zip
 
 **Cause:** `GetByRole` matches on the **exact** accessible name. MudBlazor renders the full display text (e.g., `"Home - 123 Main St, Seattle, WA 98101"`), so `{ Name = "Home" }` never matches.
 
-**Fix:** Use `page.WaitForSelectorAsync("[role='option']")` to confirm the popup is open, then use `Locator($"[role='option']:has-text('{nickname}')")`.
+**Fix:** Use `Locator($"[role='option']:has-text('{nickname}')").ClickAsync(new LocatorClickOptions { Timeout = 15_000 })`. Playwright's `Locator.ClickAsync` retries through CSS animation delays automatically. For the fully robust and CI-proven implementation, see Pattern 3 (force-click `.mud-select-input`, wait for `[role='listbox']`, target option by `data-testid`).
 
 ---
 
-### 4. Stubs Return Wrong Data Because Reset Was Skipped
+### 4. `MudSelect` Dropdown Never Opens — `[role='listbox']` Times Out
+
+**Symptom:** `TimeoutException: Timeout 10000ms exceeded — waiting for Locator("[role='listbox']") to be visible` on `SelectAddressByNicknameAsync` across ALL scenarios.
+
+**Root cause (three failure modes, tried in order):**
+
+| Approach | Failure |
+|---|---|
+| `AddressSelect.ClickAsync()` (outer wrapper) | Bounding-box centre lands on the `<label>` or padding — MudBlazor receives no "open" event; listbox never appears |
+| `AddressSelect.Locator(".mud-select-input").ClickAsync()` (no Force) | Playwright's `elementFromPoint()` returns the transparent `.mud-input-mask` overlay; waits 30 s for `.mud-select-input` to be "hittable" — times out |
+| `AddressSelect.Locator(".mud-select-input").ClickAsync(Force: true)` | ✅ Bypasses hit-test; synthetic `MouseEvent` dispatched directly to `.mud-select-input` where the `@onclick` handler is — dropdown opens reliably |
+
+**Fix:** Use `Force = true` on the scoped `.mud-select-input` locator:
+```csharp
+// ❌ Before — outer wrapper unreliable; text-based option selector fragile:
+await AddressSelect.ClickAsync();
+await page.Locator($"[role='option']:has-text('{nickname}')").ClickAsync();
+
+// ✅ After — Force bypasses overlay hit-test; data-testid is stable:
+await AddressSelect.Locator(".mud-select-input").ClickAsync(new LocatorClickOptions { Force = true });
+await page.WaitForSelectorAsync("[role='listbox']",
+    new PageWaitForSelectorOptions { Timeout = MudSelectListboxTimeoutMs });
+await page.Locator($"[data-testid='address-option-{nickname.ToLowerInvariant()}']")
+          .ClickAsync(new LocatorClickOptions { Timeout = MudSelectOptionTimeoutMs });
+```
+
+See Pattern 3 for full explanation and the two-constant timeout split.
+
+---
+
+### 5. Stubs Return Wrong Data Because Reset Was Skipped
 
 **Symptom:** Scenario B picks up cart data seeded by Scenario A.
 
@@ -811,17 +955,61 @@ pwsh playwright.ps1 show-trace playwright-traces/<scenario-name>.zip
 
 ---
 
-### 5. SignalR Negotiation Fails With 400
+### 6. SignalR Connection Failures in E2E Tests
 
-**Symptom:** SignalR connection on the order confirmation page fails during the WebSocket upgrade.
+Two distinct failure modes affect SignalR in E2E tests:
+
+#### 6a. Negotiate Returns 400 (Antiforgery)
+
+**Symptom:** `Status code '400'` with "A valid antiforgery token was not provided…" on the negotiate endpoint.
 
 **Cause:** ASP.NET Core 10+ antiforgery middleware blocks the SignalR negotiate endpoint by default.
 
 **Fix:** Add `.DisableAntiforgery()` to the hub mapping in `Storefront.Api/Program.cs`.
 
+#### 6b. `TypeError: Failed to fetch` on Negotiate (CORS)
+
+**Symptom:** `TypeError: Failed to fetch` in the SignalR client when attempting to connect. The negotiate POST is blocked silently by the browser.
+
+**Cause:** Storefront.Web and Storefront.Api run on different ports in E2E tests (e.g., `localhost:5238` vs `localhost:5237`). Under the browser Same-Origin Policy, **different ports = different origins**, so the negotiate HTTP POST is a cross-origin request. Without CORS headers, the browser blocks the response.
+
+**Fix (belt-and-suspenders — apply both):**
+
+1. Add CORS to `Storefront.Api/Program.cs` so negotiate responses include `Access-Control-Allow-Origin` headers:
+```csharp
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+});
+// ...
+app.UseCors(); // before MapWolverineEndpoints + MapHub
+```
+
+2. In `signalr-client.js`, set `skipNegotiation: true` to skip the HTTP negotiate POST entirely and connect directly via WebSocket. Safe because transport is already hardcoded to `WebSockets`:
+```javascript
+.withUrl(url, {
+    transport: signalR.HttpTransportType.WebSockets,
+    skipNegotiation: true   // bypass the CORS-triggering negotiate POST
+})
+```
+
+#### 6c. Missing `hubUrl` Argument to `signalrClient.subscribe`
+
+**Symptom:** `Failed to complete negotiation with the server: TypeError: Failed to fetch` but the hub URL in the error reads `undefined?customerId=...`.
+
+**Cause:** The JS `subscribe` function signature is `(customerId, dotNetHelper, hubUrl)`. If the Blazor component calls it with only 2 arguments, `hubUrl` is `undefined` in JavaScript, so the client tries to connect to `"undefined?customerId=..."` which resolves to the Blazor Web server (not the API), producing a 400 or CORS error.
+
+**Fix:** Always pass all three arguments:
+```csharp
+var apiBaseUrl = Configuration["ApiClients:StorefrontApiUrl"] ?? "http://localhost:5237";
+var hubUrl = $"{apiBaseUrl}/hub/storefront";
+await JS.InvokeVoidAsync("signalrClient.subscribe", customerId, dotNetHelper, hubUrl);
+```
+
 ---
 
-### 6. `data-testid` Selectors Not Found
+### 7. `data-testid` Selectors Not Found
 
 **Symptom:** `TimeoutException` on a locator that should match a visible element.
 
@@ -831,13 +1019,49 @@ pwsh playwright.ps1 show-trace playwright-traces/<scenario-name>.zip
 
 ---
 
-### 7. Ports Collide Between Test Runs
+### 8. Ports Collide Between Test Runs
 
 **Symptom:** `AddressAlreadyInUseException` when starting tests on a busy machine.
 
 **Cause:** Using a fixed port instead of `port=0`.
 
 **Fix:** Always pass `port=0` to `UseKestrel()`. The OS allocates a free port; `IServerAddressesFeature` reports the actual address.
+
+---
+
+### 9. Browser UI Used for Setup That Is Not What the Test Is Testing
+
+**Symptom:** A "setup" step (like "Given I have successfully placed an order") drives through a full browser checkout flow, causing the test to fail on MudBlazor timing issues that have nothing to do with what the test is actually checking.
+
+**Cause:** Violating the principle "the browser only touches what the test is testing." Using UI for setup couples the scenario to unrelated components and makes failures harder to diagnose.
+
+**Fix:** Seed state directly in fixtures/stubs, then navigate directly to the relevant page. See Pattern 9 for the complete setup-via-stub approach.
+
+---
+
+### 10. Blazor Server Component State Not Updating After `OnAfterRenderAsync`
+
+**Symptom:** A `data-testid` element that is conditionally rendered (`@if (_flag)`) never appears in the DOM, even though C# code sets `_flag = true`.
+
+**Cause:** In Blazor Server, mutations to component state inside `OnAfterRenderAsync` do NOT automatically schedule a re-render. Unlike `OnInitializedAsync` or event handlers, `OnAfterRenderAsync` is called **after** the render phase — Blazor does not re-render again unless explicitly requested.
+
+**Example:** `OrderConfirmation.razor` calls `SubscribeToSSE()` from `OnAfterRenderAsync`. When `_sseConnected = true` is set after the JavaScript SignalR connect call returns, no re-render occurs, so `@if (_sseConnected)` never makes the `[data-testid='signalr-connected']` element visible.
+
+**Fix:** Always call `StateHasChanged()` after modifying state inside `OnAfterRenderAsync` (or any async continuation that runs outside the Blazor synchronization context):
+
+```csharp
+// WRONG — _sseConnected = true is set but no re-render is scheduled
+await JS.InvokeVoidAsync("signalrClient.subscribe", ...);
+_sseConnected = true;
+// UI never updates — Playwright times out waiting for [data-testid='signalr-connected']
+
+// CORRECT — StateHasChanged() schedules a re-render so the UI updates
+await JS.InvokeVoidAsync("signalrClient.subscribe", ...);
+_sseConnected = true;
+StateHasChanged();
+```
+
+**Rule of thumb:** If state changes in `OnAfterRenderAsync` or inside a `try/catch` wrapping a JS interop call, add `StateHasChanged()`. If you're unsure, adding it is safe — it is idempotent and just queues one additional render pass.
 
 ## Checklist for New E2E Scenarios
 
@@ -848,6 +1072,8 @@ Use this checklist when adding a new Gherkin scenario to `checkout-flow.feature`
 - [ ] Is this the right test level? Could an Alba integration test cover this behavior?
 - [ ] Does the scenario require a real browser DOM or real HTTP port? (If not, use Alba)
 - [ ] Is the feature file in `docs/features/<bc>/` first?
+- [ ] For setup steps ("Given an order exists"): does the setup need browser UI, or can it be done via stub + direct navigation? (Pattern 9)
+- [ ] If testing auth/redirect behavior: is this in a feature file without a "login" Background that would pre-authenticate the user?
 
 ### Gherkin Scenario
 
@@ -887,6 +1113,7 @@ Use this checklist when adding a new Gherkin scenario to `checkout-flow.feature`
 
 - [ ] New interactive elements have `data-testid` attributes added
 - [ ] `data-testid` value follows the pattern: `kebab-case`, noun before verb (e.g., `btn-place-order`)
+- [ ] If state is modified in `OnAfterRenderAsync` or a JS interop callback, `StateHasChanged()` is called to schedule re-render
 
 ### Verification
 
