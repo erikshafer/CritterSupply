@@ -4,7 +4,7 @@
 **Participants:** Product Owner, Principal Architect, Engineering Lead
 **Status:** 🟡 Planning Complete — Awaiting Implementation Cycle Assignment
 **Related CONTEXTS.md Section:** [Admin Portal](../../CONTEXTS.md#admin-portal)
-**Port Assignments:** AdminPortal.Api → 5244, AdminPortal.Web → 5245
+**Port Assignments:** AdminPortal.Api → 5243, AdminPortal.Web → 5244
 
 ---
 
@@ -129,7 +129,7 @@ CritterSupply has six distinct internal user personas with different daily tasks
 | SignalR client (React/Vue) | `@microsoft/signalr` npm package | Same package used in other JS SignalR clients; well-maintained |
 | SignalR client (Blazor) | `Microsoft.AspNetCore.SignalR.Client` | Native .NET client |
 | Hub groups | Role-scoped: `role:{roleName}` | Alerts targeted to roles that need to act (vs. per-user — too granular for broadcast metrics) |
-| Port | 5244 (API), 5245 (Web) | Follows port allocation table in CLAUDE.md |
+| Port | 5243 (API), 5244 (Web) | Follows port allocation table in CLAUDE.md |
 | Schema | `adminportal` | Follows existing BC schema naming convention |
 
 ---

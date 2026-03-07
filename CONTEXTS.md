@@ -2771,7 +2771,7 @@ See [`docs/planning/pricing-event-modeling.md`](docs/planning/pricing-event-mode
 4. **ADR: `BulkPricingJob` audit trail approach** — event-sourced saga vs. explicit `BulkApprovalRecord` document
 5. **ADR: MAP vs. Floor price distinction** — deferred to Phase 2+, but documents the design decision to keep them separate
 
-**UX Review:** See [`docs/planning/pricing-ux-review.md`](docs/planning/pricing-ux-review.md) for the UX Engineer's DX analysis, `Pricing.Web` UI vision, component decisions, and risk register for the web build.
+**UX Review:** See [`docs/planning/pricing-ux-review.md`](docs/planning/pricing-ux-review.md) for the UX Engineer's DX analysis, component decisions (MudDataGrid, side-sheet editing, MudTimeline), and real-time update strategy — these artifacts inform the Pricing section of the Admin Portal.
 
 ---
 
@@ -3216,7 +3216,7 @@ This context is also an opportunity to explore **non-Blazor frontend technology*
                         │ HTTPS
 ┌───────────────────────▼─────────────────────────────┐
 │           AdminPortal.Api  (Gateway / BFF)           │
-│                Port: 5244                            │
+│                Port: 5243                            │
 │                                                      │
 │  Authentication: JWT Bearer (AdminIdentity BC)       │
 │  Authorization: Role-based (RBAC policy per route)   │
@@ -3659,7 +3659,7 @@ src/
       AdminPortal.Api.csproj              # References: AdminPortal, Messages.Contracts
       Program.cs                          # Wolverine + Marten + SignalR + RBAC auth setup
       appsettings.json                    # connection strings, downstream BC base URLs
-      Properties/launchSettings.json      # Port: 5244
+      Properties/launchSettings.json      # Port: 5243
       Authorization/
         AdminRoles.cs                     # role name constants
         AdminPolicies.cs                  # ASP.NET Core policy definitions per role
@@ -3694,7 +3694,7 @@ src/
       # Option A: Blazor Server — consistent with existing C# stack
       # Option B: React (Next.js SSR) — recommended; richer component ecosystem for dashboards
       # Option C: Vue.js (Nuxt.js SSR) — strong alternative to React
-      # Port: 5245
+      # Port: 5244
       # Connects to AdminPortal.Api SignalR hub at /hub/admin
       # Uses @microsoft/signalr npm package (Options B/C) or Microsoft.AspNetCore.SignalR.Client (Option A)
 ```
