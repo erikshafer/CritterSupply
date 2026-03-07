@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JS
+@inject IConfiguration Configuration
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @implements IAsyncDisposable
 
@@ -11,11 +12,11 @@
 
 @if (_isLoading)
 {
-    <MudProgressCircular Indeterminate="true" />
+    <MudProgressCircular Indeterminate="true" data-testid="order-confirmation-loading" />
 }
 else if (_orderNotFound)
 {
-    <MudAlert Severity="Severity.Error">Order not found.</MudAlert>
+    <MudAlert Severity="Severity.Error" data-testid="order-not-found">Order not found.</MudAlert>
     <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" Class="mt-4">
         Return to Home
     </MudButton>
@@ -24,7 +25,7 @@ else
 {
     <MudGrid>
         <MudItem xs="12">
-            <MudPaper Class="pa-4">
+            <MudPaper Class="pa-4" data-testid="order-confirmation-panel">
                 <div class="d-flex align-center mb-4">
                     <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" Class="mr-2" />
                     <div>
@@ -40,22 +41,22 @@ else
                         <MudText Typo="Typo.h6" Class="mb-2">Order Details</MudText>
                         <div class="d-flex mb-2">
                             <MudText Typo="Typo.body2" Class="mr-2" Style="font-weight: 600;">Order ID:</MudText>
-                            <MudText Typo="Typo.body2">@OrderId</MudText>
+                            <MudText Typo="Typo.body2" data-testid="order-id">@OrderId</MudText>
                         </div>
                         <div class="d-flex mb-2">
                             <MudText Typo="Typo.body2" Class="mr-2" Style="font-weight: 600;">Status:</MudText>
-                            <MudChip T="string" Color="@GetStatusColor(_currentStatus)" Size="Size.Small">@_currentStatus</MudChip>
+                            <MudChip T="string" Color="@GetStatusColor(_currentStatus)" Size="Size.Small" data-testid="order-status">@_currentStatus</MudChip>
                         </div>
                         <div class="d-flex mb-2">
                             <MudText Typo="Typo.body2" Class="mr-2" Style="font-weight: 600;">Order Date:</MudText>
-                            <MudText Typo="Typo.body2">@DateTime.UtcNow.ToString("MMMM dd, yyyy")</MudText>
+                            <MudText Typo="Typo.body2" data-testid="order-date">@DateTime.UtcNow.ToString("MMMM dd, yyyy")</MudText>
                         </div>
                     </MudItem>
 
                     <MudItem xs="12" md="6">
                         @if (_sseConnected)
                         {
-                            <MudAlert Severity="Severity.Success" Dense="true" Class="mb-2">
+                            <MudAlert Severity="Severity.Success" Dense="true" Class="mb-2" data-testid="signalr-connected">
                                 <MudIcon Icon="@Icons.Material.Filled.Wifi" Class="mr-2" />
                                 Receiving real-time order updates
                             </MudAlert>
@@ -63,7 +64,7 @@ else
 
                         @if (!string.IsNullOrEmpty(_latestUpdate))
                         {
-                            <MudAlert Severity="Severity.Info" Dense="true">
+                            <MudAlert Severity="Severity.Info" Dense="true" data-testid="order-update-notification">
                                 @_latestUpdate
                             </MudAlert>
                         }
@@ -175,7 +176,11 @@ else
         try
         {
             _dotNetHelper = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("signalrClient.subscribe", _customerId.Value.ToString(), _dotNetHelper);
+            // Build the hub URL from configuration so E2E tests can point to their test API server.
+            // Falls back to the default local port when the config key is absent.
+            var apiBaseUrl = Configuration["ApiClients:StorefrontApiUrl"] ?? "http://localhost:5237";
+            var hubUrl = $"{apiBaseUrl}/hub/storefront";
+            await JS.InvokeVoidAsync("signalrClient.subscribe", _customerId.Value.ToString(), _dotNetHelper, hubUrl);
             _sseConnected = true;
         }
         catch (Exception ex)
@@ -203,9 +208,33 @@ else
                     StateHasChanged();
                     break;
 
+                case "order-status-changed":
+                    // Handles OrderStatusChanged events routed via Wolverine SignalR transport
+                    if (eventData.TryGetProperty("NewStatus", out var newStatus))
+                    {
+                        _currentStatus = newStatus.GetString() ?? _currentStatus;
+                        _latestUpdate = $"Order status updated to {_currentStatus}";
+                    }
+                    StateHasChanged();
+                    break;
+
                 case "payment-confirmed":
                     _currentStatus = "Payment Confirmed";
                     _latestUpdate = "Payment processed successfully";
+                    StateHasChanged();
+                    break;
+
+                case "shipment-status-changed":
+                    // Handles ShipmentStatusChanged events routed via Wolverine SignalR transport
+                    _currentStatus = "Shipped";
+                    if (eventData.TryGetProperty("TrackingNumber", out var trackingSignalR))
+                    {
+                        _latestUpdate = $"Order shipped! Tracking: {trackingSignalR.GetString()}";
+                    }
+                    else
+                    {
+                        _latestUpdate = "Order has been shipped";
+                    }
                     StateHasChanged();
                     break;
 

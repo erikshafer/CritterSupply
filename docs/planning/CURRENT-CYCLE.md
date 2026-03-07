@@ -66,7 +66,7 @@
 
 ## Upcoming (Planned)
 
-- **Cycle 20:** Automated Browser Testing (Playwright vs bUnit)
+- **Cycle 20:** Automated Browser Testing (Playwright + Reqnroll — depends on Cycle 19.5 completion — [Issue #58](https://github.com/erikshafer/CritterSupply/issues/58); [Cycle 20 Plan](./cycles/cycle-20-automated-browser-testing.md); [ADR 0015](../decisions/0015-playwright-e2e-browser-testing.md))
 - **Cycle 21+:** Vendor Portal Phase 1, Returns BC
 
 ---

@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <AssemblyName>Storefront.E2ETests</AssemblyName>
+        <RootNamespace>Storefront.E2ETests</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="coverlet.collector" />
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="Microsoft.Playwright" />
+        <PackageReference Include="Reqnroll" />
+        <PackageReference Include="Reqnroll.xUnit" />
+        <PackageReference Include="Shouldly" />
+        <PackageReference Include="Testcontainers.PostgreSql" />
+        <PackageReference Include="xunit" />
+        <PackageReference Include="xunit.runner.visualstudio" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="Xunit" />
+        <Using Include="Shouldly" />
+        <Using Include="Reqnroll" />
+        <Using Include="Microsoft.Playwright" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Domain project (notification handlers, clients interfaces, real-time contracts) -->
+        <ProjectReference Include="..\..\..\src\Customer Experience\Storefront\Storefront.csproj" />
+        <!-- API project (BFF endpoints, Program.cs) -->
+        <ProjectReference Include="..\..\..\src\Customer Experience\Storefront.Api\Storefront.Api.csproj" />
+        <!-- Web project (Blazor UI, Program.cs) -->
+        <ProjectReference Include="..\..\..\src\Customer Experience\Storefront.Web\Storefront.Web.csproj" />
+    </ItemGroup>
+
+    <!-- Playwright browser installation target (run once after build) -->
+    <Target Name="InstallPlaywrightBrowsers" AfterTargets="Build">
+        <Exec Command="pwsh bin/$(Configuration)/$(TargetFramework)/playwright.ps1 install chromium" Condition="'$(PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD)' != '1'" />
+    </Target>
+
+</Project>

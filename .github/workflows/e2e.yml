@@ -1,0 +1,122 @@
+name: E2E Tests
+
+# E2E tests run on main push and nightly — NOT on every PR.
+# Rationale (ADR 0015):
+#   - E2E tests require real browser (Chromium), real Kestrel servers, and TestContainers Postgres
+#   - Runtime: 10–15 minutes (vs 2–3 min for integration tests)
+#   - Flake risk is higher for browser tests than deterministic API integration tests
+#   - PR feedback loop must remain fast — keep integration tests (dotnet.yml) for every PR
+#
+# To run E2E tests manually against a specific branch:
+#   1. Navigate to Actions → "E2E Tests" → "Run workflow"
+#   2. Select your branch and click "Run workflow"
+
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - "README.md"
+      - "CLAUDE.md"
+      - "CONTEXTS.md"
+      - "docs/**"
+  schedule:
+    # Nightly at 06:00 UTC (10:00 PM Pacific) — catches regressions not caught in PR cycle
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      headless:
+        description: 'Run Playwright in headless mode'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  e2e:
+    name: Playwright E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-e2e-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-e2e-
+            ${{ runner.os }}-nuget-
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Install Playwright browsers
+        run: |
+          dotnet tool update --global Microsoft.Playwright.CLI || dotnet tool install --global Microsoft.Playwright.CLI
+          playwright_script=$(find "tests/Customer Experience/Storefront.E2ETests/bin/Release" -maxdepth 2 -type f -name 'playwright.ps1' | head -n 1)
+          if [ -z "$playwright_script" ]; then
+            echo "playwright.ps1 not found under tests/Customer Experience/Storefront.E2ETests/bin/Release" >&2
+            exit 1
+          fi
+          pwsh "$playwright_script" install chromium --with-deps
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 0
+
+      - name: Run E2E Tests
+        run: |
+          dotnet test "tests/Customer Experience/Storefront.E2ETests/Storefront.E2ETests.csproj" \
+            --no-build \
+            --configuration Release \
+            --logger "console;verbosity=normal" \
+            --logger "trx;LogFileName=e2e-results.trx" \
+            -- -parallel none
+        env:
+          PLAYWRIGHT_HEADLESS: ${{ github.event.inputs.headless || 'true' }}
+          # TestContainers: allow Docker socket access (ubuntu-latest has Docker pre-installed)
+          DOCKER_HOST: unix:///var/run/docker.sock
+          TESTCONTAINERS_RYUK_DISABLED: false
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: |
+            **/*.trx
+          retention-days: 14
+
+      - name: Upload Playwright traces (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: |
+            **/playwright-traces/**/*.zip
+          retention-days: 7
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## E2E Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "If this run failed, download the **playwright-traces** artifact and open it with:" >> $GITHUB_STEP_SUMMARY
+          echo "\`playwright show-trace <trace-file.zip>\`" >> $GITHUB_STEP_SUMMARY

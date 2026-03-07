@@ -8,8 +8,9 @@ window.signalrClient = {
      * Subscribe to SignalR hub for a customer
      * @param {string} customerId - Customer GUID
      * @param {DotNetObjectReference} dotNetHelper - .NET object reference for callbacks
+     * @param {string} hubUrl - Full URL of the SignalR hub (e.g. "http://localhost:5237/hub/storefront")
      */
-    subscribe: async function (customerId, dotNetHelper) {
+    subscribe: async function (customerId, dotNetHelper, hubUrl) {
         // Store dotNetHelper reference
         this.dotNetHelper = dotNetHelper;
 
@@ -18,8 +19,8 @@ window.signalrClient = {
             await this.connection.stop();
         }
 
-        // Create SignalR connection
-        const url = `http://localhost:5237/hub/storefront?customerId=${customerId}`;
+        // Create SignalR connection using the provided hub URL
+        const url = `${hubUrl}?customerId=${customerId}`;
 
         this.connection = new signalR.HubConnectionBuilder()
             .withUrl(url, {

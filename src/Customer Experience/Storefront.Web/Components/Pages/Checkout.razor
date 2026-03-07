@@ -16,40 +16,40 @@
 
 @if (_isLoading)
 {
-    <MudProgressCircular Indeterminate="true" />
+    <MudProgressCircular Indeterminate="true" data-testid="checkout-loading" />
 }
 else if (_checkoutView == null)
 {
-    <MudAlert Severity="Severity.Error">Unable to load checkout. Please try again.</MudAlert>
+    <MudAlert Severity="Severity.Error" data-testid="checkout-error">Unable to load checkout. Please try again.</MudAlert>
 }
 else
 {
-    <MudStepper @ref="_stepper" Linear="true">
+    <MudStepper @ref="_stepper" Linear="true" data-testid="checkout-stepper">
         <!-- Step 1: Shipping Address -->
         <MudStep Title="Shipping Address">
             <ChildContent>
-                <MudText Typo="Typo.h6" Class="mb-4">Select Shipping Address</MudText>
+                <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Select Shipping Address</MudText>
 
                 @if (_checkoutView.SavedAddresses.Any())
                 {
-                    <MudSelect T="Guid" Label="Saved Addresses" Variant="Variant.Outlined" @bind-Value="_selectedAddressId" Disabled="@_isProcessing">
+                    <MudSelect T="Guid" Label="Saved Addresses" Variant="Variant.Outlined" @bind-Value="_selectedAddressId" Disabled="@_isProcessing" data-testid="address-select">
                         @foreach (var address in _checkoutView.SavedAddresses)
                         {
-                            <MudSelectItem T="Guid" Value="@address.AddressId">@address.Nickname - @address.DisplayLine</MudSelectItem>
+                            <MudSelectItem T="Guid" Value="@address.AddressId" data-testid="@($"address-option-{address.Nickname.ToLowerInvariant()}")">@address.Nickname - @address.DisplayLine</MudSelectItem>
                         }
                     </MudSelect>
                 }
                 else
                 {
-                    <MudAlert Severity="Severity.Info">No saved addresses. Add an address to continue.</MudAlert>
+                    <MudAlert Severity="Severity.Info" data-testid="no-saved-addresses">No saved addresses. Add an address to continue.</MudAlert>
                 }
 
                 @if (_isProcessing)
                 {
-                    <MudProgressLinear Indeterminate="true" Class="mt-4" />
+                    <MudProgressLinear Indeterminate="true" Class="mt-4" data-testid="checkout-processing" />
                 }
 
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveShippingAddressAndContinue" Disabled="@_isProcessing" Class="mt-4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveShippingAddressAndContinue" Disabled="@_isProcessing" Class="mt-4" data-testid="btn-save-address">
                     Save & Continue
                 </MudButton>
             </ChildContent>
@@ -58,20 +58,20 @@ else
         <!-- Step 2: Shipping Method -->
         <MudStep Title="Shipping Method">
             <ChildContent>
-                <MudText Typo="Typo.h6" Class="mb-4">Select Shipping Method</MudText>
+                <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Select Shipping Method</MudText>
 
-                <MudRadioGroup @bind-Value="_selectedShippingMethod" Disabled="@_isProcessing">
-                    <MudRadio Value="@("Standard")">Standard Ground (5-7 days) - $5.99</MudRadio>
-                    <MudRadio Value="@("Express")">Express Shipping (2-3 days) - $12.99</MudRadio>
-                    <MudRadio Value="@("NextDay")">Next Day Air (1 day) - $24.99</MudRadio>
+                <MudRadioGroup @bind-Value="_selectedShippingMethod" Disabled="@_isProcessing" data-testid="shipping-method-group">
+                    <MudRadio Value="@("Standard")" data-testid="shipping-method-standard">Standard Ground (5-7 days) - $5.99</MudRadio>
+                    <MudRadio Value="@("Express")" data-testid="shipping-method-express">Express Shipping (2-3 days) - $12.99</MudRadio>
+                    <MudRadio Value="@("NextDay")" data-testid="shipping-method-nextday">Next Day Air (1 day) - $24.99</MudRadio>
                 </MudRadioGroup>
 
                 @if (_isProcessing)
                 {
-                    <MudProgressLinear Indeterminate="true" Class="mt-4" />
+                    <MudProgressLinear Indeterminate="true" Class="mt-4" data-testid="checkout-processing" />
                 }
 
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveShippingMethodAndContinue" Disabled="@_isProcessing" Class="mt-4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveShippingMethodAndContinue" Disabled="@_isProcessing" Class="mt-4" data-testid="btn-save-shipping-method">
                     Save & Continue
                 </MudButton>
             </ChildContent>
@@ -80,19 +80,19 @@ else
         <!-- Step 3: Payment -->
         <MudStep Title="Payment">
             <ChildContent>
-                <MudText Typo="Typo.h6" Class="mb-4">Provide Payment Method</MudText>
+                <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Provide Payment Method</MudText>
 
-                <MudTextField @bind-Value="_paymentToken" Label="Payment Token (stub)" Variant="Variant.Outlined" Placeholder="tok_visa_test_12345" Disabled="@_isProcessing" />
+                <MudTextField @bind-Value="_paymentToken" Label="Payment Token (stub)" Variant="Variant.Outlined" Placeholder="tok_visa_test_12345" Disabled="@_isProcessing" data-testid="payment-token-input" />
                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
                     In production, this would integrate with Stripe/PayPal for tokenized payment processing.
                 </MudText>
 
                 @if (_isProcessing)
                 {
-                    <MudProgressLinear Indeterminate="true" Class="mt-4" />
+                    <MudProgressLinear Indeterminate="true" Class="mt-4" data-testid="checkout-processing" />
                 }
 
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SavePaymentMethodAndContinue" Disabled="@_isProcessing" Class="mt-4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SavePaymentMethodAndContinue" Disabled="@_isProcessing" Class="mt-4" data-testid="btn-save-payment">
                     Save & Continue
                 </MudButton>
             </ChildContent>
@@ -100,15 +100,15 @@ else
 
         <!-- Step 4: Review & Submit -->
         <MudStep Title="Review & Submit">
-            <MudText Typo="Typo.h6" Class="mb-4">Order Summary</MudText>
+            <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Order Summary</MudText>
 
-            <MudPaper Class="pa-4 mb-4">
+            <MudPaper Class="pa-4 mb-4" data-testid="order-summary">
                 <MudText Typo="Typo.h6" Class="mb-2">Line Items</MudText>
                 @foreach (var item in _checkoutView.Items)
                 {
-                    <div class="d-flex justify-space-between mb-2">
+                    <div class="d-flex justify-space-between mb-2" data-testid="@($"line-item-{item.Sku}")">
                         <MudText>@item.ProductName (x@item.Quantity)</MudText>
-                        <MudText>@item.LineTotal.ToString("C")</MudText>
+                        <MudText data-testid="@($"line-item-total-{item.Sku}")">@item.LineTotal.ToString("C")</MudText>
                     </div>
                 }
 
@@ -116,22 +116,22 @@ else
 
                 <div class="d-flex justify-space-between mb-2">
                     <MudText>Subtotal</MudText>
-                    <MudText>@_checkoutView.Subtotal.ToString("C")</MudText>
+                    <MudText data-testid="order-subtotal">@_checkoutView.Subtotal.ToString("C")</MudText>
                 </div>
                 <div class="d-flex justify-space-between mb-2">
                     <MudText>Shipping</MudText>
-                    <MudText>@_checkoutView.ShippingCost.ToString("C")</MudText>
+                    <MudText data-testid="order-shipping-cost">@_checkoutView.ShippingCost.ToString("C")</MudText>
                 </div>
 
                 <MudDivider Class="my-3" />
 
                 <div class="d-flex justify-space-between">
                     <MudText Typo="Typo.h6">Total</MudText>
-                    <MudText Typo="Typo.h6">@_checkoutView.Total.ToString("C")</MudText>
+                    <MudText Typo="Typo.h6" data-testid="order-total">@_checkoutView.Total.ToString("C")</MudText>
                 </div>
             </MudPaper>
 
-            <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@PlaceOrder" Class="mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@PlaceOrder" Class="mt-4" data-testid="btn-place-order">
                 Place Order
             </MudButton>
         </MudStep>
