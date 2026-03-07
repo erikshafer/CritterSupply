@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "fetch": {
+      "type": "local",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "tools": ["fetch"]
+    },
+    "context7": {
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "playwright": {
+      "type": "local",
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    }
+  }
+}
