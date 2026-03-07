@@ -96,22 +96,26 @@ public sealed class CheckoutFlowStepDefinitions
     [Given(@"I have successfully placed an order")]
     public async Task GivenIHaveSuccessfullyPlacedAnOrder()
     {
-        await CartPage.NavigateAsync();
-        await CartPage.ClickProceedToCheckoutAsync();
-        await CheckoutPage.WaitForCheckoutLoadedAsync();
+        // Navigate directly to the order confirmation page using the pre-seeded deterministic order.
+        //
+        // Per the E2E testing principle documented in docs/skills/e2e-playwright-testing.md:
+        //   "The browser only touches what the test is testing. Everything else is done via
+        //    API or stub — never via browser UI navigation."
+        //
+        // The SignalR scenarios test real-time hub delivery to the browser — NOT the checkout
+        // flow. The full browser checkout flow is already covered by Scenario 1 (happy path).
+        // Running the entire checkout UI as setup for SignalR tests couples two concerns,
+        // and makes the SignalR tests brittle against MudBlazor rendering timing issues
+        // that have nothing to do with SignalR.
+        //
+        // The order is pre-seeded in E2ETestFixture.SeedStandardCheckoutScenarioAsync via
+        // StubOrdersClient so GET /api/storefront/orders/{AliceOrderId} returns a valid order.
+        var orderId = WellKnownTestData.Orders.AliceOrderId;
+        await Page.GotoAsync($"/order-confirmation/{orderId}");
+        await OrderConfirmationPage.WaitForLoadAsync();
 
-        await CheckoutPage.SelectAddressByNicknameAsync(WellKnownTestData.Addresses.AliceHomeNickname);
-        await CheckoutPage.ClickSaveAddressAndContinueAsync();
-        await CheckoutPage.SelectStandardShippingAsync();
-        await CheckoutPage.ClickSaveShippingMethodAndContinueAsync();
-        await CheckoutPage.EnterPaymentTokenAsync(WellKnownTestData.Payment.ValidVisaToken);
-        await CheckoutPage.ClickSavePaymentAndContinueAsync();
-        await CheckoutPage.ClickPlaceOrderAsync();
-
-        // Store the order ID from the URL for subsequent steps
-        var url = Page.Url;
-        var orderId = url.TrimEnd('/').Split('/').Last();
-        _scenarioContext.Set(orderId, ScenarioContextKeys.OrderId);
+        // Store the order ID for subsequent steps (SignalR message injection targets this ID)
+        _scenarioContext.Set(orderId.ToString(), ScenarioContextKeys.OrderId);
     }
 
     [Given(@"I am on the order confirmation page")]
