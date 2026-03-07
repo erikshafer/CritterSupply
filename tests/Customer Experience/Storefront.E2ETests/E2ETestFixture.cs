@@ -202,6 +202,23 @@ public sealed class E2ETestFixture : IAsyncLifetime
             AddressType: "Shipping",
             IsDefault: false,
             DisplayLine: WellKnownTestData.Addresses.AliceWorkDisplayLine));
+
+        // Seed a pre-placed order for SignalR E2E scenarios.
+        // SignalR tests navigate directly to /order-confirmation/{AliceOrderId} rather than
+        // driving the full browser checkout UI — following the principle:
+        //   "The browser only touches what the test is testing.
+        //    Everything else is done via API or stub."
+        // The full browser checkout flow is already covered by the happy-path scenario (Scenario 1).
+        var orderTotal = (WellKnownTestData.Products.CeramicDogBowlPrice * 2)
+                       + WellKnownTestData.Products.InteractiveCatLaserPrice
+                       + WellKnownTestData.Shipping.StandardCost;
+
+        StubOrdersClient.AddOrder(new Storefront.Clients.OrderDto(
+            WellKnownTestData.Orders.AliceOrderId,
+            WellKnownTestData.Customers.Alice,
+            "Placed",
+            DateTimeOffset.UtcNow,
+            orderTotal));
     }
 }
 

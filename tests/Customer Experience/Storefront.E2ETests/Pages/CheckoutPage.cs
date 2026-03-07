@@ -79,14 +79,17 @@ public sealed class CheckoutPage(IPage page)
         await AddressSelect.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await AddressSelect.ClickAsync();
 
-        // Wait for at least one option to appear in the MudBlazor popup before interacting.
-        // MudBlazor renders options in an animated popover — we must confirm the popup is open
-        // before querying options, otherwise the locator resolves against a closed (hidden) state.
-        await page.WaitForSelectorAsync("[role='option']", new PageWaitForSelectorOptions { Timeout = 10_000 });
-
+        // Wait for the MudBlazor popup option to be ready, then click it.
+        //
+        // Playwright's Locator.ClickAsync() uses built-in actionability checks that retry
+        // through CSS transitions and animations — more reliable than the two-step
+        // WaitForSelectorAsync (visibility check) + ClickAsync pattern, which can miss the
+        // option when MudBlazor's popover animation temporarily makes elements non-visible.
+        //
         // Use :has-text() so the match works even when the option text includes the full display
         // line (e.g. "Home - 123 Main St, Seattle, WA 98101") not just the nickname alone.
-        await page.Locator($"[role='option']:has-text('{nickname}')").ClickAsync();
+        var optionLocator = page.Locator($"[role='option']:has-text('{nickname}')");
+        await optionLocator.ClickAsync(new LocatorClickOptions { Timeout = 15_000 });
     }
 
     public async Task ClickSaveAddressAndContinueAsync()
