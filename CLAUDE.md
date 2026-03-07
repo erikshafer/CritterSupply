@@ -658,6 +658,23 @@ Covers:
 - Blazor + Wolverine integration
 - When to use / not use BFF
 
+### When Using Wolverine's SignalR Transport
+
+For real-time hub communication — bidirectional WebSocket messaging, group-based routing, JWT/session auth, and the SignalR Client transport:
+
+**Read:** `docs/skills/wolverine-signalr.md`
+
+Covers:
+- `opts.UseSignalR()` configuration and publish rules
+- Marker interface pattern for message routing
+- Custom hub design (`WolverineHub` for bidirectional, plain `Hub` for push-only)
+- Group management (`vendor:{tenantId}`, `user:{userId}`, `customer:{id}`)
+- Authentication: session cookies (Storefront) vs JWT Bearer (Vendor Portal)
+- JavaScript and Blazor client integration
+- SignalR Client transport for integration testing
+- Marten projection side effects → Wolverine → SignalR pipeline
+- Anti-patterns: hand-rolled broadcasters, query-string identity, missing `IAsyncDisposable`
+
 ### When Organizing Code
 
 For file structure and vertical slice organization:

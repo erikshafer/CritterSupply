@@ -21,7 +21,8 @@ This directory contains implementation patterns and best practices for building 
 - 🗄️ [EF Core + Wolverine Integration](./efcore-wolverine-integration.md) - Entity models, DbContext setup, migrations, navigation properties
 
 **Building BFFs:**
-- 🎁 [BFF Real-time Patterns](./bff-realtime-patterns.md) - View composition, HTTP clients, SSE updates, Blazor integration, MudBlazor
+- 🎁 [BFF Real-time Patterns](./bff-realtime-patterns.md) - View composition, HTTP clients, SignalR/SSE updates, Blazor integration, MudBlazor
+- 📡 [Wolverine + SignalR](./wolverine-signalr.md) - Wolverine's native SignalR transport: hub setup, authentication (session & JWT), group routing, client integration, Marten side-effect pipeline
 
 **Testing Your Code:**
 - 🧪 [CritterStack Testing Patterns](./critterstack-testing-patterns.md) - Alba integration tests, pure function testing, TestFixture patterns
@@ -61,7 +62,8 @@ This directory contains implementation patterns and best practices for building 
 - [E2E Testing with Playwright](./e2e-playwright-testing.md) - Browser E2E with real Kestrel servers
 
 ### UI Frameworks
-- [BFF Real-time Patterns](./bff-realtime-patterns.md) - Blazor Server, MudBlazor, SSE
+- [BFF Real-time Patterns](./bff-realtime-patterns.md) - Blazor Server, MudBlazor, SSE/SignalR
+- [Wolverine + SignalR](./wolverine-signalr.md) - Wolverine's native SignalR transport, real-time hub patterns
 
 ---
 
@@ -82,6 +84,7 @@ This directory contains implementation patterns and best practices for building 
 2. Follow coding standards → [Modern C# Coding Standards](./modern-csharp-coding-standards.md)
 3. Integrate external services? → [External Service Integration](./external-service-integration.md)
 4. Building BFF? → [BFF Real-time Patterns](./bff-realtime-patterns.md)
+5. Adding SignalR real-time? → [Wolverine + SignalR](./wolverine-signalr.md)
 
 ### Testing Phase
 1. Write integration tests → [CritterStack Testing Patterns](./critterstack-testing-patterns.md)
@@ -124,6 +127,7 @@ Each skill document follows this structure:
 
 **Common Questions:**
 
+- *"How do I build a real-time hub with SignalR and Wolverine?"* → [Wolverine + SignalR](./wolverine-signalr.md)
 - *"How do I create a new command handler?"* → [Wolverine Message Handlers](./wolverine-message-handlers.md)
 - *"How do I test my handler?"* → [CritterStack Testing Patterns](./critterstack-testing-patterns.md)
 - *"Should I use event sourcing or document store?"* → Compare [Marten Event Sourcing](./marten-event-sourcing.md) vs [Marten Document Store](./marten-document-store.md)
