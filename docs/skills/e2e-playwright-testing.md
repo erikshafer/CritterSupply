@@ -286,57 +286,67 @@ public sealed class CheckoutPage(IPage page)
 
 ## Pattern 3: MudBlazor `MudSelect` Interaction
 
-MudBlazor's `MudSelect` renders a layered HTML structure. The outer `data-testid` wrapper is a **layout container** — clicking it in headless Chromium is unreliable because Playwright clicks the bounding-box center, which may land on padding/non-interactive regions. The actual interactive element that carries MudBlazor's `@onclick` handler is the inner `.mud-select-input` div.
+MudBlazor's `MudSelect` renders a layered HTML structure. Getting the click right in headless Chromium requires `Force = true` on the inner `.mud-select-input` element. Two timeout constants model the two distinct wait phases.
 
-Options render inside a **portal popover** at the document `<body>` level (outside the select container) and only appear in the DOM after the dropdown opens. Waiting for the `[role='listbox']` to appear before querying options synchronises the option click with the popover render.
+**Why `Force = true` is required:**  
+MudBlazor 9.x renders a transparent `.mud-input-mask` div _above_ `.mud-select-input` in z-order. This mask intercepts real pointer events so MudBlazor's JavaScript can manage dropdown state. Playwright's actionability check calls `elementFromPoint()` at the element's centre — the mask is returned, not `.mud-select-input` — so Playwright waits 30 s for `.mud-select-input` to be "hittable" (it never will be). `Force = true` skips the hit-test entirely and dispatches a synthetic `MouseEvent` directly to `.mud-select-input`, where Blazor's delegated `@onclick` handler is registered. The event bubbles normally and MudBlazor opens the dropdown.
 
-### Correct Pattern — Scoped Trigger Click + Explicit Listbox Wait + data-testid Option
+**Why not click the outer wrapper directly?**  
+`AddressSelect.ClickAsync()` fires a centre-click on the outer `[data-testid='address-select']` layout container. Under headless Chromium the bounding-box centre frequently lands on the rendered `<label>` text or surrounding padding — MudBlazor receives no "open" event there, so the listbox portal never renders.
+
+Options render inside a **portal popover** at `document.body` level (outside the select container) and only appear in the DOM after the dropdown opens. The `[role='listbox']` wait synchronises the option click with popover render.
+
+### Correct Pattern — Force-click Inner Trigger + Explicit Listbox Wait + data-testid Option
 
 ```csharp
+// Two-phase timeout: popover appearance (slow) vs option click (fast once popover is open).
+private const int MudSelectListboxTimeoutMs = 15_000; // popover open + animation + CI headroom
+private const int MudSelectOptionTimeoutMs  = 10_000; // option already in DOM when listbox visible
+
 public async Task SelectAddressByNicknameAsync(string nickname)
 {
-    // Wait for the outer MudSelect wrapper to be visible (present and rendered).
+    // Waits for async data load: the wrapper is only rendered when SavedAddresses.Any() is true.
     await AddressSelect.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
 
-    // Click the INNER .mud-select-input — the interactive element that carries MudBlazor's
-    // @onclick handler. Scoped through AddressSelect to guard against multi-select pages.
-    await AddressSelect.Locator(".mud-select-input").ClickAsync();
+    // Force = true bypasses Playwright's hit-test (blocked by MudBlazor's transparent mask).
+    // Scoped through AddressSelect to guard against multiple MudSelects on the page.
+    // NOTE: .mud-select-input is an internal MudBlazor class (verified: MudBlazor 9.1.0).
+    //       Confirm it still exists before upgrading the MudBlazor package version.
+    await AddressSelect.Locator(".mud-select-input").ClickAsync(new LocatorClickOptions { Force = true });
 
-    // Wait explicitly for the MudBlazor listbox popover to appear in the DOM.
-    // Uses page scope because the popover renders at document body level (outside AddressSelect).
+    // Wait for the MudBlazor listbox portal (rendered at document.body, not inside AddressSelect).
     await page.WaitForSelectorAsync("[role='listbox']",
-        new PageWaitForSelectorOptions { Timeout = MudSelectPopoverTimeoutMs });
+        new PageWaitForSelectorOptions { Timeout = MudSelectListboxTimeoutMs });
 
-    // Target the option by data-testid for stable selection.
-    // data-testid="address-option-{nickname.ToLowerInvariant()}" is set on each MudSelectItem
-    // in Checkout.razor and forwarded to the rendered <li> via MudBlazor UserAttributes spread.
+    // Target by data-testid — stable across text formatting changes.
+    // data-testid="address-option-{nickname.ToLowerInvariant()}" forwarded via MudBlazor UserAttributes.
     var optionLocator = page.Locator($"[data-testid='address-option-{nickname.ToLowerInvariant()}']");
-    await optionLocator.ClickAsync(new LocatorClickOptions { Timeout = MudSelectPopoverTimeoutMs });
+    await optionLocator.ClickAsync(new LocatorClickOptions { Timeout = MudSelectOptionTimeoutMs });
 }
 ```
 
-### Why Not Click the Outer Wrapper + `:has-text()` Option?
-
-Both patterns are fragile in headless CI Chromium:
+### Anti-Patterns
 
 ```csharp
-// FRAGILE — clicking the layout container is unreliable; center click can land on
-// padding. Also, [role='option']:has-text() depends on exact text formatting
-// and fails when the MudBlazor option text includes extra address details.
+// ❌ FRAGILE — outer wrapper centre click lands on <label>/padding in headless Chromium;
+//              no "open" event reaches MudBlazor; [role='listbox'] never appears.
 await AddressSelect.ClickAsync();
-await page.Locator($"[role='option']:has-text('{nickname}')")
-          .ClickAsync(new LocatorClickOptions { Timeout = 15_000 });
-```
 
-**Fix:** Click `.mud-select-input` (scoped through the select locator), wait for `[role='listbox']` explicitly, then use `[data-testid='address-option-*']` for option targeting.
+// ❌ FRAGILE — Playwright hit-test returns the .mud-input-mask overlay; waits 30s for
+//              .mud-select-input to be "hittable" — it never is because the mask is structural.
+await AddressSelect.Locator(".mud-select-input").ClickAsync();
+
+// ❌ FRAGILE — text-based: fails when MudBlazor renders full address in the option label.
+await page.Locator($"[role='option']:has-text('{nickname}')").ClickAsync();
+```
 
 ### Why Scope `.mud-select-input` Through `AddressSelect`?
 
-A bare `page.Locator(".mud-select-input")` matches the **first** `.mud-select-input` on the page. If a second `MudSelect` is added before the address dropdown in a future refactor, the unscoped locator silently hits the wrong field. Always scope through the known parent locator:
+A bare `page.Locator(".mud-select-input")` matches the **first** `.mud-select-input` on the page. Always scope through the known parent locator:
 
 ```csharp
-await AddressSelect.Locator(".mud-select-input").ClickAsync();  // ✅ scoped
-await page.Locator(".mud-select-input").ClickAsync();           // ❌ unscoped — fragile
+await AddressSelect.Locator(".mud-select-input").ClickAsync(new LocatorClickOptions { Force = true });  // ✅ scoped
+await page.Locator(".mud-select-input").ClickAsync(new LocatorClickOptions { Force = true });           // ❌ unscoped — fragile
 ```
 
 ### Anti-Pattern: `GetByRole` with Exact Name Match
@@ -901,30 +911,37 @@ pwsh playwright.ps1 show-trace playwright-traces/<scenario-name>.zip
 
 **Cause:** `GetByRole` matches on the **exact** accessible name. MudBlazor renders the full display text (e.g., `"Home - 123 Main St, Seattle, WA 98101"`), so `{ Name = "Home" }` never matches.
 
-**Fix:** Use `Locator($"[role='option']:has-text('{nickname}')").ClickAsync(new LocatorClickOptions { Timeout = 15_000 })`. Playwright's `Locator.ClickAsync` retries through CSS animation delays automatically. For a fully robust implementation, see Pattern 3 (click `.mud-select-input`, wait for `[role='listbox']`, target option by `data-testid`).
+**Fix:** Use `Locator($"[role='option']:has-text('{nickname}')").ClickAsync(new LocatorClickOptions { Timeout = 15_000 })`. Playwright's `Locator.ClickAsync` retries through CSS animation delays automatically. For the fully robust and CI-proven implementation, see Pattern 3 (force-click `.mud-select-input`, wait for `[role='listbox']`, target option by `data-testid`).
 
 ---
 
-### 4. Clicking Outer `MudSelect` Wrapper Times Out on All Scenarios
+### 4. `MudSelect` Dropdown Never Opens — `[role='listbox']` Times Out
 
-**Symptom:** `TimeoutException` on `SelectAddressByNicknameAsync` across ALL scenarios (not just later ones). No options ever appear.
+**Symptom:** `TimeoutException: Timeout 10000ms exceeded — waiting for Locator("[role='listbox']") to be visible` on `SelectAddressByNicknameAsync` across ALL scenarios.
 
-**Cause:** MudBlazor's `MudSelect` has a layered HTML structure. The outer `data-testid` wrapper (e.g., `[data-testid='address-select']`) is a **layout container**, not the interactive trigger. Playwright's `ClickAsync` clicks the element's bounding-box center; under headless Chromium this can land on padding/non-interactive areas and fail to open the dropdown. Without the dropdown opening, `[role='option']` elements are never rendered in the portal popover, so any subsequent option locator times out.
+**Root cause (three failure modes, tried in order):**
 
-**Fix:** Scope the click to `.mud-select-input` (the actual interactive trigger), wait for `[role='listbox']` to confirm the popover is rendered, then target the option by `data-testid`:
+| Approach | Failure |
+|---|---|
+| `AddressSelect.ClickAsync()` (outer wrapper) | Bounding-box centre lands on the `<label>` or padding — MudBlazor receives no "open" event; listbox never appears |
+| `AddressSelect.Locator(".mud-select-input").ClickAsync()` (no Force) | Playwright's `elementFromPoint()` returns the transparent `.mud-input-mask` overlay; waits 30 s for `.mud-select-input` to be "hittable" — times out |
+| `AddressSelect.Locator(".mud-select-input").ClickAsync(Force: true)` | ✅ Bypasses hit-test; synthetic `MouseEvent` dispatched directly to `.mud-select-input` where the `@onclick` handler is — dropdown opens reliably |
+
+**Fix:** Use `Force = true` on the scoped `.mud-select-input` locator:
 ```csharp
-// Before (unreliable — clicks layout container, uses text-based option selector):
+// ❌ Before — outer wrapper unreliable; text-based option selector fragile:
 await AddressSelect.ClickAsync();
-await page.Locator($"[role='option']:has-text('{nickname}')")
-          .ClickAsync(new LocatorClickOptions { Timeout = 15_000 });
+await page.Locator($"[role='option']:has-text('{nickname}')").ClickAsync();
 
-// After (robust — clicks interactive trigger, waits for popover, uses data-testid):
-await AddressSelect.Locator(".mud-select-input").ClickAsync();
+// ✅ After — Force bypasses overlay hit-test; data-testid is stable:
+await AddressSelect.Locator(".mud-select-input").ClickAsync(new LocatorClickOptions { Force = true });
 await page.WaitForSelectorAsync("[role='listbox']",
-    new PageWaitForSelectorOptions { Timeout = MudSelectPopoverTimeoutMs });
+    new PageWaitForSelectorOptions { Timeout = MudSelectListboxTimeoutMs });
 await page.Locator($"[data-testid='address-option-{nickname.ToLowerInvariant()}']")
-          .ClickAsync(new LocatorClickOptions { Timeout = MudSelectPopoverTimeoutMs });
+          .ClickAsync(new LocatorClickOptions { Timeout = MudSelectOptionTimeoutMs });
 ```
+
+See Pattern 3 for full explanation and the two-constant timeout split.
 
 ---
 
