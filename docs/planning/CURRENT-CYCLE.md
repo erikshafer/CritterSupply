@@ -68,6 +68,7 @@
 
 - **Cycle 20:** Automated Browser Testing (Playwright + Reqnroll — depends on Cycle 19.5 completion — [Issue #58](https://github.com/erikshafer/CritterSupply/issues/58); [Cycle 20 Plan](./cycles/cycle-20-automated-browser-testing.md); [ADR 0015](../decisions/0015-playwright-e2e-browser-testing.md))
 - **Cycle 21+:** Vendor Portal Phase 1, Returns BC
+- **Future — Pricing BC Phase 1:** Discovery and design complete (2026-03-07). Event Modeling: [`docs/planning/pricing-event-modeling.md`](pricing-event-modeling.md). Gherkin feature files: [`docs/features/pricing/`](../features/pricing/). CONTEXTS.md updated with full Pricing BC section. ADRs required before implementation cycle begins (see pricing-event-modeling.md pre-implementation checklist).
 
 ---
 
