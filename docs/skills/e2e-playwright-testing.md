@@ -956,7 +956,33 @@ await page.Locator($"[role='option']:has-text('{nickname}')")
 
 **Fix:** Seed state directly in fixtures/stubs, then navigate directly to the relevant page. See Pattern 9 for the complete setup-via-stub approach.
 
-## Checklist for New E2E Scenarios
+---
+
+### 10. Blazor Server Component State Not Updating After `OnAfterRenderAsync`
+
+**Symptom:** A `data-testid` element that is conditionally rendered (`@if (_flag)`) never appears in the DOM, even though C# code sets `_flag = true`.
+
+**Cause:** In Blazor Server, mutations to component state inside `OnAfterRenderAsync` do NOT automatically schedule a re-render. Unlike `OnInitializedAsync` or event handlers, `OnAfterRenderAsync` is called **after** the render phase — Blazor does not re-render again unless explicitly requested.
+
+**Example:** `OrderConfirmation.razor` calls `SubscribeToSSE()` from `OnAfterRenderAsync`. When `_sseConnected = true` is set after the JavaScript SignalR connect call returns, no re-render occurs, so `@if (_sseConnected)` never makes the `[data-testid='signalr-connected']` element visible.
+
+**Fix:** Always call `StateHasChanged()` after modifying state inside `OnAfterRenderAsync` (or any async continuation that runs outside the Blazor synchronization context):
+
+```csharp
+// WRONG — _sseConnected = true is set but no re-render is scheduled
+await JS.InvokeVoidAsync("signalrClient.subscribe", ...);
+_sseConnected = true;
+// UI never updates — Playwright times out waiting for [data-testid='signalr-connected']
+
+// CORRECT — StateHasChanged() schedules a re-render so the UI updates
+await JS.InvokeVoidAsync("signalrClient.subscribe", ...);
+_sseConnected = true;
+StateHasChanged();
+```
+
+**Rule of thumb:** If state changes in `OnAfterRenderAsync` or inside a `try/catch` wrapping a JS interop call, add `StateHasChanged()`. If you're unsure, adding it is safe — it is idempotent and just queues one additional render pass.
+
+
 
 Use this checklist when adding a new Gherkin scenario to `checkout-flow.feature` or a new feature file.
 
@@ -1006,6 +1032,7 @@ Use this checklist when adding a new Gherkin scenario to `checkout-flow.feature`
 
 - [ ] New interactive elements have `data-testid` attributes added
 - [ ] `data-testid` value follows the pattern: `kebab-case`, noun before verb (e.g., `btn-place-order`)
+- [ ] If state is modified in `OnAfterRenderAsync` or a JS interop callback, `StateHasChanged()` is called to schedule re-render
 
 ### Verification
 

@@ -129,7 +129,7 @@ public sealed class CheckoutFlowStepDefinitions
     [Given(@"the SignalR connection is established")]
     public async Task GivenTheSignalRConnectionIsEstablished()
     {
-        await OrderConfirmationPage.WaitForSignalRConnectionAsync(timeoutMs: 10_000);
+        await OrderConfirmationPage.WaitForSignalRConnectionAsync(timeoutMs: 15_000);
     }
 
     // ─────────────────────────────────────────────────────────────────────

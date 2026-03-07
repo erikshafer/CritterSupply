@@ -182,11 +182,16 @@ else
             var hubUrl = $"{apiBaseUrl}/hub/storefront";
             await JS.InvokeVoidAsync("signalrClient.subscribe", _customerId.Value.ToString(), _dotNetHelper, hubUrl);
             _sseConnected = true;
+            // OnAfterRenderAsync does NOT trigger a re-render when state is mutated —
+            // StateHasChanged() must be called explicitly to make the signalr-connected
+            // indicator appear in the DOM.
+            StateHasChanged();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Failed to subscribe to SignalR: {ex.Message}");
             _sseConnected = false;
+            StateHasChanged();
         }
     }
 
