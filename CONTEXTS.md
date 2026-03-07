@@ -2943,99 +2943,358 @@ The Analytics context aggregates the event streams from all bounded contexts int
 
 ## Admin Portal
 
-The Admin Portal context is an **internal-facing BFF** (Backend-for-Frontend) for CritterSupply's operations and executive team. It composes real-time business dashboards — order pipeline status, revenue metrics, inventory health, fulfillment throughput — from the event streams already flowing through the system. Unlike the customer-facing Customer Experience BC, this context is scoped to authenticated internal users (operations managers, merchandising team, customer service representatives, executives).
+The Admin Portal is **its own Bounded Context** — a dedicated BFF (Backend-for-Frontend) that sits between an internal-facing web application and CritterSupply's portfolio of domain BCs. It does not contain business logic: it acts as an **authenticated internal gateway** that composes reads from multiple domain BCs into role-tailored views, and routes write commands to the appropriate domain BC on behalf of authenticated internal users.
 
-**Why this matters:** CritterSupply's event-sourced architecture captures every meaningful business event with a granularity that most traditional e-commerce stacks cannot match. `OrderPlaced`, `ReservationFailed`, `ShipmentDeliveryFailed`, `ReturnRequested`, `PaymentFailed` — these are not just audit logs, they are real-time signals about what is happening in the business *right now*. An Admin Portal surfaces these signals as actionable dashboards and operational tools, enabling the team to spot issues, manage escalations, and make decisions without waiting for a nightly batch report.
+**Is it its own BC?** Yes. Just as Customer Experience BC is a dedicated BFF for customers that aggregates Shopping, Orders, Catalog, and Payments into a unified storefront, Admin Portal is a dedicated BFF for internal users that aggregates all domain BCs into role-tailored admin tooling. This is the BFF (Backend-for-Frontend) pattern applied to the internal domain.
 
-This context is also a natural incubator for exploring **non-Blazor frontend technology**: because internal users typically run on desktop browsers in a managed environment, it is well-suited to a React or Vue.js Single-Page Application with SSR (Server-Side Rendering via Next.js or Nuxt.js), while still benefiting from Wolverine's SignalR transport for real-time metric pushes. This allows the CritterSupply reference architecture to demonstrate polyglot frontend patterns alongside its C#/.NET backend.
+**Does it need a gateway API?** Yes — the `AdminPortal.Api` project *is* that gateway. It exposes a unified REST + SignalR surface for the admin frontend without leaking domain BC internals. The API knows which domain BC to call for each operation, handles authentication and authorization (RBAC), and merges results into admin-specific view models. Domain BCs never need to know about the Admin Portal — they just serve their own HTTP endpoints and publish their events.
+
+**Why this matters:** CritterSupply's event-sourced architecture captures every meaningful business event with a granularity that most traditional e-commerce stacks cannot match. `OrderPlaced`, `ReservationFailed`, `ShipmentDeliveryFailed`, `ReturnRequested`, `PaymentFailed` — these are not just audit logs, they are real-time signals about what is happening in the business *right now*. An Admin Portal surfaces these signals as actionable dashboards and management tools, enabling the team to spot issues, manage escalations, and make decisions without waiting for a nightly batch report.
+
+This context is also an opportunity to explore **non-Blazor frontend technology**: because internal users run on desktop browsers in a managed environment, it is well-suited to a React or Vue.js SPA with SSR (Next.js or Nuxt.js), while still benefiting from Wolverine's SignalR transport for real-time metric pushes. The backend API and SignalR hub are framework-agnostic — swapping the frontend technology does not change the .NET side.
 
 **Priority:** 🟡 Medium — unlocks significant operational value once Analytics BC is providing projections; doubles as a reference architecture showcase for non-Blazor + SignalR patterns.
 
-### Architecture Pattern: Internal BFF with Real-Time Push
+**Event Modeling:** See [docs/planning/admin-portal-event-modeling.md](docs/planning/admin-portal-event-modeling.md) for the full planning output.
 
-**Analogous to:** Customer Experience BC (BFF pattern) — but for internal users rather than customers.
+---
 
-**Frontend technology options (choose per audience):**
-- **Blazor Server** — consistent with existing stack; good for teams that want full C# end-to-end
-- **React (Next.js) with SSR** — preferred if UX/UI richness is a priority; SSR improves initial load time for data-heavy dashboards; connects to SignalR hub via `@microsoft/signalr` npm package
-- **Vue.js (Nuxt.js) with SSR** — alternative SPA framework with SSR; similar trade-offs to React/Next.js
-- **Decision note:** The backend API and SignalR hub are framework-agnostic — switching the frontend technology does not change the Admin Portal API or message contracts
+### Architecture: Gateway / BFF Pattern
 
-### Dashboard Views (Internal Users)
+```
+┌─────────────────────────────────────────────────────┐
+│              AdminPortal.Web (Frontend)              │
+│    React (Next.js SSR) / Vue (Nuxt SSR) / Blazor    │
+│                                                      │
+│  - Role-aware sidebar (only shows permitted views)   │
+│  - SignalR client: connects to /hub/admin            │
+│  - HTTP client: calls /api/admin/* endpoints         │
+└───────────────────────┬─────────────────────────────┘
+                        │ HTTPS
+┌───────────────────────▼─────────────────────────────┐
+│           AdminPortal.Api  (Gateway / BFF)           │
+│                Port: 5242                            │
+│                                                      │
+│  Authentication: JWT Bearer (AdminIdentity BC)       │
+│  Authorization: Role-based (RBAC policy per route)   │
+│  SignalR Hub: /hub/admin (Wolverine opts.UseSignalR) │
+│                                                      │
+│  ┌──────────────────────────────────────────────┐   │
+│  │  Queries (HTTP GET → domain BC HTTP clients) │   │
+│  │  Commands (HTTP POST → domain BC HTTP POST)  │   │
+│  │  Notification Handlers (RabbitMQ → SignalR)  │   │
+│  └──────────────────────────────────────────────┘   │
+└───────────────────────┬─────────────────────────────┘
+         │              │              │
+         ▼              ▼              ▼  (HTTP calls to domain BCs)
+  ┌─────────────┐ ┌──────────┐ ┌───────────────┐
+  │ Product     │ │ Pricing  │ │  Inventory    │
+  │ Catalog BC  │ │   BC     │ │     BC        │
+  │   :5133     │ │ (future) │ │   :5233       │
+  └─────────────┘ └──────────┘ └───────────────┘
+         │              │              │
+  ┌─────────────┐ ┌──────────┐ ┌───────────────┐
+  │ Orders BC   │ │ Customer │ │  Analytics    │
+  │   :5231     │ │ Identity │ │     BC        │
+  └─────────────┘ └──────────┘ └───────────────┘
+```
 
-**Executive Dashboard (read-only, high-level):**
-- Revenue today / this week / this month (live counter via SignalR)
-- Orders placed, fulfilled, cancelled (pipeline view)
-- Top-selling SKUs (from Analytics BC `ProductPerformance` projection)
-- Inventory alerts — SKUs at or below reorder threshold
-- Active fulfillment issues (delivery failures, stuck orders)
+**Key gateway behaviors:**
+- Every request is authenticated (JWT Bearer from AdminIdentity BC)
+- Every mutating request (POST/PUT/DELETE) carries `adminUserId` for audit trail
+- Gateway never stores business data — it queries domain BCs on each request (or reads its own cached event-driven projections for dashboard metrics)
+- Gateway never transforms business rules — it passes commands to domain BCs and relays the result
+- Error responses from domain BCs are translated into admin-facing problem details (not raw BC errors)
 
-**Operations Dashboard (interactive, drill-down):**
-- Live order queue: current status distribution across all Order saga states
-- Reservation failures (insufficient stock events) — identify demand outpacing supply
-- Payment failure rate — flag provider issues or fraud spikes
-- Fulfillment throughput: picked/packed/shipped per hour
-- Return request queue with reason codes
+---
 
-**Customer Service Tooling:**
-- Customer lookup: search by email → full order history, active carts, return history
-- Order detail: current saga state, all saga transitions, linked payments/shipments
-- Manual saga intervention: trigger `CancelOrder`, issue `StoreCredit` (when Store Credit BC is live)
-- Address history for a customer (queries Customer Identity BC)
+### Internal User Roles (RBAC)
 
-**Inventory Management View:**
-- Stock levels per SKU per warehouse (from Inventory BC read model)
-- Reservation pipeline: how much of each SKU is soft-held vs. committed vs. available
-- `InventoryLow` alert history and acknowledgement log
+Admin Portal uses **role-based access control** with discrete personas matching real job functions at CritterSupply. Each role has a fixed permission set enforced at the API layer.
 
-**Merchandising View:**
-- Product catalog management (CRUD interface to Product Catalog BC admin endpoints)
-- Pricing rule management (when Pricing BC is live)
-- Promotion lifecycle management (when Promotions BC is live)
+| Role | Persona | Primary Job |
+|---|---|---|
+| `CopyWriter` | Content / copy writer | Manage product copy — descriptions, marketing text, display names |
+| `PricingManager` | Pricing / vendor manager | Set and schedule product prices |
+| `WarehouseClerk` | Warehouse / inventory worker | Adjust stock levels, receive inbound goods |
+| `CustomerService` | Customer service representative | Look up customers and orders, issue credits and cancellations |
+| `OperationsManager` | Operations manager | Cross-system dashboard, alert acknowledgement, fulfillment oversight |
+| `Executive` | Business executive / leadership | Read-only strategic dashboards and report exports |
+| `SystemAdmin` | Internal platform administrator | User management, BC health status, all capabilities |
+
+#### Role Permission Matrix
+
+| Capability | CopyWriter | PricingManager | WarehouseClerk | CustomerService | OperationsManager | Executive | SystemAdmin |
+|---|---|---|---|---|---|---|---|
+| Edit product description / copy | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Publish / unpublish product | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ |
+| Set / schedule product price | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Adjust inventory quantity (manual) | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| Receive inbound stock | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| Acknowledge low-stock alert | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ |
+| Customer lookup (read) | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ✅ |
+| View order details | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ✅ |
+| Cancel order | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ✅ |
+| Issue store credit | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ |
+| View executive dashboard | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Export reports | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| View operations alerts | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ |
+| Manage admin users | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+---
+
+### Role-Specific Workflows
+
+#### 🖊️ Copy Writer — Product Content Management
+
+A content writer's job is to ensure every product has accurate, compelling copy. They do not manage pricing, inventory, or orders.
+
+**Primary view:** Product content editor — searchable SKU list with inline edit capability
+
+**Typical workflow:**
+```
+1. Search: GET /api/admin/products?q={term}&status=published
+   └─> AdminPortal.Api: query Product Catalog BC: GET /api/catalog/products?q={term}
+       └─> Return ProductContentListView (sku, name, currentDescription, lastEditedAt, lastEditedBy)
+
+2. Edit: PUT /api/admin/products/{sku}/content
+   Body: { "description": "...", "displayName": "...", "adminUserId": "..." }
+   └─> AdminPortal.Api validates (non-empty, max length)
+       └─> POST /api/catalog/products/{sku}/description (Product Catalog BC admin endpoint)
+           └─> Product Catalog BC: UpdateProductDescription command
+               └─> ProductDescriptionUpdated event → search index rebuilt (Search BC, when live)
+```
+
+**What they see:** Product name, current description, last-edited-by, last-edited-at. **They do not see:** price, inventory counts, order history, customer data.
+
+**BCs involved:** Product Catalog (write), Product Catalog (read)
+
+---
+
+#### 💰 Pricing Manager — Price Management
+
+A pricing manager sets base prices and schedules future price changes (sale pricing, price increases). They do not manage product copy or inventory.
+
+**Primary view:** Pricing dashboard — SKU list with current price, next scheduled change, and price history
+
+**Typical workflows:**
+```
+Set a base price immediately:
+PUT /api/admin/products/{sku}/price
+Body: { "newPrice": 24.99, "reason": "...", "adminUserId": "..." }
+└─> AdminPortal.Api
+    └─> POST /api/pricing/products/{sku}/price (Pricing BC admin endpoint)
+        └─> Pricing BC: SetBasePrice command → BasePriceSet event
+            └─> Shopping BC reads updated price on next AddToCart (price frozen at add-time)
+
+Schedule a future price change (e.g., holiday sale):
+POST /api/admin/products/{sku}/price/schedule
+Body: { "newPrice": 19.99, "effectiveAt": "2026-11-29T00:00:00Z", "expiresAt": "2026-12-02T23:59:59Z", "reason": "Black Friday" }
+└─> AdminPortal.Api
+    └─> POST /api/pricing/products/{sku}/price/schedule (Pricing BC admin endpoint)
+        └─> Pricing BC: SchedulePriceChange command → PriceChangeScheduled event
+            └─> Background job applies at effectiveAt; reverts at expiresAt
+
+View price history for audit:
+GET /api/admin/products/{sku}/price/history
+└─> AdminPortal.Api
+    └─> GET /api/pricing/products/{sku}/history (Pricing BC)
+        └─> Return PriceHistoryView (price, effectiveAt, reason, setBy)
+```
+
+**What they see:** Current price, price history with reasons, scheduled changes, upcoming expirations. **They do not see:** product descriptions, inventory counts, customer or order data.
+
+**BCs involved:** Pricing (write + read)
+
+---
+
+#### 📦 Warehouse Clerk — Inventory Management
+
+A warehouse worker records physical inventory reality: adjusting quantities after cycle counts, receiving inbound purchase orders, and acknowledging low-stock alerts.
+
+**Primary view:** Inventory dashboard — SKU list with current quantities, reservation holds, warehouse location
+
+**Typical workflows:**
+```
+Manual inventory adjustment (cycle count correction):
+POST /api/admin/inventory/{sku}/adjust
+Body: { "warehouseId": "...", "adjustmentQuantity": -3, "reason": "DamagedGoods", "adminUserId": "..." }
+└─> AdminPortal.Api
+    └─> POST /api/inventory/{sku}/adjust (Inventory BC admin endpoint)
+        └─> Inventory BC: AdjustInventory command → InventoryAdjusted event
+            └─> Available quantity updated; LowStockDetected emitted if threshold crossed
+
+Receive inbound stock (purchase order arrival):
+POST /api/admin/inventory/{sku}/receive
+Body: { "warehouseId": "...", "quantity": 100, "purchaseOrderRef": "PO-12345", "adminUserId": "..." }
+└─> AdminPortal.Api
+    └─> POST /api/inventory/{sku}/replenish (Inventory BC admin endpoint)
+        └─> Inventory BC: ReplenishStock command → StockReplenished event
+            └─> Analytics BC updates InventoryVelocity; Search BC may update in-stock filter
+
+Acknowledge a low-stock alert:
+POST /api/admin/inventory/alerts/{alertId}/acknowledge
+Body: { "notes": "Reorder placed, ETA 5 days", "adminUserId": "..." }
+└─> AdminPortal.Api
+    └─> POST /api/inventory/alerts/{alertId}/acknowledge (Inventory BC)
+        └─> Inventory BC: AcknowledgeLowStockAlert → LowStockAlertAcknowledged
+            └─> Alert removed from active alert list; audit record preserved
+```
+
+**What they see:** Available quantity, reserved quantity, low-stock alerts, inbound receiving history, per-warehouse breakdown. **They do not see:** prices, product descriptions, customer or order data.
+
+**BCs involved:** Inventory (write + read)
+
+---
+
+#### 🎧 Customer Service Representative — Order & Customer Tooling
+
+A customer service rep handles inbound customer issues — looking up orders, cancelling unfulfillable orders, and issuing goodwill store credit when things go wrong.
+
+**Primary view:** Customer search → order history → order detail with current saga state
+
+**Typical workflows:**
+```
+Customer lookup:
+GET /api/admin/customers?email={email}
+└─> AdminPortal.Api
+    ├─> GET /api/identity/customers?email={email} (Customer Identity BC)
+    └─> GET /api/orders?customerId={id} (Orders BC — recent orders)
+        └─> Return CustomerServiceView: customer profile + recent order summaries
+
+Order detail:
+GET /api/admin/orders/{orderId}
+└─> AdminPortal.Api
+    ├─> GET /api/orders/{orderId} (Orders BC — current saga state)
+    └─> GET /api/payments/{orderId} (Payments BC — payment attempts)
+        └─> Return OrderDetailView: saga timeline, payment status, fulfillment status, return info
+
+Cancel an order (customer requested, pre-shipment):
+POST /api/admin/orders/{orderId}/cancel
+Body: { "reason": "CustomerRequested", "notes": "...", "adminUserId": "..." }
+└─> AdminPortal.Api
+    └─> POST /api/orders/{orderId}/cancel (Orders BC)
+        └─> Order saga: CancelOrder command → OrderCancelled → compensation chain begins
+            └─> Payments BC: RefundInitiated → customer refunded
+            └─> Inventory BC: ReservationReleased
+
+Issue store credit (goodwill gesture):
+POST /api/admin/customers/{customerId}/credit
+Body: { "amount": 15.00, "reason": "ShipmentDelay", "expiresInDays": 180, "adminUserId": "..." }
+└─> AdminPortal.Api
+    └─> POST /api/credits (Store Credit BC)
+        └─> Store Credit BC: IssueStoreCredit → StoreCreditIssued event
+            └─> Credit appears in customer's wallet on next checkout
+```
+
+**What they see:** Customer profile, order history, current order saga state, payment attempts, return history. **They do not see:** price management tools, inventory adjustments, executive dashboards.
+
+**BCs involved:** Customer Identity (read), Orders (read + write), Payments (read), Returns (read), Store Credit (write)
+
+---
+
+#### 📊 Operations Manager — Live Operations Dashboard
+
+An operations manager monitors the entire system health in real-time and can intervene on alerts. They have the broadest operational scope but are still not a system administrator.
+
+**Primary view:** Live operations dashboard with SignalR-pushed metric cards
+
+**Capabilities:**
+- All Customer Service Rep capabilities (order management, customer lookup)
+- View and acknowledge inventory alerts across all SKUs (not just their products)
+- Live order pipeline: how many orders are in each saga state right now
+- Fulfillment throughput: picked/packed/shipped per hour across all warehouses
+- Payment failure rate trend: flag provider issues or fraud spikes
+- Export operational reports (CSV/Excel) for any date range
+
+**Real-time updates via SignalR:**
+```
+Every OrderPlaced event:
+  └─> OrderPlacedAdminHandler → Publish OrderCountUpdated → SignalR role:operations → increment counter
+
+Every PaymentFailed event:
+  └─> PaymentFailedAdminHandler → Publish AlertRaised (severity=Warning) → SignalR role:operations
+
+Every InventoryLow event:
+  └─> InventoryLowAdminHandler → Publish AlertRaised (severity=Info) → SignalR role:operations + role:warehouseclerk
+```
+
+---
+
+#### 📈 Executive — Strategic Dashboard & Reports
+
+An executive sees only pre-aggregated, high-level metrics. They cannot modify any data. Their primary value is understanding business health at a glance.
+
+**Primary view:** Executive dashboard with key business KPIs
+
+**What they see:**
+- Revenue today / this week / this month / this year (live counter via SignalR for today's value)
+- Orders placed, fulfilled, cancelled (pipeline view — percentages, not saga states)
+- Top-selling SKUs by revenue and by units (from Analytics BC `ProductPerformance` projection)
+- Customer acquisition this week/month (new registrations from Customer Identity BC)
+- Inventory health summary: how many SKUs have active low-stock alerts
+- Return rate this month (returns / orders ratio)
+
+**Report exports:**
+```
+GET /api/admin/reports/sales?from={date}&to={date}&format=csv
+└─> AdminPortal.Api
+    └─> GET /api/analytics/sales?from={date}&to={date} (Analytics BC)
+        └─> Stream CSV response to browser download
+```
+
+**What they do NOT see:** Individual order details, customer PII, product content edit tools, price management, inventory detail.
+
+---
 
 ### What it receives
 
-**Integration Messages (for real-time dashboard updates via SignalR):**
-- `OrderPlaced` from Orders — increment live order counter
-- `OrderCancelled` from Orders — decrement active order count, flag if high rate
-- `PaymentFailed` from Payments — alert to operations team
-- `ReservationFailed` from Inventory — alert to merchandising (potential stockout)
-- `InventoryLow` from Inventory — surface reorder alert
-- `ShipmentDeliveryFailed` from Fulfillment — surface to customer service queue
-- `ReturnRequested` from Returns — add to return review queue
-- `RefundFailed` from Payments — alert requiring manual intervention
-- All events consumed by Analytics BC (same event bus subscription — different projections)
+**Integration Messages (consumed from RabbitMQ — for real-time dashboard pushes via SignalR):**
+- `OrderPlaced` — increment live order counter; push to `role:operations` and `role:executive`
+- `OrderCancelled` — update active order count; flag if cancellation rate spikes
+- `PaymentFailed` — push `AlertRaised` to `role:operations`
+- `ReservationFailed` — push stockout alert to `role:operations` and `role:warehouseclerk`
+- `InventoryLow` — push low-stock alert to `role:warehouseclerk` and `role:operations`
+- `ShipmentDeliveryFailed` — push to `role:customerservice` alert queue
+- `ReturnRequested` — add to return review queue for `role:customerservice`
+- `RefundFailed` — push high-severity alert to `role:operations` (requires manual intervention)
 
-**HTTP Queries to Downstream BCs:**
-- Orders BC: order detail, saga state history, order search
-- Customer Identity BC: customer lookup, address history
-- Inventory BC: stock levels, reservation summary
-- Product Catalog BC: product list and detail (admin endpoints)
-- Payments BC: payment history for an order (future)
-- Analytics BC: aggregated projections (SalesFunnel, ProductPerformance, InventoryVelocity)
+**HTTP Queries routed to domain BCs (on demand, per request):**
+- Product Catalog BC: product list, product detail, content history
+- Pricing BC: current prices, price history, scheduled changes
+- Inventory BC: stock levels, reservation pipeline, alert history
+- Orders BC: order detail, order search by customer, saga state history
+- Customer Identity BC: customer lookup by email, address history
+- Payments BC: payment attempts per order
+- Returns BC: return requests per order/customer
+- Analytics BC: `SalesFunnel`, `ProductPerformance`, `InventoryVelocity`, `CustomerLifetimeValue`
 
 ### What it publishes
 
-**Commands (mutations via HTTP POST to domain BCs):**
-- `CancelOrder` → Orders BC (customer service tooling)
-- `IssueStoreCredit` → Store Credit BC (goodwill credit for customer service)
-- `AcknowledgeLowStockAlert` → Inventory BC (already planned in Inventory BC)
-- `AddProduct`, `UpdateProduct`, `ChangeProductStatus` → Product Catalog BC (merchandising tools)
-- `SetBasePrice`, `SchedulePriceChange` → Pricing BC (when live)
-- `CreatePromotion`, `DeactivatePromotion` → Promotions BC (when live)
+**Commands sent to domain BCs (HTTP POST — admin initiates, domain BC executes):**
+- `UpdateProductDescription` → Product Catalog BC (CopyWriter role)
+- `ChangeProductStatus` → Product Catalog BC (OperationsManager, SystemAdmin)
+- `SetBasePrice` / `SchedulePriceChange` → Pricing BC (PricingManager role)
+- `AdjustInventory` → Inventory BC (WarehouseClerk role)
+- `ReplenishStock` → Inventory BC (WarehouseClerk role)
+- `AcknowledgeLowStockAlert` → Inventory BC (WarehouseClerk, OperationsManager)
+- `CancelOrder` → Orders BC (CustomerService, OperationsManager)
+- `IssueStoreCredit` → Store Credit BC (CustomerService role)
 
-**SignalR Messages (to connected internal clients via `IAdminPortalMessage`):**
-- `LiveMetricUpdated` — revenue counter, order count, fulfillment throughput
-- `AlertRaised` — payment failure spike, inventory stockout, delivery failure cluster
-- `OrderQueueChanged` — saga state distribution update (for operations dashboard pipeline view)
+**SignalR Messages pushed to connected admin clients (via Wolverine `opts.UseSignalR()`):**
+- `LiveMetricUpdated` — revenue counter, order count (pushed to `role:executive` and `role:operations`)
+- `AlertRaised` — payment failure, stockout, delivery failure (pushed to appropriate role groups)
+- `OrderCountUpdated` — saga state distribution update (pushed to `role:operations`)
+- `LowStockAlertRaised` — specific SKU below threshold (pushed to `role:warehouseclerk` and `role:operations`)
 
 ### Core Invariants
 
 - Admin Portal does NOT contain business logic — all mutations are delegated to domain BCs
-- Role-based access control: Executive users see dashboards only; Operations users can intervene; Administrators can access all tooling
-- All user actions (cancellations, credits) must be attributed to the internal user who performed them (audit trail)
-- SignalR connection must be authenticated (JWT or session cookie); admin hub must not be accessible without valid internal credentials
-- Admin Portal does not persist its own state — all data lives in upstream BCs and Analytics projections
+- Every mutating request includes `adminUserId` in the payload; domain BCs record it in their events for audit trail
+- RBAC is enforced at the `AdminPortal.Api` layer (authorization policies per endpoint); frontend role-scoping is cosmetic only
+- SignalR hub (`/hub/admin`) requires authenticated JWT; role claims determine which hub groups the connection joins
+- Admin Portal does not persist its own transactional state — dashboard projections are cached event-driven read models; all source-of-truth data lives in domain BCs
+- PII accessed via Admin Portal (customer emails, addresses) must be logged per access for GDPR compliance audit
 
 ### What it doesn't own
 
@@ -3043,41 +3302,79 @@ This context is also a natural incubator for exploring **non-Blazor frontend tec
 - Analytics projections (Analytics BC — Admin Portal consumes them)
 - Customer-facing UI (Customer Experience BC)
 - Vendor-facing portal (Vendor Portal BC)
+- Admin user identity and authentication (Admin Identity BC — separate, analogous to Customer Identity and Vendor Identity)
 
 ### Integration Flows
 
-**Real-Time Executive Dashboard (Revenue + Order Pipeline):**
+**Live Executive Dashboard — Revenue Counter:**
 ```
 [Orders BC domain logic]
-CheckoutCompleted → Order saga starts → OrderPlaced published
+CheckoutCompleted → Order saga starts → OrderPlaced published to RabbitMQ
 
 [Admin Portal notification handler]
-OrderPlaced (from RabbitMQ)
-  └─> OrderPlacedAdminHandler
-      ├─> Increment LiveOrderCount projection
-      └─> Publish LiveMetricUpdated → admin:{tenantGroup} via SignalR
-          └─> React/Vue dashboard updates revenue counter + order pipeline bar
-
-[Admin Portal query]
-GET /api/admin/dashboard/live
-  └─> Compose: Analytics.SalesFunnel + Analytics.ProductPerformance + Inventory.LowStockAlerts
-      └─> Return AdminDashboardView (no second query to domain BCs for static metrics)
+OrderPlaced (from RabbitMQ exchange)
+  └─> OrderPlacedAdminHandler (Wolverine handler in AdminPortal domain assembly)
+      ├─> Update AdminMetrics projection (today's order count + revenue estimate)
+      └─> Wolverine SignalR transport:
+          └─> Publish LiveMetricUpdated to hub groups: role:executive, role:operations
+              └─> React/Vue dashboard: revenue counter animates, order pipeline bar updates
 ```
 
-**Customer Service Order Lookup:**
+**Copy Writer — Edit Product Description:**
 ```
-GET /api/admin/customers?email={email}
-  └─> Query Customer Identity BC: GET /api/customers?email={email}
-      └─> Return customer summary
+CopyWriter logs in → JWT issued with role:CopyWriter
 
-GET /api/admin/orders?customerId={customerId}
-  └─> Query Orders BC: GET /api/orders?customerId={customerId}
-      └─> Return order history with saga state per order
+POST /api/admin/products/{sku}/content
+Authorization: Bearer {jwt}
+Body: { "description": "Updated product copy...", "adminUserId": "uuid" }
+
+AdminPortal.Api:
+├─> [Authorize(Policy = "RequireCopyWriter")] attribute — rejects other roles with 403
+├─> Validate: description non-empty, max 5000 chars
+└─> HTTP POST /api/catalog/products/{sku}/description (Product Catalog BC)
+    └─> Product Catalog BC: UpdateProductDescription command
+        └─> ProductDescriptionUpdated event
+            └─> Event carries adminUserId — audit trail in Product Catalog event stream
+            └─> Search BC handler updates search index (when live)
+```
+
+**Warehouse Clerk — Receive Inbound Stock:**
+```
+WarehouseClerk scans inbound pallet → enters PO reference in portal
+
+POST /api/admin/inventory/{sku}/receive
+Authorization: Bearer {jwt}  (role:WarehouseClerk)
+Body: { "warehouseId": "WH-01", "quantity": 50, "purchaseOrderRef": "PO-2026-0042" }
+
+AdminPortal.Api:
+├─> [Authorize(Policy = "RequireWarehouseClerk")]
+├─> Validate: quantity > 0, warehouseId exists
+└─> HTTP POST /api/inventory/{sku}/replenish (Inventory BC)
+    └─> Inventory BC: ReplenishStock command
+        └─> StockReplenished event (carries adminUserId, purchaseOrderRef)
+            └─> LowStockAlert deactivated if threshold now exceeded
+            └─> Analytics BC: InventoryVelocity projection updated
+```
+
+**Customer Service — Order Cancellation:**
+```
+Customer calls CS rep, wants to cancel order
+
+GET /api/admin/customers?email=customer@example.com
+└─> AdminPortal.Api: fan-out
+    ├─> Customer Identity BC: GET /api/identity/search?email=...
+    └─> Orders BC: GET /api/orders?customerId={id}&limit=10
+        └─> Return CustomerServiceView (customer info + recent orders)
+
+Rep confirms order is still cancellable (saga state check)
 
 POST /api/admin/orders/{orderId}/cancel
-  └─> CancelOrderAdminCommand (includes adminUserId for audit)
-      └─> Send CancelOrder → Orders BC
-          └─> Order saga handles cancellation and compensation
+Body: { "reason": "CustomerRequested", "adminUserId": "cs-rep-uuid" }
+└─> AdminPortal.Api → Orders BC: POST /api/orders/{orderId}/cancel
+    └─> Order saga handles CancelOrder:
+        ├─> OrderCancelled event published
+        ├─> ReservationReleased → Inventory BC restores stock
+        └─> RefundInitiated → Payments BC processes refund
 ```
 
 ### Project Structure (Planned)
@@ -3085,53 +3382,101 @@ POST /api/admin/orders/{orderId}/cancel
 ```
 src/
   Admin Portal/
-    AdminPortal/                      # Domain project (regular SDK)
-      AdminPortal.csproj              # References: Messages.Contracts only
-      Clients/                        # HTTP client interfaces
-        IOrdersAdminClient.cs
-        IInventoryAdminClient.cs
-        IAnalyticsClient.cs
-        ICustomerIdentityAdminClient.cs
-      Composition/                    # Admin view models
+    AdminPortal/                          # Domain project (regular SDK)
+      AdminPortal.csproj                  # References: Messages.Contracts only
+      Clients/                            # HTTP client interfaces (to domain BCs)
+        IProductCatalogAdminClient.cs     # product list, content update
+        IPricingAdminClient.cs            # current price, history, schedule
+        IInventoryAdminClient.cs          # stock levels, adjust, replenish
+        IOrdersAdminClient.cs             # order search, detail, cancel
+        ICustomerIdentityAdminClient.cs   # customer search
+        IPaymentsAdminClient.cs           # payment history per order
+        IReturnsAdminClient.cs            # return history per order
+        IAnalyticsClient.cs              # aggregated projections
+        IStoreCreditAdminClient.cs        # issue credit
+      Composition/                        # Admin view models (aggregated from domain BCs)
         AdminDashboardView.cs
-        OrderQueueView.cs
-        CustomerDetailView.cs
-        InventoryAlertView.cs
-      Notifications/                  # Integration message handlers
-        IAdminPortalMessage.cs        # Marker interface for SignalR routing
-        OrderPlacedAdminHandler.cs
-        PaymentFailedAdminHandler.cs
-        ReservationFailedAdminHandler.cs
-        ShipmentDeliveryFailedAdminHandler.cs
+        CustomerServiceView.cs            # customer profile + recent orders
+        OrderDetailView.cs                # saga timeline + payment + fulfillment
+        ProductContentView.cs             # sku, name, description, lastEditedBy
+        PricingDashboardView.cs           # sku, currentPrice, history, scheduled
+        InventoryDashboardView.cs         # sku, available, reserved, alerts
+        ReportView.cs                     # CSV/Excel export models
+      Notifications/                      # RabbitMQ integration message handlers → SignalR
+        IAdminPortalMessage.cs            # Wolverine SignalR marker interface
+        OrderPlacedAdminHandler.cs        # → LiveMetricUpdated to role:executive, role:operations
+        PaymentFailedAdminHandler.cs      # → AlertRaised to role:operations
+        InventoryLowAdminHandler.cs       # → LowStockAlertRaised to role:warehouseclerk + role:operations
+        ShipmentDeliveryFailedAdminHandler.cs  # → AlertRaised to role:customerservice
+        ReturnRequestedAdminHandler.cs    # → ReturnQueueUpdated to role:customerservice
+      Projections/                        # Lightweight cached metrics (not authoritative)
+        AdminMetricsProjection.cs         # today's order count, revenue estimate (for live counter)
 
-    AdminPortal.Api/                  # API project (Web SDK)
-      AdminPortal.Api.csproj          # References: AdminPortal, Messages.Contracts
-      Program.cs                      # Wolverine + Marten + SignalR + auth setup
-      appsettings.json
-      Properties/launchSettings.json  # Port: 5242 (AdminPortal.Api)
-      Queries/                        # Admin HTTP endpoints
-        GetDashboardView.cs
-        GetOrderQueue.cs
-        GetCustomerDetail.cs
-        GetInventoryAlerts.cs
-      Commands/                       # Admin mutation endpoints
-        CancelOrderAdmin.cs
-        AcknowledgeAlert.cs
-      AdminPortalHub.cs               # SignalR hub at /hub/admin
+    AdminPortal.Api/                      # API project (Web SDK)
+      AdminPortal.Api.csproj              # References: AdminPortal, Messages.Contracts
+      Program.cs                          # Wolverine + Marten + SignalR + RBAC auth setup
+      appsettings.json                    # connection strings, downstream BC base URLs
+      Properties/launchSettings.json      # Port: 5242
+      Authorization/
+        AdminRoles.cs                     # role name constants
+        AdminPolicies.cs                  # ASP.NET Core policy definitions per role
+      Queries/                            # HTTP GET endpoints (compose from domain BCs)
+        GetDashboardView.cs               # executive dashboard
+        GetOperationsView.cs              # live operations
+        GetCustomerServiceView.cs         # customer + order lookup
+        GetProductContentList.cs          # copy writer view
+        GetPricingDashboard.cs            # pricing manager view
+        GetInventoryDashboard.cs          # warehouse clerk view
+        GetReportExport.cs                # CSV/Excel export
+      Commands/                           # HTTP POST endpoints (route to domain BCs)
+        UpdateProductContent.cs           # → Product Catalog BC
+        SetProductPrice.cs                # → Pricing BC
+        SchedulePriceChange.cs            # → Pricing BC
+        AdjustInventory.cs                # → Inventory BC
+        ReceiveStock.cs                   # → Inventory BC
+        AcknowledgeAlert.cs               # → Inventory BC
+        CancelOrderAdmin.cs               # → Orders BC
+        IssueCreditAdmin.cs               # → Store Credit BC
+      Clients/                            # HTTP client implementations
+        ProductCatalogAdminClient.cs
+        PricingAdminClient.cs
+        InventoryAdminClient.cs
+        OrdersAdminClient.cs
+        CustomerIdentityAdminClient.cs
+        AnalyticsClient.cs
+        StoreCreditAdminClient.cs
+      AdminPortalHub.cs                   # SignalR hub at /hub/admin
 
-    AdminPortal.Web/                  # Frontend app
-      # Option A: Blazor Server (consistent with existing stack)
-      # Option B: React (Next.js with SSR) — recommended for richer dashboard UX
-      # Option C: Vue.js (Nuxt.js with SSR)
-      # Frontend connects to AdminPortal.Api SignalR hub
+    AdminPortal.Web/                      # Frontend (choose one)
+      # Option A: Blazor Server — consistent with existing C# stack
+      # Option B: React (Next.js SSR) — recommended; richer component ecosystem for dashboards
+      # Option C: Vue.js (Nuxt.js SSR) — strong alternative to React
+      # Port: 5243
+      # Connects to AdminPortal.Api SignalR hub at /hub/admin
+      # Uses @microsoft/signalr npm package (Options B/C) or Microsoft.AspNetCore.SignalR.Client (Option A)
 ```
+
+### Admin Identity BC (Prerequisite)
+
+Admin Portal requires its own internal user identity system — separate from Customer Identity and Vendor Identity. This is a lightweight additional BC:
+
+**Why separate?** Admin users are employees/contractors, not customers. They have role-based access, may require corporate SSO integration, and their authentication audit trail must be kept separate from customer data.
+
+**Options (to decide during implementation cycle):**
+1. **Lightweight internal user store** — ASP.NET Core Identity backed by a separate Postgres schema (`adminidentity`); same pattern as Customer Identity and Vendor Identity
+2. **Corporate SSO / IdP integration** — Microsoft Entra ID (Azure AD), Okta, or Auth0; admin users log in with their corporate credentials; JWT issued by IdP and validated by AdminPortal.Api. Recommended for teams > 20 people.
+3. **Hybrid** — Local admin store for initial development; corporate SSO integration in a later cycle
+
+For reference architecture purposes, Option 1 (local store, same pattern as Customer Identity) is the simplest starting point and avoids external service dependencies in local development.
 
 ### Key Design Decisions
 
-- **SignalR from day one:** Real-time metric updates are the primary value proposition of this BC. Unlike the Customer Experience BC which started with SSE and migrated, Admin Portal should use Wolverine's `opts.UseSignalR()` from the start (lesson learned from ADR 0013).
-- **Single hub group model:** Admin Portal uses role-scoped hub groups (`role:executive`, `role:operations`, `role:customerservice`) rather than per-user groups. Broadcast metrics to all users with appropriate role.
-- **SSR for initial load:** Executive dashboards are data-heavy; SSR (Next.js/Nuxt.js) ensures meaningful content renders before JavaScript hydrates, avoiding blank-screen flash on navigation.
-- **Authentication:** Internal users authenticate via a separate auth mechanism from Customer Identity BC (could reuse the same ASP.NET Core auth middleware with different user store, or integrate with a corporate IdP — e.g., Microsoft Entra/Azure AD for enterprise feel).
+- **Gateway, not proxy:** AdminPortal.Api composes and translates — it does not merely proxy requests to domain BCs. It may fan out to multiple BCs in parallel and merge results (e.g., customer lookup fans out to Customer Identity + Orders).
+- **SignalR from day one:** Real-time alerts and metric updates are primary value for OperationsManager and WarehouseClerk roles. Use `opts.UseSignalR()` from the start — lesson learned from Customer Experience BC's SSE → SignalR migration debt.
+- **Role-scoped hub groups:** Each SignalR connection joins groups matching its JWT role claims (`role:executive`, `role:operations`, `role:customerservice`, `role:warehouseclerk`). Alerts are targeted to the role(s) that need to act on them.
+- **Audit trail via domain events:** Admin mutations include `adminUserId` in the command body. Domain BCs record this in their events. Admin Portal does not need its own audit log — the event streams are the audit trail.
+- **SSR for initial load:** Executive and operations dashboards are data-heavy; SSR (Next.js/Nuxt.js) ensures meaningful content renders before JavaScript hydrates. Live metric updates layer on top via SignalR hydration.
+- **No PII in SignalR messages:** SignalR push messages contain IDs and counts, never customer names, emails, or order details. PII is fetched on demand via authenticated HTTP GET only.
 
 ---
 
