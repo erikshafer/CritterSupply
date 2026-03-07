@@ -65,7 +65,11 @@ CritterSupply includes specialized GitHub Copilot agents with domain expertise t
 
 - **🚀 DevOps Engineer** ([`.github/agents/devops-engineer.md`](./.github/agents/devops-engineer.md)) - DevOps/GitOps specialist with expertise in CI/CD orchestration, Infrastructure as Code (IaC), deployment strategies (blue/green, canary, rollback), GitHub Actions, Docker/Kubernetes, and observability (OpenTelemetry). Designs autonomous deployment pipelines with risk analysis and environment-aware strategy adaptation.
 
-**How to use:** Tag the agent (`@principal-architect`, `@product-owner`, or `@devops-engineer`) in pull request or issue comments to get specialized feedback on architectural decisions, code quality, business workflow validation, or deployment strategies.
+- **🧪 QA Engineer** ([`.github/agents/qa-engineer.md`](./.github/agents/qa-engineer.md)) - Seasoned quality assurance professional with expertise in manual and automated testing, BDD, and full-stack quality strategy. Expert in building test coverage for event-driven, distributed .NET systems using the Critter Stack (Wolverine + Marten) and verifying system integrity across bounded contexts.
+
+- **🎨 UX Engineer** ([`.github/agents/ux-engineer.md`](./.github/agents/ux-engineer.md)) - User experience specialist focused on frontend design, accessibility, and UI patterns for Blazor applications. Provides feedback on component design, user flows, and ensuring the storefront delivers a cohesive, intuitive experience.
+
+**How to use:** Tag the agent (`@principal-architect`, `@product-owner`, `@devops-engineer`, `@qa-engineer`, or `@ux-engineer`) in pull request or issue comments to get specialized feedback.
 
 **Example prompts:**
 ```
@@ -75,11 +79,15 @@ CritterSupply includes specialized GitHub Copilot agents with domain expertise t
 
 @devops-engineer How should we deploy this Orders BC refactor with zero downtime?
 
+@qa-engineer What integration tests should we add to cover the new checkout flow?
+
+@ux-engineer Does this checkout page layout follow good UX principles?
+
 @principal-architect Is this bounded context boundary properly defined?
 
 @product-owner Should "BackorderRequested" be a separate event or extend "ReservationFailed"?
 
-@devops-engineer Can you design a Helm chart for Kubernetes deployment?
+@qa-engineer Is the BDD coverage sufficient for the Order saga happy path?
 ```
 
 ## 🛠️ Technology Stack <a id='1.4'></a>
@@ -172,132 +180,77 @@ For detailed responsibilities, interactions, and event flows between contexts, s
 
 ### 🔌 External Service Integration (Stripe)
 
-The Payments BC includes comprehensive documentation for integrating with Stripe's payment API as a reference implementation for third-party service integration in event-driven systems:
-
-- **Research Spike:** [`docs/planning/spikes/stripe-api-integration.md`](./docs/planning/spikes/stripe-api-integration.md) — Comprehensive overview of Stripe's API patterns, webhook integration, idempotency, and error handling
-- **ADR:** [`docs/decisions/0010-stripe-payment-gateway-integration.md`](./docs/decisions/0010-stripe-payment-gateway-integration.md) — Architectural decision record for webhook-driven payment processing
-- **Code Examples:** [`docs/examples/stripe/`](./docs/examples/stripe/) — Reference implementations for payment gateway and webhook handlers
-
-**Key Patterns Demonstrated:**
-- Two-phase commit (authorize → capture) aligned with Order saga
-- Webhook-driven event handling for eventual consistency
-- HMAC-SHA256 signature verification for security
-- Idempotency keys for safe retries
-- Event deduplication in distributed systems
+The Payments BC includes a reference implementation for third-party payment integration: a [research spike](./docs/planning/spikes/stripe-api-integration.md), [ADR 0010](./docs/decisions/0010-stripe-payment-gateway-integration.md), and [code examples](./docs/examples/stripe/) covering Stripe's webhook-driven model, two-phase authorize/capture aligned with the Order saga, HMAC-SHA256 signature verification, and idempotency keys for safe retries.
 
 ## ⏩ How to Run <a id='5.0'></a>
 
 ### Requirements <a id='5.2'></a>
-
-This software solution has multiple dependencies that need to be running locally.
 
 - [.NET 10](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
 - [Docker Desktop](https://docs.docker.com/engine/install/)
 
 ### 🛠️ Local Development <a id='5.3'></a>
 
-#### Option 1: Docker Compose (⭐ Recommended - Simplest)
-
-**The default workflow for CritterSupply:**
+#### Option 1: Docker Compose + dotnet run (⭐ Recommended)
 
 ```bash
 # 1. Start infrastructure (Postgres, RabbitMQ, Jaeger)
 docker-compose --profile infrastructure up -d
 
-# 2. Build the solution
-dotnet build
-
-# 3. Run tests
-dotnet test
-
-# 4. Run a specific BC (e.g., Customer Experience)
+# 2. Run a service (e.g., Customer Experience storefront)
 dotnet run --project "src/Customer Experience/Storefront.Web/Storefront.Web.csproj"
 # Navigate to http://localhost:5238
 ```
 
-**Why this is the default:**
-- ✅ **Zero additional setup** - Just Docker Desktop + .NET 10
-- ✅ **Fastest hot reload** - Native .NET process, not containerized
-- ✅ **Best debugging** - F5 in Rider/Visual Studio works seamlessly
-- ✅ **Lower memory** - Only infrastructure in containers (~300MB vs ~2GB)
-- ✅ **Full IDE tooling** - Profilers, diagnostics, live unit testing all work
-
-**See [QUICKSTART.md](./QUICKSTART.md) for step-by-step guide.**
+**See [QUICKSTART.md](./QUICKSTART.md) for a full step-by-step guide.**
 
 ---
 
-#### Option 2: .NET Aspire (Optional - Enhanced Observability)
-
-**.NET Aspire** provides a unified dashboard for all 9 .NET services. **For developers who want enhanced observability:**
+#### Option 2: .NET Aspire (Optional — Enhanced Observability)
 
 ```bash
-# Step 1: Start infrastructure (Postgres, RabbitMQ, Jaeger) with fixed ports
+# Start infrastructure first
 docker-compose --profile infrastructure up -d
 
-# Step 2: Start all 8 APIs + Blazor Web via Aspire
+# Then start all services via Aspire
 dotnet run --project src/CritterSupply.AppHost
 
 # 🚀 Aspire Dashboard: https://localhost:17265
 # 🛍️ Storefront Web:   http://localhost:5238
 ```
 
-**What Aspire adds:**
-- ✅ **Unified dashboard** - Live logs, traces, metrics, health checks for all .NET services
-- ✅ **One command** - Starts all 9 .NET services (vs 9 manual `dotnet run` commands)
-- ✅ **Service discovery** - Automatic HTTP endpoint discovery for service-to-service calls
-- ✅ **Demo-friendly** - Polished UI for showcasing system to stakeholders
-
-**Why Aspire is optional (not required):**
-- Docker Compose provides all functionality needed for development
-- Aspire adds learning curve and additional concepts
-- Most developers prefer native debugging over containerized orchestration
-
-**See [docs/ASPIRE-GUIDE.md](./docs/ASPIRE-GUIDE.md) for Aspire setup or [ADR 0009](./docs/decisions/0009-aspire-integration.md) for architecture details.**
+**See [docs/ASPIRE-GUIDE.md](./docs/ASPIRE-GUIDE.md) for setup details or [ADR 0009](./docs/decisions/0009-aspire-integration.md) for the rationale.**
 
 ---
 
 #### Option 3: Fully Containerized (Demos & Onboarding)
 
-**Run entire stack in Docker containers** (useful for demos, onboarding, or integration testing):
-
 ```bash
-# Start infrastructure + all 8 APIs + Blazor web in containers
+# Start infrastructure + all APIs + Blazor web in containers
 docker-compose --profile all up --build
 
 # 🛍️ Storefront Web: http://localhost:5238
 ```
 
-**When to use:**
-- Onboarding new developers (no .NET SDK required on host)
-- Demonstrating full system to stakeholders
-- Cross-BC integration testing without running services natively
-
-**Selective service startup:**
+**Selective startup:**
 
 ```bash
 # Infrastructure + specific BCs
 docker-compose --profile infrastructure --profile orders --profile shopping up
-
-# Infrastructure only (default for native development)
-docker-compose --profile infrastructure up -d
 ```
 
 **Stop and cleanup:**
 
 ```bash
-# Stop all containers
-docker-compose --profile all down
-
-# Stop and remove volumes (fresh start)
-docker-compose --profile all down -v
+docker-compose --profile all down        # Stop all containers
+docker-compose --profile all down -v     # Stop and remove volumes (fresh start)
 ```
 
 #### Run Individual Bounded Contexts (Native)
 
-Each BC can be run independently with `dotnet run`. See [CLAUDE.md](./CLAUDE.md) for port allocations and detailed run commands.
+Each BC can be run independently with `dotnet run`. See [CLAUDE.md](./CLAUDE.md) for port allocations and run commands.
 
 ```bash
-# Examples:
 dotnet run --project "src/Orders/Orders.Api/Orders.Api.csproj"        # Port 5231
 dotnet run --project "src/Shopping/Shopping.Api/Shopping.Api.csproj"  # Port 5236
 dotnet run --project "src/Product Catalog/ProductCatalog.Api/ProductCatalog.Api.csproj"  # Port 5133
@@ -309,40 +262,7 @@ Each BC includes `.http` files for manual testing. See [docs/HTTP-FILES-GUIDE.md
 
 #### 🔭 Distributed Tracing with Jaeger
 
-CritterSupply ships with [Jaeger](https://www.jaegertracing.io/) for distributed tracing across all bounded contexts. All API projects are instrumented with OpenTelemetry and export traces via OTLP to Jaeger.
-
-**Access Jaeger UI:** http://localhost:16686
-
-Jaeger starts automatically with the `infrastructure` profile:
-
-```bash
-# Start infrastructure (Postgres + RabbitMQ + Jaeger)
-docker-compose --profile infrastructure up -d
-
-# Then run an API natively, e.g.:
-dotnet run --project "src/Orders/Orders.Api/Orders.Api.csproj"
-
-# Open Jaeger UI to view traces
-# http://localhost:16686
-```
-
-**Trace coverage:**
-- HTTP request spans (ASP.NET Core instrumentation)
-- Wolverine message handler spans (via `AddSource("Wolverine")`)
-- Cross-service message flows (HTTP → Wolverine → RabbitMQ)
-
-**Service names in Jaeger UI:**
-
-| Service | Port |
-|---------|------|
-| Orders | 5231 |
-| Payments | 5232 |
-| Inventory | 5233 |
-| Fulfillment | 5234 |
-| CustomerIdentity | 5235 |
-| Shopping | 5236 |
-| ProductCatalog | 5133 |
-| Storefront | 5237 |
+CritterSupply ships with [Jaeger](https://www.jaegertracing.io/) for distributed tracing. Jaeger starts automatically with the `infrastructure` profile — access the UI at **http://localhost:16686**. All API projects are instrumented with OpenTelemetry via OTLP export.
 
 ## 🏫 Resources <a id='9.0'></a>
 
