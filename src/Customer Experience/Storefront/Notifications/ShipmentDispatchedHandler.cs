@@ -20,7 +20,7 @@ public static class ShipmentDispatchedHandler
             message.ShipmentId,
             message.OrderId,
             customerId,
-            "Shipped",
+            "Dispatched",
             message.TrackingNumber,
             message.DispatchedAt);
     }

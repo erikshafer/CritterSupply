@@ -67,8 +67,13 @@ jobs:
 
       - name: Install Playwright browsers
         run: |
-          dotnet tool install --global Microsoft.Playwright.CLI || true
-          pwsh tests/Customer\ Experience/Storefront.E2ETests/bin/Release/*/playwright.ps1 install chromium --with-deps
+          dotnet tool update --global Microsoft.Playwright.CLI || dotnet tool install --global Microsoft.Playwright.CLI
+          playwright_script=$(find "tests/Customer Experience/Storefront.E2ETests/bin/Release" -maxdepth 2 -type f -name 'playwright.ps1' | head -n 1)
+          if [ -z "$playwright_script" ]; then
+            echo "playwright.ps1 not found under tests/Customer Experience/Storefront.E2ETests/bin/Release" >&2
+            exit 1
+          fi
+          pwsh "$playwright_script" install chromium --with-deps
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 0
 
