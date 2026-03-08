@@ -145,6 +145,10 @@
   <Folder Name="/Shared/">
     <Project Path="src/Shared/Messages.Contracts/Messages.Contracts.csproj" />
   </Folder>
+  <Folder Name="/Pricing/">
+    <Project Path="src/Pricing/Pricing/Pricing.csproj" />
+    <Project Path="tests/Pricing/Pricing.UnitTests/Pricing.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/Aspire/">
     <Project Path="src/CritterSupply.AppHost/CritterSupply.AppHost.csproj" />
     <Project Path="src/CritterSupply.ServiceDefaults/CritterSupply.ServiceDefaults.csproj" />
