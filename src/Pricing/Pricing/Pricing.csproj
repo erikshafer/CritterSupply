@@ -7,8 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Marten" />
-    <PackageReference Include="System.Text.Json" />
+    <PackageReference Include="WolverineFx.Http.Marten" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Messages.Contracts\Messages.Contracts.csproj" />
   </ItemGroup>
 
 </Project>
