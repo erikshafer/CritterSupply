@@ -169,14 +169,23 @@ src/Vendor Portal/
 │   └── VendorPortal.csproj
 ├── VendorPortal.Api/          (API: HTTP endpoints, VendorPortalHub, DI wiring) — port 5239
 │   └── VendorPortal.Api.csproj
-└── VendorPortal.Web/          (Blazor: UI components, SignalR client) — port 5241
-    └── VendorPortal.Web.csproj
+└── VendorPortal.Web/          (Blazor WASM frontend) — port 5241
+    └── VendorPortal.Web.csproj  (SDK: Microsoft.NET.Sdk.BlazorWebAssembly)
 ```
+
+> **Frontend technology decision (ADR 0021):** `VendorPortal.Web` is **Blazor WebAssembly (WASM)**,
+> intentionally diverging from `Storefront.Web` (Blazor Server). Reasons:
+> - Long sessions (8–12h) require WASM's browser-resident runtime — no server circuit to GC
+> - JWT `AccessTokenProvider` factory is native to WASM; avoids `IHttpContextAccessor` plumbing
+> - One WebSocket connection per user (hub only) vs Blazor Server's two (circuit + hub)
+> - Static file deployment via Nginx; no .NET runtime in the Web container
+>
+> See [ADR 0021: Blazor WASM for VendorPortal.Web](../decisions/0021-blazor-wasm-for-vendor-portal-web.md)
 
 **Responsibility boundaries (non-negotiable):**
 - `VendorPortal` (domain): Aggregates, projections, notification handlers (thin: receive integration message → return typed hub message)
-- `VendorPortal.Api`: HTTP endpoints (`[WolverineGet/Post]`), `VendorPortalHub`, `Program.cs`, RabbitMQ subscriptions, JWT validation
-- `VendorPortal.Web`: Blazor pages/components, `HubConnectionBuilder`, JWT token storage
+- `VendorPortal.Api`: HTTP endpoints (`[WolverineGet/Post]`), `VendorPortalHub : WolverineHub`, `Program.cs`, RabbitMQ subscriptions, JWT validation
+- `VendorPortal.Web`: Blazor WASM pages/components, `VendorHubService` (singleton, owns `HubConnection`), `ITokenService` (JWT in WASM memory), background token refresh timer
 
 ### SignalR Architecture
 
@@ -192,9 +201,15 @@ public interface IVendorUserMessage { Guid VendorUserId { get; } }
 
 **Hub design (minimal, secure):**
 
+> ⚠️ **IMPORTANT:** `VendorPortalHub` must inherit `WolverineHub` — **not** plain `Hub`.
+> The VP requires client→server Wolverine routing (change request responses, alert acknowledgments).
+> `WolverineHub.OnConnectedAsync()` registers the connection with Wolverine's routing pipeline.
+> Inheriting plain `Hub` breaks client→server message dispatch silently.
+> See `docs/skills/wolverine-signalr.md` for the `WolverineHub` vs `Hub` distinction.
+
 ```csharp
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-public sealed class VendorPortalHub : Hub
+public sealed class VendorPortalHub : WolverineHub  // ← WolverineHub, not Hub
 {
     public override async Task OnConnectedAsync()
     {
@@ -215,7 +230,7 @@ public sealed class VendorPortalHub : Hub
             await Groups.AddToGroupAsync(Context.ConnectionId, $"vendor:{tenantId}");
         }
         
-        await base.OnConnectedAsync();
+        await base.OnConnectedAsync();  // ← Required: registers connection with Wolverine routing
     }
 }
 ```

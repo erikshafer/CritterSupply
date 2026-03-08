@@ -889,12 +889,19 @@ Recommended feature files:
 - Command handler (RecordShipment → Fulfillment BC)
 - Integration tests for order tracking
 
-**Session 6-7:** UI Implementation (Blazor/React)
-- Product management pages
-- Inventory management pages
-- Order fulfillment pages
-- Analytics dashboard
-- Change request review (admin view)
+**Session 6-7:** UI Implementation (Blazor WASM — `VendorPortal.Web`)
+
+> **Technology decision:** `VendorPortal.Web` uses **Blazor WebAssembly (WASM)** — see [ADR 0021](../decisions/0021-blazor-wasm-for-vendor-portal-web.md).
+> Intentionally diverges from `Storefront.Web` (Blazor Server) due to long sessions (8–12h), JWT-native hub auth, and single WebSocket connection per user.
+
+- `VendorHubService` singleton with `AccessTokenProvider` factory (JWT refresh-on-reconnect)
+- Background token refresh timer (every 13 min — prevents mid-session 401)
+- "Live" indicator component (green / reconnecting spinner)
+- Reconnect-and-catch-up for missed low-stock alerts (`GET /api/vendor-portal/alerts?since=lastSeenAt`)
+- Product management pages (change request drafting, submission, tracking)
+- Inventory management pages (snapshot view, alert feed, acknowledgment)
+- Analytics dashboard with ApexCharts.Blazor streaming charts (verify WASM compatibility in Phase 2 spike)
+- Change request history and detail pages
 
 **Session 8:** Edge Cases & Polish
 - Multi-tenancy isolation tests

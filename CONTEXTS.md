@@ -2059,7 +2059,28 @@ The Vendor Portal context provides partnered vendors with a private, tenant-isol
 
 **Real-Time**: SignalR via Wolverine (`opts.UseSignalR()`) — dual hub groups: `vendor:{tenantId}` (shared tenant notifications) and `user:{userId}` (individual notifications)
 
+**Frontend**: **Blazor WASM** — `VendorPortal.Web` (port 5241)
+- SDK: `Microsoft.NET.Sdk.BlazorWebAssembly`, `net10.0`
+- UI library: MudBlazor (consistent with ADR 0005) + ApexCharts.Blazor for streaming analytics charts
+- JWT token stored in WASM memory via `ITokenService` singleton; background refresh timer (every 13 min); `AccessTokenProvider` factory on `HubConnectionBuilder`
+- `VendorHubService` singleton pattern: owns `HubConnection` lifecycle, handles reconnect-and-catch-up, exposes observable `State` for Live indicator
+- Hosted by Nginx serving static files; no .NET runtime in the Web container
+- **Intentionally diverges from `Storefront.Web` (Blazor Server)** — VP requires 8–12 hour session stability, JWT-native hub auth, and single WebSocket connection per user. See [ADR 0021](docs/decisions/0021-blazor-wasm-for-vendor-portal-web.md).
+
+**Comparison: Storefront.Web vs VendorPortal.Web**
+
+| Dimension | Storefront.Web | VendorPortal.Web |
+|---|---|---|
+| Blazor hosting model | Server | **WASM** |
+| Session duration | Minutes (browse-and-buy) | Hours (ambient awareness, B2B) |
+| Auth mechanism | Session cookies (ADR 0012) | JWT Bearer (ADR 0015) |
+| Hub identity source | Query-string GUID (session-backed) | JWT claims only (cryptographic) |
+| Deployment | Kestrel (.NET container) | Nginx (static files) |
+| WebSocket connections/user | 2 (circuit + hub) | 1 (hub only) |
+
 **Event Modeling Session**: See [docs/planning/vendor-portal-event-modeling.md](docs/planning/vendor-portal-event-modeling.md) for full planning output including event diagrams, risks, and phased roadmap.
+
+**ADRs**: [ADR 0015: JWT for Vendor Identity](docs/decisions/0015-jwt-for-vendor-identity.md) · [ADR 0021: Blazor WASM for VendorPortal.Web](docs/decisions/0021-blazor-wasm-for-vendor-portal-web.md)
 
 ### Purpose
 
