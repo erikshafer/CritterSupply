@@ -1063,6 +1063,72 @@ StateHasChanged();
 
 **Rule of thumb:** If state changes in `OnAfterRenderAsync` or inside a `try/catch` wrapping a JS interop call, add `StateHasChanged()`. If you're unsure, adding it is safe — it is idempotent and just queues one additional render pass.
 
+### Pitfall: NetworkIdle vs. Blazor Rendering Completion
+
+**Symptom:** Test passes locally but fails in CI with "element not visible" or "timeout waiting for element" errors. `WaitForLoadStateAsync(LoadState.NetworkIdle)` completes, but assertions immediately after still fail.
+
+**Root cause:** `NetworkIdle` waits for HTTP requests to settle, but **not** for Blazor to finish rendering the response. In CI environments (slower CPUs, shared runners), the delay between "HTTP complete" and "DOM updated" is more pronounced.
+
+**Example failure:**
+```csharp
+// Step 1: Clear stub cart data
+_fixture.StubShoppingClient.Clear();
+
+// Step 2: Navigate to cart page
+await page.GotoAsync("/cart");
+await page.WaitForLoadStateAsync(LoadState.NetworkIdle); // ✅ HTTP complete
+
+// Step 3: Check for empty cart message
+var isVisible = await page.GetByText("Your cart is empty.").IsVisibleAsync();
+// ❌ Returns false in CI — Blazor hasn't rendered the empty state yet
+```
+
+**Why this happens:**
+1. `WaitForLoadStateAsync(LoadState.NetworkIdle)` ensures no more HTTP requests are in-flight
+2. But Blazor's `OnAfterRenderAsync` might still be executing (e.g., calling `LoadCart()`, updating `_cartView`, setting `_isLoading = false`)
+3. The component hasn't called `StateHasChanged()` or completed its render cycle yet
+4. Test checks `IsVisibleAsync()` immediately → returns `false` because DOM hasn't updated
+
+**Fix:** Use `WaitForAsync()` with a timeout instead of `IsVisibleAsync()` when checking for elements that depend on async component lifecycle:
+
+```csharp
+// WRONG — immediate check, no waiting for render
+public async Task<bool> IsEmptyCartMessageVisibleAsync()
+{
+    return await EmptyCartMessage.IsVisibleAsync();
+}
+
+// CORRECT — wait for element to appear in DOM before checking visibility
+public async Task<bool> IsEmptyCartMessageVisibleAsync()
+{
+    try
+    {
+        await EmptyCartMessage.WaitForAsync(new() { Timeout = 5000 });
+        return await EmptyCartMessage.IsVisibleAsync();
+    }
+    catch (TimeoutException)
+    {
+        return false;
+    }
+}
+```
+
+**When to use `WaitForAsync()`:**
+- After navigation to a page with async data loading (`OnAfterRenderAsync`, `OnInitializedAsync`)
+- After stub data changes that require component re-render
+- After actions that trigger SignalR/SSE updates
+- In POM methods that check for conditionally-rendered elements (empty states, error messages, success notifications)
+
+**When `IsVisibleAsync()` is safe:**
+- Checking for elements that are always present (navigation bar, page title)
+- After explicitly waiting for another element first (e.g., after `WaitForURLAsync()` + waiting for a form to appear, checking if submit button is enabled)
+- In assertions where failure is expected (negative tests)
+
+**CI-specific considerations:**
+- CI runners often have slower CPUs and higher latency
+- Default Playwright timeouts (30s) are usually sufficient, but individual element waits need explicit `WaitForAsync()` calls
+- Use `PLAYWRIGHT_HEADLESS=false` locally to debug timing issues — if the element appears *after* the error message, you have a wait strategy problem
+
 ## Checklist for New E2E Scenarios
 
 Use this checklist when adding a new Gherkin scenario to `checkout-flow.feature` or a new feature file.

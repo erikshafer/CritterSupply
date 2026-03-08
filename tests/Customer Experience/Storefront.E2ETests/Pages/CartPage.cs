@@ -36,7 +36,17 @@ public sealed class CartPage(IPage page)
 
     public async Task<bool> IsEmptyCartMessageVisibleAsync()
     {
-        return await EmptyCartMessage.IsVisibleAsync();
+        // Wait for loading spinner to disappear, then check for empty message
+        // In CI, Blazor rendering can be slower than NetworkIdle
+        try
+        {
+            await EmptyCartMessage.WaitForAsync(new() { Timeout = 5000 });
+            return await EmptyCartMessage.IsVisibleAsync();
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
     }
 
     public async Task<int> GetCartItemCountAsync()
