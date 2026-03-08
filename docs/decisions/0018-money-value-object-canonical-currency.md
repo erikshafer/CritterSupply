@@ -148,10 +148,10 @@ Phase 1 hardcodes `"USD"`, but the infrastructure is ready. Phase 2+ adds multi-
 
 ```csharp
 // Clear intent
-public sealed record ProductPriced(Guid ProductPriceId, string Sku, Money Price, ...);
+public sealed record InitialPriceSet(Guid ProductPriceId, string Sku, Money Price, ...);
 
 // vs ambiguous
-public sealed record ProductPriced(Guid ProductPriceId, string Sku, decimal Price, ...);
+public sealed record InitialPriceSet(Guid ProductPriceId, string Sku, decimal Price, ...);
 ```
 
 **4. DDD Value Object Pattern**

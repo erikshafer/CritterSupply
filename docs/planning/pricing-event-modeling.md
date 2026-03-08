@@ -173,13 +173,11 @@ public sealed record ProductRegistered(
     DateTimeOffset RegisteredAt);
 
 // First time a price is set — Unpriced → Published (Phase 1: no Draft)
-// UX RECOMMENDATION: Consider renaming to `InitialPriceSet` for stream readability.
-// ProductPriced vs PriceChanged looks like the same event category to new developers.
+// DECISION (2026-03-08): Renamed from ProductPriced → InitialPriceSet per UX Engineer recommendation.
 // InitialPriceSet makes the stream tell a clear story:
 //   ProductRegistered → InitialPriceSet → PriceChanged → PriceChangeScheduled → ScheduledPriceActivated
-// If renaming: MUST happen before first production write — event types cannot be renamed
-// without a data migration or [EventType] alias. Team decision pending — see Event Naming Decision section.
-public sealed record ProductPriced(
+// This distinguishes "first price setting" from "subsequent price changes" at a glance.
+public sealed record InitialPriceSet(
     Guid ProductPriceId,
     string Sku,
     Money Price,
@@ -423,21 +421,21 @@ public sealed record VendorPriceSuggestionSubmitted(
 
 ## Event Naming Decision: Why Three Distinct Events
 
-`ProductPriced`, `PriceChanged`, and `ScheduledPriceActivated` are kept as separate events:
+`InitialPriceSet`, `PriceChanged`, and `ScheduledPriceActivated` are kept as separate events:
 
-- **`ProductPriced`** (or `InitialPriceSet` — see UX review): "For the first time, someone decided what this SKU costs." Transition from `Unpriced` → `Published`. Sets floor and ceiling atomically. A distinct business operation — not just changing a number.
+- **`InitialPriceSet`** (renamed from `ProductPriced` per UX Engineer recommendation): "For the first time, someone decided what this SKU costs." Transition from `Unpriced` → `Published`. Sets floor and ceiling atomically. A distinct business operation — not just changing a number.
 - **`PriceChanged`**: "Someone changed an already-priced product's price." Carries `OldPrice` and `PreviousPriceSetAt` (meaningless on first-price event). User-driven.
 - **`ScheduledPriceActivated`**: "The system fired a previously scheduled change." System-driven (Wolverine delivered a scheduled message). Queryable separately from manual changes.
 
 **Do not merge these three into one event. The semantic clarity is worth the extra types.**
 
-**⚠️ Open naming decision:** The UX Engineer recommends renaming `ProductPriced` → `InitialPriceSet` for stream readability. `InitialPriceSet` makes the stream tell a clearer story to developers who have never seen this domain:
+**✅ Naming decision RESOLVED (2026-03-08):** `InitialPriceSet` is the canonical event name. This makes the stream tell a clearer story to developers who have never seen this domain:
 
 ```
 ProductRegistered → InitialPriceSet → PriceChanged → PriceChangeScheduled → ScheduledPriceActivated
 ```
 
-This rename **must happen before any production writes** — event types in Marten event streams cannot be renamed without a data migration (or Marten's `[EventType]` alias pattern). Team decision required before the implementation sprint begins. See [`docs/planning/pricing-ux-review.md`](pricing-ux-review.md) Section 1.1 for the full analysis.
+This distinguishes "first price setting" from "subsequent price changes" at a glance. Decision made before any production writes to avoid data migration complexity.
 
 Similarly, `PriceChangeScheduleCancelled` has been renamed to `ScheduledPriceChangeCancelled` in the event definitions above to align with `ScheduledPriceActivated` naming.
 
@@ -507,7 +505,7 @@ Includes flag: `bool SuggestedPriceBelowFloor` — surfaces floor-price violatio
 
 ### Price History
 
-**No separate projection needed for Phase 1.** The event stream itself is the audit trail. Admin price history endpoint reads raw events (`ProductPriced`, `PriceChanged`, `ScheduledPriceActivated`, `PriceCorrected`) from the stream via `session.Events.FetchStreamAsync(streamId)`.
+**No separate projection needed for Phase 1.** The event stream itself is the audit trail. Admin price history endpoint reads raw events (`InitialPriceSet`, `PriceChanged`, `ScheduledPriceActivated`, `PriceCorrected`) from the stream via `session.Events.FetchStreamAsync(streamId)`.
 
 **Phase 2 backlog:** `PriceHistoryView` projection when traffic demands it.
 
@@ -755,7 +753,7 @@ src/Pricing/
 │   │   │
 │   │   ├── Events/
 │   │   │   ├── ProductRegistered.cs
-│   │   │   ├── ProductPriced.cs              # Consider renaming to InitialPriceSet.cs (see UX review)
+│   │   │   ├── InitialPriceSet.cs            # Renamed from ProductPriced.cs (UX recommendation accepted)
 │   │   │   ├── PriceChanged.cs
 │   │   │   ├── PriceChangeScheduled.cs
 │   │   │   ├── ScheduledPriceChangeCancelled.cs
@@ -940,14 +938,14 @@ TIME ─────────────────────────
    → FluentValidation: Price > 0 ✓; ChangedBy != Guid.Empty ✓
    → Load ProductPrice → exists, Status == Unpriced ✓
    → Before(): price > 0 ✓
-🟢 ProductPriced {Sku, Price: $24.99, Status → Published}
+🟢 InitialPriceSet {Sku, Price: $24.99, Status → Published}
    → CurrentPriceView updated INLINE: Status: Published, BasePrice: $24.99
    → OutgoingMessages: PricePublished integration event → RabbitMQ
    → Shopping BC can now accept AddItemToCart for this SKU
    → BFF includes price in product listing
 
 POST-CONDITIONS:
-  - ProductPrice stream: ProductRegistered + ProductPriced (2 events)
+  - ProductPrice stream: ProductRegistered + InitialPriceSet (2 events)
   - CurrentPriceView: Status Published, BasePrice $24.99
   - PricePublished integration event delivered to Shopping BC and BFF
   - Storefront can display price immediately (zero lag from inline projection)
@@ -1114,7 +1112,7 @@ Before any implementation code is written:
 - [x] **CONTEXTS.md updated:** Add Pricing BC section, update Future Considerations, update Shopping/Orders integration notes
 - [x] **Port 5242** registered in CLAUDE.md port allocation table
 - [x] **UX Engineer review complete** ([docs/planning/pricing-ux-review.md](pricing-ux-review.md)) — action items must be resolved before implementation sprint
-- [ ] **Event naming decision:** `ProductPriced` → `InitialPriceSet`? Team decision required before first production write
+- [x] **Event naming decision:** `InitialPriceSet` confirmed (renamed from `ProductPriced` per UX Engineer recommendation, 2026-03-08)
 - [ ] **`pricing` schema** added to database init scripts (implementation cycle)
 - [ ] **PO confirms:** Cart price TTL — what is the configured default (suggested: 1 hour)?
 - [x] **Gherkin feature files** written and reviewed by PO (`docs/features/pricing/`)
@@ -1126,7 +1124,7 @@ Before any implementation code is written:
 
 1. `Messages.Contracts.Pricing` namespace — `PricePublished`, `PriceUpdated`, `VendorPriceSuggestionSubmitted`
 2. `Money` value object in `Pricing` domain project
-3. `ProductPrice` aggregate + `ProductRegistered`, `ProductPriced`, `PriceChanged` events
+3. `ProductPrice` aggregate + `ProductRegistered`, `InitialPriceSet`, `PriceChanged` events
 4. `CurrentPriceViewProjection` (inline, keyed by SKU string)
 5. `ProductAddedHandler` (creates ProductPrice stream from Catalog integration event)
 6. `SetPrice` command handler
