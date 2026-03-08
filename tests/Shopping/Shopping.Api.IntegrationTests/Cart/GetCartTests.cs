@@ -29,8 +29,8 @@ public class GetCartTests : IAsyncLifetime
         using var session = _fixture.GetDocumentSession();
         var cart = (await session.Query<Shopping.Cart.Cart>().ToListAsync()).Single();
 
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-002", 1, 29.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-002", 1));
 
         // Act
         var response = await _fixture.Host.Scenario(cfg =>
@@ -51,15 +51,15 @@ public class GetCartTests : IAsyncLifetime
 
         var item1 = result.Items.Single(i => i.Sku == "SKU-001");
         item1.Quantity.ShouldBe(2);
-        item1.UnitPrice.ShouldBe(19.99m);
-        item1.LineTotal.ShouldBe(39.98m);
+        item1.UnitPrice.ShouldBe(29.99m);
+        item1.LineTotal.ShouldBe(59.98m); // 2 * 29.99
 
         var item2 = result.Items.Single(i => i.Sku == "SKU-002");
         item2.Quantity.ShouldBe(1);
         item2.UnitPrice.ShouldBe(29.99m);
         item2.LineTotal.ShouldBe(29.99m);
 
-        result.TotalAmount.ShouldBe(69.97m);
+        result.TotalAmount.ShouldBe(89.97m); // 59.98 + 29.99
     }
 
     [Fact]

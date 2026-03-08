@@ -29,7 +29,7 @@ public class AddItemToCartValidationTests : IAsyncLifetime
         // Act & Assert
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", 0, 19.99m))
+            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", 0))
                 .ToUrl($"/api/carts/{cart.Id}/items");
             x.StatusCodeShouldBe(400);
             x.ContentShouldContain("Quantity");
@@ -45,26 +45,10 @@ public class AddItemToCartValidationTests : IAsyncLifetime
         // Act & Assert
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", -5, 19.99m))
+            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", -5))
                 .ToUrl($"/api/carts/{cart.Id}/items");
             x.StatusCodeShouldBe(400);
             x.ContentShouldContain("Quantity");
-        });
-    }
-
-    [Fact]
-    public async Task POST_AddItem_WithNegativePrice_Returns400()
-    {
-        // Arrange
-        var cart = await CreateCart();
-
-        // Act & Assert
-        await _fixture.Host.Scenario(x =>
-        {
-            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", 2, -10.00m))
-                .ToUrl($"/api/carts/{cart.Id}/items");
-            x.StatusCodeShouldBe(400);
-            x.ContentShouldContain("Unit Price");
         });
     }
 
@@ -77,7 +61,7 @@ public class AddItemToCartValidationTests : IAsyncLifetime
         // Act & Assert
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(new AddItemToCart(cart.Id, "", 2, 19.99m))
+            x.Post.Json(new AddItemToCart(cart.Id, "", 2))
                 .ToUrl($"/api/carts/{cart.Id}/items");
             x.StatusCodeShouldBe(400);
             x.ContentShouldContain("Sku");
@@ -94,7 +78,7 @@ public class AddItemToCartValidationTests : IAsyncLifetime
         // Act & Assert
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(new AddItemToCart(cart.Id, longSku, 2, 19.99m))
+            x.Post.Json(new AddItemToCart(cart.Id, longSku, 2))
                 .ToUrl($"/api/carts/{cart.Id}/items");
             x.StatusCodeShouldBe(400);
             x.ContentShouldContain("Sku");
@@ -107,7 +91,7 @@ public class AddItemToCartValidationTests : IAsyncLifetime
         // Act & Assert
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(new AddItemToCart(Guid.Empty, "SKU-001", 2, 19.99m))
+            x.Post.Json(new AddItemToCart(Guid.Empty, "SKU-001", 2))
                 .ToUrl($"/api/carts/{Guid.Empty}/items");
             x.StatusCodeShouldBe(400);
             x.ContentShouldContain("Cart Id");
@@ -123,7 +107,7 @@ public class AddItemToCartValidationTests : IAsyncLifetime
         // Act & Assert
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(new AddItemToCart(nonExistentCartId, "SKU-001", 2, 19.99m))
+            x.Post.Json(new AddItemToCart(nonExistentCartId, "SKU-001", 2))
                 .ToUrl($"/api/carts/{nonExistentCartId}/items");
             x.StatusCodeShouldBe(404);
         });
@@ -134,13 +118,13 @@ public class AddItemToCartValidationTests : IAsyncLifetime
     {
         // Arrange - Create cart, add item, then clear it
         var cart = await CreateCart();
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 1, 10.00m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 1));
         await _fixture.ExecuteAndWaitAsync(new ClearCart(cart.Id, "Testing"));
 
         // Act & Assert - Attempt to add item to cleared (terminal) cart
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(new AddItemToCart(cart.Id, "SKU-002", 1, 15.00m))
+            x.Post.Json(new AddItemToCart(cart.Id, "SKU-002", 1))
                 .ToUrl($"/api/carts/{cart.Id}/items");
             x.StatusCodeShouldBe(400);
             x.ContentShouldContain("Cannot modify a cart");
@@ -152,31 +136,16 @@ public class AddItemToCartValidationTests : IAsyncLifetime
     {
         // Arrange - Create cart, add item, then initiate checkout
         var cart = await CreateCart();
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 1, 10.00m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 1));
         await _fixture.ExecuteAndWaitAsync(new InitiateCheckout(cart.Id));
 
         // Act & Assert - Attempt to add item to checked-out (terminal) cart
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(new AddItemToCart(cart.Id, "SKU-002", 1, 15.00m))
+            x.Post.Json(new AddItemToCart(cart.Id, "SKU-002", 1))
                 .ToUrl($"/api/carts/{cart.Id}/items");
             x.StatusCodeShouldBe(400);
             x.ContentShouldContain("Cannot modify a cart");
-        });
-    }
-
-    [Fact]
-    public async Task POST_AddItem_WithZeroPrice_Succeeds()
-    {
-        // Arrange - Zero price is valid (free items, promotions, etc.)
-        var cart = await CreateCart();
-
-        // Act & Assert
-        await _fixture.Host.Scenario(x =>
-        {
-            x.Post.Json(new AddItemToCart(cart.Id, "FREE-SAMPLE", 1, 0.00m))
-                .ToUrl($"/api/carts/{cart.Id}/items");
-            x.StatusCodeShouldBe(204);
         });
     }
 

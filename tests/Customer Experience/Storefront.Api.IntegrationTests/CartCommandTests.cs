@@ -64,7 +64,7 @@ public class CartCommandTests(TestFixture fixture) : IClassFixture<TestFixture>,
         var item = cart.Items.Single();
         item.Sku.ShouldBe("DOG-BOWL-001");
         item.Quantity.ShouldBe(2);
-        item.UnitPrice.ShouldBe(19.99m);
+        item.UnitPrice.ShouldBe(29.99m);
     }
 
     [Fact]

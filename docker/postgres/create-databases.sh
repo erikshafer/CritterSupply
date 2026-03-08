@@ -20,6 +20,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "postgres" <<-EOSQL
     CREATE DATABASE shopping;
     CREATE DATABASE productcatalog;
     CREATE DATABASE storefront;
+    CREATE DATABASE pricing;
 EOSQL
 
 echo "CritterSupply: all bounded context databases created successfully."

@@ -119,7 +119,7 @@ public class RemoveItemFromCartTests : IAsyncLifetime
     {
         // Arrange - Cart with single item
         var cart = await CreateCart();
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));
 
         // Act - Remove the only item
         await _fixture.Host.Scenario(x =>
@@ -173,8 +173,8 @@ public class RemoveItemFromCartTests : IAsyncLifetime
     private async Task<Shopping.Cart.Cart> CreateCartWithItems()
     {
         var cart = await CreateCart();
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-002", 1, 29.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-002", 1));
 
         using var session = _fixture.GetDocumentSession();
         return await session.Events.AggregateStreamAsync<Shopping.Cart.Cart>(cart.Id) ?? cart;

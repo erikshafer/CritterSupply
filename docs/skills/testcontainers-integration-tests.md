@@ -439,6 +439,136 @@ public class UpdateProductTests : IAsyncLifetime
 
 **Key Insight:** Marten and Polecat share 99% of the same API surface. Cleanup patterns will be identical.
 
+### ⚠️ Critical: Event Store with Deterministic Stream IDs
+
+**IMPORTANT:** Event-sourced BCs that use **deterministic stream IDs** (e.g., based on SKU, email, or other business identifiers) **MUST** implement `IAsyncLifetime` for data cleanup.
+
+#### Why This Matters
+
+Unlike document-based BCs (Payments, Orders) that use `Guid.NewGuid()` for unique IDs per test, some event-sourced aggregates use deterministic stream IDs:
+
+```csharp
+// Deterministic stream ID based on SKU
+public static class ProductPrice
+{
+    public static Guid StreamId(string sku) =>
+        GuidUtility.Create(GuidNamespace, sku.ToUpperInvariant());
+}
+
+// Test that reuses SKU "DOG-FOOD-5LB" across multiple tests
+var streamId = ProductPrice.StreamId("DOG-FOOD-5LB"); // Always same GUID
+session.Events.StartStream<ProductPrice>(streamId, events); // ❌ COLLISION!
+```
+
+**Problem:** If tests reuse the same business identifier (like "DOG-FOOD-5LB"), they generate the same stream ID, causing `ExistingStreamIdCollisionException`.
+
+#### ❌ Fails Without Cleanup
+
+```csharp
+// BAD: Tests collide on deterministic stream IDs
+[Collection(IntegrationTestCollection.Name)]
+public sealed class GetPriceEndpointTests(TestFixture fixture)
+{
+    // ❌ NO cleanup - stream IDs persist across tests!
+
+    [Fact]
+    public async Task Test1_CreatesPriceForDogFood()
+    {
+        var sku = "DOG-FOOD-5LB";
+        var streamId = ProductPrice.StreamId(sku); // Deterministic
+
+        session.Events.StartStream<ProductPrice>(streamId, events);
+        await session.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Test2_CreatesPriceForDogFood()
+    {
+        var sku = "DOG-FOOD-5LB";
+        var streamId = ProductPrice.StreamId(sku); // SAME as Test1!
+
+        session.Events.StartStream<ProductPrice>(streamId, events); // ❌ COLLISION!
+        await session.SaveChangesAsync();
+    }
+}
+```
+
+**Error:**
+```
+Marten.Exceptions.ExistingStreamIdCollisionException:
+Stream #da5e0e7b-9d53-1f5a-9a59-088d3babb53f already exists in the database
+```
+
+#### ✅ Fixed with IAsyncLifetime
+
+```csharp
+// GOOD: Clean before each test
+[Collection(IntegrationTestCollection.Name)]
+public sealed class GetPriceEndpointTests(TestFixture fixture) : IAsyncLifetime
+{
+    private readonly TestFixture _fixture = fixture;
+
+    // ✅ Clean ALL event data before each test
+    public Task InitializeAsync() => _fixture.CleanAllDataAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task Test1_CreatesPriceForDogFood()
+    {
+        // Fresh database - no collision
+        var sku = "DOG-FOOD-5LB";
+        var streamId = ProductPrice.StreamId(sku);
+
+        session.Events.StartStream<ProductPrice>(streamId, events);
+        await session.SaveChangesAsync(); // ✅ Works
+    }
+
+    [Fact]
+    public async Task Test2_CreatesPriceForDogFood()
+    {
+        // Database cleaned by InitializeAsync() - no collision
+        var sku = "DOG-FOOD-5LB";
+        var streamId = ProductPrice.StreamId(sku);
+
+        session.Events.StartStream<ProductPrice>(streamId, events);
+        await session.SaveChangesAsync(); // ✅ Works
+    }
+}
+```
+
+#### TestFixture Must Support Event Cleanup
+
+Ensure your `TestFixture` has a method that clears **both documents AND events**:
+
+```csharp
+public class TestFixture : IAsyncLifetime
+{
+    // ... container setup ...
+
+    /// <summary>
+    /// Cleans all document and event data from the database.
+    /// CRITICAL for event-sourced BCs with deterministic stream IDs.
+    /// </summary>
+    public async Task CleanAllDataAsync()
+    {
+        var store = GetDocumentStore();
+        await store.Advanced.Clean.DeleteAllDocumentsAsync();
+        await store.Advanced.Clean.DeleteAllEventDataAsync(); // ✅ Essential!
+    }
+}
+```
+
+#### When to Use `IAsyncLifetime` for Cleanup
+
+| BC Pattern | Stream ID Type | Requires IAsyncLifetime? | Example BCs |
+|------------|----------------|--------------------------|-------------|
+| **Event-sourced with deterministic IDs** | Based on business key (SKU, email, etc.) | ✅ **YES - Required** | Pricing, Product Catalog (if event-sourced) |
+| **Event-sourced with random IDs** | `Guid.NewGuid()` per test | ⚠️ Recommended | Orders (uses random OrderId per test) |
+| **Document-based with unique IDs** | `Guid.NewGuid()` per test | ⚠️ Recommended | Payments (uses random PaymentId per test) |
+| **EF Core with shared data** | Deterministic or shared entities | ✅ **YES - Required** | Customer Identity (shared email addresses) |
+
+**Best Practice:** Always implement `IAsyncLifetime` for test classes to ensure test isolation, even if using random IDs.
+
 ### Pattern 2: EF Core-Based BC
 
 ```csharp

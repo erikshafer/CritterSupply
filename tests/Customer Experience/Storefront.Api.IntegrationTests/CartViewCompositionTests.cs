@@ -77,8 +77,8 @@ public class CartViewCompositionTests : IClassFixture<TestFixture>
         dogBowl.ProductName.ShouldBe("Ceramic Dog Bowl (Large)"); // From Catalog BC
         dogBowl.ProductImageUrl.ShouldBe("https://example.com/dog-bowl.jpg"); // From Catalog BC
         dogBowl.Quantity.ShouldBe(2);
-        dogBowl.UnitPrice.ShouldBe(19.99m);
-        dogBowl.LineTotal.ShouldBe(39.98m);
+        dogBowl.UnitPrice.ShouldBe(19.99m);  // Matches seed data on line 29
+        dogBowl.LineTotal.ShouldBe(39.98m);  // 2 * 19.99
 
         // AND: Subtotal should be calculated correctly
         var expectedSubtotal = (2 * 19.99m) + (1 * 29.99m); // $69.97

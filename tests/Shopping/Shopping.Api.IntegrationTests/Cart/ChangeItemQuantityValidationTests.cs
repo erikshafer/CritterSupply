@@ -152,7 +152,7 @@ public class ChangeItemQuantityValidationTests : IAsyncLifetime
     private async Task<Shopping.Cart.Cart> CreateCartWithItem(string sku, int quantity)
     {
         var cart = await CreateCart();
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, sku, quantity, 19.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, sku, quantity));
 
         using var session = _fixture.GetDocumentSession();
         return await session.Events.AggregateStreamAsync<Shopping.Cart.Cart>(cart.Id) ?? cart;

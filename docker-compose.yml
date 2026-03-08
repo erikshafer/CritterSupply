@@ -178,11 +178,14 @@ services:
       RabbitMQ__hostname: rabbitmq
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_SERVICE_NAME: Shopping.Api
+      Pricing__BaseUrl: http://pricing-api:8080
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      pricing-api:
+        condition: service_started
     networks:
       - backend
     profiles: [all, shopping]
@@ -209,6 +212,29 @@ services:
     networks:
       - backend
     profiles: [all, catalog]
+
+  pricing-api:
+    container_name: crittersupply-pricing
+    build:
+      context: .
+      dockerfile: src/Pricing/Pricing.Api/Dockerfile
+    ports:
+      - "5242:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__marten: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
+      RabbitMQ__hostname: rabbitmq
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: Pricing.Api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    profiles: [all, pricing]
 
   storefront-api:
     container_name: crittersupply-storefront-api

@@ -198,7 +198,7 @@ public class TestFixture : IAsyncLifetime
         // Add items to cart
         foreach (var (sku, quantity, unitPrice) in items)
         {
-            await StubShoppingClient.AddItemAsync(cartId, sku, quantity, unitPrice);
+            await StubShoppingClient.AddItemAsync(cartId, sku, quantity);
         }
 
         return cartId;

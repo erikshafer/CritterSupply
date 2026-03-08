@@ -32,13 +32,17 @@ public sealed class StubShoppingClient : IShoppingClient
         return Task.FromResult(cartId);
     }
 
-    public Task AddItemAsync(Guid cartId, string sku, int quantity, decimal unitPrice, CancellationToken ct = default)
+    public Task AddItemAsync(Guid cartId, string sku, int quantity, CancellationToken ct = default)
     {
         if (!_carts.TryGetValue(cartId, out var cart))
             throw new HttpRequestException($"Cart {cartId} not found", null, System.Net.HttpStatusCode.NotFound);
 
         var items = cart.Items.ToList();
         var existing = items.FirstOrDefault(i => i.Sku == sku);
+
+        // Stub uses hardcoded price (real implementation would fetch from Pricing BC)
+        var stubPrice = 29.99m;
+
         if (existing != null)
         {
             items.Remove(existing);
@@ -46,7 +50,7 @@ public sealed class StubShoppingClient : IShoppingClient
         }
         else
         {
-            items.Add(new CartItemDto(sku, quantity, unitPrice));
+            items.Add(new CartItemDto(sku, quantity, stubPrice));
         }
 
         _carts[cartId] = cart with { Items = items };

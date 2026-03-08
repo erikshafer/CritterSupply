@@ -112,6 +112,18 @@ builder.Services.AddHttpClient("CustomerIdentity", client =>
     client.Timeout = TimeSpan.FromSeconds(10);
 });
 
+// Configure HttpClient for Pricing BC integration
+builder.Services.AddHttpClient("PricingClient", client =>
+{
+    var pricingBaseUrl = builder.Configuration.GetValue<string>("Pricing:BaseUrl")
+                         ?? "http://localhost:5242";
+    client.BaseAddress = new Uri(pricingBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(5);
+});
+
+// Register HTTP client implementations
+builder.Services.AddScoped<Shopping.Clients.IPricingClient, Shopping.Api.Clients.PricingClient>();
+
 builder.Services.AddWolverineHttp();
 
 var app = builder.Build();

@@ -30,7 +30,7 @@ public class InitiateCheckoutHttpTests : IAsyncLifetime
         using var session = _fixture.GetDocumentSession();
         var cart = (await session.Query<Shopping.Cart.Cart>().ToListAsync()).Single();
 
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));
 
         // Act - Initiate checkout via HTTP
         var result = await _fixture.Host.Scenario(x =>
@@ -99,7 +99,7 @@ public class InitiateCheckoutHttpTests : IAsyncLifetime
         using var session = _fixture.GetDocumentSession();
         var cart = (await session.Query<Shopping.Cart.Cart>().ToListAsync()).Single();
 
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));
         await _fixture.ExecuteAndWaitAsync(new InitiateCheckout(cart.Id));
 
         // Act & Assert - Second checkout attempt should fail
@@ -122,8 +122,8 @@ public class InitiateCheckoutHttpTests : IAsyncLifetime
         using var session = _fixture.GetDocumentSession();
         var cart = (await session.Query<Shopping.Cart.Cart>().ToListAsync()).Single();
 
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-002", 1, 9.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-002", 1));
 
         // Act - Initiate checkout
         var (tracked, result) = await _fixture.TrackedHttpCall(x =>
