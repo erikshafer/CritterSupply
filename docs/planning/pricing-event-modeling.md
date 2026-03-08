@@ -1107,10 +1107,10 @@ Pricing BC:
 Before any implementation code is written:
 
 - [x] **ADR 0016 written:** UUID v5 for deterministic natural-key stream IDs ([docs/decisions/0016-uuid-v5-for-natural-key-stream-ids.md](../decisions/0016-uuid-v5-for-natural-key-stream-ids.md))
-- [ ] **ADR written:** Add-to-cart vs. checkout-time price freeze policy
-- [ ] **ADR written:** `Money` value object as canonical monetary representation
-- [ ] **ADR written:** `BulkPricingJob` audit trail approach
-- [ ] **ADR written:** MAP vs. Floor price distinction
+- [x] **ADR 0017 written:** Add-to-cart vs. checkout-time price freeze policy ([docs/decisions/0017-price-freeze-at-add-to-cart.md](../decisions/0017-price-freeze-at-add-to-cart.md))
+- [x] **ADR 0018 written:** `Money` value object as canonical monetary representation ([docs/decisions/0018-money-value-object-canonical-currency.md](../decisions/0018-money-value-object-canonical-currency.md))
+- [x] **ADR 0019 written:** `BulkPricingJob` audit trail approach ([docs/decisions/0019-bulk-pricing-job-audit-trail.md](../decisions/0019-bulk-pricing-job-audit-trail.md))
+- [x] **ADR 0020 written:** MAP vs. Floor price distinction ([docs/decisions/0020-map-vs-floor-price-distinction.md](../decisions/0020-map-vs-floor-price-distinction.md))
 - [x] **CONTEXTS.md updated:** Add Pricing BC section, update Future Considerations, update Shopping/Orders integration notes
 - [x] **Port 5242** registered in CLAUDE.md port allocation table
 - [x] **UX Engineer review complete** ([docs/planning/pricing-ux-review.md](pricing-ux-review.md)) — action items must be resolved before implementation sprint
