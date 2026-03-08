@@ -230,6 +230,16 @@ else
                 try
                 {
                     _checkoutView = await client.GetFromJsonAsync<CheckoutView>($"/api/storefront/checkouts/{_checkoutId.Value}");
+
+                    // Auto-select first saved address for better UX.
+                    // If the customer has saved addresses and hasn't already selected one,
+                    // pre-select the first address (typically the default/most recent).
+                    // User can still change selection via the dropdown.
+                    if (_checkoutView?.SavedAddresses.Any() == true && _selectedAddressId == Guid.Empty)
+                    {
+                        _selectedAddressId = _checkoutView.SavedAddresses.First().AddressId;
+                    }
+
                     return;
                 }
                 catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound && attempt < maxRetries)
