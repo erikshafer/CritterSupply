@@ -426,84 +426,221 @@ ReservationReleaseRequested (from Orders)
 
 ## Fulfillment (Folder: Fulfillment Management)
 
-The Fulfillment context owns the physical execution of getting items from warehouse to customer—picking, packing, shipping, and delivery tracking. It takes over once Orders has secured payment and committed inventory. This BC integrates with carriers for tracking numbers and manages warehouse/FC routing logic.
+The Fulfillment context owns the physical execution of getting items from warehouse to customer—picking, packing, shipping, and delivery tracking. It takes over once Orders has secured payment and committed inventory. This BC integrates with carriers for tracking numbers and manages warehouse/FC routing logic through the **Order Routing Engine (ORE)**.
 
 **Naming Note:** The folder is currently `Fulfillment Management/` but the BC is conceptually "Fulfillment" (simpler, industry standard). See `docs/BC-NAMING-ANALYSIS.md` for naming rationale.
+
+**Full Workflow Reference:** See [`docs/fulfillment/FULFILLMENT-BUSINESS-WORKFLOWS.md`](docs/fulfillment/FULFILLMENT-BUSINESS-WORKFLOWS.md) for the comprehensive realistic workflow documentation including multi-warehouse routing, international flows, sad paths, and compensation events.
+
+### Fulfillment Center Network
+
+| FC | Location | Ownership | Timezone | Notes |
+|----|----------|-----------|----------|-------|
+| NJ FC | Newark, NJ | CritterSupply-owned | Eastern | Drop-and-hook; East Coast primary |
+| OH FC | Columbus, OH | CritterSupply-owned | Eastern | Drop-and-hook; Midwest primary; returns capable |
+| WA FC | Kent, WA | CritterSupply-owned | Pacific | No USPS commercial pickup; no returns processing |
+| TX FC | Dallas, TX | Partially 3PL | Central | 3PL overflow; hazmat-certified; 8–24hr SLA |
+| Toronto Hub | Toronto, ON | CritterSupply-owned | Eastern | Canada-only; USMCA corridor |
+| Birmingham Hub | Birmingham, UK | CritterSupply-owned | GMT/BST | UK commercial import hub; domestic UK distribution |
 
 ### What it receives
 
 - `FulfillmentRequested` from Orders — order reference, line items, committed inventory allocations, shipping address, shipping method
-- `ReturnShipmentReceived` from carrier integration — items arriving back at warehouse
+- Carrier webhook events — tracking updates (in transit, out for delivery, delivered, delivery failed, customs hold) translated to domain events at the integration boundary
 
 ### Internal lifecycle
 
-- Pending — fulfillment request received, awaiting assignment
-- Assigned — routed to a specific warehouse/FC
-- Picking — items being pulled from bins
-- Packing — items boxed, shipping label generated
-- Shipped — handed to carrier, tracking number assigned
-- InTransit — carrier updates (optional granularity)
-- OutForDelivery — final mile
-- Delivered — carrier confirmed delivery
-- DeliveryFailed — attempted but unsuccessful
+The full Shipment lifecycle from work order to delivery includes intermediate states and exception branches:
+
+**Happy Path States:**
+- `WorkOrderCreated` — fulfillment request translated to work order for WMS
+- `WaveReleased` — WMS batches work orders into an optimized pick wave
+- `Picking` — picker assigned; items being pulled from bin locations (RF scanner / voice-directed)
+- `PickCompleted` — all items picked and accounted for
+- `Packing` — items at pack station; scan-verify-pack (SVP) in progress
+- `PackCompleted` — carton sealed and weighed
+- `Labeled` — rate shopping complete; shipping label generated; tracking number assigned (first availability)
+- `Manifested` — shipment tendered to carrier system
+- `CustomsDocsPrepared` — commercial invoice and HS codes prepared (international orders only)
+- `Staged` — carton at outbound dock, organized by carrier pickup window
+- `HandedToCarrier` — driver scans manifest; physical custody transfers to carrier
+- `InTransit` — carrier facility first scan received
+- `OutForDelivery` — package loaded on local delivery vehicle
+- `Delivered` — carrier confirms delivery (terminal)
+
+**Exception States (branches from happy path):**
+- `ShortPickDetected` — bin empty or quantity insufficient; triggers alternative bin check or emergency re-route
+- `Backordered` — no stock at any FC; customer notified; item held for replenishment
+- `PackDiscrepancyDetected` — weight mismatch, damaged item, or no valid carton size; supervisor review required
+- `GhostShipmentDetected` — no carrier scan 24+ hours after handoff; investigation opened
+- `LostInTransit` — 5+ business days without carrier scan; carrier trace opened; reship dispatched immediately
+- `CarrierPickupMissed` — driver no-show or volume cap; escalation to carrier relations
+- `CustomsHeld` — package held by customs authority (international only); 2–15 business day resolution window
+- `DeliveryAttemptFailed` — carrier delivery exception (no one home, access blocked, etc.); 1–3 attempts before RTS
+- `ReturnToSender` — maximum delivery attempts exhausted; package returning to FC
+
+### Order Routing Engine (ORE)
+
+The ORE evaluates FCs in strict priority order. **Inventory is reserved at order confirmation time, not at pick time.**
+
+1. **Tier 1 — Inventory availability** (hard constraint): FC must have sufficient available = on-hand minus already-reserved
+2. **Tier 2 — Geographic proximity / shipping zone**: Minimize UPS/FedEx zone for cost and speed
+3. **Tier 3 — Carrier service compatibility**: WA FC has no USPS commercial pickup; APO/FPO → USPS only
+4. **Tier 4 — Throughput capacity**: 85% utilization triggers overflow to next-eligible FC
+5. **Tier 5 — Split eligibility**: If no single FC can fulfill complete order, evaluate multi-FC split
+6. **Tier 6 — 3PL overflow**: TX 3PL as last resort (higher cost, 8–24hr SLA)
+
+**International routing is fixed:**
+- Canada → always Toronto Hub (no direct US-to-Canada shipping)
+- UK → always Birmingham Hub (bulk commercial import simplifies per-order customs)
 
 ### What it publishes
 
-- `ShipmentAssigned` — includes which FC is handling it
-- `ShipmentPacked` — ready for carrier pickup
-- `ShipmentDispatched` — tracking number available
-- `ShipmentInTransit` — optional, for detailed tracking
-- `ShipmentOutForDelivery` — optional
-- `ShipmentDelivered` — delivery confirmed
-- `ShipmentDeliveryFailed` — delivery unsuccessful
+**Integration events (published to message bus):**
+- `TrackingNumberAssigned` — first moment a tracking number exists; published to Orders BC and Customer Experience BC
+- `ShipmentHandedToCarrier` — physical custody transferred; Orders BC updates saga state
+- `ShipmentRerouted` — emergency re-route to alternate FC (transparent to customer)
+- `BackorderCreated` — no stock at any FC; customer notification triggered
+- `OrderSplitIntoShipments` — multi-FC split; separate tracking group per shipment
+- `ShipmentInTransit` — carrier facility first scan (carrier-reported, translated)
+- `ShipmentDelivered` — carrier confirms delivery; Orders saga transitions to Delivered
+- `ShipmentDeliveryFailed` — delivery unsuccessful after maximum attempts; Orders saga notified
+- `ShipmentLostInTransit` — 5+ business days no scan; reship dispatched
+- `ReshipmentCreated` — new shipment stream opened for a replacement order
 
 ### Core Invariants
 
 - A shipment cannot be created without committed inventory allocation
-- A shipment cannot be assigned to a warehouse without sufficient committed stock at that location
-- Tracking number must exist before marking as Shipped
-- Delivery confirmation requires carrier verification
+- A shipment cannot be assigned to a warehouse without sufficient available stock at that location
+- **Tracking number does not exist until label generation** — it is NOT created at order placement
+- A shipment cannot be marked Shipped before a tracking number is assigned
+- Delivery confirmation requires carrier verification event
 - A shipment can only be delivered once
+- Hazmat items (ORM-D/Limited Quantity) cannot use air shipping services regardless of customer selection
+- International orders cannot be routed to domestic US FCs (customs complexity)
+- The WA FC cannot be selected when the order requires USPS service
+
+### Pick/Pack SLAs
+
+| Order Type | SLA | Notes |
+|------------|-----|-------|
+| Standard | 4 business hours | Measured against FC operating hours (6 AM–10 PM local) |
+| Expedited | 2 business hours | Jumps to front of pick queue |
+| Hazmat | 6 business hours | Extra labeling, ORM-D marking, declaration required |
+| 3PL (TX) | 8–24 business hours | Contractual SLA with 3PL partner |
+| Temperature-sensitive | 4 business hours | Cold pack confirmation required at pack station |
+
+### Order Cutoff Times
+
+| FC | Cutoff | Timezone |
+|----|--------|----------|
+| NJ FC | 2:00 PM | Eastern |
+| OH FC | 1:00 PM | Eastern |
+| WA FC | 12:00 PM | Pacific |
+| TX FC | 1:00 PM | Central |
+| Toronto Hub | 11:00 AM | Eastern |
+| Birmingham Hub | 10:00 AM | GMT/BST |
 
 ### What it doesn't own
 
-- Inventory levels (consumes committed allocations from Inventory)
-- Payment status or order validity (Orders has already confirmed)
-- Carrier contract negotiation or rate shopping (Shipping/Logistics context)
-- Return eligibility or refund decisions (Returns and Orders)
-- Customer communication (Notifications)
+- Inventory levels (consumes committed allocations from Inventory BC)
+- Payment status or order validity (Orders BC has already confirmed)
+- Carrier contract negotiation or rate shopping decisions (informed by Logistics/Carrier config)
+- Return eligibility or refund decisions (Returns BC and Orders BC)
+- Customer communication content (Notifications layer)
+- Duty and tax calculation for international orders (landed cost engine at checkout in Orders/Pricing)
 
 ### Integration Flows
 
-**Choreography: Fulfillment Processing**
+**Choreography: Fulfillment Processing (Domestic)**
 ```
 FulfillmentRequested (from Orders)
   └─> FulfillmentRequestedHandler
-      └─> RequestFulfillment (internal command)
-          └─> RequestFulfillmentHandler
-              └─> ShipmentStarted (Shipment stream created)
+      └─> WorkOrderCreated (WMS notified)
+          └─> [WMS: WaveReleased → PickListAssigned → PickStarted → ItemPicked]
+              └─> PickCompleted
+                  └─> [WMS: PackingStarted → ItemVerifiedAtPack]
+                      └─> PackingCompleted
+                          └─> [Rate shop → ShippingLabelGenerated]
+                              └─> TrackingNumberAssigned → Orders, Customer Experience (integration)
+                                  └─> ShipmentManifested
+                                      └─> PackageStagedForPickup
+                                          └─> CarrierPickupConfirmed
+                                              └─> ShipmentHandedToCarrier → Orders (integration)
 
-AssignWarehouse (command)
-  └─> AssignWarehouseHandler
-      └─> WarehouseAssigned
+[Carrier webhook events — translated at integration boundary]
+  └─> ShipmentInTransit → Customer Experience (integration)
+  └─> OutForDelivery → Customer Experience (integration)
+  └─> ShipmentDelivered → Orders (integration)
+  └─> DeliveryAttemptFailed → [1–3 attempts → ReturnToSenderInitiated]
+```
 
-DispatchShipment (command)
-  └─> DispatchShipmentHandler
-      ├─> ShipmentDispatched → Orders
-      └─> [Carrier integration for tracking]
+**Exception Path: Short Pick**
+```
+ShortPickDetected
+  └─> [Alternative bin found?]
+      ├─> Yes → PickResumed → continues normally
+      └─> No → [Other FC has stock?]
+              ├─> Yes → ShipmentRerouted (integration) → WorkOrderCreated at new FC
+              └─> No → BackorderCreated (integration) → CustomerBackorderNotificationSent
+```
 
-ConfirmDelivery (command)
-  └─> ConfirmDeliveryHandler
-      ├─> ShipmentDelivered → Orders
-      └─> [Carrier confirmed delivery]
+**Exception Path: Lost in Transit**
+```
+ShipmentLostInTransit (5+ business days no scan)
+  └─> CarrierTraceOpened
+  └─> ReshipmentCreated (integration) → immediate reship
+  └─> [Carrier trace completes]
+      ├─> ShipmentRecovered (carrier locates package; customer may receive both)
+      └─> CarrierClaimFiled → CarrierClaimSettled
+```
 
-[Delivery failure scenario]
-  └─> ShipmentDeliveryFailed → Orders
+**Exception Path: Delivery Failure**
+```
+DeliveryAttemptFailed (attempt 1 or 2)
+  └─> Customer notified with redelivery options
+  └─> Carrier retries next business day
+
+DeliveryAttemptFailed (attempt 3 — final)
+  └─> ReturnToSenderInitiated (integration) → Orders BC notified
+  └─> [Package returns to FC in 5–15 business days]
+      └─> ReturnReceived
+          └─> [Customer choice: reship to corrected address or refund]
+              ├─> ReshipmentCreated (integration)
+              └─> RefundIssued (via Payments BC)
+```
+
+**Exception Path: Compensation — Carrier Intercept**
+```
+CarrierInterceptRequested ($15–20 fee)
+  └─> CarrierInterceptConfirmed → package redirected
+  └─> CarrierInterceptFailed
+      └─> VoluntaryRecallInitiated (integration)
+          └─> RecallReturnReceived
+              └─> ReshipmentCreated OR RefundIssued
+```
+
+**International Path: Canada → Toronto Hub**
+```
+FulfillmentRequested (Canada destination)
+  └─> OrderRoutingEngine → ShipmentAssigned (TORONTO-HUB)
+      └─> [Pick → Pack → Label] at Toronto Hub
+          └─> CustomsDocumentationPrepared
+              └─> USMCACertificateOfOriginIssued (if US-origin goods, value < CAD $150)
+                  └─> PackageStagedForPickup (DHL / FedEx International)
+                      └─> ShipmentHandedToCarrier → Orders (integration)
+                          └─> [DHL transit → CBSA customs clearance]
+                              └─> CustomsHoldInitiated (if held — carrier-reported)
+                              └─> ShipmentDelivered → Orders (integration)
 ```
 
 ### Notes
 
-Warehouse/FC selection uses routing logic to select the optimal location—nearest to shipping address with available committed stock. More sophisticated rules can be added later.
+- **Carrier-reported events are translated at the integration boundary** — the Customer Experience BC must never consume raw carrier data directly. Fulfillment BC owns the translation layer.
+- **SLA is in business hours** against FC operating hours (6 AM–10 PM local time, two shifts during peak). An order placed at 9 PM starts its SLA clock at 6 AM the following morning.
+- **Split shipments** each have their own Shipment stream and tracking number. The Orders BC and Customer Experience BC must handle N shipments per order ID.
+- **Hazmat classification** is maintained in the Product Catalog SKU master. The ORE checks hazmat status at routing time; the WMS enforces it again at pack station (secondary check).
+- **3PL partners must hold hazmat certification** to handle ORM-D/Limited Quantity items. TX 3PL is hazmat-certified; other potential 3PL partners may not be.
 
 ---
 

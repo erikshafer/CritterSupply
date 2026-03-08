@@ -3,7 +3,7 @@
 **Document Owner:** UX Engineering  
 **Audience:** Software engineers, domain modelers, QA, product  
 **Scope:** Physical fulfillment lifecycle — from work order release through last-mile delivery and all exception paths  
-**Last Updated:** 2026
+**Last Updated:** 2026-03-08
 
 ---
 

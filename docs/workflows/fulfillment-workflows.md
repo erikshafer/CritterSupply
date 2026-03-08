@@ -5,6 +5,12 @@
 **Database:** Marten (PostgreSQL event store)  
 **RabbitMQ:** ❌ Not configured (uses local queues only)
 
+> ⚠️ **This document reflects early implementation status (Cycle 17).** For the comprehensive realistic workflow documentation covering multi-warehouse routing, international flows, sad paths, compensation events, SLAs, and 49 domain events — see:
+> **[`docs/fulfillment/FULFILLMENT-BUSINESS-WORKFLOWS.md`](../fulfillment/FULFILLMENT-BUSINESS-WORKFLOWS.md)**
+>
+> For Gherkin acceptance criteria covering these workflows, see:
+> **[`docs/features/fulfillment/`](../features/fulfillment/)**
+
 ---
 
 ## Overview
