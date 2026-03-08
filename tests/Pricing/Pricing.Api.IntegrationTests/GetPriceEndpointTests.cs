@@ -5,9 +5,12 @@ using Shouldly;
 namespace Pricing.Api.IntegrationTests;
 
 [Collection(IntegrationTestCollection.Name)]
-public sealed class GetPriceEndpointTests(TestFixture fixture)
+public sealed class GetPriceEndpointTests(TestFixture fixture) : IAsyncLifetime
 {
     private readonly TestFixture _fixture = fixture;
+
+    public Task InitializeAsync() => _fixture.CleanAllDataAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task GetPrice_WithExistingSku_Returns200WithPriceView()
