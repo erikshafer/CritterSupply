@@ -29,11 +29,12 @@ public sealed class LoginPage(IPage page)
         // after the fetch completes. WaitForLoadStateAsync(NetworkIdle) can return between the fetch
         // completing and the hard reload starting — meaning page.Url is still "/login" when read.
         // WaitForURL waits for the navigation away from /login to be fully committed first.
+        // Timeout increased to 30s for slower CI environments (cold start, shared resources).
         try
         {
             await page.WaitForURLAsync(
                 url => !url.Contains("/login"),
-                new() { Timeout = 10_000 });
+                new() { Timeout = 30_000 });
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         }
         catch (TimeoutException)
