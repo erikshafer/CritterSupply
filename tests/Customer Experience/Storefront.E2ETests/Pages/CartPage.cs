@@ -9,7 +9,7 @@ namespace Storefront.E2ETests.Pages;
 public sealed class CartPage(IPage page)
 {
     private ILocator ProceedToCheckoutButton => page.GetByRole(AriaRole.Button, new() { Name = "Proceed to Checkout" });
-    private ILocator EmptyCartMessage => page.GetByText("Your cart is empty");
+    private ILocator EmptyCartMessage => page.GetByText("Your cart is empty.");
     private ILocator CartItems => page.Locator("[data-testid^='cart-item-']");
 
     public async Task NavigateAsync()
