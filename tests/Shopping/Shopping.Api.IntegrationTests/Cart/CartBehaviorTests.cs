@@ -17,7 +17,12 @@ public class CartBehaviorTests : IAsyncLifetime
         _fixture = fixture;
     }
 
-    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+    public async Task InitializeAsync()
+    {
+        await _fixture.CleanAllDocumentsAsync();
+        _fixture.StubPricingClient.Clear(); // Clear stub prices between tests
+    }
+
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
@@ -29,14 +34,14 @@ public class CartBehaviorTests : IAsyncLifetime
         // Act - Add same SKU twice
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m))
+            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", 2))
                 .ToUrl($"/api/carts/{cart.Id}/items");
             x.StatusCodeShouldBe(204);
         });
 
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", 3, 19.99m))
+            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", 3))
                 .ToUrl($"/api/carts/{cart.Id}/items");
             x.StatusCodeShouldBe(204);
         });
@@ -48,27 +53,28 @@ public class CartBehaviorTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task AddItem_SameSkuWithDifferentPrices_UsesFirstPrice()
+    public async Task AddItem_SameSku_AccumulatesQuantityWithServerAuthoritativePrice()
     {
         // Arrange
         var cart = await CreateCart();
+        _fixture.StubPricingClient.SetPrice("SKU-001", 19.99m);
 
-        // Act - Add same SKU with different prices
+        // Act - Add same SKU twice (server fetches same price both times)
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m))
+            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", 2))
                 .ToUrl($"/api/carts/{cart.Id}/items");
             x.StatusCodeShouldBe(204);
         });
 
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", 1, 29.99m))
+            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", 1))
                 .ToUrl($"/api/carts/{cart.Id}/items");
             x.StatusCodeShouldBe(204);
         });
 
-        // Assert - Should keep first price (19.99) and accumulate quantity
+        // Assert - Should use server-authoritative price (19.99) and accumulate quantity
         using var session = _fixture.GetDocumentSession();
         var updatedCart = await session.Events.AggregateStreamAsync<Shopping.Cart.Cart>(cart.Id);
         updatedCart!.Items["SKU-001"].Quantity.ShouldBe(3);
@@ -80,9 +86,9 @@ public class CartBehaviorTests : IAsyncLifetime
     {
         // Arrange - Cart with multiple items
         var cart = await CreateCart();
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-002", 1, 29.99m));
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-003", 5, 9.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-002", 1));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-003", 5));
 
         // Act - Clear cart via HTTP (DELETE doesn't support body, Reason will be null)
         await _fixture.Host.Scenario(x =>
@@ -124,7 +130,7 @@ public class CartBehaviorTests : IAsyncLifetime
     {
         // Arrange - Create and clear cart
         var cart = await CreateCart();
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 1, 10.00m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 1));
         await _fixture.ExecuteAndWaitAsync(new ClearCart(cart.Id, "First clear"));
 
         // Act & Assert - Second clear attempt should fail
@@ -139,11 +145,11 @@ public class CartBehaviorTests : IAsyncLifetime
     [Fact]
     public async Task GET_Cart_CalculatesTotalAmount_WithMultipleItems()
     {
-        // Arrange - Cart with items
+        // Arrange - Cart with items (all at stub default price 29.99)
         var cart = await CreateCart();
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));  // 39.98
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-002", 1, 29.99m));  // 29.99
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-003", 3, 5.00m));   // 15.00
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));  // 59.98
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-002", 1));  // 29.99
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-003", 3));  // 89.97
 
         // Act
         var result = await _fixture.Host.Scenario(x =>
@@ -154,8 +160,8 @@ public class CartBehaviorTests : IAsyncLifetime
 
         var cartResponse = await result.ReadAsJsonAsync<CartResponse>();
 
-        // Assert - Total should be 84.97
-        cartResponse.TotalAmount.ShouldBe(84.97m);
+        // Assert - Total should be 179.94 (2*29.99 + 1*29.99 + 3*29.99)
+        cartResponse.TotalAmount.ShouldBe(179.94m);
         cartResponse.Items.Count.ShouldBe(3);
     }
 
@@ -164,7 +170,7 @@ public class CartBehaviorTests : IAsyncLifetime
     {
         // Arrange - Cart with item
         var cart = await CreateCart();
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 5, 19.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 5));
 
         // Act - Remove item
         await _fixture.Host.Scenario(x =>
@@ -176,7 +182,7 @@ public class CartBehaviorTests : IAsyncLifetime
         // Act - Add same item back
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", 3, 19.99m))
+            x.Post.Json(new AddItemToCart(cart.Id, "SKU-001", 3))
                 .ToUrl($"/api/carts/{cart.Id}/items");
             x.StatusCodeShouldBe(204);
         });
@@ -192,7 +198,7 @@ public class CartBehaviorTests : IAsyncLifetime
     {
         // Arrange
         var cart = await CreateCart();
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 5, 19.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 5));
 
         // Act - Change quantity to same value (idempotent)
         await _fixture.Host.Scenario(x =>

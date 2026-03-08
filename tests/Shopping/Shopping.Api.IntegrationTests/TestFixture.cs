@@ -1,6 +1,8 @@
 using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
+using Shopping.Api.IntegrationTests.Stubs;
+using Shopping.Clients;
 using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.Tracking;
@@ -22,6 +24,7 @@ public class TestFixture : IAsyncLifetime
     private string? _connectionString;
 
     public IAlbaHost Host { get; private set; } = null!;
+    public StubPricingClient StubPricingClient { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
@@ -34,6 +37,9 @@ public class TestFixture : IAsyncLifetime
         // does not (seem) to have any negative or unintended side effects.
         JasperFxEnvironment.AutoStartHost = true;
 
+        // Initialize stub Pricing client
+        StubPricingClient = new StubPricingClient();
+
         Host = await AlbaHost.For<Program>(builder =>
         {
             builder.ConfigureServices(services =>
@@ -43,6 +49,9 @@ public class TestFixture : IAsyncLifetime
                 {
                     opts.Connection(_connectionString);
                 });
+
+                // Replace real Pricing client with stub
+                services.AddSingleton<IPricingClient>(StubPricingClient);
 
                 // Disable external Wolverine transports for testing
                 services.DisableAllExternalWolverineTransports();

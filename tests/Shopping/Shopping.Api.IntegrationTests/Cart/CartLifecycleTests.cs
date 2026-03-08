@@ -68,7 +68,7 @@ public class CartLifecycleTests : IAsyncLifetime
         using var session = _fixture.GetDocumentSession();
         var cart = (await session.Query<Shopping.Cart.Cart>().ToListAsync()).Single();
         
-        var addCommand = new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m);
+        var addCommand = new AddItemToCart(cart.Id, "SKU-001", 2);
 
         // Act
         await _fixture.ExecuteAndWaitAsync(addCommand);
@@ -78,7 +78,7 @@ public class CartLifecycleTests : IAsyncLifetime
         updatedCart.ShouldNotBeNull();
         updatedCart.Items.ShouldContainKey("SKU-001");
         updatedCart.Items["SKU-001"].Quantity.ShouldBe(2);
-        updatedCart.Items["SKU-001"].UnitPrice.ShouldBe(19.99m);
+        updatedCart.Items["SKU-001"].UnitPrice.ShouldBe(29.99m);
     }
 
     [Fact]
@@ -92,9 +92,9 @@ public class CartLifecycleTests : IAsyncLifetime
         using var session = _fixture.GetDocumentSession();
         var cart = (await session.Query<Shopping.Cart.Cart>().ToListAsync()).Single();
         
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));
         
-        var addMoreCommand = new AddItemToCart(cart.Id, "SKU-001", 3, 19.99m);
+        var addMoreCommand = new AddItemToCart(cart.Id, "SKU-001", 3);
 
         // Act
         await _fixture.ExecuteAndWaitAsync(addMoreCommand);
@@ -116,7 +116,7 @@ public class CartLifecycleTests : IAsyncLifetime
         using var session = _fixture.GetDocumentSession();
         var cart = (await session.Query<Shopping.Cart.Cart>().ToListAsync()).Single();
 
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));
 
         // Act - RemoveItemFromCart is now HTTP-only (no command record)
         var (tracked, result) = await _fixture.TrackedHttpCall(x =>
@@ -142,7 +142,7 @@ public class CartLifecycleTests : IAsyncLifetime
         using var session = _fixture.GetDocumentSession();
         var cart = (await session.Query<Shopping.Cart.Cart>().ToListAsync()).Single();
         
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));
         
         var changeCommand = new ChangeItemQuantity(cart.Id, "SKU-001", 5);
 
@@ -166,8 +166,8 @@ public class CartLifecycleTests : IAsyncLifetime
         using var session = _fixture.GetDocumentSession();
         var cart = (await session.Query<Shopping.Cart.Cart>().ToListAsync()).Single();
         
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-002", 1, 9.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-002", 1));
         
         var clearCommand = new ClearCart(cart.Id, "User requested");
 
@@ -193,7 +193,7 @@ public class CartLifecycleTests : IAsyncLifetime
         using var session = _fixture.GetDocumentSession();
         var cart = (await session.Query<Shopping.Cart.Cart>().ToListAsync()).Single();
         
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));
         
         var initiateCommand = new InitiateCheckout(cart.Id);
 
@@ -219,13 +219,13 @@ public class CartLifecycleTests : IAsyncLifetime
         using var session = _fixture.GetDocumentSession();
         var cart = (await session.Query<Shopping.Cart.Cart>().ToListAsync()).Single();
         
-        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2, 19.99m));
+        await _fixture.ExecuteAndWaitAsync(new AddItemToCart(cart.Id, "SKU-001", 2));
         await _fixture.ExecuteAndWaitAsync(new InitiateCheckout(cart.Id));
 
         // Act & Assert - attempting to add item should fail validation in Before() method
         var (tracked, result) = await _fixture.TrackedHttpCall(x =>
         {
-            x.Post.Json(new AddItemToCart(cart.Id, "SKU-002", 1, 9.99m))
+            x.Post.Json(new AddItemToCart(cart.Id, "SKU-002", 1))
                 .ToUrl($"/api/carts/{cart.Id}/items");
             x.StatusCodeShouldBe(400);
         });

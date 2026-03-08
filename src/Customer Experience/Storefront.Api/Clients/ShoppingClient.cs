@@ -43,9 +43,9 @@ public sealed class ShoppingClient : IShoppingClient
         return Guid.Parse(cartIdString);
     }
 
-    public async Task AddItemAsync(Guid cartId, string sku, int quantity, decimal unitPrice, CancellationToken ct = default)
+    public async Task AddItemAsync(Guid cartId, string sku, int quantity, CancellationToken ct = default)
     {
-        var payload = new { cartId, sku, quantity, unitPrice };
+        var payload = new { cartId, sku, quantity };
         var response = await _httpClient.PostAsJsonAsync($"/api/carts/{cartId}/items", payload, ct);
         response.EnsureSuccessStatusCode();
     }

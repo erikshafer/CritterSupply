@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using Shopping.Clients;
 using Wolverine;
 using Wolverine.Http;
 using Wolverine.Marten;
@@ -9,8 +10,7 @@ namespace Shopping.Cart;
 public sealed record AddItemToCart(
     Guid CartId,
     string Sku,
-    int Quantity,
-    decimal UnitPrice)
+    int Quantity)
 {
     public class AddItemToCartValidator : AbstractValidator<AddItemToCart>
     {
@@ -19,7 +19,6 @@ public sealed record AddItemToCart(
             RuleFor(x => x.CartId).NotEmpty();
             RuleFor(x => x.Sku).NotEmpty().MaximumLength(50);
             RuleFor(x => x.Quantity).GreaterThan(0);
-            RuleFor(x => x.UnitPrice).GreaterThanOrEqualTo(0);
         }
     }
 }
@@ -44,14 +43,37 @@ public static class AddItemToCartHandler
     }
 
     [WolverinePost("/api/carts/{cartId}/items")]
-    public static (Events, OutgoingMessages) Handle(
+    public static async Task<(Events, OutgoingMessages, ProblemDetails)> Handle(
         AddItemToCart command,
-        [WriteAggregate] Cart cart)
+        IPricingClient pricingClient,
+        [WriteAggregate] Cart cart,
+        CancellationToken ct)
     {
+        // Fetch server-authoritative price from Pricing BC
+        var price = await pricingClient.GetPriceAsync(command.Sku, ct);
+
+        if (price is null)
+        {
+            return ([], new OutgoingMessages(), new ProblemDetails
+            {
+                Detail = $"Price not available for SKU: {command.Sku}. Product may not be priced yet.",
+                Status = 400
+            });
+        }
+
+        if (price.Status != "Published")
+        {
+            return ([], new OutgoingMessages(), new ProblemDetails
+            {
+                Detail = $"Product {command.Sku} is not available for purchase (Status: {price.Status}).",
+                Status = 400
+            });
+        }
+
         var @event = new ItemAdded(
             command.Sku,
             command.Quantity,
-            command.UnitPrice,
+            price.BasePrice, // ✅ Server-authoritative price
             DateTimeOffset.UtcNow);
 
         var outgoing = new OutgoingMessages();
@@ -60,9 +82,9 @@ public static class AddItemToCartHandler
             cart.CustomerId ?? Guid.Empty, // Anonymous carts use Guid.Empty
             command.Sku,
             command.Quantity,
-            command.UnitPrice,
+            price.BasePrice, // ✅ Server-authoritative price
             DateTimeOffset.UtcNow));
 
-        return ([@event], outgoing);
+        return ([@event], outgoing, WolverineContinue.NoProblems);
     }
 }

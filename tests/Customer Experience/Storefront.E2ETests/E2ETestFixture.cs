@@ -153,13 +153,11 @@ public sealed class E2ETestFixture : IAsyncLifetime
         await StubShoppingClient.AddItemAsync(
             cartId,
             WellKnownTestData.Products.CeramicDogBowlSku,
-            quantity: 2,
-            unitPrice: WellKnownTestData.Products.CeramicDogBowlPrice);
+            quantity: 2);
         await StubShoppingClient.AddItemAsync(
             cartId,
             WellKnownTestData.Products.InteractiveCatLaserSku,
-            quantity: 1,
-            unitPrice: WellKnownTestData.Products.InteractiveCatLaserPrice);
+            quantity: 1);
 
         // Coordinate stubs: register a deterministic checkoutId so that when the browser
         // POSTs /carts/{cartId}/checkout, InitiateCheckoutAsync returns a known ID,

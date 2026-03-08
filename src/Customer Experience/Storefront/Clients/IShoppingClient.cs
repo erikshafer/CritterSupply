@@ -10,7 +10,7 @@ public interface IShoppingClient
 
     // Commands
     Task<Guid> InitializeCartAsync(Guid customerId, CancellationToken ct = default);
-    Task AddItemAsync(Guid cartId, string sku, int quantity, decimal unitPrice, CancellationToken ct = default);
+    Task AddItemAsync(Guid cartId, string sku, int quantity, CancellationToken ct = default);
     Task RemoveItemAsync(Guid cartId, string sku, CancellationToken ct = default);
     Task ChangeQuantityAsync(Guid cartId, string sku, int newQuantity, CancellationToken ct = default);
     Task ClearCartAsync(Guid cartId, string? reason = null, CancellationToken ct = default);

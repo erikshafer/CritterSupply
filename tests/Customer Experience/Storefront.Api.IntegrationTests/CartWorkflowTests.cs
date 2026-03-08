@@ -88,15 +88,15 @@ public class CartWorkflowTests(TestFixture fixture) : IClassFixture<TestFixture>
         var dogBowl = cartView.Items.FirstOrDefault(i => i.Sku == "DOG-BOWL-001");
         dogBowl.ShouldNotBeNull();
         dogBowl.Quantity.ShouldBe(5);
-        dogBowl.LineTotal.ShouldBe(99.95m); // 5 * 19.99
+        dogBowl.LineTotal.ShouldBe(149.95m); // 5 * 29.99
 
         var dogFood = cartView.Items.FirstOrDefault(i => i.Sku == "DOG-FOOD-001");
         dogFood.ShouldNotBeNull();
         dogFood.Quantity.ShouldBe(1);
-        dogFood.LineTotal.ShouldBe(45.00m);
+        dogFood.LineTotal.ShouldBe(29.99m); // 1 * 29.99 (stub default)
 
         // AND: Subtotal should be correct
-        var expectedSubtotal = 99.95m + 45.00m; // 144.95
+        var expectedSubtotal = 149.95m + 29.99m; // 179.94
         cartView.Subtotal.ShouldBe(expectedSubtotal);
     }
 
