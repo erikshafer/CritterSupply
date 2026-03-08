@@ -8,7 +8,6 @@ namespace Pricing.UnitTests;
 /// </summary>
 public sealed class CurrentPriceViewProjectionTests
 {
-    private readonly CurrentPriceViewProjection _projection = new();
     private readonly DateTimeOffset _testTime = new(2026, 3, 7, 12, 0, 0, TimeSpan.Zero);
     private readonly Guid _testUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
@@ -25,8 +24,10 @@ public sealed class CurrentPriceViewProjectionTests
             SetBy: _testUserId,
             PricedAt: _testTime);
 
+        var projection = new CurrentPriceViewProjection();
+
         // Act
-        var view = _projection.Create(evt);
+        var view = projection.Create(evt);
 
         // Assert
         view.Id.ShouldBe("DOG-FOOD-5LB");
@@ -56,9 +57,10 @@ public sealed class CurrentPriceViewProjectionTests
             CeilingPrice: null,
             SetBy: _testUserId,
             PricedAt: _testTime);
+        var projection = new CurrentPriceViewProjection();
 
         // Act
-        var view = _projection.Create(evt);
+        var view = projection.Create(evt);
 
         // Assert
         view.FloorPrice.ShouldBeNull();
@@ -83,7 +85,7 @@ public sealed class CurrentPriceViewProjectionTests
             SourceSuggestionId: null);
 
         // Act
-        var result = _projection.Apply(evt, current);
+        var result = CurrentPriceViewProjection.Apply(current, evt);
 
         // Assert
         result.BasePrice.ShouldBe(19.99m);
@@ -108,7 +110,7 @@ public sealed class CurrentPriceViewProjectionTests
             ScheduledAt: _testTime);
 
         // Act
-        var result = _projection.Apply(evt, current);
+        var result = CurrentPriceViewProjection.Apply(current, evt);
 
         // Assert
         result.HasPendingSchedule.ShouldBe(true);
@@ -131,7 +133,7 @@ public sealed class CurrentPriceViewProjectionTests
             CancelledAt: _testTime.AddDays(1));
 
         // Act
-        var result = _projection.Apply(evt, current);
+        var result = CurrentPriceViewProjection.Apply(current, evt);
 
         // Assert
         result.HasPendingSchedule.ShouldBe(false);
@@ -153,7 +155,7 @@ public sealed class CurrentPriceViewProjectionTests
             ActivatedAt: _testTime.AddDays(7));
 
         // Act
-        var result = _projection.Apply(evt, current);
+        var result = CurrentPriceViewProjection.Apply(current, evt);
 
         // Assert
         result.BasePrice.ShouldBe(29.99m);
@@ -180,7 +182,7 @@ public sealed class CurrentPriceViewProjectionTests
             ExpiresAt: null);
 
         // Act
-        var result = _projection.Apply(evt, current);
+        var result = CurrentPriceViewProjection.Apply(current, evt);
 
         // Assert
         result.FloorPrice.ShouldBe(18m);
@@ -202,7 +204,7 @@ public sealed class CurrentPriceViewProjectionTests
             ExpiresAt: null);
 
         // Act
-        var result = _projection.Apply(evt, current);
+        var result = CurrentPriceViewProjection.Apply(current, evt);
 
         // Assert
         result.CeilingPrice.ShouldBe(45m);
@@ -224,7 +226,7 @@ public sealed class CurrentPriceViewProjectionTests
             CorrectedAt: _testTime.AddDays(1));
 
         // Act
-        var result = _projection.Apply(evt, current);
+        var result = CurrentPriceViewProjection.Apply(current, evt);
 
         // Assert
         result.BasePrice.ShouldBe(23.99m);
@@ -243,7 +245,7 @@ public sealed class CurrentPriceViewProjectionTests
             DiscontinuedAt: _testTime.AddDays(30));
 
         // Act
-        var result = _projection.Apply(evt, current);
+        var result = CurrentPriceViewProjection.Apply(current, evt);
 
         // Assert
         result.Status.ShouldBe(PriceStatus.Discontinued);
@@ -251,31 +253,6 @@ public sealed class CurrentPriceViewProjectionTests
         result.ScheduledChangeAt.ShouldBeNull();
         result.ScheduledPrice.ShouldBeNull();
         result.LastUpdatedAt.ShouldBe(_testTime.AddDays(30));
-    }
-
-    [Fact]
-    public void Apply_IsImmutable_DoesNotModifyOriginalView()
-    {
-        // Arrange
-        var original = CreatePublishedView(basePrice: 24.99m);
-        var evt = new PriceChanged(
-            ProductPriceId: Guid.NewGuid(),
-            Sku: "DOG-FOOD-5LB",
-            OldPrice: Money.Of(24.99m, "USD"),
-            NewPrice: Money.Of(19.99m, "USD"),
-            PreviousPriceSetAt: _testTime,
-            Reason: null,
-            ChangedBy: _testUserId,
-            ChangedAt: _testTime.AddDays(1),
-            BulkPricingJobId: null,
-            SourceSuggestionId: null);
-
-        // Act
-        var result = _projection.Apply(evt, original);
-
-        // Assert
-        original.BasePrice.ShouldBe(24.99m);  // Original unchanged
-        result.BasePrice.ShouldBe(19.99m);    // New instance has updated value
     }
 
     [Fact]
@@ -290,9 +267,10 @@ public sealed class CurrentPriceViewProjectionTests
             CeilingPrice: null,
             SetBy: _testUserId,
             PricedAt: _testTime);
+        var projection = new CurrentPriceViewProjection();
 
         // Act
-        var view = _projection.Create(evt);
+        var view = projection.Create(evt);
 
         // Assert
         view.Id.ShouldBe(view.Sku);

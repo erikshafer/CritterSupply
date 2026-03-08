@@ -1,22 +1,32 @@
 using Marten.Events.Aggregation;
+using Marten.Events.Projections;
 
 namespace Pricing.Products;
 
 /// <summary>
-/// Inline Marten projection for CurrentPriceView.
+/// Inline Marten projection for CurrentPriceView using MultiStreamProjection.
 /// Lifecycle: ProjectionLifecycle.Inline (zero lag, same transaction as command).
-/// Listens to: ProductPrice event stream.
-/// Document ID: SKU string (normalized to uppercase).
+/// Maps: Guid event streams → string-keyed documents (SKU as document ID).
+/// MultiStreamProjection allows aggregating events by a property (SKU) different from stream ID.
 /// </summary>
-public sealed class CurrentPriceViewProjection : SingleStreamProjection<CurrentPriceView, string>
+public sealed class CurrentPriceViewProjection : MultiStreamProjection<CurrentPriceView, string>
 {
-    // Marten will automatically use the Sku property from events as the document ID
-    // This enables direct lookup: session.LoadAsync<CurrentPriceView>("DOG-FOOD-5LB")
+    public CurrentPriceViewProjection()
+    {
+        // Tell Marten which property to use as the document ID for each event type
+        // This allows Guid streams to produce string-keyed documents
+        Identity<InitialPriceSet>(x => x.Sku);
+        Identity<PriceChanged>(x => x.Sku);
+        Identity<PriceChangeScheduled>(x => x.Sku);
+        Identity<ScheduledPriceChangeCancelled>(x => x.Sku);
+        Identity<ScheduledPriceActivated>(x => x.Sku);
+        Identity<FloorPriceSet>(x => x.Sku);
+        Identity<CeilingPriceSet>(x => x.Sku);
+        Identity<PriceCorrected>(x => x.Sku);
+        Identity<PriceDiscontinued>(x => x.Sku);
+    }
 
-    // ========== Apply Methods ==========
-    // Pure functions: (CurrentView, Event) → NewView
-    // Denormalize Money value objects to decimal + string Currency
-
+    // Create method for InitialPriceSet (first event creates the document)
     public CurrentPriceView Create(InitialPriceSet evt)
     {
         return new CurrentPriceView
@@ -33,9 +43,9 @@ public sealed class CurrentPriceViewProjection : SingleStreamProjection<CurrentP
         };
     }
 
-    public CurrentPriceView Apply(PriceChanged evt, CurrentPriceView current)
+    public static CurrentPriceView Apply(CurrentPriceView view, PriceChanged evt)
     {
-        return current with
+        return view with
         {
             BasePrice = evt.NewPrice.Amount,
             Currency = evt.NewPrice.Currency,
@@ -45,9 +55,9 @@ public sealed class CurrentPriceViewProjection : SingleStreamProjection<CurrentP
         };
     }
 
-    public CurrentPriceView Apply(PriceChangeScheduled evt, CurrentPriceView current)
+    public static CurrentPriceView Apply(CurrentPriceView view, PriceChangeScheduled evt)
     {
-        return current with
+        return view with
         {
             HasPendingSchedule = true,
             ScheduledChangeAt = evt.ScheduledFor,
@@ -56,9 +66,9 @@ public sealed class CurrentPriceViewProjection : SingleStreamProjection<CurrentP
         };
     }
 
-    public CurrentPriceView Apply(ScheduledPriceChangeCancelled evt, CurrentPriceView current)
+    public static CurrentPriceView Apply(CurrentPriceView view, ScheduledPriceChangeCancelled evt)
     {
-        return current with
+        return view with
         {
             HasPendingSchedule = false,
             ScheduledChangeAt = null,
@@ -67,13 +77,13 @@ public sealed class CurrentPriceViewProjection : SingleStreamProjection<CurrentP
         };
     }
 
-    public CurrentPriceView Apply(ScheduledPriceActivated evt, CurrentPriceView current)
+    public static CurrentPriceView Apply(CurrentPriceView view, ScheduledPriceActivated evt)
     {
-        return current with
+        return view with
         {
             BasePrice = evt.ActivatedPrice.Amount,
-            PreviousBasePrice = current.BasePrice,
-            PreviousPriceSetAt = current.LastUpdatedAt,
+            PreviousBasePrice = view.BasePrice,
+            PreviousPriceSetAt = view.LastUpdatedAt,
             HasPendingSchedule = false,
             ScheduledChangeAt = null,
             ScheduledPrice = null,
@@ -81,27 +91,27 @@ public sealed class CurrentPriceViewProjection : SingleStreamProjection<CurrentP
         };
     }
 
-    public CurrentPriceView Apply(FloorPriceSet evt, CurrentPriceView current)
+    public static CurrentPriceView Apply(CurrentPriceView view, FloorPriceSet evt)
     {
-        return current with
+        return view with
         {
             FloorPrice = evt.FloorPrice.Amount,
             LastUpdatedAt = evt.SetAt
         };
     }
 
-    public CurrentPriceView Apply(CeilingPriceSet evt, CurrentPriceView current)
+    public static CurrentPriceView Apply(CurrentPriceView view, CeilingPriceSet evt)
     {
-        return current with
+        return view with
         {
             CeilingPrice = evt.CeilingPrice.Amount,
             LastUpdatedAt = evt.SetAt
         };
     }
 
-    public CurrentPriceView Apply(PriceCorrected evt, CurrentPriceView current)
+    public static CurrentPriceView Apply(CurrentPriceView view, PriceCorrected evt)
     {
-        return current with
+        return view with
         {
             BasePrice = evt.CorrectedPrice.Amount,
             PreviousBasePrice = evt.PreviousPrice.Amount,
@@ -109,9 +119,9 @@ public sealed class CurrentPriceViewProjection : SingleStreamProjection<CurrentP
         };
     }
 
-    public CurrentPriceView Apply(PriceDiscontinued evt, CurrentPriceView current)
+    public static CurrentPriceView Apply(CurrentPriceView view, PriceDiscontinued evt)
     {
-        return current with
+        return view with
         {
             Status = PriceStatus.Discontinued,
             HasPendingSchedule = false,

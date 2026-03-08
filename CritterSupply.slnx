@@ -147,7 +147,9 @@
   </Folder>
   <Folder Name="/Pricing/">
     <Project Path="src/Pricing/Pricing/Pricing.csproj" />
+    <Project Path="src/Pricing/Pricing.Api/Pricing.Api.csproj" />
     <Project Path="tests/Pricing/Pricing.UnitTests/Pricing.UnitTests.csproj" />
+    <Project Path="tests/Pricing/Pricing.Api.IntegrationTests/Pricing.Api.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Aspire/">
     <Project Path="src/CritterSupply.AppHost/CritterSupply.AppHost.csproj" />
