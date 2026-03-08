@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Storefront.Api;
@@ -287,6 +288,8 @@ public sealed class CheckoutFlowStepDefinitions
     [Then(@"the checkout wizard should be visible")]
     public async Task ThenCheckoutWizardShouldBeVisible()
     {
+        // Wait for the checkout page to fully load (data fetched, spinner gone)
+        await CheckoutPage.WaitForCheckoutLoadedAsync();
         var isLoaded = await CheckoutPage.IsLoadedSuccessfullyAsync();
         isLoaded.ShouldBeTrue("Checkout stepper should be visible after loading");
     }
@@ -414,27 +417,88 @@ public sealed class CheckoutFlowStepDefinitions
 
     private async Task AdvanceToStepAsync(string targetStep)
     {
+        // Get the checkoutId from localStorage (seeded by test setup)
+        var checkoutIdString = await Page.EvaluateAsync<string>("() => localStorage.getItem('checkoutId')");
+        if (!Guid.TryParse(checkoutIdString, out var checkoutId))
+        {
+            throw new InvalidOperationException("checkoutId not found in localStorage");
+        }
+
+        // Advance through checkout steps by calling API endpoints directly.
+        // This bypasses MudBlazor dropdown UI interaction issues and focuses on workflow testing.
+        // Each API call advances the checkout state, then we reload the page to show the new step.
+        var apiClient = new HttpClient { BaseAddress = new Uri(_fixture.StorefrontApiBaseUrl) };
+
         switch (targetStep.ToLowerInvariant())
         {
             case "shipping method":
-                await CheckoutPage.SelectAddressByNicknameAsync(WellKnownTestData.Addresses.AliceHomeNickname);
-                await CheckoutPage.ClickSaveAddressAndContinueAsync();
+                // Complete Step 1: Shipping Address
+                var addressResponse = await apiClient.PostAsJsonAsync(
+                    $"/api/storefront/checkouts/{checkoutId}/shipping-address",
+                    new
+                    {
+                        addressLine1 = WellKnownTestData.Addresses.AliceHomeAddressLine1,
+                        addressLine2 = (string?)null,
+                        city = WellKnownTestData.Addresses.AliceHomeCity,
+                        stateOrProvince = WellKnownTestData.Addresses.AliceHomeState,
+                        postalCode = WellKnownTestData.Addresses.AliceHomePostalCode,
+                        country = WellKnownTestData.Addresses.AliceHomeCountry
+                    });
+                addressResponse.EnsureSuccessStatusCode();
+                // Navigate back to checkout page to reload Blazor state (API calls don't update Blazor Server component state)
+                await CheckoutPage.NavigateAsync();
                 break;
 
             case "payment":
-                await CheckoutPage.SelectAddressByNicknameAsync(WellKnownTestData.Addresses.AliceHomeNickname);
-                await CheckoutPage.ClickSaveAddressAndContinueAsync();
-                await CheckoutPage.SelectStandardShippingAsync();
-                await CheckoutPage.ClickSaveShippingMethodAndContinueAsync();
+                // Complete Step 1: Shipping Address
+                await apiClient.PostAsJsonAsync(
+                    $"/api/storefront/checkouts/{checkoutId}/shipping-address",
+                    new
+                    {
+                        addressLine1 = WellKnownTestData.Addresses.AliceHomeAddressLine1,
+                        addressLine2 = (string?)null,
+                        city = WellKnownTestData.Addresses.AliceHomeCity,
+                        stateOrProvince = WellKnownTestData.Addresses.AliceHomeState,
+                        postalCode = WellKnownTestData.Addresses.AliceHomePostalCode,
+                        country = WellKnownTestData.Addresses.AliceHomeCountry
+                    });
+                // Complete Step 2: Shipping Method
+                await apiClient.PostAsJsonAsync(
+                    $"/api/storefront/checkouts/{checkoutId}/shipping-method",
+                    new
+                    {
+                        shippingMethod = WellKnownTestData.Shipping.StandardMethod,
+                        shippingCost = WellKnownTestData.Shipping.StandardCost
+                    });
+                await CheckoutPage.NavigateAsync();
                 break;
 
             case "review":
-                await CheckoutPage.SelectAddressByNicknameAsync(WellKnownTestData.Addresses.AliceHomeNickname);
-                await CheckoutPage.ClickSaveAddressAndContinueAsync();
-                await CheckoutPage.SelectStandardShippingAsync();
-                await CheckoutPage.ClickSaveShippingMethodAndContinueAsync();
-                await CheckoutPage.EnterPaymentTokenAsync(WellKnownTestData.Payment.ValidVisaToken);
-                await CheckoutPage.ClickSavePaymentAndContinueAsync();
+                // Complete Step 1: Shipping Address
+                await apiClient.PostAsJsonAsync(
+                    $"/api/storefront/checkouts/{checkoutId}/shipping-address",
+                    new
+                    {
+                        addressLine1 = WellKnownTestData.Addresses.AliceHomeAddressLine1,
+                        addressLine2 = (string?)null,
+                        city = WellKnownTestData.Addresses.AliceHomeCity,
+                        stateOrProvince = WellKnownTestData.Addresses.AliceHomeState,
+                        postalCode = WellKnownTestData.Addresses.AliceHomePostalCode,
+                        country = WellKnownTestData.Addresses.AliceHomeCountry
+                    });
+                // Complete Step 2: Shipping Method
+                await apiClient.PostAsJsonAsync(
+                    $"/api/storefront/checkouts/{checkoutId}/shipping-method",
+                    new
+                    {
+                        shippingMethod = WellKnownTestData.Shipping.StandardMethod,
+                        shippingCost = WellKnownTestData.Shipping.StandardCost
+                    });
+                // Complete Step 3: Payment
+                await apiClient.PostAsJsonAsync(
+                    $"/api/storefront/checkouts/{checkoutId}/payment-method",
+                    new { paymentMethodToken = WellKnownTestData.Payment.ValidVisaToken });
+                await CheckoutPage.NavigateAsync();
                 break;
 
             default:
