@@ -85,9 +85,9 @@ builder.Services.AddSignalR();
 
 builder.Host.UseWolverine(opts =>
 {
-    opts.Discovery.DisableConventionalDiscovery();
+    // Include the API assembly (HTTP endpoints, dashboard)
     opts.Discovery.IncludeAssembly(typeof(VendorPortal.Api.Dashboard.GetDashboardEndpoint).Assembly);
-    // Handle VendorProductAssociated events from Product Catalog
+    // Include the domain assembly (message handlers: VendorProductAssociatedHandler etc.)
     opts.Discovery.IncludeAssembly(typeof(VendorProductCatalogEntry).Assembly);
 
     // Configure RabbitMQ for integration messages

@@ -1,8 +1,10 @@
+using Alba;
 using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 using Wolverine;
+using Wolverine.Tracking;
 
 namespace VendorPortal.Api.IntegrationTests;
 
@@ -90,12 +92,17 @@ public sealed class TestFixture : IAsyncLifetime
 
     /// <summary>
     /// Sends a message directly through Wolverine and waits for all cascaded work to finish.
-    /// Useful for testing handler side-effects without going through HTTP.
+    /// Uses Alba's TrackActivity to ensure handler side-effects are fully persisted.
     /// </summary>
-    public async Task ExecuteMessageAsync<T>(T message, CancellationToken ct = default)
+    public async Task ExecuteMessageAsync<T>(T message, int timeoutSeconds = 15, CancellationToken ct = default)
         where T : class
     {
-        var bus = Host.Services.GetRequiredService<IMessageBus>();
-        await bus.InvokeAsync(message, ct);
+        await Host.TrackActivity(TimeSpan.FromSeconds(timeoutSeconds))
+            .DoNotAssertOnExceptionsDetected()
+            .AlsoTrack(Host)
+            .ExecuteAndWaitAsync((Func<IMessageContext, Task>)(async ctx =>
+            {
+                await ctx.InvokeAsync(message, ct);
+            }));
     }
 }

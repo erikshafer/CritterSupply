@@ -38,24 +38,16 @@ public sealed record AssignProductToVendor(Guid VendorTenantId)
 }
 
 /// <summary>
-/// GET  /api/admin/products/{sku}/vendor-assignment  — retrieve the current vendor assignment.
-/// POST /api/admin/products/{sku}/vendor-assignment  — assign or reassign the SKU to a vendor.
+/// GET /api/admin/products/{sku}/vendor-assignment — retrieve the current vendor assignment.
+/// Separated from AssignProductToVendorHandler to avoid Wolverine compound handler ambiguity.
 /// </summary>
-public static class AssignProductToVendorHandler
+public static class GetVendorAssignmentHandler
 {
-    // ── Shared Load step (used by both GET and POST compound handlers) ────────
-
     public static Task<Product?> Load(string sku, IDocumentSession session, CancellationToken ct)
         => session.LoadAsync<Product>(sku, ct);
 
-    // ── GET Handler ───────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Returns the current vendor assignment for the given SKU.
-    /// Returns 404 if the product does not exist or has not been assigned to any vendor.
-    /// </summary>
     [WolverineGet("/api/admin/products/{sku}/vendor-assignment")]
-    public static IResult GetVendorAssignment(string sku, Product? product)
+    public static IResult Handle(string sku, Product? product)
     {
         if (product is null)
             return Results.Problem(
@@ -73,8 +65,19 @@ public static class AssignProductToVendorHandler
             product.AssignedBy!,
             product.AssignedAt!.Value));
     }
+}
 
-    // ── POST Before (validation / guard) ─────────────────────────────────────
+/// <summary>
+/// POST /api/admin/products/{sku}/vendor-assignment — assign or reassign the SKU to a vendor.
+/// </summary>
+public static class AssignProductToVendorHandler
+{
+    // ── Compound handler Load step ────────────────────────────────────────────
+
+    public static Task<Product?> Load(string sku, IDocumentSession session, CancellationToken ct)
+        => session.LoadAsync<Product>(sku, ct);
+
+    // ── Before (validation / guard) ───────────────────────────────────────────
 
     /// <summary>
     /// Guards the POST handler. Returns 404 for missing products and 400 for discontinued ones.
