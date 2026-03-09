@@ -1,7 +1,7 @@
 # Product Catalog · Listings · Marketplaces BC: Architecture Evolution Plan
 
 **Document Owner:** Principal Software Architect  
-**Status:** 🟡 Active — PO + UX findings incorporated; Owner decisions outstanding  
+**Status:** 🟡 Active — PO + UX + PSA findings incorporated; Owner decisions outstanding  
 **Date:** 2026-03-10  
 **Last Updated:** 2026-03-10  
 **Triggered by:** PO + UX Engineer discovery session on Product Catalog evolution and marketplace selling  
@@ -23,6 +23,16 @@
 6. [Questions for Owner/Erik](#6-questions-for-ownererik)
 7. [Recommended Phasing](#7-recommended-phasing)
 8. [ADR Candidates](#8-adr-candidates)
+
+**Part C — UX Engineer Perspective (Addendum)**
+- [C.1 UX Assessment of the Event Sourcing Decision](#c1--ux-assessment-of-the-event-sourcing-decision)
+- [C.2 Event Granularity: UX Business Use Cases](#c2--event-granularity-ux-business-use-cases)
+- [C.3 Listings Event Granularity: UX Implications](#c3--listings-event-granularity-ux-implications)
+- [C.4 Product Change History: A New Admin Feature](#c4--product-change-history-a-new-admin-feature)
+- [C.5 Marketplace Document Store: UX Fit](#c5--marketplace-document-store-ux-fit)
+- [C.6 Real-Time Admin Notifications (SignalR)](#c6--real-time-admin-notifications-signalr)
+- [C.7 UX Risk Register: Event Sourcing Specific Risks](#c7--ux-risk-register-event-sourcing-specific-risks)
+- [C.8 UX Recommendations: Admin UI for Event-Sourced Product Catalog](#c8--ux-recommendations-admin-ui-for-event-sourced-product-catalog)
 
 ---
 
@@ -748,3 +758,416 @@ PostgreSQL shared instance — per-BC schema isolation:
 ```
 
 Each BC sets `opts.DatabaseSchemaName = "{bc_name}"` in its Marten configuration. No cross-schema queries at runtime. All cross-BC data flows through integration messages.
+
+---
+
+---
+
+# Part C: UX Engineer Perspective
+**Author:** UX Engineer  
+**Date:** 2026-03-09  
+**Context:** Response to PSA Architecture Evolution Plan — Product Catalog BC Event Sourcing Migration
+
+---
+
+## C.1 — UX Assessment of the Event Sourcing Decision
+
+**Verdict: Strong Yes from the UX side — with important implementation guardrails.**
+
+### Does granular event granularity map to user-visible features?
+
+Yes, and more directly than the PSA's rationale suggests. The three highest-value user-visible capabilities that fall out of event sourcing for free:
+
+1. **Product Change History timeline** — Every catalog manager has asked "who changed that description and when?" after a product shipped with bad copy. Right now we have no answer. With event sourcing, the answer is built into the aggregate. This is not a nice-to-have for a pet supply retailer: compliance teams need it for hazmat and recall documentation. Merchandising teams need it for seasonal planning audits. Customer service needs it when a customer calls about a product that "used to say" something it no longer says.
+
+2. **Precise listing reaction** — When a catalog manager updates `ProductCategoryAssigned`, the admin UI can inform them *specifically* that "3 marketplace listings may need to be re-mapped to the new category." This is only possible if the system knows *what* changed, not just *that* something changed. Granular events are the mechanism; the user-visible output is confidence — the catalog manager knows exactly what downstream work is triggered.
+
+3. **Recall cascade visibility** — `ProductDiscontinued` as a first-class domain event enables the admin UI to show a real-time cascade summary: "Discontinuing this product will force-end 12 active listings. Do you want to proceed?" This is the difference between a scary black-box operation and a transparent, controllable workflow. Users can make informed decisions. This is a foundational safety UX requirement for a retail product.
+
+### Does the recall cascade design work from a UX standpoint?
+
+Yes, but only if the admin UI is designed to surface it actively. The PSA is correct that the event routing is clean architecturally. The UX risk is that the cascade happens *correctly* but *invisibly* — the catalog manager clicks "Discontinue," something happens in the background, and they have no idea if 1 listing or 47 listings were affected.
+
+**Required UX contract:**
+- Before confirming `ProductDiscontinued`: show a count of affected active listings (optimistic read from current projections — no event sourcing magic needed here, just a query)
+- After confirming: show a real-time progress indicator or summary of listings transitioned (see C.6 for SignalR design)
+- After completion: show a permanent audit record in Product Change History
+
+Owned by UX: the modal design, the progress/confirmation pattern, the summary view  
+Owned by PSA/Engineer: the event routing, the cascade trigger, the projection updates
+
+### Is the event stream valuable as a Product Change History view?
+
+Yes. This is a first-class admin feature, not a developer debug tool. See C.4 for full design. The short answer: **surface it as a tab on every product detail page, not buried in a separate log viewer.**
+
+---
+
+## C.2 — Event Granularity: UX Business Use Cases
+
+| Event | User-Facing Capability | Who Sees It | UX Notes |
+|---|---|---|---|
+| `ProductAdded` | Confirms new product creation; seeds the change history timeline | Catalog manager who created it; their team lead | Show as "Product created by [user]" in history — not raw event name |
+| `ProductMigrated` | One-time — should NOT appear in the UI change history | System only | Filter this from all user-facing history views. It is a technical bootstrap artifact, not a business event. |
+| `ProductNameChanged` | Content audit trail — "was this change approved?" link to content review workflow | Merchandising team, content reviewers | Show old name → new name diff inline in history. High value for SEO and compliance audits. |
+| `ProductDescriptionUpdated` | Same as above; triggers content review queue entry if description exceeds a word-count change threshold | Content team | Consider a "significant change" heuristic: >30% text change = flag for review. UX can define the threshold; engineer implements the projection rule. |
+| `ProductImagesUpdated` | Image audit trail; shows thumbnail(s) of what changed | Merchandising, creative team | This event needs a UX refinement (see below) — "updated" is ambiguous. |
+| `ProductTagsUpdated` | SEO/search relevance change log | SEO manager, merchandising | Low urgency; useful in batch weekly summary |
+| `ProductDimensionsSet` | Shipping cost recalculation trigger; fulfillment team alert | Fulfillment ops, finance | Should trigger a soft alert to fulfillment: "Dimensions changed — verify shipping rate tier" |
+| `ProductCategoryAssigned` | Triggers listing re-mapping workflow — catalog manager sees inline prompt to review affected listings | Catalog manager, marketplace team | Most operationally significant event after discontinuation. See C.3. |
+| `ProductBrandSet` | Brand association audit; useful when switching vendors or during brand consolidation | Merchandising, vendor management | Low urgency unless brand change is bulk (multiple SKUs) |
+| `ProductActivated` | Product becomes visible and purchasable — triggers storefront listing check | Catalog manager, storefront team | Should show as a green "went live" marker in history timeline |
+| `ProductDiscontinued` | Recall/discontinuation cascade workflow — see C.1 and C.3 | Catalog manager, compliance, ops | Highest-urgency event in the system. Requires modal confirmation and real-time cascade summary. |
+| `ProductSetToOutOfSeason` | Seasonal management — catalog manager can batch-set products and schedule a reactivation date | Merchandising, seasonal planning team | Admin UI SHOULD offer a "reactivate on date" field alongside this transition. The event itself doesn't need to carry the reactivation date — a scheduled command can handle it — but the UX must make it easy to set. |
+| `ProductSetToComingSoon` | Pre-launch workflow — enables "notify me" subscriptions, countdown displays on storefront PDP | Merchandising, marketing, storefront | Phase 1: admin sets Coming Soon, storefront shows status label. Phase 2: "notify me when available" subscription list builds from this. Marketing team should be notified when this status is set so they can plan launch content. |
+| `ProductDeleted` | Permanent removal — requires explicit confirmation, shows in history with "deleted by [user]" | Catalog manager, admin | Hard delete vs. soft delete distinction must be clear to users. `ProductDeleted` should be near-irreversible in the UI (require typing the product name to confirm). |
+| `ProductRestored` | Undo of deletion — recovery workflow for accidental deletes | Admin, catalog manager | Show as a recovery event in history. Rare but critical when it's needed. |
+| `ProductVariantAdded` *(Phase 2)* | Variant management — parent product gains a new color/size/configuration; storefront selector updates | Merchandising, storefront | Admin UI needs a variant editor that feels like managing a family, not creating isolated products. Each variant addition should show a preview of the updated storefront selector. |
+
+### UX Refinement Required: `ProductImagesUpdated`
+
+"Updated" is too coarse. The admin UI and the change history view need to distinguish:
+
+- **Image added** (existing images retained; 1 new added) → low-risk, show "+1 image" in history
+- **Image replaced** (all images swapped) → high-risk, requires content review — show "all images replaced" with thumbnail comparison in history
+- **Image removed** (product now has fewer images) → medium-risk, show count change
+
+**Recommendation to PSA:** Consider splitting `ProductImagesUpdated` into `ProductImageAdded`, `ProductImageRemoved`, and `ProductImageSetReplaced`. The UX value of distinguishing these is significant — a content reviewer who sees "all images replaced" behaves very differently from one who sees "+1 supplemental image added." If splitting the event isn't desired in Phase 1, add a `ChangeType` attribute to `ProductImagesUpdated` with values `Added | Removed | FullReplacement`.
+
+Owned by UX: defining the distinction and the UX behavior for each case  
+Owned by PSA/Engineer: event schema decision
+
+---
+
+## C.3 — Listings Event Granularity: UX Implications
+
+### Validating the `EndedReason` Attribute
+
+The `EndedReason` attribute on `ListingEnded` is the right call. Here are the five most important values and how user behavior differs for each:
+
+| EndedReason | User-Visible Label | Admin's Immediate Action |
+|---|---|---|
+| `RecallForced` | "Forced Down — Product Discontinued" | Review: can this listing be re-linked to a replacement product? Or permanently close. Urgent. |
+| `CategoryMismatch` | "Ended — Category Mismatch" | Re-map to new category and resubmit. Admin needs a direct "re-list" affordance on this ended listing. |
+| `MarketplaceRejected` | "Ended — Rejected by [Marketplace Name]" | Review marketplace rejection reason (which may come from an external API response), correct, and resubmit. |
+| `ManualEnd` | "Ended — Manually Closed" | No action required. Informational. Show who ended it and when. |
+| `ProductDeleted` | "Ended — Product Removed" | No action required. Listing cannot be restored unless product is restored first. |
+
+**Design implication:** The Listing detail page should show `EndedReason` prominently — not buried in metadata. For `RecallForced` and `MarketplaceRejected`, show an inline call-to-action card, not just a status label.
+
+### When a Listing Goes `Live`: What Notification Does the Catalog Manager Get?
+
+**Recommendation: In-app toast + persistent notification bell.**
+
+- Toast: "✓ [Product Name] listing is now Live on [Marketplace]" — dismissible after 5 seconds
+- Notification bell: persists the event so they can review it later if they missed the toast
+- Email: only if the listing had been in review for >24 hours (i.e., it's a delayed approval they may have forgotten about)
+
+Do NOT send email for every listing going live — at scale, a catalog manager publishing 50 SKUs in a day would receive 50 emails. Email should be reserved for delayed or unexpected state changes.
+
+### When a Listing is Forced Down by Recall: Admin Call-to-Action
+
+This is the highest-stakes UX moment in the Listings admin. The catalog manager should see:
+
+```
+┌─────────────────────────────────────────────────────┐
+│ ⚠ LISTING FORCED DOWN — PRODUCT DISCONTINUED        │
+│                                                     │
+│ "Himalayan Pink Salt Dog Treats" (SKU: HPT-2204)    │
+│ was discontinued at 2:47 PM today.                  │
+│                                                     │
+│ This listing has been removed from Amazon US.       │
+│                                                     │
+│ [Review Discontinuation]  [Acknowledge & Dismiss]   │
+└─────────────────────────────────────────────────────┘
+```
+
+"Review Discontinuation" navigates to the product detail page showing the `ProductDiscontinued` event in Change History, with any compliance notes the catalog manager added at discontinuation time.
+
+"Acknowledge & Dismiss" marks the notification as reviewed. The listing itself remains in `Ended` state — dismissing the notification does NOT restore the listing.
+
+If multiple listings are force-ended simultaneously (e.g., 12 listings across marketplaces), group them into a single notification: "12 listings force-ended due to [Product Name] discontinuation — [Review All]" rather than flooding the admin with 12 individual toasts.
+
+### Is `Paused` vs. `Ended` Clear to Users?
+
+Currently, no — without explicit UI treatment, users will conflate these. The distinction must be encoded in visual design and copy:
+
+| State | Color/Badge | Copy | User Mental Model |
+|---|---|---|---|
+| `Paused` | Yellow / ⏸ Paused | "Temporarily hidden from marketplace" | "I can easily resume this" |
+| `Ended` | Gray / ✖ Ended | "Closed — requires re-listing to restore" | "This is done; significant effort to bring back" |
+
+The Paused state should always show a prominent "Resume Listing" button. The Ended state should show "Create New Listing from This Product" (not "restore," which implies it resumes the same listing ID — which it won't on most marketplaces).
+
+For `RecallForced` ended listings specifically, the "Create New Listing" button should be disabled until the product status is no longer `Discontinued`.
+
+---
+
+## C.4 — Product Change History: A New Admin Feature
+
+### Information Architecture
+
+**Location:** Tab on the Product Detail page, labeled "History"  
+**NOT:** A separate admin section, a developer log viewer, or a modal
+
+Rationale: Catalog managers need change history in context of the product they're working on. Navigating away to a separate history section breaks the workflow. A tab keeps them in context.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  [← Back to Catalog]                                                │
+│                                                                     │
+│  Himalayan Pink Salt Dog Treats                    SKU: HPT-2204   │
+│  ─────────────────────────────────────────────────────────────────  │
+│  [Overview] [Images] [Listings] [Pricing] [History]                 │
+│─────────────────────────────────────────────────────────────────────│
+│                                                                     │
+│  PRODUCT CHANGE HISTORY                                             │
+│                                                                     │
+│  Filter: [All Changes ▼]   [Date Range: Last 30 days ▼]   [Export] │
+│                                                                     │
+│  ● Today, 2:47 PM                                                   │
+│    Product Discontinued                                             │
+│    Reason: Supplier discontinued ingredient                         │
+│    By: Sarah M. (Merchandising)                                     │
+│    → 12 listings force-ended across 3 marketplaces                 │
+│                                                                     │
+│  ○ Jul 8, 10:14 AM                                                  │
+│    Description Updated                                              │
+│    Changed ~40% of description text                                 │
+│    By: Content Team (via bulk import)                               │
+│    [Show diff ▼]                                                    │
+│                                                                     │
+│  ○ Jul 2, 3:01 PM                                                   │
+│    Category Reassigned                                              │
+│    Dog Treats → Natural & Organic Dog Treats                        │
+│    By: Jake L. (Catalog)                                            │
+│    → 4 listings flagged for re-mapping                             │
+│                                                                     │
+│  ○ Jun 15, 9:00 AM                                                  │
+│    Images Updated (Full Replacement)                                │
+│    6 images replaced with 8 new images                              │
+│    By: Creative Team                                                │
+│    [View image comparison ▼]                                        │
+│                                                                     │
+│  ○ May 3, 11:22 AM                                                  │
+│    Product Created                                                  │
+│    By: Jake L. (Catalog)                                            │
+│─────────────────────────────────────────────────────────────────────│
+│  [Load earlier history]                                             │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Information Density
+
+**Show "significant" events by default; allow "all events" via filter.**
+
+Default visible events (significant):
+- Status changes (Activated, Discontinued, Out of Season, Coming Soon)
+- Category reassignment
+- Full image replacement
+- Description updates (>30% change)
+- Name changes
+
+Hidden by default (visible via "All Changes" filter):
+- Tag updates
+- Minor dimension adjustments
+- Individual image additions
+
+This mirrors how email clients treat important vs. promotional — the underlying events are all stored, but the UX surfaces relevance, not volume.
+
+### Category Reassignment vs. Name Fix in History
+
+Category reassignment should display the from → to taxonomy path and call out downstream impact ("4 listings flagged"). A name fix should show the old name struck through and the new name, with no downstream impact note unless a name change triggers any listing review requirement on the target marketplace.
+
+Visual weight: category reassignment gets a heavier card (border highlight). Name fix gets a lighter inline entry. The design system should have two history card weights: `significant` (border, impact note) and `minor` (no border, no impact note).
+
+### Can a User "Revert" from History?
+
+**Short answer: No. And say so clearly.**
+
+Offering a "revert" button from a history view implies that reverting is safe and consequence-free. For an event-sourced product catalog, reversion is actually a new command — `ProductNameReverted` is still a new event, not an undo. And reverting a `ProductCategoryAssigned` would trigger another downstream cascade.
+
+**Recommended approach:** Instead of "Revert," offer **"Copy values from this point in time"** — a read-only snapshot view of what the product looked like at that moment, with a "Use these values" button that pre-fills the edit form. The catalog manager then reviews and explicitly saves, creating new forward-moving events. This is transparent, auditable, and doesn't create a false "undo" mental model.
+
+Owned by UX: the "Copy from history" pattern design  
+Owned by PSA/Engineer: the product-at-point-in-time query (Marten's `AggregateStreamAsync` at a specific version handles this natively)
+
+---
+
+## C.5 — Marketplace Document Store: UX Fit
+
+### Does the Document Store Design Work for Marketplace Config Management?
+
+Yes — for the current scope of CritterSupply's marketplace management needs, a document store is the right fit. Marketplace configurations change rarely (perhaps a few times a month), the number of channels is small (5-10 active at any time), and the operations are administrative rather than high-frequency transactional.
+
+The `ChannelCode` as a stable string identifier works cleanly in the admin UI:
+- It can be used as a display key in dropdowns and tables without needing to resolve an opaque GUID
+- It provides human-readable identifiers in API responses and debug logs
+- It maps naturally to external marketplace identifiers
+
+### What Would Be LOST Without an Event History for Marketplace Config?
+
+This is the meaningful UX gap. Concrete scenarios that will occur in production:
+
+1. **Fee structure changes:** "Amazon raised their category fee last quarter — when did we update our margin settings and did we catch all affected listings?" No event history = no answer.
+2. **Configuration drift:** "Our Amazon US channel has different settings than Amazon CA — when did they diverge?" No history = audit by memory.
+3. **Who changed the API credentials:** A security audit question. Without history, the answer is "someone at some point."
+4. **Rollback after a bad config change:** If a fee rule change causes incorrect pricing on 200 listings, you need to know *exactly* what changed to undo it.
+
+These scenarios are real operational risks for a retail business, not edge cases.
+
+### Recommendation: Lightweight Audit Log on Marketplace Documents
+
+The PSA should add a lightweight `AuditLog` embedded document on each Marketplace document — an append-only list of `{Timestamp, UserId, FieldChanged, OldValue, NewValue, Note}` records. This is NOT full event sourcing — it's a pragmatic audit trail that requires no architectural shift.
+
+At 5-10 marketplace channels with config changes a few times per month, the audit log stays small indefinitely. The UX benefit (answering "who changed what and when") is immediate.
+
+**What the UX surface looks like:** A "Configuration History" tab on the Marketplace detail page in admin, identical in structure to the Product Change History tab but lighter in implementation.
+
+Owned by UX: tab design and display requirements  
+Owned by PSA/Engineer: `AuditLog` embedded document schema, update-on-write mechanism
+
+### Adding a New Marketplace Channel: UX for `ChannelCode` Design
+
+The catalog manager adding `KROGER_US` as a new channel needs a guided workflow, not a raw "create document" form:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  ADD NEW MARKETPLACE CHANNEL                        │
+│                                                     │
+│  Channel Code *                                     │
+│  [KROGER_US                          ]              │
+│  Use: BRAND_REGION format (e.g. AMAZON_US)          │
+│                                                     │
+│  Display Name *                                     │
+│  [Kroger Marketplace (United States) ]              │
+│                                                     │
+│  Channel Type *                                     │
+│  ○ Third-party Marketplace  ● Own Website           │
+│  ○ Wholesale Portal                                 │
+│                                                     │
+│  Region *  [United States ▼]                        │
+│                                                     │
+│  ─────────────────────────────────────────────────  │
+│  [Cancel]                        [Create Channel]   │
+└─────────────────────────────────────────────────────┘
+```
+
+Key UX requirements:
+- `ChannelCode` field: auto-format to UPPERCASE, replace spaces with underscores, show format hint
+- Prevent duplicate `ChannelCode` — inline validation on blur (check against existing codes)
+- "Display Name" is what appears in the admin UI everywhere — the `ChannelCode` is the system key; show it in a monospace font to signal "technical identifier"
+- After creation, immediately navigate to the new channel's configuration page so the manager can set it up without a separate navigation step
+
+---
+
+## C.6 — Real-Time Admin Notifications (SignalR)
+
+### Immediate (Real-Time Push Required)
+
+These events require admin attention now. Use a persistent notification panel (not just a toast) that survives page navigation.
+
+| Event | Toast Content | Action |
+|---|---|---|
+| `ProductDiscontinued` | "⚠ [Product Name] discontinued — [N] listings force-ended" | [Review Listings] |
+| `ListingEnded` with `EndedReason = MarketplaceRejected` | "✖ [Product] listing rejected by [Marketplace] — action needed" | [View Rejection] |
+| `ListingEnded` with `EndedReason = RecallForced` | "⚠ [Product] listing removed due to discontinuation" | [Review] |
+| `ProductRestored` | "✓ [Product] restored — [N] listings ready to re-publish" | [Review Listings] |
+
+**Toast design spec:**
+- Position: bottom-right, stacked if multiple
+- Duration: 8 seconds (longer than typical 3s because these require a decision)
+- Color: Red/amber for warnings, green for positive confirmations
+- If 3+ toasts would stack: collapse into "3 new notifications — [View All]" to avoid overwhelming the screen
+
+### Background (Batch or Periodic)
+
+These events can wait for a dashboard widget refresh or a notification bell count update. Do NOT push as toasts.
+
+- `ProductCategoryAssigned` — notify via dashboard "Listings needing re-map" counter
+- `ListingLive` — notification bell count, daily email digest (opt-in)
+- `ProductActivated` — notification bell only
+- `ProductImagesUpdated` — dashboard "Recent Changes" feed
+- `ProductDescriptionUpdated` — dashboard "Pending content review" queue if threshold exceeded
+
+### Silent (Log to History, No Notification)
+
+- `ProductTagsUpdated`
+- `ProductDimensionsSet`
+- `ProductBrandSet`
+- `ProductMigrated` (never surface this to users)
+- `ProductNameChanged` (unless a compliance review workflow is triggered — then background)
+
+---
+
+## C.7 — UX Risk Register: Event Sourcing Specific Risks
+
+### Risk 1: Product Change History Becomes Overwhelming
+**Trigger:** An active SKU that's been in the catalog for 2 years may have hundreds of events — every seasonal status change, every image update, every tag tweak.  
+**User impact:** The History tab becomes unusable noise. Catalog managers stop checking it.  
+**Mitigation:** Default to "Significant events only" filter (as defined in C.4). Implement event categorization in the projection — each event gets a `Significance` attribute (`Major | Minor | System`). The UX filters on this, not on event type. This categorization must be defined collaboratively by UX and Engineering — it cannot be an afterthought.  
+**Owned by:** UX (significance taxonomy), Engineer (projection attribute)
+
+### Risk 2: Recall Cascade UI Creates Panic
+**Trigger:** A catalog manager discontinues one product. Simultaneously, the notification panel fills with 12-47 forced-ended listing notifications across multiple marketplaces.  
+**User impact:** Cognitive overload. The manager may not know if the system is behaving correctly or something has gone wrong. They may attempt to manually undo by restoring the product (creating a bad state).  
+**Mitigation:** Before confirming `ProductDiscontinued`, show a pre-flight summary: "This will force-end 12 active listings across 3 marketplaces. This cannot be immediately undone." Post-cascade, show a single grouped summary notification — not 12 individual ones. The grouped notification expands to show the full list.  
+**Owned by:** UX (modal design, grouped notification design), Engineer (pre-flight count query, grouping logic)
+
+### Risk 3: Eventual Consistency Creates Stale History
+**Trigger:** A catalog manager makes a change, immediately clicks the History tab, and does not see their change listed.  
+**User impact:** They assume the save failed and repeat the action, creating duplicate events.  
+**Mitigation:** After any write command, the admin UI should show an optimistic "Change saved — history updating..." indicator on the History tab. This sets correct expectations without requiring the projection to be synchronously updated. The tab refreshes automatically after a 2-3 second delay.  
+**Owned by:** UX (loading state design), Engineer (optimistic UI implementation)
+
+### Risk 4: `ProductMigrated` Event Leaks Into User-Facing Views
+**Trigger:** The one-time bootstrap migration emits a `ProductMigrated` event for every existing SKU. If filtering is not implemented correctly, catalog managers will see "Product Migrated" as the first history entry for every product — a confusing and meaningless artifact.  
+**Mitigation:** `ProductMigrated` must be explicitly excluded from all user-facing projections and history views from day one. This is a build-time requirement, not a post-launch cleanup. The filtering rule should be documented in the admin UI spec and enforced in the history projection.  
+**Owned by:** UX (specification), Engineer (projection filter implementation)
+
+### Risk 5: Status Label Confusion Between Product Status and Listing Status
+**Trigger:** A product can be `Active` in the Product Catalog while one of its listings is `Paused` on Amazon. A catalog manager looking at the product overview may see "Active" and assume the product is selling everywhere — missing the paused listing.  
+**User impact:** Invisible lost sales. Paused listings go unnoticed.  
+**Mitigation:** The Product Overview page must show a Listings Summary widget: aggregate status counts across all marketplaces. "2 Live, 1 Paused, 0 Ended" — so the product-level status never implies marketplace-level health.  
+**Owned by:** UX (widget design), Engineer (cross-BC read model — Product + Listings projection)
+
+---
+
+## C.8 — UX Recommendations: Admin UI for Event-Sourced Product Catalog
+
+### P0 — Required Before Launch
+
+**P0.1: Pre-flight confirmation modal for `ProductDiscontinued`**  
+The single highest-stakes operation in the system. Must show affected listing count, marketplace breakdown, and require explicit confirmation before the command is submitted. No exceptions.
+
+**P0.2: Grouped cascade notification for recall events**  
+Individual per-listing toasts for a recall cascade will create a broken admin experience. Implement grouped notification logic from day one — this is easier to build correctly than to retrofit. UX to provide the grouping spec; Engineer to implement in the SignalR hub.
+
+**P0.3: Filter `ProductMigrated` from all user-facing history views**  
+Build-time requirement. If this ships without the filter, every product's history will start with a confusing "Product Migrated" entry. Document the filter requirement in the projection spec.
+
+### P1 — Required Within First Iteration
+
+**P1.1: Product Change History tab with significance filtering**  
+Build the History tab as described in C.4. Default to significant events. Include the "All Changes" filter. This is the primary user-visible benefit of event sourcing — ship it, don't defer it.
+
+**P1.2: Listings Summary widget on Product Overview**  
+Cross-BC read model showing aggregate listing status per product. Prevents the "product is Active but listing is Paused" blind spot identified in C.7 Risk 5.
+
+**P1.3: `Paused` vs. `Ended` visual differentiation in Listings admin**  
+Implement the color/badge/copy distinctions described in C.3 before launch. Once users form a mental model around these states, retroactively changing the visual design is expensive.
+
+### P2 — High-Value, Next Iteration
+
+**P2.1: "Copy values from history" pattern for quasi-revert**  
+As described in C.4 — not a true revert, but a "pre-fill from historical state" workflow. High value for seasonal products that cycle between states annually (Out of Season → Active → Out of Season).
+
+**P2.2: Lightweight audit log on Marketplace documents**  
+As described in C.5 — an embedded `AuditLog` on each Marketplace document, surfaced as a "Configuration History" tab in admin. Addresses the operational audit gap without requiring full event sourcing for Marketplaces.
+
+**P2.3: `ProductSetToOutOfSeason` reactivation scheduling**  
+Add a "Reactivate on date" field to the Out of Season transition workflow. The event itself doesn't carry the date — a scheduled command handles it — but the UX must make it easy to set at transition time so merchandisers don't have to remember to manually re-activate seasonal products.
+
+---
+
+*End of Part C — UX Engineer Perspective*  
+*This section to be reviewed by PSA for cross-cutting implementation dependencies before the architecture document is finalized.*

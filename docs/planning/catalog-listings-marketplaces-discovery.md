@@ -2,7 +2,7 @@
 ## Discovery Session: Product Owner + UX Engineer
 
 **Document Owner:** Product Owner (primary), UX Engineer (addendum)
-**Status:** 🟡 Draft — Awaiting Owner/Erik decisions and Principal Engineer synthesis
+**Status:** 🟡 Draft — PSA synthesis complete; Awaiting Owner/Erik decisions (D1–D10)
 **Date:** 2026-03-09
 **Last Updated:** 2026-03-09 (PO + UX outputs merged)
 **Triggered by:** Owner request to evolve Product Catalog BC toward multi-channel marketplace selling
@@ -12,7 +12,7 @@
 - Reference format: [`docs/planning/fulfillment-evolution-plan.md`](fulfillment-evolution-plan.md)
 
 **Companion documents (pending):**
-- Principal Engineer synthesis — architecture evolution plan *(pending review)*
+- Principal Engineer synthesis: [`catalog-listings-marketplaces-evolution-plan.md`](catalog-listings-marketplaces-evolution-plan.md) ✅
 - ADR candidates *(to be authored after Owner decisions)*
 
 ---
