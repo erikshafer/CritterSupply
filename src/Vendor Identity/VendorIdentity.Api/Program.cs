@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using JasperFx;
 using Microsoft.EntityFrameworkCore;
+using VendorIdentity.Api.Auth;
 using VendorIdentity.Identity;
 using Wolverine;
 using Wolverine.FluentValidation;
@@ -29,11 +30,31 @@ builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(opts =>
     opts.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 });
 
+// JWT configuration
+var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
+    ?? throw new Exception("JWT settings not found in configuration");
+builder.Services.AddSingleton(jwtSettings);
+builder.Services.AddSingleton<JwtTokenService>();
+
+// CORS for VendorPortal.Web (Blazor WASM at port 5241)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("VendorPortalWeb", policy =>
+    {
+        policy.WithOrigins("http://localhost:5241")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // Required for cookies (refresh token)
+    });
+});
+
 builder.Host.UseWolverine(opts =>
 {
     opts.Discovery.DisableConventionalDiscovery();
     // Discover handlers from the VendorIdentity assembly
     opts.Discovery.IncludeAssembly(typeof(VendorIdentity.TenantManagement.VendorTenant).Assembly);
+    // Discover auth endpoints from the API assembly
+    opts.Discovery.IncludeAssembly(typeof(VendorLoginEndpoint).Assembly);
 
     opts.Policies.AutoApplyTransactions();
     opts.Policies.UseDurableLocalQueues();
@@ -58,12 +79,15 @@ builder.Services.AddWolverineHttp();
 
 var app = builder.Build();
 
+app.UseCors("VendorPortalWeb");
+
 // Apply EF Core migrations on startup (development only)
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<VendorIdentityDbContext>();
     await dbContext.Database.MigrateAsync();
+    await VendorIdentitySeedData.SeedAsync(dbContext);
 }
 
 if (app.Environment.IsDevelopment())

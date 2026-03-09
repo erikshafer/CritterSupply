@@ -1,0 +1,94 @@
+@using VendorPortal.Web.Auth
+@using VendorPortal.Web.Hub
+@inherits LayoutComponentBase
+@inject VendorAuthState AuthState
+@inject TokenRefreshService TokenRefreshService
+@inject VendorHubService HubService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<MudLayout>
+    <MudAppBar Elevation="1" Dense="true">
+        <MudIconButton Icon="@Icons.Material.Filled.Pets" Color="Color.Inherit" />
+        <MudText Typo="Typo.h6" Class="ml-2">Vendor Portal</MudText>
+
+        @if (AuthState.IsAuthenticated)
+        {
+            <MudSpacer />
+
+            <MudTooltip Text="@HubStatusText">
+                <MudIcon Icon="@HubStatusIcon"
+                         Color="@HubStatusColor"
+                         Size="Size.Small"
+                         Class="mr-2"
+                         aria-label="@HubStatusText" />
+            </MudTooltip>
+
+            <MudText Typo="Typo.body2" Class="mr-2">
+                @AuthState.FirstName — @AuthState.TenantName
+            </MudText>
+
+            <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Class="mr-2"
+                     aria-label="@($"Your role: {AuthState.RoleDisplayName}")">
+                @AuthState.RoleDisplayName
+            </MudChip>
+
+            <MudIconButton Icon="@Icons.Material.Filled.Logout"
+                           Color="Color.Inherit"
+                           Title="Sign Out"
+                           aria-label="Sign Out"
+                           OnClick="HandleLogout" />
+        }
+    </MudAppBar>
+
+    <MudMainContent Class="pt-10">
+        <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    [Inject] private VendorAuthService AuthService { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        AuthState.OnChange += StateHasChanged;
+        HubService.OnStateChanged += StateHasChanged;
+
+        TokenRefreshService.Start();
+    }
+
+    private string HubStatusIcon => HubService.State switch
+    {
+        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected => Icons.Material.Filled.Circle,
+        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Reconnecting => Icons.Material.Outlined.Circle,
+        _ => Icons.Material.Filled.Cancel
+    };
+
+    private Color HubStatusColor => HubService.State switch
+    {
+        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected => Color.Success,
+        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Reconnecting => Color.Warning,
+        _ => Color.Error
+    };
+
+    private string HubStatusText => HubService.State switch
+    {
+        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected => "Live",
+        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Reconnecting => "Reconnecting...",
+        _ => "Disconnected"
+    };
+
+    private async Task HandleLogout()
+    {
+        await HubService.DisconnectAsync();
+        await AuthService.LogoutAsync();
+    }
+
+    public void Dispose()
+    {
+        AuthState.OnChange -= StateHasChanged;
+        HubService.OnStateChanged -= StateHasChanged;
+    }
+}

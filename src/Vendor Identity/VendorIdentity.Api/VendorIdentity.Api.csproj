@@ -8,6 +8,9 @@
 
     <ItemGroup>
         <PackageReference Include="AspNetCore.HealthChecks.Npgsql" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+        <PackageReference Include="Microsoft.IdentityModel.Tokens" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Swashbuckle.AspNetCore" />
     </ItemGroup>

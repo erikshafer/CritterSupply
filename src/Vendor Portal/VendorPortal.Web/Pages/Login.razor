@@ -1,0 +1,134 @@
+@page "/login"
+@using VendorPortal.Web.Auth
+@inject VendorAuthService AuthService
+@inject VendorAuthState AuthState
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Sign In — Vendor Portal</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudPaper Elevation="3" Class="pa-6">
+        <div class="d-flex flex-column align-center mb-4">
+            <MudIcon Icon="@Icons.Material.Filled.Business"
+                     Color="Color.Primary"
+                     Style="font-size: 3rem;"
+                     Class="mb-2" />
+            <MudText Typo="Typo.h5" Align="Align.Center" Style="font-weight:700;">
+                CritterSupply
+            </MudText>
+            <MudText Typo="Typo.subtitle1" Align="Align.Center" Color="Color.Secondary">
+                Vendor Portal
+            </MudText>
+        </div>
+
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudTextField @bind-Value="_email"
+                          Label="Email"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          RequiredError="Email is required"
+                          InputType="InputType.Email"
+                          autocomplete="username"
+                          Class="mb-4" />
+
+            <MudTextField @bind-Value="_password"
+                          Label="Password"
+                          Variant="Variant.Outlined"
+                          InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                          OnAdornmentClick="() => _showPassword = !_showPassword"
+                          AdornmentAriaLabel="@(_showPassword ? "Hide password" : "Show password")"
+                          Required="true"
+                          RequiredError="Password is required"
+                          autocomplete="current-password"
+                          Class="mb-4" />
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-4" aria-live="assertive">
+                    @_errorMessage
+                </MudAlert>
+            }
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       OnClick="HandleLogin"
+                       Disabled="_isLoading">
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Signing in...</span>
+                }
+                else
+                {
+                    <span>Sign In</span>
+                }
+            </MudButton>
+        </MudForm>
+
+        <MudDivider Class="my-4" />
+
+        @* POC only — remove before staging deployment *@
+        <MudAlert Severity="Severity.Info" Dense="true">
+            <strong>Demo accounts</strong> (password: <em>password</em>)<br />
+            Admin: <code>admin@acmepets.test</code><br />
+            Catalog Manager: <code>catalog@acmepets.test</code><br />
+            Read Only: <code>readonly@acmepets.test</code>
+        </MudAlert>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private MudForm? _form;
+    private bool _isValid;
+    private string _email = "";
+    private string _password = "";
+    private string? _errorMessage;
+    private bool _isLoading;
+    private bool _showPassword;
+
+    [Parameter, SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (AuthState.IsAuthenticated)
+        {
+            Navigation.NavigateTo(ReturnUrl ?? "/dashboard");
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        if (_form is null) return;
+        await _form.ValidateAsync();
+        if (!_isValid) return;
+
+        _isLoading = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var success = await AuthService.LoginAsync(_email, _password);
+            if (success)
+            {
+                Snackbar.Add($"Welcome back, {AuthState.FirstName}!", Severity.Success);
+                Navigation.NavigateTo(ReturnUrl ?? "/dashboard");
+            }
+            else
+            {
+                // Inline persistent error — not a Snackbar (inaccessible for auth failures)
+                _errorMessage = "Invalid email or password. Please try again.";
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+}
