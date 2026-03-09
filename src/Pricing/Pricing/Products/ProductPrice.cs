@@ -118,75 +118,75 @@ public sealed record ProductPrice
         return new Guid(hash[..16]);
     }
 
-    public ProductPrice Apply(InitialPriceSet evt) =>
+    public ProductPrice Apply(InitialPriceSet @event) =>
         this with
         {
             Status = PriceStatus.Published,
-            BasePrice = evt.Price,
-            FloorPrice = evt.FloorPrice,
-            CeilingPrice = evt.CeilingPrice,
-            LastChangedAt = evt.PricedAt
+            BasePrice = @event.Price,
+            FloorPrice = @event.FloorPrice,
+            CeilingPrice = @event.CeilingPrice,
+            LastChangedAt = @event.PricedAt
         };
 
-    public ProductPrice Apply(PriceChanged evt) =>
+    public ProductPrice Apply(PriceChanged @event) =>
         this with
         {
-            BasePrice = evt.NewPrice,
-            PreviousBasePrice = evt.OldPrice,
-            PreviousPriceSetAt = evt.PreviousPriceSetAt,
-            LastChangedAt = evt.ChangedAt
+            BasePrice = @event.NewPrice,
+            PreviousBasePrice = @event.OldPrice,
+            PreviousPriceSetAt = @event.PreviousPriceSetAt,
+            LastChangedAt = @event.ChangedAt
         };
 
-    public ProductPrice Apply(PriceChangeScheduled evt) =>
+    public ProductPrice Apply(PriceChangeScheduled @event) =>
         this with
         {
             PendingSchedule = new ScheduledPriceChange
             {
-                ScheduleId = evt.ScheduleId,
-                ScheduledPrice = evt.ScheduledPrice,
-                ScheduledFor = evt.ScheduledFor,
-                ScheduledBy = evt.ScheduledBy,
-                ScheduledAt = evt.ScheduledAt
+                ScheduleId = @event.ScheduleId,
+                ScheduledPrice = @event.ScheduledPrice,
+                ScheduledFor = @event.ScheduledFor,
+                ScheduledBy = @event.ScheduledBy,
+                ScheduledAt = @event.ScheduledAt
             }
         };
 
-    public ProductPrice Apply(ScheduledPriceChangeCancelled evt) =>
+    public ProductPrice Apply(ScheduledPriceChangeCancelled @event) =>
         this with
         {
             PendingSchedule = null
         };
 
-    public ProductPrice Apply(ScheduledPriceActivated evt) =>
+    public ProductPrice Apply(ScheduledPriceActivated @event) =>
         this with
         {
-            BasePrice = evt.ActivatedPrice,
+            BasePrice = @event.ActivatedPrice,
             PreviousBasePrice = BasePrice,
             PreviousPriceSetAt = LastChangedAt ?? RegisteredAt,
             PendingSchedule = null,
-            LastChangedAt = evt.ActivatedAt
+            LastChangedAt = @event.ActivatedAt
         };
 
-    public ProductPrice Apply(FloorPriceSet evt) =>
+    public ProductPrice Apply(FloorPriceSet @event) =>
         this with
         {
-            FloorPrice = evt.FloorPrice
+            FloorPrice = @event.FloorPrice
         };
 
-    public ProductPrice Apply(CeilingPriceSet evt) =>
+    public ProductPrice Apply(CeilingPriceSet @event) =>
         this with
         {
-            CeilingPrice = evt.CeilingPrice
+            CeilingPrice = @event.CeilingPrice
         };
 
-    public ProductPrice Apply(PriceCorrected evt) =>
+    public ProductPrice Apply(PriceCorrected @event) =>
         this with
         {
-            BasePrice = evt.CorrectedPrice,
-            PreviousBasePrice = evt.PreviousPrice,
-            LastChangedAt = evt.CorrectedAt
+            BasePrice = @event.CorrectedPrice,
+            PreviousBasePrice = @event.PreviousPrice,
+            LastChangedAt = @event.CorrectedAt
         };
 
-    public ProductPrice Apply(PriceDiscontinued evt) =>
+    public ProductPrice Apply(PriceDiscontinued @event) =>
         this with
         {
             Status = PriceStatus.Discontinued,
