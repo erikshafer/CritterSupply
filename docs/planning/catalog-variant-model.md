@@ -23,6 +23,14 @@
 6. [Phase 3 Implementation Tasks](#6-phase-3-implementation-tasks)
 7. [ADR Additions](#7-adr-additions)
 8. [Outstanding Questions for Owner](#8-outstanding-questions-for-owner)
+9. [Product Owner Sign-Off & Business Validation](#9-product-owner-sign-off--business-validation)
+   - [PO Sign-Off Statement](#91-po-sign-off-statement)
+   - [Business Rationale](#92-business-rationale)
+   - [Catalog Manager Workflow](#93-catalog-manager-workflow)
+   - [Impact on Outstanding Decisions](#94-impact-on-outstanding-decisions)
+   - [Business Rules for the Variant Model](#95-business-rules-for-the-variant-model)
+   - [Glossary Additions and Refinements](#96-glossary-additions-and-refinements)
+   - [Open Questions for the Owner](#97-open-questions-for-the-owner)
 
 ---
 
@@ -998,3 +1006,548 @@ The following questions remain open after D1. They are ordered by phase dependen
 ---
 
 *This document supersedes the stub Phase 3 section in `catalog-listings-marketplaces-evolution-plan.md` for all D1-related detail. The evolution plan's phase structure remains authoritative for overall sequencing; this document is the detailed technical specification for the variant model decisions within Phase 3.*
+
+---
+
+## 9. Product Owner Sign-Off & Business Validation
+
+**Author:** Product Owner  
+**Date:** 2026-06-14  
+**Status:** ✅ Business Endorsed — Proceed to Phase 3 implementation
+
+---
+
+### 9.1 PO Sign-Off Statement
+
+I have reviewed the Principal Architect's implementation guide, the full discovery document (`catalog-listings-marketplaces-discovery.md`), and the canonical glossary (`catalog-listings-marketplaces-glossary.md`). I formally endorse **Option A — One Parent ProductFamily + N Child Variant SKU Records** as the correct business decision for CritterSupply.
+
+Erik's reasoning is exactly right, and I want to put it in plain business terms: this is not an experiment. Parent/child product hierarchy is the established, battle-tested pattern used by every major marketplace and every serious e-commerce platform on the planet. Amazon has operated this way for twenty years. Shopify built its entire merchant ecosystem on it. Walmart Marketplace requires it. eBay calls them variations. When we eventually go live with marketplace integrations — and we will — those APIs will expect a parent listing with children underneath it. Building anything else today means paying a rewrite tax the moment we flip on marketplace connectivity. Option A eliminates that debt before it accumulates. There is no competitive advantage in inventing a proprietary variant model for a pet supply retailer; the advantage is in executing well on the patterns the industry has already proven. We are building CritterSupply to be realistic and robust, and this decision reflects exactly that commitment.
+
+From a day-to-day operations standpoint, Option A also produces the clearest, most intuitive experience for the catalog managers who will live inside this system. Every merchandising professional I have worked with across roles in vendor relations, product management, and marketplace channel management thinks in families and variants naturally. "We carry the PetSupreme Nylon Dog Collar in six SKUs" is how buyers talk. "We carry six loosely related collar products" is not. The data model should match the mental model of the people who will use it — and Option A does exactly that.
+
+---
+
+### 9.2 Business Rationale
+
+#### 9.2.1 How Option A Aligns with Amazon, Walmart, eBay, and Shopify
+
+Every major marketplace that CritterSupply would realistically integrate with operates on a native parent/child model. This is not a coincidence — it emerged from the same business reality we face:
+
+**Amazon:** Uses Parent ASIN / Child ASIN structure. The parent ASIN holds shared attributes (title, brand, main description, primary image). Child ASINs each hold differentiating attributes (size, color, scent) and have their own inventory, their own price, and their own Buy Box. When a customer searches for "stainless steel dog bowl," they find one product page — the parent. They select "Large" and the page updates to show the Large child's pricing and stock. Amazon's API (`amazon-sp-api`) literally cannot accept a collection of related products without a parent binding them. If we submitted six collar SKUs without a parent ASIN, Amazon would treat them as six unrelated products with duplicate titles — a listing health violation.
+
+**Walmart Marketplace:** Uses Item Groups (parent-child). The Item Group holds shared content; each member item has its own Item ID and variant data. Walmart's Supplier Center enforces parent-child submission for any product with multiple configurations. Flat submissions of color/size variants are rejected at intake.
+
+**eBay:** Calls the parent a "Multi-Variation Listing" and refers to the differentiating properties as "Variations." An eBay Variation has its own quantity and price but lives under one listing URL. Customers see a single listing with a picker; eBay's data model underneath is structurally identical to Option A.
+
+**Shopify:** Its native data model is `Product` (the family) and `ProductVariant` (the child). Every Shopify storefront, every Shopify app, every Shopify API integration is built around this shape. The Storefront API, the Admin API, the Webhooks — all speak parent/child. If CritterSupply ever runs a Shopify sales channel, Option A maps directly to Shopify's model with zero transformation.
+
+The practical consequence: Option A means our internal catalog model and every external marketplace API speak the same language. No translation layer, no mapping tax, no "adapter that converts our flat model into their hierarchical model." The integration boundary is clean because the shapes match.
+
+#### 9.2.2 Why Option B (Flat Products with FamilyId Reference) Creates Catalog Manager Pain at Scale
+
+Option B — standalone product records loosely coupled by a shared `FamilyId` field — feels simple at implementation time and becomes painful to operate at catalog scale.
+
+The central problem is **orphaned metadata**. In Option B, there is no `ProductFamily` aggregate that owns the shared display content. That means the family name, description, brand, and images have to live on every variant record simultaneously — and stay in sync. When a copywriter updates the product description for "CritterBrew Stainless Steel Dog Bowl," they update the `Description` field on `DOG-BOWL-S-001`, `DOG-BOWL-M-001`, and `DOG-BOWL-L-001` separately, or we build a "sync all siblings" batch operation that is itself a source of bugs and inconsistencies. I have seen this exact problem at two shops: you end up with three variants of the same product that have three slightly different descriptions because one was updated and the others were not. That inconsistency surfaces to customers on the marketplace and creates listing quality violations.
+
+In Option B, there is also no authoritative event trail for family-level changes. If we want to know "when was the CritterBrew Bowl family renamed and who approved it?" — there is no stream to answer that question. Events are per-variant. We have lost the audit history at the family level.
+
+At scale — say, a catalog of 5,000 SKUs across 1,200 families — Option B becomes operationally untenable. Bulk category reassignment ("move all dog bowls from `Dogs > Feeding` to `Dogs > Feeding > Bowls & Feeders`") requires touching every individual SKU record instead of updating one `ProductFamily` record. Any cross-variant report ("show me all families that have a variant with no active Amazon listing") requires a join that Option A makes trivial.
+
+Option B is the model you build when you assume you will never have more than a few dozen products. We are building for realistic scale.
+
+#### 9.2.3 Why Option C (Embedded Variants) Makes Marketplace Submission Structurally Harder
+
+Option C — embedding variants as a list inside a single product document — is attractive in a simple read world and breaks down badly in a write world.
+
+The fundamental problem is **independence**. Each variant SKU must be independently listable, independently priceable, independently inventoried, and independently recallable. If `DOG-COLLAR-L-RED` is involved in a safety recall but `DOG-COLLAR-S-BLACK` is not, we need to force down the Large Red listing on Amazon while leaving the Small Black listing live. With Option C, the entire "product" document is either live or not — there is no independent lifecycle per variant. A recall becomes an all-or-nothing operation that either harms inventory unnecessarily (taking down safe variants) or requires a complex extraction from an embedded list (which defeats the point of embedding).
+
+At marketplace submission time, Option C creates a second problem: the marketplace API expects to receive child items as independent submissions with their own identifiers. The Amazon SP-API call to create a child ASIN requires a separate API call per child, with each child's attribute set submitted individually. If our internal model has variants embedded in a parent document, we have to extract them, iterate over them, and submit each individually anyway — which means we are doing the parent/child decomposition at the API boundary regardless. Option A just makes that decomposition explicit and natural.
+
+There is also a practical Marten concern (my architect would express this more precisely than I can): an event-sourced aggregate with an embedded list of sub-items cannot give each sub-item its own audit trail. Every change to any variant — a price update, a status change, an image swap — hits the same parent stream. The event stream for a high-volume product family becomes a noise-filled log of mixed signals from different variants. Untangling "what changed on the Large Red SKU specifically" requires filtering events by attribute, which is fragile. Option A gives every variant its own clean `catalog:{sku}` event stream.
+
+#### 9.2.4 Concrete Pet Supply Examples
+
+To make this concrete, here is how Option A applies to real product types we will carry:
+
+**Dog Collars — Size × Color:**
+- Family: "PetSupreme Nylon Dog Collar" (`FAMILY-ID-001`)
+- Variants: `DOG-COLLAR-S-BLK`, `DOG-COLLAR-M-BLK`, `DOG-COLLAR-L-BLK`, `DOG-COLLAR-S-RED`, `DOG-COLLAR-M-RED`, `DOG-COLLAR-L-RED`
+- Family owns: name ("PetSupreme Nylon Dog Collar"), brand ("PetSupreme"), category (`Dogs > Collars & Leashes > Collars`), shared description ("Durable nylon construction, brass hardware..."), lifestyle images
+- Variant owns: size attribute ("Small"), color attribute ("Black"), variant-specific image (black collar swatch), SKU, individual price, individual inventory
+
+**Fountain/Bowl — Size Only:**
+- Family: "AquaPaws Circulating Pet Fountain" (`FAMILY-ID-002`)
+- Variants: `FOUNTAIN-SM-001` (1.5L), `FOUNTAIN-MD-001` (2.5L), `FOUNTAIN-LG-001` (4L)
+- Family owns: brand ("AquaPaws"), shared description, how-it-works images, category (`Dogs > Bowls & Feeders > Water Fountains`)
+- Variant owns: size ("1.5L"), weight (critical for hazmat/shipping calc), variant-specific product shot, price, inventory
+
+**Dry Dog Food — Weight:**
+- Family: "Orijen Original Dry Dog Food" (`FAMILY-ID-003`)
+- Variants: `ORIJEN-OG-4LB`, `ORIJEN-OG-13LB`, `ORIJEN-OG-25LB`
+- Family owns: brand ("Orijen"), AAFCO compliance text (applies to all sizes), ingredient list (same formulation), category (`Dogs > Food > Dry Food > All Breeds`)
+- Variant owns: weight ("4 lb"), actual ship weight (critical for carrier rate calculation), barcode/UPC (each size has its own), price, inventory
+
+**Flea Treatment — Species + Dosage:**
+- Family: "Frontline Plus Flea & Tick Treatment" (`FAMILY-ID-004`)
+- Variants: `FLEA-TX-SDOG-001` (Small dog, 5-22 lbs, 3-count), `FLEA-TX-MDOG-001` (Medium dog, 23-44 lbs, 3-count), `FLEA-TX-LDOG-001` (Large dog, 45-88 lbs, 3-count), `FLEA-TX-CAT-001` (Cats 1.5 lbs+, 3-count)
+- Note: `IsHazmat: true` on all variants; the compliance metadata is variant-level because dosage-specific regulatory filings are per-SKU. The hazmat warning applies at the family level too, but the specific regulatory submission (EPA registration number) is per-variant.
+
+**Holiday/Seasonal — Single Variant (Family with One Child):**
+- Family: "CritterSupply Holiday Advent Calendar — Dogs" (`FAMILY-ID-005`)
+- Variants: `ADV-CAL-DOG-2026` (one SKU; no size or color)
+- This is a valid single-variant family. It was a single standalone product in Cycle 1; it becomes a family with one child because *next year* it will be `ADV-CAL-DOG-2027` — a new variant added to the same family. The family allows catalog managers to group year-over-year editions without creating unrelated products.
+
+This last example illustrates an important business point: **a family with one variant is not a degenerate case**. It is forward-looking. We create the family at product launch even if today there is only one SKU, because we know variants may be added later. The structure allows expansion without catalog reorganization.
+
+---
+
+### 9.3 Catalog Manager Workflow
+
+This section describes the end-to-end business workflow for catalog managers when creating and managing product families. These workflows will drive the Admin Portal UX requirements in Phase 3.
+
+#### 9.3.1 Creating a New Product Family
+
+**Scenario:** A buyer has negotiated a new private-label stainless steel dog bowl with our contract manufacturer. It will come in Small (24oz), Medium (48oz), and Large (64oz). The buyer hands a product brief to the catalog manager.
+
+**Step 1 — Create the Product Family**
+
+The catalog manager opens the Admin Portal, navigates to **Product Catalog > Families > Create New Family**, and fills in the family-level details:
+
+| Field | Example Value | Notes |
+|---|---|---|
+| Family Name | CritterBrew Stainless Steel Dog Bowl | Required. Shared across all variants. |
+| Brand | CritterBrew | Our private label brand. |
+| Category | Dogs > Bowls & Feeders > Stainless Steel Bowls | Drives marketplace attribute schema |
+| Base Description | Premium 18/8 stainless steel, dishwasher safe, non-slip silicone base... | Shared description; variant pages may extend it |
+| Shared Images | [lifestyle-bowl-photo.jpg, detail-interior.jpg, non-slip-base.jpg] | Images that appear for all variants before a variant-specific image is selected |
+
+The catalog manager does **not** enter pricing, inventory, or SKUs at this step. Those belong to the variants.
+
+Clicking **Save** creates the `ProductFamily` record. The family is in **Draft** state (no variants, no listings, not visible anywhere). The system generates a UUID v7 `FamilyId`. The catalog manager receives a confirmation: "CritterBrew Stainless Steel Dog Bowl family created. Add at least one variant to make this family listable."
+
+**Step 2 — Add Variants**
+
+The catalog manager clicks **Add Variant** within the newly created family. For each size, they fill in the variant-level form:
+
+| Field | Small | Medium | Large | Notes |
+|---|---|---|---|---|
+| SKU | CRBW-BOWL-S-001 | CRBW-BOWL-M-001 | CRBW-BOWL-L-001 | Human-readable, stable, immutable |
+| Size | Small | Medium | Large | Variant attribute |
+| Capacity | 24 oz | 48 oz | 64 oz | Second attribute for this family |
+| Dimensions | 4.5" W × 2" H | 6" W × 2.5" H | 7.5" W × 3" H | Shipping/display |
+| Ship Weight | 0.6 lbs | 0.9 lbs | 1.2 lbs | Critical for carrier rate calculation |
+| Variant Image | [bowl-small.jpg] | [bowl-medium.jpg] | [bowl-large.jpg] | Size-specific product shot |
+| Status | Active | Active | Active | All three ready to sell |
+
+Each variant created fires a `ProductCreated` event (if the SKU is new to the catalog) or a `ProductVariantAdded` event (if the SKU existed as a standalone product being adopted into the family). The variant's stream is `catalog:CRBW-BOWL-S-001`.
+
+**Step 3 — Review the Family**
+
+Once all three variants are added, the catalog manager sees the family summary view:
+
+```
+CritterBrew Stainless Steel Dog Bowl
+Brand: CritterBrew | Category: Dogs > Bowls & Feeders > Stainless Steel Bowls
+Status: Active | Variants: 3
+
+  SKU               Size    Capacity  Status   Listings
+  CRBW-BOWL-S-001   Small   24 oz     Active   No active listings
+  CRBW-BOWL-M-001   Medium  48 oz     Active   No active listings
+  CRBW-BOWL-L-001   Large   64 oz     Active   No active listings
+```
+
+The family is now listable. The catalog manager can hand off to the merchandising team to create listings on Amazon, Walmart, or OWN_WEBSITE. Pricing and inventory are entered separately through their respective BCs.
+
+#### 9.3.2 Adding a New Variant to an Existing Family
+
+**Scenario:** Six months after launch, our buyer adds an XL size (96oz) for working dog breeds. The product is ready to sell.
+
+The catalog manager opens the existing "CritterBrew Stainless Steel Dog Bowl" family and clicks **Add Variant**. They enter:
+
+| Field | Value |
+|---|---|
+| SKU | CRBW-BOWL-XL-001 |
+| Size | XL |
+| Capacity | 96 oz |
+| Ship Weight | 1.8 lbs |
+| Variant Image | [bowl-xl.jpg] |
+| Status | Active |
+
+The system appends `ProductVariantAdded` to the `ProductFamily` stream and creates `catalog:CRBW-BOWL-XL-001` as a new Product stream. The `ProductVariantAdded` integration message is published via RabbitMQ. Downstream reactions:
+
+- **Listings BC:** Updates `ProductSummaryView` to reflect the new variant's `FamilyId`. The XL variant is now available for listing.
+- **Marketplaces BC:** If the family already has an active Amazon listing (parent ASIN exists), the Marketplaces BC knows this new variant should be submitted as a new child ASIN under the existing parent. It places the new child into a "Pending Submission" state for catalog manager review before live submission.
+- **Storefront BC:** Updates the `ProductFamilyView` to add the XL size to the attribute picker on the bowl's browse page.
+
+The catalog manager does not touch Amazon directly. The event cascade handles cross-BC propagation. This is the operational value of Option A — adding one SKU to the catalog automatically surfaces it across all downstream systems that care about it.
+
+#### 9.3.3 Updating Shared Family Content
+
+**Scenario:** The copywriter has improved the base description with new marketing copy. This change should apply to all variants across all channels.
+
+The catalog manager opens the family, clicks **Edit Family**, and updates the `Description` field. This fires `ProductFamilyContentUpdated` on the family stream. The integration message propagates to:
+
+- **Listings BC:** Queues a "content refresh needed" flag on all active listings for this family. Catalog managers review and re-submit to marketplace channels with the new copy.
+- **Storefront BC:** Updates the family browse page description immediately (reads from the family view).
+
+One edit, propagated to all three SKUs and all active channels. This is the content efficiency gain that Option B fundamentally cannot match.
+
+#### 9.3.4 Data That Lives on the Family vs. the Variant
+
+This is the clearest way to communicate the model to catalog managers, buyers, and copywriters:
+
+**Lives on the Product Family (shared, authoritative for all variants):**
+- Family display name (e.g., "CritterBrew Stainless Steel Dog Bowl")
+- Brand (e.g., "CritterBrew")
+- Category assignment (e.g., `Dogs > Bowls & Feeders > Stainless Steel Bowls`)
+- Base description / long-form copy
+- Shared images (lifestyle, detail, packaging — images that are accurate for any variant)
+- Material / construction notes that apply universally (e.g., "18/8 stainless steel, BPA-free")
+- Family-level compliance notes (e.g., "California Prop 65 warning applies to all variants")
+- SEO keywords (shared base; channel-specific refinements live in Listings BC)
+
+**Lives on the Product Variant (specific to one SKU):**
+- SKU (immutable, human-readable, the identifier everything else points to)
+- Variant attributes — the differentiating properties (Size, Color, Scent, Weight, Flavor, Count, etc.)
+- Variant-specific images (e.g., the color swatch for "Red," the size-labeled product shot for "Large")
+- Ship weight and dimensions (vary per size; used for carrier rate calculation)
+- UPC / GTIN / EAN barcode (each variant has its own registered barcode)
+- Product Status (`Active`, `OutOfSeason`, `Discontinued`, `Recalled`) — independently managed per SKU
+- Compliance metadata specific to this variant (e.g., EPA registration number for a specific flea treatment dosage)
+
+**Lives in other BCs (never on the catalog record):**
+- Price (Pricing BC — per SKU)
+- Inventory / stock level (Inventory BC — per SKU + warehouse)
+- Listing state on a channel (Listings BC — per SKU + channel code)
+- Channel-specific title / bullets / A+ content (Listings BC — marketplace copy is separate from catalog copy)
+
+---
+
+### 9.4 Impact on Outstanding Decisions
+
+With D1 resolved, several of the remaining open decisions (D2, D3, D8, D9, and others) are now better scoped. Here is my assessment of each, now that we know the shape of the variant model:
+
+#### D2 — Is OWN_WEBSITE a Formal Channel in the Listings Model?
+
+**D1 Impact:** Under Option A, the storefront browse experience is family-centric — customers browse by family and select attributes to resolve a specific variant SKU. This is categorically different from a single-product page. If OWN_WEBSITE is a formal Listings BC channel, then:
+- A Listing exists per (variant SKU, `OWN_WEBSITE`) pair
+- The storefront reads listing state to determine visibility (a variant is visible on the website if its `OWN_WEBSITE` listing is `Live`)
+- The storefront's family browse page renders based on which variant listings are live, not raw product status
+
+If OWN_WEBSITE is not a formal channel, the storefront reads directly from Product Catalog BC and all `Active` variants in a family are visible on the site. The family browse page is simpler to build but we lose the per-variant channel control.
+
+**My PO assessment:** I lean toward OWN_WEBSITE being a formal channel in the Listings model. The reason: it gives catalog managers a single, consistent mental model. "A product is live on a channel when its listing on that channel is Live." The alternative — where Amazon/Walmart/eBay work through listings but the website bypasses that — creates a two-system problem for catalog managers. They have to remember that website visibility works differently. The consistency gain is worth the upfront complexity. **Recommendation: OWN_WEBSITE = formal Listings channel. Owner decision needed to confirm.**
+
+#### D3 — Does Listings BC Own Marketplace API Calls?
+
+**D1 Impact:** Under Option A, when the first variant of a family is submitted to Amazon, we need to create both a parent ASIN and a child ASIN in a coordinated sequence. When subsequent siblings are submitted, we need to attach them as children to the already-created parent ASIN. This coordination logic — "does a parent ASIN already exist for this family on this channel, and if so, what is its external ID?" — is non-trivial.
+
+If Listings BC owns the API calls directly, it must maintain a `FamilyId → ExternalParentListingId` lookup per channel. Every time a listing is submitted, Listings BC checks the lookup, conditionally creates the parent first, then submits the child. Listings BC becomes tightly coupled to the specifics of each marketplace's parent/child API.
+
+If there is a separate Marketplaces BC (adapter layer), the family grouping logic lives there — Listings BC sends a `ListingSubmittedToMarketplace` message with the variant SKU and `FamilyId`, and Marketplaces BC handles the coordination of parent vs. child creation per channel. This is cleaner: Listings BC knows nothing about how Amazon structures parent ASINs; Marketplaces BC encapsulates that complexity.
+
+**My PO assessment:** The adapter layer (Marketplaces BC as a distinct context) is the right call, and D1 strengthens that argument. The parent ASIN coordination logic is specific to Amazon's data model. Walmart has its own Item Group logic. eBay has Multi-Variation Listing logic. None of these are the same. Putting all of that in Listings BC means Listings BC needs to know Amazon-specific, Walmart-specific, and eBay-specific grouping rules — a clear violation of bounded context discipline. **Recommendation: Separate Marketplaces BC as adapter layer. Listings BC publishes intent; Marketplaces BC handles API specifics. Owner decision needed to confirm.**
+
+#### D8 — Compliance Metadata Required at Listings Launch or Deferrable?
+
+**D1 Impact:** Under Option A, compliance metadata will have a dual-level structure:
+- **Family-level compliance:** Does this product class carry a Prop 65 warning? Is any variant of this family a regulated chemical? This can be a flag on the `ProductFamily` record.
+- **Variant-level compliance:** What is the specific EPA registration number for this flea treatment dosage? What is the GTIN for this bag weight?
+
+This means the compliance metadata design must account for both levels of the hierarchy. If we defer compliance metadata, we defer it at both the family and variant level — and we accept that Amazon and Walmart will reject any listings that require hazmat classification (which includes all flea/tick treatments, some grooming products with alcohol bases, and pet medications).
+
+**My PO assessment:** Compliance metadata cannot be fully deferred if we intend to list anything in the health and wellness category. However, it does not need to be enforced for purely non-hazardous categories (collars, bowls, dry food, non-medicated grooming). **Recommendation: Implement `IsHazmat` and `HazmatClass` at the variant level at Listings BC launch; defer full Prop 65 and state restriction metadata to Phase 3+. Gate Amazon/Walmart submission of hazmat SKUs behind a compliance-complete check. Owner decision needed on which product categories we plan to activate at Phase 1 launch — that determines the urgency.**
+
+#### D9 — Automated Seasonal Reactivation vs. Manual?
+
+**D1 Impact:** Under Option A, seasonal reactivation operates at the **variant level**. If "Snowflake Holiday Cat Stocking" (`CAT-STKG-012`) is `OutOfSeason`, and reactivation is automated on October 1, the system fires `ProductActivated` on the variant's stream — not the family stream. The family itself does not have a status; individual variants do.
+
+This creates a workflow question: when a catalog manager sets a variant to `OutOfSeason`, should they also be able to set a `PlannedReactivationDate` at the same time? Or is reactivation always a manual action that the catalog manager must remember to take?
+
+**My PO assessment:** For Phase 3 launch, **manual reactivation is acceptable** — it forces a catalog manager to confirm the product is ready before it goes live again, which is a healthy operational gate. However, I strongly recommend building the `PlannedReactivationDate` field on the variant record now, even if we do not implement the automated job yet. Storing the intent gives us a dashboard view ("variants scheduled to reactivate in October") and lays the groundwork for automation in Phase 3+. **Recommendation: Manual reactivation at launch; store `PlannedReactivationDate` on variant for operational visibility. Automate in Phase 3+. Owner confirmation needed.**
+
+#### D4 — Is a Marketplace an Aggregate or Configuration?
+
+**D1 Impact:** Under Option A, a marketplace needs to know about the family grouping concept — specifically, whether it supports parent/child structures (Amazon: yes, Walmart: yes, eBay: yes for multi-variation listings, our own website: handled differently). If Marketplace is an aggregate, it can carry this `SupportsParentChildGrouping: true/false` flag as a managed attribute. If Marketplace is a configuration enum, we hardcode it.
+
+**My PO assessment:** For Phase 3, a lightweight aggregate (document store, not event-sourced) is the right answer. We need to store per-marketplace configuration including parent/child support, credential references, and API endpoint metadata — and that collection will grow as we add marketplaces. An enum breaks every time we add a marketplace. **Recommendation: Marketplace as a lightweight document aggregate in Marketplaces BC. Owner decision needed to confirm scope.**
+
+#### D5 — Does Category-to-Marketplace Mapping Live in Product Catalog BC or Marketplaces BC?
+
+**D1 Impact:** Under Option A, the `ProductFamily` owns the internal category. When a family's listings are submitted to Amazon, the Marketplaces BC must map `Dogs > Bowls & Feeders > Stainless Steel Bowls` → Amazon browse node `2975312011`. This mapping is marketplace-specific knowledge. It does not belong in Product Catalog BC, which knows nothing about Amazon's taxonomy.
+
+**My PO assessment:** Category-to-marketplace mapping belongs in **Marketplaces BC**. It is inherently marketplace-specific. Product Catalog BC owns the CritterSupply internal category tree; Marketplaces BC owns the translation from that tree to each marketplace's taxonomy. The separation keeps Product Catalog clean and lets us update marketplace mappings without touching the catalog. **Recommendation: Mappings in Marketplaces BC. This aligns with the Principal Architect's existing position.**
+
+#### D6 — Credentials Management (Marketplaces BC or Infrastructure Vault?)
+
+**D1 Impact:** D1 does not materially change this decision's analysis. However, Option A does surface one related concern: marketplace credentials are now more operationally critical because the parent/child creation sequence requires two sequential authenticated API calls. A credential failure mid-sequence (parent created, child submission fails due to credential expiry) creates a partial state that must be detected and compensated. Credentials must be reliable.
+
+**My PO assessment:** **API credentials belong in infrastructure secrets management (Vault / AWS Secrets Manager / Azure Key Vault), not in Marketplaces BC.** Credentials are a security concern, not a domain concern. Marketplaces BC reads credentials at submission time from a secrets reference; it does not store secret values in its own database. **Owner confirmation needed on which secrets management system is in scope for CritterSupply's infrastructure.**
+
+---
+
+### 9.5 Business Rules for the Variant Model
+
+The following business rules govern the family/variant model from an operations perspective. These should be encoded as domain invariants and enforced in command handlers.
+
+#### Rule 1 — Can a Variant Exist Without a Family?
+
+**Yes.** A variant (Product record) may exist without a `FamilyId`. This represents a **standalone product** — a product that has no siblings and does not belong to a family grouping. Every existing product in the catalog before the variant model is introduced is a standalone product. They remain valid indefinitely without being forced into a family.
+
+**Business rationale:** Not every product has variants. "CritterSupply XL Premium Dog Kennel" may be a single-SKU product with no size variants. Forcing it into a family creates unnecessary overhead. Standalone SKUs list on Amazon as single products (no parent ASIN). Standalone products are first-class catalog citizens.
+
+**Operational note:** The Admin Portal should make standalone products clearly distinguishable from family members — a visual indicator like "Standalone Product (no family)" prevents catalog managers from thinking a product is "broken" because it has no family link.
+
+#### Rule 2 — Can a Family Have Only One Variant?
+
+**Yes.** A `ProductFamily` with exactly one variant is a valid and intentional state. This most commonly represents:
+
+- A single-SKU product that **might** gain siblings in the future (e.g., the advent calendar example above — current year's edition, with future years expected)
+- A product where the catalog manager created the family structure in anticipation of variants that have not yet been sourced (e.g., "we know a green colorway is coming Q3")
+- A product transitioning from standalone to family (the original SKU is the first member; more are expected)
+
+The Admin Portal should display a **soft warning** ("This family has only one variant — is this intentional?") but must not block listing or publishing. A one-variant family is not an error state.
+
+**Hard rule:** A family must have at least one variant to have any listings created against it. An **empty family** (zero variants) cannot have listings. This is enforced by Listings BC at draft creation time: `FamilyId` must resolve to a family with at least one `Active` variant.
+
+#### Rule 3 — What Happens to a Family When All Variants Are Discontinued?
+
+When every variant in a family reaches `Discontinued` status, the family itself transitions to an **Archived** state automatically (system event, not manual). The family record is never deleted — it is retained for historical integrity and audit trail. Archived families:
+- Do not appear in active catalog views (filtered out by default)
+- Cannot accept new variants (an Archived family is a terminal state for the family grouping itself)
+- Retain all historical events, listings, and order history referencing their variant SKUs
+- Can be surfaced via an "Archived families" admin view for historical lookup
+
+**Business rationale:** We never delete product records. Orders placed five years ago reference SKUs that must remain resolvable. An archived family + discontinued variants preserve full historical integrity without polluting the active catalog view.
+
+**Edge case — Recalled families:** If a family has one or more `Recalled` variants and the remaining variants are `Active`, the family does not archive. The active variants continue to be managed normally. If all variants are eventually `Recalled` or `Discontinued`, the family archives. Recall state on a variant is a permanent terminal state; the SKU can never return to `Active`.
+
+#### Rule 4 — Can a Variant Belong to More Than One Family?
+
+**No.** A variant (Product record) may belong to exactly one `ProductFamily` at a time, or no family at all (standalone). This is a hard invariant enforced at the domain level.
+
+**Business rationale:** Multi-family membership creates ambiguity about which family's shared content is authoritative. If `DOG-COLLAR-M-BLK` belongs to both "PetSupreme Nylon Dog Collar" and "PetSupreme All-Weather Collar Collection," which family name appears on its Amazon listing? Which family's description does the storefront inherit? The ambiguity is irresolvable without a priority system, which defeats the simplicity of the model. More importantly, Amazon, Walmart, and eBay all enforce single parent ASIN per child — a product cannot appear under two Amazon parent ASINs simultaneously.
+
+**Operational escape valve:** If a variant genuinely needs to appear in two contexts (a rare merchandising need), the correct solution is to create a separate "collection" or "bundle" as a Listings BC concern — not a Product Catalog family membership change. The catalog stays clean; the channel-specific grouping logic lives in Listings/Marketplaces.
+
+#### Rule 5 — Can a Standalone Product Be Added to a Family Post-Hoc?
+
+**Yes, with constraints.** An existing standalone product may be assigned to a `ProductFamily` at a later date via the `AddVariantToFamily` command. This is a common operational scenario: a product launches as standalone, then the buyer adds a second size, and the catalog manager retroactively groups both under a family.
+
+**Constraints:**
+- **Existing listings are not retroactively affected.** If `DOG-BOWL-001` has three active Amazon listings (submitted as a standalone product, no parent ASIN), those listings retain their current state. They are not automatically reorganized under a parent ASIN just because the product joined a family. New listings created *after* the family assignment will use the family grouping.
+- **Catalog manager must review active listings** after a family assignment and decide whether to delist the old standalone listing and re-list as a child under the family's parent ASIN. This is a manual merchandising decision, not an automated cascade.
+- The Admin Portal should surface a **post-assignment notice:** "DOG-BOWL-001 has 3 active listings as a standalone product. Review and update listings to reflect the new family grouping."
+
+#### Rule 6 — Who Can Create, Edit, and Archive Variants?
+
+| Action | Permitted Roles | Notes |
+|---|---|---|
+| Create Product Family | MerchandisingManager, SystemAdmin | Requires category assignment (buyer input) |
+| Add Variant to Family | MerchandisingManager, SystemAdmin | Requires SKU, at least one variant attribute |
+| Edit Family Shared Content | MerchandisingManager, CopyWriter, SystemAdmin | CopyWriter edits description/images only; cannot change category or archive |
+| Edit Variant Attributes | MerchandisingManager, SystemAdmin | Variant attribute changes may invalidate active listings; system warns |
+| Set Variant Status (Active / OutOfSeason / ComingSoon) | MerchandisingManager, SystemAdmin | |
+| Discontinue a Variant | MerchandisingManager, SystemAdmin | Requires confirmation; triggers cascade review of active listings |
+| Initiate Recall | ComplianceOfficer, SystemAdmin | Emergency action; bypass standard review; immediate cascade |
+| Archive Product Family | SystemAdmin | Typically triggered automatically when all variants are discontinued |
+| Remove Variant from Family | MerchandisingManager, SystemAdmin | Returns variant to standalone status; does not delete it |
+
+**Note:** Vendor Portal users (vendor-side) may submit product data for catalog manager review, but they do not have direct write access to create families or assign variants. Vendor submissions enter a review queue; a MerchandisingManager approves or rejects.
+
+#### Rule 7 — Is There a Maximum Number of Variants Per Family?
+
+**No hard system limit at this time.** In practice, e-commerce catalogs rarely exceed 100 variants per family (most fall under 20). A dog collar in 5 sizes × 10 colors = 50 variants, which is realistic. A pet food in 6 bag sizes × 3 protein sources = 18 variants.
+
+**Soft operational guidance:** Families with more than 50 variants should trigger a catalog manager review — this often indicates a family that should be split into sub-families (e.g., "Chicken Recipe" family and "Salmon Recipe" family as separate groupings rather than one giant multi-protein/multi-size family). The Admin Portal may surface this as an advisory: "This family has 52 variants. Consider splitting by primary attribute for clearer customer navigation."
+
+**Marketplace reality check:** Amazon limits the number of child ASINs under a single parent ASIN to a practical maximum (varies by category, typically 50-200). For families that would exceed marketplace limits, Marketplaces BC must handle the splitting logic — this is a Phase 3+ concern.
+
+#### Rule 8 — What Variant Attributes Are Supported — Free-Form or Constrained?
+
+For **Phase 3 launch**, variant attributes will be **free-form key-value pairs** (`Dictionary<string, string>`) validated at the UI layer rather than enforced by domain schema. The Admin Portal will present a **dropdown of recommended attribute keys** based on the product's category to guide consistent data entry:
+
+| Category | Suggested Attribute Keys |
+|---|---|
+| Collars, Harnesses, Leashes | Size, Color |
+| Bowls & Feeders | Size, Capacity |
+| Dry / Wet Food | Weight, Flavor/Protein Source, Life Stage |
+| Treats & Chews | Weight, Flavor |
+| Flea & Tick / Medications | Pet Size/Weight Range, Count |
+| Toys | Size, Color, Material |
+| Beds & Furniture | Size, Color |
+| Grooming | Size, Scent/Formula |
+
+The domain accepts any string key — the UI dropdown constrains the inputs. A catalog manager who types a custom key (e.g., "Texture") is permitted; the system will not reject it. This avoids domain-layer brittleness while keeping practical catalog data clean.
+
+**Phase 3+ aspiration:** Introduce a `VariantAttributeSchema` owned by Product Catalog BC, defining permitted attribute keys per category node. This enables validation of marketplace attribute mapping and catches catalog manager typos at submission time. Until then, UI guidance is the gate.
+
+---
+
+### 9.6 Glossary Additions and Refinements
+
+The following terms should be added to `catalog-listings-marketplaces-glossary.md` now that the D1 model is confirmed. These are business-operational terms that catalog managers and buyers will use daily.
+
+---
+
+#### Standalone Product
+
+**Definition:** A Product record that does not belong to any Product Family. A standalone product has no `FamilyId` and no variant siblings. It is a single purchasable unit in the catalog. Standalone products are valid catalog citizens; not every product requires a family grouping. On marketplaces, a standalone product is submitted as a single listing with no parent/child structure.
+
+**Canonical examples:** A one-size-only luxury dog crate; a single-edition holiday item; an accessory that has no meaningful variant dimensions.
+
+**Code note:** `FamilyId == null` on the `Product` record. No change to SKU, stream key, or listing behavior from a standalone product's perspective.
+
+**Aliases / Rejected Terms:**
+- ~~Orphan product~~ — rejected; "orphan" implies something broken or unwanted. A standalone product is intentional.
+- ~~Single SKU product~~ — acceptable informally, but "Standalone Product" is the canonical term.
+
+---
+
+#### Family Archive
+
+**Definition:** The terminal state of a Product Family when all of its member variants have been discontinued or recalled. An archived family retains its full event history and is never deleted, but it no longer appears in active catalog management views. No new variants may be added to an archived family; no new listings may be created for its variants (which are themselves in terminal status).
+
+**Business significance:** Family archive is a system-triggered transition, not a manual action. It fires automatically when the last active variant in a family reaches a terminal status (`Discontinued` or `Recalled`). It is not a user-initiated archival action.
+
+**Code note:** `ProductFamilyArchived` domain event; `Status: Archived` on the `ProductFamily` aggregate.
+
+---
+
+#### Variant Attribute
+
+**Definition:** A key-value property that distinguishes one Product Variant from its siblings within the same Product Family. Each variant carries one or more variant attributes that encode the dimension(s) along which variants differ: Size, Color, Scent, Weight, Flavor, Count, or any other differentiating property. The combination of attribute values for a variant must be unique within its family — no two variants in the same family may have identical attribute sets.
+
+**Examples:**
+- `{ "Size": "Large", "Color": "Red" }` on `DOG-COLLAR-L-RED`
+- `{ "Weight": "25 lb" }` on `ORIJEN-OG-25LB`
+- `{ "Size": "Large Dog (45-88 lbs)", "Count": "3" }` on `FLEA-TX-LDOG-001`
+
+**Business significance:** Variant attributes are the customer-facing selectors on a product page. "Choose your size" and "Choose your color" each correspond to an attribute key. The attribute set drives the attribute picker UI on the storefront browse page and the variation selector on marketplace listings.
+
+**Code note:** `VariantAttributes` value object wrapping `IReadOnlyDictionary<string, string>`. Free-form for Phase 3; schema-constrained in Phase 3+.
+
+**Aliases / Rejected Terms:**
+- ~~Option~~ — rejected; "Option" is Shopify's term for the attribute key (e.g., "Size" is an option). We use "Attribute" to avoid confusion with Shopify jargon.
+- ~~Property~~ — too generic; "Attribute" is the canonical term in marketplace APIs (Amazon's "item-attribute", Walmart's "variantGroupAttribute").
+- ~~Dimension~~ — acceptable informally in PO/UX discussion, but "Attribute" is the canonical code term.
+
+---
+
+#### Shared Content
+
+**Definition:** The product information that is common to all variants within a Product Family and lives on the `ProductFamily` record — not on any individual variant. Shared content includes: family display name, brand, base description, shared product images, and category assignment. Shared content is the catalog manager's single point of control for content that does not vary by size, color, or configuration.
+
+**Business significance:** Updating shared content once propagates the change to all variant listings on all channels. This is the primary efficiency gain of the parent/child model versus a flat model (Option B), where equivalent content updates require touching every individual product record.
+
+**Aliases / Rejected Terms:**
+- ~~Parent content~~ — acceptable informally, but "Shared Content" communicates the purpose more clearly.
+- ~~Inherited content~~ — rejected; "inheritance" implies that variants override the parent value, which is not always accurate. Variants extend shared content; they do not necessarily override it.
+
+---
+
+#### Variant Disambiguation
+
+**Definition:** The process by which a customer (on the storefront) or a marketplace buyer selects the specific variant SKU they want to purchase from within a Product Family. Variant disambiguation happens through the attribute picker UI — the customer selects "Large" from the Size dropdown and "Red" from the Color dropdown, and the system resolves their selection to a specific SKU (e.g., `DOG-COLLAR-L-RED`). The resolved SKU is the unit added to cart.
+
+**Business significance:** Variant disambiguation is the boundary between browsing (family-level) and purchasing (variant-level). A customer browses the "PetSupreme Nylon Dog Collar" family; they add `DOG-COLLAR-L-RED` to cart. The Cart BC and all downstream BCs (Orders, Inventory, Fulfillment) operate exclusively on the resolved SKU — they are never aware of the family grouping.
+
+**Operational note:** The attribute picker must validate that the selected combination resolves to an in-stock, `Active` variant. Combinations that do not exist (e.g., a color/size pairing that was never created) or variants that are `OutOfSeason` or `Discontinued` must be handled gracefully by the storefront (greyed out, "currently unavailable," not added to cart).
+
+---
+
+#### Refinements to Existing Glossary Terms
+
+**Product Variant** (refine existing definition):
+
+Add the following to the existing "Code Usage" section:
+
+> A Variant's `variantAttributes` field holds its differentiating properties (see Variant Attribute above). A Variant's `familyId` field is the UUID v7 of its parent `ProductFamily`. Both fields are nullable — a Product record with `familyId == null` is a Standalone Product.
+
+**Product Family** (refine existing "Code Usage"):
+
+Add:
+
+> `ProductFamily` transitions through the following states: `Active` (has at least one non-terminal variant), `Archived` (all variants discontinued or recalled, system-triggered). There is no `Discontinued` or `Recalled` status on `ProductFamily` itself — those statuses live on individual variants.
+
+---
+
+### 9.7 Open Questions for the Owner
+
+The following business policy questions require Owner input. D1 is fully resolved; these questions arise from the implications of the D1 model choice and should be answered before Phase 3 Admin Portal UI design begins.
+
+---
+
+**PO-Q1 — Variant Creation: Catalog Manager Only, or Can Vendors Propose Variants?** 🔴 Blocks Vendor Portal Phase 3 scope
+
+> Under Option A, variants are SKU-level products that require careful data quality control — a rogue variant with a bad SKU, wrong weight, or mis-assigned family causes downstream problems in Listings, Inventory, and Fulfillment.
+>
+> **Option A:** Catalog managers create all variants. Vendors submit product briefs through the Vendor Portal (or email/spreadsheet), and a catalog manager enters them. This maximizes data quality but adds operational overhead.
+>
+> **Option B:** Vendors can propose variants through the Vendor Portal, which creates a "proposed variant" in a pending state. A catalog manager reviews and approves/rejects before the variant is live in the catalog. This reduces catalog manager data entry but requires a review queue workflow.
+>
+> **My recommendation:** Option B (vendor proposals with mandatory catalog manager approval) is the right long-term model for a realistic e-commerce operation. Vendors know their products; catalog managers ensure quality and consistency. But if Vendor Portal Phase 3 is deprioritized, Option A (catalog manager entry only) is acceptable at launch.
+>
+> **Owner decision needed:** Is vendor-proposed variant creation in scope for Phase 3 Vendor Portal, or deferred to Phase 4?
+
+---
+
+**PO-Q2 — How Do We Handle UPC/GTIN at the Variant Level?** 🟡 Affects marketplace listing compliance
+
+> Amazon and Walmart require a valid UPC, EAN, or GTIN for every child ASIN/item submitted. Private-label products (our CritterBrew brand) need GS1-registered barcodes that we control. Third-party brand products (PetSupreme, Orijen, Frontline) have manufacturer-assigned UPCs.
+>
+> Do we store UPC/GTIN as a variant attribute (free-form, alongside Size and Color)? Or as a dedicated field on the `Product` record? And do we have a process for registering GS1 barcodes for private-label variants before they can be listed on Amazon?
+>
+> **My recommendation:** GTIN deserves a dedicated, typed field on the `Product` record — not a free-form attribute — because it has a specific validation format (8, 12, 13, or 14 digits) and is required at marketplace submission time. The absence of a GTIN should block Amazon/Walmart listing creation.
+>
+> **Owner decision needed:** Confirm GTIN as a required (or strongly recommended) variant-level field. Confirm whether CritterSupply has a GS1 account for private-label barcode registration.
+
+---
+
+**PO-Q3 — What Is the Policy on Variant Attribute Changes Post-Listing?** 🟡 Affects listing validity
+
+> If a catalog manager changes a variant's attributes *after* the variant has active listings — e.g., corrects "Size: Lg" to "Size: Large" — does that change:
+> (a) Automatically propagate to all active listings, triggering a re-submission to marketplaces?
+> (b) Flag the active listings as "pending content refresh" and require catalog manager action?
+> (c) Have no effect on active listings (listings are snapshots at creation time)?
+>
+> **My recommendation:** Option (b). Attribute changes should flag active listings for review rather than auto-propagating. This prevents accidental listing updates on live marketplace content. The catalog manager sees a "listings affected by this change: 3 [Review]" prompt.
+>
+> **Owner decision needed:** Confirm the preferred propagation policy for variant attribute changes.
+
+---
+
+**PO-Q4 — Can a Variant Be Transferred Between Families?** 🟢 Low urgency
+
+> Can `DOG-COLLAR-M-BLK` be moved from the "PetSupreme Nylon Dog Collar" family to the "PetSupreme Everyday Collar Collection" family without discontinuing and recreating it? The SKU stays the same; only the family membership changes.
+>
+> **My recommendation:** Yes, transfer should be permitted — a catalog manager may need to reorganize families as the catalog matures. The operation is `RemoveVariantFromFamily` (returns to standalone) + `AddVariantToFamily` (assigns to new family). This should be a single "Transfer Variant" action in the Admin UI to prevent an accidental standalone-limbo state. Existing listings carry the old `FamilyId` until explicitly updated (same policy as post-hoc family assignment in Rule 5).
+>
+> **Owner decision needed:** Confirm that variant transfer between families is a permitted operation and that the "carry old FamilyId on existing listings" behavior is acceptable.
+
+---
+
+**PO-Q5 — What Is the "Minimum Viable Family" for Launch? What Must Be Present Before a Listing Can Be Created?** 🔴 Blocks Listings BC validation logic
+
+> When a catalog manager tries to create a listing for a variant, what must be true of both the variant and its family?
+>
+> **Proposed minimum gates (variant level):**
+> - Variant status = `Active` or `ComingSoon`
+> - At least one variant attribute defined (no "blank" variants)
+> - At least one variant-specific or family-level image exists
+> - Ship weight populated (required for carrier rate calculation)
+>
+> **Proposed minimum gates (family level, if variant is a family member):**
+> - Family name populated
+> - Category assigned
+> - At least one shared image OR the variant has its own image
+>
+> **Owner decision needed:** Are these the right gates? Are there additional required fields that should block listing creation (e.g., brand, GTIN, base description minimum length)?
+
+---
+
+*All five questions above require Owner input before Phase 3 Admin Portal UI and Listings BC validation logic are finalized. None of them block the core variant model implementation (ProductFamily aggregate, Product stream changes) — that engineering work can begin immediately. These questions specifically gate the Admin Portal UX design and the Listings BC validation rule set.*
+
+---
+
+*This Product Owner section was added 2026-06-14 as part of the D1 formal sign-off process. It is the business counterpart to the Principal Architect's technical implementation guide in Sections 1–8. Both sections together constitute the full D1 decision record for CritterSupply.*
