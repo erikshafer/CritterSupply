@@ -160,4 +160,8 @@
     <Project Path="src/Vendor Identity/VendorIdentity/VendorIdentity.csproj" />
     <Project Path="tests/Vendor Identity/VendorIdentity.Api.IntegrationTests/VendorIdentity.Api.IntegrationTests.csproj" />
   </Folder>
+  <Folder Name="/Vendor Portal/">
+    <Project Path="src/Vendor Portal/VendorPortal.Api/VendorPortal.Api.csproj" />
+    <Project Path="src/Vendor Portal/VendorPortal.Web/VendorPortal.Web.csproj" />
+  </Folder>
 </Solution>

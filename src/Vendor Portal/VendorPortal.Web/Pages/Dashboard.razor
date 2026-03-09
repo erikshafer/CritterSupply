@@ -1,0 +1,179 @@
+@page "/dashboard"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.SignalR.Client
+@using VendorPortal.Web.Auth
+@using VendorPortal.Web.Hub
+@attribute [Authorize]
+@inject VendorAuthState AuthState
+@inject VendorHubService HubService
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<PageTitle>Dashboard — Vendor Portal</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">
+    Dashboard
+</MudText>
+<MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+    @AuthState.TenantName — @AuthState.Role view
+</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+
+@if (_summary is not null)
+{
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Inventory" Color="Color.Primary" Style="font-size:2rem;" />
+                <MudText Typo="Typo.h4">@_summary.TotalSkus</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Total SKUs</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center">
+                <MudIcon Icon="@Icons.Material.Filled.EditNote" Color="Color.Warning" Style="font-size:2rem;" />
+                <MudText Typo="Typo.h4">@_summary.PendingChangeRequests</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Pending Change Requests</MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Style="font-size:2rem;" />
+                <MudText Typo="Typo.h4">@_summary.ActiveLowStockAlerts</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Low Stock Alerts</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudText Typo="Typo.h6" GutterBottom="true">Quick Actions</MudText>
+
+        @if (AuthState.CanSubmitChangeRequests)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Class="mr-2">
+                Submit Change Request
+            </MudButton>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Your role (<strong>@AuthState.Role</strong>) is read-only. Contact your Admin to submit change requests.
+            </MudAlert>
+        }
+
+        @if (AuthState.IsAdmin)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Group" Class="mr-2 mt-2">
+                Manage Users
+            </MudButton>
+        }
+    </MudPaper>
+
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudText Typo="Typo.h6" GutterBottom="true">Real-Time Connection</MudText>
+        <MudText Typo="Typo.body2">
+            Hub state: <strong>@HubService.State</strong>
+        </MudText>
+        @if (HubService.State != Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                       OnClick="ConnectToHubAsync" Class="mt-2">
+                Connect Live
+            </MudButton>
+        }
+
+        @if (_hubMessages.Any())
+        {
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.subtitle2">Recent Hub Messages:</MudText>
+            @foreach (var msg in _hubMessages.TakeLast(5))
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@msg</MudText>
+            }
+        }
+    </MudPaper>
+
+    <MudAlert Severity="Severity.Info" Class="mt-4">
+        <strong>POC Note:</strong> @_summary.Message
+    </MudAlert>
+}
+
+@code {
+    private DashboardSummary? _summary;
+    private bool _isLoading = true;
+    private readonly List<string> _hubMessages = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardAsync();
+    }
+
+    private async Task LoadDashboardAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("VendorPortalApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.GetAsync("/api/vendor-portal/dashboard");
+            if (response.IsSuccessStatusCode)
+            {
+                _summary = await response.Content.ReadFromJsonAsync<DashboardSummary>();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Snackbar.Add("Session expired. Please log in again.", Severity.Warning);
+            }
+            else
+            {
+                Snackbar.Add("Failed to load dashboard.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ConnectToHubAsync()
+    {
+        await HubService.ConnectAsync();
+
+        if (HubService.Connection is not null)
+        {
+            HubService.Connection.On("Connected", (System.Text.Json.JsonElement msg) =>
+            {
+                _hubMessages.Add($"[{DateTimeOffset.Now:HH:mm:ss}] Connected: {msg}");
+                InvokeAsync(StateHasChanged);
+            });
+        }
+    }
+
+    public void Dispose()
+    {
+        HubService.OnStateChanged -= StateHasChanged;
+    }
+
+    private sealed record DashboardSummary(
+        Guid VendorTenantId,
+        string TenantName,
+        string UserEmail,
+        string UserRole,
+        int TotalSkus,
+        int PendingChangeRequests,
+        int ActiveLowStockAlerts,
+        string Message);
+}

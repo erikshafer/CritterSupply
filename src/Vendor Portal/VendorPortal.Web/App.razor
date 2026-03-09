@@ -1,0 +1,20 @@
+<MudThemeProvider />
+<MudSnackbarProvider />
+<MudDialogProvider />
+
+<Router AppAssembly="typeof(App).Assembly">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                <RedirectToLogin />
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not found — Vendor Portal</PageTitle>
+        <LayoutView Layout="typeof(Layout.MainLayout)">
+            <MudText Typo="Typo.h5">Page not found.</MudText>
+        </LayoutView>
+    </NotFound>
+</Router>
