@@ -14,7 +14,7 @@ This directory contains implementation patterns and best practices for building 
 - 🔄 [Wolverine Sagas](./wolverine-sagas.md) - Stateful orchestration sagas, multi-BC coordination, compensation chains, idempotency
 
 **Working with Aggregates:**
-- 📝 [Marten Event Sourcing](./marten-event-sourcing.md) - Event-sourced aggregates, decider pattern, factory methods
+- 📝 [Event-Sourced Aggregate Design](./marten-event-sourcing.md) - Event-sourced aggregates, decider pattern, factory methods
 - 📦 [Marten Document Store](./marten-document-store.md) - Document models, CRUD patterns, value objects for queryable fields
 
 **Traditional Relational Data:**
@@ -49,7 +49,7 @@ This directory contains implementation patterns and best practices for building 
 - [Wolverine Sagas](./wolverine-sagas.md) - Stateful orchestration, multi-BC coordination, compensation chains
 
 ### Marten
-- [Marten Event Sourcing](./marten-event-sourcing.md) - Event-sourced aggregates, projections
+- [Event-Sourced Aggregate Design](./marten-event-sourcing.md) - Event-sourced aggregates, projections
 - [Marten Document Store](./marten-document-store.md) - Document models, queries, value objects
 
 ### Entity Framework Core
@@ -74,7 +74,7 @@ This directory contains implementation patterns and best practices for building 
 2. Review [Vertical Slice Organization](./vertical-slice-organization.md) for file structure
 3. Write Gherkin features (see [Reqnroll BDD Testing](./reqnroll-bdd-testing.md))
 4. Choose persistence strategy:
-   - Event sourcing? → [Marten Event Sourcing](./marten-event-sourcing.md)
+   - Event sourcing? → [Event-Sourced Aggregate Design](./marten-event-sourcing.md)
    - Document store? → [Marten Document Store](./marten-document-store.md)
    - Traditional relational? → [EF Core + Wolverine Integration](./efcore-wolverine-integration.md)
    - Multi-BC orchestration over time? → [Wolverine Sagas](./wolverine-sagas.md)
@@ -280,7 +280,7 @@ Each skill document follows this structure:
 - *"How do I build a real-time hub with SignalR and Wolverine?"* → [Wolverine + SignalR](./wolverine-signalr.md)
 - *"How do I create a new command handler?"* → [Wolverine Message Handlers](./wolverine-message-handlers.md)
 - *"How do I test my handler?"* → [CritterStack Testing Patterns](./critterstack-testing-patterns.md)
-- *"Should I use event sourcing or document store?"* → Compare [Marten Event Sourcing](./marten-event-sourcing.md) vs [Marten Document Store](./marten-document-store.md)
+- *"Should I use event sourcing or document store?"* → Compare [Event-Sourced Aggregate Design](./marten-event-sourcing.md) vs [Marten Document Store](./marten-document-store.md)
 - *"How do I build a saga that coordinates multiple BCs?"* → [Wolverine Sagas](./wolverine-sagas.md)
 - *"How do I organize my code?"* → [Vertical Slice Organization](./vertical-slice-organization.md)
 - *"When should I use EF Core?"* → [EF Core + Wolverine Integration](./efcore-wolverine-integration.md)
