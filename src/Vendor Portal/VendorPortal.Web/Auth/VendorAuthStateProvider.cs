@@ -14,10 +14,12 @@ namespace VendorPortal.Web.Auth;
 public sealed class VendorAuthStateProvider : AuthenticationStateProvider
 {
     private readonly VendorAuthState _authState;
+    private readonly ILogger<VendorAuthStateProvider> _logger;
 
-    public VendorAuthStateProvider(VendorAuthState authState)
+    public VendorAuthStateProvider(VendorAuthState authState, ILogger<VendorAuthStateProvider> logger)
     {
         _authState = authState;
+        _logger = logger;
         _authState.OnChange += OnAuthStateChanged;
     }
 
@@ -36,6 +38,7 @@ public sealed class VendorAuthStateProvider : AuthenticationStateProvider
 
             if (jwt.ValidTo < DateTime.UtcNow)
             {
+                _logger.LogInformation("Access token is expired — returning anonymous state");
                 var anonymous = new ClaimsPrincipal(new ClaimsIdentity());
                 return Task.FromResult(new AuthenticationState(anonymous));
             }
@@ -44,8 +47,9 @@ public sealed class VendorAuthStateProvider : AuthenticationStateProvider
             var user = new ClaimsPrincipal(identity);
             return Task.FromResult(new AuthenticationState(user));
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to parse access token — returning anonymous state");
             var anonymous = new ClaimsPrincipal(new ClaimsIdentity());
             return Task.FromResult(new AuthenticationState(anonymous));
         }

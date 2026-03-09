@@ -29,15 +29,18 @@ public sealed class VendorAuthService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly VendorAuthState _authState;
     private readonly NavigationManager _navigationManager;
+    private readonly ILogger<VendorAuthService> _logger;
 
     public VendorAuthService(
         IHttpClientFactory httpClientFactory,
         VendorAuthState authState,
-        NavigationManager navigationManager)
+        NavigationManager navigationManager,
+        ILogger<VendorAuthService> logger)
     {
         _httpClientFactory = httpClientFactory;
         _authState = authState;
         _navigationManager = navigationManager;
+        _logger = logger;
     }
 
     public async Task<bool> LoginAsync(string email, string password)
@@ -58,6 +61,12 @@ public sealed class VendorAuthService
             var expiresAt = ParseTokenExpiry(loginResponse.AccessToken);
             var (tenantId, userId) = ParseTenantAndUserId(loginResponse.AccessToken);
 
+            if (tenantId == Guid.Empty || userId == Guid.Empty)
+            {
+                _logger.LogError("Login response token is missing VendorTenantId or VendorUserId claims");
+                return false;
+            }
+
             _authState.SetAuthenticated(
                 accessToken: loginResponse.AccessToken,
                 email: loginResponse.Email,
@@ -71,8 +80,9 @@ public sealed class VendorAuthService
 
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Login request failed for email {Email}", email);
             return false;
         }
     }
@@ -100,8 +110,9 @@ public sealed class VendorAuthService
             _authState.UpdateAccessToken(refreshResponse.AccessToken, expiresAt);
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Token refresh request failed");
             return false;
         }
     }
@@ -120,7 +131,7 @@ public sealed class VendorAuthService
         }
     }
 
-    private static DateTimeOffset ParseTokenExpiry(string token)
+    private DateTimeOffset ParseTokenExpiry(string token)
     {
         try
         {
@@ -128,13 +139,16 @@ public sealed class VendorAuthService
             var jwt = handler.ReadJwtToken(token);
             return new DateTimeOffset(jwt.ValidTo, TimeSpan.Zero);
         }
-        catch
+        catch (Exception ex)
         {
-            return DateTimeOffset.UtcNow.AddMinutes(15);
+            // Return immediate expiry to force re-authentication rather than granting
+            // an assumed 15-minute window on a potentially malformed token.
+            _logger.LogError(ex, "Failed to parse token expiry — forcing immediate expiry");
+            return DateTimeOffset.UtcNow;
         }
     }
 
-    private static (Guid tenantId, Guid userId) ParseTenantAndUserId(string token)
+    private (Guid tenantId, Guid userId) ParseTenantAndUserId(string token)
     {
         try
         {
@@ -142,13 +156,18 @@ public sealed class VendorAuthService
             var jwt = handler.ReadJwtToken(token);
             var tenantIdStr = jwt.Claims.FirstOrDefault(c => c.Type == "VendorTenantId")?.Value;
             var userIdStr = jwt.Claims.FirstOrDefault(c => c.Type == "VendorUserId")?.Value;
-            return (
-                Guid.TryParse(tenantIdStr, out var t) ? t : Guid.Empty,
-                Guid.TryParse(userIdStr, out var u) ? u : Guid.Empty
-            );
+
+            var tenantId = Guid.TryParse(tenantIdStr, out var t) ? t : Guid.Empty;
+            var userId = Guid.TryParse(userIdStr, out var u) ? u : Guid.Empty;
+
+            if (tenantId == Guid.Empty || userId == Guid.Empty)
+                _logger.LogWarning("Token is missing required VendorTenantId or VendorUserId claims");
+
+            return (tenantId, userId);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to parse tenant/user IDs from token");
             return (Guid.Empty, Guid.Empty);
         }
     }

@@ -20,6 +20,7 @@ public sealed class VendorRefreshEndpoint
         VendorIdentityDbContext dbContext,
         JwtTokenService tokenService,
         JwtSettings jwtSettings,
+        ILogger<VendorRefreshEndpoint> logger,
         CancellationToken ct)
     {
         var refreshCookie = httpContext.Request.Cookies["vendor_refresh_token"];
@@ -49,8 +50,9 @@ public sealed class VendorRefreshEndpoint
             var principal = handler.ValidateToken(oldToken, tokenValidation, out _);
             userIdString = principal.FindFirst("VendorUserId")?.Value;
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Token validation failed during refresh");
             return Results.Unauthorized();
         }
 
