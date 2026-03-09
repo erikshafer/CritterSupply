@@ -1,7 +1,7 @@
 # Product Catalog · Listings · Marketplaces BC: Architecture Evolution Plan
 
 **Document Owner:** Principal Software Architect  
-**Status:** 🟡 Active — PO + UX + PSA findings incorporated; Owner decisions outstanding  
+**Status:** 🟡 Active — D1 (variant model) decided ✅; D2, D3, D6, D7, D8, D9, D10 outstanding  
 **Date:** 2026-03-10  
 **Last Updated:** 2026-03-10  
 **Triggered by:** PO + UX Engineer discovery session on Product Catalog evolution and marketplace selling  
@@ -515,13 +515,19 @@ The following decisions require Owner input before implementation begins. They a
 
 ---
 
-**D1 — Variant Model Shape** 🔴 BLOCKS EVERYTHING ELSE
+**D1 — Variant Model Shape** ✅ **DECIDED — Option A (Parent/Child Hierarchy)**
 
-> Do variants use parent/child SKUs (Option A: one parent document, N child SKU records), a flat product with embedded variants (Option C: `IReadOnlyList<ProductVariant>` on the product record), or loosely linked standalone SKUs (Option B: `ProductFamilyId` reference)?
+> **Owner Decision (2026-03-09):** Option A — One parent product (`ProductFamily`) + N child SKU records (`ProductVariant`). Example: Parent "AquaPaws Fountain" → Children: SKU-SM, SKU-MD, SKU-LG.
 >
-> **Architect's recommendation: Option A (parent/child).** It matches how Amazon, Shopify, and every major marketplace model variants natively. Parent holds shared content (name, description, brand, images). Child holds differentiating attributes (size, color, weight) plus its own SKU, pricing, and inventory. Listings BC creates listings against child SKUs, not parent products. The parent is a grouping container.
+> **Rationale (Owner's words):** "This is similar to how I did it in the past when I worked at ecommerce shops at multiple large marketplaces. I want to 'go with the crowd' and the patterns they've established. We're building CritterSupply to be realistic and robust, so that means go with what's common and established."
 >
-> **Why it must be decided first:** Listing stream key (`listing:{sku}:{channelCode}`) anchors on SKU — if variants share a parent SKU, the key design changes. Inventory BC's reservation model changes. Pricing BC's `ProductPrice` stream key is per-SKU — that holds. But the storefront's "select your size" UX only exists after this is resolved. The UX Engineer explicitly blocked Listings UI design on this answer.
+> **Full implementation guide:** See [`docs/planning/catalog-variant-model.md`](catalog-variant-model.md) — contains PSA technical design, PO business validation, and UX sign-off.
+>
+> **PSA sign-off:** ✅ Endorsed. `ProductFamily` is an event-sourced aggregate (UUID v7 stream key); `ProductVariant` is a `Product` record with `FamilyId?` set (no separate class). Listing stream key `listing:{sku}:{channelCode}` is confirmed correct — listings anchor on child SKU. See ADR 0030 candidate.
+>
+> **PO sign-off:** ✅ Endorsed. Aligns with Amazon (parent/child ASIN), Walmart (Item Groups), eBay (Multi-Variation Listings), Shopify (Product/ProductVariant). Eliminates catalog manager busywork. Business rules documented in catalog-variant-model.md §9.
+>
+> **UX sign-off:** ✅ Endorsed. Prior hard block (P0.3 — "do not build Listings UI until D1 resolved") is **lifted**. Admin UI design specs for Family page, variant grid, Add Variant flow, and Listing creation flow are documented in catalog-variant-model.md §10.
 
 ---
 

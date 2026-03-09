@@ -3,8 +3,8 @@
 **Decision:** D1 — Variant Model Shape  
 **Resolution:** ✅ Option A — One Parent ProductFamily + N Child Variant SKU Records  
 **Date:** 2026-06-14  
-**Author:** Principal Software Architect  
-**Status:** 🟢 Approved — Ready for Phase 3 implementation planning
+**Authors:** Principal Software Architect · Product Owner · UX Engineer  
+**Status:** 🟢 Fully Endorsed — All three sign-offs complete. Ready for Phase 3 implementation.
 
 ---
 
@@ -31,6 +31,25 @@
    - [Business Rules for the Variant Model](#95-business-rules-for-the-variant-model)
    - [Glossary Additions and Refinements](#96-glossary-additions-and-refinements)
    - [Open Questions for the Owner](#97-open-questions-for-the-owner)
+10. [UX Engineer Sign-Off & UI Design Specification](#10-ux-engineer-sign-off--ui-design-specification)
+    - [Sign-Off Statement](#101-sign-off-statement)
+    - [Admin UI Design Specification](#102-admin-ui-design-specification)
+      - [Product Family Page](#1021-product-family-page)
+      - [Variant List Component (MudDataGrid)](#1022-variant-list-component-muddatagrid)
+      - [Add Variant Flow](#1023-add-variant-flow)
+      - [Variant Attribute Editor](#1024-variant-attribute-editor)
+      - [Standalone Products — The No-Family Case](#1025-standalone-products--the-no-family-case)
+    - [Storefront / Customer-Facing UX](#103-storefront--customer-facing-ux)
+      - [Product Listing Page (PLP)](#1031-product-listing-page-plp)
+      - [Product Detail Page (PDP) — Family + Variant Picker](#1032-product-detail-page-pdp--family--variant-picker)
+      - [Add to Cart Interaction](#1033-add-to-cart-interaction)
+    - [Listing Creation Flow (Now Unblocked by D1)](#104-listing-creation-flow-now-unblocked-by-d1)
+      - [Family-First Listing Creation Flow](#1041-family-first-listing-creation-flow)
+      - [Marketplace-Specific Variant Grouping UI](#1042-marketplace-specific-variant-grouping-ui)
+    - [Domain-vs-UI Divergence Table Additions](#105-domain-vs-ui-divergence-table-additions)
+    - [Updated UX Risk Register](#106-updated-ux-risk-register)
+    - [UI Copy Additions](#107-ui-copy-additions)
+    - [Remaining UX Questions](#108-remaining-ux-questions)
 
 ---
 
