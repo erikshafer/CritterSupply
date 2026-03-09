@@ -105,7 +105,7 @@ public static class AssignProductToVendorHandler
     /// Assigns the SKU to the specified vendor.
     /// Idempotent: returns 200 without publishing an event if the vendor is already the same.
     /// On reassignment, sets PreviousVendorTenantId so subscribers can clean up old associations.
-    /// Phase 2: replace "system" with authenticated admin principal from HttpContext.
+    /// TODO(Phase 2): Replace "system" with the authenticated admin principal from HttpContext.
     /// </summary>
     [WolverinePost("/api/admin/products/{sku}/vendor-assignment")]
     public static async Task<IResult> Handle(
@@ -126,9 +126,9 @@ public static class AssignProductToVendorHandler
                 product.AssignedAt!.Value));
         }
 
-        // Phase 2: resolve from HttpContext.User (JWT claims).
+        // TODO(Phase 2): Wire real admin authentication. Replace "system" with
+        // HttpContext.User.Identity?.Name or the NameIdentifier claim.
         const string assignedBy = "system";
-
         var previousVendorTenantId = product.VendorTenantId; // null if first assignment
         var assignedAt = DateTimeOffset.UtcNow;
 
@@ -233,7 +233,7 @@ public static class BulkAssignProductsToVendorHandler
         var productArray = await Task.WhenAll(productTasks);
         var productDict = productArray
             .Where(p => p is not null)
-            .ToDictionary(p => p!.Id);
+            .ToDictionary(p => p!.Id, p => p!);
 
         var succeeded = new List<AssignmentSuccess>();
         var failed = new List<AssignmentFailure>();
@@ -272,7 +272,10 @@ public static class BulkAssignProductsToVendorHandler
             var previousVendorTenantId = product.VendorTenantId;
             var updated = product.AssignToVendor(item.VendorTenantId, assignedBy);
 
-            // Update the in-memory dictionary so duplicate SKUs in the same batch are handled correctly.
+            // Update the in-memory dictionary so duplicate SKUs in the same batch are handled
+            // correctly. If a client sends the same SKU twice with different VendorTenantIds,
+            // the last occurrence wins — this is intentional "last write wins" semantics for
+            // bulk operations. Each successful occurrence publishes its own event.
             productDict[item.Sku] = updated;
 
             session.Store(updated);

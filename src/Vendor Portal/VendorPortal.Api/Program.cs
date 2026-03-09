@@ -102,7 +102,9 @@ builder.Host.UseWolverine(opts =>
     })
     .AutoProvision();
 
-    // Subscribe to VendorProductAssociated events published by Product Catalog
+    // Subscribe to VendorProductAssociated events published by Product Catalog.
+    // ProcessInline ensures the handler runs synchronously in the consuming thread,
+    // avoiding background thread complexity and making test execution deterministic.
     opts.ListenToRabbitQueue("vendor-portal-product-associated")
         .ProcessInline();
 });

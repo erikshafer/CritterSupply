@@ -12,7 +12,7 @@ namespace VendorPortal.VendorProductCatalog;
 public static class VendorProductAssociatedHandler
 {
     public static async Task Handle(
-        VendorProductAssociated @event,
+        VendorProductAssociated integrationEvent,
         IDocumentSession session,
         CancellationToken ct)
     {
@@ -21,11 +21,11 @@ public static class VendorProductAssociatedHandler
         // need to de-associate the SKU from the old vendor (e.g., analytics).
         var entry = new VendorProductCatalogEntry
         {
-            Id = @event.Sku,
-            Sku = @event.Sku,
-            VendorTenantId = @event.VendorTenantId,
-            AssociatedBy = @event.AssociatedBy,
-            AssociatedAt = @event.AssociatedAt,
+            Id = integrationEvent.Sku,
+            Sku = integrationEvent.Sku,
+            VendorTenantId = integrationEvent.VendorTenantId,
+            AssociatedBy = integrationEvent.AssociatedBy,
+            AssociatedAt = integrationEvent.AssociatedAt,
             IsActive = true
         };
 

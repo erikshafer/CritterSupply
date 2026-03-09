@@ -105,8 +105,16 @@ public sealed class VendorProductCatalogTests : IAsyncLifetime
         var vendorBId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
 
-        var eventA = new VendorProductAssociated("BIRD-SEED-001", vendorAId, "admin", now);
-        var eventB = new VendorProductAssociated("FISH-FOOD-001", vendorBId, "admin", now);
+        var eventA = new VendorProductAssociated(
+            Sku: "BIRD-SEED-001",
+            VendorTenantId: vendorAId,
+            AssociatedBy: "admin",
+            AssociatedAt: now);
+        var eventB = new VendorProductAssociated(
+            Sku: "FISH-FOOD-001",
+            VendorTenantId: vendorBId,
+            AssociatedBy: "admin",
+            AssociatedAt: now);
 
         // Act
         await _fixture.ExecuteMessageAsync(eventA);

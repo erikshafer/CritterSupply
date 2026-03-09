@@ -31,9 +31,6 @@ public sealed class AssignProductToVendorTests : IAsyncLifetime
         await session.SaveChangesAsync();
     }
 
-    private static AddProduct MakeAddProductCommand(string sku) =>
-        new(sku, "Test Product", "A test product description", "Dogs");
-
     // ── GET vendor assignment ──────────────────────────────────────────────
 
     [Fact]
