@@ -1,6 +1,7 @@
 using FluentValidation;
 using Marten;
 using Messages.Contracts.ProductCatalog;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProductCatalog.Products;
 using Wolverine;
@@ -47,6 +48,7 @@ public static class GetVendorAssignmentHandler
     public static Task<Product?> Load(string sku, IDocumentSession session, CancellationToken ct)
         => session.LoadAsync<Product>(sku, ct);
 
+    [Authorize(Policy = "Admin")]
     [WolverineGet("/api/admin/products/{sku}/vendor-assignment")]
     public static IResult Handle(string sku, Product? product)
     {
@@ -112,6 +114,7 @@ public static class AssignProductToVendorHandler
     /// Returns an OutgoingMessages cascade so Wolverine tracks the integration event for testing.
     /// TODO(Phase 2): Replace "system" with the authenticated admin principal from HttpContext.
     /// </summary>
+    [Authorize(Policy = "Admin")]
     [WolverinePost("/api/admin/products/{sku}/vendor-assignment")]
     public static async Task<(IResult, OutgoingMessages)> Handle(
         string sku,
@@ -219,6 +222,7 @@ public sealed record BulkAssignmentResult(
 /// </summary>
 public static class BulkAssignProductsToVendorHandler
 {
+    [Authorize(Policy = "Admin")]
     [WolverinePost("/api/admin/products/vendor-assignments/bulk")]
     public static async Task<(IResult, OutgoingMessages)> Handle(
         BulkAssignProductsToVendor command,

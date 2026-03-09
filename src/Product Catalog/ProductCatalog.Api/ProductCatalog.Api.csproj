@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Marten" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="WolverineFx.Http.Marten" />
     <PackageReference Include="WolverineFx.Http.FluentValidation" />
     <PackageReference Include="WolverineFx.RabbitMQ" />

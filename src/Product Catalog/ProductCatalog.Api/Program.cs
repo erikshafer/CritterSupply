@@ -1,11 +1,14 @@
 using Marten;
 using Messages.Contracts.ProductCatalog;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using ProductCatalog.Products;
 using ProductCatalog.Shared;
+using System.Text;
 using Wolverine;
 using Wolverine.FluentValidation;
 using Wolverine.Http;
@@ -36,6 +39,38 @@ builder.Services.AddMarten(opts =>
 })
     .UseLightweightSessions()
     .IntegrateWithWolverine();
+
+// JWT Bearer authentication for admin endpoints.
+// Tokens are issued by VendorIdentity.Api (Phase 1: shared signing key; Phase 2: dedicated admin IdP).
+var jwtSigningKey = builder.Configuration["Jwt:SigningKey"]
+    ?? "dev-only-signing-key-change-in-production-must-be-at-least-32-chars";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "vendor-identity";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "vendor-portal";
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSigningKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+        };
+    });
+
+// Authorization policy: "Admin" requires a JWT with Role == "Admin".
+// Phase 2: replace with a dedicated admin identity provider and finer-grained policies.
+builder.Services.AddAuthorization(opts =>
+{
+    opts.AddPolicy("Admin", policy => policy
+        .RequireAuthenticatedUser()
+        .RequireRole("Admin"));
+});
 
 // Wolverine messaging and HTTP
 builder.Host.UseWolverine(opts =>
@@ -103,6 +138,9 @@ if (app.Environment.IsDevelopment())
         opts.SwaggerEndpoint("/api/v1/swagger.json", "Product Catalog API");
     });
 }
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Map Aspire default endpoints (/health, /alive)
 app.MapDefaultEndpoints();

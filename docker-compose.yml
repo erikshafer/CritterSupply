@@ -204,6 +204,9 @@ services:
       RabbitMQ__hostname: rabbitmq
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_SERVICE_NAME: ProductCatalog.Api
+      Jwt__SigningKey: "dev-only-signing-key-change-in-production-must-be-at-least-32-chars"
+      Jwt__Issuer: "vendor-identity"
+      Jwt__Audience: "vendor-portal"
     depends_on:
       postgres:
         condition: service_healthy

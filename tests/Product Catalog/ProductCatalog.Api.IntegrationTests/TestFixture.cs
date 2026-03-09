@@ -1,6 +1,11 @@
+using System.Security.Claims;
+using System.Text.Encodings.Web;
 using JasperFx.CommandLine;
 using Marten;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.Tracking;
@@ -46,6 +51,19 @@ public class TestFixture : IAsyncLifetime
 
                 // Disable external Wolverine transports for testing
                 services.DisableAllExternalWolverineTransports();
+
+                // Register the test auth scheme alongside (not replacing) the real JWT Bearer
+                // scheme, then use PostConfigure to set it as the default. This preserves the
+                // JWT Bearer registration for scenarios that may want to test real token validation
+                // while ensuring all admin endpoint tests automatically authenticate as Admin.
+                services.AddAuthentication()
+                    .AddScheme<AuthenticationSchemeOptions, AdminAuthHandler>(
+                        AdminAuthHandler.SchemeName, _ => { });
+                services.PostConfigure<AuthenticationOptions>(options =>
+                {
+                    options.DefaultAuthenticateScheme = AdminAuthHandler.SchemeName;
+                    options.DefaultChallengeScheme = AdminAuthHandler.SchemeName;
+                });
             });
         });
 
@@ -139,5 +157,35 @@ public class TestFixture : IAsyncLifetime
         });
 
         return (tracked, result);
+    }
+}
+
+/// <summary>
+/// Fake authentication handler used in integration tests.
+/// Automatically authenticates every request as an Admin user, satisfying the "Admin"
+/// authorization policy without requiring a real JWT. This keeps test code clean while
+/// still exercising the full authorization middleware pipeline.
+/// </summary>
+internal sealed class AdminAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+{
+    public const string SchemeName = "TestAdmin";
+
+    public AdminAuthHandler(
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder)
+        : base(options, logger, encoder) { }
+
+    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.Name, "test-admin"),
+            new Claim(ClaimTypes.Role, "Admin"),
+        };
+        var identity = new ClaimsIdentity(claims, SchemeName);
+        var principal = new ClaimsPrincipal(identity);
+        var ticket = new AuthenticationTicket(principal, SchemeName);
+        return Task.FromResult(AuthenticateResult.Success(ticket));
     }
 }
