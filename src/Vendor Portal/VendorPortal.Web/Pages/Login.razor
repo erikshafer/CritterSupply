@@ -10,7 +10,7 @@
 <MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
     <MudPaper Elevation="3" Class="pa-6">
         <div class="d-flex flex-column align-center mb-4">
-            <MudIcon Icon="@Icons.Material.Filled.Storefront"
+            <MudIcon Icon="@Icons.Material.Filled.Business"
                      Color="Color.Primary"
                      Style="font-size: 3rem;"
                      Class="mb-2" />
@@ -29,15 +29,28 @@
                           Required="true"
                           RequiredError="Email is required"
                           InputType="InputType.Email"
+                          autocomplete="username"
                           Class="mb-4" />
 
             <MudTextField @bind-Value="_password"
                           Label="Password"
                           Variant="Variant.Outlined"
-                          InputType="InputType.Password"
+                          InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                          OnAdornmentClick="() => _showPassword = !_showPassword"
+                          AdornmentAriaLabel="@(_showPassword ? "Hide password" : "Show password")"
                           Required="true"
                           RequiredError="Password is required"
+                          autocomplete="current-password"
                           Class="mb-4" />
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-4" aria-live="assertive">
+                    @_errorMessage
+                </MudAlert>
+            }
 
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
@@ -58,11 +71,12 @@
 
         <MudDivider Class="my-4" />
 
+        @* POC only — remove before staging deployment *@
         <MudAlert Severity="Severity.Info" Dense="true">
             <strong>Demo accounts</strong> (password: <em>password</em>)<br />
             Admin: <code>admin@acmepets.test</code><br />
-            CatalogManager: <code>catalog@acmepets.test</code><br />
-            ReadOnly: <code>readonly@acmepets.test</code>
+            Catalog Manager: <code>catalog@acmepets.test</code><br />
+            Read Only: <code>readonly@acmepets.test</code>
         </MudAlert>
     </MudPaper>
 </MudContainer>
@@ -72,7 +86,9 @@
     private bool _isValid;
     private string _email = "";
     private string _password = "";
+    private string? _errorMessage;
     private bool _isLoading;
+    private bool _showPassword;
 
     [Parameter, SupplyParameterFromQuery(Name = "returnUrl")]
     public string? ReturnUrl { get; set; }
@@ -92,6 +108,7 @@
         if (!_isValid) return;
 
         _isLoading = true;
+        _errorMessage = null;
         StateHasChanged();
 
         try
@@ -104,7 +121,8 @@
             }
             else
             {
-                Snackbar.Add("Invalid email or password.", Severity.Error);
+                // Inline persistent error — not a Snackbar (inaccessible for auth failures)
+                _errorMessage = "Invalid email or password. Please try again.";
             }
         }
         finally

@@ -73,7 +73,7 @@ public sealed class VendorRefreshEndpoint
         {
             HttpOnly = true,
             SameSite = SameSiteMode.Strict,
-            Secure = !httpContext.Request.IsHttps ? false : true, // POC: always true in production (HTTPS)
+            Secure = httpContext.Request.IsHttps, // POC: always true in production (HTTPS)
             Expires = DateTimeOffset.UtcNow.AddDays(7),
             Path = "/api/vendor-identity/auth"
         });

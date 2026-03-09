@@ -17,23 +17,26 @@
             <MudSpacer />
 
             <MudTooltip Text="@HubStatusText">
-                <MudIcon Icon="@Icons.Material.Filled.Circle"
+                <MudIcon Icon="@HubStatusIcon"
                          Color="@HubStatusColor"
                          Size="Size.Small"
-                         Class="mr-2" />
+                         Class="mr-2"
+                         aria-label="@HubStatusText" />
             </MudTooltip>
 
             <MudText Typo="Typo.body2" Class="mr-2">
                 @AuthState.FirstName — @AuthState.TenantName
             </MudText>
 
-            <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Class="mr-2">
-                @AuthState.Role
+            <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Class="mr-2"
+                     aria-label="@($"Your role: {AuthState.RoleDisplayName}")">
+                @AuthState.RoleDisplayName
             </MudChip>
 
             <MudIconButton Icon="@Icons.Material.Filled.Logout"
                            Color="Color.Inherit"
                            Title="Sign Out"
+                           aria-label="Sign Out"
                            OnClick="HandleLogout" />
         }
     </MudAppBar>
@@ -55,6 +58,13 @@
 
         TokenRefreshService.Start();
     }
+
+    private string HubStatusIcon => HubService.State switch
+    {
+        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected => Icons.Material.Filled.Circle,
+        Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Reconnecting => Icons.Material.Outlined.Circle,
+        _ => Icons.Material.Filled.Cancel
+    };
 
     private Color HubStatusColor => HubService.State switch
     {

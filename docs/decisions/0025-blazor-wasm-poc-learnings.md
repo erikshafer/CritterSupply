@@ -53,5 +53,40 @@ Implement a minimal POC covering JWT login/refresh/logout (VendorIdentity.Api), 
 
 **References:**
 - Cycle 22 Phase 2 implementation
+- `docs/skills/blazor-wasm-jwt.md` — WASM + JWT patterns and gotchas skill doc
 - `docs/skills/wolverine-signalr.md` — SignalR hub patterns
 - `docs/skills/bff-realtime-patterns.md` — BFF composition patterns
+
+---
+
+## UX Review Findings (Phase 3 Backlog)
+
+A UX Engineer review of the POC identified the following items ordered by severity. Critical items were addressed immediately; the rest are Phase 3 backlog.
+
+### Fixed in POC (applied after UX review)
+- ✅ Login icon changed from `Storefront` → `Business` (correct B2B brand signal)
+- ✅ Auth error is now an inline `MudAlert` with `aria-live="assertive"` (not a dismissable Snackbar)
+- ✅ Password visibility toggle added (`AdornmentIcon` pattern)
+- ✅ `autocomplete="username"` and `autocomplete="current-password"` added to login fields
+- ✅ KPI cards reordered urgency-first: Alerts → Pending CRs → Total SKUs
+- ✅ KPI card color is dynamic (red when count > 0, green when 0)
+- ✅ KPI cards have `aria-label` with count for screen readers
+- ✅ Hub status icon now uses shape + color (not color-only) for accessibility
+- ✅ Hub status dot has `aria-label` (not just tooltip)
+- ✅ `RoleDisplayName` property added for human-readable role names ("Catalog Manager" not "CatalogManager")
+- ✅ Role chip uses `RoleDisplayName` + `aria-label`
+- ✅ Logout button has `aria-label` in addition to `Title`
+- ✅ Debug "Real-Time Connection" panel removed from production UI
+- ✅ POC Note alert removed from Dashboard
+- ✅ ReadOnly users shown what they _can_ do (not just what they can't)
+
+### Phase 3 Must-Fix (pre-launch)
+- 🔴 **Tab Visibility API**: Wire JS `visibilitychange` event → `TokenRefreshService.CheckAndRefreshIfNeededAsync()`. Without this, ambient-mode users on backgrounded tabs will have silent expired sessions.
+- 🔴 **Session Expiry Modal**: Replace the 401 Snackbar with a non-dismissable modal overlay ("Session Expired → Sign In again → Returns to same page").
+- 🔴 **Navigation Shell**: Persistent left sidebar with role-filtered nav items, alert badge count, and mobile hamburger drawer — must be built before Phase 3 pages are added.
+- 🔴 **"Forgot Password?" link**: Required before go-live. The invite-based onboarding creates system-set passwords; vendors need self-service reset.
+- 🟡 **On-startup session restore**: Call `/auth/refresh` at app startup to silently restore sessions after page reload (using the HttpOnly refresh cookie).
+- 🟡 **KPI card click-through**: Each card navigates to the filtered list (e.g., "7 Pending CRs" → `/requests?status=pending`).
+- 🟡 **"Data as of" timestamp**: Show projection freshness timestamp below the KPI grid.
+- 🟡 **Empty states**: New vendor with 0 SKUs needs a guided empty state ("Your catalog is being set up...").
+- 🟡 **Role change mid-session**: `VendorUserRoleChanged` SignalR push should trigger token refresh to reflect new role without logout.

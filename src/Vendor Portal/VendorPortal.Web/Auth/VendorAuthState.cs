@@ -69,4 +69,13 @@ public sealed class VendorAuthState
     public bool IsCatalogManager => Role is "Admin" or "CatalogManager";
     public bool CanSubmitChangeRequests => Role is "Admin" or "CatalogManager";
     public bool CanManageUsers => Role == "Admin";
+
+    /// <summary>Human-readable display name for the role (not a raw enum identifier).</summary>
+    public string RoleDisplayName => Role switch
+    {
+        "Admin" => "Admin",
+        "CatalogManager" => "Catalog Manager",
+        "ReadOnly" => "Read Only",
+        _ => Role ?? "Unknown"
+    };
 }
