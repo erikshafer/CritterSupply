@@ -2,7 +2,7 @@
 
 **Status:** ✅ Accepted
 
-**Date:** 2026-06-15
+**Date:** 2026-03-09
 
 **Context:**
 Cycle 22 Phase 2 introduces the Vendor Portal as CritterSupply's first Blazor WebAssembly frontend. Unlike Storefront.Web (Blazor Server), WASM runs entirely in the browser. This creates fundamental differences in authentication, HTTP client setup, and background service patterns that must be documented before full implementation.

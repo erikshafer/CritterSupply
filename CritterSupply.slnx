@@ -43,6 +43,7 @@
     <File Path="docs/skills/testcontainers-integration-tests.md" />
     <File Path="docs/skills/vertical-slice-organization.md" />
     <File Path="docs/skills/wolverine-message-handlers.md" />
+    <File Path="docs/skills/blazor-wasm-jwt.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Workflows/">
     <File Path="docs/workflows/customer-experience-workflows.md" />
@@ -91,6 +92,11 @@
     <File Path="docs\decisions\0005-mudblazor-ui-framework.md" />
     <File Path="docs\decisions\0006-reqnroll-bdd-framework.md" />
     <File Path="docs\decisions\0013-signalr-migration-from-sse.md" />
+    <File Path="docs/decisions/0021-blazor-wasm-for-vendor-portal-web.md" />
+    <File Path="docs/decisions/0022-wolverine-http-route-parameter-binding.md" />
+    <File Path="docs/decisions/0023-feature-based-organization-for-ef-core-bcs.md" />
+    <File Path="docs/decisions/0024-sha256-token-hashing-vendor-invitations.md" />
+    <File Path="docs/decisions/0025-blazor-wasm-poc-learnings.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Features/">
     <File Path="docs\features\customer-experience\cart-real-time-updates.feature" />

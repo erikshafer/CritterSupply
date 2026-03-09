@@ -692,6 +692,25 @@ Covers:
 - Marten projection side effects → Wolverine → SignalR pipeline
 - Anti-patterns: hand-rolled broadcasters, query-string identity, missing `IAsyncDisposable`
 
+### When Building Blazor WASM Frontends with JWT
+
+For Blazor WebAssembly projects using JWT authentication (Vendor Portal pattern):
+
+**Read:** `docs/skills/blazor-wasm-jwt.md`
+
+Covers:
+- `Microsoft.NET.Sdk.BlazorWebAssembly` SDK and `wwwroot/index.html` static entry point
+- Named `HttpClient` registrations with explicit `BaseAddress` (cross-origin in WASM)
+- `AddAuthorizationCore()` (not `AddAuthorization()`) for WASM
+- In-memory JWT storage (`VendorAuthState`) — never localStorage (XSS risk)
+- Custom `AuthenticationStateProvider` reading from in-memory state
+- Background token refresh via `System.Threading.Timer` (no `IHostedService` in WASM)
+- SignalR `AccessTokenProvider` delegate for reconnect-safe JWT auth
+- Browser tab throttling and on-resume token expiry check
+- RBAC: role-based UI with server-side enforcement
+- CORS `AllowCredentials()` for cross-origin HttpOnly refresh token cookie
+- Key differences from Storefront.Web (Blazor Server)
+
 ### When Organizing Code
 
 For file structure and vertical slice organization:
@@ -854,6 +873,8 @@ See [DEVPROGRESS.md](./DEVPROGRESS.md) for current development status.
 | `efcore-wolverine-integration.md` | Entity Framework Core with Wolverine |
 | `external-service-integration.md` | Strategy pattern, graceful degradation |
 | `bff-realtime-patterns.md` | Backend-for-Frontend, real-time updates (SSE + SignalR) |
+| `wolverine-signalr.md` | Wolverine SignalR transport, hub auth, group routing, WASM client |
+| `blazor-wasm-jwt.md` | Blazor WASM + JWT: named HTTP clients, in-memory tokens, SignalR AccessTokenProvider, RBAC |
 | `vertical-slice-organization.md` | File structure, colocation patterns |
 | `modern-csharp-coding-standards.md` | C# language features, immutability |
 | `critterstack-testing-patterns.md` | Unit and integration testing |
