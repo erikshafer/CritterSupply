@@ -118,13 +118,8 @@ public sealed record ProductPrice
         return new Guid(hash[..16]);
     }
 
-    // ========== Apply Methods ==========
-    // Pure functions: (CurrentState, Event) → NewState
-    // No side effects, no validation (validation in handlers per A-Frame pattern)
-
-    public ProductPrice Apply(InitialPriceSet evt)
-    {
-        return this with
+    public ProductPrice Apply(InitialPriceSet evt) =>
+        this with
         {
             Status = PriceStatus.Published,
             BasePrice = evt.Price,
@@ -132,22 +127,18 @@ public sealed record ProductPrice
             CeilingPrice = evt.CeilingPrice,
             LastChangedAt = evt.PricedAt
         };
-    }
 
-    public ProductPrice Apply(PriceChanged evt)
-    {
-        return this with
+    public ProductPrice Apply(PriceChanged evt) =>
+        this with
         {
             BasePrice = evt.NewPrice,
             PreviousBasePrice = evt.OldPrice,
             PreviousPriceSetAt = evt.PreviousPriceSetAt,
             LastChangedAt = evt.ChangedAt
         };
-    }
 
-    public ProductPrice Apply(PriceChangeScheduled evt)
-    {
-        return this with
+    public ProductPrice Apply(PriceChangeScheduled evt) =>
+        this with
         {
             PendingSchedule = new ScheduledPriceChange
             {
@@ -158,19 +149,15 @@ public sealed record ProductPrice
                 ScheduledAt = evt.ScheduledAt
             }
         };
-    }
 
-    public ProductPrice Apply(ScheduledPriceChangeCancelled evt)
-    {
-        return this with
+    public ProductPrice Apply(ScheduledPriceChangeCancelled evt) =>
+        this with
         {
             PendingSchedule = null
         };
-    }
 
-    public ProductPrice Apply(ScheduledPriceActivated evt)
-    {
-        return this with
+    public ProductPrice Apply(ScheduledPriceActivated evt) =>
+        this with
         {
             BasePrice = evt.ActivatedPrice,
             PreviousBasePrice = BasePrice,
@@ -178,40 +165,31 @@ public sealed record ProductPrice
             PendingSchedule = null,
             LastChangedAt = evt.ActivatedAt
         };
-    }
 
-    public ProductPrice Apply(FloorPriceSet evt)
-    {
-        return this with
+    public ProductPrice Apply(FloorPriceSet evt) =>
+        this with
         {
             FloorPrice = evt.FloorPrice
         };
-    }
 
-    public ProductPrice Apply(CeilingPriceSet evt)
-    {
-        return this with
+    public ProductPrice Apply(CeilingPriceSet evt) =>
+        this with
         {
             CeilingPrice = evt.CeilingPrice
         };
-    }
 
-    public ProductPrice Apply(PriceCorrected evt)
-    {
-        return this with
+    public ProductPrice Apply(PriceCorrected evt) =>
+        this with
         {
             BasePrice = evt.CorrectedPrice,
             PreviousBasePrice = evt.PreviousPrice,
             LastChangedAt = evt.CorrectedAt
         };
-    }
 
-    public ProductPrice Apply(PriceDiscontinued evt)
-    {
-        return this with
+    public ProductPrice Apply(PriceDiscontinued evt) =>
+        this with
         {
             Status = PriceStatus.Discontinued,
-            PendingSchedule = null  // Clear any pending schedules
+            PendingSchedule = null
         };
-    }
 }
