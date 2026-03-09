@@ -2,7 +2,7 @@
 
 **Decision:** D1 — Variant Model Shape  
 **Resolution:** ✅ Option A — One Parent ProductFamily + N Child Variant SKU Records  
-**Date:** 2026-06-14  
+**Date:** 2026-03-09  
 **Authors:** Principal Software Architect · Product Owner · UX Engineer  
 **Status:** 🟢 Fully Endorsed — All three sign-offs complete. Ready for Phase 3 implementation.
 
@@ -1031,7 +1031,7 @@ The following questions remain open after D1. They are ordered by phase dependen
 ## 9. Product Owner Sign-Off & Business Validation
 
 **Author:** Product Owner  
-**Date:** 2026-06-14  
+**Date:** 2026-03-09  
 **Status:** ✅ Business Endorsed — Proceed to Phase 3 implementation
 
 ---
@@ -1569,4 +1569,4 @@ The following business policy questions require Owner input. D1 is fully resolve
 
 ---
 
-*This Product Owner section was added 2026-06-14 as part of the D1 formal sign-off process. It is the business counterpart to the Principal Architect's technical implementation guide in Sections 1–8. Both sections together constitute the full D1 decision record for CritterSupply.*
+*This Product Owner section was added 2026-03-09 as part of the D1 formal sign-off process. It is the business counterpart to the Principal Architect's technical implementation guide in Sections 1–8. Both sections together constitute the full D1 decision record for CritterSupply.*
