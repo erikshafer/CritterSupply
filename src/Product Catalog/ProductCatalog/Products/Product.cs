@@ -113,14 +113,14 @@ public sealed record Product
     /// Assigns this product to a vendor tenant.
     /// Used by the admin AssignProductToVendor endpoint.
     /// </summary>
-    public Product AssignToVendor(Guid vendorTenantId, string assignedBy)
+    public Product AssignToVendor(Guid vendorTenantId, string assignedBy, DateTimeOffset assignedAt)
     {
         return this with
         {
             VendorTenantId = vendorTenantId,
             AssignedBy = assignedBy,
-            AssignedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            AssignedAt = assignedAt,
+            UpdatedAt = assignedAt
         };
     }
 

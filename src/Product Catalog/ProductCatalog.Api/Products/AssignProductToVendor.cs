@@ -136,7 +136,7 @@ public static class AssignProductToVendorHandler
         var assignedAt = DateTimeOffset.UtcNow;
 
         // Persist the assignment on the Product document.
-        var updated = product.AssignToVendor(command.VendorTenantId, assignedBy);
+        var updated = product.AssignToVendor(command.VendorTenantId, assignedBy, assignedAt);
         session.Store(updated);
         await session.SaveChangesAsync(ct);
 
@@ -273,7 +273,7 @@ public static class BulkAssignProductsToVendorHandler
             }
 
             var previousVendorTenantId = product.VendorTenantId;
-            var updated = product.AssignToVendor(item.VendorTenantId, assignedBy);
+            var updated = product.AssignToVendor(item.VendorTenantId, assignedBy, assignedAt);
 
             // Update the in-memory dictionary so duplicate SKUs in the same batch are handled
             // correctly. If a client sends the same SKU twice with different VendorTenantIds,
