@@ -564,6 +564,23 @@ docker-compose --profile all build --no-cache
 
 ---
 
+## How Skill Files Work with AI Agents
+
+**For AI agents reading this file:** This `CLAUDE.md` is your automatically-loaded configuration. Individual skill files (in `docs/skills/`) are **not** auto-loaded — you must proactively fetch them using your file-reading tools when the Skill Invocation Guide below says to do so.
+
+**For humans configuring AI tools:**
+
+| Tool | How skill files reach the AI |
+|------|------------------------------|
+| **Copilot Coding Agent** (GitHub Issues) | This file is auto-loaded; agent fetches skill files on demand based on guidance below |
+| **Copilot Chat** (IDE) | Use `#file:docs/skills/your-skill.md` to explicitly include a skill |
+| **Claude Desktop** (Project) | Upload skill `.md` files to Project Knowledge; copy this file into Project Instructions |
+| **Any chat AI** (ad-hoc) | Copy-paste the relevant skill file content directly into your prompt |
+
+See `docs/skills/README.md` → *"How AI Agents Use Skill Files"* for a full guide.
+
+---
+
 ## Skill Invocation Guide
 
 Skills provide detailed patterns and examples. Read the appropriate skill **before** implementing.
