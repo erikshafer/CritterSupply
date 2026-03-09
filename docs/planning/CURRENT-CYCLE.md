@@ -14,16 +14,16 @@
 ---
 
 **Cycle:** 22 — Vendor Portal + Vendor Identity Phase 1
-**Status:** 📋 **READY TO START** (Pre-planning complete)
+**Status:** 🚀 **IN PROGRESS** (Issues created, ready to implement)
 **GitHub Milestone:** [Cycle 22: Vendor Portal + Vendor Identity Phase 1](https://github.com/erikshafer/CritterSupply/milestone/16)
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
-**Epic Issue:** TBD (to be created)
+**Epic Issue:** [#249](https://github.com/erikshafer/CritterSupply/issues/249)
 
 ---
 
 ## Current Status
 
-**Cycle 22 is ready to begin!** Vendor Portal + Vendor Identity Phase 1 will establish the infrastructure foundation for vendor-facing features (no UI yet).
+**Cycle 22 has begun!** Vendor Portal + Vendor Identity Phase 1 will establish the infrastructure foundation for vendor-facing features (no UI yet).
 
 **Priority #1:** VendorProductCatalog (the load-bearing pillar) — SKU→VendorTenantId lookup that enables all analytics and change request invariants.
 
@@ -36,7 +36,31 @@
 - VendorPortal.Api skeleton with RabbitMQ subscriptions
 - Integration tests (full round-trip testable with no UI)
 
-**Phase 1 Tasks:** Issues TBD (to be created from event modeling checklist)
+**Phase 1 Tasks (17 issues created):**
+
+### Vendor Identity (4 issues)
+- [#254](https://github.com/erikshafer/CritterSupply/issues/254): Create EF Core project structure + migrations
+- [#255](https://github.com/erikshafer/CritterSupply/issues/255): Implement CreateVendorTenant command + handler
+- [#256](https://github.com/erikshafer/CritterSupply/issues/256): Implement InviteVendorUser command + handler
+- [#257](https://github.com/erikshafer/CritterSupply/issues/257): Write integration tests for Vendor Identity BC
+
+### Vendor Portal (4 issues)
+- [#270](https://github.com/erikshafer/CritterSupply/issues/270): Create domain + API project structure
+- [#271](https://github.com/erikshafer/CritterSupply/issues/271): Implement VendorProductCatalog document + projection
+- [#272](https://github.com/erikshafer/CritterSupply/issues/272): Configure RabbitMQ subscriptions in VendorPortal.Api
+- [#273](https://github.com/erikshafer/CritterSupply/issues/273): Write integration tests for VendorPortal BC
+
+### Product Catalog (4 issues)
+- [#286](https://github.com/erikshafer/CritterSupply/issues/286): Add VendorProductAssociated integration event
+- [#287](https://github.com/erikshafer/CritterSupply/issues/287): Implement AssignProductToVendor admin endpoint
+- [#288](https://github.com/erikshafer/CritterSupply/issues/288): Implement BulkAssignProductsToVendor command
+- [#289](https://github.com/erikshafer/CritterSupply/issues/289): Write integration tests for vendor assignment
+
+### Infrastructure (4 issues)
+- [#302](https://github.com/erikshafer/CritterSupply/issues/302): Update Messages.Contracts with VendorIdentity namespace
+- [#303](https://github.com/erikshafer/CritterSupply/issues/303): Update docker-compose.yml with vendoridentity-api + vendorportal-api
+- [#304](https://github.com/erikshafer/CritterSupply/issues/304): Update CONTEXTS.md: validate Phase 1 integration contracts
+- [#305](https://github.com/erikshafer/CritterSupply/issues/305): Update .slnx with new Vendor Portal + Vendor Identity projects
 
 **Next cycles:**
 - **Cycle 23:** Vendor Portal Phase 2 — JWT auth + SignalR hub + static analytics dashboard
@@ -46,7 +70,7 @@
 
 ## Recently Completed
 
-- ✅ **Cycle 21:** Pricing BC Phase 1 (2026-03-07 to 2026-03-08)
+- ✅ **Cycle 21:** Pricing BC Phase 1 (2026-03-07 to 2026-03-08) — **MILESTONE CLOSED**
   - ProductPrice event-sourced aggregate (UUID v5 deterministic stream ID)
   - Money value object (140 unit tests)
   - CurrentPriceView inline projection (zero-lag queries)
@@ -54,7 +78,8 @@
   - 5 ADRs written (UUID v5, price freeze, Money VO, bulk jobs, MAP vs Floor)
   - 151 Pricing tests + 56 Shopping tests (all passing)
   - Docker Compose integration
-  - [Plan](pricing-event-modeling.md) | [Retrospective](./cycles/cycle-21-retrospective.md) | [Milestone](https://github.com/erikshafer/CritterSupply/milestone/15)
+  - 11 issues closed (all deliverables complete)
+  - [Plan](pricing-event-modeling.md) | [Retrospective](./cycles/cycle-21-retrospective.md) | [Milestone](https://github.com/erikshafer/CritterSupply/milestone/15) (closed)
 
 - ✅ **Cycle 20:** Automated Browser Testing (2026-03-04 to 2026-03-07)
   - Playwright + Reqnroll E2E testing infrastructure
@@ -138,5 +163,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-08 (Cycle 21 complete, Cycle 22 ready to start — Vendor Portal + Vendor Identity Phase 1)*
+*Last Updated: 2026-03-08 (Cycle 21 closed, Cycle 22 in progress — 17 issues created for Vendor Portal + Vendor Identity Phase 1)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*
