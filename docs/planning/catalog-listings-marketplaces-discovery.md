@@ -2,9 +2,9 @@
 ## Discovery Session: Product Owner + UX Engineer
 
 **Document Owner:** Product Owner (primary), UX Engineer (addendum)
-**Status:** 🟡 Draft — PSA synthesis complete; Awaiting Owner/Erik decisions (D1–D10)
+**Status:** 🟡 Active — D1 ✅ decided (2026-03-09); D4 ✅ decided (PSA); D5 ✅ decided (PSA); D2, D3, D6, D7, D8, D9, D10 awaiting Owner/Erik
 **Date:** 2026-03-09
-**Last Updated:** 2026-03-09 (PO + UX outputs merged)
+**Last Updated:** 2026-03-09 (PO + UX outputs merged; D1 Owner decision recorded)
 **Triggered by:** Owner request to evolve Product Catalog BC toward multi-channel marketplace selling
 **Source documents:**
 - [`CONTEXTS.md`](../../CONTEXTS.md) — Product Catalog BC section
@@ -14,6 +14,7 @@
 **Companion documents:**
 - Principal Engineer synthesis: [`catalog-listings-marketplaces-evolution-plan.md`](catalog-listings-marketplaces-evolution-plan.md) ✅
 - Ubiquitous language glossary: [`catalog-listings-marketplaces-glossary.md`](catalog-listings-marketplaces-glossary.md) ✅
+- D1 variant model decision + all sign-offs: [`catalog-variant-model.md`](catalog-variant-model.md) ✅
 - ADR candidates *(to be authored after Owner decisions)*
 
 ---
@@ -145,7 +146,7 @@ When a vendor supplies a dog collar in five colors and three sizes (15 combinati
 
 Option (a) is the Amazon/Shopify model. Option (b) is simpler but loses the shared content benefit. Option (c) creates a very complex document.
 
-> **🔴 Owner/Erik Decision Required:** What is the variant model for CritterSupply? This decision has cascading effects on Listings, Inventory, Pricing, and the storefront experience.
+> **✅ Decision Made (2026-03-09):** **Option A — One parent `ProductFamily` + N child variant SKU records (parent/child hierarchy).** Example: Parent "AquaPaws Fountain" → Children: SKU-SM, SKU-MD, SKU-LG. See [`catalog-variant-model.md`](catalog-variant-model.md) for full PSA technical design, PO business validation, and UX sign-off.
 
 **Q2: Can variants have different prices, weights, and images?**  
 A 5-lb bag of dog food and a 20-lb bag of the same dog food are variants. But they have different prices, different weights (critical for shipping), potentially different primary images, and possibly different inventory levels. How much do variants diverge before they become their own unrelated products?
@@ -223,7 +224,7 @@ The internal categories (Dogs, Cats, Fish, Birds, etc.) need to be managed somew
 **Q12: How does internal categorization map to marketplace category trees?**  
 Amazon has over 10,000 browse nodes. Walmart has a different hierarchy. eBay has yet another. Our internal "Dogs > Bowls" needs to map to Amazon `2975448011`, Walmart `pet_bowls`, eBay `66792`. Who maintains these mappings? When Amazon reorganizes their taxonomy (which they do regularly), how do we detect the change and update the mapping?
 
-> **🔴 Owner/Erik Decision Required:** Does category-to-marketplace mapping live in Product Catalog BC (as a subdomain) or in Marketplaces BC (as a marketplace-owned concern)?
+> **✅ Decided (PSA — no Owner input required):** Category-to-marketplace mapping lives in **Marketplaces BC**. Change rate follows the marketplace, not the catalog. See `catalog-listings-marketplaces-evolution-plan.md` §4.3 for rationale.
 
 ---
 
@@ -371,7 +372,7 @@ This is the most fundamental design question for this BC. Let me think through t
 - **Database record** (document or relational): Full lifecycle management. We can add, suspend, or retire marketplaces through API operations. Supports audit trail. Appropriate if marketplaces are expected to come and go.
 - **Event-sourced aggregate**: Captures every configuration change, credential rotation, and status transition over time. Probably overkill unless we need full audit history of marketplace configuration changes.
 
-> **🔴 Owner/Erik Decision Required:** What is the expected "rate of change" for marketplace configuration? If we add a marketplace once every two years and never change credentials in the system, an enum is fine. If we're actively managing credentials, rate limits, and schema versions across six marketplaces simultaneously, we need a proper aggregate.
+> **✅ Decided (PSA — no Owner input required):** Marketplace is a **Marten document entity** with a stable `ChannelCode` string (`AMAZON_US`, `EBAY_US`, `WALMART_US`, `OWN_WEBSITE`). Not an enum (too rigid), not an event-sourced aggregate (overkill for config). See `catalog-listings-marketplaces-evolution-plan.md` §4.1 for rationale.
 
 **Q2: What is the lifecycle of a Marketplace?**  
 Proposed lifecycle:
@@ -708,18 +709,18 @@ In priority order:
 
 The following decisions are flagged **Owner/Erik must decide** throughout this document. Consolidated here for convenience:
 
-| # | Decision | Context | Impact if Deferred |
-|---|----------|---------|-------------------|
-| D1 | Variant model (parent-child vs. standalone with family link vs. embedded) | Section 2.1 Q1 | Blocks Listings BC design entirely |
-| D2 | Is our own website a formal "channel" in the Listings model? | Section 3.2 Q6 | Determines Listings BC scope for Phase 1 |
-| D3 | Does Listings BC own marketplace API integration, or is there an adapter layer? | Section 3.4 Q12 | Determines failure handling architecture |
-| D4 | Is a Marketplace an aggregate (event-sourced or document) or configuration/enum? | Section 4.1 Q1 | Determines Marketplaces BC complexity |
-| D5 | Does category-to-marketplace mapping live in Product Catalog BC or Marketplaces BC? | Section 2.4 Q12 | Critical for taxonomy change cascade workflow |
-| D6 | Are credentials managed in Marketplaces BC or infrastructure (Vault)? | Section 4.2 Q5 | Security posture and operational responsibility |
-| D7 | Is lot/batch tracking in scope for Inventory BC? | Section 5 Workflow 3 | Determines precision of product recall scope |
-| D8 | Compliance metadata — required at Listings BC launch or deferrable? | Section 2.3 Q9 | Amazon will reject listings without hazmat data |
-| D9 | Automated seasonal product reactivation vs. manual | Section 2.2 Q5 | Operational overhead for seasonal catalog |
-| D10 | Schema versioning for marketplace attribute definitions | Section 4.2 Q8 | Risk: breaking listings on marketplace API version changes |
+| # | Decision | Context | Status | Impact if Deferred |
+|---|----------|---------|--------|-------------------|
+| D1 | Variant model (parent-child vs. standalone with family link vs. embedded) | Section 2.1 Q1 | ✅ **Decided** — Option A: parent/child hierarchy ([details](catalog-variant-model.md)) | ~~Blocks Listings BC design entirely~~ — unblocked |
+| D2 | Is our own website a formal "channel" in the Listings model? | Section 3.2 Q6 | 🔴 **Owner decision required** | Determines Listings BC scope for Phase 1 |
+| D3 | Does Listings BC own marketplace API integration, or is there an adapter layer? | Section 3.4 Q12 | 🔴 **Owner decision required** | Determines failure handling architecture |
+| D4 | Is a Marketplace an aggregate (event-sourced or document) or configuration/enum? | Section 4.1 Q1 | ✅ **Decided** (PSA) — Marten document entity; no Owner input needed | ~~Determines Marketplaces BC complexity~~ — resolved |
+| D5 | Does category-to-marketplace mapping live in Product Catalog BC or Marketplaces BC? | Section 2.4 Q12 | ✅ **Decided** (PSA) — Marketplaces BC owns it; no Owner input needed | ~~Critical for taxonomy change cascade workflow~~ — resolved |
+| D6 | Are credentials managed in Marketplaces BC or infrastructure (Vault)? | Section 4.2 Q5 | 🟡 **Owner decision required** | Security posture and operational responsibility |
+| D7 | Is lot/batch tracking in scope for Inventory BC? | Section 5 Workflow 3 | 🟡 **Owner decision required** | Determines precision of product recall scope |
+| D8 | Compliance metadata — required at Listings BC launch or deferrable? | Section 2.3 Q9 | 🔴 **Owner decision required** | Amazon will reject listings without hazmat data |
+| D9 | Automated seasonal product reactivation vs. manual | Section 2.2 Q5 | 🟡 **Owner decision required** | Operational overhead for seasonal catalog |
+| D10 | Schema versioning for marketplace attribute definitions | Section 4.2 Q8 | 🟡 **Owner decision required** | Risk: breaking listings on marketplace API version changes |
 
 ---
 
