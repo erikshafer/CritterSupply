@@ -155,10 +155,9 @@ public sealed record ProductFamily
     public ProductFamily Apply(ProductVariantRemoved @event) =>
         this with
         {
-            VariantSkus = VariantSkus
-                .Where(sku => !string.Equals(sku, @event.VariantSku, StringComparison.OrdinalIgnoreCase))
-                .ToList()
-                .AsReadOnly(),
+            // Filter then collect using a collection expression — single allocation, no double-wrap.
+            VariantSkus = [.. VariantSkus
+                .Where(sku => !string.Equals(sku, @event.VariantSku, StringComparison.OrdinalIgnoreCase))],
             UpdatedAt = @event.RemovedAt
         };
 
@@ -284,6 +283,7 @@ public sealed class AddVariantToFamilyValidator : AbstractValidator<AddVariantTo
     {
         RuleFor(x => x.FamilyId).NotEmpty();
         RuleFor(x => x.VariantSku).NotEmpty()
+            // Constant extracted to SkuValidation.Pattern in production — shown inline here for clarity.
             .Matches(@"^[A-Z0-9\-]+$").WithMessage("SKU must be uppercase alphanumeric with hyphens.");
         RuleFor(x => x.Attributes).NotNull().NotEmpty()
             .WithMessage("At least one variant attribute is required (e.g., Size or Color).");
@@ -304,10 +304,10 @@ public static class AddVariantToFamilyHandler
         var productStreamId = Product.StreamId(command.VariantSku);  // catalog:{sku} UUID v5
 
         var family = await session.Events.AggregateStreamAsync<ProductFamily>(familyStreamId, token: ct)
-            ?? throw new InvalidOperationException($"ProductFamily {command.FamilyId} not found.");
+            ?? throw new InvalidOperationException($"ProductFamily {command.FamilyId} not found. Ensure the family was created before adding variants.");
 
         var product = await session.Events.AggregateStreamAsync<Product>(productStreamId, token: ct)
-            ?? throw new InvalidOperationException($"Product {command.VariantSku} not found in catalog.");
+            ?? throw new InvalidOperationException($"Product with SKU '{command.VariantSku}' not found in catalog. Ensure the product was added via AddProduct before assigning it to a family.");
 
         return (family, product);
     }
@@ -401,9 +401,9 @@ public sealed record VariantAttributes
         ArgumentNullException.ThrowIfNull(values);
         if (values.Count == 0) throw new ArgumentException("VariantAttributes cannot be empty.", nameof(values));
 
-        // Normalize keys: trim whitespace, PascalCase first letter.
+        // Normalize keys: trim whitespace, PascalCase first letter. Filter empty/whitespace keys and values.
         var normalized = values
-            .Where(kv => !string.IsNullOrWhiteSpace(kv.Key) && kv.Value is not null)
+            .Where(kv => !string.IsNullOrWhiteSpace(kv.Key) && !string.IsNullOrWhiteSpace(kv.Value))
             .ToDictionary(
                 kv => NormalizeKey(kv.Key),
                 kv => kv.Value.Trim(),
@@ -435,7 +435,10 @@ public sealed record VariantAttributes
     private static string NormalizeKey(string key)
     {
         var trimmed = key.Trim();
-        return trimmed.Length == 0 ? trimmed : char.ToUpperInvariant(trimmed[0]) + trimmed[1..];
+        // Length <= 1: single char → just uppercase it (trimmed[1..] would be empty anyway, but this is explicit).
+        return trimmed.Length <= 1
+            ? trimmed.ToUpperInvariant()
+            : char.ToUpperInvariant(trimmed[0]) + trimmed[1..];
     }
 
     // Record equality is structural via Values comparison (FrozenDictionary implements IEquatable).
@@ -469,7 +472,7 @@ public sealed class VariantAttributesJsonConverter : JsonConverter<VariantAttrib
         ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(ref reader, options)
-            ?? throw new JsonException("Cannot deserialize VariantAttributes from null.");
+            ?? throw new JsonException("JSON input is null or empty when deserializing VariantAttributes. Ensure the JSON property is a non-null object (e.g., { \"Size\": \"Large\" }).");
         return dict.Count == 0 ? VariantAttributes.Empty : VariantAttributes.From(dict);
     }
 
@@ -723,6 +726,12 @@ public static Guid StreamId(string sku)
 {
     // UUID v5 (RFC 4122 §4.3) — deterministic, namespaced SHA-1.
     // See ADR 0016 for full rationale. See ADR 0023 for 'catalog:' namespace prefix.
+    //
+    // NAMESPACE: RFC 4122 URL namespace UUID (6ba7b810-9dad-11d1-80b4-00c04fd430c8).
+    // This is the well-known UUID for the URL namespace defined in RFC 4122 Appendix C.
+    // Used here as the base namespace for all CritterSupply UUID v5 derivations.
+    // Each BC uses a different string prefix ("catalog:", "pricing:", "listing:") to
+    // ensure UUIDs from different BCs are distinct even for the same SKU input.
     var namespaceBytes = new Guid("6ba7b810-9dad-11d1-80b4-00c04fd430c8").ToByteArray();
     var nameBytes = Encoding.UTF8.GetBytes($"catalog:{sku.ToUpperInvariant()}");
     var hash = SHA1.HashData([.. namespaceBytes, .. nameBytes]);
