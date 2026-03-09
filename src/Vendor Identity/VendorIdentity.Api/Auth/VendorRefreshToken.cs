@@ -11,11 +11,16 @@ namespace VendorIdentity.Api.Auth;
 
 public sealed record VendorRefreshResponse(string AccessToken);
 
+// Empty record signals to Wolverine that the body is intentionally empty (no request DTO needed).
+// Without this, Wolverine misidentifies VendorIdentityDbContext as the body type.
+public sealed record VendorRefreshRequest;
+
 public sealed class VendorRefreshEndpoint
 {
     [AllowAnonymous]
     [WolverinePost("/api/vendor-identity/auth/refresh")]
     public static async Task<IResult> Refresh(
+        VendorRefreshRequest request,
         HttpContext httpContext,
         VendorIdentityDbContext dbContext,
         JwtTokenService tokenService,

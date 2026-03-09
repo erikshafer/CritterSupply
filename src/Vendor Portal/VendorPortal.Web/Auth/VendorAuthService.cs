@@ -97,7 +97,7 @@ public sealed class VendorAuthService
                 client.DefaultRequestHeaders.Authorization =
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _authState.AccessToken);
 
-            var response = await client.PostAsync("/api/vendor-identity/auth/refresh", null);
+            var response = await client.PostAsJsonAsync("/api/vendor-identity/auth/refresh", new { });
 
             if (!response.IsSuccessStatusCode)
                 return false;
@@ -122,7 +122,7 @@ public sealed class VendorAuthService
         try
         {
             var client = _httpClientFactory.CreateClient("VendorIdentityApi");
-            await client.PostAsync("/api/vendor-identity/auth/logout", null);
+            await client.PostAsJsonAsync("/api/vendor-identity/auth/logout", new { });
         }
         finally
         {
