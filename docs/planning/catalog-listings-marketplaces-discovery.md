@@ -11,8 +11,9 @@
 - Current implementation: `src/Product Catalog/`
 - Reference format: [`docs/planning/fulfillment-evolution-plan.md`](fulfillment-evolution-plan.md)
 
-**Companion documents (pending):**
+**Companion documents:**
 - Principal Engineer synthesis: [`catalog-listings-marketplaces-evolution-plan.md`](catalog-listings-marketplaces-evolution-plan.md) ✅
+- Ubiquitous language glossary: [`catalog-listings-marketplaces-glossary.md`](catalog-listings-marketplaces-glossary.md) ✅
 - ADR candidates *(to be authored after Owner decisions)*
 
 ---
