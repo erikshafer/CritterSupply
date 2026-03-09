@@ -23,7 +23,7 @@ Implement a minimal POC covering JWT login/refresh/logout (VendorIdentity.Api), 
 
 1. **HttpClient base address**: In WASM, `IHttpClientFactory` named clients must set `client.BaseAddress` explicitly. The default `HttpClient` points to the WASM app's own URL (e.g., `http://localhost:5241`), not the API.
 
-2. **Cross-origin cookies**: The refresh token HttpOnly cookie requires `AllowCredentials()` in CORS policy AND the browser must send `credentials: include` (the `IHttpClientFactory` HttpClient does this automatically with named clients only when CORS is properly configured).
+2. **Cross-origin cookies**: The refresh token HttpOnly cookie requires `AllowCredentials()` in CORS policy AND the Blazor WASM `HttpClient` must be explicitly configured so the browser sends `credentials: include`. Named clients do **not** enable this automatically — without explicit client-side configuration (e.g., setting `WebAssemblyHttpHandlerOptions.DefaultBrowserRequestCredentials = BrowserRequestCredentials.Include` or configuring the primary handler per client), the browser will not send cookies on cross-origin requests.
 
 3. **SignalR `AccessTokenProvider`**: Pass JWT to SignalR via `options.AccessTokenProvider` lambda (reads from `VendorAuthState`). This is called on every connection attempt, so token refreshes are picked up automatically on reconnect.
 

@@ -145,9 +145,23 @@ new CookieOptions
 }
 ```
 
-3. **Client (WASM):** The WASM `HttpClient` sends cookies automatically for cross-origin requests when CORS is properly configured. No special header needed.
+3. **Client (WASM):** The browser `fetch` used by Blazor WASM defaults to `credentials: "same-origin"`, so cookies are **not** sent on cross-origin calls (e.g., `http://localhost:5241` → `http://localhost:5239`) unless you explicitly opt in. Configure the WASM `HttpClient`'s underlying handler to include credentials:
 
-> **Production note:** With HTTPS (both client and server), set `Secure = true` and `SameSite = Lax` or `None` depending on your cross-site requirements.
+```csharp
+// In Program.cs — configure the named client's handler to send cookies cross-origin
+builder.Services.AddHttpClient("VendorIdentityApi", c => c.BaseAddress = new Uri(identityApiUrl))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        // In Blazor WASM, use WebAssemblyHttpHandler and set DefaultBrowserRequestCredentials.
+        // The line below is the Blazor WASM equivalent of fetch credentials: "include"
+    });
+
+// Or set it globally on the WebAssemblyHttpHandler options:
+builder.Services.Configure<WebAssemblyHttpHandlerOptions>(options =>
+    options.DefaultBrowserRequestCredentials = BrowserRequestCredentials.Include);
+```
+
+> **Production note:** With HTTPS (both client and server), set `Secure = true` and choose `SameSite = Lax` or `None` as appropriate for your cross-site/cross-origin requirements. Named clients do NOT automatically switch fetch credentials to `include` — this must be configured explicitly on the client side.
 
 ---
 
@@ -246,11 +260,37 @@ Blazor WASM does not support `IHostedService`. Use `System.Threading.Timer` star
 public sealed class TokenRefreshService : IAsyncDisposable
 {
     private Timer? _timer;
+    private readonly SemaphoreSlim _refreshSemaphore = new(1, 1);
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(13); // before 15-min expiry
 
     public void Start()
     {
-        _timer = new Timer(async _ => await TryRefreshAsync(), null, RefreshInterval, RefreshInterval);
+        // Idempotent: only start the timer once
+        if (_timer is not null)
+            return;
+
+        _timer = new Timer(async _ => await SafeRefreshAsync(), null, RefreshInterval, RefreshInterval);
+    }
+
+    private async Task SafeRefreshAsync()
+    {
+        // Prevent overlapping refreshes if the timer ticks again while a refresh is in progress
+        if (!await _refreshSemaphore.WaitAsync(0))
+            return;
+
+        try
+        {
+            await TryRefreshAsync();
+        }
+        catch (Exception)
+        {
+            // Swallow or log the exception so it doesn't crash the process or spam logs
+            // _logger.LogError(ex, "Error refreshing access token.");
+        }
+        finally
+        {
+            _refreshSemaphore.Release();
+        }
     }
 
     public async Task CheckAndRefreshIfNeededAsync()
@@ -258,7 +298,14 @@ public sealed class TokenRefreshService : IAsyncDisposable
         // Call this on tab visibility change to handle browser throttling
         var timeLeft = _authState.TokenExpiresAt - DateTimeOffset.UtcNow;
         if (timeLeft <= TimeSpan.FromMinutes(3))
-            await TryRefreshAsync();
+            await SafeRefreshAsync();
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _timer?.Dispose();
+        _refreshSemaphore.Dispose();
+        return ValueTask.CompletedTask;
     }
     // ...
 }
