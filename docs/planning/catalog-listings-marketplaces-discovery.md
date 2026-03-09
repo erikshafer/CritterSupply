@@ -67,7 +67,7 @@ The Vendor Portal feature files show us vendor-scoped views of products, which m
 **❌ Regulatory and Compliance Metadata**  
 This is a significant gap that only grows as we expand to marketplaces and more SKUs. What's missing:
 - **Hazmat classification** — the CONTEXTS.md already flags this: "Hazmat classification is maintained in the Product Catalog SKU master." But the actual `Product` record has no hazmat field today. Fulfillment's routing engine would check this at routing time, but where does the authoritative value live?
-- **Age restrictions** — pet medications, some reptile supplies, and certain food items have regulatory age-gate requirements on some marketplaces
+- **Age restrictions** — pet medications, some reptile supplies, and certain food items have regulatory age gate requirements on some marketplaces
 - **Country restrictions** — some flea treatments cannot be sold in California; some food ingredients are prohibited in certain countries if we ever sell internationally
 - **Proposition 65 warnings** (California) — many pet products need these disclosures
 - **Organic/natural certification claims** — FDA-regulated language for pet food
@@ -481,7 +481,7 @@ These are plain-English workflow descriptions — no code, no framework referenc
    Both listings advance to `ReadyForReview`. Compliance officer confirms. Listings advance to `Submitted`.
 
 7. **Submission to marketplace APIs.** Listings BC submits:
-   - Amazon: Creates new ASIN via SP-API Product Type Definition schema for `PET_FOOD_AND_TREAT` *(or appropriate product type)*
+   - Amazon: Creates new ASIN via SP-API Product Type Definition schema for `PET_WATERER_AND_FEEDER` *(or the most appropriate product type for water fountains)*
    - eBay: Creates new listing via Trading API
 
 8. **Marketplace confirmation.** Amazon responds (can take minutes to hours): "ASIN B098XXXXXXX created." Listing status → `Live`. eBay responds: "Item 123456789012 created." Listing status → `Live`.
