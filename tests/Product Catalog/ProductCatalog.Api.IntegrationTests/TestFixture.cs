@@ -129,7 +129,7 @@ public class TestFixture : IAsyncLifetime
     /// This ensures that any cascaded work spawned by the initial command is completed before
     /// passing control back to the calling test.
     /// </summary>
-    protected async Task<(ITrackedSession, IScenarioResult)> TrackedHttpCall(Action<Scenario> configuration)
+    public async Task<(ITrackedSession, IScenarioResult)> TrackedHttpCall(Action<Scenario> configuration)
     {
         IScenarioResult result = null!;
 

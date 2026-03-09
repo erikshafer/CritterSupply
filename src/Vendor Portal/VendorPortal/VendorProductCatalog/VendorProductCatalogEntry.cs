@@ -25,7 +25,7 @@ public sealed class VendorProductCatalogEntry
 
     /// <summary>
     /// True while the assignment is active.
-    /// Set to false if the product is discontinued or the assignment is revoked.
+    /// Set to false when the product is discontinued (handled by a future ProductDiscontinued handler — Phase 2+).
     /// </summary>
     public bool IsActive { get; init; }
 }

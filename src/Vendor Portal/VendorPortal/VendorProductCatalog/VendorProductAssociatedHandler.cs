@@ -19,6 +19,8 @@ public static class VendorProductAssociatedHandler
         // Store() performs an upsert — safe for both new assignments and reassignments.
         // PreviousVendorTenantId is available on the event if downstream projections
         // need to de-associate the SKU from the old vendor (e.g., analytics).
+        // TODO(Phase 2): Handle ProductDiscontinued integration event to set IsActive = false.
+        //   A separate handler will subscribe to ProductDiscontinued and update IsActive on the entry.
         var entry = new VendorProductCatalogEntry
         {
             Id = integrationEvent.Sku,

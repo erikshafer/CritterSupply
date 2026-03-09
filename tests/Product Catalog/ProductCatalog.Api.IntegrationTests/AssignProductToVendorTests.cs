@@ -1,7 +1,9 @@
 using Marten;
+using Messages.Contracts.ProductCatalog;
 using ProductCatalog.Api.Products;
 using ProductCatalog.Products;
 using Shouldly;
+using Wolverine.Tracking;
 
 namespace ProductCatalog.Api.IntegrationTests;
 
@@ -144,6 +146,12 @@ public sealed class AssignProductToVendorTests : IAsyncLifetime
         response.ShouldNotBeNull();
         response.Sku.ShouldBe("ASSIGN-SUCCESS-001");
         response.VendorTenantId.ShouldBe(vendorId);
+        response.PreviousVendorTenantId.ShouldBeNull(); // first-time assignment
+
+        // Verify the assignment is also persisted on the Product document
+        using var session = _fixture.GetDocumentSession();
+        var product = await session.LoadAsync<Product>("ASSIGN-SUCCESS-001");
+        product!.VendorTenantId.ShouldBe(vendorId);
     }
 
     [Fact]
@@ -160,7 +168,7 @@ public sealed class AssignProductToVendorTests : IAsyncLifetime
             s.StatusCodeShouldBe(200);
         });
 
-        // Second assignment with same vendor — should still return 200
+        // Second assignment with same vendor — must return 200 (idempotent)
         var result = await _fixture.Host.Scenario(s =>
         {
             s.Post.Json(new AssignProductToVendor(vendorId))
@@ -171,6 +179,11 @@ public sealed class AssignProductToVendorTests : IAsyncLifetime
         var response = await result.ReadAsJsonAsync<VendorAssignmentResponse>();
         response.ShouldNotBeNull();
         response.VendorTenantId.ShouldBe(vendorId);
+
+        // Verify product document still shows original vendor (not a duplicate write)
+        using var session = _fixture.GetDocumentSession();
+        var product = await session.LoadAsync<Product>("IDEMPOTENT-001");
+        product!.VendorTenantId.ShouldBe(vendorId);
     }
 
     [Fact]

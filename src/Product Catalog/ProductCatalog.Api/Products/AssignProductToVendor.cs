@@ -15,7 +15,8 @@ public sealed record VendorAssignmentResponse(
     string Sku,
     Guid VendorTenantId,
     string AssignedBy,
-    DateTimeOffset AssignedAt);
+    DateTimeOffset AssignedAt,
+    Guid? PreviousVendorTenantId = null);
 
 // ─── Single Assignment ────────────────────────────────────────────────────────
 
@@ -108,25 +109,27 @@ public static class AssignProductToVendorHandler
     /// Assigns the SKU to the specified vendor.
     /// Idempotent: returns 200 without publishing an event if the vendor is already the same.
     /// On reassignment, sets PreviousVendorTenantId so subscribers can clean up old associations.
+    /// Returns an OutgoingMessages cascade so Wolverine tracks the integration event for testing.
     /// TODO(Phase 2): Replace "system" with the authenticated admin principal from HttpContext.
     /// </summary>
     [WolverinePost("/api/admin/products/{sku}/vendor-assignment")]
-    public static async Task<IResult> Handle(
+    public static async Task<(IResult, OutgoingMessages)> Handle(
         string sku,
         AssignProductToVendor command,
         Product product,
         IDocumentSession session,
-        IMessageBus bus,
         CancellationToken ct)
     {
+        var outgoing = new OutgoingMessages();
+
         // Idempotent: same vendor already assigned — return existing state, no event.
         if (product.VendorTenantId == command.VendorTenantId)
         {
-            return Results.Ok(new VendorAssignmentResponse(
+            return (Results.Ok(new VendorAssignmentResponse(
                 sku,
                 product.VendorTenantId.Value,
                 product.AssignedBy!,
-                product.AssignedAt!.Value));
+                product.AssignedAt!.Value)), outgoing);
         }
 
         // TODO(Phase 2): Wire real admin authentication. Replace "system" with
@@ -140,19 +143,22 @@ public static class AssignProductToVendorHandler
         session.Store(updated);
         await session.SaveChangesAsync(ct);
 
-        // Publish integration event. VendorPortal subscribes and upserts its lookup.
-        await bus.PublishAsync(new VendorProductAssociated(
+        // Cascade integration event via Wolverine. VendorPortal subscribes and upserts its lookup.
+        // Using OutgoingMessages (not bus.PublishAsync) ensures the event is tracked by Wolverine's
+        // test infrastructure and participates in the outbox/saga pipeline.
+        outgoing.Add(new VendorProductAssociated(
             Sku: sku,
             VendorTenantId: command.VendorTenantId,
             AssociatedBy: assignedBy,
             AssociatedAt: assignedAt,
             PreviousVendorTenantId: previousVendorTenantId));
 
-        return Results.Ok(new VendorAssignmentResponse(
+        return (Results.Ok(new VendorAssignmentResponse(
             sku,
             command.VendorTenantId,
             assignedBy,
-            assignedAt));
+            assignedAt,
+            previousVendorTenantId)), outgoing);
     }
 }
 
@@ -214,29 +220,17 @@ public sealed record BulkAssignmentResult(
 public static class BulkAssignProductsToVendorHandler
 {
     [WolverinePost("/api/admin/products/vendor-assignments/bulk")]
-    public static async Task<IResult> Handle(
+    public static async Task<(IResult, OutgoingMessages)> Handle(
         BulkAssignProductsToVendor command,
         IDocumentSession session,
-        IMessageBus bus,
         CancellationToken ct)
     {
-        // Phase 2: resolve from HttpContext.User (JWT claims).
         const string assignedBy = "system";
+        var outgoing = new OutgoingMessages();
 
-        // Batch-load all referenced products to minimise round-trips.
-        var distinctSkus = command.Assignments
-            .Select(a => a.Sku)
-            .Distinct()
-            .ToArray();
-
-        var productTasks = distinctSkus
-            .Select(sku => session.LoadAsync<Product>(sku, ct))
-            .ToList();
-
-        var productArray = await Task.WhenAll(productTasks);
-        var productDict = productArray
-            .Where(p => p is not null)
-            .ToDictionary(p => p!.Id, p => p!);
+        var distinctSkus = command.Assignments.Select(a => a.Sku).Distinct().ToArray();
+        var productArray = await Task.WhenAll(distinctSkus.Select(sku => session.LoadAsync<Product>(sku, ct)));
+        var productDict = productArray.Where(p => p is not null).ToDictionary(p => p!.Id, p => p!);
 
         var succeeded = new List<AssignmentSuccess>();
         var failed = new List<AssignmentFailure>();
@@ -245,27 +239,18 @@ public static class BulkAssignProductsToVendorHandler
         {
             if (!productDict.TryGetValue(item.Sku, out var product))
             {
-                failed.Add(new AssignmentFailure(
-                    item.Sku,
-                    item.VendorTenantId,
-                    "ProductNotFound",
-                    $"Product '{item.Sku}' was not found in the catalog."));
+                failed.Add(new AssignmentFailure(item.Sku, item.VendorTenantId, "ProductNotFound", $"Product '{item.Sku}' was not found in the catalog."));
                 continue;
             }
 
             if (product.IsTerminal)
             {
-                failed.Add(new AssignmentFailure(
-                    item.Sku,
-                    item.VendorTenantId,
-                    "ProductDiscontinued",
-                    $"Product '{item.Sku}' is discontinued or deleted and cannot be assigned."));
+                failed.Add(new AssignmentFailure(item.Sku, item.VendorTenantId, "ProductDiscontinued", $"Product '{item.Sku}' is discontinued or deleted and cannot be assigned."));
                 continue;
             }
 
             var assignedAt = DateTimeOffset.UtcNow;
 
-            // Idempotent: same vendor already assigned — count as success, skip event.
             if (product.VendorTenantId == item.VendorTenantId)
             {
                 succeeded.Add(new AssignmentSuccess(item.Sku, item.VendorTenantId, product.AssignedAt!.Value));
@@ -274,16 +259,10 @@ public static class BulkAssignProductsToVendorHandler
 
             var previousVendorTenantId = product.VendorTenantId;
             var updated = product.AssignToVendor(item.VendorTenantId, assignedBy, assignedAt);
-
-            // Update the in-memory dictionary so duplicate SKUs in the same batch are handled
-            // correctly. If a client sends the same SKU twice with different VendorTenantIds,
-            // the last occurrence wins — this is intentional "last write wins" semantics for
-            // bulk operations. Each successful occurrence publishes its own event.
             productDict[item.Sku] = updated;
-
             session.Store(updated);
 
-            await bus.PublishAsync(new VendorProductAssociated(
+            outgoing.Add(new VendorProductAssociated(
                 Sku: item.Sku,
                 VendorTenantId: item.VendorTenantId,
                 AssociatedBy: assignedBy,
@@ -302,9 +281,8 @@ public static class BulkAssignProductsToVendorHandler
             TotalSucceeded: succeeded.Count,
             TotalFailed: failed.Count);
 
-        // HTTP 207 Multi-Status when any items failed; 200 OK on full success.
-        return failed.Count > 0
+        return (failed.Count > 0
             ? Results.Json(result, statusCode: StatusCodes.Status207MultiStatus)
-            : Results.Ok(result);
+            : Results.Ok(result), outgoing);
     }
 }
