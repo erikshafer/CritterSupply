@@ -1,4 +1,5 @@
 using Marten;
+using Messages.Contracts.ProductCatalog;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -10,6 +11,7 @@ using Wolverine.FluentValidation;
 using Wolverine.Http;
 using Wolverine.Http.FluentValidation;
 using Wolverine.Marten;
+using Wolverine.RabbitMQ;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +43,22 @@ builder.Host.UseWolverine(opts =>
     opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
     opts.Discovery.IncludeAssembly(typeof(Product).Assembly);
     opts.UseFluentValidation();
+
+    // Configure RabbitMQ for integration messages
+    var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");
+    opts.UseRabbitMq(rabbit =>
+    {
+        rabbit.HostName = rabbitConfig["hostname"] ?? "localhost";
+        rabbit.VirtualHost = rabbitConfig["virtualhost"] ?? "/";
+        rabbit.Port = rabbitConfig.GetValue<int?>("port") ?? 5672;
+        rabbit.UserName = rabbitConfig["username"] ?? "guest";
+        rabbit.Password = rabbitConfig["password"] ?? "guest";
+    })
+    .AutoProvision();
+
+    // Publish VendorProductAssociated events to the Vendor Portal exchange
+    opts.PublishMessage<VendorProductAssociated>()
+        .ToRabbitExchange("vendor-portal-product-associated");
 });
 
 // Wolverine HTTP

@@ -1,11 +1,15 @@
 using System.Text;
 using JasperFx;
+using Marten;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using VendorPortal.Api.Hubs;
+using VendorPortal.VendorProductCatalog;
 using Wolverine;
 using Wolverine.Http;
 using Wolverine.Http.FluentValidation;
+using Wolverine.Marten;
+using Wolverine.RabbitMQ;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,6 +56,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+// Marten document store — owns the VendorProductCatalog lookup and future Vendor Portal projections
+var connectionString = builder.Configuration.GetConnectionString("postgres")
+    ?? "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=postgres";
+
+builder.Services.AddMarten(opts =>
+{
+    opts.Connection(connectionString);
+    opts.DatabaseSchemaName = "vendorportal";
+})
+.UseLightweightSessions()
+.IntegrateWithWolverine();
+
 // CORS for VendorPortal.Web (Blazor WASM at port 5241)
 builder.Services.AddCors(options =>
 {
@@ -71,6 +87,24 @@ builder.Host.UseWolverine(opts =>
 {
     opts.Discovery.DisableConventionalDiscovery();
     opts.Discovery.IncludeAssembly(typeof(VendorPortal.Api.Dashboard.GetDashboardEndpoint).Assembly);
+    // Handle VendorProductAssociated events from Product Catalog
+    opts.Discovery.IncludeAssembly(typeof(VendorProductCatalogEntry).Assembly);
+
+    // Configure RabbitMQ for integration messages
+    var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");
+    opts.UseRabbitMq(rabbit =>
+    {
+        rabbit.HostName = rabbitConfig["hostname"] ?? "localhost";
+        rabbit.VirtualHost = rabbitConfig["virtualhost"] ?? "/";
+        rabbit.Port = rabbitConfig.GetValue<int?>("port") ?? 5672;
+        rabbit.UserName = rabbitConfig["username"] ?? "guest";
+        rabbit.Password = rabbitConfig["password"] ?? "guest";
+    })
+    .AutoProvision();
+
+    // Subscribe to VendorProductAssociated events published by Product Catalog
+    opts.ListenToRabbitQueue("vendor-portal-product-associated")
+        .ProcessInline();
 });
 
 builder.Services.AddEndpointsApiExplorer();

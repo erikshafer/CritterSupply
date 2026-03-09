@@ -168,6 +168,8 @@
   </Folder>
   <Folder Name="/Vendor Portal/">
     <Project Path="src/Vendor Portal/VendorPortal.Api/VendorPortal.Api.csproj" />
+    <Project Path="src/Vendor Portal/VendorPortal/VendorPortal.csproj" />
     <Project Path="src/Vendor Portal/VendorPortal.Web/VendorPortal.Web.csproj" />
+    <Project Path="tests/Vendor Portal/VendorPortal.Api.IntegrationTests/VendorPortal.Api.IntegrationTests.csproj" />
   </Folder>
 </Solution>

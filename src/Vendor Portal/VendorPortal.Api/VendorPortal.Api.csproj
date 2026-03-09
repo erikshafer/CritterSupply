@@ -5,6 +5,9 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Marten" />
+        <PackageReference Include="WolverineFx.Http.Marten" />
+        <PackageReference Include="WolverineFx.RabbitMQ" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Swashbuckle.AspNetCore" />
@@ -16,6 +19,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\CritterSupply.ServiceDefaults\CritterSupply.ServiceDefaults.csproj" />
+        <ProjectReference Include="..\VendorPortal\VendorPortal.csproj" />
     </ItemGroup>
 
 </Project>
+

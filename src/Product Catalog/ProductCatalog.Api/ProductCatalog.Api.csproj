@@ -10,6 +10,7 @@
     <PackageReference Include="Marten" />
     <PackageReference Include="WolverineFx.Http.Marten" />
     <PackageReference Include="WolverineFx.Http.FluentValidation" />
+    <PackageReference Include="WolverineFx.RabbitMQ" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
