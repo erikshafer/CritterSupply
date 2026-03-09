@@ -36,7 +36,17 @@ public sealed class TokenRefreshService : IAsyncDisposable
 
     public void Start()
     {
-        _timer = new Timer(async _ => await TryRefreshAsync(), null, RefreshInterval, RefreshInterval);
+        _timer = new Timer(async _ =>
+        {
+            try
+            {
+                await TryRefreshAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled exception in token refresh timer callback");
+            }
+        }, null, RefreshInterval, RefreshInterval);
         _logger.LogInformation("Token refresh timer started (interval: {Interval})", RefreshInterval);
     }
 

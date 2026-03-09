@@ -82,6 +82,7 @@ public sealed class VendorHubService : IAsyncDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to connect to VendorPortalHub");
+            OnStateChanged?.Invoke();
         }
     }
 
