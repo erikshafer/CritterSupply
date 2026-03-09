@@ -1,4 +1,6 @@
-namespace VendorIdentity.Entities;
+using VendorIdentity.TenantManagement;
+
+namespace VendorIdentity.UserInvitations;
 
 public sealed class VendorUser
 {

@@ -1,15 +1,17 @@
 using System.Security.Cryptography;
 using System.Text;
 using Messages.Contracts.VendorIdentity;
-using VendorIdentity.Data;
-using VendorIdentity.Entities;
+using Microsoft.AspNetCore.Http;
+using VendorIdentity.Identity;
 using Wolverine;
+using Wolverine.Http;
 
-namespace VendorIdentity.Commands;
+namespace VendorIdentity.UserInvitations;
 
-public sealed class InviteVendorUserHandler
+public static class InviteVendorUserHandler
 {
-    public static async Task<(Guid UserId, OutgoingMessages Events)> Handle(
+    [WolverinePost("/api/vendor-identity/tenants/{VendorTenantId}/users/invite")]
+    public static async Task<(CreationResponse, OutgoingMessages)> Handle(
         InviteVendorUser command,
         VendorIdentityDbContext db,
         CancellationToken cancellation)
@@ -42,7 +44,7 @@ public sealed class InviteVendorUserHandler
             VendorTenantId = command.VendorTenantId,
             Token = tokenHash,
             InvitedRole = command.Role,
-            Status = Entities.InvitationStatus.Pending,
+            Status = InvitationStatus.Pending,
             InvitedAt = user.InvitedAt.Value,
             ExpiresAt = user.InvitedAt.Value.AddHours(72), // 72-hour expiry
             ResendCount = 0
@@ -68,6 +70,8 @@ public sealed class InviteVendorUserHandler
         var outgoing = new OutgoingMessages();
         outgoing.Add(integrationEvent);
 
-        return (user.Id, outgoing);
+        var response = new CreationResponse($"/api/vendor-identity/tenants/{command.VendorTenantId}/users/{user.Id}");
+
+        return (response, outgoing);
     }
 }

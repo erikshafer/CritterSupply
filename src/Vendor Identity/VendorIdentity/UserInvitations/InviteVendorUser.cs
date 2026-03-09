@@ -1,6 +1,6 @@
 using Messages.Contracts.VendorIdentity;
 
-namespace VendorIdentity.Commands;
+namespace VendorIdentity.UserInvitations;
 
 /// <summary>
 /// Invites a new user to a vendor tenant.

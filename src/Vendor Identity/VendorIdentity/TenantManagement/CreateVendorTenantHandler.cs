@@ -1,13 +1,15 @@
 using Messages.Contracts.VendorIdentity;
-using VendorIdentity.Data;
-using VendorIdentity.Entities;
+using Microsoft.AspNetCore.Http;
+using VendorIdentity.Identity;
 using Wolverine;
+using Wolverine.Http;
 
-namespace VendorIdentity.Commands;
+namespace VendorIdentity.TenantManagement;
 
-public sealed class CreateVendorTenantHandler
+public static class CreateVendorTenantHandler
 {
-    public static async Task<(Guid TenantId, OutgoingMessages Events)> Handle(
+    [WolverinePost("/api/vendor-identity/tenants")]
+    public static async Task<(CreationResponse, OutgoingMessages)> Handle(
         CreateVendorTenant command,
         VendorIdentityDbContext db,
         CancellationToken cancellation)
@@ -34,6 +36,8 @@ public sealed class CreateVendorTenantHandler
         var outgoing = new OutgoingMessages();
         outgoing.Add(integrationEvent);
 
-        return (tenant.Id, outgoing);
+        var response = new CreationResponse($"/api/vendor-identity/tenants/{tenant.Id}");
+
+        return (response, outgoing);
     }
 }

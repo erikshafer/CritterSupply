@@ -1,8 +1,8 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
-using VendorIdentity.Data;
+using VendorIdentity.Identity;
 
-namespace VendorIdentity.Commands;
+namespace VendorIdentity.TenantManagement;
 
 public sealed class CreateVendorTenantValidator : AbstractValidator<CreateVendorTenant>
 {

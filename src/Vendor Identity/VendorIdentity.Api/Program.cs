@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using JasperFx;
 using Microsoft.EntityFrameworkCore;
-using VendorIdentity.Data;
+using VendorIdentity.Identity;
 using Wolverine;
 using Wolverine.FluentValidation;
 using Wolverine.Http;
@@ -33,7 +33,7 @@ builder.Host.UseWolverine(opts =>
 {
     opts.Discovery.DisableConventionalDiscovery();
     // Discover handlers from the VendorIdentity assembly
-    opts.Discovery.IncludeAssembly(typeof(VendorIdentity.Entities.VendorTenant).Assembly);
+    opts.Discovery.IncludeAssembly(typeof(VendorIdentity.TenantManagement.VendorTenant).Assembly);
 
     opts.Policies.AutoApplyTransactions();
     opts.Policies.UseDurableLocalQueues();

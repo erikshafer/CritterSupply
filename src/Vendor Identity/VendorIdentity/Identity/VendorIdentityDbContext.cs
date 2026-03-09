@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using VendorIdentity.Entities;
+using VendorIdentity.TenantManagement;
+using VendorIdentity.UserInvitations;
 
-namespace VendorIdentity.Data;
+namespace VendorIdentity.Identity;
 
 /// <summary>
 /// EF Core DbContext for Vendor Identity bounded context.

@@ -1,4 +1,4 @@
-namespace VendorIdentity.Entities;
+namespace VendorIdentity.UserInvitations;
 
 public sealed class VendorUserInvitation
 {

@@ -1,4 +1,4 @@
-namespace VendorIdentity.Commands;
+namespace VendorIdentity.TenantManagement;
 
 /// <summary>
 /// Creates a new vendor tenant organization.

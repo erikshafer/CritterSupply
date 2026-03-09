@@ -1,4 +1,4 @@
-namespace VendorIdentity.Entities;
+namespace VendorIdentity.TenantManagement;
 
 public enum VendorTenantStatus
 {
