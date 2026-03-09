@@ -23,7 +23,7 @@ public sealed class GetDashboardEndpoint
     {
         var tenantIdString = httpContext.User.FindFirst("VendorTenantId")?.Value;
         var userEmail = httpContext.User.FindFirst(ClaimTypes.Email)?.Value;
-        var role = httpContext.User.FindFirst("Role")?.Value;
+        var role = httpContext.User.FindFirst(ClaimTypes.Role)?.Value;
         var tenantStatus = httpContext.User.FindFirst("VendorTenantStatus")?.Value;
 
         if (tenantIdString is null || !Guid.TryParse(tenantIdString, out var tenantId))

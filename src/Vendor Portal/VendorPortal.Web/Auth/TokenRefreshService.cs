@@ -36,6 +36,9 @@ public sealed class TokenRefreshService : IAsyncDisposable
 
     public void Start()
     {
+        if (_timer is not null)
+            return;
+
         _timer = new Timer(async _ =>
         {
             try

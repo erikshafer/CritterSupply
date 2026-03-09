@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Alba;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -116,7 +117,10 @@ public sealed class VendorAuthTests : IClassFixture<VendorIdentityApiFixture>, I
         var jwt = handler.ReadJwtToken(response.AccessToken);
         jwt.Claims.ShouldContain(c => c.Type == "VendorUserId" && c.Value == ActiveAdminId.ToString());
         jwt.Claims.ShouldContain(c => c.Type == "VendorTenantId" && c.Value == TestTenantId.ToString());
-        jwt.Claims.ShouldContain(c => c.Type == "Role" && c.Value == "Admin");
+        // ClaimTypes.Role maps to "http://schemas.microsoft.com/ws/2008/06/identity/claims/role" in raw JWT,
+        // but JwtSecurityTokenHandler maps it to the short name "role" when reading
+        jwt.Claims.ShouldContain(c =>
+            (c.Type == ClaimTypes.Role || c.Type == "role") && c.Value == "Admin");
         jwt.Claims.ShouldContain(c => c.Type == "VendorTenantStatus" && c.Value == "Active");
         jwt.ValidTo.ShouldBeGreaterThan(DateTime.UtcNow);
     }
@@ -219,24 +223,28 @@ public sealed class VendorAuthTests : IClassFixture<VendorIdentityApiFixture>, I
     [Fact]
     public async Task Logout_ClearsRefreshTokenCookie()
     {
-        // Arrange — log in first to set the cookie
-        var loginRequest = new VendorLoginRequest(ActiveAdminEmail, TestPassword);
-        await _fixture.Host.Scenario(x =>
-        {
-            x.Post.Json(loginRequest).ToUrl("/api/vendor-identity/auth/login");
-            x.StatusCodeShouldBe(200);
-        });
-
-        // Act — log out
+        // Act — logout clears the cookie (the prior login step is not needed because
+        // ASP.NET Core Cookies.Delete() always emits a Set-Cookie regardless of whether
+        // a cookie was present in the request — this is a stateless server-side operation)
         var result = await _fixture.Host.Scenario(x =>
         {
             x.Post.Json(new { }).ToUrl("/api/vendor-identity/auth/logout");
             x.StatusCodeShouldBe(200);
         });
 
-        // Assert — Set-Cookie should tell the browser to expire/clear the cookie
+        // Assert — Set-Cookie header contains the cookie name with an empty value (deletion semantics)
         var setCookieHeader = result.Context.Response.Headers["Set-Cookie"].ToString();
         setCookieHeader.ShouldContain("vendor_refresh_token");
+
+        // The deleted cookie is emitted with an empty value (vendor_refresh_token=;) not a new token
+        var cookieValue = ExtractCookieValue(setCookieHeader, "vendor_refresh_token");
+        cookieValue.ShouldBeEmpty("expected an empty cookie value indicating deletion, not a live token");
+
+        // The deleted cookie's Expires attribute should be in the past
+        var expiresMatch = System.Text.RegularExpressions.Regex.Match(
+            setCookieHeader, @"expires=([^;]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (expiresMatch.Success && DateTimeOffset.TryParse(expiresMatch.Groups[1].Value, out var cookieExpiry))
+            cookieExpiry.ShouldBeLessThan(DateTimeOffset.UtcNow);
     }
 
     // ─── Refresh ──────────────────────────────────────────────────────────────
@@ -302,6 +310,72 @@ public sealed class VendorAuthTests : IClassFixture<VendorIdentityApiFixture>, I
 
         var handler = new JwtSecurityTokenHandler();
         handler.CanReadToken(refreshResponse.AccessToken).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Refresh_ForDeactivatedUser_Returns401()
+    {
+        // Arrange — log in, then deactivate the user mid-session
+        var loginRequest = new VendorLoginRequest(ActiveAdminEmail, TestPassword);
+        var loginResult = await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(loginRequest).ToUrl("/api/vendor-identity/auth/login");
+            x.StatusCodeShouldBe(200);
+        });
+
+        var loginResponse = loginResult.ReadAsJson<VendorLoginResponse>();
+        loginResponse.ShouldNotBeNull();
+        var setCookieHeader = loginResult.Context.Response.Headers["Set-Cookie"].ToString();
+        var refreshTokenValue = ExtractCookieValue(setCookieHeader, "vendor_refresh_token");
+
+        // Deactivate the user directly in the DB (simulates an admin suspending the account)
+        await using var dbContext = _fixture.GetDbContext();
+        var user = await dbContext.Users.FindAsync(ActiveAdminId);
+        user.ShouldNotBeNull();
+        user.Status = VendorUserStatus.Deactivated;
+        await dbContext.SaveChangesAsync();
+
+        // Act — refresh should be rejected even though the refresh cookie is valid
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(new { }).ToUrl("/api/vendor-identity/auth/refresh");
+            x.WithRequestHeader("Cookie", $"vendor_refresh_token={refreshTokenValue}");
+            x.WithRequestHeader("Authorization", $"Bearer {loginResponse.AccessToken}");
+            x.StatusCodeShouldBe(401);
+        });
+    }
+
+    [Fact]
+    public async Task Refresh_ForUserInTerminatedTenant_Returns401()
+    {
+        // Arrange — log in with an active user in an active tenant, then terminate the tenant
+        var loginRequest = new VendorLoginRequest(ActiveAdminEmail, TestPassword);
+        var loginResult = await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(loginRequest).ToUrl("/api/vendor-identity/auth/login");
+            x.StatusCodeShouldBe(200);
+        });
+
+        var loginResponse = loginResult.ReadAsJson<VendorLoginResponse>();
+        loginResponse.ShouldNotBeNull();
+        var setCookieHeader = loginResult.Context.Response.Headers["Set-Cookie"].ToString();
+        var refreshTokenValue = ExtractCookieValue(setCookieHeader, "vendor_refresh_token");
+
+        // Terminate the tenant mid-session
+        await using var dbContext = _fixture.GetDbContext();
+        var tenant = await dbContext.Tenants.FindAsync(TestTenantId);
+        tenant.ShouldNotBeNull();
+        tenant.Status = VendorTenantStatus.Terminated;
+        await dbContext.SaveChangesAsync();
+
+        // Act — refresh should be rejected; terminated tenant users cannot continue refreshing
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(new { }).ToUrl("/api/vendor-identity/auth/refresh");
+            x.WithRequestHeader("Cookie", $"vendor_refresh_token={refreshTokenValue}");
+            x.WithRequestHeader("Authorization", $"Bearer {loginResponse.AccessToken}");
+            x.StatusCodeShouldBe(401);
+        });
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────

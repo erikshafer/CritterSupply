@@ -23,7 +23,7 @@ public sealed class VendorPortalHub : Hub
     {
         var tenantId = Context.User?.FindFirst("VendorTenantId")?.Value;
         var userId = Context.User?.FindFirst("VendorUserId")?.Value;
-        var role = Context.User?.FindFirst("Role")?.Value;
+        var role = Context.User?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
 
         if (tenantId is null || userId is null)
         {

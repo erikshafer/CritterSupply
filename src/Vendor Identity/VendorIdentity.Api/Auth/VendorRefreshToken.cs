@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using VendorIdentity.Identity;
+using VendorIdentity.TenantManagement;
 using VendorIdentity.UserInvitations;
 using Wolverine.Http;
 
@@ -69,6 +70,9 @@ public sealed class VendorRefreshEndpoint
             .FirstOrDefaultAsync(u => u.Id == userId, ct);
 
         if (user is null || user.Status != VendorUserStatus.Active)
+            return Results.Unauthorized();
+
+        if (user.VendorTenant.Status == VendorTenantStatus.Terminated)
             return Results.Unauthorized();
 
         var newAccessToken = tokenService.CreateAccessToken(user, user.VendorTenant);

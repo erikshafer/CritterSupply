@@ -27,7 +27,7 @@ public sealed class JwtTokenService
             new Claim("VendorTenantId", user.VendorTenantId.ToString()),
             new Claim("VendorTenantStatus", tenant.Status.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
-            new Claim("Role", user.Role.ToString()),
+            new Claim(ClaimTypes.Role, user.Role.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
 
