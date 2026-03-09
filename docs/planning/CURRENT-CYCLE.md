@@ -13,37 +13,48 @@
 
 ---
 
-**Cycle:** 21 — Pricing BC Phase 1
-**Status:** 📋 **PLANNED** (Ready to start)
-**GitHub Milestone:** [Cycle 21: Pricing BC Phase 1](https://github.com/erikshafer/CritterSupply/milestone/15)
+**Cycle:** 22 — Vendor Portal + Vendor Identity Phase 1
+**Status:** 📋 **READY TO START** (Pre-planning complete)
+**GitHub Milestone:** [Cycle 22: Vendor Portal + Vendor Identity Phase 1](https://github.com/erikshafer/CritterSupply/milestone/16)
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
-**Epic Issue:** [#184](https://github.com/erikshafer/CritterSupply/issues/184)
+**Epic Issue:** TBD (to be created)
 
 ---
 
 ## Current Status
 
-**Cycle 21 is ready to begin!** Pricing BC Phase 1 will establish server-authoritative pricing and close the critical security gap in Shopping BC.
+**Cycle 22 is ready to begin!** Vendor Portal + Vendor Identity Phase 1 will establish the infrastructure foundation for vendor-facing features (no UI yet).
 
-**Priority #1:** Server-authoritative pricing at add-to-cart (Shopping BC integration) — closes security vulnerability where client can supply any price.
+**Priority #1:** VendorProductCatalog (the load-bearing pillar) — SKU→VendorTenantId lookup that enables all analytics and change request invariants.
 
-**Key Deliverables:**
-- ProductPrice event-sourced aggregate (Unpriced → Published lifecycle)
-- CurrentPriceView inline projection (zero-lag price queries)
-- Money value object with currency support
-- 4 required ADRs written before implementation
-- Integration with Product Catalog BC (ProductRegistered event handler)
-- Shopping BC calls Pricing BC for authoritative prices
+**Key Deliverables (Phase 1 - Infrastructure Foundation):**
+- VendorIdentity EF Core project (VendorTenant, VendorUser, VendorUserInvitation entities)
+- CreateVendorTenant + InviteVendorUser commands + integration events
+- VendorPortal domain project + VendorProductCatalog document store
+- VendorProductAssociated integration event (Catalog BC → Vendor Portal)
+- AssignProductToVendor + bulk-assignment commands (Catalog BC admin endpoints)
+- VendorPortal.Api skeleton with RabbitMQ subscriptions
+- Integration tests (full round-trip testable with no UI)
 
-**Phase 1 Tasks:** [9 issues created](https://github.com/erikshafer/CritterSupply/milestone/15) (#190-#214)
+**Phase 1 Tasks:** Issues TBD (to be created from event modeling checklist)
 
 **Next cycles:**
-- **Cycle 22:** Vendor Portal + Vendor Identity Phase 1 ([Milestone 16](https://github.com/erikshafer/CritterSupply/milestone/16)) - Issues TBD
-- **Cycle 23:** Admin Portal Phase 1 ([Milestone 17](https://github.com/erikshafer/CritterSupply/milestone/17)) - Issues TBD
+- **Cycle 23:** Vendor Portal Phase 2 — JWT auth + SignalR hub + static analytics dashboard
+- **Cycle 24:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling ([Milestone 17](https://github.com/erikshafer/CritterSupply/milestone/17))
 
 ---
 
 ## Recently Completed
+
+- ✅ **Cycle 21:** Pricing BC Phase 1 (2026-03-07 to 2026-03-08)
+  - ProductPrice event-sourced aggregate (UUID v5 deterministic stream ID)
+  - Money value object (140 unit tests)
+  - CurrentPriceView inline projection (zero-lag queries)
+  - Shopping BC security fix (server-authoritative pricing)
+  - 5 ADRs written (UUID v5, price freeze, Money VO, bulk jobs, MAP vs Floor)
+  - 151 Pricing tests + 56 Shopping tests (all passing)
+  - Docker Compose integration
+  - [Plan](pricing-event-modeling.md) | [Retrospective](./cycles/cycle-21-retrospective.md) | [Milestone](https://github.com/erikshafer/CritterSupply/milestone/15)
 
 - ✅ **Cycle 20:** Automated Browser Testing (2026-03-04 to 2026-03-07)
   - Playwright + Reqnroll E2E testing infrastructure
@@ -79,17 +90,19 @@
 
 ### Next 3 Cycles (Milestones Created, Issues Ready/TBD)
 
-- **Cycle 21:** Pricing BC Phase 1 — Server-authoritative pricing, ProductPrice aggregate, Money value object ([Milestone 15](https://github.com/erikshafer/CritterSupply/milestone/15), [Epic #184](https://github.com/erikshafer/CritterSupply/issues/184), 9 issues created)
-  - Event Modeling: [`docs/planning/pricing-event-modeling.md`](pricing-event-modeling.md)
-  - Gherkin features: [`docs/features/pricing/`](../features/pricing/)
-  - ADRs required: 4 ADRs before implementation ([Issue #190](https://github.com/erikshafer/CritterSupply/issues/190))
-
 - **Cycle 22:** Vendor Portal + Vendor Identity Phase 1 — Infrastructure foundation (no UI yet) ([Milestone 16](https://github.com/erikshafer/CritterSupply/milestone/16), Issues TBD)
   - Event Modeling: [`docs/planning/vendor-portal-event-modeling.md`](vendor-portal-event-modeling.md)
   - Gherkin features: [`docs/features/vendor-portal/`](../features/vendor-portal/), [`docs/features/vendor-identity/`](../features/vendor-identity/)
   - ADR: [ADR 0015: JWT for Vendor Identity](../decisions/0015-jwt-for-vendor-identity.md)
 
-- **Cycle 23:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling ([Milestone 17](https://github.com/erikshafer/CritterSupply/milestone/17), Issues TBD)
+- **Cycle 23:** Vendor Portal Phase 2 — JWT auth + SignalR hub + static analytics dashboard (estimated 2 weeks)
+  - Builds on Cycle 22 infrastructure
+  - VendorPortalHub with dual group membership (vendor:{tenantId}, user:{userId})
+  - JWT Bearer authentication (15-min access + 7-day refresh)
+  - Static analytics dashboard (HTTP queries, no SignalR updates yet)
+  - OrderPlacedHandler fan-out to ProductPerformanceSummary projection
+
+- **Cycle 24:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling ([Milestone 17](https://github.com/erikshafer/CritterSupply/milestone/17), Issues TBD)
   - Event Modeling: [`docs/planning/admin-portal-event-modeling.md`](admin-portal-event-modeling.md)
   - Gherkin features: [`docs/features/admin-portal/`](../features/admin-portal/)
 
@@ -125,5 +138,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-08 (Cycle 20 closed, Cycle 21-23 milestones created, Pricing BC issues ready, CURRENT-CYCLE now reflects active planning state)*
+*Last Updated: 2026-03-08 (Cycle 21 complete, Cycle 22 ready to start — Vendor Portal + Vendor Identity Phase 1)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*
