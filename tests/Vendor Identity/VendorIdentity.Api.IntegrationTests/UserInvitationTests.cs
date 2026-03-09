@@ -45,18 +45,18 @@ public sealed class UserInvitationTests : IClassFixture<VendorIdentityApiFixture
         // Arrange
         var tenantId = await CreateTenantAsync("Test Vendor", "contact@testvendor.com");
 
-        var request = new
-        {
-            Email = "newuser@testvendor.com",
-            FirstName = "Jane",
-            LastName = "Smith",
-            Role = VendorRole.CatalogManager
-        };
+        var command = new InviteVendorUser(
+            tenantId,
+            "newuser@testvendor.com",
+            "Jane",
+            "Smith",
+            VendorRole.CatalogManager
+        );
 
         // Act
         var result = await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(request).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/invite");
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/invite");
             x.StatusCodeShouldBe(201);
         });
 
@@ -98,18 +98,18 @@ public sealed class UserInvitationTests : IClassFixture<VendorIdentityApiFixture
         // Arrange
         var nonExistentTenantId = Guid.NewGuid();
 
-        var request = new
-        {
-            Email = "user@example.com",
-            FirstName = "John",
-            LastName = "Doe",
-            Role = VendorRole.Admin
-        };
+        var command = new InviteVendorUser(
+            nonExistentTenantId,
+            "user@example.com",
+            "John",
+            "Doe",
+            VendorRole.Admin
+        );
 
         // Act & Assert
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(request).ToUrl($"/api/vendor-identity/tenants/{nonExistentTenantId}/users/invite");
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{nonExistentTenantId}/users/invite");
             x.StatusCodeShouldBe(400);
         });
     }
@@ -120,34 +120,34 @@ public sealed class UserInvitationTests : IClassFixture<VendorIdentityApiFixture
         // Arrange
         var tenantId = await CreateTenantAsync("Test Vendor 2", "contact@testvendor2.com");
 
-        var firstRequest = new
-        {
-            Email = "existing@testvendor.com",
-            FirstName = "First",
-            LastName = "User",
-            Role = VendorRole.Admin
-        };
+        var firstCommand = new InviteVendorUser(
+            tenantId,
+            "existing@testvendor.com",
+            "First",
+            "User",
+            VendorRole.Admin
+        );
 
         // Create first user
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(firstRequest).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/invite");
+            x.Post.Json(firstCommand).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/invite");
             x.StatusCodeShouldBe(201);
         });
 
         // Act - try to invite user with same email
-        var duplicateRequest = new
-        {
-            Email = "existing@testvendor.com",
-            FirstName = "Second",
-            LastName = "User",
-            Role = VendorRole.ReadOnly
-        };
+        var duplicateCommand = new InviteVendorUser(
+            tenantId,
+            "existing@testvendor.com",
+            "Second",
+            "User",
+            VendorRole.ReadOnly
+        );
 
         // Assert
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(duplicateRequest).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/invite");
+            x.Post.Json(duplicateCommand).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/invite");
             x.StatusCodeShouldBe(400);
         });
     }
@@ -158,18 +158,18 @@ public sealed class UserInvitationTests : IClassFixture<VendorIdentityApiFixture
         // Arrange
         var tenantId = await CreateTenantAsync("Test Vendor 3", "contact@testvendor3.com");
 
-        var request = new
-        {
-            Email = "not-an-email",
-            FirstName = "John",
-            LastName = "Doe",
-            Role = VendorRole.Admin
-        };
+        var command = new InviteVendorUser(
+            tenantId,
+            "not-an-email",
+            "John",
+            "Doe",
+            VendorRole.Admin
+        );
 
         // Act & Assert
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(request).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/invite");
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/invite");
             x.StatusCodeShouldBe(400);
         });
     }
@@ -180,18 +180,18 @@ public sealed class UserInvitationTests : IClassFixture<VendorIdentityApiFixture
         // Arrange
         var tenantId = await CreateTenantAsync("Test Vendor 4", "contact@testvendor4.com");
 
-        var request = new
-        {
-            Email = "user@example.com",
-            FirstName = "",
-            LastName = "Doe",
-            Role = VendorRole.Admin
-        };
+        var command = new InviteVendorUser(
+            tenantId,
+            "user@example.com",
+            "",
+            "Doe",
+            VendorRole.Admin
+        );
 
         // Act & Assert
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(request).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/invite");
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/invite");
             x.StatusCodeShouldBe(400);
         });
     }
@@ -202,18 +202,18 @@ public sealed class UserInvitationTests : IClassFixture<VendorIdentityApiFixture
         // Arrange
         var tenantId = await CreateTenantAsync("Test Vendor 5", "contact@testvendor5.com");
 
-        var request = new
-        {
-            Email = "tokentest@example.com",
-            FirstName = "Token",
-            LastName = "Test",
-            Role = VendorRole.Admin
-        };
+        var command = new InviteVendorUser(
+            tenantId,
+            "tokentest@example.com",
+            "Token",
+            "Test",
+            VendorRole.Admin
+        );
 
         // Act
         await _fixture.Host.Scenario(x =>
         {
-            x.Post.Json(request).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/invite");
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/invite");
             x.StatusCodeShouldBe(201);
         });
 

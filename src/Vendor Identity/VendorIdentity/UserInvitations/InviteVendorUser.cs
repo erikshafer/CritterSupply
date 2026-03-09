@@ -6,7 +6,7 @@ namespace VendorIdentity.UserInvitations;
 /// Invites a new user to a vendor tenant.
 /// </summary>
 public sealed record InviteVendorUser(
-    Guid VendorTenantId,
+    Guid TenantId,
     string Email,
     string FirstName,
     string LastName,

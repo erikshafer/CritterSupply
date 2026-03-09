@@ -10,7 +10,7 @@ namespace VendorIdentity.UserInvitations;
 
 public static class InviteVendorUserHandler
 {
-    [WolverinePost("/api/vendor-identity/tenants/{VendorTenantId}/users/invite")]
+    [WolverinePost("/api/vendor-identity/tenants/{tenantId}/users/invite")]
     public static async Task<(CreationResponse, OutgoingMessages)> Handle(
         InviteVendorUser command,
         VendorIdentityDbContext db,
@@ -26,7 +26,7 @@ public static class InviteVendorUserHandler
         var user = new VendorUser
         {
             Id = Guid.NewGuid(),
-            VendorTenantId = command.VendorTenantId,
+            VendorTenantId = command.TenantId,
             Email = command.Email,
             FirstName = command.FirstName,
             LastName = command.LastName,
@@ -41,7 +41,7 @@ public static class InviteVendorUserHandler
         {
             Id = Guid.NewGuid(),
             VendorUserId = user.Id,
-            VendorTenantId = command.VendorTenantId,
+            VendorTenantId = command.TenantId,
             Token = tokenHash,
             InvitedRole = command.Role,
             Status = InvitationStatus.Pending,
@@ -70,7 +70,7 @@ public static class InviteVendorUserHandler
         var outgoing = new OutgoingMessages();
         outgoing.Add(integrationEvent);
 
-        var response = new CreationResponse($"/api/vendor-identity/tenants/{command.VendorTenantId}/users/{user.Id}");
+        var response = new CreationResponse($"/api/vendor-identity/tenants/{command.TenantId}/users/{user.Id}");
 
         return (response, outgoing);
     }

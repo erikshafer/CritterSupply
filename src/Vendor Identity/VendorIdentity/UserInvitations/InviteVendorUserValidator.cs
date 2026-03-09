@@ -8,14 +8,14 @@ public sealed class InviteVendorUserValidator : AbstractValidator<InviteVendorUs
 {
     public InviteVendorUserValidator(VendorIdentityDbContext db)
     {
-        RuleFor(x => x.VendorTenantId)
+        RuleFor(x => x.TenantId)
             .NotEmpty()
-            .WithMessage("Vendor tenant ID is required")
+            .WithMessage("Tenant ID is required")
             .MustAsync(async (tenantId, cancellationToken) =>
             {
                 return await db.Tenants.AnyAsync(t => t.Id == tenantId, cancellationToken);
             })
-            .WithMessage("Vendor tenant '{PropertyValue}' does not exist");
+            .WithMessage("Tenant '{PropertyValue}' does not exist");
 
         RuleFor(x => x.Email)
             .NotEmpty()
