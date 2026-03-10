@@ -204,6 +204,9 @@ services:
       RabbitMQ__hostname: rabbitmq
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_SERVICE_NAME: ProductCatalog.Api
+      Jwt__SigningKey: "dev-only-signing-key-change-in-production-must-be-at-least-32-chars"
+      Jwt__Issuer: "vendor-identity"
+      Jwt__Audience: "vendor-portal"
     depends_on:
       postgres:
         condition: service_healthy
@@ -223,7 +226,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__postgres: "Host=postgres;Port=5432;Database=postgres;Username=postgres;Password=postgres"
+      ConnectionStrings__postgres: "Host=postgres;Port=5432;Database=pricing;Username=postgres;Password=postgres"
       RabbitMQ__hostname: rabbitmq
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_SERVICE_NAME: Pricing.Api
@@ -235,6 +238,61 @@ services:
     networks:
       - backend
     profiles: [all, pricing]
+
+  vendoridentity-api:
+    container_name: crittersupply-vendoridentity
+    build:
+      context: .
+      dockerfile: src/Vendor Identity/VendorIdentity.Api/Dockerfile
+    ports:
+      - "5240:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__postgres: "Host=postgres;Port=5432;Database=vendoridentity;Username=postgres;Password=postgres"
+      RabbitMQ__hostname: rabbitmq
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: VendorIdentity.Api
+      Jwt__SigningKey: "dev-only-signing-key-change-in-production-must-be-at-least-32-chars"
+      Jwt__Issuer: "vendor-identity"
+      Jwt__Audience: "vendor-portal"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    profiles: [all, vendor]
+
+  vendorportal-api:
+    container_name: crittersupply-vendorportal
+    build:
+      context: .
+      dockerfile: src/Vendor Portal/VendorPortal.Api/Dockerfile
+    ports:
+      - "5239:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__postgres: "Host=postgres;Port=5432;Database=vendorportal;Username=postgres;Password=postgres"
+      RabbitMQ__hostname: rabbitmq
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: VendorPortal.Api
+      Jwt__SigningKey: "dev-only-signing-key-change-in-production-must-be-at-least-32-chars"
+      Jwt__Issuer: "vendor-identity"
+      Jwt__Audience: "vendor-portal"
+      ApiClients__VendorIdentityApiUrl: "http://vendoridentity-api:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      vendoridentity-api:
+        condition: service_started
+    networks:
+      - backend
+    profiles: [all, vendor]
 
   storefront-api:
     container_name: crittersupply-storefront-api

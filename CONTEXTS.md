@@ -1419,6 +1419,7 @@ Product Catalog is a **read-heavy** BC with very different access patterns than 
 - `ProductAdded` - New product available in catalog (Inventory may create stock record)
 - `ProductUpdated` - Product details changed (Customer Experience may invalidate cached listings)
 - `ProductDiscontinued` - Product no longer available (Orders may prevent new purchases)
+- `VendorProductAssociated` - Published to `vendor-portal-product-associated` exchange when an admin assigns or reassigns a SKU to a vendor. Contains `PreviousVendorTenantId` (null on first assignment, non-null on reassignment) so subscribers can clean up old associations. Contains `ReassignmentNote?` for audit trail. VendorPortal.Api subscribes via `vendor-portal-product-associated` queue.
 
 **Note on Domain Events:**
 Product Catalog does NOT use event sourcing, so there are no persisted domain events. Changes to products are direct document updates. Only integration messages (listed above) are published to notify other BCs.
@@ -1534,11 +1535,14 @@ SearchProducts (query from Storefront)
 - `GET /api/products/tags/{tag}` - Products with specific tag
 
 **Admin Commands (merchandising team):**
-- `POST /api/admin/products` - Add new product
-- `PUT /api/admin/products/{sku}` - Update product details
-- `PUT /api/admin/products/{sku}/images` - Update product images
-- `PUT /api/admin/products/{sku}/status` - Change product status
-- `DELETE /api/admin/products/{sku}` - Soft delete (mark as discontinued)
+- `POST /api/products` - Add new product
+- `PATCH /api/products/{sku}/status` - Change product status
+- `PUT /api/products/{sku}` - Update product details
+
+**Admin Vendor Assignment (JWT Bearer + Admin role required):**
+- `POST /api/admin/products/{sku}/vendor-assignment` - Assign or reassign SKU to a vendor tenant. Body: `{ vendorTenantId: Guid, reassignmentNote?: string }`. Idempotent (same vendor → 200 no-op). Discontinued/deleted products → 400. Publishes `VendorProductAssociated` on success. **Note (Phase 2):** `VendorTenantId` is not validated against VendorIdentity.Api; invalid GUIDs create orphaned entries.
+- `GET /api/admin/products/{sku}/vendor-assignment` - Retrieve current vendor assignment for a SKU. Returns 404 if product does not exist. Returns 200 with `IsAssigned: false` if product exists but has no assignment. Returns 200 with `IsAssigned: true` and full assignment details if assigned.
+- `POST /api/admin/products/vendor-assignments/bulk` - Bulk assign up to 100 SKUs. Body: `{ assignments: [{ sku, vendorTenantId, reassignmentNote? }] }`. Returns HTTP 200 on full success, HTTP 207 (Multi-Status) on partial success, HTTP 400 if the request is invalid (empty list, >100 items). Each successful item publishes an individual `VendorProductAssociated` event. Succeeded items include `PreviousVendorTenantId` (null = new assignment, non-null = reassignment).
 
 **Category Queries:**
 - `GET /api/categories` - List all categories (hierarchical tree)
@@ -2190,7 +2194,7 @@ The divergence on authentication (JWT vs cookies) is **intentional** — require
 
 The Vendor Portal context provides partnered vendors with a private, tenant-isolated view into how their products perform within CritterSupply. Vendors can see real-time sales analytics, monitor inventory levels, and submit product change requests. The portal uses **SignalR** (via Wolverine's native transport) for bidirectional real-time communication — live analytics updates, change request decisions, and inventory alerts.
 
-**Status**: 🔜 Planned (Phase 2 of Vendor implementation — Phase 1 is Vendor Identity + VendorProductCatalog foundation)
+**Status**: 🚧 In Progress (Cycle 22 — Phase 1: VendorProductCatalog subscription implemented; admin assignment endpoints live in ProductCatalog.Api; full analytics/change-request UI is Phase 2)
 
 **Persistence Strategy**: Marten (document store for accounts/requests, projections for read models)
 
@@ -2236,13 +2240,19 @@ One tenant per vendor organization (`VendorTenantId` from Vendor Identity JWT cl
 `VendorProductCatalog` is populated by `VendorProductAssociated` events published by Catalog BC when an admin assigns a SKU to a vendor tenant. It provides the SKU→VendorTenantId lookup that all handlers use for tenant routing.
 
 ```
-VendorProductCatalog document:
-  Id: {Sku}                  (document ID is the SKU)
+VendorProductCatalogEntry document (Marten, schema: vendorportal):
+  Id: {Sku}                  (document ID is the SKU — O(1) lookup)
   Sku: string
   VendorTenantId: Guid
+  AssociatedBy: string       (admin username who made the assignment)
   AssociatedAt: DateTimeOffset
   IsActive: bool
 ```
+
+**Implemented (Cycle 22):** `VendorProductAssociatedHandler` in `VendorPortal` domain assembly
+upserts this document when it receives `VendorProductAssociated` from the
+`vendor-portal-product-associated` RabbitMQ queue. Supports both new assignments
+(`PreviousVendorTenantId = null`) and reassignments (non-null `PreviousVendorTenantId`).
 
 A bulk-assignment backfill admin command must exist alongside the individual assignment endpoint to handle existing SKUs when the portal first deploys.
 

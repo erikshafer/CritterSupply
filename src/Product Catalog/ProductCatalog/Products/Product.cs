@@ -25,6 +25,12 @@ public sealed record Product
     public DateTimeOffset AddedAt { get; init; }
     public DateTimeOffset? UpdatedAt { get; init; }
 
+    // Vendor assignment — set by admin via AssignProductToVendor endpoint.
+    // Null until the product is assigned to a vendor tenant.
+    public Guid? VendorTenantId { get; init; }
+    public string? AssignedBy { get; init; }
+    public DateTimeOffset? AssignedAt { get; init; }
+
     public Product() { }
 
     public static Product Create(
@@ -100,6 +106,21 @@ public sealed record Product
         {
             IsDeleted = true,
             UpdatedAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    /// <summary>
+    /// Assigns this product to a vendor tenant.
+    /// Used by the admin AssignProductToVendor endpoint.
+    /// </summary>
+    public Product AssignToVendor(Guid vendorTenantId, string assignedBy, DateTimeOffset assignedAt)
+    {
+        return this with
+        {
+            VendorTenantId = vendorTenantId,
+            AssignedBy = assignedBy,
+            AssignedAt = assignedAt,
+            UpdatedAt = assignedAt
         };
     }
 
