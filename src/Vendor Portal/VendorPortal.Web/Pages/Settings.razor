@@ -5,6 +5,7 @@
 @inject VendorAuthState AuthState
 @inject IHttpClientFactory HttpClientFactory
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 @inject ILogger<Settings> Logger
 
 <PageTitle>Settings — Vendor Portal</PageTitle>
@@ -16,7 +17,7 @@
 
 @* ─── Notification Preferences ─── *@
 <MudPaper Elevation="2" Class="pa-4 mb-4">
-    <MudText Typo="Typo.h6" GutterBottom="true">
+    <MudText Typo="Typo.h6" GutterBottom="true" id="notification-prefs-heading">
         <MudIcon Icon="@Icons.Material.Filled.Notifications" Class="mr-1" aria-hidden="true" />
         Notification Preferences
     </MudText>
@@ -31,19 +32,39 @@
     }
     else
     {
-        <MudStack Spacing="2">
-            <MudSwitch @bind-Value="_lowStockAlerts" Color="Color.Primary"
-                       Label="Low Stock Alerts"
-                       data-testid="pref-low-stock-alerts" />
-            <MudSwitch @bind-Value="_changeRequestDecisions" Color="Color.Primary"
-                       Label="Change Request Decisions"
-                       data-testid="pref-change-request-decisions" />
-            <MudSwitch @bind-Value="_inventoryUpdates" Color="Color.Primary"
-                       Label="Inventory Updates"
-                       data-testid="pref-inventory-updates" />
-            <MudSwitch @bind-Value="_salesMetrics" Color="Color.Primary"
-                       Label="Sales Metrics"
-                       data-testid="pref-sales-metrics" />
+        <MudStack Spacing="2" role="group" aria-labelledby="notification-prefs-heading">
+            <div>
+                <MudSwitch @bind-Value="_lowStockAlerts" Color="Color.Primary"
+                           Label="Low Stock Alerts"
+                           data-testid="pref-low-stock-alerts" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-12 mt-n1 mb-1">
+                    Get notified when your products drop below their restock threshold.
+                </MudText>
+            </div>
+            <div>
+                <MudSwitch @bind-Value="_changeRequestDecisions" Color="Color.Primary"
+                           Label="Change Request Decisions"
+                           data-testid="pref-change-request-decisions" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-12 mt-n1 mb-1">
+                    Receive updates when the catalog team approves, rejects, or asks questions about your requests.
+                </MudText>
+            </div>
+            <div>
+                <MudSwitch @bind-Value="_inventoryUpdates" Color="Color.Primary"
+                           Label="Inventory Updates"
+                           data-testid="pref-inventory-updates" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-12 mt-n1 mb-1">
+                    See live inventory level changes on your dashboard as stock moves.
+                </MudText>
+            </div>
+            <div>
+                <MudSwitch @bind-Value="_salesMetrics" Color="Color.Primary"
+                           Label="Sales Metrics"
+                           data-testid="pref-sales-metrics" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-12 mt-n1 mb-1">
+                    Receive periodic sales data updates on your dashboard.
+                </MudText>
+            </div>
         </MudStack>
 
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
@@ -85,7 +106,8 @@
     else
     {
         <MudTable Items="@_savedViews" Dense="true" Hover="true" Striped="true"
-                  data-testid="saved-views-table">
+                  data-testid="saved-views-table"
+                  aria-label="Saved dashboard views">
             <HeaderContent>
                 <MudTh>View Name</MudTh>
                 <MudTh>Created</MudTh>
@@ -103,7 +125,7 @@
                                    Title="Delete saved view"
                                    aria-label="@($"Delete saved view: {context.ViewName}")"
                                    data-testid="@($"delete-view-{context.ViewId}")"
-                                   OnClick="@(() => DeleteViewAsync(context.ViewId))" />
+                                   OnClick="@(() => ConfirmDeleteViewAsync(context.ViewId, context.ViewName))" />
                 </MudTd>
             </RowTemplate>
         </MudTable>
@@ -212,6 +234,23 @@
         {
             _isLoadingViews = false;
         }
+    }
+
+    private async Task ConfirmDeleteViewAsync(Guid viewId, string viewName)
+    {
+        var parameters = new DialogParameters<MudMessageBox>
+        {
+            { x => x.Title, "Delete Saved View" },
+            { x => x.MarkupMessage, new MarkupString($"Delete \"{viewName}\"? This cannot be undone.") },
+            { x => x.YesText, "Delete" },
+            { x => x.CancelText, "Cancel" },
+        };
+
+        var dialog = await DialogService.ShowAsync<MudMessageBox>("Delete Saved View", parameters);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
+            await DeleteViewAsync(viewId);
     }
 
     private async Task DeleteViewAsync(Guid viewId)
