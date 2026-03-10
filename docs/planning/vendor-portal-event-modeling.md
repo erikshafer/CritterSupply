@@ -723,13 +723,15 @@ InventoryAdjusted(string Sku, string WarehouseId, int QuantityChange, int NewQua
 
 ---
 
-### Phase 5 — Saved Views + VendorAccount
+### Phase 5 — Saved Views + VendorAccount ✅ (Cycle 22)
 
-- [ ] `VendorAccount` aggregate (initialized by `VendorTenantCreated`)
-- [ ] `SaveDashboardView` / `DeleteDashboardView` commands
-- [ ] `UpdateNotificationPreferences` command (opt-out defaults: all notifications on by default)
-- [ ] `VendorPortal.Web`: saved views selector, notification preferences settings page
-- [ ] HTTP endpoints for account management
+- [x] `VendorAccount` Marten document (initialized by `VendorTenantCreated`, Id = VendorTenantId)
+- [x] `SaveDashboardView` / `DeleteDashboardView` commands (with duplicate name guard)
+- [x] `UpdateNotificationPreferences` command (opt-out defaults: all notifications on by default)
+- [x] `VendorPortal.Web`: Settings page with notification preferences + saved views management
+- [x] HTTP endpoints for account management (5 endpoints, JWT-authenticated)
+- [x] RabbitMQ queue subscription: `vendor-portal-tenant-created`
+- [x] 27 integration tests (86 total across all phases)
 
 ---
 

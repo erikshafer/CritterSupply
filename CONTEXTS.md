@@ -2194,7 +2194,7 @@ The divergence on authentication (JWT vs cookies) is **intentional** — require
 
 The Vendor Portal context provides partnered vendors with a private, tenant-isolated view into how their products perform within CritterSupply. Vendors can see real-time sales analytics, monitor inventory levels, and submit product change requests. The portal uses **SignalR** (via Wolverine's native transport) for bidirectional real-time communication — live analytics updates, change request decisions, and inventory alerts.
 
-**Status**: 🚧 In Progress (Cycle 22 — Phases 1–4 complete: VendorProductCatalog subscription, JWT auth + SignalR hub, live analytics dashboard, Change Request full lifecycle; Phase 5+ deferred to backlog)
+**Status**: 🚧 In Progress (Cycle 22 — Phases 1–5 complete: VendorProductCatalog subscription, JWT auth + SignalR hub, live analytics dashboard, Change Request full lifecycle, VendorAccount + Saved Views + Notification Preferences; Phase 6+ deferred to backlog)
 
 **Persistence Strategy**: Marten (document store for accounts/requests, projections for read models)
 
@@ -2569,11 +2569,11 @@ VendorTenantTerminated (from Vendor Identity)
 - `GET /api/vendor-portal/change-requests/{requestId}` - Get request detail with full audit trail
 
 **Account Management:**
-- `GET /api/vendor-portal/account` - Get vendor account settings
-- `PUT /api/vendor-portal/account/notifications` - Update notification preferences (default: all on)
-- `POST /api/vendor-portal/account/views` - Save dashboard view configuration
-- `GET /api/vendor-portal/account/views` - List saved views
-- `DELETE /api/vendor-portal/account/views/{viewId}` - Delete saved view
+- `GET /api/vendor-portal/account/preferences` - Get notification preferences (defaults to all-on if no account)
+- `PUT /api/vendor-portal/account/preferences` - Update notification preferences (opt-out model: all on by default)
+- `GET /api/vendor-portal/account/dashboard-views` - List saved dashboard views
+- `POST /api/vendor-portal/account/dashboard-views` - Save dashboard view configuration (409 on duplicate name)
+- `DELETE /api/vendor-portal/account/dashboard-views/{viewId}` - Delete saved view
 
 **SignalR Hub:**
 - `WS /hub/vendor-portal?access_token={jwt}` - SignalR WebSocket connection
@@ -2614,9 +2614,14 @@ VendorTenantTerminated (from Vendor Identity)
 - Catalog BC stubs for approval workflow
 - VendorPortal.Web: change request pages
 
-**Phase 5 — Saved Views + VendorAccount**
-- `VendorAccount` aggregate; `SaveDashboardView` / `UpdateNotificationPreferences` commands
-- VendorPortal.Web: saved views selector, notification preferences
+**Phase 5 — Saved Views + VendorAccount** ✅ (Cycle 22)
+- `VendorAccount` Marten document (Id = VendorTenantId, initialized by `VendorTenantCreated`)
+- `NotificationPreferences` with opt-out model (4 toggles, all default true)
+- `SaveDashboardView` / `DeleteDashboardView` / `UpdateNotificationPreferences` commands
+- Duplicate view name guard (case-insensitive, returns 409 Conflict)
+- VendorPortal.Web: Settings page (notification preferences, saved views management)
+- RabbitMQ queue: `vendor-portal-tenant-created`
+- 27 integration tests (86 total across all phases)
 
 **Phase 6 — Full Identity Lifecycle + Admin Tools**
 - Invitation expiry job, resend/revoke, reactivation, role changes
