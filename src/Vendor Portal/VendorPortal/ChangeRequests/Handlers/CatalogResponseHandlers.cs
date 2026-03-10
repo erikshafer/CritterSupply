@@ -24,7 +24,7 @@ public static class DescriptionChangeApprovedHandler
         return
         [
             new ChangeRequestStatusUpdated(request.VendorTenantId, request.Id, request.Sku, "Approved", @event.ApprovedAt),
-            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "Approved", null, @event.ApprovedAt)
+            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "Approved", null, @event.ApprovedAt, request.Type.ToString())
         ];
     }
 }
@@ -51,7 +51,7 @@ public static class DescriptionChangeRejectedHandler
         return
         [
             new ChangeRequestStatusUpdated(request.VendorTenantId, request.Id, request.Sku, "Rejected", @event.RejectedAt),
-            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "Rejected", reason, @event.RejectedAt)
+            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "Rejected", reason, @event.RejectedAt, request.Type.ToString())
         ];
     }
 }
@@ -76,7 +76,7 @@ public static class ImageChangeApprovedHandler
         return
         [
             new ChangeRequestStatusUpdated(request.VendorTenantId, request.Id, request.Sku, "Approved", @event.ApprovedAt),
-            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "Approved", null, @event.ApprovedAt)
+            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "Approved", null, @event.ApprovedAt, request.Type.ToString())
         ];
     }
 }
@@ -103,7 +103,7 @@ public static class ImageChangeRejectedHandler
         return
         [
             new ChangeRequestStatusUpdated(request.VendorTenantId, request.Id, request.Sku, "Rejected", @event.RejectedAt),
-            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "Rejected", reason, @event.RejectedAt)
+            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "Rejected", reason, @event.RejectedAt, request.Type.ToString())
         ];
     }
 }
@@ -128,7 +128,7 @@ public static class DataCorrectionApprovedHandler
         return
         [
             new ChangeRequestStatusUpdated(request.VendorTenantId, request.Id, request.Sku, "Approved", @event.ApprovedAt),
-            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "Approved", null, @event.ApprovedAt)
+            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "Approved", null, @event.ApprovedAt, request.Type.ToString())
         ];
     }
 }
@@ -155,7 +155,7 @@ public static class DataCorrectionRejectedHandler
         return
         [
             new ChangeRequestStatusUpdated(request.VendorTenantId, request.Id, request.Sku, "Rejected", @event.RejectedAt),
-            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "Rejected", reason, @event.RejectedAt)
+            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "Rejected", reason, @event.RejectedAt, request.Type.ToString())
         ];
     }
 }
@@ -183,7 +183,7 @@ public static class MoreInfoRequestedForChangeRequestHandler
         return
         [
             new ChangeRequestStatusUpdated(request.VendorTenantId, request.Id, request.Sku, "NeedsMoreInfo", @event.RequestedAt),
-            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "NeedsMoreInfo", @event.Question, @event.RequestedAt)
+            new ChangeRequestDecisionPersonal(request.SubmittedByUserId, request.Id, request.Sku, "NeedsMoreInfo", @event.Question, @event.RequestedAt, request.Type.ToString())
         ];
     }
 }

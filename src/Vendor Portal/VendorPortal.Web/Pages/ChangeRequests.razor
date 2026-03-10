@@ -30,18 +30,20 @@
 </div>
 
 @* Status filter chips *@
-<MudPaper Elevation="0" Class="mb-3 d-flex gap-2 flex-wrap">
+<MudPaper Elevation="0" Class="mb-3 d-flex gap-2 flex-wrap" role="group" aria-label="Filter by status">
     <MudChip T="string" Color="@(_statusFilter == null ? Color.Primary : Color.Default)"
              Variant="@(_statusFilter == null ? Variant.Filled : Variant.Outlined)"
-             OnClick="@(() => ApplyFilter(null))" Size="Size.Small">
+             OnClick="@(() => ApplyFilter(null))" Size="Size.Small"
+             aria-pressed="@(_statusFilter == null ? "true" : "false")">
         All
     </MudChip>
     @foreach (var status in _availableStatuses)
     {
         <MudChip T="string" Color="@(_statusFilter == status ? Color.Primary : Color.Default)"
                  Variant="@(_statusFilter == status ? Variant.Filled : Variant.Outlined)"
-                 OnClick="@(() => ApplyFilter(status))" Size="Size.Small">
-            @status
+                 OnClick="@(() => ApplyFilter(status))" Size="Size.Small"
+                 aria-pressed="@(_statusFilter == status ? "true" : "false")">
+            @GetStatusLabel(status)
         </MudChip>
     }
 </MudPaper>
@@ -53,10 +55,23 @@
 else if (_items is null or { Count: 0 })
 {
     <MudAlert Severity="Severity.Info" data-testid="no-requests-message">
-        No change requests found.
-        @if (AuthState.CanSubmitChangeRequests && _statusFilter is null)
+        @if (_statusFilter is not null)
         {
-            <span> <MudLink Href="/change-requests/submit">Submit your first change request.</MudLink></span>
+            <span>No <strong>@GetStatusLabel(_statusFilter)</strong> change requests found. </span>
+            <MudButton Variant="Variant.Text" Color="Color.Info" Size="Size.Small"
+                       OnClick="@(() => ApplyFilter(null))"
+                       Style="min-width:auto; text-transform:none; font-size:inherit; padding:0; vertical-align:baseline;">
+                Clear filter
+            </MudButton>
+            <span> to see all requests.</span>
+        }
+        else
+        {
+            <span>No change requests found.</span>
+            @if (AuthState.CanSubmitChangeRequests)
+            {
+                <span> <MudLink Href="/change-requests/submit">Submit your first change request.</MudLink></span>
+            }
         }
     </MudAlert>
 }
@@ -77,7 +92,7 @@ else
             <MudTd DataLabel="Title">@context.Title</MudTd>
             <MudTd DataLabel="Type">
                 <MudChip T="string" Size="Size.Small" Color="GetTypeColor(context.Type)" Variant="Variant.Outlined">
-                    @context.Type
+                    @GetTypeLabel(context.Type)
                 </MudChip>
             </MudTd>
             <MudTd DataLabel="Status">
@@ -170,6 +185,12 @@ else
     {
         "NeedsMoreInfo" => "Needs More Info",
         _ => status
+    };
+
+    private static string GetTypeLabel(string type) => type switch
+    {
+        "DataCorrection" => "Data Correction",
+        _ => type
     };
 
     private static Color GetTypeColor(string type) => type switch

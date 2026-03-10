@@ -6,10 +6,11 @@
 @inject IHttpClientFactory HttpClientFactory
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject IDialogService DialogService
 
-<PageTitle>Change Request Detail — Vendor Portal</PageTitle>
+<PageTitle>@(_request?.Title is not null ? $"{_request.Title} — Vendor Portal" : "Change Request — Vendor Portal")</PageTitle>
 
-<MudBreadcrumbs Items="_breadcrumbs" Class="mb-4 pa-0" />
+<MudBreadcrumbs Items="Breadcrumbs" Class="mb-4 pa-0" />
 
 @if (_isLoading)
 {
@@ -17,7 +18,10 @@
 }
 else if (_request is null)
 {
-    <MudAlert Severity="Severity.Error">Change request not found.</MudAlert>
+    <MudAlert Severity="Severity.Error">
+        Change request not found.
+        <MudLink Href="/change-requests" Class="ml-1">Back to Change Requests</MudLink>
+    </MudAlert>
 }
 else
 {
@@ -70,7 +74,15 @@ else
                                    OnClick="ProvideAdditionalInfo"
                                    Disabled="_isActioning || string.IsNullOrWhiteSpace(_additionalInfoResponse)"
                                    data-testid="provide-info-btn">
-                            Submit Response
+                            @if (_isActioning)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                <span>Submitting…</span>
+                            }
+                            else
+                            {
+                                <span>Submit Response</span>
+                            }
                         </MudButton>
                     }
                 </MudAlert>
@@ -87,6 +99,18 @@ else
                             <MudLink Href="/change-requests/submit">Submit a new request</MudLink> to address the feedback.
                         </MudText>
                     }
+                </MudAlert>
+            }
+
+            @if (_request.Status == "Superseded" && _request.ReplacedByRequestId.HasValue)
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-4" data-testid="superseded-alert">
+                    <MudText Typo="Typo.body2">
+                        This request was superseded by a newer submission.
+                        <MudLink Href="@($"/change-requests/{_request.ReplacedByRequestId.Value}")" Class="ml-1">
+                            View replacement request
+                        </MudLink>
+                    </MudText>
                 </MudAlert>
             }
         </MudItem>
@@ -128,19 +152,45 @@ else
                 </MudTimeline>
             </MudPaper>
 
-            @if (CanWithdraw)
+            @if (CanSubmit || CanWithdraw)
             {
                 <MudPaper Elevation="2" Class="pa-4">
                     <MudText Typo="Typo.h6" GutterBottom="true">Actions</MudText>
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Error"
-                               StartIcon="@Icons.Material.Filled.Cancel"
-                               FullWidth="true"
-                               OnClick="WithdrawRequest"
-                               Disabled="_isActioning"
-                               data-testid="withdraw-btn">
-                        Withdraw Request
-                    </MudButton>
+
+                    @if (CanSubmit)
+                    {
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Send"
+                                   FullWidth="true"
+                                   OnClick="SubmitDraft"
+                                   Disabled="_isActioning"
+                                   Class="mb-2"
+                                   data-testid="submit-draft-btn">
+                            @if (_isActioning)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                <span>Submitting…</span>
+                            }
+                            else
+                            {
+                                <span>Submit Request</span>
+                            }
+                        </MudButton>
+                    }
+
+                    @if (CanWithdraw)
+                    {
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Error"
+                                   StartIcon="@Icons.Material.Filled.Cancel"
+                                   FullWidth="true"
+                                   OnClick="ConfirmWithdraw"
+                                   Disabled="_isActioning"
+                                   data-testid="withdraw-btn">
+                            Withdraw Request
+                        </MudButton>
+                    }
                 </MudPaper>
             }
         </MudItem>
@@ -155,15 +205,26 @@ else
     private bool _isActioning;
     private string _additionalInfoResponse = string.Empty;
 
+    // CanWithdraw: only for Submitted/NeedsMoreInfo — these have been sent to the Catalog team and can be recalled.
+    // Draft is excluded because drafts have never left the vendor's control; the right action is to Submit them.
+    // Read-only roles (non-CanSubmitChangeRequests) may view but cannot act.
     private bool CanWithdraw =>
         _request is not null &&
-        _request.Status is "Draft" or "Submitted" or "NeedsMoreInfo";
+        AuthState.CanSubmitChangeRequests &&
+        _request.Status is "Submitted" or "NeedsMoreInfo";
 
-    private static readonly IReadOnlyList<BreadcrumbItem> _breadcrumbs =
+    // Draft-only: vendor needs to explicitly submit after saving a draft
+    private bool CanSubmit =>
+        _request is not null &&
+        AuthState.CanSubmitChangeRequests &&
+        _request.Status is "Draft";
+
+    // Computed so the breadcrumb title updates once the request loads
+    private IReadOnlyList<BreadcrumbItem> Breadcrumbs =>
     [
         new BreadcrumbItem("Dashboard", href: "/dashboard"),
         new BreadcrumbItem("Change Requests", href: "/change-requests"),
-        new BreadcrumbItem("Detail", href: null, disabled: true)
+        new BreadcrumbItem(_request?.Title ?? "Detail", href: null, disabled: true)
     ];
 
     protected override async Task OnInitializedAsync()
@@ -201,6 +262,50 @@ else
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task ConfirmWithdraw()
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            title: "Withdraw Change Request",
+            message: "Are you sure you want to withdraw this request? This action cannot be undone.",
+            yesText: "Withdraw",
+            cancelText: "Cancel");
+
+        if (confirmed == true)
+            await WithdrawRequest();
+    }
+
+    private async Task SubmitDraft()
+    {
+        _isActioning = true;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("VendorPortalApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.PostAsync(
+                $"/api/vendor-portal/change-requests/{RequestId}/submit", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Change request submitted.", Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to submit. Please try again.", Severity.Error);
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Failed to submit change request.", Severity.Error);
+        }
+        finally
+        {
+            _isActioning = false;
         }
     }
 

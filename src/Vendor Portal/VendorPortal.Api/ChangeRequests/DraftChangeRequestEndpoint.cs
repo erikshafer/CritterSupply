@@ -11,7 +11,7 @@ namespace VendorPortal.Api.ChangeRequests;
 public sealed record DraftChangeRequestRequest(
     Guid RequestId,
     string Sku,
-    ChangeRequestType Type,
+    string Type,
     string Title,
     string Details,
     string? AdditionalNotes = null,
@@ -58,12 +58,15 @@ public sealed class DraftChangeRequestEndpoint
         if (string.IsNullOrWhiteSpace(body.Details))
             return Results.BadRequest("Details is required.");
 
+        if (!Enum.TryParse<ChangeRequestType>(body.Type, ignoreCase: true, out var changeRequestType))
+            return Results.BadRequest("Invalid change request type. Valid values: Description, Image, DataCorrection.");
+
         var command = new DraftChangeRequest(
             RequestId: body.RequestId == Guid.Empty ? Guid.NewGuid() : body.RequestId,
             VendorTenantId: tenantId,
             SubmittedByUserId: userId,
             Sku: body.Sku,
-            Type: body.Type,
+            Type: changeRequestType,
             Title: body.Title,
             Details: body.Details,
             AdditionalNotes: body.AdditionalNotes,

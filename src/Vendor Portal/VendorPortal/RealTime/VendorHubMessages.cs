@@ -55,7 +55,8 @@ public sealed record ChangeRequestDecisionPersonal(
     string Sku,
     string Decision,
     string? Reason,
-    DateTimeOffset DecidedAt) : IVendorUserMessage;
+    DateTimeOffset DecidedAt,
+    string? ChangeType = null) : IVendorUserMessage;
 
 /// <summary>
 /// Pushed to <c>user:{userId}</c> when the user's account is deactivated.

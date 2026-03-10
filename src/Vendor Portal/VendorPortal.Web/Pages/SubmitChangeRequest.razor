@@ -53,6 +53,7 @@
                       RequiredError="Title is required"
                       HelperText="Short summary (shown in list views)"
                       MaxLength="120"
+                      Counter="120"
                       Class="mb-4"
                       data-testid="title-field" />
 
@@ -92,7 +93,7 @@
             <MudButton Variant="Variant.Outlined"
                        Color="Color.Secondary"
                        OnClick="SaveDraft"
-                       Disabled="_isSubmitting || !_isFormValid"
+                       Disabled="_isSubmitting || string.IsNullOrWhiteSpace(_sku)"
                        data-testid="save-draft-btn">
                 Save as Draft
             </MudButton>
@@ -151,8 +152,17 @@
 
     private async Task Submit(bool submitAfterDraft)
     {
-        await _form.Validate();
-        if (!_isFormValid) return;
+        if (submitAfterDraft)
+        {
+            // Full validation required before submitting to the Catalog team
+            await _form.Validate();
+            if (!_isFormValid) return;
+        }
+        else
+        {
+            // Drafts only require a SKU — vendor may not have finished writing details yet
+            if (string.IsNullOrWhiteSpace(_sku)) return;
+        }
 
         _isSubmitting = true;
         _errorMessage = string.Empty;
@@ -195,7 +205,7 @@
                 }
                 else
                 {
-                    Snackbar.Add("Draft saved. Failed to submit — please submit from the list view.", Severity.Warning);
+                    Snackbar.Add("Draft saved. Failed to submit — open the draft from your change requests list to try again.", Severity.Warning);
                 }
             }
             else

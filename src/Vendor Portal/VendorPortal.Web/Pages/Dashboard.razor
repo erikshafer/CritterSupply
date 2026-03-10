@@ -10,6 +10,7 @@
 @inject VendorHubService HubService
 @inject IHttpClientFactory HttpClientFactory
 @inject ISnackbar Snackbar
+@inject NavigationManager Navigation
 @implements IDisposable
 
 <PageTitle>Dashboard — Vendor Portal</PageTitle>
@@ -251,9 +252,16 @@
                 }
                 else if (eventType?.EndsWith("ChangeRequestStatusUpdated") == true)
                 {
-                    // Refresh the pending change request count on the dashboard KPI card
+                    // Refresh the pending change request count on the dashboard KPI card.
+                    // This is a tenant-broadcast — all vendor users see their count update.
                     _lastHubMessageAt = DateTimeOffset.UtcNow;
                     await LoadDashboardAsync();
+                }
+                else if (eventType?.EndsWith("ChangeRequestDecisionPersonal") == true)
+                {
+                    // Personal decision notification — only the submitting user receives this.
+                    // Show an actionable toast with the decision context per spec.
+                    ShowChangeRequestDecisionToast(envelope);
                 }
             });
     }
@@ -341,6 +349,78 @@
         if (!envelope.TryGetProperty("type", out var typeEl)) return false;
         eventType = typeEl.GetString();
         return eventType is not null;
+    }
+
+    /// <summary>
+    /// Shows a personalized snackbar toast when the vendor user receives a personal decision notification.
+    /// Only the submitting user receives <c>ChangeRequestDecisionPersonal</c> (routed to user:{userId}).
+    /// Decisions: "Approved", "Rejected", "NeedsMoreInfo" — each with distinct copy and action per spec.
+    /// </summary>
+    private void ShowChangeRequestDecisionToast(JsonElement envelope)
+    {
+        try
+        {
+            if (!envelope.TryGetProperty("data", out var data)) return;
+
+            // Property names match the C# record serialized as camelCase by System.Text.Json:
+            // ChangeRequestDecisionPersonal(VendorUserId, RequestId, Sku, Decision, Reason, DecidedAt)
+            var decision = data.TryGetProperty("decision", out var decisionEl) ? decisionEl.GetString() : null;
+            var sku = data.TryGetProperty("sku", out var skuEl) ? skuEl.GetString() : null;
+            var reason = data.TryGetProperty("reason", out var reasonEl) ? reasonEl.GetString() : null;
+            var requestId = data.TryGetProperty("requestId", out var idEl) && idEl.TryGetGuid(out var parsedId)
+                ? parsedId : (Guid?)null;
+
+            switch (decision)
+            {
+                case "Approved":
+                    var approvedMsg = sku is not null
+                        ? $"✅ Change request for {sku} approved!"
+                        : "✅ Your change request was approved!";
+                    Snackbar.Add(approvedMsg, Severity.Success, config =>
+                    {
+                        if (requestId.HasValue)
+                        {
+                            config.Action = "View";
+                            config.ActionColor = Color.Success;
+                            config.OnClick = _ => { Navigation.NavigateTo($"/change-requests/{requestId.Value}"); return Task.CompletedTask; };
+                        }
+                    });
+                    break;
+
+                case "Rejected":
+                    var rejectedMsg = !string.IsNullOrWhiteSpace(reason)
+                        ? $"❌ Change request rejected: '{reason}'"
+                        : "❌ Your change request was rejected.";
+                    Snackbar.Add(rejectedMsg, Severity.Error, config =>
+                    {
+                        // Rejection reason warrants longer display so the vendor has time to read it
+                        config.VisibleStateDuration = 8000;
+                        if (requestId.HasValue)
+                        {
+                            config.Action = "View";
+                            config.ActionColor = Color.Error;
+                            config.OnClick = _ => { Navigation.NavigateTo($"/change-requests/{requestId.Value}"); return Task.CompletedTask; };
+                        }
+                    });
+                    break;
+
+                case "NeedsMoreInfo":
+                    Snackbar.Add("📋 The Catalog team has a question for you.", Severity.Warning, config =>
+                    {
+                        config.Action = "View";
+                        config.ActionColor = Color.Warning;
+                        var destination = requestId.HasValue
+                            ? $"/change-requests/{requestId.Value}"
+                            : "/change-requests";
+                        config.OnClick = _ => { Navigation.NavigateTo(destination); return Task.CompletedTask; };
+                    });
+                    break;
+            }
+        }
+        catch
+        {
+            // Toast failure is non-critical — the KPI count refresh handles the authoritative state
+        }
     }
 
     private static string GetSkuFromEnvelope(JsonElement envelope)
