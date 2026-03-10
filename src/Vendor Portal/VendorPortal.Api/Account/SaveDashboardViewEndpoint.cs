@@ -34,7 +34,8 @@ public sealed class SaveDashboardViewEndpoint
         if (tenantIdString is null || !Guid.TryParse(tenantIdString, out var tenantId))
             return Results.Unauthorized();
 
-        if (string.IsNullOrWhiteSpace(request.ViewName))
+        var viewName = request.ViewName?.Trim();
+        if (string.IsNullOrWhiteSpace(viewName))
             return Results.BadRequest("View name is required.");
 
         // Pre-check: distinguish between 404 (no account) and 409 (duplicate name)
@@ -44,7 +45,7 @@ public sealed class SaveDashboardViewEndpoint
 
         var command = new SaveDashboardViewCommand(
             VendorTenantId: tenantId,
-            ViewName: request.ViewName.Trim(),
+            ViewName: viewName,
             FilterCriteria: request.FilterCriteria ?? new DashboardFilterCriteria());
 
         var savedView = await bus.InvokeAsync<SavedDashboardView?>(command, ct);

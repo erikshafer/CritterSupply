@@ -241,7 +241,7 @@
         var parameters = new DialogParameters<MudMessageBox>
         {
             { x => x.Title, "Delete Saved View" },
-            { x => x.MarkupMessage, new MarkupString($"Delete \"{viewName}\"? This cannot be undone.") },
+            { x => x.Message, $"Delete \"{viewName}\"? This cannot be undone." },
             { x => x.YesText, "Delete" },
             { x => x.CancelText, "Cancel" },
         };
