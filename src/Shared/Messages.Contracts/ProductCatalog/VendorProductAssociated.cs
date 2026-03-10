@@ -13,10 +13,16 @@ namespace Messages.Contracts.ProductCatalog;
 /// Null when this is a new assignment; non-null when this is a reassignment from another vendor.
 /// Subscribers can use this to clean up old vendor associations.
 /// </param>
+/// <param name="ReassignmentNote">
+/// Optional admin note explaining why the assignment or reassignment was made.
+/// Null for first-time assignments unless an explicit note was provided.
+/// Used for audit trail (e.g., "Contract Termination", "Acquisition", "Data Entry Correction").
+/// </param>
 public sealed record VendorProductAssociated(
     string Sku,
     Guid VendorTenantId,
     string AssociatedBy,
     DateTimeOffset AssociatedAt,
-    Guid? PreviousVendorTenantId = null
+    Guid? PreviousVendorTenantId = null,
+    string? ReassignmentNote = null
 );

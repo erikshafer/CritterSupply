@@ -46,15 +46,23 @@ public sealed class AssignProductToVendorTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetVendorAssignment_Returns404_WhenProductHasNoAssignment()
+    public async Task GetVendorAssignment_Returns200_WhenProductHasNoAssignment()
     {
         await SeedProductAsync("UNASSIGNED-001");
 
-        await _fixture.Host.Scenario(s =>
+        var result = await _fixture.Host.Scenario(s =>
         {
             s.Get.Url("/api/admin/products/UNASSIGNED-001/vendor-assignment");
-            s.StatusCodeShouldBe(404);
+            s.StatusCodeShouldBe(200);
         });
+
+        var response = await result.ReadAsJsonAsync<VendorAssignmentResponse>();
+        response.ShouldNotBeNull();
+        response.Sku.ShouldBe("UNASSIGNED-001");
+        response.IsAssigned.ShouldBeFalse();
+        response.VendorTenantId.ShouldBeNull();
+        response.AssignedBy.ShouldBeNull();
+        response.AssignedAt.ShouldBeNull();
     }
 
     [Fact]
@@ -82,9 +90,10 @@ public sealed class AssignProductToVendorTests : IAsyncLifetime
         var response = await result.ReadAsJsonAsync<VendorAssignmentResponse>();
         response.ShouldNotBeNull();
         response.Sku.ShouldBe("ASSIGNED-001");
+        response.IsAssigned.ShouldBeTrue();
         response.VendorTenantId.ShouldBe(vendorId);
         response.AssignedBy.ShouldBe("system");
-        response.AssignedAt.ShouldBeGreaterThan(DateTimeOffset.UtcNow.AddMinutes(-1));
+        response.AssignedAt!.Value.ShouldBeGreaterThan(DateTimeOffset.UtcNow.AddMinutes(-1));
     }
 
     // ── POST (single assignment) ───────────────────────────────────────────
@@ -145,6 +154,7 @@ public sealed class AssignProductToVendorTests : IAsyncLifetime
         var response = await result.ReadAsJsonAsync<VendorAssignmentResponse>();
         response.ShouldNotBeNull();
         response.Sku.ShouldBe("ASSIGN-SUCCESS-001");
+        response.IsAssigned.ShouldBeTrue();
         response.VendorTenantId.ShouldBe(vendorId);
         response.PreviousVendorTenantId.ShouldBeNull(); // first-time assignment
 
@@ -178,6 +188,7 @@ public sealed class AssignProductToVendorTests : IAsyncLifetime
 
         var response = await result.ReadAsJsonAsync<VendorAssignmentResponse>();
         response.ShouldNotBeNull();
+        response.IsAssigned.ShouldBeTrue();
         response.VendorTenantId.ShouldBe(vendorId);
 
         // Verify product document still shows original vendor (not a duplicate write)
@@ -320,5 +331,78 @@ public sealed class AssignProductToVendorTests : IAsyncLifetime
         var response = await result.ReadAsJsonAsync<BulkAssignmentResult>();
         response.ShouldNotBeNull();
         response.Failed[0].ReasonCode.ShouldBe("ProductDiscontinued");
+    }
+
+    [Fact]
+    public async Task BulkAssign_SetsPreviousVendorTenantId_OnReassignment()
+    {
+        await SeedProductAsync("REASSIGN-BULK-001");
+
+        var vendorA = Guid.NewGuid();
+        var vendorB = Guid.NewGuid();
+
+        // First assign to Vendor A
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new AssignProductToVendor(vendorA))
+                .ToUrl("/api/admin/products/REASSIGN-BULK-001/vendor-assignment");
+            s.StatusCodeShouldBe(200);
+        });
+
+        // Bulk reassign from Vendor A → Vendor B with a note
+        var command = new BulkAssignProductsToVendor(
+        [
+            new BulkAssignmentItem("REASSIGN-BULK-001", vendorB, "Supplier transition")
+        ]);
+
+        var result = await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(command).ToUrl("/api/admin/products/vendor-assignments/bulk");
+            s.StatusCodeShouldBe(200);
+        });
+
+        var response = await result.ReadAsJsonAsync<BulkAssignmentResult>();
+        response.ShouldNotBeNull();
+        response.TotalSucceeded.ShouldBe(1);
+        response.Succeeded[0].PreviousVendorTenantId.ShouldBe(vendorA);
+        response.Succeeded[0].VendorTenantId.ShouldBe(vendorB);
+    }
+
+    [Fact]
+    public async Task AssignProduct_IncludesProductName_InResponse()
+    {
+        await SeedProductAsync("NAMED-001");
+        var vendorId = Guid.NewGuid();
+
+        var result = await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new AssignProductToVendor(vendorId))
+                .ToUrl("/api/admin/products/NAMED-001/vendor-assignment");
+            s.StatusCodeShouldBe(200);
+        });
+
+        var response = await result.ReadAsJsonAsync<VendorAssignmentResponse>();
+        response.ShouldNotBeNull();
+        response.ProductName.ShouldNotBeNullOrWhiteSpace();
+        response.IsAssigned.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task AssignProduct_PropagatesReassignmentNote_InResponse()
+    {
+        await SeedProductAsync("NOTE-001");
+        var vendorId = Guid.NewGuid();
+        const string note = "Contract signed 2026-03-10";
+
+        var result = await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new AssignProductToVendor(vendorId, note))
+                .ToUrl("/api/admin/products/NOTE-001/vendor-assignment");
+            s.StatusCodeShouldBe(200);
+        });
+
+        var response = await result.ReadAsJsonAsync<VendorAssignmentResponse>();
+        response.ShouldNotBeNull();
+        response.ReassignmentNote.ShouldBe(note);
     }
 }

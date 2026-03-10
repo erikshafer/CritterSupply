@@ -1419,7 +1419,7 @@ Product Catalog is a **read-heavy** BC with very different access patterns than 
 - `ProductAdded` - New product available in catalog (Inventory may create stock record)
 - `ProductUpdated` - Product details changed (Customer Experience may invalidate cached listings)
 - `ProductDiscontinued` - Product no longer available (Orders may prevent new purchases)
-- `VendorProductAssociated` - Published to `vendor-portal-product-associated` exchange when an admin assigns or reassigns a SKU to a vendor. Contains `PreviousVendorTenantId` (null on first assignment, non-null on reassignment) so subscribers can clean up old associations. VendorPortal.Api subscribes via `vendor-portal-product-associated` queue.
+- `VendorProductAssociated` - Published to `vendor-portal-product-associated` exchange when an admin assigns or reassigns a SKU to a vendor. Contains `PreviousVendorTenantId` (null on first assignment, non-null on reassignment) so subscribers can clean up old associations. Contains `ReassignmentNote?` for audit trail. VendorPortal.Api subscribes via `vendor-portal-product-associated` queue.
 
 **Note on Domain Events:**
 Product Catalog does NOT use event sourcing, so there are no persisted domain events. Changes to products are direct document updates. Only integration messages (listed above) are published to notify other BCs.
@@ -1539,10 +1539,10 @@ SearchProducts (query from Storefront)
 - `PATCH /api/products/{sku}/status` - Change product status
 - `PUT /api/products/{sku}` - Update product details
 
-**Admin Vendor Assignment (Phase 1 — authentication deferred to Phase 2):**
-- `POST /api/admin/products/{sku}/vendor-assignment` - Assign or reassign SKU to a vendor tenant. Body: `{ vendorTenantId: Guid }`. Idempotent (same vendor → 200 no-op). Discontinued/deleted products → 400. Publishes `VendorProductAssociated` on success.
-- `GET /api/admin/products/{sku}/vendor-assignment` - Retrieve current vendor assignment for a SKU. Returns 404 if product does not exist or has no assignment.
-- `POST /api/admin/products/vendor-assignments/bulk` - Bulk assign up to 100 SKUs. Returns HTTP 200 on full success, HTTP 207 (Multi-Status) on partial success, HTTP 400 if the request is invalid (empty list, >100 items). Each successful item publishes an individual `VendorProductAssociated` event.
+**Admin Vendor Assignment (JWT Bearer + Admin role required):**
+- `POST /api/admin/products/{sku}/vendor-assignment` - Assign or reassign SKU to a vendor tenant. Body: `{ vendorTenantId: Guid, reassignmentNote?: string }`. Idempotent (same vendor → 200 no-op). Discontinued/deleted products → 400. Publishes `VendorProductAssociated` on success. **Note (Phase 2):** `VendorTenantId` is not validated against VendorIdentity.Api; invalid GUIDs create orphaned entries.
+- `GET /api/admin/products/{sku}/vendor-assignment` - Retrieve current vendor assignment for a SKU. Returns 404 if product does not exist. Returns 200 with `IsAssigned: false` if product exists but has no assignment. Returns 200 with `IsAssigned: true` and full assignment details if assigned.
+- `POST /api/admin/products/vendor-assignments/bulk` - Bulk assign up to 100 SKUs. Body: `{ assignments: [{ sku, vendorTenantId, reassignmentNote? }] }`. Returns HTTP 200 on full success, HTTP 207 (Multi-Status) on partial success, HTTP 400 if the request is invalid (empty list, >100 items). Each successful item publishes an individual `VendorProductAssociated` event. Succeeded items include `PreviousVendorTenantId` (null = new assignment, non-null = reassignment).
 
 **Category Queries:**
 - `GET /api/categories` - List all categories (hierarchical tree)

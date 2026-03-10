@@ -11,13 +11,27 @@ namespace ProductCatalog.Api.Products;
 
 // ─── Response Models ──────────────────────────────────────────────────────────
 
-/// <summary>Response returned when a vendor assignment is retrieved or created.</summary>
+/// <summary>
+/// Response returned when a vendor assignment is retrieved or created.
+/// <para>
+/// When <see cref="IsAssigned"/> is <c>false</c> the product exists but has no vendor assignment yet —
+/// distinct from a 404 (product not found). Assignment fields are null in that case.
+/// </para>
+/// <para>
+/// <b>Phase 2 note:</b> <c>VendorDisplayName</c> is not included in Phase 1.
+/// Callers requiring a human-readable vendor name must resolve <see cref="VendorTenantId"/>
+/// via VendorIdentity.Api. It will be denormalized here in Phase 2.
+/// </para>
+/// </summary>
 public sealed record VendorAssignmentResponse(
     string Sku,
-    Guid VendorTenantId,
-    string AssignedBy,
-    DateTimeOffset AssignedAt,
-    Guid? PreviousVendorTenantId = null);
+    string ProductName,
+    bool IsAssigned,
+    Guid? VendorTenantId = null,
+    string? AssignedBy = null,
+    DateTimeOffset? AssignedAt = null,
+    Guid? PreviousVendorTenantId = null,
+    string? ReassignmentNote = null);
 
 // ─── Single Assignment ────────────────────────────────────────────────────────
 
@@ -25,8 +39,13 @@ public sealed record VendorAssignmentResponse(
 /// Command to assign a single product SKU to a vendor.
 /// SKU is bound from the route; VendorTenantId comes from the request body.
 /// AssociatedBy is resolved at handler time (admin identity — Phase 2 will wire real auth).
+/// <para>
+/// <b>Phase 2 note:</b> <see cref="VendorTenantId"/> is accepted as-is without cross-BC validation.
+/// A non-existent vendor GUID will create an orphaned assignment. Vendor existence validation
+/// via VendorIdentity.Api will be added in Phase 2.
+/// </para>
 /// </summary>
-public sealed record AssignProductToVendor(Guid VendorTenantId)
+public sealed record AssignProductToVendor(Guid VendorTenantId, string? ReassignmentNote = null)
 {
     public sealed class AssignProductToVendorValidator : AbstractValidator<AssignProductToVendor>
     {
@@ -41,6 +60,11 @@ public sealed record AssignProductToVendor(Guid VendorTenantId)
 
 /// <summary>
 /// GET /api/admin/products/{sku}/vendor-assignment — retrieve the current vendor assignment.
+/// <list type="bullet">
+///   <item>404 — product does not exist in the catalog.</item>
+///   <item>200 with <c>IsAssigned: false</c> — product exists but has no vendor assignment yet.</item>
+///   <item>200 with <c>IsAssigned: true</c> — product is assigned; all assignment fields populated.</item>
+/// </list>
 /// Separated from AssignProductToVendorHandler to avoid Wolverine compound handler ambiguity.
 /// </summary>
 public static class GetVendorAssignmentHandler
@@ -57,16 +81,20 @@ public static class GetVendorAssignmentHandler
                 detail: $"Product '{sku}' was not found.",
                 statusCode: StatusCodes.Status404NotFound);
 
+        var productName = (string)product.Name;
+
+        // Return 200 with IsAssigned:false so callers can distinguish "product exists, no assignment"
+        // from "product not found" without parsing error message strings.
         if (product.VendorTenantId is null)
-            return Results.Problem(
-                detail: $"Product '{sku}' has not been assigned to any vendor.",
-                statusCode: StatusCodes.Status404NotFound);
+            return Results.Ok(new VendorAssignmentResponse(sku, productName, IsAssigned: false));
 
         return Results.Ok(new VendorAssignmentResponse(
-            sku,
-            product.VendorTenantId.Value,
-            product.AssignedBy!,
-            product.AssignedAt!.Value));
+            Sku: sku,
+            ProductName: productName,
+            IsAssigned: true,
+            VendorTenantId: product.VendorTenantId,
+            AssignedBy: product.AssignedBy,
+            AssignedAt: product.AssignedAt));
     }
 }
 
@@ -86,12 +114,12 @@ public static class AssignProductToVendorHandler
     /// Guards the POST handler. Returns 404 for missing products and 400 for discontinued ones.
     /// Wolverine runs this before Handle when the return is not WolverineContinue.NoProblems.
     /// </summary>
-    public static ProblemDetails Before(Product? product, AssignProductToVendor command)
+    public static ProblemDetails Before(string sku, Product? product, AssignProductToVendor command)
     {
         if (product is null)
             return new ProblemDetails
             {
-                Detail = "Product not found.",
+                Detail = $"Product '{sku}' was not found.",
                 Status = StatusCodes.Status404NotFound
             };
 
@@ -112,7 +140,14 @@ public static class AssignProductToVendorHandler
     /// Idempotent: returns 200 without publishing an event if the vendor is already the same.
     /// On reassignment, sets PreviousVendorTenantId so subscribers can clean up old associations.
     /// Returns an OutgoingMessages cascade so Wolverine tracks the integration event for testing.
-    /// TODO(Phase 2): Replace "system" with the authenticated admin principal from HttpContext.
+    /// <para>
+    /// <b>Phase 2 notes:</b>
+    /// <list type="bullet">
+    ///   <item>Replace "system" <c>AssignedBy</c> with the authenticated admin principal from HttpContext.</item>
+    ///   <item>Validate <c>VendorTenantId</c> against VendorIdentity.Api before committing assignment.
+    ///         Currently any GUID is accepted; a non-existent vendor creates an orphaned assignment.</item>
+    /// </list>
+    /// </para>
     /// </summary>
     [Authorize(Policy = "Admin")]
     [WolverinePost("/api/admin/products/{sku}/vendor-assignment")]
@@ -124,15 +159,18 @@ public static class AssignProductToVendorHandler
         CancellationToken ct)
     {
         var outgoing = new OutgoingMessages();
+        var productName = (string)product.Name;
 
         // Idempotent: same vendor already assigned — return existing state, no event.
         if (product.VendorTenantId == command.VendorTenantId)
         {
             return (Results.Ok(new VendorAssignmentResponse(
-                sku,
-                product.VendorTenantId.Value,
-                product.AssignedBy!,
-                product.AssignedAt!.Value)), outgoing);
+                Sku: sku,
+                ProductName: productName,
+                IsAssigned: true,
+                VendorTenantId: product.VendorTenantId,
+                AssignedBy: product.AssignedBy,
+                AssignedAt: product.AssignedAt)), outgoing);
         }
 
         // TODO(Phase 2): Wire real admin authentication. Replace "system" with
@@ -154,21 +192,29 @@ public static class AssignProductToVendorHandler
             VendorTenantId: command.VendorTenantId,
             AssociatedBy: assignedBy,
             AssociatedAt: assignedAt,
-            PreviousVendorTenantId: previousVendorTenantId));
+            PreviousVendorTenantId: previousVendorTenantId,
+            ReassignmentNote: command.ReassignmentNote));
 
         return (Results.Ok(new VendorAssignmentResponse(
-            sku,
-            command.VendorTenantId,
-            assignedBy,
-            assignedAt,
-            previousVendorTenantId)), outgoing);
+            Sku: sku,
+            ProductName: productName,
+            IsAssigned: true,
+            VendorTenantId: command.VendorTenantId,
+            AssignedBy: assignedBy,
+            AssignedAt: assignedAt,
+            PreviousVendorTenantId: previousVendorTenantId,
+            ReassignmentNote: command.ReassignmentNote)), outgoing);
     }
 }
 
 // ─── Bulk Assignment ──────────────────────────────────────────────────────────
 
-/// <summary>A single item in a bulk vendor assignment request.</summary>
-public sealed record BulkAssignmentItem(string Sku, Guid VendorTenantId);
+/// <summary>
+/// A single item in a bulk vendor assignment request.
+/// <see cref="ReassignmentNote"/> is optional — include it when the assignment is a cross-vendor
+/// reassignment so the audit trail captures the business reason.
+/// </summary>
+public sealed record BulkAssignmentItem(string Sku, Guid VendorTenantId, string? ReassignmentNote = null);
 
 /// <summary>Command to assign multiple SKUs to their respective vendor tenants in one call.</summary>
 public sealed record BulkAssignProductsToVendor(IReadOnlyList<BulkAssignmentItem> Assignments)
@@ -197,8 +243,17 @@ public sealed record BulkAssignProductsToVendor(IReadOnlyList<BulkAssignmentItem
     }
 }
 
-/// <summary>Details of a successfully processed bulk assignment item.</summary>
-public sealed record AssignmentSuccess(string Sku, Guid VendorTenantId, DateTimeOffset AssignedAt);
+/// <summary>
+/// Details of a successfully processed bulk assignment item.
+/// <see cref="PreviousVendorTenantId"/> is null for first-time assignments and non-null for
+/// cross-vendor reassignments — allows callers to produce "N new, M reassigned" summaries.
+/// </summary>
+public sealed record AssignmentSuccess(
+    string Sku,
+    string ProductName,
+    Guid VendorTenantId,
+    DateTimeOffset AssignedAt,
+    Guid? PreviousVendorTenantId = null);
 
 /// <summary>Details of a failed bulk assignment item.</summary>
 public sealed record AssignmentFailure(string Sku, Guid VendorTenantId, string ReasonCode, string Reason);
@@ -219,6 +274,10 @@ public sealed record BulkAssignmentResult(
 /// Assigns up to 100 SKUs to vendor tenants in a single request.
 /// Returns HTTP 200 on full success and HTTP 207 (Multi-Status) on partial success.
 /// Each successfully assigned SKU triggers an individual VendorProductAssociated integration event.
+/// <para>
+/// <b>Phase 2 note:</b> VendorTenantId values are not validated against VendorIdentity.Api.
+/// Invalid GUIDs will silently create orphaned SKU→Vendor entries. Validation will be added in Phase 2.
+/// </para>
 /// </summary>
 public static class BulkAssignProductsToVendorHandler
 {
@@ -253,11 +312,12 @@ public static class BulkAssignProductsToVendorHandler
                 continue;
             }
 
+            var productName = (string)product.Name;
             var assignedAt = DateTimeOffset.UtcNow;
 
             if (product.VendorTenantId == item.VendorTenantId)
             {
-                succeeded.Add(new AssignmentSuccess(item.Sku, item.VendorTenantId, product.AssignedAt!.Value));
+                succeeded.Add(new AssignmentSuccess(item.Sku, productName, item.VendorTenantId, product.AssignedAt!.Value));
                 continue;
             }
 
@@ -271,9 +331,10 @@ public static class BulkAssignProductsToVendorHandler
                 VendorTenantId: item.VendorTenantId,
                 AssociatedBy: assignedBy,
                 AssociatedAt: assignedAt,
-                PreviousVendorTenantId: previousVendorTenantId));
+                PreviousVendorTenantId: previousVendorTenantId,
+                ReassignmentNote: item.ReassignmentNote));
 
-            succeeded.Add(new AssignmentSuccess(item.Sku, item.VendorTenantId, assignedAt));
+            succeeded.Add(new AssignmentSuccess(item.Sku, productName, item.VendorTenantId, assignedAt, previousVendorTenantId));
         }
 
         await session.SaveChangesAsync(ct);
@@ -290,3 +351,4 @@ public static class BulkAssignProductsToVendorHandler
             : Results.Ok(result), outgoing);
     }
 }
+
