@@ -172,8 +172,8 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 | 👤 **Customer Identity**   | Addresses and saved payment methods            | ✅ Complete |
 | 📦 **Product Catalog**     | Product definitions and pricing                | ✅ Complete |
 | 🎁 **Customer Experience** | Storefront BFF (Blazor + SignalR)              | ✅ Complete |
-| 🏢 **Vendor Identity**     | Vendor user authentication & tenant management | 🔜 Planned |
-| 📊 **Vendor Portal**       | Vendor analytics, insights, change requests    | 🔜 Planned |
+| 🏢 **Vendor Identity**     | Vendor user authentication & tenant management | 🚧 In Progress |
+| 📊 **Vendor Portal**       | Vendor analytics, insights, change requests    | 🚧 In Progress |
 | 🔄 **Returns**             | Return authorization and processing            | 🔜 Planned |
 | 💰 **Pricing**             | Server-authoritative pricing, scheduled price changes | 🔜 Planned |
 | 🖥️ **Admin Portal**        | Internal operations portal (gateway BFF)       | 🔜 Planned |

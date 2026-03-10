@@ -519,6 +519,83 @@ Use `AuthorizeRouteView` (not `RouteView`) to enforce authentication for `[Autho
 
 ---
 
+## Catch Block Logging in Blazor Pages
+
+Blazor Razor components that perform async HTTP or SignalR operations frequently wrap those calls in
+`try/catch`. **Empty catch blocks are a debuggability anti-pattern** — without logging, there is
+zero trace of what failed, where it failed, or what the exception was.
+
+This is especially critical in `async void` Blazor event handlers, where exceptions cannot propagate
+to a caller and are silently swallowed.
+
+### Always inject ILogger<T> in pages that catch exceptions
+
+```razor
+@inject ILogger<Dashboard> Logger
+```
+
+### Log at Debug level in all catch blocks
+
+```razor
+@code {
+    // ❌ Silent — no trace of what failed
+    catch (Exception)
+    {
+        Snackbar.Add("Failed to load dashboard.", Severity.Error);
+    }
+
+    // ✅ Debug-level log preserves the full exception and context
+    catch (Exception ex)
+    {
+        Logger.LogDebug(ex, "Exception loading dashboard summary.");
+        Snackbar.Add("Failed to load dashboard.", Severity.Error);
+    }
+}
+```
+
+Use `LogDebug` for non-fatal failures (the snackbar already surfaces the error to the user).
+Use `LogWarning` if the failure indicates a degraded but recoverable state.
+Use `LogError` only for unexpected, unrecoverable failures that the snackbar cannot represent.
+
+### Static methods in Blazor code blocks cannot use injected services
+
+`@inject` injects into the component instance. `static` members of the code block do not have
+access to instance services:
+
+```razor
+@code {
+    // ❌ static — cannot access Logger (a non-static injected field)
+    private static string GetSkuFromEnvelope(JsonElement envelope)
+    {
+        try { ... }
+        catch { }  // Cannot call Logger.LogDebug here!
+    }
+
+    // ✅ Remove 'static' to get access to Logger
+    private string GetSkuFromEnvelope(JsonElement envelope)
+    {
+        try { ... }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to extract SKU from hub envelope.");
+        }
+        return "unknown";
+    }
+}
+```
+
+> **Rule of thumb:** If a private helper method in a Blazor code block might catch an exception, do
+> not make it `static`. The logger injection is an instance concern.
+
+### Checklist for non-fatal catch blocks
+
+- [ ] Catch `Exception ex` (not the untyped `catch`)
+- [ ] `Logger.LogDebug(ex, "Description of attempted operation")` before snackbar
+- [ ] Method is non-static if logging via injected `Logger`
+- [ ] For `async void` handlers: at minimum log; never let the exception disappear silently
+
+---
+
 ## Checklist: New Blazor WASM Feature
 
 - [ ] SDK is `Microsoft.NET.Sdk.BlazorWebAssembly` (not `Microsoft.NET.Sdk.Web`)

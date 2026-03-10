@@ -1,8 +1,10 @@
 # ADR 0013: Migrate from SSE to SignalR for Real-Time Communication
 
-**Status:** ⚠️ Proposed
+**Status:** ✅ Accepted — implemented in Vendor Portal (Cycle 22, Phases 1–4)
 
 **Date:** 2026-03-04
+
+**Accepted:** 2026-03-10 (Cycle 22 Phase 4 sign-off)
 
 **Supersedes:** [ADR 0004: Use Server-Sent Events (SSE) over SignalR](./0004-sse-over-signalr.md)
 

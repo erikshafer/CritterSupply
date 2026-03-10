@@ -10,6 +10,8 @@
 @inject VendorHubService HubService
 @inject IHttpClientFactory HttpClientFactory
 @inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject ILogger<Dashboard> Logger
 @implements IDisposable
 
 <PageTitle>Dashboard — Vendor Portal</PageTitle>
@@ -106,8 +108,17 @@
         @if (AuthState.CanSubmitChangeRequests)
         {
             <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Add" Class="mr-2">
+                       StartIcon="@Icons.Material.Filled.Add" Class="mr-2"
+                       Href="/change-requests/submit"
+                       data-testid="submit-change-request-btn">
                 Submit Change Request
+            </MudButton>
+
+            <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                       StartIcon="@Icons.Material.Filled.List" Class="mr-2"
+                       Href="/change-requests"
+                       data-testid="view-change-requests-btn">
+                View Change Requests
             </MudButton>
         }
 
@@ -171,10 +182,11 @@
                 await FetchMissedAlertsAsync();
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Async void cannot propagate exceptions — swallow here to prevent unobserved task exception.
             // FetchMissedAlertsAsync has its own try-catch; StateHasChanged failures are non-fatal.
+            Logger.LogDebug(ex, "Non-fatal exception in OnHubStateChanged async continuation.");
         }
     }
 
@@ -240,6 +252,19 @@
                     _lastHubMessageAt = DateTimeOffset.UtcNow;
                     await FetchMissedAlertsAsync();
                 }
+                else if (eventType?.EndsWith("ChangeRequestStatusUpdated") == true)
+                {
+                    // Refresh the pending change request count on the dashboard KPI card.
+                    // This is a tenant-broadcast — all vendor users see their count update.
+                    _lastHubMessageAt = DateTimeOffset.UtcNow;
+                    await LoadDashboardAsync();
+                }
+                else if (eventType?.EndsWith("ChangeRequestDecisionPersonal") == true)
+                {
+                    // Personal decision notification — only the submitting user receives this.
+                    // Show an actionable toast with the decision context per spec.
+                    ShowChangeRequestDecisionToast(envelope);
+                }
             });
     }
 
@@ -275,9 +300,10 @@
                 }
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Catch-up failure is non-critical — stale count is acceptable; next reconnect fixes it
+            Logger.LogDebug(ex, "Non-critical failure fetching missed alerts after hub reconnection.");
         }
     }
 
@@ -309,8 +335,9 @@
                 Snackbar.Add("Failed to load dashboard.", Severity.Error);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Logger.LogDebug(ex, "Exception loading dashboard summary.");
             Snackbar.Add("Failed to load dashboard. Please try again.", Severity.Error);
         }
         finally
@@ -328,7 +355,80 @@
         return eventType is not null;
     }
 
-    private static string GetSkuFromEnvelope(JsonElement envelope)
+    /// <summary>
+    /// Shows a personalized snackbar toast when the vendor user receives a personal decision notification.
+    /// Only the submitting user receives <c>ChangeRequestDecisionPersonal</c> (routed to user:{userId}).
+    /// Decisions: "Approved", "Rejected", "NeedsMoreInfo" — each with distinct copy and action per spec.
+    /// </summary>
+    private void ShowChangeRequestDecisionToast(JsonElement envelope)
+    {
+        try
+        {
+            if (!envelope.TryGetProperty("data", out var data)) return;
+
+            // Property names match the C# record serialized as camelCase by System.Text.Json:
+            // ChangeRequestDecisionPersonal(VendorUserId, RequestId, Sku, Decision, Reason, DecidedAt)
+            var decision = data.TryGetProperty("decision", out var decisionEl) ? decisionEl.GetString() : null;
+            var sku = data.TryGetProperty("sku", out var skuEl) ? skuEl.GetString() : null;
+            var reason = data.TryGetProperty("reason", out var reasonEl) ? reasonEl.GetString() : null;
+            var requestId = data.TryGetProperty("requestId", out var idEl) && idEl.TryGetGuid(out var parsedId)
+                ? parsedId : (Guid?)null;
+
+            switch (decision)
+            {
+                case "Approved":
+                    var approvedMsg = sku is not null
+                        ? $"✅ Change request for {sku} approved!"
+                        : "✅ Your change request was approved!";
+                    Snackbar.Add(approvedMsg, Severity.Success, config =>
+                    {
+                        if (requestId.HasValue)
+                        {
+                            config.Action = "View";
+                            config.ActionColor = Color.Success;
+                            config.OnClick = _ => { Navigation.NavigateTo($"/change-requests/{requestId.Value}"); return Task.CompletedTask; };
+                        }
+                    });
+                    break;
+
+                case "Rejected":
+                    var rejectedMsg = !string.IsNullOrWhiteSpace(reason)
+                        ? $"❌ Change request rejected: '{reason}'"
+                        : "❌ Your change request was rejected.";
+                    Snackbar.Add(rejectedMsg, Severity.Error, config =>
+                    {
+                        // Rejection reason warrants longer display so the vendor has time to read it
+                        config.VisibleStateDuration = 8000;
+                        if (requestId.HasValue)
+                        {
+                            config.Action = "View";
+                            config.ActionColor = Color.Error;
+                            config.OnClick = _ => { Navigation.NavigateTo($"/change-requests/{requestId.Value}"); return Task.CompletedTask; };
+                        }
+                    });
+                    break;
+
+                case "NeedsMoreInfo":
+                    Snackbar.Add("📋 The Catalog team has a question for you.", Severity.Warning, config =>
+                    {
+                        config.Action = "View";
+                        config.ActionColor = Color.Warning;
+                        var destination = requestId.HasValue
+                            ? $"/change-requests/{requestId.Value}"
+                            : "/change-requests";
+                        config.OnClick = _ => { Navigation.NavigateTo(destination); return Task.CompletedTask; };
+                    });
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Toast failure is non-critical — the KPI count refresh handles the authoritative state
+            Logger.LogDebug(ex, "Non-critical failure rendering decision toast notification.");
+        }
+    }
+
+    private string GetSkuFromEnvelope(JsonElement envelope)
     {
         try
         {
@@ -338,7 +438,10 @@
                 return sku.GetString() ?? "unknown";
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to extract SKU from hub envelope — envelope shape mismatch.");
+        }
         return "unknown";
     }
 

@@ -348,6 +348,37 @@ public static ProblemDetails Before(GetCustomer query, Customer? customer)
 }
 ```
 
+### Message Record Field Nullability
+
+**Fields on message records (commands, events, integration messages) that are always populated
+should be required and non-nullable.** Optional-with-default is a code smell that:
+- Suggests the field might be legitimately absent when it never is
+- Hides type-system guarantees at call sites
+- Invites "I'll fill it in later" patterns that defer correctness checks
+
+```csharp
+// ❌ Nullable-with-default: implies ChangeType might be absent — it never is
+public sealed record ChangeRequestDecisionPersonal(
+    Guid VendorUserId,
+    Guid RequestId,
+    string Decision,
+    string? ChangeType = null) : IVendorUserMessage;
+
+// ✅ Required: compiler enforces population at all construction sites
+public sealed record ChangeRequestDecisionPersonal(
+    Guid VendorUserId,
+    Guid RequestId,
+    string Decision,
+    string ChangeType) : IVendorUserMessage;
+```
+
+**When nullable fields ARE appropriate on messages:**
+- Fields that are genuinely optional by business logic (e.g., `string? RejectionReason` — only set when rejected)
+- Fields added in a later version for backward compatibility with existing serialized messages
+
+**Rule of thumb:** If every handler or factory method that creates this record always passes a value,
+the field is not optional — make it required.
+
 ## Pattern Matching
 
 Use modern pattern matching:

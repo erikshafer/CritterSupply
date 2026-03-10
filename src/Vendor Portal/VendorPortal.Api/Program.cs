@@ -140,6 +140,28 @@ builder.Host.UseWolverine(opts =>
 
     opts.ListenToRabbitQueue("vendor-portal-stock-replenished")
         .ProcessInline();
+
+    // Subscribe to Product Catalog BC change request response messages
+    opts.ListenToRabbitQueue("vendor-portal-description-change-approved")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-description-change-rejected")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-image-change-approved")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-image-change-rejected")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-data-correction-approved")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-data-correction-rejected")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-more-info-requested")
+        .ProcessInline();
 });
 
 builder.Services.AddEndpointsApiExplorer();

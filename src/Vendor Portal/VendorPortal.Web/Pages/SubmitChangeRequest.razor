@@ -1,0 +1,227 @@
+@page "/change-requests/submit"
+@using System.Net.Http.Json
+@using System.Text.Json
+@using VendorPortal.Web.Auth
+@attribute [Authorize]
+@inject VendorAuthState AuthState
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Submit Change Request — Vendor Portal</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" Class="mb-4 pa-0" />
+
+<MudText Typo="Typo.h4" GutterBottom="true">Submit Change Request</MudText>
+
+@if (!AuthState.CanSubmitChangeRequests)
+{
+    <MudAlert Severity="Severity.Warning">
+        You do not have permission to submit change requests. Contact your tenant Admin.
+    </MudAlert>
+    return;
+}
+
+<MudPaper Elevation="2" Class="pa-4">
+    <MudForm @ref="_form" @bind-IsValid="_isFormValid">
+
+        <MudTextField @bind-Value="_sku"
+                      Label="SKU"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      RequiredError="SKU is required"
+                      HelperText="The product SKU this change applies to"
+                      Class="mb-4"
+                      data-testid="sku-field" />
+
+        <MudSelect @bind-Value="_type"
+                   Label="Change Type"
+                   Variant="Variant.Outlined"
+                   Required="true"
+                   RequiredError="Change type is required"
+                   Class="mb-4"
+                   data-testid="type-select">
+            <MudSelectItem Value="@("Description")">Description — Update product description text</MudSelectItem>
+            <MudSelectItem Value="@("Image")">Image — Upload new product images</MudSelectItem>
+            <MudSelectItem Value="@("DataCorrection")">Data Correction — Fix structured data (weight, category, UPC, etc.)</MudSelectItem>
+        </MudSelect>
+
+        <MudTextField @bind-Value="_title"
+                      Label="Title"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      RequiredError="Title is required"
+                      HelperText="Short summary (shown in list views)"
+                      MaxLength="120"
+                      Counter="120"
+                      Class="mb-4"
+                      data-testid="title-field" />
+
+        <MudTextField @bind-Value="_details"
+                      Label="Details"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      RequiredError="Details are required"
+                      Lines="5"
+                      HelperText="@DetailsHelperText"
+                      Class="mb-4"
+                      data-testid="details-field" />
+
+        <MudTextField @bind-Value="_additionalNotes"
+                      Label="Additional Notes (optional)"
+                      Variant="Variant.Outlined"
+                      Lines="3"
+                      HelperText="Any context that may help the Catalog team review your request"
+                      Class="mb-4"
+                      data-testid="notes-field" />
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-4" aria-live="assertive">
+                @_errorMessage
+            </MudAlert>
+        }
+
+        <div class="d-flex gap-2 justify-end">
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       OnClick="Cancel"
+                       Disabled="_isSubmitting">
+                Cancel
+            </MudButton>
+
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Secondary"
+                       OnClick="SaveDraft"
+                       Disabled="_isSubmitting || string.IsNullOrWhiteSpace(_sku)"
+                       data-testid="save-draft-btn">
+                Save as Draft
+            </MudButton>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="SubmitNow"
+                       Disabled="_isSubmitting || !_isFormValid"
+                       data-testid="submit-btn">
+                @if (_isSubmitting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Submitting…</span>
+                }
+                else
+                {
+                    <span>Submit Request</span>
+                }
+            </MudButton>
+        </div>
+    </MudForm>
+</MudPaper>
+
+@code {
+    private MudForm _form = default!;
+    private bool _isFormValid;
+    private bool _isSubmitting;
+    private string _errorMessage = string.Empty;
+
+    private string _sku = string.Empty;
+    private string _type = "Description";
+    private string _title = string.Empty;
+    private string _details = string.Empty;
+    private string? _additionalNotes;
+
+    private string DetailsHelperText => _type switch
+    {
+        "Description" => "Enter the new product description",
+        "Image" => "Describe the images you are uploading (use image upload URL endpoint first)",
+        "DataCorrection" => "Describe what data needs to be corrected and the correct values",
+        _ => "Enter the change details"
+    };
+
+    private static readonly IReadOnlyList<BreadcrumbItem> _breadcrumbs =
+    [
+        new BreadcrumbItem("Dashboard", href: "/dashboard"),
+        new BreadcrumbItem("Change Requests", href: "/change-requests"),
+        new BreadcrumbItem("Submit", href: null, disabled: true)
+    ];
+
+    private void Cancel() => Navigation.NavigateTo("/change-requests");
+
+    private async Task SaveDraft() => await Submit(submitAfterDraft: false);
+
+    private async Task SubmitNow() => await Submit(submitAfterDraft: true);
+
+    private async Task Submit(bool submitAfterDraft)
+    {
+        if (submitAfterDraft)
+        {
+            // Full validation required before submitting to the Catalog team
+            await _form.Validate();
+            if (!_isFormValid) return;
+        }
+        else
+        {
+            // Drafts only require a SKU — vendor may not have finished writing details yet
+            if (string.IsNullOrWhiteSpace(_sku)) return;
+        }
+
+        _isSubmitting = true;
+        _errorMessage = string.Empty;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("VendorPortalApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var requestId = Guid.NewGuid();
+
+            // Step 1: Create draft
+            var draftPayload = new
+            {
+                RequestId = requestId,
+                Sku = _sku,
+                Type = _type,
+                Title = _title,
+                Details = _details,
+                AdditionalNotes = string.IsNullOrWhiteSpace(_additionalNotes) ? null : _additionalNotes
+            };
+
+            var draftResponse = await client.PostAsJsonAsync("/api/vendor-portal/change-requests/draft", draftPayload);
+            if (!draftResponse.IsSuccessStatusCode)
+            {
+                _errorMessage = "Failed to create change request. Please try again.";
+                return;
+            }
+
+            if (submitAfterDraft)
+            {
+                // Step 2: Submit immediately
+                var submitResponse = await client.PostAsync(
+                    $"/api/vendor-portal/change-requests/{requestId}/submit", null);
+
+                if (submitResponse.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Change request submitted successfully.", Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add("Draft saved. Failed to submit — open the draft from your change requests list to try again.", Severity.Warning);
+                }
+            }
+            else
+            {
+                Snackbar.Add("Change request saved as draft.", Severity.Info);
+            }
+
+            Navigation.NavigateTo("/change-requests");
+        }
+        catch (Exception)
+        {
+            _errorMessage = "An error occurred. Please try again.";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

@@ -40,7 +40,8 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.102
+          dotnet-quality: ga
 
       - name: Restore dependencies (NuGet packages)
         run: dotnet restore
