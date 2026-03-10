@@ -583,6 +583,22 @@ public sealed class AnalyticsHandlersTests : IAsyncLifetime
         });
     }
 
+    [Fact]
+    public async Task GetActiveLowStockAlerts_Returns403_WhenVendorIsTerminated()
+    {
+        // Arrange — terminated vendor token (up to 15 min post-termination a valid JWT may still exist)
+        var vendorId = Guid.NewGuid();
+        var token = _fixture.CreateTestJwt(vendorId, tenantStatus: "Terminated");
+
+        // Act
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Get.Url("/api/vendor-portal/analytics/alerts/low-stock");
+            s.WithRequestHeader("Authorization", $"Bearer {token}");
+            s.StatusCodeShouldBe(403);
+        });
+    }
+
     // ───────────────────────────────────────────────
     // Helpers
     // ───────────────────────────────────────────────

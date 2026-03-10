@@ -124,8 +124,8 @@ public sealed class VendorHubService : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         if (_connection is not null)
-        {
             await _connection.DisposeAsync();
-        }
+
+        _connectLock.Dispose();
     }
 }

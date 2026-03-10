@@ -206,7 +206,7 @@
                 // Wolverine CloudEvents envelope: { "type": "...", "data": { ... } }
                 if (!TryGetEventType(envelope, out var eventType)) return;
 
-                if (eventType?.Contains("LowStockAlertRaised") == true)
+                if (eventType?.EndsWith("LowStockAlertRaised") == true)
                 {
                     _activeLowStockAlerts++;
                     _lastHubMessageAt = DateTimeOffset.UtcNow;
@@ -226,13 +226,13 @@
 
                     await InvokeAsync(StateHasChanged);
                 }
-                else if (eventType?.Contains("SalesMetricUpdated") == true)
+                else if (eventType?.EndsWith("SalesMetricUpdated") == true)
                 {
                     _salesMetricUpdatedAt = DateTimeOffset.UtcNow;
                     _lastHubMessageAt = DateTimeOffset.UtcNow;
                     await InvokeAsync(StateHasChanged);
                 }
-                else if (eventType?.Contains("InventoryLevelUpdated") == true)
+                else if (eventType?.EndsWith("InventoryLevelUpdated") == true)
                 {
                     // P1-B: Re-fetch the authoritative alert count from the API.
                     // Inventory level changes may resolve existing alerts on the server side.

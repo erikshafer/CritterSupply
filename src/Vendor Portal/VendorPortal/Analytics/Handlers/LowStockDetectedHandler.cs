@@ -34,7 +34,6 @@ public static class LowStockDetectedHandler
 
         // Dedup: load existing alert to determine if this is new or an update
         var existing = await session.LoadAsync<LowStockAlert>(alertId, ct);
-        var now = DateTimeOffset.UtcNow;
 
         var alert = new LowStockAlert
         {
@@ -45,7 +44,7 @@ public static class LowStockDetectedHandler
             CurrentQuantity = @event.CurrentQuantity,
             ThresholdQuantity = @event.ThresholdQuantity,
             FirstDetectedAt = existing?.FirstDetectedAt ?? @event.DetectedAt,
-            LastUpdatedAt = now,
+            LastUpdatedAt = @event.DetectedAt,
             IsActive = true
         };
 

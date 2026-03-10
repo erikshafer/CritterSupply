@@ -106,13 +106,7 @@ public sealed class TestFixture : IAsyncLifetime
     public async Task ExecuteMessageAsync<T>(T message, int timeoutSeconds = 15, CancellationToken ct = default)
         where T : class
     {
-        await Host.TrackActivity(TimeSpan.FromSeconds(timeoutSeconds))
-            .DoNotAssertOnExceptionsDetected()
-            .AlsoTrack(Host)
-            .ExecuteAndWaitAsync((Func<IMessageContext, Task>)(async ctx =>
-            {
-                await ctx.InvokeAsync(message, ct);
-            }));
+        await TrackMessageAsync(message, timeoutSeconds, ct);
     }
 
     /// <summary>

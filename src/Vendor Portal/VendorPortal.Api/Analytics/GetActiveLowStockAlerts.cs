@@ -44,7 +44,7 @@ public sealed class GetActiveLowStockAlertsEndpoint
         if (tenantIdString is null || !Guid.TryParse(tenantIdString, out var tenantId))
             return Results.Unauthorized();
 
-        if (tenantStatus == "Suspended")
+        if (tenantStatus is "Suspended" or "Terminated")
             return Results.Forbid();
 
         // Load active alerts for this tenant, optionally filtered by last-seen timestamp.
