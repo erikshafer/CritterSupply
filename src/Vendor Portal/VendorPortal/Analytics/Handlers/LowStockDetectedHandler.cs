@@ -53,7 +53,11 @@ public static class LowStockDetectedHandler
         await session.SaveChangesAsync(ct);
 
         // Push real-time alert to vendor's hub group only on NEW alerts (not quantity updates).
-        // Updated quantities are visible on the next dashboard refresh.
+        // Rationale: firing a hub push on every quantity update would cause UI noise for alerts
+        // that are already visible. The updated quantity is reflected when:
+        //   a) The vendor explicitly refreshes the dashboard, OR
+        //   b) An InventoryAdjusted event arrives (handled by InventoryAdjustedHandler) which
+        //      triggers a lightweight API re-fetch of the authoritative alert count.
         if (existing is null)
         {
             return new LowStockAlertRaised(

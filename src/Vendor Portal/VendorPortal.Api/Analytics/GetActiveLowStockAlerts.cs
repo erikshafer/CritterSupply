@@ -49,9 +49,11 @@ public sealed class GetActiveLowStockAlertsEndpoint
 
         // Load active alerts for this tenant, optionally filtered by last-seen timestamp.
         // The client sends its last-received timestamp on reconnect to request only missed alerts.
+        // Using LastUpdatedAt (not FirstDetectedAt) to capture alerts that were first detected
+        // before the disconnect but were updated (quantity changed) during the offline window.
         var alerts = await querySession.Query<LowStockAlert>()
             .Where(a => a.VendorTenantId == tenantId && a.IsActive)
-            .Where(a => since == null || a.FirstDetectedAt > since.Value)
+            .Where(a => since == null || a.LastUpdatedAt > since.Value)
             .OrderByDescending(a => a.LastUpdatedAt)
             .ToListAsync(ct);
 

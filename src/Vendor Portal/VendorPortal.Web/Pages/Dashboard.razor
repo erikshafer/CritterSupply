@@ -161,12 +161,20 @@
     /// </summary>
     private async void OnHubStateChanged()
     {
-        await InvokeAsync(StateHasChanged);
-
-        if (HubService.State == HubConnectionState.Connected)
+        try
         {
-            RegisterHubListeners();
-            await FetchMissedAlertsAsync();
+            await InvokeAsync(StateHasChanged);
+
+            if (HubService.State == HubConnectionState.Connected)
+            {
+                RegisterHubListeners();
+                await FetchMissedAlertsAsync();
+            }
+        }
+        catch (Exception)
+        {
+            // Async void cannot propagate exceptions — swallow here to prevent unobserved task exception.
+            // FetchMissedAlertsAsync has its own try-catch; StateHasChanged failures are non-fatal.
         }
     }
 

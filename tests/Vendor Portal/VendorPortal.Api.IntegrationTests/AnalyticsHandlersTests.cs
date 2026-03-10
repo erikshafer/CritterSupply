@@ -263,7 +263,7 @@ public sealed class AnalyticsHandlersTests : IAsyncLifetime
     // ───────────────────────────────────────────────
 
     [Fact]
-    public async Task GetActiveLowStockAlerts_Returns200_WhenUnauthorized()
+    public async Task GetActiveLowStockAlerts_Returns401_WhenUnauthorized()
     {
         // Act — no auth token
         var result = await _fixture.Host.Scenario(s =>
