@@ -538,10 +538,110 @@ public sealed class IdentityLifecycleTests : IClassFixture<VendorIdentityApiFixt
 
         var command = new TerminateVendorTenant(tenant.Id, "Duplicate contract");
 
-        // Act & Assert
+         // Act & Assert
         await _fixture.Host.Scenario(x =>
         {
             x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenant.Id}/terminate");
+            x.StatusCodeShouldBe(400);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  17. Deactivate User — Not Found
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task DeactivateUser_WhenUserNotFound_Returns400()
+    {
+        var tenantId = await CreateActiveTenantAsync("Deactivate NotFound Tenant", "deactivate-nf@test.com");
+        var nonExistentUserId = Guid.NewGuid();
+
+        var command = new DeactivateVendorUser(tenantId, nonExistentUserId, "No longer needed");
+
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/{nonExistentUserId}/deactivate");
+            x.StatusCodeShouldBe(400);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  18. Suspend Tenant — Not Found
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task SuspendTenant_WhenTenantNotFound_Returns400()
+    {
+        var nonExistentTenantId = Guid.NewGuid();
+        var command = new SuspendVendorTenant(nonExistentTenantId, "Policy violation");
+
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{nonExistentTenantId}/suspend");
+            x.StatusCodeShouldBe(400);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  19. Terminate Tenant — Not Found
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task TerminateTenant_WhenTenantNotFound_Returns400()
+    {
+        var nonExistentTenantId = Guid.NewGuid();
+        var command = new TerminateVendorTenant(nonExistentTenantId, "Contract ended");
+
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{nonExistentTenantId}/terminate");
+            x.StatusCodeShouldBe(400);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  20. Terminate Tenant — Missing Reason Returns 400
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task TerminateTenant_WithMissingReason_Returns400()
+    {
+        var tenantId = await CreateActiveTenantAsync("Terminate No Reason", "terminate-noreason@test.com");
+        var command = new TerminateVendorTenant(tenantId, "");
+
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenantId}/terminate");
+            x.StatusCodeShouldBe(400);
+        });
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  21. Reinstate Tenant — Terminated Tenant Cannot Be Reinstated
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ReinstateTenant_WhenTerminated_Returns400()
+    {
+        await using var setupDb = _fixture.GetDbContext();
+        var tenant = new VendorTenant
+        {
+            Id = Guid.NewGuid(),
+            OrganizationName = "Reinstate Terminated",
+            ContactEmail = "reinstate-terminated@test.com",
+            Status = VendorTenantStatus.Terminated,
+            OnboardedAt = DateTimeOffset.UtcNow,
+            TerminatedAt = DateTimeOffset.UtcNow,
+            TerminationReason = "Contract ended"
+        };
+        setupDb.Tenants.Add(tenant);
+        await setupDb.SaveChangesAsync();
+
+        var command = new ReinstateVendorTenant(tenant.Id);
+
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenant.Id}/reinstate");
             x.StatusCodeShouldBe(400);
         });
     }
