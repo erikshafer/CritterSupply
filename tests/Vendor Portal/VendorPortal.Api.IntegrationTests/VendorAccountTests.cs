@@ -492,6 +492,281 @@ public sealed class VendorAccountTests : IAsyncLifetime
         });
     }
 
+    // QA Required #2: Write endpoints also require JWT
+    [Fact]
+    public async Task WriteEndpoints_Return401_WithoutJwt()
+    {
+        // POST dashboard view
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new { ViewName = "test" })
+                .ToUrl("/api/vendor-portal/account/dashboard-views");
+            s.StatusCodeShouldBe(401);
+        });
+
+        // DELETE dashboard view
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Delete.Url($"/api/vendor-portal/account/dashboard-views/{Guid.NewGuid()}");
+            s.StatusCodeShouldBe(401);
+        });
+
+        // PUT preferences
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Put.Json(new
+            {
+                LowStockAlerts = true, ChangeRequestDecisions = true,
+                InventoryUpdates = true, SalesMetrics = true
+            }).ToUrl("/api/vendor-portal/account/preferences");
+            s.StatusCodeShouldBe(401);
+        });
+    }
+
+    // QA Required #1: Duplicate view name constraint (matches feature file spec)
+    [Fact]
+    public async Task PostDashboardView_Returns409_WhenDuplicateViewName()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        await CreateTestAccount(tenantId);
+        var jwt = _fixture.CreateTestJwt(tenantId);
+
+        var request = new { ViewName = "Top Products", FilterCriteria = new { LowStockOnly = true } };
+
+        // Create first view — should succeed
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(request).ToUrl("/api/vendor-portal/account/dashboard-views");
+            s.WithRequestHeader("Authorization", $"Bearer {jwt}");
+            s.StatusCodeShouldBe(201);
+        });
+
+        // Act — attempt duplicate name
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(request).ToUrl("/api/vendor-portal/account/dashboard-views");
+            s.WithRequestHeader("Authorization", $"Bearer {jwt}");
+            s.StatusCodeShouldBe(409);
+        });
+    }
+
+    // QA Required #1 (case-insensitive): Duplicate check ignores case
+    [Fact]
+    public async Task PostDashboardView_Returns409_WhenDuplicateViewName_CaseInsensitive()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        await CreateTestAccount(tenantId);
+        var jwt = _fixture.CreateTestJwt(tenantId);
+
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new { ViewName = "My View" }).ToUrl("/api/vendor-portal/account/dashboard-views");
+            s.WithRequestHeader("Authorization", $"Bearer {jwt}");
+            s.StatusCodeShouldBe(201);
+        });
+
+        // Act — same name different case
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new { ViewName = "my view" }).ToUrl("/api/vendor-portal/account/dashboard-views");
+            s.WithRequestHeader("Authorization", $"Bearer {jwt}");
+            s.StatusCodeShouldBe(409);
+        });
+    }
+
+    // QA Required #3: Cross-tenant DELETE isolation
+    [Fact]
+    public async Task DeleteDashboardView_CannotDeleteAnotherTenantView()
+    {
+        // Arrange — tenant A creates a view
+        var tenantA = Guid.NewGuid();
+        await CreateTestAccount(tenantA);
+        var saveCommand = new SaveDashboardViewCommand(tenantA, "Tenant A Private", new DashboardFilterCriteria());
+        await _fixture.ExecuteMessageAsync(saveCommand);
+
+        using var session = _fixture.GetDocumentSession();
+        var accountA = await session.LoadAsync<VendorPortal.VendorAccount.VendorAccount>(tenantA);
+        accountA.ShouldNotBeNull();
+        var viewId = accountA.SavedDashboardViews[0].ViewId;
+
+        // Tenant B tries to delete tenant A's view by ID
+        var tenantB = Guid.NewGuid();
+        await CreateTestAccount(tenantB);
+        var jwtB = _fixture.CreateTestJwt(tenantB);
+
+        // Act
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Delete.Url($"/api/vendor-portal/account/dashboard-views/{viewId}");
+            s.WithRequestHeader("Authorization", $"Bearer {jwtB}");
+            s.StatusCodeShouldBe(404); // B's account doesn't have this view
+        });
+
+        // Assert — tenant A's view is still intact
+        using var verifySession = _fixture.GetDocumentSession();
+        var accountAAfter = await verifySession.LoadAsync<VendorPortal.VendorAccount.VendorAccount>(tenantA);
+        accountAAfter.ShouldNotBeNull();
+        accountAAfter.SavedDashboardViews.Count.ShouldBe(1);
+    }
+
+    // QA Recommended #4: POST → GET round-trip
+    [Fact]
+    public async Task PostDashboardView_PersistedView_IsReturnedByGet()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        await CreateTestAccount(tenantId);
+        var jwt = _fixture.CreateTestJwt(tenantId);
+
+        // POST
+        var request = new { ViewName = "Persisted View", FilterCriteria = new { LowStockOnly = true, SkuFilter = "DOG-" } };
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(request).ToUrl("/api/vendor-portal/account/dashboard-views");
+            s.WithRequestHeader("Authorization", $"Bearer {jwt}");
+            s.StatusCodeShouldBe(201);
+        });
+
+        // GET
+        var getResult = await _fixture.Host.Scenario(s =>
+        {
+            s.Get.Url("/api/vendor-portal/account/dashboard-views");
+            s.WithRequestHeader("Authorization", $"Bearer {jwt}");
+            s.StatusCodeShouldBe(200);
+        });
+
+        var response = getResult.ReadAsJson<DashboardViewsResponse>();
+        response.ShouldNotBeNull();
+        response.Views.Count.ShouldBe(1);
+        response.Views[0].ViewName.ShouldBe("Persisted View");
+    }
+
+    // QA Recommended #5: DELETE → GET round-trip
+    [Fact]
+    public async Task DeleteDashboardView_ViewIsGone_WhenFetchedAfterDelete()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        await CreateTestAccount(tenantId);
+        var jwt = _fixture.CreateTestJwt(tenantId);
+
+        // Create and then delete
+        var createResult = await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new { ViewName = "Ephemeral" }).ToUrl("/api/vendor-portal/account/dashboard-views");
+            s.WithRequestHeader("Authorization", $"Bearer {jwt}");
+            s.StatusCodeShouldBe(201);
+        });
+        var created = createResult.ReadAsJson<SaveDashboardViewApiResponse>();
+        created.ShouldNotBeNull();
+
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Delete.Url($"/api/vendor-portal/account/dashboard-views/{created.ViewId}");
+            s.WithRequestHeader("Authorization", $"Bearer {jwt}");
+            s.StatusCodeShouldBe(204);
+        });
+
+        // GET — should be empty
+        var getResult = await _fixture.Host.Scenario(s =>
+        {
+            s.Get.Url("/api/vendor-portal/account/dashboard-views");
+            s.WithRequestHeader("Authorization", $"Bearer {jwt}");
+            s.StatusCodeShouldBe(200);
+        });
+
+        var response = getResult.ReadAsJson<DashboardViewsResponse>();
+        response.ShouldNotBeNull();
+        response.Views.ShouldBeEmpty();
+    }
+
+    // QA Recommended #6: Account exists but no saved views
+    [Fact]
+    public async Task GetDashboardViews_ReturnsEmptyList_WhenAccountExistsButNoViews()
+    {
+        // Arrange — account exists but no views saved
+        var tenantId = Guid.NewGuid();
+        await CreateTestAccount(tenantId);
+        var jwt = _fixture.CreateTestJwt(tenantId);
+
+        // Act
+        var result = await _fixture.Host.Scenario(s =>
+        {
+            s.Get.Url("/api/vendor-portal/account/dashboard-views");
+            s.WithRequestHeader("Authorization", $"Bearer {jwt}");
+            s.StatusCodeShouldBe(200);
+        });
+
+        var response = result.ReadAsJson<DashboardViewsResponse>();
+        response.ShouldNotBeNull();
+        response.Views.ShouldBeEmpty();
+    }
+
+    // QA Recommended #7: Full filter criteria serialization round-trip
+    [Fact]
+    public async Task SaveDashboardView_PreservesAllFilterCriteriaFields()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        await CreateTestAccount(tenantId);
+
+        var filterCriteria = new DashboardFilterCriteria
+        {
+            DateFrom = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            DateTo = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero),
+            SkuFilter = "DOG-FOOD-",
+            LowStockOnly = true,
+            WarehouseId = "WH-EAST-001",
+        };
+
+        var command = new SaveDashboardViewCommand(tenantId, "Full Filter Test", filterCriteria);
+
+        // Act
+        await _fixture.ExecuteMessageAsync(command);
+
+        // Assert — all 5 fields persisted
+        using var session = _fixture.GetDocumentSession();
+        var account = await session.LoadAsync<VendorPortal.VendorAccount.VendorAccount>(tenantId);
+        account.ShouldNotBeNull();
+        account.SavedDashboardViews.Count.ShouldBe(1);
+
+        var saved = account.SavedDashboardViews[0];
+        saved.FilterCriteria.DateFrom.ShouldBe(filterCriteria.DateFrom);
+        saved.FilterCriteria.DateTo.ShouldBe(filterCriteria.DateTo);
+        saved.FilterCriteria.SkuFilter.ShouldBe("DOG-FOOD-");
+        saved.FilterCriteria.LowStockOnly.ShouldBe(true);
+        saved.FilterCriteria.WarehouseId.ShouldBe("WH-EAST-001");
+    }
+
+    // QA Recommended #8: UpdatedAt timestamp assertions
+    [Fact]
+    public async Task UpdateNotificationPreferences_UpdatesTimestamp()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        await CreateTestAccount(tenantId);
+
+        using var sessionBefore = _fixture.GetDocumentSession();
+        var accountBefore = await sessionBefore.LoadAsync<VendorPortal.VendorAccount.VendorAccount>(tenantId);
+        accountBefore.ShouldNotBeNull();
+        var createdAt = accountBefore.CreatedAt;
+
+        // Small delay to ensure timestamp difference
+        await Task.Delay(50);
+
+        // Act
+        var command = new UpdateNotificationPreferencesCommand(tenantId, false, false, false, false);
+        await _fixture.ExecuteMessageAsync(command);
+
+        // Assert
+        using var sessionAfter = _fixture.GetDocumentSession();
+        var accountAfter = await sessionAfter.LoadAsync<VendorPortal.VendorAccount.VendorAccount>(tenantId);
+        accountAfter.ShouldNotBeNull();
+        accountAfter.UpdatedAt.ShouldBeGreaterThan(createdAt);
+    }
+
     // ───────────────────────────────────────────────
     // Helper: create a VendorAccount for a given tenant
     // ───────────────────────────────────────────────

@@ -26,6 +26,7 @@ public sealed class SaveDashboardViewEndpoint
     public static async Task<IResult> SaveDashboardView(
         SaveDashboardViewRequest request,
         HttpContext httpContext,
+        IQuerySession querySession,
         IMessageBus bus,
         CancellationToken ct)
     {
@@ -36,6 +37,11 @@ public sealed class SaveDashboardViewEndpoint
         if (string.IsNullOrWhiteSpace(request.ViewName))
             return Results.BadRequest("View name is required.");
 
+        // Pre-check: distinguish between 404 (no account) and 409 (duplicate name)
+        var account = await querySession.LoadAsync<VendorPortal.VendorAccount.VendorAccount>(tenantId, ct);
+        if (account is null)
+            return Results.NotFound("Vendor account not found. Please contact support.");
+
         var command = new SaveDashboardViewCommand(
             VendorTenantId: tenantId,
             ViewName: request.ViewName.Trim(),
@@ -43,7 +49,7 @@ public sealed class SaveDashboardViewEndpoint
 
         var savedView = await bus.InvokeAsync<SavedDashboardView?>(command, ct);
         if (savedView is null)
-            return Results.NotFound("Vendor account not found. Please contact support.");
+            return Results.Conflict("A view with this name already exists.");
 
         return Results.Created(
             $"/api/vendor-portal/account/dashboard-views/{savedView.ViewId}",

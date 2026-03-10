@@ -25,6 +25,16 @@ public static class SaveDashboardViewHandler
             return null;
         }
 
+        // Invariant: no duplicate view names within the same account
+        if (account.SavedDashboardViews.Any(v =>
+                v.ViewName.Equals(command.ViewName, StringComparison.OrdinalIgnoreCase)))
+        {
+            logger.LogDebug(
+                "Dashboard view name '{ViewName}' already exists for tenant {TenantId} — rejecting duplicate",
+                command.ViewName, command.VendorTenantId);
+            return null;
+        }
+
         var savedView = new SavedDashboardView
         {
             ViewId = Guid.NewGuid(),
