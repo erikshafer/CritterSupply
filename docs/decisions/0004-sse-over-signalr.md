@@ -1,6 +1,6 @@
 # ADR 0004: Use Server-Sent Events (SSE) over SignalR for Real-Time Updates
 
-**Status:** ✅ Accepted — ⚠️ Supersession Proposed by [ADR 0013](./0013-signalr-migration-from-sse.md)
+**Status:** 🔄 Superseded by [ADR 0013: Migrate from SSE to SignalR](./0013-signalr-migration-from-sse.md) (accepted 2026-03-10)
 
 **Date:** 2026-02-04
 

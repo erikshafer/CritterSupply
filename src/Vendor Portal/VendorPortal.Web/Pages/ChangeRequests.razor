@@ -112,6 +112,15 @@ else
                            data-testid="@($"view-request-{context.Id}")">
                     View
                 </MudButton>
+                @if (context.Status == "Draft" && AuthState.CanSubmitChangeRequests)
+                {
+                    <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error"
+                               OnClick="@(() => DeleteDraft(context.Id))"
+                               Disabled="_deletingDraftId == context.Id"
+                               data-testid="@($"delete-draft-{context.Id}")">
+                        Delete
+                    </MudButton>
+                }
             </MudTd>
         </RowTemplate>
     </MudTable>
@@ -121,6 +130,7 @@ else
     private IReadOnlyList<ChangeRequestSummaryModel>? _items;
     private bool _isLoading = true;
     private string? _statusFilter;
+    private Guid? _deletingDraftId;
 
     private static readonly IReadOnlyList<string> _availableStatuses =
         ["Draft", "Submitted", "NeedsMoreInfo", "Approved", "Rejected", "Withdrawn", "Superseded"];
@@ -202,6 +212,39 @@ else
         "DataCorrection" => Color.Tertiary,
         _ => Color.Default
     };
+
+    private async Task DeleteDraft(Guid draftId)
+    {
+        _deletingDraftId = draftId;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("VendorPortalApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.PostAsync(
+                $"/api/vendor-portal/change-requests/{draftId}/withdraw", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Draft deleted.", Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete draft.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Exception deleting draft {DraftId}.", draftId);
+            Snackbar.Add("Failed to delete draft.", Severity.Error);
+        }
+        finally
+        {
+            _deletingDraftId = null;
+        }
+    }
 
     private sealed record ChangeRequestSummaryModel(
         Guid Id,
