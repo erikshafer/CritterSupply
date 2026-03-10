@@ -23,6 +23,16 @@ public sealed class LoginPage(IPage page)
     {
         await EmailInput.FillAsync(email);
         await PasswordInput.FillAsync(password);
+
+        // Blazor Server processes form input events asynchronously via its SignalR circuit.
+        // FillAsync fires browser-side events synchronously, but the .NET component state
+        // (_email, _password) is updated only after the event round-trips through the circuit.
+        // On a loaded CI runner, clicking "Sign In" immediately after FillAsync can trigger
+        // MudForm.ValidateAsync() before _email/_password are set, causing validation to see
+        // empty fields and returning IsValid=false. A 300ms pause is well within Playwright's
+        // default action timeouts and gives the Blazor circuit ample time to process oninput.
+        await page.WaitForTimeoutAsync(300);
+
         await LoginButton.ClickAsync();
 
         // forceLoad: true in Login.razor's Navigation.NavigateTo fires a SECOND full-page navigation
