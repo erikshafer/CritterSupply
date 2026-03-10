@@ -14,7 +14,7 @@
 ---
 
 **Cycle:** 22 — Vendor Portal + Vendor Identity Phase 1
-**Status:** 🚀 **IN PROGRESS** (Issues created, ready to implement)
+**Status:** ✅ **COMPLETE** (All phases 1–5 implemented)
 **GitHub Milestone:** [Cycle 22: Vendor Portal + Vendor Identity Phase 1](https://github.com/erikshafer/CritterSupply/milestone/16)
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 **Epic Issue:** [#249](https://github.com/erikshafer/CritterSupply/issues/249)
@@ -23,52 +23,41 @@
 
 ## Current Status
 
-**Cycle 22 has begun!** Vendor Portal + Vendor Identity Phase 1 will establish the infrastructure foundation for vendor-facing features (no UI yet).
+**Cycle 22 is COMPLETE!** All 5 phases of the Vendor Portal initial build-out have been delivered.
 
-**Priority #1:** VendorProductCatalog (the load-bearing pillar) — SKU→VendorTenantId lookup that enables all analytics and change request invariants.
+**Phase 5 Deliverables (Saved Views + VendorAccount):**
+- VendorAccount Marten document initialized by VendorTenantCreated event
+- NotificationPreferences with opt-out model (4 toggles, all default true)
+- SaveDashboardView / DeleteDashboardView with duplicate name guard
+- UpdateNotificationPreferences command
+- 5 HTTP endpoints (GET/POST/DELETE dashboard-views, GET/PUT preferences)
+- Settings page in Blazor WASM (notification preferences, saved views management)
+- Settings link in MainLayout + Dashboard quick actions
+- 27 integration tests (86 total across all phases, 100% pass rate)
 
-**Key Deliverables (Phase 1 - Infrastructure Foundation):**
-- VendorIdentity EF Core project (VendorTenant, VendorUser, VendorUserInvitation entities)
-- CreateVendorTenant + InviteVendorUser commands + integration events
-- VendorPortal domain project + VendorProductCatalog document store
-- VendorProductAssociated integration event (Catalog BC → Vendor Portal)
-- AssignProductToVendor + bulk-assignment commands (Catalog BC admin endpoints)
-- VendorPortal.Api skeleton with RabbitMQ subscriptions
-- Integration tests (full round-trip testable with no UI)
-
-**Phase 1 Tasks (17 issues created):**
-
-### Vendor Identity (4 issues)
-- [#254](https://github.com/erikshafer/CritterSupply/issues/254): Create EF Core project structure + migrations
-- [#255](https://github.com/erikshafer/CritterSupply/issues/255): Implement CreateVendorTenant command + handler
-- [#256](https://github.com/erikshafer/CritterSupply/issues/256): Implement InviteVendorUser command + handler
-- [#257](https://github.com/erikshafer/CritterSupply/issues/257): Write integration tests for Vendor Identity BC
-
-### Vendor Portal (4 issues)
-- [#270](https://github.com/erikshafer/CritterSupply/issues/270): Create domain + API project structure
-- [#271](https://github.com/erikshafer/CritterSupply/issues/271): Implement VendorProductCatalog document + projection
-- [#272](https://github.com/erikshafer/CritterSupply/issues/272): Configure RabbitMQ subscriptions in VendorPortal.Api
-- [#273](https://github.com/erikshafer/CritterSupply/issues/273): Write integration tests for VendorPortal BC
-
-### Product Catalog (4 issues)
-- [#286](https://github.com/erikshafer/CritterSupply/issues/286): Add VendorProductAssociated integration event
-- [#287](https://github.com/erikshafer/CritterSupply/issues/287): Implement AssignProductToVendor admin endpoint
-- [#288](https://github.com/erikshafer/CritterSupply/issues/288): Implement BulkAssignProductsToVendor command
-- [#289](https://github.com/erikshafer/CritterSupply/issues/289): Write integration tests for vendor assignment
-
-### Infrastructure (4 issues)
-- [#302](https://github.com/erikshafer/CritterSupply/issues/302): Update Messages.Contracts with VendorIdentity namespace
-- [#303](https://github.com/erikshafer/CritterSupply/issues/303): Update docker-compose.yml with vendoridentity-api + vendorportal-api
-- [#304](https://github.com/erikshafer/CritterSupply/issues/304): Update CONTEXTS.md: validate Phase 1 integration contracts
-- [#305](https://github.com/erikshafer/CritterSupply/issues/305): Update .slnx with new Vendor Portal + Vendor Identity projects
+**Completed Phases:**
+- ✅ Phase 1: JWT Auth Infrastructure (VendorIdentity.Api, EF Core, token issuance)
+- ✅ Phase 2: Vendor Portal API (analytics, alerts, dashboard, multi-tenant isolation)
+- ✅ Phase 3: Blazor WASM Frontend (SignalR hub, in-memory JWT, live updates)
+- ✅ Phase 4: Change Request Workflow (7-state machine, Catalog BC integration)
+- ✅ Phase 5: Saved Views + VendorAccount (notification preferences, saved dashboard views)
 
 **Next cycles:**
-- **Cycle 23:** Vendor Portal Phase 2 — JWT auth + SignalR hub + static analytics dashboard
+- **Cycle 23:** Vendor Portal Phase 2 — Advanced analytics, "Load View" dashboard action, email notification preferences
 - **Cycle 24:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling ([Milestone 17](https://github.com/erikshafer/CritterSupply/milestone/17))
 
 ---
 
 ## Recently Completed
+
+- ✅ **Cycle 22:** Vendor Portal + Vendor Identity Phase 1 (2026-03-08 to 2026-03-10) — **ALL 5 PHASES COMPLETE**
+  - Phase 1: JWT Auth (VendorIdentity.Api, EF Core, token lifecycle)
+  - Phase 2: Vendor Portal API (analytics, alerts, dashboard, multi-tenant)
+  - Phase 3: Blazor WASM Frontend (SignalR hub, in-memory JWT, live updates)
+  - Phase 4: Change Request Workflow (7-state machine, Catalog BC integration)
+  - Phase 5: Saved Views + VendorAccount (notification preferences, saved dashboard views)
+  - 86 integration tests (100% pass rate)
+  - [Event Modeling](vendor-portal-event-modeling.md) | [Retrospective](./cycles/cycle-22-retrospective.md) | [Milestone](https://github.com/erikshafer/CritterSupply/milestone/16)
 
 - ✅ **Cycle 21:** Pricing BC Phase 1 (2026-03-07 to 2026-03-08) — **MILESTONE CLOSED**
   - ProductPrice event-sourced aggregate (UUID v5 deterministic stream ID)
@@ -115,17 +104,11 @@
 
 ### Next 3 Cycles (Milestones Created, Issues Ready/TBD)
 
-- **Cycle 22:** Vendor Portal + Vendor Identity Phase 1 — Infrastructure foundation (no UI yet) ([Milestone 16](https://github.com/erikshafer/CritterSupply/milestone/16), Issues TBD)
-  - Event Modeling: [`docs/planning/vendor-portal-event-modeling.md`](vendor-portal-event-modeling.md)
-  - Gherkin features: [`docs/features/vendor-portal/`](../features/vendor-portal/), [`docs/features/vendor-identity/`](../features/vendor-identity/)
-  - ADR: [ADR 0015: JWT for Vendor Identity](../decisions/0015-jwt-for-vendor-identity.md)
-
-- **Cycle 23:** Vendor Portal Phase 2 — JWT auth + SignalR hub + static analytics dashboard (estimated 2 weeks)
-  - Builds on Cycle 22 infrastructure
-  - VendorPortalHub with dual group membership (vendor:{tenantId}, user:{userId})
-  - JWT Bearer authentication (15-min access + 7-day refresh)
-  - Static analytics dashboard (HTTP queries, no SignalR updates yet)
-  - OrderPlacedHandler fan-out to ProductPerformanceSummary projection
+- **Cycle 23:** Vendor Portal Phase 2 — Advanced analytics, "Load View" dashboard action, email notification preferences
+  - Builds on Cycle 22 Phase 5 infrastructure
+  - Dashboard filter state management + "Load Saved View" action
+  - Email notification preference integration (requires Notifications BC)
+  - Advanced analytics dashboard with live charts
 
 - **Cycle 24:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling ([Milestone 17](https://github.com/erikshafer/CritterSupply/milestone/17), Issues TBD)
   - Event Modeling: [`docs/planning/admin-portal-event-modeling.md`](admin-portal-event-modeling.md)
@@ -163,5 +146,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-08 (Cycle 21 closed, Cycle 22 in progress — 17 issues created for Vendor Portal + Vendor Identity Phase 1)*
+*Last Updated: 2026-03-10 (Cycle 22 closed — all 5 phases complete, 86 integration tests passing)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*

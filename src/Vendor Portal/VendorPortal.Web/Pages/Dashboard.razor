@@ -130,9 +130,16 @@
             </MudButton>
         }
 
+        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                   StartIcon="@Icons.Material.Filled.Settings" Class="mr-2"
+                   Href="/settings"
+                   data-testid="settings-btn">
+            Settings
+        </MudButton>
+
         @if (!AuthState.CanSubmitChangeRequests && !AuthState.IsAdmin)
         {
-            <MudText Typo="Typo.body2" Color="Color.Secondary">
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
                 You can view analytics, manage your notification preferences, and track change request status.
                 Contact your Admin to submit change requests.
             </MudText>

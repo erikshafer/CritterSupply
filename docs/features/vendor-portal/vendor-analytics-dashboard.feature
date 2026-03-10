@@ -120,9 +120,9 @@ Feature: Vendor Portal Analytics Dashboard
       | Date Range  | Last 7 Days |
       | SKU         | CPE-TOY-01  |
     When I click "Save View" and enter the name "Rope Toy — Weekly"
-    Then a "DashboardViewSaved" domain event is recorded within the Vendor Portal
+    Then the view is persisted in my vendor account
     And the view appears in my Saved Views list
-    And the "DashboardViewSaved" event is NOT published to RabbitMQ (internal only)
+    And the view save is NOT published to RabbitMQ (internal to Vendor Portal only)
 
   Scenario: Vendor loads a saved dashboard view
     Given I have a saved view named "Rope Toy — Weekly"
@@ -140,4 +140,4 @@ Feature: Vendor Portal Analytics Dashboard
     Given I have a saved view named "Rope Toy — Weekly"
     When I click "Delete" on the view
     Then the view is removed from my Saved Views list
-    And a "DashboardViewDeleted" domain event is recorded
+    And the view is removed from my vendor account

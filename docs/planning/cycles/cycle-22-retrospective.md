@@ -1,8 +1,8 @@
-# Cycle 22 Retrospective: Vendor Portal Phases 1–4
+# Cycle 22 Retrospective: Vendor Portal Phases 1–5
 
 **Dates:** 2026-03-08 to 2026-03-10
-**Duration:** 3 days (phased delivery across 4 sign-off sessions)
-**Status:** ✅ **COMPLETE** — all 4 sign-offs obtained (UX, QA, PO, Principal Architect)
+**Duration:** 3 days (phased delivery across 5 sign-off sessions)
+**Status:** ✅ **COMPLETE** — all sign-offs obtained (UX, QA, PO, Principal Architect) for all 5 phases
 
 ---
 
@@ -18,6 +18,8 @@ isolation, and cross-BC messaging through a realistic change request workflow.
 3. **Phase 3** — Blazor WASM frontend (VendorPortal.Web) with SignalR hub connection
 4. **Phase 4** — Change request management: full 7-state workflow, cross-BC messaging (Catalog BC),
    structured Q&A thread (InfoResponses), real-time decision notifications via SignalR
+5. **Phase 5** — VendorAccount initialized by VendorTenantCreated, notification preferences (opt-out model),
+   saved dashboard views with duplicate name guard, Settings page in Blazor WASM
 
 ---
 
@@ -52,6 +54,32 @@ isolation, and cross-BC messaging through a realistic change request workflow.
 - Delete Draft (drafts) vs Withdraw (submitted/NeedsMoreInfo) semantic distinction in Blazor UI
 - `ILogger<T>` injected in all Blazor pages; all catch blocks log at Debug level
 - 59 integration tests passing
+
+### Phase 5 — Saved Views + VendorAccount
+- `VendorAccount` Marten document: Id = VendorTenantId, initialized by `VendorTenantCreated` event from Vendor Identity BC
+- `NotificationPreferences` record: opt-out model with 4 boolean toggles (LowStockAlerts, ChangeRequestDecisions, InventoryUpdates, SalesMetrics), all default true
+- `SavedDashboardView` / `DashboardFilterCriteria`: named filter configurations with 5 filter fields
+- Duplicate view name guard (case-insensitive, 409 Conflict)
+- 5 HTTP endpoints: GET/POST/DELETE dashboard-views, GET/PUT preferences
+- `VendorTenantCreatedHandler` idempotent (skips if account already exists)
+- Settings page in Blazor WASM: notification preference toggles with helper text, saved views table with delete confirmation dialog
+- Settings link in MainLayout app bar + Dashboard Quick Actions
+- ARIA accessibility: `role="group"` + `aria-labelledby` for notification preferences, `aria-label` on saved views table
+- RabbitMQ queue subscription: `vendor-portal-tenant-created`
+- 27 new integration tests (86 total across all phases, 100% pass rate)
+
+**Phase 5 UX Improvements (from UX Engineer sign-off):**
+- Helper text under each notification toggle explaining what it controls
+- Delete confirmation dialog (`IDialogService`) preventing accidental view deletion
+- Semantic form grouping for screen reader accessibility (WCAG 2.1 AA)
+
+**Phase 5 QA Improvements (from QA Engineer sign-off):**
+- Duplicate view name constraint (matches feature file acceptance criteria)
+- Write endpoint 401 coverage (POST/DELETE/PUT without JWT)
+- Cross-tenant DELETE isolation test
+- POST→GET and DELETE→GET round-trip verification tests
+- Full DashboardFilterCriteria 5-field serialization round-trip
+- UpdatedAt timestamp assertions
 
 ---
 
@@ -345,9 +373,11 @@ and executed. Update the ADR in the same PR that completes the implementation.
 
 ## What To Improve
 
-- **CONTEXTS.md drift** — 7 errors found at final review, all from delayed updates
+- **CONTEXTS.md drift** — 7 errors found at final review (Phases 1-4), plus 5 endpoint URL mismatches found during Phase 5 PO review. Update CONTEXTS.md as endpoints are implemented, not after.
 - **Catch-up assertion test** — the `BuildCatalogMessage` bug (L2) was NOT caught by any test because no test asserted the payload of the outgoing catalog message. Add assertions on the full outgoing message payload, not just status transitions.
 - **ADR lifecycle discipline** — ADR 0013 was `Proposed` for the entire Phases 1-4 implementation
+- **Feature file accuracy** — Feature file said "DashboardViewSaved domain event is recorded" but implementation uses Marten document store (not event sourcing). Feature files should reflect the actual persistence pattern. Updated in Phase 5.
+- **POST→GET round-trip tests** — QA discovered that 201 response assertions without subsequent GET verification leaves false-positive risk. Always verify persistence with a round-trip test.
 
 ---
 
@@ -355,14 +385,16 @@ and executed. Update the ADR in the same PR that completes the implementation.
 
 | Metric | Value |
 |--------|-------|
-| Integration tests added | 59 |
-| Test pass rate at Phase 4 close | 100% (59/59) |
+| Integration tests added (Phases 1–4) | 59 |
+| Integration tests added (Phase 5) | 27 |
+| Total integration tests | 86 |
+| Test pass rate at Phase 5 close | 100% (86/86) |
 | ADRs updated | 2 (0004 superseded, 0013 accepted) |
-| CONTEXTS.md corrections at final review | 7 |
+| CONTEXTS.md corrections at final review | 7 (Phase 4) + 5 endpoint URL updates (Phase 5) |
 | Skills updated | 4 (marten-document-store, wolverine-signalr, wolverine-message-handlers, blazor-wasm-jwt) |
 | New skills created | 0 |
 | Code review iterations | 2 (initial review, post-PO-blocker review) |
-| PO blockers at first review | 3 (all resolved) |
+| PO blockers at first review | 3 (Phases 1-4, all resolved) + 2 (Phase 5, all resolved) |
 | PA bugs found at final review | 1 (BuildCatalogMessage — fixed) |
 
 ---
@@ -371,7 +403,10 @@ and executed. Update the ADR in the same PR that completes the implementation.
 
 | Role | Status | Date |
 |------|--------|------|
-| UX Engineer | ✅ | Cycle 22 Phase 3 |
-| QA Engineer | ✅ | Cycle 22 Phase 4 |
-| Product Owner | ✅ | 2026-03-10 |
+| UX Engineer (Phase 3) | ✅ | Cycle 22 Phase 3 |
+| UX Engineer (Phase 5) | ✅ | Cycle 22 Phase 5 (B1: helper text, B2: delete confirmation, B3: ARIA grouping) |
+| QA Engineer (Phase 4) | ✅ | Cycle 22 Phase 4 |
+| QA Engineer (Phase 5) | ✅ | Cycle 22 Phase 5 (3 required + 5 recommended, 86/86 tests) |
+| Product Owner (Phase 4) | ✅ | 2026-03-10 |
+| Product Owner (Phase 5) | ✅ | 2026-03-10 (CONTEXTS.md URL updates + feature file corrections) |
 | Principal Architect | ✅ | 2026-03-10 |
