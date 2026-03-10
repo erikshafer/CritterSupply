@@ -6,8 +6,11 @@ namespace VendorPortal.Api.Hubs;
 
 /// <summary>
 /// SignalR hub for real-time Vendor Portal updates.
-/// JWT-authenticated: VendorTenantId extracted from claims only (never query string).
-/// POC: Uses plain Hub (not WolverineHub) for push-only — upgrade to WolverineHub in Phase 3 for bidirectional.
+/// JWT-authenticated: VendorTenantId and VendorUserId extracted from claims only (never query string).
+/// Dual group membership: vendor:{tenantId} for tenant-wide messages, user:{userId} for personal messages.
+///
+/// Phase 3: server→client push only — Wolverine publishes hub messages via IHubContext.
+/// Phase 4 will upgrade to WolverineHub for bidirectional client→server routing (change requests).
 /// </summary>
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public sealed class VendorPortalHub : Hub
@@ -23,6 +26,7 @@ public sealed class VendorPortalHub : Hub
     {
         var tenantId = Context.User?.FindFirst("VendorTenantId")?.Value;
         var userId = Context.User?.FindFirst("VendorUserId")?.Value;
+        var tenantStatus = Context.User?.FindFirst("VendorTenantStatus")?.Value;
         var role = Context.User?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
 
         if (tenantId is null || userId is null)
@@ -32,19 +36,19 @@ public sealed class VendorPortalHub : Hub
             return;
         }
 
+        if (tenantStatus is "Suspended" or "Terminated")
+        {
+            _logger.LogWarning("Hub connection rejected: tenant {TenantId} has status {Status}",
+                tenantId, tenantStatus);
+            Context.Abort();
+            return;
+        }
+
         await Groups.AddToGroupAsync(Context.ConnectionId, $"vendor:{tenantId}");
         await Groups.AddToGroupAsync(Context.ConnectionId, $"user:{userId}");
 
         _logger.LogInformation("Vendor hub connected: user={UserId} tenant={TenantId} role={Role}",
             userId, tenantId, role);
-
-        await Clients.Caller.SendAsync("Connected", new
-        {
-            message = "Connected to Vendor Portal",
-            tenantId,
-            userId,
-            connectedAt = DateTimeOffset.UtcNow
-        });
 
         await base.OnConnectedAsync();
     }

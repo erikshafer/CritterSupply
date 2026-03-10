@@ -33,48 +33,66 @@ public sealed class VendorHubService : IAsyncDisposable
         _logger = logger;
     }
 
+    private readonly SemaphoreSlim _connectLock = new(1, 1);
+
     public async Task ConnectAsync(CancellationToken ct = default)
     {
-        if (_connection is not null)
+        // Guard against concurrent reconnect calls (e.g., rapid "Reconnect" button clicks)
+        if (!await _connectLock.WaitAsync(0, ct))
             return;
-
-        var apiUrl = _configuration["ApiClients:VendorPortalApiUrl"] ?? "http://localhost:5239";
-        var hubUrl = $"{apiUrl}/hub/vendor-portal";
-
-        _connection = new HubConnectionBuilder()
-            .WithUrl(hubUrl, options =>
-            {
-                // AccessTokenProvider is called on every connection attempt.
-                // Lambda captures _authState so reconnects always use the freshest token.
-                options.AccessTokenProvider = () =>
-                    Task.FromResult<string?>(_authState.AccessToken);
-            })
-            .WithAutomaticReconnect([TimeSpan.Zero, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(10)])
-            .Build();
-
-        _connection.Reconnecting += _ =>
-        {
-            _logger.LogInformation("Hub reconnecting...");
-            OnStateChanged?.Invoke();
-            return Task.CompletedTask;
-        };
-
-        _connection.Reconnected += _ =>
-        {
-            _logger.LogInformation("Hub reconnected");
-            OnStateChanged?.Invoke();
-            return Task.CompletedTask;
-        };
-
-        _connection.Closed += _ =>
-        {
-            _logger.LogWarning("Hub connection closed");
-            OnStateChanged?.Invoke();
-            return Task.CompletedTask;
-        };
 
         try
         {
+            // If connection exists and is already active (not in terminal state), do nothing.
+            if (_connection is not null &&
+                _connection.State is HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting)
+            {
+                return;
+            }
+
+            // If connection exists but is in the terminal Disconnected state (retry policy exhausted),
+            // dispose the old connection before creating a fresh one.
+            if (_connection is not null)
+            {
+                await _connection.DisposeAsync();
+                _connection = null;
+            }
+
+            var apiUrl = _configuration["ApiClients:VendorPortalApiUrl"] ?? "http://localhost:5239";
+            var hubUrl = $"{apiUrl}/hub/vendor-portal";
+
+            _connection = new HubConnectionBuilder()
+                .WithUrl(hubUrl, options =>
+                {
+                    // AccessTokenProvider is called on every connection attempt.
+                    // Lambda captures _authState so reconnects always use the freshest token.
+                    options.AccessTokenProvider = () =>
+                        Task.FromResult<string?>(_authState.AccessToken);
+                })
+                .WithAutomaticReconnect([TimeSpan.Zero, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(10)])
+                .Build();
+
+            _connection.Reconnecting += _ =>
+            {
+                _logger.LogInformation("Hub reconnecting...");
+                OnStateChanged?.Invoke();
+                return Task.CompletedTask;
+            };
+
+            _connection.Reconnected += _ =>
+            {
+                _logger.LogInformation("Hub reconnected");
+                OnStateChanged?.Invoke();
+                return Task.CompletedTask;
+            };
+
+            _connection.Closed += _ =>
+            {
+                _logger.LogWarning("Hub connection closed");
+                OnStateChanged?.Invoke();
+                return Task.CompletedTask;
+            };
+
             await _connection.StartAsync(ct);
             _logger.LogInformation("Hub connected: state={State}", _connection.State);
             OnStateChanged?.Invoke();
@@ -83,6 +101,10 @@ public sealed class VendorHubService : IAsyncDisposable
         {
             _logger.LogError(ex, "Failed to connect to VendorPortalHub");
             OnStateChanged?.Invoke();
+        }
+        finally
+        {
+            _connectLock.Release();
         }
     }
 
@@ -102,8 +124,8 @@ public sealed class VendorHubService : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         if (_connection is not null)
-        {
             await _connection.DisposeAsync();
-        }
+
+        _connectLock.Dispose();
     }
 }

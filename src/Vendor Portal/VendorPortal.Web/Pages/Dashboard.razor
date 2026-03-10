@@ -1,5 +1,7 @@
 @page "/dashboard"
 @using System.Net.Http.Json
+@using System.Text.Json
+@using System.Text.Json.Serialization
 @using Microsoft.AspNetCore.SignalR.Client
 @using VendorPortal.Web.Auth
 @using VendorPortal.Web.Hub
@@ -25,6 +27,21 @@
                        aria-label="Loading dashboard data" />
 }
 
+@* P1-C: In-page recovery banner when SignalR terminally disconnects *@
+@if (HubService.State == HubConnectionState.Disconnected)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3"
+              aria-live="assertive" data-testid="hub-disconnected-banner">
+        <MudIcon Icon="@Icons.Material.Filled.WifiOff" Class="mr-1" aria-hidden="true" />
+        Live updates are paused.
+        <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small"
+                   OnClick="ReconnectAsync" Class="ml-1 pa-0" Style="min-width:auto; text-transform:none;">
+            Reconnect
+        </MudButton>
+        or refresh the page to restore live data.
+    </MudAlert>
+}
+
 @if (_summary is not null)
 {
     <section aria-label="Dashboard summary">
@@ -32,11 +49,14 @@
         <MudGrid>
             <MudItem xs="12" sm="4">
                 <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center"
-                          aria-label="@($"Low Stock Alerts: {_summary.ActiveLowStockAlerts}")">
+                          aria-label="@($"Low Stock Alerts: {_activeLowStockAlerts}")">
                     <MudIcon Icon="@Icons.Material.Filled.Warning"
-                             Color="@(_summary.ActiveLowStockAlerts > 0 ? Color.Error : Color.Success)"
+                             Color="@(_activeLowStockAlerts > 0 ? Color.Error : Color.Success)"
                              Style="font-size:2rem;" aria-hidden="true" />
-                    <MudText Typo="Typo.h4">@_summary.ActiveLowStockAlerts</MudText>
+                    @* P1-A: aria-live wrapper so screen readers announce live count changes *@
+                    <div aria-live="polite" aria-atomic="true">
+                        <MudText Typo="Typo.h4">@_activeLowStockAlerts</MudText>
+                    </div>
                     <MudText Typo="Typo.body2" Color="Color.Secondary">Low Stock Alerts</MudText>
                 </MudPaper>
             </MudItem>
@@ -64,6 +84,21 @@
             </MudItem>
         </MudGrid>
     </section>
+
+    @if (_salesMetricUpdatedAt.HasValue)
+    {
+        @* aria-live="polite": waits for user to finish current interaction before announcing *@
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3"
+                  aria-live="polite" data-testid="sales-metric-updated-banner">
+            Sales data updated at @_salesMetricUpdatedAt.Value.ToLocalTime().ToString("HH:mm:ss").
+            @* P2-C: Use MudButton (rendered as <button>) for keyboard accessibility — <a> without href is not in tab order *@
+            <MudButton Variant="Variant.Text" Color="Color.Info" Size="Size.Small"
+                       OnClick="LoadDashboardAsync" Class="ml-1 pa-0"
+                       Style="min-width:auto; text-transform:none; font-size:inherit;">
+                Refresh
+            </MudButton>
+        </MudAlert>
+    }
 
     <MudPaper Elevation="2" Class="pa-4 mt-4">
         <MudText Typo="Typo.h6" GutterBottom="true">Quick Actions</MudText>
@@ -98,10 +133,152 @@
     private DashboardSummary? _summary;
     private bool _isLoading = true;
 
+    // Live analytics state — updated by SignalR hub messages
+    private int _activeLowStockAlerts;
+    private DateTimeOffset? _salesMetricUpdatedAt;
+
+    // Reconnection catch-up: track the timestamp of the last received hub message
+    private DateTimeOffset _lastHubMessageAt = DateTimeOffset.MinValue;
+
+    // Hub message listener registration — disposed in Dispose()
+    private IDisposable? _hubMessageHandler;
+
+    private static readonly JsonSerializerOptions CloudEventsOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     protected override async Task OnInitializedAsync()
     {
-        HubService.OnStateChanged += StateHasChanged;
+        HubService.OnStateChanged += OnHubStateChanged;
         await LoadDashboardAsync();
+        RegisterHubListeners();
+    }
+
+    /// <summary>
+    /// Called whenever the hub connection state changes (connected, reconnecting, disconnected).
+    /// On reconnect, fetches missed alerts since the last known hub message.
+    /// </summary>
+    private async void OnHubStateChanged()
+    {
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+
+            if (HubService.State == HubConnectionState.Connected)
+            {
+                RegisterHubListeners();
+                await FetchMissedAlertsAsync();
+            }
+        }
+        catch (Exception)
+        {
+            // Async void cannot propagate exceptions — swallow here to prevent unobserved task exception.
+            // FetchMissedAlertsAsync has its own try-catch; StateHasChanged failures are non-fatal.
+        }
+    }
+
+    /// <summary>
+    /// Attempts to reconnect to the SignalR hub after terminal disconnection.
+    /// Called from the in-page disconnect banner (P1-C fix).
+    /// </summary>
+    private async Task ReconnectAsync()
+    {
+        await HubService.ConnectAsync();
+    }
+
+    /// <summary>
+    /// Registers a single handler on the "ReceiveMessage" hub method.
+    /// Wolverine wraps all messages in a CloudEvents envelope delivered via this single method.
+    /// We demultiplex by the "type" discriminator in the envelope.
+    /// Previous registration is disposed before re-registering (safe on reconnect).
+    /// </summary>
+    private void RegisterHubListeners()
+    {
+        if (HubService.Connection is null) return;
+
+        _hubMessageHandler?.Dispose();
+
+        _hubMessageHandler = HubService.Connection.On<JsonElement>(
+            "ReceiveMessage",
+            async envelope =>
+            {
+                // Wolverine CloudEvents envelope: { "type": "...", "data": { ... } }
+                if (!TryGetEventType(envelope, out var eventType)) return;
+
+                if (eventType?.EndsWith("LowStockAlertRaised") == true)
+                {
+                    _activeLowStockAlerts++;
+                    _lastHubMessageAt = DateTimeOffset.UtcNow;
+
+                    // P2-B: Only show snackbar with SKU when parseable; always provide action
+                    var sku = GetSkuFromEnvelope(envelope);
+                    var message = sku != "unknown"
+                        ? $"Low stock: {sku}"
+                        : "New low stock alert received";
+
+                    Snackbar.Add(message, Severity.Warning, config =>
+                    {
+                        config.Action = "View Alerts";
+                        config.ActionColor = Color.Warning;
+                        config.OnClick = _ => LoadDashboardAsync();
+                    });
+
+                    await InvokeAsync(StateHasChanged);
+                }
+                else if (eventType?.EndsWith("SalesMetricUpdated") == true)
+                {
+                    _salesMetricUpdatedAt = DateTimeOffset.UtcNow;
+                    _lastHubMessageAt = DateTimeOffset.UtcNow;
+                    await InvokeAsync(StateHasChanged);
+                }
+                else if (eventType?.EndsWith("InventoryLevelUpdated") == true)
+                {
+                    // P1-B: Re-fetch the authoritative alert count from the API.
+                    // Inventory level changes may resolve existing alerts on the server side.
+                    // The server is the source of truth — we don't try to compute resolution locally.
+                    _lastHubMessageAt = DateTimeOffset.UtcNow;
+                    await FetchMissedAlertsAsync();
+                }
+            });
+    }
+
+    /// <summary>
+    /// Fetches active low-stock alerts from the API.
+    /// Called on initial load, after SignalR reconnection, and when InventoryLevelUpdated arrives.
+    /// Uses the last-hub-message timestamp as a fence when reconnecting after a gap.
+    /// </summary>
+    private async Task FetchMissedAlertsAsync()
+    {
+        try
+        {
+            var since = _lastHubMessageAt == DateTimeOffset.MinValue
+                ? (DateTimeOffset?)null
+                : _lastHubMessageAt;
+
+            var client = HttpClientFactory.CreateClient("VendorPortalApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var url = since.HasValue
+                ? $"/api/vendor-portal/analytics/alerts/low-stock?since={Uri.EscapeDataString(since.Value.ToString("O"))}"
+                : "/api/vendor-portal/analytics/alerts/low-stock";
+
+            var response = await client.GetAsync(url);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ActiveLowStockAlertsResponse>();
+                if (result is not null)
+                {
+                    _activeLowStockAlerts = result.TotalCount;
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Catch-up failure is non-critical — stale count is acceptable; next reconnect fixes it
+        }
     }
 
     private async Task LoadDashboardAsync()
@@ -117,10 +294,14 @@
             if (response.IsSuccessStatusCode)
             {
                 _summary = await response.Content.ReadFromJsonAsync<DashboardSummary>();
+                if (_summary is not null)
+                {
+                    _activeLowStockAlerts = _summary.ActiveLowStockAlerts;
+                    _salesMetricUpdatedAt = null; // Reset "updated" banner after explicit refresh
+                }
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                // TODO Phase 3: show non-dismissable session-expired modal (see ADR 0025)
                 Snackbar.Add("Session expired. Please log in again.", Severity.Warning);
             }
             else
@@ -138,9 +319,33 @@
         }
     }
 
+    private static bool TryGetEventType(JsonElement envelope, out string? eventType)
+    {
+        eventType = null;
+        if (envelope.ValueKind != JsonValueKind.Object) return false;
+        if (!envelope.TryGetProperty("type", out var typeEl)) return false;
+        eventType = typeEl.GetString();
+        return eventType is not null;
+    }
+
+    private static string GetSkuFromEnvelope(JsonElement envelope)
+    {
+        try
+        {
+            if (envelope.TryGetProperty("data", out var data) &&
+                data.TryGetProperty("sku", out var sku))
+            {
+                return sku.GetString() ?? "unknown";
+            }
+        }
+        catch { }
+        return "unknown";
+    }
+
     public void Dispose()
     {
-        HubService.OnStateChanged -= StateHasChanged;
+        HubService.OnStateChanged -= OnHubStateChanged;
+        _hubMessageHandler?.Dispose();
     }
 
     private sealed record DashboardSummary(
@@ -152,4 +357,17 @@
         int PendingChangeRequests,
         int ActiveLowStockAlerts,
         string Message);
+
+    private sealed record ActiveLowStockAlertsResponse(
+        IReadOnlyList<LowStockAlertSummary> Alerts,
+        int TotalCount,
+        DateTimeOffset QueriedAt);
+
+    private sealed record LowStockAlertSummary(
+        string Sku,
+        string WarehouseId,
+        int CurrentQuantity,
+        int ThresholdQuantity,
+        DateTimeOffset FirstDetectedAt,
+        DateTimeOffset LastUpdatedAt);
 }

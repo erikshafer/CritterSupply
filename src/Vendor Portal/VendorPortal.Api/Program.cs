@@ -4,12 +4,14 @@ using Marten;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using VendorPortal.Api.Hubs;
+using VendorPortal.RealTime;
 using VendorPortal.VendorProductCatalog;
 using Wolverine;
 using Wolverine.Http;
 using Wolverine.Http.FluentValidation;
 using Wolverine.Marten;
 using Wolverine.RabbitMQ;
+using Wolverine.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -80,15 +82,34 @@ builder.Services.AddCors(options =>
     });
 });
 
-// SignalR
+// SignalR — also called by opts.UseSignalR(), but called here explicitly for CORS and hub options clarity
 builder.Services.AddSignalR();
 
 builder.Host.UseWolverine(opts =>
 {
     // Include the API assembly (HTTP endpoints, dashboard)
     opts.Discovery.IncludeAssembly(typeof(VendorPortal.Api.Dashboard.GetDashboardEndpoint).Assembly);
-    // Include the domain assembly (message handlers: VendorProductAssociatedHandler etc.)
+    // Include the domain assembly (message handlers: VendorProductAssociatedHandler, analytics handlers, etc.)
     opts.Discovery.IncludeAssembly(typeof(VendorProductCatalogEntry).Assembly);
+
+    // Configure SignalR transport for server→client push (Phase 3).
+    // Phase 4 will upgrade to WolverineHub for bidirectional client→server routing.
+    opts.UseSignalR();
+
+    // Publish rules: route all tenant/user hub messages via Wolverine's SignalR transport.
+    // These messages are delivered to all connected clients; the VendorPortalHub's group
+    // management (OnConnectedAsync) gates which connections receive each message.
+    opts.Publish(x =>
+    {
+        x.MessagesImplementing<IVendorTenantMessage>();
+        x.ToSignalR();
+    });
+
+    opts.Publish(x =>
+    {
+        x.MessagesImplementing<IVendorUserMessage>();
+        x.ToSignalR();
+    });
 
     // Configure RabbitMQ for integration messages
     var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");
@@ -103,9 +124,21 @@ builder.Host.UseWolverine(opts =>
     .AutoProvision();
 
     // Subscribe to VendorProductAssociated events published by Product Catalog.
-    // ProcessInline ensures the handler runs synchronously in the consuming thread,
-    // avoiding background thread complexity and making test execution deterministic.
     opts.ListenToRabbitQueue("vendor-portal-product-associated")
+        .ProcessInline();
+
+    // Subscribe to Order events for sales analytics fan-out.
+    opts.ListenToRabbitQueue("vendor-portal-order-placed")
+        .ProcessInline();
+
+    // Subscribe to Inventory events for low-stock alerts and inventory snapshot updates.
+    opts.ListenToRabbitQueue("vendor-portal-low-stock-detected")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-inventory-adjusted")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-stock-replenished")
         .ProcessInline();
 });
 
@@ -137,7 +170,8 @@ app.MapWolverineEndpoints(opts =>
     opts.UseFluentValidationProblemDetailMiddleware();
 });
 
-app.MapHub<VendorPortalHub>("/hub/vendor-portal");
+app.MapHub<VendorPortalHub>("/hub/vendor-portal")
+    .DisableAntiforgery(); // JWT-authenticated hub — safe to disable (no ambient browser credentials)
 
 app.MapGet("/", (HttpResponse response) =>
 {

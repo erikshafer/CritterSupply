@@ -2194,7 +2194,7 @@ The divergence on authentication (JWT vs cookies) is **intentional** — require
 
 The Vendor Portal context provides partnered vendors with a private, tenant-isolated view into how their products perform within CritterSupply. Vendors can see real-time sales analytics, monitor inventory levels, and submit product change requests. The portal uses **SignalR** (via Wolverine's native transport) for bidirectional real-time communication — live analytics updates, change request decisions, and inventory alerts.
 
-**Status**: 🚧 In Progress (Cycle 22 — Phase 1: VendorProductCatalog subscription implemented; admin assignment endpoints live in ProductCatalog.Api; full analytics/change-request UI is Phase 2)
+**Status**: 🚧 In Progress (Cycle 22 — Phases 1–3 complete: VendorProductCatalog subscription, JWT auth + SignalR hub, live analytics dashboard; Phase 4 (Change Request Lifecycle) is next)
 
 **Persistence Strategy**: Marten (document store for accounts/requests, projections for read models)
 
@@ -2229,9 +2229,11 @@ Present pre-aggregated sales and inventory analytics scoped to the vendor's prod
 
 ### Multi-Tenancy Model
 
-One tenant per vendor organization (`VendorTenantId` from Vendor Identity JWT claims). Each vendor's data is fully isolated using Marten's `ForTenant(tenantId)`. `VendorTenantId` is extracted from JWT claims only — never from request parameters.
+One tenant per vendor organization (`VendorTenantId` from Vendor Identity JWT claims). Each vendor's data is fully isolated via **application-level tenant filtering**: composite document IDs (`{VendorTenantId}:{Sku}` or `{VendorTenantId}:{Sku}:{WarehouseId}`) combined with LINQ predicates on `VendorTenantId`. `VendorTenantId` is extracted from JWT claims only — never from request parameters.
 
-**Critical exception:** `VendorProductCatalog` (SKU→Tenant lookup) is intentionally NOT tenant-isolated. It is the system-wide lookup that tells handlers which tenant to query. All other projections use `session.ForTenant(tenantId)`.
+> **Implementation note:** Marten's built-in `session.ForTenant(tenantId)` is **not** currently used. Tenant isolation is enforced at the application level via composite IDs and query predicates. `VendorProductCatalog` is intentionally not tenant-isolated (it is the system-wide SKU→Tenant lookup used by all handlers).
+
+**Critical exception:** `VendorProductCatalog` (SKU→Tenant lookup) is intentionally NOT tenant-isolated. It is the system-wide lookup that tells handlers which tenant to query. All other projections filter by `VendorTenantId` in their query predicates.
 
 ### The Load-Bearing Pillar: VendorProductCatalog
 
@@ -2249,7 +2251,7 @@ VendorProductCatalogEntry document (Marten, schema: vendorportal):
   IsActive: bool
 ```
 
-**Implemented (Cycle 22):** `VendorProductAssociatedHandler` in `VendorPortal` domain assembly
+**Implemented (Cycle 22 Phase 1):** `VendorProductAssociatedHandler` in `VendorPortal` domain assembly
 upserts this document when it receives `VendorProductAssociated` from the
 `vendor-portal-product-associated` RabbitMQ queue. Supports both new assignments
 (`PreviousVendorTenantId = null`) and reassignments (non-null `PreviousVendorTenantId`).
@@ -2305,17 +2307,24 @@ Rejected, Withdrawn, Replaced = TERMINAL (no further transitions)
   - `VendorTenantId`, `Sku` (partition keys)
   - `DailySales`, `WeeklySales`, `MonthlySales`, `QuarterlySales`, `YearlySales`
   - `Revenue`, `UnitsSold`, `AverageOrderValue` (per time bucket)
-  - Populated by `OrderPlacedHandler` fan-out via internal `UpdateTenantSalesSummary` command
+  - **Phase 4+:** `OrderPlacedHandler` fan-out via internal `UpdateTenantSalesSummary` command
+  - **Phase 3 (implemented):** `OrderPlacedAnalyticsHandler` sends a lightweight `SalesMetricUpdated` SignalR notification (one per affected vendor tenant via HashSet dedup); full `ProductPerformanceSummary` aggregation is deferred to Phase 4
 
-- `InventorySnapshot` - Current stock levels (tenant-isolated)
-  - `VendorTenantId`, `Sku` (partition keys)
-  - `AvailableQuantity`, `ReservedQuantity`, `WarehouseId`
-  - `LastRestockedAt`, `LastSoldAt`, `LastCalculatedAt` (shown in UI for data freshness)
+- `InventorySnapshot` - Current stock levels (application-level tenant isolation via composite ID)
+  - `Id` (string) — composite: `{VendorTenantId}:{Sku}:{WarehouseId}` (one document per vendor+SKU+warehouse)
+  - `VendorTenantId` (Guid), `Sku` (string), `WarehouseId` (string)
+  - `CurrentQuantity` (int)
+  - `LastUpdatedAt` (DateTimeOffset)
+  - **Implemented (Cycle 22 Phase 3):** `InventoryAdjustedHandler` + `StockReplenishedHandler`
 
-- `LowStockAlert` - Active unacknowledged low-stock alerts (tenant-isolated)
-  - `AlertId`, `VendorTenantId`, `Sku`, `CurrentQuantity`, `Threshold`
-  - `Status` (Active | Acknowledged)
-  - Deduplication: one active alert per Sku per tenant
+- `LowStockAlert` - Active unacknowledged low-stock alerts (application-level tenant isolation via composite ID)
+  - `Id` (string) — composite: `{VendorTenantId}:{Sku}` (one active alert per vendor+SKU; O(1) dedup)
+  - `VendorTenantId` (Guid), `Sku` (string), `WarehouseId` (string)
+  - `CurrentQuantity` (int), `ThresholdQuantity` (int)
+  - `IsActive` (bool) — `true` when stock is below threshold; cleared by `AcknowledgeLowStockAlert`
+  - `FirstDetectedAt` (DateTimeOffset) — preserved across quantity updates
+  - `LastUpdatedAt` (DateTimeOffset) — event timestamp of the triggering `LowStockDetected` event
+  - **Implemented (Cycle 22 Phase 3):** `LowStockDetectedHandler` with deduplication
 
 - `ChangeRequestSummary` - Current state of all change requests (tenant-isolated)
   - `VendorTenantId` (partition key)
@@ -2371,10 +2380,11 @@ From **Vendor Identity**:
 ### Core Invariants
 
 **Multi-Tenancy Invariants:**
-- All queries and projections must use `session.ForTenant(tenantId)` — except `VendorProductCatalog` (system-wide lookup)
+- Tenant isolation uses composite document IDs and LINQ predicates on `VendorTenantId` — not `session.ForTenant()` (Marten built-in multi-tenancy is not configured)
 - `VendorTenantId` comes from JWT claims only — never from request parameters or body
 - Vendors can only see data for products in their `VendorProductCatalog`
 - Change requests must reference a Sku present in the vendor's `VendorProductCatalog`
+- Suspended or Terminated vendors are rejected at both the SignalR hub and REST endpoints (403 Forbidden)
 
 **Change Request Invariants:**
 - Only one active (Draft, Submitted, NeedsMoreInfo) request per `VendorTenantId` + `Sku` + `Type`
