@@ -74,10 +74,18 @@ public sealed class ChangeRequest
 
     /// <summary>
     /// The set of statuses considered "active" (non-terminal).
-    /// Stored as a static array so both <see cref="IsActive"/> and Marten LINQ queries
-    /// can reference a single source of truth.
-    /// Capture into a local variable before use in a LINQ expression:
-    /// <c>var active = ChangeRequest.ActiveStatuses;</c>
+    /// Stored as a static array so both <see cref="IsActive"/> and handler query predicates
+    /// can reference a single source of truth for documentation purposes.
+    ///
+    /// ⚠️ Marten LINQ limitation: enum arrays cannot be used directly in parameterized queries
+    /// (e.g., <c>.Contains()</c> or <c>.Any()</c> on <c>ActiveStatuses</c> will not translate).
+    /// Handlers must use explicit OR conditions instead:
+    /// <code>
+    /// .Where(r => r.Status == ChangeRequestStatus.Draft ||
+    ///             r.Status == ChangeRequestStatus.Submitted ||
+    ///             r.Status == ChangeRequestStatus.NeedsMoreInfo)
+    /// </code>
+    /// See <see cref="IsActive"/> for in-memory active checks (use this; avoids duplication).
     /// </summary>
     public static readonly ChangeRequestStatus[] ActiveStatuses =
     [

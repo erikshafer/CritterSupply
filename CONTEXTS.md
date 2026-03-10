@@ -2194,7 +2194,7 @@ The divergence on authentication (JWT vs cookies) is **intentional** — require
 
 The Vendor Portal context provides partnered vendors with a private, tenant-isolated view into how their products perform within CritterSupply. Vendors can see real-time sales analytics, monitor inventory levels, and submit product change requests. The portal uses **SignalR** (via Wolverine's native transport) for bidirectional real-time communication — live analytics updates, change request decisions, and inventory alerts.
 
-**Status**: 🚧 In Progress (Cycle 22 — Phases 1–3 complete: VendorProductCatalog subscription, JWT auth + SignalR hub, live analytics dashboard; Phase 4 (Change Request Lifecycle) is next)
+**Status**: 🚧 In Progress (Cycle 22 — Phases 1–4 complete: VendorProductCatalog subscription, JWT auth + SignalR hub, live analytics dashboard, Change Request full lifecycle; Phase 5+ deferred to backlog)
 
 **Persistence Strategy**: Marten (document store for accounts/requests, projections for read models)
 
@@ -2271,32 +2271,33 @@ A bulk-assignment backfill admin command must exist alongside the individual ass
   - `Id` (Guid)
   - `VendorTenantId` (Guid)
   - `Sku` (string)
-  - `Type` (ChangeRequestType enum) - `DescriptionUpdate`, `ImageUpload`, `DataCorrection`
+  - `Type` (ChangeRequestType enum) - `Description`, `Image`, `DataCorrection`
   - `Status` (ChangeRequestStatus enum) - see state machine below
   - `LatestContent` (string?) - description text or correction details
   - `ImageStorageKeys` (IReadOnlyList<string>) - object storage references (claim-check pattern)
-  - `ReplacedByRequestId` (Guid?) - set when Status = `Replaced`; enables UI linkage
+  - `ReplacedByRequestId` (Guid?) - set when Status = `Superseded`; enables UI to show "replaced by request #xxx" linkage
   - `SubmittedAt`, `ResolvedAt` (DateTimeOffset?)
 
 **ChangeRequest State Machine:**
 ```
 Draft ──────────────────────→ Submitted    (SubmitChangeRequest command)
 Draft ──────────────────────→ Withdrawn    (WithdrawChangeRequest command)
+Draft ──────────────────────→ Superseded   (system: new request submitted for same Sku+Type by same tenant)
 
 Submitted ──────────────────→ NeedsMoreInfo (MoreInfoRequestedForChangeRequest from Catalog)
-Submitted ──────────────────→ Approved      (DescriptionChangeApproved from Catalog)
-Submitted ──────────────────→ Rejected      (DescriptionChangeRejected from Catalog)
+Submitted ──────────────────→ Approved      (DescriptionChangeApproved / ImageChangeApproved / DataCorrectionApproved from Catalog)
+Submitted ──────────────────→ Rejected      (DescriptionChangeRejected / ImageChangeRejected / DataCorrectionRejected from Catalog)
 Submitted ──────────────────→ Withdrawn     (WithdrawChangeRequest command)
+Submitted ──────────────────→ Superseded   (system: new request submitted for same Sku+Type by same tenant)
 
-NeedsMoreInfo ──────────────→ Submitted     (ProvideAdditionalInfo command)
+NeedsMoreInfo ──────────────→ Submitted     (ProvideAdditionalInfo command — re-enters Catalog review)
 NeedsMoreInfo ──────────────→ Withdrawn     (WithdrawChangeRequest command)
+NeedsMoreInfo ──────────────→ Superseded   (system: new request submitted for same Sku+Type by same tenant)
 
-Approved ───────────────────→ Replaced      (system: newer request approved for same Sku+Type)
-
-Rejected, Withdrawn, Replaced = TERMINAL (no further transitions)
+Approved, Rejected, Withdrawn, Superseded = TERMINAL (no further transitions)
 ```
 
-**Key ChangeRequest invariant:** Only one active (Draft, Submitted, or NeedsMoreInfo) request per `VendorTenantId` + `Sku` + `Type` combination. Submitting a new one auto-withdraws any existing active request.
+**Key ChangeRequest invariant:** Only one active (Draft, Submitted, or NeedsMoreInfo) request per `VendorTenantId` + `Sku` + `Type` combination. Submitting a new one auto-supersedes any existing active request.
 
 **Projections (Read Models, Pre-Aggregated):**
 
@@ -2388,9 +2389,9 @@ From **Vendor Identity**:
 
 **Change Request Invariants:**
 - Only one active (Draft, Submitted, NeedsMoreInfo) request per `VendorTenantId` + `Sku` + `Type`
-- Submitting a new request for same Sku+Type auto-withdraws any existing active request
+- Submitting a new request for same Sku+Type auto-supersedes any existing active request (sets their status to `Superseded`, records `ReplacedByRequestId`)
 - Change requests are immutable after submission (must withdraw and resubmit to change)
-- `Replaced` state carries `ReplacedByRequestId` for UI linkage
+- `Superseded` state carries `ReplacedByRequestId` for UI linkage ("replaced by request #xxx")
 - Image uploads use claim-check pattern: `ImageStorageKeys` (not raw bytes) in both aggregate and integration event
 
 **Dashboard View Invariants:**
@@ -2418,7 +2419,7 @@ From **Vendor Identity**:
 | Context | Relationship | Notes |
 |---------|--------------|-------|
 | Vendor Identity | Upstream | Authenticates vendor users, provides tenant claims (`VendorTenantId`) for data isolation |
-| Catalog | Downstream | Receives change requests (`DescriptionChangeRequested`, `ImageUploadRequested`, `ProductCorrectionRequested`), publishes approval outcomes |
+| Catalog | Downstream | Receives change requests (`DescriptionChangeRequested`, `ImageUploadRequested`, `DataCorrectionRequested`), publishes approval outcomes |
 | Orders | Upstream | Source of sales events (`OrderPlaced`, `OrderItemShipped`, `OrderItemReturned`) for analytics aggregation |
 | Inventory | Upstream | Source of stock-level events (`InventoryAdjusted`, `StockReplenished`, `LowStockDetected`) for inventory snapshots |
 
@@ -2456,43 +2457,72 @@ LowStockDetected (integration message from Inventory)
 ```
 DraftChangeRequest (command from vendor)
   └─> DraftChangeRequestHandler
-      ├─> Validate SKU is in VendorProductCatalog (session.ForTenant not needed for lookup)
-      ├─> Check: active request for same SKU+Type exists? → auto-withdraw + warn user
-      ├─> IStartStream<ChangeRequest>(ChangeRequestDrafted) → Status=Draft
-      └─> Return new RequestId
+      ├─> Idempotency check: if RequestId already exists → return (at-least-once delivery safe)
+      ├─> Create ChangeRequest document (Status=Draft) via session.Store()
+      └─> session.SaveChangesAsync() — no outgoing messages at draft time
 
 SubmitChangeRequest (command from vendor)
-  └─> [Load] ChangeRequest via [ReadAggregate]
-  └─> [Before] Validate CanSubmit (Status must be Draft)
-  └─> [Handle] Returns:
-      ├─> ChangeRequestSubmitted domain event → Status=Submitted
-      └─> DescriptionChangeRequested / ImageUploadRequested / DataCorrectionRequested
-          → Catalog BC via Wolverine transactional outbox
+  └─> SubmitChangeRequestHandler
+      ├─> session.LoadAsync<ChangeRequest>(RequestId)
+      ├─> Guard: not found → return [] silently
+      ├─> Guard: VendorTenantId mismatch → return [] silently (never reveal existence)
+      ├─> Guard: Status != Draft → return [] silently (idempotent / invalid transition)
+      ├─> Auto-supersede invariant: query for other active (Draft/Submitted/NeedsMoreInfo) requests
+      │   for same VendorTenantId + Sku + Type → set Status=Superseded, ReplacedByRequestId=RequestId
+      ├─> Transition request → Status=Submitted, SubmittedAt=now
+      ├─> session.Store() all changed documents, session.SaveChangesAsync()
+      └─> Return [ChangeRequestStatusUpdated (hub), DescriptionChangeRequested / ImageUploadRequested
+          / DataCorrectionRequested (Catalog BC via Wolverine publish rules → RabbitMQ exchange)]
 
 [Catalog BC processes: approve / reject / needs-more-info]
 
-DescriptionChangeApproved (integration message from Catalog)
-  └─> DescriptionChangeApprovedHandler (Vendor Portal)
-      ├─> Load ChangeRequest aggregate (session.ForTenant)
-      ├─> Append ChangeRequestApproved event → Status=Approved (terminal)
-      ├─> Check: other Approved requests for same SKU+Type → mark as Replaced
-      └─> Publish ChangeRequestStatusUpdated → IVendorTenantMessage → "vendor:{tenantId}"
-          Publish ChangeRequestDecisionPersonal → IVendorUserMessage → "user:{submitterUserId}"
+DescriptionChangeApproved / ImageChangeApproved / DataCorrectionApproved
+  (integration message from Catalog BC → vendor-portal-*-change-approved RabbitMQ queues)
+  └─> ApprovedHandler (VendorPortal domain)
+      ├─> session.LoadAsync<ChangeRequest>(RequestId)
+      ├─> Guard: not found, VendorTenantId mismatch, or !IsActive → return [] silently
+      ├─> Mutate: Status=Approved, ResolvedAt=now → session.Store(), session.SaveChangesAsync()
+      └─> Return [ChangeRequestStatusUpdated (→ "vendor:{tenantId}" hub group),
+                  ChangeRequestDecisionPersonal (→ "user:{submitterUserId}" hub group)]
           [Toast: "✅ Description update for SKU-1001 approved!"]
 
-MoreInfoRequestedForChangeRequest (integration message from Catalog)
-  └─> MoreInfoRequestedHandler
-      ├─> Append MoreInfoRequested event → Status=NeedsMoreInfo
-      └─> Publish notification → "user:{submitterUserId}"
+DescriptionChangeRejected / ImageChangeRejected / DataCorrectionRejected
+  (integration message from Catalog BC → vendor-portal-*-change-rejected RabbitMQ queues)
+  └─> RejectedHandler (VendorPortal domain)
+      ├─> session.LoadAsync<ChangeRequest>(RequestId)
+      ├─> Guard: not found, VendorTenantId mismatch, or !IsActive → return [] silently
+      ├─> Mutate: Status=Rejected, RejectionReason=reason, ResolvedAt=now → session.Store(), SaveChangesAsync()
+      └─> Return [ChangeRequestStatusUpdated, ChangeRequestDecisionPersonal with Reason]
+
+MoreInfoRequestedForChangeRequest (integration message from Catalog BC)
+  └─> MoreInfoRequestedForChangeRequestHandler
+      ├─> session.LoadAsync<ChangeRequest>(RequestId)
+      ├─> Guard: not found, VendorTenantId mismatch → return [] silently
+      ├─> Guard: Status != Submitted → return [] silently (only valid from Submitted)
+      ├─> Mutate: Status=NeedsMoreInfo, Question=question → session.Store(), SaveChangesAsync()
+      └─> Return [ChangeRequestStatusUpdated, ChangeRequestDecisionPersonal with Question as Reason]
           [Toast: "📋 Catalog team has a question about your request"]
 
 ProvideAdditionalInfo (command from vendor)
-  └─> [Load] ChangeRequest → validate Status=NeedsMoreInfo
-  └─> [Handle] Returns AdditionalInfoProvided event → Status=Submitted (re-enters review)
+  └─> ProvideAdditionalInfoHandler
+      ├─> session.LoadAsync<ChangeRequest>(RequestId)
+      ├─> Guard: not found, VendorTenantId mismatch → return [] silently
+      ├─> Guard: Status != NeedsMoreInfo → return [] silently (invalid transition)
+      ├─> Append VendorInfoResponse(response, now) to InfoResponses list (structured Q&A history)
+      ├─> Mutate: Status=Submitted, SubmittedAt=now → session.Store(), SaveChangesAsync()
+      └─> Return [ChangeRequestStatusUpdated (hub), DescriptionChangeRequested / ImageUploadRequested
+          / DataCorrectionRequested with AdditionalNotes=vendorResponse (Catalog BC via RabbitMQ)]
+          Note: InfoResponses list is stored locally on the document for UI history display;
+          the vendor's specific response is forwarded to Catalog BC via AdditionalNotes.
 
 WithdrawChangeRequest (command from vendor)
-  └─> [Load] ChangeRequest → validate CanWithdraw (Draft, Submitted, or NeedsMoreInfo)
-  └─> [Handle] Returns ChangeRequestWithdrawn event → Status=Withdrawn (terminal)
+  └─> WithdrawChangeRequestHandler
+      ├─> session.LoadAsync<ChangeRequest>(RequestId)
+      ├─> Guard: not found → return null silently
+      ├─> Guard: VendorTenantId mismatch → return null silently
+      ├─> Guard: !IsActive → return null silently (already terminal)
+      ├─> Mutate: Status=Withdrawn, ResolvedAt=now → session.Store(), SaveChangesAsync()
+      └─> Return ChangeRequestStatusUpdated (→ "vendor:{tenantId}" hub group)
 ```
 
 **Vendor Identity Events → SignalR:**

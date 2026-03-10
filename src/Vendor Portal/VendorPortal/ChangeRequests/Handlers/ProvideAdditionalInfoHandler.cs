@@ -54,13 +54,16 @@ public static class ProvideAdditionalInfoHandler
                 UpdatedAt: now)
         };
 
-        var catalogMessage = BuildCatalogMessage(request, now);
+        // Pass command.Response explicitly so Catalog BC sees the vendor's answer.
+        // AdditionalNotes on the request still holds the original draft notes;
+        // the structured Q&A history lives in InfoResponses on the document.
+        var catalogMessage = BuildCatalogMessage(request, command.Response, now);
         if (catalogMessage is not null) outgoing.Add(catalogMessage);
 
         return outgoing;
     }
 
-    private static object? BuildCatalogMessage(ChangeRequest request, DateTimeOffset submittedAt)
+    private static object? BuildCatalogMessage(ChangeRequest request, string vendorResponse, DateTimeOffset submittedAt)
     {
         return request.Type switch
         {
@@ -69,7 +72,7 @@ public static class ProvideAdditionalInfoHandler
                 VendorTenantId: request.VendorTenantId,
                 Sku: request.Sku,
                 NewDescription: request.Details,
-                AdditionalNotes: request.AdditionalNotes,
+                AdditionalNotes: vendorResponse,
                 SubmittedAt: submittedAt),
 
             ChangeRequestType.Image => new ImageUploadRequested(
@@ -77,7 +80,7 @@ public static class ProvideAdditionalInfoHandler
                 VendorTenantId: request.VendorTenantId,
                 Sku: request.Sku,
                 ImageStorageKeys: request.ImageStorageKeys,
-                AdditionalNotes: request.AdditionalNotes,
+                AdditionalNotes: vendorResponse,
                 SubmittedAt: submittedAt),
 
             ChangeRequestType.DataCorrection => new DataCorrectionRequested(
@@ -86,7 +89,7 @@ public static class ProvideAdditionalInfoHandler
                 Sku: request.Sku,
                 CorrectionType: "General",
                 CorrectionDetails: request.Details,
-                AdditionalNotes: request.AdditionalNotes,
+                AdditionalNotes: vendorResponse,
                 SubmittedAt: submittedAt),
 
             _ => null
