@@ -6,5 +6,6 @@ namespace Messages.Contracts.VendorIdentity;
 /// </summary>
 public sealed record VendorTenantTerminated(
     Guid VendorTenantId,
+    string Reason,
     DateTimeOffset TerminatedAt
 );

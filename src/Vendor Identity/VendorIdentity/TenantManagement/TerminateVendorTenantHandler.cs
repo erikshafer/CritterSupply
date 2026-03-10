@@ -19,11 +19,13 @@ public static class TerminateVendorTenantHandler
 
         tenant.Status = VendorTenantStatus.Terminated;
         tenant.TerminatedAt = DateTimeOffset.UtcNow;
+        tenant.TerminationReason = command.Reason;
 
         await db.SaveChangesAsync(cancellation);
 
         var integrationEvent = new VendorTenantTerminated(
             tenant.Id,
+            command.Reason,
             tenant.TerminatedAt.Value
         );
 

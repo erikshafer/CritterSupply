@@ -496,7 +496,7 @@ public sealed class IdentityLifecycleTests : IClassFixture<VendorIdentityApiFixt
         // Arrange
         var tenantId = await CreateActiveTenantAsync("Terminate Tenant", "terminate@test.com");
 
-        var command = new TerminateVendorTenant(tenantId);
+        var command = new TerminateVendorTenant(tenantId, "Contract violation");
 
         // Act
         await _fixture.Host.Scenario(x =>
@@ -512,6 +512,7 @@ public sealed class IdentityLifecycleTests : IClassFixture<VendorIdentityApiFixt
         tenant.Status.ShouldBe(VendorTenantStatus.Terminated);
         tenant.TerminatedAt.ShouldNotBeNull();
         tenant.TerminatedAt.Value.ShouldBeInRange(DateTimeOffset.UtcNow.AddSeconds(-5), DateTimeOffset.UtcNow);
+        tenant.TerminationReason.ShouldBe("Contract violation");
     }
 
     // ──────────────────────────────────────────────────────
@@ -535,7 +536,7 @@ public sealed class IdentityLifecycleTests : IClassFixture<VendorIdentityApiFixt
         setupDb.Tenants.Add(tenant);
         await setupDb.SaveChangesAsync();
 
-        var command = new TerminateVendorTenant(tenant.Id);
+        var command = new TerminateVendorTenant(tenant.Id, "Duplicate contract");
 
         // Act & Assert
         await _fixture.Host.Scenario(x =>

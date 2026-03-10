@@ -21,6 +21,12 @@ public sealed class TerminateVendorTenantValidator : AbstractValidator<Terminate
                 var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
                 return tenant is not null && tenant.Status != VendorTenantStatus.Terminated;
             })
-            .WithMessage("Tenant is already terminated");
+            .WithMessage("Cannot terminate an already terminated tenant");
+
+        RuleFor(x => x.Reason)
+            .NotEmpty()
+            .WithMessage("Termination reason is required")
+            .MaximumLength(500)
+            .WithMessage("Termination reason must not exceed 500 characters");
     }
 }

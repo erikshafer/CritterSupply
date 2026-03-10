@@ -4,5 +4,6 @@ namespace VendorIdentity.TenantManagement;
 /// Permanently terminates a vendor tenant. This is a terminal state.
 /// </summary>
 public sealed record TerminateVendorTenant(
-    Guid TenantId
+    Guid TenantId,
+    string Reason
 );

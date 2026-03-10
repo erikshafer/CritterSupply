@@ -54,6 +54,9 @@ public sealed class VendorIdentityDbContext : DbContext
 
             entity.Property(t => t.TerminatedAt);
 
+            entity.Property(t => t.TerminationReason)
+                .HasMaxLength(500);
+
             // One-to-many relationship: Tenant -> Users
             entity.HasMany(t => t.Users)
                 .WithOne(u => u.VendorTenant)
