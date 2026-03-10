@@ -1,0 +1,293 @@
+@page "/settings"
+@using System.Net.Http.Json
+@using System.Net.Http.Headers
+@attribute [Authorize]
+@inject VendorAuthState AuthState
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@inject ILogger<Settings> Logger
+
+<PageTitle>Settings — Vendor Portal</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Settings</MudText>
+<MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+    Manage your notification preferences and saved dashboard views.
+</MudText>
+
+@* ─── Notification Preferences ─── *@
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6" GutterBottom="true">
+        <MudIcon Icon="@Icons.Material.Filled.Notifications" Class="mr-1" aria-hidden="true" />
+        Notification Preferences
+    </MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+        All notifications are enabled by default. Toggle off any you don't want to receive.
+    </MudText>
+
+    @if (_isLoadingPrefs)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-2"
+                           aria-label="Loading notification preferences" />
+    }
+    else
+    {
+        <MudStack Spacing="2">
+            <MudSwitch @bind-Value="_lowStockAlerts" Color="Color.Primary"
+                       Label="Low Stock Alerts"
+                       data-testid="pref-low-stock-alerts" />
+            <MudSwitch @bind-Value="_changeRequestDecisions" Color="Color.Primary"
+                       Label="Change Request Decisions"
+                       data-testid="pref-change-request-decisions" />
+            <MudSwitch @bind-Value="_inventoryUpdates" Color="Color.Primary"
+                       Label="Inventory Updates"
+                       data-testid="pref-inventory-updates" />
+            <MudSwitch @bind-Value="_salesMetrics" Color="Color.Primary"
+                       Label="Sales Metrics"
+                       data-testid="pref-sales-metrics" />
+        </MudStack>
+
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Save"
+                   OnClick="SavePreferencesAsync"
+                   Disabled="@_isSavingPrefs"
+                   Class="mt-3"
+                   data-testid="save-preferences-btn">
+            @if (_isSavingPrefs)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+            }
+            Save Preferences
+        </MudButton>
+    }
+</MudPaper>
+
+@* ─── Saved Dashboard Views ─── *@
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6" GutterBottom="true">
+        <MudIcon Icon="@Icons.Material.Filled.ViewList" Class="mr-1" aria-hidden="true" />
+        Saved Dashboard Views
+    </MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+        Save named filter configurations for quick access from the dashboard.
+    </MudText>
+
+    @if (_isLoadingViews)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-2"
+                           aria-label="Loading saved views" />
+    }
+    else if (_savedViews.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" data-testid="no-saved-views-message">
+            No saved views yet. Use the "Save Current View" button on the dashboard to create one.
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@_savedViews" Dense="true" Hover="true" Striped="true"
+                  data-testid="saved-views-table">
+            <HeaderContent>
+                <MudTh>View Name</MudTh>
+                <MudTh>Created</MudTh>
+                <MudTh>Filters</MudTh>
+                <MudTh Style="width:80px;">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="View Name">@context.ViewName</MudTd>
+                <MudTd DataLabel="Created">@context.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
+                <MudTd DataLabel="Filters">@FormatFilterSummary(context)</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Color="Color.Error"
+                                   Size="Size.Small"
+                                   Title="Delete saved view"
+                                   aria-label="@($"Delete saved view: {context.ViewName}")"
+                                   data-testid="@($"delete-view-{context.ViewId}")"
+                                   OnClick="@(() => DeleteViewAsync(context.ViewId))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    // Notification preference state
+    private bool _isLoadingPrefs = true;
+    private bool _isSavingPrefs;
+    private bool _lowStockAlerts = true;
+    private bool _changeRequestDecisions = true;
+    private bool _inventoryUpdates = true;
+    private bool _salesMetrics = true;
+
+    // Saved views state
+    private bool _isLoadingViews = true;
+    private List<SavedViewItem> _savedViews = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadPreferencesAsync(), LoadSavedViewsAsync());
+    }
+
+    // ─── Notification Preferences ───
+
+    private async Task LoadPreferencesAsync()
+    {
+        _isLoadingPrefs = true;
+        try
+        {
+            var client = CreateAuthenticatedClient();
+            var response = await client.GetFromJsonAsync<NotificationPreferencesDto>(
+                "/api/vendor-portal/account/preferences");
+
+            if (response is not null)
+            {
+                _lowStockAlerts = response.LowStockAlerts;
+                _changeRequestDecisions = response.ChangeRequestDecisions;
+                _inventoryUpdates = response.InventoryUpdates;
+                _salesMetrics = response.SalesMetrics;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to load notification preferences");
+            Snackbar.Add("Failed to load notification preferences.", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingPrefs = false;
+        }
+    }
+
+    private async Task SavePreferencesAsync()
+    {
+        _isSavingPrefs = true;
+        try
+        {
+            var client = CreateAuthenticatedClient();
+            var request = new NotificationPreferencesDto(
+                _lowStockAlerts, _changeRequestDecisions, _inventoryUpdates, _salesMetrics);
+
+            var response = await client.PutAsJsonAsync(
+                "/api/vendor-portal/account/preferences", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Notification preferences saved.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Failed to save preferences. Please try again.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to save notification preferences");
+            Snackbar.Add("Failed to save preferences.", Severity.Error);
+        }
+        finally
+        {
+            _isSavingPrefs = false;
+        }
+    }
+
+    // ─── Saved Dashboard Views ───
+
+    private async Task LoadSavedViewsAsync()
+    {
+        _isLoadingViews = true;
+        try
+        {
+            var client = CreateAuthenticatedClient();
+            var response = await client.GetFromJsonAsync<DashboardViewsDto>(
+                "/api/vendor-portal/account/dashboard-views");
+
+            _savedViews = response?.Views?.ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to load saved dashboard views");
+            Snackbar.Add("Failed to load saved views.", Severity.Error);
+        }
+        finally
+        {
+            _isLoadingViews = false;
+        }
+    }
+
+    private async Task DeleteViewAsync(Guid viewId)
+    {
+        try
+        {
+            var client = CreateAuthenticatedClient();
+            var response = await client.DeleteAsync(
+                $"/api/vendor-portal/account/dashboard-views/{viewId}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                _savedViews.RemoveAll(v => v.ViewId == viewId);
+                Snackbar.Add("View deleted.", Severity.Success);
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete view.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to delete saved view {ViewId}", viewId);
+            Snackbar.Add("Failed to delete view.", Severity.Error);
+        }
+    }
+
+    private string FormatFilterSummary(SavedViewItem view)
+    {
+        var parts = new List<string>();
+
+        if (view.FilterCriteria?.DateFrom.HasValue == true)
+            parts.Add($"From: {view.FilterCriteria.DateFrom.Value:yyyy-MM-dd}");
+        if (view.FilterCriteria?.DateTo.HasValue == true)
+            parts.Add($"To: {view.FilterCriteria.DateTo.Value:yyyy-MM-dd}");
+        if (!string.IsNullOrEmpty(view.FilterCriteria?.SkuFilter))
+            parts.Add($"SKU: {view.FilterCriteria.SkuFilter}");
+        if (view.FilterCriteria?.LowStockOnly == true)
+            parts.Add("Low stock only");
+        if (!string.IsNullOrEmpty(view.FilterCriteria?.WarehouseId))
+            parts.Add($"Warehouse: {view.FilterCriteria.WarehouseId}");
+
+        return parts.Count > 0 ? string.Join(", ", parts) : "No filters";
+    }
+
+    private HttpClient CreateAuthenticatedClient()
+    {
+        var client = HttpClientFactory.CreateClient("VendorPortalApi");
+        if (!string.IsNullOrEmpty(AuthState.AccessToken))
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+        return client;
+    }
+
+    // ─── DTOs ───
+
+    private sealed record NotificationPreferencesDto(
+        bool LowStockAlerts,
+        bool ChangeRequestDecisions,
+        bool InventoryUpdates,
+        bool SalesMetrics);
+
+    private sealed record DashboardViewsDto(
+        IReadOnlyList<SavedViewItem> Views);
+
+    private sealed record SavedViewItem(
+        Guid ViewId,
+        string ViewName,
+        FilterCriteriaDto? FilterCriteria,
+        DateTimeOffset CreatedAt);
+
+    private sealed record FilterCriteriaDto(
+        DateTimeOffset? DateFrom,
+        DateTimeOffset? DateTo,
+        string? SkuFilter,
+        bool? LowStockOnly,
+        string? WarehouseId);
+}

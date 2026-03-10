@@ -123,6 +123,11 @@ builder.Host.UseWolverine(opts =>
     })
     .AutoProvision();
 
+    // Subscribe to VendorTenantCreated events published by Vendor Identity.
+    // Initializes VendorAccount document with default notification preferences.
+    opts.ListenToRabbitQueue("vendor-portal-tenant-created")
+        .ProcessInline();
+
     // Subscribe to VendorProductAssociated events published by Product Catalog.
     opts.ListenToRabbitQueue("vendor-portal-product-associated")
         .ProcessInline();
