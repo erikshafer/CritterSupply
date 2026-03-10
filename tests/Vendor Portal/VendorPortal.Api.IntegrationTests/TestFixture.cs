@@ -145,16 +145,17 @@ public sealed class TestFixture : IAsyncLifetime
         string tenantStatus = "Active",
         string role = "Admin")
     {
+        var resolvedUserId = userId ?? Guid.NewGuid(); // resolve once so VendorUserId and Sub match
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(TestJwtSigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
         {
             new Claim("VendorTenantId", tenantId.ToString()),
-            new Claim("VendorUserId", (userId ?? Guid.NewGuid()).ToString()),
+            new Claim("VendorUserId", resolvedUserId.ToString()),
             new Claim("VendorTenantStatus", tenantStatus),
             new Claim(ClaimTypes.Role, role),
-            new Claim(JwtRegisteredClaimNames.Sub, (userId ?? Guid.NewGuid()).ToString()),
+            new Claim(JwtRegisteredClaimNames.Sub, resolvedUserId.ToString()),
         };
 
         var token = new JwtSecurityToken(
