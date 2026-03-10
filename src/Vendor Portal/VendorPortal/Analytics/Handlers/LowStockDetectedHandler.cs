@@ -1,0 +1,70 @@
+using Marten;
+using Messages.Contracts.Inventory;
+using VendorPortal.RealTime;
+using VendorPortal.VendorProductCatalog;
+
+namespace VendorPortal.Analytics.Handlers;
+
+/// <summary>
+/// Handles <see cref="LowStockDetected"/> integration messages from the Inventory BC.
+/// Looks up the owning vendor via <see cref="VendorProductCatalogEntry"/>,
+/// upserts an active <see cref="LowStockAlert"/> document (dedup: one per VendorTenantId + Sku),
+/// and returns a <see cref="LowStockAlertRaised"/> SignalR message to be published to the
+/// vendor's hub group via Wolverine's SignalR transport.
+///
+/// Unknown SKUs (no active VendorProductCatalog entry) return null — no hub push, no exception.
+/// </summary>
+public static class LowStockDetectedHandler
+{
+    public static async Task<LowStockAlertRaised?> Handle(
+        LowStockDetected @event,
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        // Look up vendor ownership for this SKU
+        var catalogEntry = await session.LoadAsync<VendorProductCatalogEntry>(@event.Sku, ct);
+        if (catalogEntry is null || !catalogEntry.IsActive)
+        {
+            // Unknown SKU — silently skip. Wolverine will emit a structured log at debug level.
+            return null;
+        }
+
+        var vendorTenantId = catalogEntry.VendorTenantId;
+        var alertId = LowStockAlert.BuildId(vendorTenantId, @event.Sku);
+
+        // Dedup: load existing alert to determine if this is new or an update
+        var existing = await session.LoadAsync<LowStockAlert>(alertId, ct);
+        var now = DateTimeOffset.UtcNow;
+
+        var alert = new LowStockAlert
+        {
+            Id = alertId,
+            VendorTenantId = vendorTenantId,
+            Sku = @event.Sku,
+            WarehouseId = @event.WarehouseId,
+            CurrentQuantity = @event.CurrentQuantity,
+            ThresholdQuantity = @event.ThresholdQuantity,
+            FirstDetectedAt = existing?.FirstDetectedAt ?? @event.DetectedAt,
+            LastUpdatedAt = now,
+            IsActive = true
+        };
+
+        session.Store(alert);
+        await session.SaveChangesAsync(ct);
+
+        // Push real-time alert to vendor's hub group only on NEW alerts (not quantity updates).
+        // Updated quantities are visible on the next dashboard refresh.
+        if (existing is null)
+        {
+            return new LowStockAlertRaised(
+                VendorTenantId: vendorTenantId,
+                Sku: @event.Sku,
+                WarehouseId: @event.WarehouseId,
+                CurrentQuantity: @event.CurrentQuantity,
+                ThresholdQuantity: @event.ThresholdQuantity,
+                DetectedAt: @event.DetectedAt);
+        }
+
+        return null;
+    }
+}
