@@ -37,7 +37,9 @@ public sealed class GetDashboardEndpoint
         if (tenantStatus == "Suspended")
             return Results.Forbid();
 
-        // Query real pending change request count (Draft + Submitted + NeedsMoreInfo)
+        // Query real pending change request count using the canonical active states
+        // (Draft, Submitted, NeedsMoreInfo — see ChangeRequest.ActiveStatuses).
+        // Explicit OR conditions are required because Marten LINQ cannot parameterize enum arrays.
         var pendingCount = await querySession.Query<ChangeRequest>()
             .CountAsync(r =>
                 r.VendorTenantId == tenantId &&

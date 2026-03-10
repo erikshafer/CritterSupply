@@ -35,8 +35,15 @@ public sealed class ChangeRequest
     /// <summary>Full details of the requested change (for Description and DataCorrection types).</summary>
     public string Details { get; init; } = null!;
 
-    /// <summary>Optional additional notes from the vendor.</summary>
+    /// <summary>Optional additional notes from the vendor (set at draft time).</summary>
     public string? AdditionalNotes { get; set; }
+
+    /// <summary>
+    /// Structured log of vendor responses to "Needs More Info" questions from the Catalog BC.
+    /// Preferred over string-concatenating into <see cref="AdditionalNotes"/> for multi-round exchanges.
+    /// Each entry captures the response text and the timestamp of the response.
+    /// </summary>
+    public List<VendorInfoResponse> InfoResponses { get; set; } = [];
 
     /// <summary>
     /// Storage keys for pre-uploaded images (Image type only).
@@ -66,8 +73,23 @@ public sealed class ChangeRequest
     public DateTimeOffset? ResolvedAt { get; set; }
 
     /// <summary>
+    /// The set of statuses considered "active" (non-terminal).
+    /// Stored as a static array so both <see cref="IsActive"/> and Marten LINQ queries
+    /// can reference a single source of truth.
+    /// Capture into a local variable before use in a LINQ expression:
+    /// <c>var active = ChangeRequest.ActiveStatuses;</c>
+    /// </summary>
+    public static readonly ChangeRequestStatus[] ActiveStatuses =
+    [
+        ChangeRequestStatus.Draft,
+        ChangeRequestStatus.Submitted,
+        ChangeRequestStatus.NeedsMoreInfo
+    ];
+
+    /// <summary>
     /// True when the request is in an active (non-terminal) state.
-    /// Active states: Draft, Submitted, NeedsMoreInfo.
+    /// Active states are defined by <see cref="ActiveStatuses"/>.
+    /// Uses a pattern expression for efficient repeated access.
     /// </summary>
     public bool IsActive => Status is
         ChangeRequestStatus.Draft or

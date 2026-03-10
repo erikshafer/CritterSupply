@@ -454,8 +454,9 @@ public sealed class ChangeRequestTests : IAsyncLifetime
         var request = await docSession.LoadAsync<ChangeRequest>(requestId);
         request.ShouldNotBeNull();
         request.Status.ShouldBe(ChangeRequestStatus.Submitted);
-        request.AdditionalNotes.ShouldNotBeNull();
-        request.AdditionalNotes.ShouldContain("wild-caught salmon");
+        // Response is now stored in the structured InfoResponses list
+        request.InfoResponses.ShouldNotBeEmpty();
+        request.InfoResponses[0].Response.ShouldContain("wild-caught salmon");
     }
 
     // ───────────────────────────────────────────────

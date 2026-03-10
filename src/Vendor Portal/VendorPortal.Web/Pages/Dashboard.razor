@@ -11,6 +11,7 @@
 @inject IHttpClientFactory HttpClientFactory
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject ILogger<Dashboard> Logger
 @implements IDisposable
 
 <PageTitle>Dashboard — Vendor Portal</PageTitle>
@@ -181,10 +182,11 @@
                 await FetchMissedAlertsAsync();
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Async void cannot propagate exceptions — swallow here to prevent unobserved task exception.
             // FetchMissedAlertsAsync has its own try-catch; StateHasChanged failures are non-fatal.
+            Logger.LogDebug(ex, "Non-fatal exception in OnHubStateChanged async continuation.");
         }
     }
 
@@ -298,9 +300,10 @@
                 }
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Catch-up failure is non-critical — stale count is acceptable; next reconnect fixes it
+            Logger.LogDebug(ex, "Non-critical failure fetching missed alerts after hub reconnection.");
         }
     }
 
@@ -332,8 +335,9 @@
                 Snackbar.Add("Failed to load dashboard.", Severity.Error);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Logger.LogDebug(ex, "Exception loading dashboard summary.");
             Snackbar.Add("Failed to load dashboard. Please try again.", Severity.Error);
         }
         finally
@@ -417,13 +421,14 @@
                     break;
             }
         }
-        catch
+        catch (Exception ex)
         {
             // Toast failure is non-critical — the KPI count refresh handles the authoritative state
+            Logger.LogDebug(ex, "Non-critical failure rendering decision toast notification.");
         }
     }
 
-    private static string GetSkuFromEnvelope(JsonElement envelope)
+    private string GetSkuFromEnvelope(JsonElement envelope)
     {
         try
         {
@@ -433,7 +438,10 @@
                 return sku.GetString() ?? "unknown";
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to extract SKU from hub envelope — envelope shape mismatch.");
+        }
         return "unknown";
     }
 

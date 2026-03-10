@@ -6,6 +6,7 @@
 @inject IHttpClientFactory HttpClientFactory
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject ILogger<ChangeRequests> Logger
 
 <PageTitle>Change Requests — Vendor Portal</PageTitle>
 
@@ -159,8 +160,9 @@ else
                 Snackbar.Add("Failed to load change requests.", Severity.Error);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Logger.LogDebug(ex, "Exception loading change requests list.");
             Snackbar.Add("Failed to load change requests. Please try again.", Severity.Error);
         }
         finally

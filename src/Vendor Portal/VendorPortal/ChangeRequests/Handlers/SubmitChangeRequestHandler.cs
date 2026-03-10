@@ -45,17 +45,18 @@ public static class SubmitChangeRequestHandler
 
         var now = DateTimeOffset.UtcNow;
 
-        // Auto-withdraw invariant: supersede any other active request for this SKU+Type
+        // Auto-withdraw invariant: supersede any other active request for this SKU+Type.
+        // "Active" mirrors ChangeRequest.ActiveStatuses (Draft, Submitted, NeedsMoreInfo).
+        // Explicit OR conditions are required because Marten LINQ cannot parameterize enum arrays.
         var existingActive = await session.Query<ChangeRequest>()
             .Where(r =>
                 r.VendorTenantId == command.VendorTenantId &&
                 r.Sku == request.Sku &&
                 r.Type == request.Type &&
                 r.Id != command.RequestId &&
-                r.Status != ChangeRequestStatus.Approved &&
-                r.Status != ChangeRequestStatus.Rejected &&
-                r.Status != ChangeRequestStatus.Withdrawn &&
-                r.Status != ChangeRequestStatus.Superseded)
+                (r.Status == ChangeRequestStatus.Draft ||
+                 r.Status == ChangeRequestStatus.Submitted ||
+                 r.Status == ChangeRequestStatus.NeedsMoreInfo))
             .ToListAsync(ct);
 
         foreach (var activeRequest in existingActive)

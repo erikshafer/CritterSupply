@@ -32,13 +32,12 @@ public static class ProvideAdditionalInfoHandler
 
         var now = DateTimeOffset.UtcNow;
 
-        // Append the vendor's response to AdditionalNotes
-        var updatedNotes = string.IsNullOrWhiteSpace(request.AdditionalNotes)
-            ? command.Response
-            : $"{request.AdditionalNotes}\n\n[Response to question]: {command.Response}";
+        // Append a structured entry to the InfoResponses list.
+        // This replaces the previous string-concatenation pattern and preserves each
+        // Q&A round as a distinct timestamped entry for the UI to render as a thread.
+        request.InfoResponses.Add(new VendorInfoResponse(command.Response, now));
 
         request.Status = ChangeRequestStatus.Submitted;
-        request.AdditionalNotes = updatedNotes;
         request.SubmittedAt = now;
 
         session.Store(request);

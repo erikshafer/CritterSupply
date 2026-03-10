@@ -7,6 +7,8 @@ using Wolverine.Http;
 
 namespace VendorPortal.Api.ChangeRequests;
 
+public sealed record InfoResponseDto(string Response, DateTimeOffset RespondedAt);
+
 public sealed record ChangeRequestDetailResponse(
     Guid Id,
     string Sku,
@@ -15,6 +17,7 @@ public sealed record ChangeRequestDetailResponse(
     string Title,
     string Details,
     string? AdditionalNotes,
+    IReadOnlyList<InfoResponseDto> InfoResponses,
     string? RejectionReason,
     string? Question,
     Guid? ReplacedByRequestId,
@@ -59,6 +62,9 @@ public sealed class GetChangeRequestEndpoint
             Title: request.Title,
             Details: request.Details,
             AdditionalNotes: request.AdditionalNotes,
+            InfoResponses: request.InfoResponses
+                .Select(r => new InfoResponseDto(r.Response, r.RespondedAt))
+                .ToList(),
             RejectionReason: request.RejectionReason,
             Question: request.Question,
             ReplacedByRequestId: request.ReplacedByRequestId,

@@ -7,6 +7,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
+@inject ILogger<ChangeRequestDetail> Logger
 
 <PageTitle>@(_request?.Title is not null ? $"{_request.Title} — Vendor Portal" : "Change Request — Vendor Portal")</PageTitle>
 
@@ -112,6 +113,23 @@ else
                         </MudLink>
                     </MudText>
                 </MudAlert>
+            }
+
+            @if (_request.InfoResponses is { Count: > 0 })
+            {
+                <MudPaper Elevation="1" Class="pa-4 mb-4" data-testid="info-responses-thread">
+                    <MudText Typo="Typo.h6" GutterBottom="true">Q&amp;A Thread</MudText>
+                    @foreach (var entry in _request.InfoResponses)
+                    {
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @entry.RespondedAt.ToLocalTime().ToString("g")
+                        </MudText>
+                        <MudText Typo="Typo.body2" Style="white-space: pre-wrap;" Class="mt-1">
+                            @entry.Response
+                        </MudText>
+                    }
+                </MudPaper>
             }
         </MudItem>
 
@@ -255,8 +273,9 @@ else
                 Snackbar.Add("Failed to load change request.", Severity.Error);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Logger.LogDebug(ex, "Exception loading change request {RequestId}.", RequestId);
             Snackbar.Add("Failed to load change request.", Severity.Error);
         }
         finally
@@ -299,8 +318,9 @@ else
                 Snackbar.Add("Failed to submit. Please try again.", Severity.Error);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Logger.LogDebug(ex, "Exception submitting draft change request {RequestId}.", RequestId);
             Snackbar.Add("Failed to submit change request.", Severity.Error);
         }
         finally
@@ -331,8 +351,9 @@ else
                 Snackbar.Add("Failed to withdraw. The request may have already been resolved.", Severity.Error);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Logger.LogDebug(ex, "Exception withdrawing change request {RequestId}.", RequestId);
             Snackbar.Add("Failed to withdraw change request.", Severity.Error);
         }
         finally
@@ -367,8 +388,9 @@ else
                 Snackbar.Add("Failed to submit response. Please try again.", Severity.Error);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Logger.LogDebug(ex, "Exception providing additional info for change request {RequestId}.", RequestId);
             Snackbar.Add("Failed to submit response.", Severity.Error);
         }
         finally
@@ -394,6 +416,8 @@ else
         _ => status
     };
 
+    private sealed record InfoResponseItem(string Response, DateTimeOffset RespondedAt);
+
     private sealed record ChangeRequestDetailModel(
         Guid Id,
         string Sku,
@@ -402,6 +426,7 @@ else
         string Title,
         string Details,
         string? AdditionalNotes,
+        IReadOnlyList<InfoResponseItem> InfoResponses,
         string? RejectionReason,
         string? Question,
         Guid? ReplacedByRequestId,
