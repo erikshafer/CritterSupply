@@ -35,8 +35,20 @@ public sealed class VendorHubService : IAsyncDisposable
 
     public async Task ConnectAsync(CancellationToken ct = default)
     {
-        if (_connection is not null)
+        // If connection exists and is already active (not in terminal state), do nothing.
+        if (_connection is not null &&
+            _connection.State is HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting)
+        {
             return;
+        }
+
+        // If connection exists but is in the terminal Disconnected state (retry policy exhausted),
+        // dispose the old connection before creating a fresh one.
+        if (_connection is not null)
+        {
+            await _connection.DisposeAsync();
+            _connection = null;
+        }
 
         var apiUrl = _configuration["ApiClients:VendorPortalApiUrl"] ?? "http://localhost:5239";
         var hubUrl = $"{apiUrl}/hub/vendor-portal";

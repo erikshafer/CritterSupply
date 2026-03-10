@@ -27,6 +27,21 @@
                        aria-label="Loading dashboard data" />
 }
 
+@* P1-C: In-page recovery banner when SignalR terminally disconnects *@
+@if (HubService.State == HubConnectionState.Disconnected)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3"
+              aria-live="assertive" data-testid="hub-disconnected-banner">
+        <MudIcon Icon="@Icons.Material.Filled.WifiOff" Class="mr-1" aria-hidden="true" />
+        Live updates are paused.
+        <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small"
+                   OnClick="ReconnectAsync" Class="ml-1 pa-0" Style="min-width:auto; text-transform:none;">
+            Reconnect
+        </MudButton>
+        or refresh the page to restore live data.
+    </MudAlert>
+}
+
 @if (_summary is not null)
 {
     <section aria-label="Dashboard summary">
@@ -38,7 +53,10 @@
                     <MudIcon Icon="@Icons.Material.Filled.Warning"
                              Color="@(_activeLowStockAlerts > 0 ? Color.Error : Color.Success)"
                              Style="font-size:2rem;" aria-hidden="true" />
-                    <MudText Typo="Typo.h4">@_activeLowStockAlerts</MudText>
+                    @* P1-A: aria-live wrapper so screen readers announce live count changes *@
+                    <div aria-live="polite" aria-atomic="true">
+                        <MudText Typo="Typo.h4">@_activeLowStockAlerts</MudText>
+                    </div>
                     <MudText Typo="Typo.body2" Color="Color.Secondary">Low Stock Alerts</MudText>
                 </MudPaper>
             </MudItem>
@@ -69,10 +87,16 @@
 
     @if (_salesMetricUpdatedAt.HasValue)
     {
+        @* aria-live="polite": waits for user to finish current interaction before announcing *@
         <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3"
                   aria-live="polite" data-testid="sales-metric-updated-banner">
             Sales data updated at @_salesMetricUpdatedAt.Value.ToLocalTime().ToString("HH:mm:ss").
-            <MudLink OnClick="LoadDashboardAsync" Class="ml-1">Refresh</MudLink>
+            @* P2-C: Use MudButton (rendered as <button>) for keyboard accessibility — <a> without href is not in tab order *@
+            <MudButton Variant="Variant.Text" Color="Color.Info" Size="Size.Small"
+                       OnClick="LoadDashboardAsync" Class="ml-1 pa-0"
+                       Style="min-width:auto; text-transform:none; font-size:inherit;">
+                Refresh
+            </MudButton>
         </MudAlert>
     }
 
@@ -116,10 +140,8 @@
     // Reconnection catch-up: track the timestamp of the last received hub message
     private DateTimeOffset _lastHubMessageAt = DateTimeOffset.MinValue;
 
-    // Hub message listener registrations — disposed in Dispose()
-    private IDisposable? _lowStockAlertHandler;
-    private IDisposable? _salesMetricHandler;
-    private IDisposable? _inventoryLevelHandler;
+    // Hub message listener registration — disposed in Dispose()
+    private IDisposable? _hubMessageHandler;
 
     private static readonly JsonSerializerOptions CloudEventsOptions = new()
     {
@@ -149,22 +171,29 @@
     }
 
     /// <summary>
-    /// Registers per-message handlers on the SignalR hub connection.
-    /// Wolverine wraps all messages in a CloudEvents envelope delivered via "ReceiveMessage".
+    /// Attempts to reconnect to the SignalR hub after terminal disconnection.
+    /// Called from the in-page disconnect banner (P1-C fix).
+    /// </summary>
+    private async Task ReconnectAsync()
+    {
+        await HubService.ConnectAsync();
+    }
+
+    /// <summary>
+    /// Registers a single handler on the "ReceiveMessage" hub method.
+    /// Wolverine wraps all messages in a CloudEvents envelope delivered via this single method.
     /// We demultiplex by the "type" discriminator in the envelope.
+    /// Previous registration is disposed before re-registering (safe on reconnect).
     /// </summary>
     private void RegisterHubListeners()
     {
         if (HubService.Connection is null) return;
 
-        // Remove previous registrations before re-registering (safe on reconnect)
-        _lowStockAlertHandler?.Dispose();
-        _salesMetricHandler?.Dispose();
-        _inventoryLevelHandler?.Dispose();
+        _hubMessageHandler?.Dispose();
 
-        _lowStockAlertHandler = HubService.Connection.On<JsonElement>(
+        _hubMessageHandler = HubService.Connection.On<JsonElement>(
             "ReceiveMessage",
-            envelope =>
+            async envelope =>
             {
                 // Wolverine CloudEvents envelope: { "type": "...", "data": { ... } }
                 if (!TryGetEventType(envelope, out var eventType)) return;
@@ -173,34 +202,43 @@
                 {
                     _activeLowStockAlerts++;
                     _lastHubMessageAt = DateTimeOffset.UtcNow;
-                    Snackbar.Add(
-                        $"Low stock alert: {GetSkuFromEnvelope(envelope)}",
-                        Severity.Warning);
-                    InvokeAsync(StateHasChanged);
+
+                    // P2-B: Only show snackbar with SKU when parseable; always provide action
+                    var sku = GetSkuFromEnvelope(envelope);
+                    var message = sku != "unknown"
+                        ? $"Low stock: {sku}"
+                        : "New low stock alert received";
+
+                    Snackbar.Add(message, Severity.Warning, config =>
+                    {
+                        config.Action = "View Alerts";
+                        config.ActionColor = Color.Warning;
+                        config.OnClick = _ => LoadDashboardAsync();
+                    });
+
+                    await InvokeAsync(StateHasChanged);
                 }
                 else if (eventType?.Contains("SalesMetricUpdated") == true)
                 {
                     _salesMetricUpdatedAt = DateTimeOffset.UtcNow;
                     _lastHubMessageAt = DateTimeOffset.UtcNow;
-                    InvokeAsync(StateHasChanged);
+                    await InvokeAsync(StateHasChanged);
                 }
                 else if (eventType?.Contains("InventoryLevelUpdated") == true)
                 {
+                    // P1-B: Re-fetch the authoritative alert count from the API.
+                    // Inventory level changes may resolve existing alerts on the server side.
+                    // The server is the source of truth — we don't try to compute resolution locally.
                     _lastHubMessageAt = DateTimeOffset.UtcNow;
-                    // Inventory level changes are reflected in the alert counts;
-                    // a full refresh is not triggered here to avoid UI churn.
-                    InvokeAsync(StateHasChanged);
+                    await FetchMissedAlertsAsync();
                 }
             });
-
-        // Aliases for salesMetric and inventoryLevel are handled in the single On above
-        _salesMetricHandler = null;
-        _inventoryLevelHandler = null;
     }
 
     /// <summary>
-    /// Fetches missed low-stock alerts since the last received hub message.
-    /// Called after SignalR reconnection to catch up on alerts that arrived while offline.
+    /// Fetches active low-stock alerts from the API.
+    /// Called on initial load, after SignalR reconnection, and when InventoryLevelUpdated arrives.
+    /// Uses the last-hub-message timestamp as a fence when reconnecting after a gap.
     /// </summary>
     private async Task FetchMissedAlertsAsync()
     {
@@ -231,7 +269,7 @@
         }
         catch (Exception)
         {
-            // Catch-up failure is non-critical — stale count is acceptable; next refresh fixes it
+            // Catch-up failure is non-critical — stale count is acceptable; next reconnect fixes it
         }
     }
 
@@ -299,9 +337,7 @@
     public void Dispose()
     {
         HubService.OnStateChanged -= OnHubStateChanged;
-        _lowStockAlertHandler?.Dispose();
-        _salesMetricHandler?.Dispose();
-        _inventoryLevelHandler?.Dispose();
+        _hubMessageHandler?.Dispose();
     }
 
     private sealed record DashboardSummary(

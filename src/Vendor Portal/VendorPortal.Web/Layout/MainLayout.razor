@@ -17,11 +17,19 @@
             <MudSpacer />
 
             <MudTooltip Text="@HubStatusText">
-                <MudIcon Icon="@HubStatusIcon"
-                         Color="@HubStatusColor"
-                         Size="Size.Small"
-                         Class="mr-2"
-                         aria-label="@HubStatusText" />
+                @* P2-A: Show text label for non-connected states — icon-only is ambiguous and invisible on touch devices *@
+                <div class="d-flex align-center gap-1" aria-label="@HubStatusText" role="status">
+                    <MudIcon Icon="@HubStatusIcon"
+                             Color="@HubStatusColor"
+                             Size="Size.Small"
+                             aria-hidden="true" />
+                    @if (HubService.State != Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
+                    {
+                        <MudText Typo="Typo.caption" Color="@HubStatusColor">
+                            @HubStatusText
+                        </MudText>
+                    }
+                </div>
             </MudTooltip>
 
             <MudText Typo="Typo.body2" Class="mr-2">
