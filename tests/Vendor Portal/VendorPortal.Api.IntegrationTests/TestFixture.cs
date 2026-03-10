@@ -1,7 +1,11 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using Alba;
 using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.Tracking;
@@ -21,6 +25,11 @@ public sealed class TestFixture : IAsyncLifetime
         .WithName($"vendor-portal-postgres-test-{Guid.NewGuid():N}")
         .WithCleanUp(true)
         .Build();
+
+    // Test JWT configuration — matches appsettings.json values used in testing
+    private const string TestJwtSigningKey = "dev-only-signing-key-change-in-production-must-be-at-least-32-chars";
+    private const string TestJwtIssuer = "vendor-identity";
+    private const string TestJwtAudience = "vendor-portal";
 
     private string? _connectionString;
 
@@ -104,5 +113,57 @@ public sealed class TestFixture : IAsyncLifetime
             {
                 await ctx.InvokeAsync(message, ct);
             }));
+    }
+
+    /// <summary>
+    /// Sends a message through Wolverine and returns the tracked session for hub message assertions.
+    /// Use this when you need to verify what Wolverine published (e.g., SignalR hub messages).
+    /// </summary>
+    public Task<ITrackedSession> TrackMessageAsync<T>(T message, int timeoutSeconds = 15, CancellationToken ct = default)
+        where T : class
+    {
+        return Host.TrackActivity(TimeSpan.FromSeconds(timeoutSeconds))
+            .DoNotAssertOnExceptionsDetected()
+            .AlsoTrack(Host)
+            .ExecuteAndWaitAsync((Func<IMessageContext, Task>)(async ctx =>
+            {
+                await ctx.InvokeAsync(message, ct);
+            }));
+    }
+
+    /// <summary>
+    /// Creates a signed JWT Bearer token for use in authenticated endpoint tests.
+    /// Uses the same signing key and parameters as the production configuration.
+    /// </summary>
+    /// <param name="tenantId">The vendor tenant ID to embed in claims.</param>
+    /// <param name="userId">The vendor user ID to embed in claims. Defaults to a new Guid.</param>
+    /// <param name="tenantStatus">Tenant status claim (Active, Suspended, Terminated).</param>
+    /// <param name="role">Role claim (Admin, ProductManager, Analyst).</param>
+    public string CreateTestJwt(
+        Guid tenantId,
+        Guid? userId = null,
+        string tenantStatus = "Active",
+        string role = "Admin")
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(TestJwtSigningKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new[]
+        {
+            new Claim("VendorTenantId", tenantId.ToString()),
+            new Claim("VendorUserId", (userId ?? Guid.NewGuid()).ToString()),
+            new Claim("VendorTenantStatus", tenantStatus),
+            new Claim(ClaimTypes.Role, role),
+            new Claim(JwtRegisteredClaimNames.Sub, (userId ?? Guid.NewGuid()).ToString()),
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: TestJwtIssuer,
+            audience: TestJwtAudience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(1),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
