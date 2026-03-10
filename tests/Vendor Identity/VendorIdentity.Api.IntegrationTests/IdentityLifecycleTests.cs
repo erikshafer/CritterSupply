@@ -645,4 +645,500 @@ public sealed class IdentityLifecycleTests : IClassFixture<VendorIdentityApiFixt
             x.StatusCodeShouldBe(400);
         });
     }
+
+    // ──────────────────────────────────────────────────────
+    //  22. Deactivate User in Suspended Tenant — Succeeds
+    //  (Identity-level operations are not blocked by tenant suspension)
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task DeactivateUser_InSuspendedTenant_Returns200()
+    {
+        // Arrange — create a suspended tenant with an active user
+        await using var setupDb = _fixture.GetDbContext();
+        var tenant = new VendorTenant
+        {
+            Id = Guid.NewGuid(),
+            OrganizationName = "Suspended Tenant Deactivate",
+            ContactEmail = "suspended-deact@test.com",
+            Status = VendorTenantStatus.Suspended,
+            OnboardedAt = DateTimeOffset.UtcNow,
+            SuspendedAt = DateTimeOffset.UtcNow,
+            SuspensionReason = "Policy review"
+        };
+        setupDb.Tenants.Add(tenant);
+
+        // Create two admins so deactivation is allowed
+        var admin1 = new VendorUser
+        {
+            Id = Guid.NewGuid(),
+            VendorTenantId = tenant.Id,
+            Email = "susp-admin1@test.com",
+            FirstName = "Admin",
+            LastName = "One",
+            Role = VendorRole.Admin,
+            Status = VendorUserStatus.Active,
+            InvitedAt = DateTimeOffset.UtcNow,
+            ActivatedAt = DateTimeOffset.UtcNow
+        };
+        var catalogUser = new VendorUser
+        {
+            Id = Guid.NewGuid(),
+            VendorTenantId = tenant.Id,
+            Email = "susp-catalog@test.com",
+            FirstName = "Catalog",
+            LastName = "User",
+            Role = VendorRole.CatalogManager,
+            Status = VendorUserStatus.Active,
+            InvitedAt = DateTimeOffset.UtcNow,
+            ActivatedAt = DateTimeOffset.UtcNow
+        };
+        setupDb.Users.AddRange(admin1, catalogUser);
+        await setupDb.SaveChangesAsync();
+
+        var command = new DeactivateVendorUser(tenant.Id, catalogUser.Id, "Removing during suspension");
+
+        // Act — should succeed because validators don't check tenant status
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenant.Id}/users/{catalogUser.Id}/deactivate");
+            x.StatusCodeShouldBe(200);
+        });
+
+        // Assert
+        await using var dbContext = _fixture.GetDbContext();
+        var user = await dbContext.Users.FirstAsync(u => u.Id == catalogUser.Id);
+        user.Status.ShouldBe(VendorUserStatus.Deactivated);
+        user.DeactivatedAt.ShouldNotBeNull();
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  23. Change Role in Suspended Tenant — Succeeds
+    //  (Identity-level operations are not blocked by tenant suspension)
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ChangeRole_InSuspendedTenant_Returns200()
+    {
+        // Arrange — create a suspended tenant with two admins
+        await using var setupDb = _fixture.GetDbContext();
+        var tenant = new VendorTenant
+        {
+            Id = Guid.NewGuid(),
+            OrganizationName = "Suspended Tenant Role",
+            ContactEmail = "suspended-role@test.com",
+            Status = VendorTenantStatus.Suspended,
+            OnboardedAt = DateTimeOffset.UtcNow,
+            SuspendedAt = DateTimeOffset.UtcNow,
+            SuspensionReason = "Under investigation"
+        };
+        setupDb.Tenants.Add(tenant);
+
+        var admin1 = new VendorUser
+        {
+            Id = Guid.NewGuid(),
+            VendorTenantId = tenant.Id,
+            Email = "susp-role-admin1@test.com",
+            FirstName = "Admin",
+            LastName = "One",
+            Role = VendorRole.Admin,
+            Status = VendorUserStatus.Active,
+            InvitedAt = DateTimeOffset.UtcNow,
+            ActivatedAt = DateTimeOffset.UtcNow
+        };
+        var admin2 = new VendorUser
+        {
+            Id = Guid.NewGuid(),
+            VendorTenantId = tenant.Id,
+            Email = "susp-role-admin2@test.com",
+            FirstName = "Admin",
+            LastName = "Two",
+            Role = VendorRole.Admin,
+            Status = VendorUserStatus.Active,
+            InvitedAt = DateTimeOffset.UtcNow,
+            ActivatedAt = DateTimeOffset.UtcNow
+        };
+        setupDb.Users.AddRange(admin1, admin2);
+        await setupDb.SaveChangesAsync();
+
+        var command = new ChangeVendorUserRole(tenant.Id, admin1.Id, VendorRole.CatalogManager);
+
+        // Act — should succeed because validators don't check tenant status
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Patch.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenant.Id}/users/{admin1.Id}/role");
+            x.StatusCodeShouldBe(200);
+        });
+
+        // Assert
+        await using var dbContext = _fixture.GetDbContext();
+        var user = await dbContext.Users.FirstAsync(u => u.Id == admin1.Id);
+        user.Role.ShouldBe(VendorRole.CatalogManager);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  24. Reactivate User in Suspended Tenant — Succeeds
+    //  (Identity-level operations are not blocked by tenant suspension)
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ReactivateUser_InSuspendedTenant_Returns200()
+    {
+        // Arrange — create a suspended tenant with a deactivated user
+        await using var setupDb = _fixture.GetDbContext();
+        var tenant = new VendorTenant
+        {
+            Id = Guid.NewGuid(),
+            OrganizationName = "Suspended Tenant Reactivate",
+            ContactEmail = "suspended-react@test.com",
+            Status = VendorTenantStatus.Suspended,
+            OnboardedAt = DateTimeOffset.UtcNow,
+            SuspendedAt = DateTimeOffset.UtcNow,
+            SuspensionReason = "Temporary hold"
+        };
+        setupDb.Tenants.Add(tenant);
+
+        var deactivatedUser = new VendorUser
+        {
+            Id = Guid.NewGuid(),
+            VendorTenantId = tenant.Id,
+            Email = "susp-react-user@test.com",
+            FirstName = "Deactivated",
+            LastName = "User",
+            Role = VendorRole.CatalogManager,
+            Status = VendorUserStatus.Deactivated,
+            InvitedAt = DateTimeOffset.UtcNow,
+            DeactivatedAt = DateTimeOffset.UtcNow
+        };
+        setupDb.Users.Add(deactivatedUser);
+        await setupDb.SaveChangesAsync();
+
+        var command = new ReactivateVendorUser(tenant.Id, deactivatedUser.Id);
+
+        // Act — should succeed because validators don't check tenant status
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenant.Id}/users/{deactivatedUser.Id}/reactivate");
+            x.StatusCodeShouldBe(200);
+        });
+
+        // Assert
+        await using var dbContext = _fixture.GetDbContext();
+        var user = await dbContext.Users.FirstAsync(u => u.Id == deactivatedUser.Id);
+        user.Status.ShouldBe(VendorUserStatus.Active);
+        user.DeactivatedAt.ShouldBeNull();
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  25. Deactivate User in Terminated Tenant — Succeeds
+    //  (Validators check tenant existence, not status)
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task DeactivateUser_InTerminatedTenant_Returns200()
+    {
+        // Arrange — create a terminated tenant with an active user
+        await using var setupDb = _fixture.GetDbContext();
+        var tenant = new VendorTenant
+        {
+            Id = Guid.NewGuid(),
+            OrganizationName = "Terminated Tenant Deactivate",
+            ContactEmail = "terminated-deact@test.com",
+            Status = VendorTenantStatus.Terminated,
+            OnboardedAt = DateTimeOffset.UtcNow,
+            TerminatedAt = DateTimeOffset.UtcNow,
+            TerminationReason = "Contract ended"
+        };
+        setupDb.Tenants.Add(tenant);
+
+        // Need an admin to satisfy last-admin check + a user to deactivate
+        var admin = new VendorUser
+        {
+            Id = Guid.NewGuid(),
+            VendorTenantId = tenant.Id,
+            Email = "term-deact-admin@test.com",
+            FirstName = "Admin",
+            LastName = "User",
+            Role = VendorRole.Admin,
+            Status = VendorUserStatus.Active,
+            InvitedAt = DateTimeOffset.UtcNow,
+            ActivatedAt = DateTimeOffset.UtcNow
+        };
+        var catalogUser = new VendorUser
+        {
+            Id = Guid.NewGuid(),
+            VendorTenantId = tenant.Id,
+            Email = "term-deact-catalog@test.com",
+            FirstName = "Catalog",
+            LastName = "User",
+            Role = VendorRole.CatalogManager,
+            Status = VendorUserStatus.Active,
+            InvitedAt = DateTimeOffset.UtcNow,
+            ActivatedAt = DateTimeOffset.UtcNow
+        };
+        setupDb.Users.AddRange(admin, catalogUser);
+        await setupDb.SaveChangesAsync();
+
+        var command = new DeactivateVendorUser(tenant.Id, catalogUser.Id, "Cleanup after termination");
+
+        // Act — should succeed because validators don't check tenant status
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenant.Id}/users/{catalogUser.Id}/deactivate");
+            x.StatusCodeShouldBe(200);
+        });
+
+        // Assert
+        await using var dbContext = _fixture.GetDbContext();
+        var user = await dbContext.Users.FirstAsync(u => u.Id == catalogUser.Id);
+        user.Status.ShouldBe(VendorUserStatus.Deactivated);
+        user.DeactivatedAt.ShouldNotBeNull();
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  26. Change Role in Terminated Tenant — Succeeds
+    //  (Validators check tenant existence, not status)
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ChangeRole_InTerminatedTenant_Returns200()
+    {
+        // Arrange — create a terminated tenant with two admins
+        await using var setupDb = _fixture.GetDbContext();
+        var tenant = new VendorTenant
+        {
+            Id = Guid.NewGuid(),
+            OrganizationName = "Terminated Tenant Role",
+            ContactEmail = "terminated-role@test.com",
+            Status = VendorTenantStatus.Terminated,
+            OnboardedAt = DateTimeOffset.UtcNow,
+            TerminatedAt = DateTimeOffset.UtcNow,
+            TerminationReason = "Breach of contract"
+        };
+        setupDb.Tenants.Add(tenant);
+
+        var admin1 = new VendorUser
+        {
+            Id = Guid.NewGuid(),
+            VendorTenantId = tenant.Id,
+            Email = "term-role-admin1@test.com",
+            FirstName = "Admin",
+            LastName = "One",
+            Role = VendorRole.Admin,
+            Status = VendorUserStatus.Active,
+            InvitedAt = DateTimeOffset.UtcNow,
+            ActivatedAt = DateTimeOffset.UtcNow
+        };
+        var admin2 = new VendorUser
+        {
+            Id = Guid.NewGuid(),
+            VendorTenantId = tenant.Id,
+            Email = "term-role-admin2@test.com",
+            FirstName = "Admin",
+            LastName = "Two",
+            Role = VendorRole.Admin,
+            Status = VendorUserStatus.Active,
+            InvitedAt = DateTimeOffset.UtcNow,
+            ActivatedAt = DateTimeOffset.UtcNow
+        };
+        setupDb.Users.AddRange(admin1, admin2);
+        await setupDb.SaveChangesAsync();
+
+        var command = new ChangeVendorUserRole(tenant.Id, admin1.Id, VendorRole.ReadOnly);
+
+        // Act — should succeed because validators don't check tenant status
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Patch.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenant.Id}/users/{admin1.Id}/role");
+            x.StatusCodeShouldBe(200);
+        });
+
+        // Assert
+        await using var dbContext = _fixture.GetDbContext();
+        var user = await dbContext.Users.FirstAsync(u => u.Id == admin1.Id);
+        user.Role.ShouldBe(VendorRole.ReadOnly);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  27. Invite User to Terminated Tenant — Succeeds
+    //  (InviteVendorUserValidator checks tenant existence, not status)
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task InviteUser_InTerminatedTenant_Returns201()
+    {
+        // Arrange — create a terminated tenant
+        await using var setupDb = _fixture.GetDbContext();
+        var tenant = new VendorTenant
+        {
+            Id = Guid.NewGuid(),
+            OrganizationName = "Terminated Tenant Invite",
+            ContactEmail = "terminated-invite@test.com",
+            Status = VendorTenantStatus.Terminated,
+            OnboardedAt = DateTimeOffset.UtcNow,
+            TerminatedAt = DateTimeOffset.UtcNow,
+            TerminationReason = "Account closed"
+        };
+        setupDb.Tenants.Add(tenant);
+        await setupDb.SaveChangesAsync();
+
+        var command = new InviteVendorUser(
+            tenant.Id,
+            "new-invite-terminated@test.com",
+            "New",
+            "User",
+            VendorRole.CatalogManager);
+
+        // Act — should succeed because validator doesn't check tenant status
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenant.Id}/users/invite");
+            x.StatusCodeShouldBe(201);
+        });
+
+        // Assert — user and invitation were created
+        await using var dbContext = _fixture.GetDbContext();
+        var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Email == "new-invite-terminated@test.com");
+        user.ShouldNotBeNull();
+        user.VendorTenantId.ShouldBe(tenant.Id);
+        user.Status.ShouldBe(VendorUserStatus.Invited);
+
+        var invitation = await dbContext.Invitations.FirstOrDefaultAsync(i => i.VendorUserId == user.Id);
+        invitation.ShouldNotBeNull();
+        invitation.Status.ShouldBe(InvitationStatus.Pending);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  28. Resend Invitation — Produces Different Token Each Time
+    //  (Verifies new random bytes are generated per resend)
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ResendInvitation_ConsecutiveResends_ProduceDifferentTokens()
+    {
+        // Arrange
+        var tenantId = await CreateActiveTenantAsync("Token Diff Tenant", "tokendiff@test.com");
+        var (userId, invitationId) = await CreateInvitedUserWithPendingInvitationAsync(tenantId, "tokendiff-user@test.com");
+
+        var command = new ResendVendorUserInvitation(tenantId, userId);
+
+        // Act — first resend
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/{userId}/invitation/resend");
+            x.StatusCodeShouldBe(200);
+        });
+
+        string tokenAfterFirstResend;
+        {
+            await using var db1 = _fixture.GetDbContext();
+            var inv1 = await db1.Invitations.FirstAsync(i => i.Id == invitationId);
+            tokenAfterFirstResend = inv1.Token;
+            inv1.ResendCount.ShouldBe(1);
+        }
+
+        // Act — second resend
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/{userId}/invitation/resend");
+            x.StatusCodeShouldBe(200);
+        });
+
+        string tokenAfterSecondResend;
+        {
+            await using var db2 = _fixture.GetDbContext();
+            var inv2 = await db2.Invitations.FirstAsync(i => i.Id == invitationId);
+            tokenAfterSecondResend = inv2.Token;
+            inv2.ResendCount.ShouldBe(2);
+        }
+
+        // Assert — all three tokens must be distinct (original, first resend, second resend)
+        var originalToken = "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890";
+        tokenAfterFirstResend.ShouldNotBe(originalToken);
+        tokenAfterSecondResend.ShouldNotBe(originalToken);
+        tokenAfterSecondResend.ShouldNotBe(tokenAfterFirstResend);
+
+        // Both tokens should be valid SHA-256 hex strings (64 chars)
+        tokenAfterFirstResend.Length.ShouldBe(64);
+        tokenAfterSecondResend.Length.ShouldBe(64);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  29. Change Role — Same Role (No-Op) Succeeds
+    //  (No validator rule prevents changing to the same role)
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ChangeRole_ToSameRole_Returns200AndRoleUnchanged()
+    {
+        // Arrange
+        var tenantId = await CreateActiveTenantAsync("Same Role Tenant", "samerole@test.com");
+        var userId = await CreateUserAsync(tenantId, VendorRole.CatalogManager, VendorUserStatus.Active, "samerole-user@test.com");
+
+        var command = new ChangeVendorUserRole(tenantId, userId, VendorRole.CatalogManager);
+
+        // Act — should succeed (no validator prevents same-role assignment)
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Patch.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/{userId}/role");
+            x.StatusCodeShouldBe(200);
+        });
+
+        // Assert — role should still be CatalogManager
+        await using var dbContext = _fixture.GetDbContext();
+        var user = await dbContext.Users.FirstAsync(u => u.Id == userId);
+        user.Role.ShouldBe(VendorRole.CatalogManager);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  30. Deactivate User — Already Deactivated Returns 400
+    //  (Validator requires user to be in Active status)
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task DeactivateUser_WhenAlreadyDeactivated_Returns400()
+    {
+        // Arrange — create a deactivated user
+        var tenantId = await CreateActiveTenantAsync("Double Deactivate Tenant", "doubledeact@test.com");
+        var userId = await CreateUserAsync(tenantId, VendorRole.CatalogManager, VendorUserStatus.Deactivated, "doubledeact-user@test.com");
+
+        var command = new DeactivateVendorUser(tenantId, userId, "Second deactivation attempt");
+
+        // Act & Assert — should fail because user is not Active
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenantId}/users/{userId}/deactivate");
+            x.StatusCodeShouldBe(400);
+        });
+
+        // Verify status didn't change
+        await using var dbContext = _fixture.GetDbContext();
+        var user = await dbContext.Users.FirstAsync(u => u.Id == userId);
+        user.Status.ShouldBe(VendorUserStatus.Deactivated);
+    }
+
+    // ──────────────────────────────────────────────────────
+    //  31. Suspend Tenant — Empty Reason Returns 400
+    //  (Validator requires non-empty reason)
+    // ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task SuspendTenant_WithEmptyReason_Returns400()
+    {
+        // Arrange
+        var tenantId = await CreateActiveTenantAsync("Suspend No Reason", "suspend-noreason@test.com");
+        var command = new SuspendVendorTenant(tenantId, "");
+
+        // Act & Assert — should fail because reason is empty
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/vendor-identity/tenants/{tenantId}/suspend");
+            x.StatusCodeShouldBe(400);
+        });
+
+        // Verify tenant status didn't change
+        await using var dbContext = _fixture.GetDbContext();
+        var tenant = await dbContext.Tenants.FirstAsync(t => t.Id == tenantId);
+        tenant.Status.ShouldBe(VendorTenantStatus.Active);
+    }
 }
