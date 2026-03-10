@@ -308,25 +308,35 @@ else
 
     private async Task ConfirmDeleteDraft()
     {
-        var confirmed = await DialogService.ShowMessageBox(
-            title: "Delete Draft",
-            message: "Are you sure you want to delete this draft? This action cannot be undone.",
-            yesText: "Delete",
-            cancelText: "Cancel");
+        var parameters = new DialogParameters<MudMessageBox>
+        {
+            { x => x.Title, "Delete Draft" },
+            { x => x.Message, "Are you sure you want to delete this draft? This action cannot be undone." },
+            { x => x.YesText, "Delete" },
+            { x => x.CancelText, "Cancel" },
+        };
 
-        if (confirmed == true)
+        var dialog = await DialogService.ShowAsync<MudMessageBox>("Delete Draft", parameters);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
             await WithdrawRequest();
     }
 
     private async Task ConfirmWithdraw()
     {
-        var confirmed = await DialogService.ShowMessageBox(
-            title: "Withdraw Change Request",
-            message: "Are you sure you want to withdraw this request? This action cannot be undone.",
-            yesText: "Withdraw",
-            cancelText: "Cancel");
+        var parameters = new DialogParameters<MudMessageBox>
+        {
+            { x => x.Title, "Withdraw Change Request" },
+            { x => x.Message, "Are you sure you want to withdraw this request? This action cannot be undone." },
+            { x => x.YesText, "Withdraw" },
+            { x => x.CancelText, "Cancel" },
+        };
 
-        if (confirmed == true)
+        var dialog = await DialogService.ShowAsync<MudMessageBox>("Withdraw Change Request", parameters);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: false })
             await WithdrawRequest();
     }
 

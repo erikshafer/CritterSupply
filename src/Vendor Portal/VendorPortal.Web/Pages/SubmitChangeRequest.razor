@@ -155,7 +155,7 @@
         if (submitAfterDraft)
         {
             // Full validation required before submitting to the Catalog team
-            await _form.Validate();
+            await _form.ValidateAsync();
             if (!_isFormValid) return;
         }
         else
