@@ -106,8 +106,17 @@
         @if (AuthState.CanSubmitChangeRequests)
         {
             <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Add" Class="mr-2">
+                       StartIcon="@Icons.Material.Filled.Add" Class="mr-2"
+                       Href="/change-requests/submit"
+                       data-testid="submit-change-request-btn">
                 Submit Change Request
+            </MudButton>
+
+            <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                       StartIcon="@Icons.Material.Filled.List" Class="mr-2"
+                       Href="/change-requests"
+                       data-testid="view-change-requests-btn">
+                View Change Requests
             </MudButton>
         }
 
@@ -239,6 +248,12 @@
                     // The server is the source of truth — we don't try to compute resolution locally.
                     _lastHubMessageAt = DateTimeOffset.UtcNow;
                     await FetchMissedAlertsAsync();
+                }
+                else if (eventType?.EndsWith("ChangeRequestStatusUpdated") == true)
+                {
+                    // Refresh the pending change request count on the dashboard KPI card
+                    _lastHubMessageAt = DateTimeOffset.UtcNow;
+                    await LoadDashboardAsync();
                 }
             });
     }

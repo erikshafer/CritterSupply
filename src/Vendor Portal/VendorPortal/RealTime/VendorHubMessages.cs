@@ -31,3 +31,37 @@ public sealed record InventoryLevelUpdated(
     string WarehouseId,
     int NewQuantity,
     DateTimeOffset AdjustedAt) : IVendorTenantMessage;
+
+/// <summary>
+/// Pushed to <c>vendor:{tenantId}</c> when a change request status changes.
+/// All users in the tenant see this broadcast — useful for team awareness.
+/// Clients should refresh the change request list badge count.
+/// </summary>
+public sealed record ChangeRequestStatusUpdated(
+    Guid VendorTenantId,
+    Guid RequestId,
+    string Sku,
+    string Status,
+    DateTimeOffset UpdatedAt) : IVendorTenantMessage;
+
+/// <summary>
+/// Pushed to <c>user:{userId}</c> as a personal decision notification.
+/// Only the submitting vendor user receives this — shown as a toast with context.
+/// Decision values: "Approved", "Rejected", "NeedsMoreInfo".
+/// </summary>
+public sealed record ChangeRequestDecisionPersonal(
+    Guid VendorUserId,
+    Guid RequestId,
+    string Sku,
+    string Decision,
+    string? Reason,
+    DateTimeOffset DecidedAt) : IVendorUserMessage;
+
+/// <summary>
+/// Pushed to <c>user:{userId}</c> when the user's account is deactivated.
+/// Clients must disconnect the hub, clear the JWT from memory, and redirect to an "Access Revoked" page.
+/// </summary>
+public sealed record ForceLogout(
+    Guid VendorUserId,
+    string Reason,
+    DateTimeOffset RevokedAt) : IVendorUserMessage;

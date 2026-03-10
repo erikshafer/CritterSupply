@@ -1,0 +1,306 @@
+@page "/change-requests/{RequestId:guid}"
+@using System.Net.Http.Json
+@using VendorPortal.Web.Auth
+@attribute [Authorize]
+@inject VendorAuthState AuthState
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Change Request Detail — Vendor Portal</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" Class="mb-4 pa-0" />
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="Loading change request" />
+}
+else if (_request is null)
+{
+    <MudAlert Severity="Severity.Error">Change request not found.</MudAlert>
+}
+else
+{
+    <div class="d-flex align-center justify-space-between mb-4">
+        <div>
+            <MudText Typo="Typo.h4" GutterBottom="false">@_request.Title</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                SKU: <code>@_request.Sku</code> — @_request.Type change request
+            </MudText>
+        </div>
+
+        <MudChip T="string" Color="@GetStatusColor(_request.Status)" Variant="Variant.Filled" Size="Size.Medium">
+            @GetStatusLabel(_request.Status)
+        </MudChip>
+    </div>
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" GutterBottom="true">Details</MudText>
+                <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@_request.Details</MudText>
+
+                @if (!string.IsNullOrWhiteSpace(_request.AdditionalNotes))
+                {
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Additional Notes</MudText>
+                    <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@_request.AdditionalNotes</MudText>
+                }
+            </MudPaper>
+
+            @if (!string.IsNullOrWhiteSpace(_request.Question))
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-4" data-testid="needs-more-info-alert">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">
+                        <MudIcon Icon="@Icons.Material.Filled.QuestionAnswer" Class="mr-1" aria-hidden="true" />
+                        Question from Catalog Team
+                    </MudText>
+                    <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@_request.Question</MudText>
+
+                    @if (AuthState.CanSubmitChangeRequests)
+                    {
+                        <MudDivider Class="my-2" />
+                        <MudTextField @bind-Value="_additionalInfoResponse"
+                                      Label="Your Response"
+                                      Variant="Variant.Outlined"
+                                      Lines="4"
+                                      Class="mb-2"
+                                      data-testid="additional-info-response" />
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   OnClick="ProvideAdditionalInfo"
+                                   Disabled="_isActioning || string.IsNullOrWhiteSpace(_additionalInfoResponse)"
+                                   data-testid="provide-info-btn">
+                            Submit Response
+                        </MudButton>
+                    }
+                </MudAlert>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_request.RejectionReason))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4" data-testid="rejection-reason-alert">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Rejection Reason</MudText>
+                    <MudText Typo="Typo.body2">@_request.RejectionReason</MudText>
+                    @if (AuthState.CanSubmitChangeRequests)
+                    {
+                        <MudText Typo="Typo.caption" Class="mt-2">
+                            <MudLink Href="/change-requests/submit">Submit a new request</MudLink> to address the feedback.
+                        </MudText>
+                    }
+                </MudAlert>
+            }
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" GutterBottom="true">Timeline</MudText>
+
+                <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Left">
+                    <MudTimelineItem Color="Color.Default" Size="Size.Small">
+                        <ItemContent>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Created — @_request.CreatedAt.ToLocalTime().ToString("g")
+                            </MudText>
+                        </ItemContent>
+                    </MudTimelineItem>
+
+                    @if (_request.SubmittedAt.HasValue)
+                    {
+                        <MudTimelineItem Color="Color.Info" Size="Size.Small">
+                            <ItemContent>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Submitted — @_request.SubmittedAt.Value.ToLocalTime().ToString("g")
+                                </MudText>
+                            </ItemContent>
+                        </MudTimelineItem>
+                    }
+
+                    @if (_request.ResolvedAt.HasValue)
+                    {
+                        <MudTimelineItem Color="@GetStatusColor(_request.Status)" Size="Size.Small">
+                            <ItemContent>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @_request.Status — @_request.ResolvedAt.Value.ToLocalTime().ToString("g")
+                                </MudText>
+                            </ItemContent>
+                        </MudTimelineItem>
+                    }
+                </MudTimeline>
+            </MudPaper>
+
+            @if (CanWithdraw)
+            {
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h6" GutterBottom="true">Actions</MudText>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Error"
+                               StartIcon="@Icons.Material.Filled.Cancel"
+                               FullWidth="true"
+                               OnClick="WithdrawRequest"
+                               Disabled="_isActioning"
+                               data-testid="withdraw-btn">
+                        Withdraw Request
+                    </MudButton>
+                </MudPaper>
+            }
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid RequestId { get; set; }
+
+    private ChangeRequestDetailModel? _request;
+    private bool _isLoading = true;
+    private bool _isActioning;
+    private string _additionalInfoResponse = string.Empty;
+
+    private bool CanWithdraw =>
+        _request is not null &&
+        _request.Status is "Draft" or "Submitted" or "NeedsMoreInfo";
+
+    private static readonly IReadOnlyList<BreadcrumbItem> _breadcrumbs =
+    [
+        new BreadcrumbItem("Dashboard", href: "/dashboard"),
+        new BreadcrumbItem("Change Requests", href: "/change-requests"),
+        new BreadcrumbItem("Detail", href: null, disabled: true)
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("VendorPortalApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.GetAsync($"/api/vendor-portal/change-requests/{RequestId}");
+            if (response.IsSuccessStatusCode)
+            {
+                _request = await response.Content.ReadFromJsonAsync<ChangeRequestDetailModel>();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _request = null;
+            }
+            else
+            {
+                Snackbar.Add("Failed to load change request.", Severity.Error);
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Failed to load change request.", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task WithdrawRequest()
+    {
+        _isActioning = true;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("VendorPortalApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.PostAsync(
+                $"/api/vendor-portal/change-requests/{RequestId}/withdraw", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Change request withdrawn.", Severity.Success);
+                Navigation.NavigateTo("/change-requests");
+            }
+            else
+            {
+                Snackbar.Add("Failed to withdraw. The request may have already been resolved.", Severity.Error);
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Failed to withdraw change request.", Severity.Error);
+        }
+        finally
+        {
+            _isActioning = false;
+        }
+    }
+
+    private async Task ProvideAdditionalInfo()
+    {
+        if (string.IsNullOrWhiteSpace(_additionalInfoResponse)) return;
+
+        _isActioning = true;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("VendorPortalApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.PostAsJsonAsync(
+                $"/api/vendor-portal/change-requests/{RequestId}/additional-info",
+                new { Response = _additionalInfoResponse });
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Response submitted. Your request is back under review.", Severity.Success);
+                _additionalInfoResponse = string.Empty;
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to submit response. Please try again.", Severity.Error);
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Failed to submit response.", Severity.Error);
+        }
+        finally
+        {
+            _isActioning = false;
+        }
+    }
+
+    private static Color GetStatusColor(string status) => status switch
+    {
+        "Draft" => Color.Default,
+        "Submitted" => Color.Info,
+        "NeedsMoreInfo" => Color.Warning,
+        "Approved" => Color.Success,
+        "Rejected" => Color.Error,
+        "Withdrawn" or "Superseded" => Color.Dark,
+        _ => Color.Default
+    };
+
+    private static string GetStatusLabel(string status) => status switch
+    {
+        "NeedsMoreInfo" => "Needs More Info",
+        _ => status
+    };
+
+    private sealed record ChangeRequestDetailModel(
+        Guid Id,
+        string Sku,
+        string Type,
+        string Status,
+        string Title,
+        string Details,
+        string? AdditionalNotes,
+        string? RejectionReason,
+        string? Question,
+        Guid? ReplacedByRequestId,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset? SubmittedAt,
+        DateTimeOffset? ResolvedAt);
+}
