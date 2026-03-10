@@ -85,10 +85,13 @@ public sealed class VendorPortalHub : WolverineHub
 ```
 
 > **Inheritance requirement depends on your use case:**
-> - **Client→server Wolverine routing** (clients send messages that Wolverine dispatches to handlers): your custom hub **must** inherit from `WolverineHub`, not plain `Hub`. The `ReceiveMessage` override that feeds the Wolverine pipeline lives in `WolverineHub`.
+> - **Client→server Wolverine routing** (clients send messages **via WebSocket** that Wolverine dispatches to handlers): your custom hub **must** inherit from `WolverineHub`, not plain `Hub`. The `ReceiveMessage` override that feeds the Wolverine pipeline lives in `WolverineHub`.
 > - **Server→client push only** (Wolverine publishes to the hub; clients only receive): a plain `Hub` subclass with `app.MapHub<T>()` is sufficient. Wolverine delivers via `IHubContext<T>` and does not require `WolverineHub` for outbound-only flows.
 >
-> The current Storefront `StorefrontHub : Hub` is server→client only — notification handlers return typed messages that Wolverine routes via `IHubContext`. The Vendor Portal `VendorPortalHub` will inherit `WolverineHub` when client→server routing (e.g., bidirectional change requests) is needed.
+> **Clarification from Cycle 22 (Vendor Portal):** "Bidirectional workflow" does NOT automatically mean `WolverineHub`. The Vendor Portal change request workflow (Phase 4) is end-to-end bidirectional — vendors submit requests and receive decisions. But `VendorPortalHub` remained a plain `Hub` because client→server actions (submit, withdraw, provide info) are **HTTP endpoints**. SignalR is only used for server→client notifications (decision toasts, status badge updates). `WolverineHub` is needed only when the **client sends messages via the WebSocket connection** itself (not via HTTP) and expects Wolverine to route those messages to handlers.
+>
+> - **Storefront `StorefrontHub : Hub`** — server→client push only. Handlers return messages; Wolverine routes via `IHubContext`.
+> - **Vendor Portal `VendorPortalHub : Hub`** — server→client push only, even for a bidirectional workflow. HTTP handles client→server; SignalR handles server→client.
 >
 > Always call `await base.OnConnectedAsync()` — skipping it will break group tracking.
 
@@ -981,7 +984,8 @@ Look for the "Message Routing" table in the output. SignalR-routed messages appe
 | Pitfall | Symptom | Fix |
 |---------|---------|-----|
 | Forgot `.DisableAntiforgery()` | Hub negotiation fails with 400/403 in ASP.NET Core 10+ | Add `.DisableAntiforgery()` to `MapWolverineSignalRHub()` |
-| Custom hub inherits `Hub` not `WolverineHub` | Messages are not received / routing breaks | Inherit `WolverineHub` |
+| Custom hub inherits `Hub` not `WolverineHub` | Client→server messages not received / Wolverine routing breaks | Inherit `WolverineHub` — but only if clients send via WebSocket, not HTTP |
+| Assuming bidirectional workflow → WolverineHub | Over-engineered hub; plain Hub works for HTTP commands + SignalR notifications | Use plain `Hub` when client→server is HTTP; `WolverineHub` only for WebSocket→Wolverine dispatch |
 | Called `base.OnConnectedAsync()` wrong | Group enrollment partially works | Always call `await base.OnConnectedAsync()` last |
 | Using `WebApplicationFactory` for SignalR integration tests | Tests hang / SignalR handshake fails | Use real Kestrel (`WebApplication` on a port) |
 | Passing tenant identity in query string | Security vulnerability: tenant spoofing | Use JWT claims only for vendor-grade contexts |

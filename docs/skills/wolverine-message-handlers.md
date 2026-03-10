@@ -432,6 +432,94 @@ public static OutgoingMessages Handle(...)
 }
 ```
 
+### Building Outgoing Messages: Command vs Entity State
+
+When a handler mutates a document and then builds an outgoing integration message, be explicit about
+which data source each field comes from. **Never assume the entity's current state reflects the
+command's data** — some fields on the entity may hold older values that were not updated as part
+of this command.
+
+**The bug pattern:**
+
+```csharp
+// Handler: vendor provides a response to a Catalog BC question
+request.InfoResponses.Add(new VendorInfoResponse(command.Response, now)); // ✅ written to list
+request.SubmittedAt = now;
+session.Store(request);
+await session.SaveChangesAsync(ct);
+
+// ❌ WRONG: BuildCatalogMessage reads request.AdditionalNotes
+//    — this is the original DRAFT notes, NOT command.Response
+var msg = BuildCatalogMessage(request, now);
+
+private static object? BuildCatalogMessage(ChangeRequest request, DateTimeOffset at)
+{
+    return new DescriptionChangeRequested(
+        ...
+        AdditionalNotes: request.AdditionalNotes,  // ❌ original draft notes, not the response!
+        ...);
+}
+```
+
+**The fix — pass transient command values explicitly:**
+
+```csharp
+// ✅ CORRECT: pass command.Response explicitly so the helper uses the right source
+var msg = BuildCatalogMessage(request, command.Response, now);
+
+private static object? BuildCatalogMessage(
+    ChangeRequest request,
+    string vendorResponse,       // explicit — comes from command, not entity
+    DateTimeOffset at)
+{
+    return new DescriptionChangeRequested(
+        ...
+        AdditionalNotes: vendorResponse,  // ✅ the actual vendor response
+        ...);
+}
+```
+
+**Rule:** When a helper method builds an outgoing message that mixes entity state AND command data,
+make the distinction explicit via method parameters. This prevents silent data loss where a field
+appears populated (it reads from the entity's old value) but carries the wrong information.
+
+This bug will not be caught by state-transition tests — only by tests that assert the **payload**
+of outgoing messages. Always assert the full outgoing message, not just the resulting document state.
+
+### Returning IEnumerable<object> for Multi-Type Dispatch
+
+When a handler needs to publish messages of different types to different transports (e.g., one to
+RabbitMQ, another to SignalR), returning `IEnumerable<object>` lets Wolverine route each element
+by its runtime type:
+
+```csharp
+public static async Task<IEnumerable<object>> Handle(
+    DescriptionChangeApproved @event,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    // ... update document ...
+
+    return
+    [
+        new ChangeRequestStatusUpdated(...),     // → SignalR: vendor:{tenantId} group
+        new ChangeRequestDecisionPersonal(...),  // → SignalR: user:{userId} group
+        // Could also include: new SomeRabbitMqMessage(...)  → RabbitMQ exchange
+    ];
+}
+```
+
+Wolverine's publish rules (configured in `Program.cs`) determine routing for each concrete type.
+This is a clean alternative to `OutgoingMessages` when mixing transport targets in the same handler.
+
+**Return `[]` to no-op:** An empty enumerable tells Wolverine nothing to publish — useful for
+idempotency guards and silent early-returns:
+
+```csharp
+if (request is null || request.VendorTenantId != @event.VendorTenantId || !request.IsActive)
+    return [];  // Silently skip — Wolverine traces the no-op implicitly
+```
+
 ## HTTP Endpoint Attributes
 
 ```csharp

@@ -9,15 +9,33 @@ Patterns for using Marten as a document database (not event sourcing) in Critter
 - Current state is all that matters (no need for historical replay)
 - Read-heavy workload (90%+ reads, few writes)
 - Document model fits naturally (flexible schema, nested objects)
+- State machine with lifecycle transitions, but another BC owns the audit trail
 
 **Use Marten Event Store when:**
 - Transaction data with frequent state changes (Orders, Payments, Inventory)
 - Historical changes are valuable (audit trail, temporal queries)
 - Complex business logic benefits from event sourcing patterns
+- This BC is the authoritative owner of the lifecycle
 
 **CritterSupply examples:**
-- **Document Store:** Product Catalog (products are master data)
+- **Document Store:** Product Catalog (products are master data), ChangeRequest (7-state machine — Catalog BC owns the audit trail)
 - **Event Store:** Orders, Payments, Inventory, Fulfillment
+
+**Decision heuristic for state machines:**
+
+| Signal | Document Store | Event Sourcing |
+|--------|---------------|----------------|
+| Need replay / temporal queries | No | ✅ Yes |
+| Another BC owns the history | ✅ Yes — just track status | No |
+| Audit trail required in this BC | No | ✅ Yes |
+| Complex business logic with transitions | ✅ Mutable document works | Only if history is also needed |
+| Simple CRUD with occasional status changes | ✅ | — |
+
+**Anti-pattern:** CONTEXTS.md for the Vendor Portal ChangeRequest originally described it as
+event-sourced (with `IStartStream`, `[ReadAggregate]`, and domain events). The actual implementation
+correctly used a plain Marten document (mutation pattern) because the Catalog BC owns the authoritative
+workflow history and the Vendor Portal only needs current state. When CONTEXTS.md uses event-sourcing
+language for a document-store BC, the implementation will diverge from the spec.
 
 ## Value Objects and Queryable Fields
 
@@ -448,3 +466,73 @@ public static async Task<CreationResponse> Handle(
 ```
 
 Note: These are **integration messages**, not domain events. They're not persisted in an event stream.
+
+---
+
+## LINQ Limitations
+
+### Enum Arrays Cannot Be Parameterized
+
+Marten's LINQ provider (backed by Npgsql) cannot serialize C# enum arrays as PostgreSQL query
+parameters. Using `Contains()` on an enum array variable will throw at runtime:
+
+```
+InvalidCastException: Writing values of 'MyStatus[]' is not supported for
+parameters having NpgsqlDbType '-2147483639'.
+```
+
+This limitation applies even when you capture the array into a local variable — the underlying
+Npgsql serialization issue is not resolved by the capture:
+
+```csharp
+// ❌ Does NOT work — Npgsql cannot serialize the enum array
+var activeStatuses = new[] { Status.Draft, Status.Submitted, Status.NeedsMoreInfo };
+.Where(r => activeStatuses.Contains(r.Status))
+
+// ❌ Also fails — local variable capture doesn't help
+var active = MyDoc.ActiveStatuses;  // static readonly Status[]
+.Where(r => active.Contains(r.Status))
+
+// ✅ Use explicit OR conditions
+.Where(r => r.Status == Status.Draft ||
+            r.Status == Status.Submitted ||
+            r.Status == Status.NeedsMoreInfo)
+```
+
+**Pattern for shared active-status definitions:**
+
+Define a static array on the document class for documentation and in-memory checks. Explain in
+XML docs why LINQ queries must use explicit OR conditions:
+
+```csharp
+/// <summary>
+/// The set of "active" (non-terminal) statuses.
+/// ⚠️ Marten LINQ limitation: enum arrays cannot be parameterized in LINQ queries.
+/// Use explicit OR conditions in queries: r.Status == S1 || r.Status == S2 || ...
+/// Use <see cref="IsActive"/> for in-memory checks (uses 'is' pattern — O(1)).
+/// </summary>
+public static readonly MyStatus[] ActiveStatuses = [Draft, Submitted, NeedsMoreInfo];
+
+// ✅ In-memory check — use C# 'is' pattern, not array.Contains()
+public bool IsActive => Status is MyStatus.Draft or MyStatus.Submitted or MyStatus.NeedsMoreInfo;
+```
+
+> **See also:** Cycle 22 Retrospective — Lesson L1 (ChangeRequest.ActiveStatuses implementation)
+
+### Nullable `.Value` Cannot Be Evaluated in LINQ Expressions
+
+Marten's LINQ provider cannot evaluate `nullable.Value` inside an expression when the nullable is
+`null`. Build queries conditionally at the C# level:
+
+```csharp
+// ❌ Throws if 'since' is null — Marten evaluates since.Value inside the expression
+.Where(a => a.Date > since.Value)
+
+// ✅ Build query conditionally
+var baseQuery = session.Query<MyDoc>().Where(a => a.TenantId == tenantId);
+var filteredQuery = since.HasValue
+    ? baseQuery.Where(a => a.Date > since.Value)
+    : baseQuery;
+```
+
+This applies to any `Nullable<T>.Value` access inside a LINQ expression — not just `DateTimeOffset?`.
