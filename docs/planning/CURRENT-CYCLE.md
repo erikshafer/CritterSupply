@@ -14,7 +14,7 @@
 ---
 
 **Cycle:** 22 — Vendor Portal + Vendor Identity Phase 1
-**Status:** ✅ **COMPLETE** (All phases 1–5 implemented)
+**Status:** ✅ **COMPLETE** (All phases 1–6 implemented)
 **GitHub Milestone:** [Cycle 22: Vendor Portal + Vendor Identity Phase 1](https://github.com/erikshafer/CritterSupply/milestone/16)
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 **Epic Issue:** [#249](https://github.com/erikshafer/CritterSupply/issues/249)
@@ -23,17 +23,17 @@
 
 ## Current Status
 
-**Cycle 22 is COMPLETE!** All 5 phases of the Vendor Portal initial build-out have been delivered.
+**Cycle 22 is COMPLETE!** All 6 phases of the Vendor Portal initial build-out have been delivered.
 
-**Phase 5 Deliverables (Saved Views + VendorAccount):**
-- VendorAccount Marten document initialized by VendorTenantCreated event
-- NotificationPreferences with opt-out model (4 toggles, all default true)
-- SaveDashboardView / DeleteDashboardView with duplicate name guard
-- UpdateNotificationPreferences command
-- 5 HTTP endpoints (GET/POST/DELETE dashboard-views, GET/PUT preferences)
-- Settings page in Blazor WASM (notification preferences, saved views management)
-- Settings link in MainLayout + Dashboard quick actions
-- 27 integration tests (86 total across all phases, 100% pass rate)
+**Phase 6 Deliverables (Full Identity Lifecycle + Admin Tools):**
+- 8 new admin API endpoints: ResendInvitation, RevokeInvitation, DeactivateUser, ReactivateUser, ChangeRole, SuspendTenant, ReinstateTenant, TerminateTenant
+- Last-admin protection invariant (cannot deactivate/demote last Admin in tenant)
+- VendorTenantTerminated compensation handler (auto-rejects in-flight change requests)
+- 2 new integration events: VendorUserInvitationResent, VendorUserInvitationRevoked
+- VendorTenantTerminated event updated with Reason field
+- EF Core migration: AddTerminationReason
+- 31 integration tests for Phase 6 (57 total for VendorIdentity, 143 total across Vendor Portal + Identity)
+- Sign-offs: UX Engineer ✅, QA Engineer ✅, Product Owner ✅
 
 **Completed Phases:**
 - ✅ Phase 1: JWT Auth Infrastructure (VendorIdentity.Api, EF Core, token issuance)
@@ -41,22 +41,24 @@
 - ✅ Phase 3: Blazor WASM Frontend (SignalR hub, in-memory JWT, live updates)
 - ✅ Phase 4: Change Request Workflow (7-state machine, Catalog BC integration)
 - ✅ Phase 5: Saved Views + VendorAccount (notification preferences, saved dashboard views)
+- ✅ Phase 6: Full Identity Lifecycle + Admin Tools (suspend/reinstate/terminate tenants, user management, compensation)
 
 **Next cycles:**
-- **Cycle 23:** Vendor Portal Phase 2 — Advanced analytics, "Load View" dashboard action, email notification preferences
+- **Cycle 23:** Vendor Portal Phase 2 — Advanced analytics, "Load View" dashboard action, E2E testing, email notification preferences
 - **Cycle 24:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling ([Milestone 17](https://github.com/erikshafer/CritterSupply/milestone/17))
 
 ---
 
 ## Recently Completed
 
-- ✅ **Cycle 22:** Vendor Portal + Vendor Identity Phase 1 (2026-03-08 to 2026-03-10) — **ALL 5 PHASES COMPLETE**
+- ✅ **Cycle 22:** Vendor Portal + Vendor Identity Phase 1 (2026-03-08 to 2026-03-10) — **ALL 6 PHASES COMPLETE**
   - Phase 1: JWT Auth (VendorIdentity.Api, EF Core, token lifecycle)
   - Phase 2: Vendor Portal API (analytics, alerts, dashboard, multi-tenant)
   - Phase 3: Blazor WASM Frontend (SignalR hub, in-memory JWT, live updates)
   - Phase 4: Change Request Workflow (7-state machine, Catalog BC integration)
   - Phase 5: Saved Views + VendorAccount (notification preferences, saved dashboard views)
-  - 86 integration tests (100% pass rate)
+  - Phase 6: Full Identity Lifecycle + Admin Tools (8 admin endpoints, compensation handler, last-admin protection)
+  - 143 integration tests across Vendor Portal + Identity (100% pass rate)
   - [Event Modeling](vendor-portal-event-modeling.md) | [Retrospective](./cycles/cycle-22-retrospective.md) | [Milestone](https://github.com/erikshafer/CritterSupply/milestone/16)
 
 - ✅ **Cycle 21:** Pricing BC Phase 1 (2026-03-07 to 2026-03-08) — **MILESTONE CLOSED**
@@ -146,5 +148,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-10 (Cycle 22 closed — all 5 phases complete, 86 integration tests passing)*
+*Last Updated: 2026-03-10 (Cycle 22 closed — all 6 phases complete, 143 integration tests passing)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*

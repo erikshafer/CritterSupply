@@ -735,18 +735,25 @@ InventoryAdjusted(string Sku, string WarehouseId, int QuantityChange, int NewQua
 
 ---
 
-### Phase 6 — Full Identity Lifecycle + Admin Tools
+### Phase 6 — Full Identity Lifecycle + Admin Tools ✅ (Cycle 22)
 
-- [ ] Invitation expiry background job (Wolverine scheduled message)
-- [ ] `ResendVendorUserInvitation` command + `VendorUserInvitationResent` event
-- [ ] `RevokeVendorUserInvitation` command + `VendorUserInvitationRevoked` event
-- [ ] `ReactivateVendorUser` command + `VendorUserReactivated` event
-- [ ] `ChangeVendorUserRole` command + `VendorUserRoleChanged` event
-- [ ] `SuspendVendorTenant` / `ReinstateVendorTenant` / `TerminateVendorTenant` commands
-- [ ] In-flight change request compensation on termination (auto-reject)
-- [ ] Last-admin protection invariant (cannot deactivate last Admin in tenant)
-- [ ] `VendorPortal.Web`: user management page (Admin role only), suspension status page
-- [ ] Full integration tests for identity lifecycle scenarios
+- [ ] Invitation expiry background job (Wolverine scheduled message) — **deferred to Cycle 23**
+- [x] `ResendVendorUserInvitation` command + `VendorUserInvitationResent` event
+- [x] `RevokeVendorUserInvitation` command + `VendorUserInvitationRevoked` event
+- [x] `ReactivateVendorUser` command + `VendorUserReactivated` event
+- [x] `ChangeVendorUserRole` command + `VendorUserRoleChanged` event
+- [x] `DeactivateVendorUser` command + `VendorUserDeactivated` event (with last-admin protection)
+- [x] `SuspendVendorTenant` / `ReinstateVendorTenant` / `TerminateVendorTenant` commands (with Reason field per UX review)
+- [x] In-flight change request compensation on termination (auto-reject with "Vendor contract ended")
+- [x] Last-admin protection invariant (cannot deactivate/demote last Admin in tenant)
+- [ ] `VendorPortal.Web`: user management page (Admin role only), suspension status page — **deferred to Cycle 23**
+- [x] Full integration tests for identity lifecycle scenarios (31 tests, 57 total for VendorIdentity)
+- [x] EF Core migration: AddTerminationReason (TerminationReason column on VendorTenant)
+
+**Key architectural finding (L11):** User identity operations (deactivate, change role, reactivate, invite) succeed on
+Suspended and Terminated tenants. Validators check tenant existence, not status. Suspension/termination enforcement
+happens at the Vendor Portal (BFF/login) layer, not at the identity API layer. This is intentional — identity
+operations are administrative and may need to execute regardless of tenant status.
 
 ---
 
