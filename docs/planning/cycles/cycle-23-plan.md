@@ -731,18 +731,25 @@ the same invariant twice at different levels.
 
 ## Estimated Test Count
 
-| Feature File | Scenarios | Complexity |
-|-------------|-----------|------------|
-| `vendor-login.feature` | 4 | Low — form fill + redirect |
-| `vendor-dashboard.feature` | 5 | Medium — KPI + SignalR |
-| `vendor-change-requests.feature` | 4 | High — form + list + filters + roles |
-| `vendor-settings.feature` | 2 | Low — toggle + save |
-| `vendor-protected-routes.feature` | 3 | Low — redirect assertion |
-| **Total** | **18** | |
+> **Updated after detailed QA scenario planning.** See
+> [`docs/cycle-23/VENDOR-PORTAL-E2E-TEST-PLAN.md`](../cycle-23/VENDOR-PORTAL-E2E-TEST-PLAN.md)
+> for full feature files and prioritized implementation waves.
+
+| Feature File | Scenarios | Priority | Complexity |
+|-------------|:---------:|:--------:|------------|
+| `vendor-portal-e2e-auth.feature` | 8 | P0–P2 | Low — form fill + redirect |
+| `vendor-portal-e2e-dashboard.feature` | 5 | P0–P2 | Medium — KPI + role visibility |
+| `vendor-portal-e2e-signalr.feature` | 7 | P0–P2 | High — real-time WebSocket |
+| `vendor-portal-e2e-change-request-lifecycle.feature` | 9 | P0–P2 | High — form + detail + actions |
+| `vendor-portal-e2e-change-request-list.feature` | 8 | P1–P2 | Medium — table + filter chips |
+| `vendor-portal-e2e-rbac.feature` | 7 | P1–P2 | Medium — role-based UI |
+| `vendor-portal-e2e-settings.feature` | 5 | P2 | Low — toggle + save |
+| **Total** | **49** | | |
+
+**Implementation waves:** P0 (9 scenarios, ~3 days) → P1 (23 scenarios, ~5 days) → P2 (17 scenarios, ~4 days).
+Minimum viable suite = P0 wave only. 1 scenario tagged `@mudselect-risk` for known MudSelect issue.
 
 **Comparison:** Storefront E2ETests has 10 scenarios (4 active, 6 `@ignore`/`@wip`).
-The Vendor Portal targets 18 scenarios, with expectation that 2-4 may need `@ignore` for
-MudSelect issues.
 
 ---
 

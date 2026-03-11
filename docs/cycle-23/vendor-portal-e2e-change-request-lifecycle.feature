@@ -76,7 +76,7 @@ Feature: Vendor Portal Change Request Lifecycle
     When I navigate to the change request detail page for that request
     Then I should see the SKU "DOG-LEASH-03"
     And I should see the title "Leash material description fix"
-    And I should see the details "Should say \"reinforced nylon\""
+    And I should see the details 'Should say "reinforced nylon"'
     And I should see the status chip showing "Submitted"
     And I should see a "Withdraw Request" button
 
