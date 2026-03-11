@@ -89,6 +89,10 @@ builder.Host.UseWolverine(opts =>
     // Subscribe to Shopping BC integration messages
     opts.ListenToRabbitQueue("storefront-notifications")
         .ProcessInline(); // Process messages immediately (no buffering)
+
+    // Subscribe to Fulfillment BC integration messages
+    opts.ListenToRabbitQueue("storefront-fulfillment-events")
+        .ProcessInline();
 });
 
 // Add HTTP clients for downstream BC queries

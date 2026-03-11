@@ -7,24 +7,24 @@ using IntegrationMessages = Messages.Contracts.Fulfillment;
 
 namespace Fulfillment.Shipments;
 
-public sealed record ConfirmDelivery(
+public sealed record RecordDeliveryFailure(
     Guid ShipmentId,
-    string? RecipientName = null)
+    string Reason)
 {
-    public class ConfirmDeliveryValidator : AbstractValidator<ConfirmDelivery>
+    public class RecordDeliveryFailureValidator : AbstractValidator<RecordDeliveryFailure>
     {
-        public ConfirmDeliveryValidator()
+        public RecordDeliveryFailureValidator()
         {
             RuleFor(x => x.ShipmentId).NotEmpty();
-            RuleFor(x => x.RecipientName).MaximumLength(200);
+            RuleFor(x => x.Reason).NotEmpty().MaximumLength(500);
         }
     }
 }
 
-public static class ConfirmDeliveryHandler
+public static class RecordDeliveryFailureHandler
 {
     public static ProblemDetails Before(
-        ConfirmDelivery command,
+        RecordDeliveryFailure command,
         Shipment? shipment)
     {
         if (shipment is null)
@@ -33,30 +33,29 @@ public static class ConfirmDeliveryHandler
         if (shipment.Status != ShipmentStatus.Shipped)
             return new ProblemDetails
             {
-                Detail = $"Cannot confirm delivery for shipment in {shipment.Status} status. Must be Shipped first.",
+                Detail = $"Cannot record delivery failure for shipment in {shipment.Status} status. Must be Shipped first.",
                 Status = 400
             };
 
         return WolverineContinue.NoProblems;
     }
 
-    [WolverinePost("/api/fulfillment/shipments/{shipmentId}/confirm-delivery")]
+    [WolverinePost("/api/fulfillment/shipments/{shipmentId}/record-delivery-failure")]
     public static (Events, OutgoingMessages) Handle(
-        ConfirmDelivery command,
+        RecordDeliveryFailure command,
         [WriteAggregate] Shipment shipment)
     {
-        var deliveredAt = DateTimeOffset.UtcNow;
+        var failedAt = DateTimeOffset.UtcNow;
 
-        var domainEvent = new ShipmentDelivered(deliveredAt, command.RecipientName);
-
+        var domainEvent = new ShipmentDeliveryFailed(command.Reason, failedAt);
         var events = new Events();
         events.Add(domainEvent);
 
-        var integrationMessage = new IntegrationMessages.ShipmentDelivered(
+        var integrationMessage = new IntegrationMessages.ShipmentDeliveryFailed(
             shipment.OrderId,
             command.ShipmentId,
-            deliveredAt,
-            command.RecipientName);
+            command.Reason,
+            failedAt);
 
         var outgoing = new OutgoingMessages();
         outgoing.Add(integrationMessage);

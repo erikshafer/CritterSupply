@@ -112,6 +112,18 @@ builder.Host.UseWolverine(opts =>
         .ToLocalQueue("order-placement")
         .UseDurableInbox();
 
+    // Route FulfillmentRequested to Fulfillment BC via RabbitMQ
+    opts.PublishMessage<Messages.Contracts.Fulfillment.FulfillmentRequested>()
+        .ToRabbitQueue("fulfillment-requests");
+
+    // Listen for Fulfillment BC integration messages (ShipmentDispatched, ShipmentDelivered, ShipmentDeliveryFailed)
+    opts.ListenToRabbitQueue("orders-fulfillment-events")
+        .ProcessInline();
+
+    // Listen for Returns BC integration messages (ReturnRequested, ReturnCompleted, ReturnDenied)
+    opts.ListenToRabbitQueue("orders-returns-events")
+        .ProcessInline();
+
     // Publish OrderPlaced to storefront-notifications queue
     opts.PublishMessage<Messages.Contracts.Orders.OrderPlaced>()
         .ToRabbitQueue("storefront-notifications");
