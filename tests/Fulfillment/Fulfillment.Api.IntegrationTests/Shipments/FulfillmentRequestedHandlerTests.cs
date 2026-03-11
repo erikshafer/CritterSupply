@@ -47,8 +47,8 @@ public class FulfillmentRequestedHandlerTests : IAsyncLifetime
     /// When the same FulfillmentRequested message is received twice for the same OrderId
     /// (at-least-once delivery duplication), the UUID v5 deterministic stream key must
     /// ensure only ONE shipment stream is created in Marten.
-    /// The second handler invocation will fail with a stream-already-exists error,
-    /// which is suppressed by DoNotAssertOnExceptionsDetected() in the test fixture.
+    /// The second handler invocation detects the existing stream via FetchStreamStateAsync
+    /// and returns early — no exception thrown, no duplicate event appended.
     /// The net result: exactly one shipment per OrderId.
     /// </summary>
     [Fact]
@@ -58,9 +58,9 @@ public class FulfillmentRequestedHandlerTests : IAsyncLifetime
         var orderId = Guid.NewGuid();
         var message = BuildFulfillmentRequested(orderId);
 
-        // Act: send the integration message twice — the second should be a no-op (idempotent)
+        // Act: send the integration message twice — the second is a true no-op (stream exists guard)
         await _fixture.ExecuteAndWaitAsync(message);
-        await _fixture.ExecuteAndWaitAsync(message); // duplicate — second StartStream fails silently
+        await _fixture.ExecuteAndWaitAsync(message); // duplicate — handler returns early idempotently
 
         // Assert: only ONE shipment exists for this OrderId
         await using var session = _fixture.GetDocumentSession();

@@ -10,9 +10,10 @@ namespace Fulfillment.Shipments;
 /// </summary>
 public static class FulfillmentRequestedHandler
 {
-    public static void Handle(
+    public static async Task Handle(
         IntegrationMessages.FulfillmentRequested message,
-        IDocumentSession session)
+        IDocumentSession session,
+        CancellationToken cancellationToken)
     {
         // Map integration message types to domain event types
         var shippingAddress = new ShippingAddress(
@@ -39,6 +40,13 @@ public static class FulfillmentRequestedHandler
         // Create a deterministic UUID v5 from the OrderId to ensure idempotency.
         // Multiple FulfillmentRequested messages for the same OrderId always create the same stream.
         var shipmentId = CreateVersion5Guid(message.OrderId);
+
+        // Idempotency guard: if the stream already exists (at-least-once delivery duplicate),
+        // skip StartStream to avoid ExistingStreamIdCollisionException.
+        var existingState = await session.Events.FetchStreamStateAsync(shipmentId, cancellationToken);
+        if (existingState is not null)
+            return;
+
         session.Events.StartStream<Shipment>(shipmentId, domainEvent);
     }
 
