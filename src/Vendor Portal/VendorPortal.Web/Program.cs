@@ -29,8 +29,12 @@ builder.Services.AddHttpClient("VendorPortalApi", client =>
 builder.Services.AddMudServices();
 
 // Auth state — in-memory JWT storage (NOT localStorage — XSS risk)
+// GOTCHA: In Blazor WASM, Scoped == Singleton (single browser tab lifetime).
+// TokenRefreshService is Singleton (background timer) so its dependencies must also be
+// Singleton. VendorAuthService is safe as Singleton because NavigationManager is
+// Singleton in WASM (no server-side HttpContext / per-circuit scoping).
 builder.Services.AddSingleton<VendorAuthState>();
-builder.Services.AddScoped<VendorAuthService>();
+builder.Services.AddSingleton<VendorAuthService>();
 builder.Services.AddSingleton<TokenRefreshService>();
 
 // Custom AuthenticationStateProvider (reads from VendorAuthState)
