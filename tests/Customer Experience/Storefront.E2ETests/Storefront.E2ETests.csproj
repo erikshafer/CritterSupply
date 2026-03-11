@@ -57,7 +57,7 @@
              the Microsoft.Playwright NuGet package. If neither is possible, print a message
              but don't fail the build. -->
         <Exec Condition="'$(OS)' != 'Windows_NT' and '$(PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD)' != '1'"
-              Command="bash -c 'BIN=bin/$(Configuration)/$(TargetFramework); if command -v pwsh &gt;/dev/null 2&gt;&amp;1; then pwsh $BIN/playwright.ps1 install chromium; elif [ -x &quot;$BIN/.playwright/node/linux-x64/node&quot; ]; then &quot;$BIN/.playwright/node/linux-x64/node&quot; &quot;$BIN/.playwright/package/cli.js&quot; install chromium; elif [ -x &quot;$BIN/.playwright/node/darwin-arm64/node&quot; ]; then &quot;$BIN/.playwright/node/darwin-arm64/node&quot; &quot;$BIN/.playwright/package/cli.js&quot; install chromium; elif [ -x &quot;$BIN/.playwright/node/darwin-x64/node&quot; ]; then &quot;$BIN/.playwright/node/darwin-x64/node&quot; &quot;$BIN/.playwright/package/cli.js&quot; install chromium; else echo &quot;Playwright browser install skipped: no pwsh and no bundled Node.js found. Run the install manually — see docs/PLAYWRIGHT-SETUP.md&quot;; fi'"
+              Command="bash -c 'BIN=bin/$(Configuration)/$(TargetFramework); if command -v pwsh &gt;/dev/null 2&gt;&amp;1; then pwsh $BIN/playwright.ps1 install chromium; else for ARCH in linux-x64 darwin-arm64 darwin-x64; do N=&quot;$BIN/.playwright/node/$ARCH/node&quot;; if [ -x &quot;$N&quot; ]; then &quot;$N&quot; &quot;$BIN/.playwright/package/cli.js&quot; install chromium; exit 0; fi; done; echo &quot;Playwright browser install skipped — see docs/PLAYWRIGHT-SETUP.md&quot;; fi'"
               IgnoreExitCode="true" />
     </Target>
 
