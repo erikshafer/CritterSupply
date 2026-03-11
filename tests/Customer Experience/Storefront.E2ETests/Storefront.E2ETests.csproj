@@ -44,17 +44,20 @@
     </ItemGroup>
 
     <!-- Playwright browser installation target (run once after build).
-         Use pwsh on Windows and bash on Unix-like systems so builds are cross-platform
-         (macOS/Linux don't necessarily have pwsh installed). Honor PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD. -->
+         Use pwsh on Windows and the bundled Node.js CLI on Unix-like systems so builds
+         are cross-platform (macOS/Linux don't necessarily have pwsh installed).
+         Honor PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD. -->
     <Target Name="InstallPlaywrightBrowsers" AfterTargets="Build">
         <!-- Windows: prefer pwsh -> playwright.ps1. Don't fail the build if pwsh is missing (IgnoreExitCode). -->
         <Exec Command="pwsh bin/$(Configuration)/$(TargetFramework)/playwright.ps1 install chromium"
               Condition="'$(OS)' == 'Windows_NT' and '$(PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD)' != '1'"
               IgnoreExitCode="true" />
 
-        <!-- Non-Windows: Try pwsh if present, otherwise fallback to playwright.sh. If neither is possible, print a message but don't fail the build. -->
+        <!-- Non-Windows: Try pwsh if present, otherwise use the Node.js CLI bundled by
+             the Microsoft.Playwright NuGet package. If neither is possible, print a message
+             but don't fail the build. -->
         <Exec Condition="'$(OS)' != 'Windows_NT' and '$(PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD)' != '1'"
-              Command="bash -c 'if command -v pwsh &gt;/dev/null 2&gt;&amp;1; then pwsh bin/$(Configuration)/$(TargetFramework)/playwright.ps1 install chromium; elif [ -x bin/$(Configuration)/$(TargetFramework)/playwright.sh ]; then bash bin/$(Configuration)/$(TargetFramework)/playwright.sh install chromium; else echo &quot;Playwright browser install skipped: no pwsh and no playwright.sh found. Set PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 to suppress this.&quot;; fi'"
+              Command="bash -c 'BIN=bin/$(Configuration)/$(TargetFramework); if command -v pwsh &gt;/dev/null 2&gt;&amp;1; then pwsh $BIN/playwright.ps1 install chromium; elif [ -x &quot;$BIN/.playwright/node/linux-x64/node&quot; ]; then &quot;$BIN/.playwright/node/linux-x64/node&quot; &quot;$BIN/.playwright/package/cli.js&quot; install chromium; elif [ -x &quot;$BIN/.playwright/node/darwin-arm64/node&quot; ]; then &quot;$BIN/.playwright/node/darwin-arm64/node&quot; &quot;$BIN/.playwright/package/cli.js&quot; install chromium; elif [ -x &quot;$BIN/.playwright/node/darwin-x64/node&quot; ]; then &quot;$BIN/.playwright/node/darwin-x64/node&quot; &quot;$BIN/.playwright/package/cli.js&quot; install chromium; else echo &quot;Playwright browser install skipped: no pwsh and no bundled Node.js found. Run the install manually — see docs/PLAYWRIGHT-SETUP.md&quot;; fi'"
               IgnoreExitCode="true" />
     </Target>
 
