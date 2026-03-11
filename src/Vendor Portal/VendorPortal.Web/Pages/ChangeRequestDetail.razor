@@ -26,7 +26,7 @@ else if (_request is null)
 }
 else
 {
-    <div class="d-flex align-center justify-space-between mb-4">
+    <div class="d-flex align-center justify-space-between mb-4 flex-wrap gap-2">
         <div>
             <MudText Typo="Typo.h4" GutterBottom="false">@_request.Title</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">
@@ -34,9 +34,55 @@ else
             </MudText>
         </div>
 
-        <MudChip T="string" Color="@GetStatusColor(_request.Status)" Variant="Variant.Filled" Size="Size.Medium">
-            @GetStatusLabel(_request.Status)
-        </MudChip>
+        <div class="d-flex align-center gap-2 flex-wrap">
+            <MudChip T="string" Color="@GetStatusColor(_request.Status)" Variant="Variant.Filled" Size="Size.Medium">
+                @GetStatusLabel(_request.Status)
+            </MudChip>
+
+            @if (CanSubmit)
+            {
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Send"
+                           OnClick="SubmitDraft"
+                           Disabled="_isActioning"
+                           data-testid="submit-draft-btn">
+                    @if (_isActioning)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Submitting…</span>
+                    }
+                    else
+                    {
+                        <span>Submit for Review</span>
+                    }
+                </MudButton>
+            }
+
+            @if (CanDeleteDraft)
+            {
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Default"
+                           StartIcon="@Icons.Material.Filled.DeleteOutline"
+                           OnClick="ConfirmDeleteDraft"
+                           Disabled="_isActioning"
+                           data-testid="delete-draft-btn">
+                    Delete Draft
+                </MudButton>
+            }
+
+            @if (CanWithdraw)
+            {
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Error"
+                           StartIcon="@Icons.Material.Filled.Cancel"
+                           OnClick="ConfirmWithdraw"
+                           Disabled="_isActioning"
+                           data-testid="withdraw-btn">
+                    Withdraw Request
+                </MudButton>
+            }
+        </div>
     </div>
 
     <MudGrid>
@@ -169,62 +215,6 @@ else
                     }
                 </MudTimeline>
             </MudPaper>
-
-            @if (CanSubmit || CanWithdraw || CanDeleteDraft)
-            {
-                <MudPaper Elevation="2" Class="pa-4">
-                    <MudText Typo="Typo.h6" GutterBottom="true">Actions</MudText>
-
-                    @if (CanSubmit)
-                    {
-                        <MudButton Variant="Variant.Filled"
-                                   Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.Send"
-                                   FullWidth="true"
-                                   OnClick="SubmitDraft"
-                                   Disabled="_isActioning"
-                                   Class="mb-2"
-                                   data-testid="submit-draft-btn">
-                            @if (_isActioning)
-                            {
-                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                                <span>Submitting…</span>
-                            }
-                            else
-                            {
-                                <span>Submit Request</span>
-                            }
-                        </MudButton>
-                    }
-
-                    @if (CanDeleteDraft)
-                    {
-                        <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Default"
-                                   StartIcon="@Icons.Material.Filled.DeleteOutline"
-                                   FullWidth="true"
-                                   OnClick="ConfirmDeleteDraft"
-                                   Disabled="_isActioning"
-                                   Class="mb-2"
-                                   data-testid="delete-draft-btn">
-                            Delete Draft
-                        </MudButton>
-                    }
-
-                    @if (CanWithdraw)
-                    {
-                        <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Error"
-                                   StartIcon="@Icons.Material.Filled.Cancel"
-                                   FullWidth="true"
-                                   OnClick="ConfirmWithdraw"
-                                   Disabled="_isActioning"
-                                   data-testid="withdraw-btn">
-                            Withdraw Request
-                        </MudButton>
-                    }
-                </MudPaper>
-            }
         </MudItem>
     </MudGrid>
 }

@@ -62,9 +62,11 @@ public sealed class GetDashboardEndpoint
             .CountAsync(a => a.VendorTenantId == tenantId && a.IsActive, ct);
 
         // Resolve organization name from the VendorAccount document (set on onboarding).
-        // Falls back to "Unknown Tenant" if the account has not yet been seeded.
+        // Falls back to "Your Account" if the account has not yet been seeded — neutral and
+        // non-alarming while the seed data completes; in practice VendorPortalSeedData.cs
+        // creates the document at startup so this branch should never display.
         var account = await querySession.LoadAsync<VendorAccountDocument>(tenantId, ct);
-        var tenantName = account?.OrganizationName ?? "Unknown Tenant";
+        var tenantName = account?.OrganizationName ?? "Your Account";
 
         var summary = new DashboardSummary(
             VendorTenantId: tenantId,
