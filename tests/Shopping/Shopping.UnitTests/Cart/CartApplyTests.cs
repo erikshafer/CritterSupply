@@ -86,6 +86,45 @@ public class CartApplyTests
         result.Status.ShouldBe(CartStatus.Active);
     }
 
+    /// <summary>
+    /// When the same SKU is added again at a different price, the original unit price is preserved.
+    /// The accumulation path updates only Quantity, not UnitPrice — this is intentional:
+    /// the price is locked at the time the item was first added to the cart.
+    /// </summary>
+    [Fact]
+    public void Apply_ItemAdded_ExistingSku_WithDifferentPrice_Preserves_Original_UnitPrice()
+    {
+        var existingItems = new Dictionary<string, CartLineItem>
+        {
+            ["CAT-FOOD-001"] = new CartLineItem("CAT-FOOD-001", Quantity: 1, UnitPrice: 10.00m)
+        };
+        var cart = BuildActiveCart(items: existingItems);
+        var @event = new ItemAdded("CAT-FOOD-001", Quantity: 1, UnitPrice: 12.00m, AddedAt: DateTimeOffset.UtcNow);
+
+        var result = cart.Apply(@event);
+
+        result.Items["CAT-FOOD-001"].UnitPrice.ShouldBe(10.00m); // original price is preserved
+        result.Items["CAT-FOOD-001"].Quantity.ShouldBe(2);        // quantity still accumulates
+    }
+
+    /// <summary>
+    /// Removing a SKU that is not in the cart leaves the cart unchanged (defensive no-op).
+    /// </summary>
+    [Fact]
+    public void Apply_ItemRemoved_UnknownSku_Leaves_Cart_Unchanged()
+    {
+        var existingItems = new Dictionary<string, CartLineItem>
+        {
+            ["SKU-KNOWN"] = new CartLineItem("SKU-KNOWN", 2, 7.50m)
+        };
+        var cart = BuildActiveCart(items: existingItems);
+
+        var result = cart.Apply(new ItemRemoved("SKU-NOT-IN-CART", DateTimeOffset.UtcNow));
+
+        result.Items.Count.ShouldBe(1);
+        result.Items.ShouldContainKey("SKU-KNOWN");
+    }
+
     // ---------------------------------------------------------------------------
     // Apply(ItemRemoved)
     // ---------------------------------------------------------------------------

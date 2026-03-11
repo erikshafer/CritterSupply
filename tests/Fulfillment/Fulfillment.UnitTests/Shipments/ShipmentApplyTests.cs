@@ -221,4 +221,34 @@ public class ShipmentApplyTests
 
         result.WarehouseId.ShouldBe("WH-SOUTH-02");
     }
+
+    /// <summary>
+    /// Applying ShipmentDelivered preserves the Carrier and TrackingNumber set during dispatch.
+    /// The delivery event only records DeliveredAt; prior dispatch fields must survive.
+    /// </summary>
+    [Fact]
+    public void Apply_ShipmentDelivered_Preserves_Carrier_And_TrackingNumber()
+    {
+        var shipment = BuildShippedShipment(carrier: "FedEx", tracking: "274899996100");
+
+        var result = shipment.Apply(new ShipmentDelivered(DateTimeOffset.UtcNow));
+
+        result.Carrier.ShouldBe("FedEx");
+        result.TrackingNumber.ShouldBe("274899996100");
+    }
+
+    /// <summary>
+    /// Applying ShipmentDeliveryFailed preserves the Carrier and TrackingNumber set during dispatch.
+    /// The failure event only records the Reason; prior dispatch fields must survive.
+    /// </summary>
+    [Fact]
+    public void Apply_ShipmentDeliveryFailed_Preserves_Carrier_And_TrackingNumber()
+    {
+        var shipment = BuildShippedShipment(carrier: "UPS", tracking: "1Z999AA10123456784");
+
+        var result = shipment.Apply(new ShipmentDeliveryFailed("No access to building", DateTimeOffset.UtcNow));
+
+        result.Carrier.ShouldBe("UPS");
+        result.TrackingNumber.ShouldBe("1Z999AA10123456784");
+    }
 }
