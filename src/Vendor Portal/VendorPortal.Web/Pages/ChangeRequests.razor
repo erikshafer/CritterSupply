@@ -6,6 +6,7 @@
 @inject IHttpClientFactory HttpClientFactory
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject IDialogService DialogService
 @inject ILogger<ChangeRequests> Logger
 
 <PageTitle>Change Requests — Vendor Portal</PageTitle>
@@ -215,6 +216,20 @@ else
 
     private async Task DeleteDraft(Guid draftId)
     {
+        var parameters = new DialogParameters<MudMessageBox>
+        {
+            { x => x.Title, "Delete Draft" },
+            { x => x.Message, "Are you sure you want to delete this draft? This action cannot be undone." },
+            { x => x.YesText, "Delete" },
+            { x => x.CancelText, "Cancel" },
+        };
+
+        var dialog = await DialogService.ShowAsync<MudMessageBox>("Delete Draft", parameters);
+        var result = await dialog.Result;
+
+        if (result is { Canceled: true })
+            return;
+
         _deletingDraftId = draftId;
         try
         {
