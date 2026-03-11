@@ -1,33 +1,55 @@
-name: .NET
+name: CI
+
+# CI runs on every PR and push to main — but only when code or build config changes.
+# E2E tests have their own workflow (e2e.yml) and do NOT run here (see ADR 0015).
+#
+# Jobs:
+#   unit-tests        — builds the solution and runs unit tests (no Docker required)
+#   integration-tests — builds the solution and runs API integration tests (Testcontainers)
+#
+# Both jobs run in parallel, giving faster overall feedback and distinct status
+# indicators so failures can be identified at a glance in the GitHub Actions UI.
 
 on:
   push:
-    branches: [ "main"]
-    paths-ignore:
-      - "README.md"
-      - "CLAUDE.md"
-      - "CONTEXTS.md"
-      - "DEVPROGRESS.md"
+    branches: [ "main" ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/dotnet.yml'
+      - '*.props'
+      - '*.slnx'
+      - 'docker-compose.yml'
   pull_request:
-    branches: [ "main"]
-    paths-ignore:
-      - "README.md"
-      - "CLAUDE.md"
-      - "CONTEXTS.md"
-      - "DEVPROGRESS.md"
+    branches: [ "main" ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/dotnet.yml'
+      - '*.props'
+      - '*.slnx'
+      - 'docker-compose.yml'
+
+# Cancel in-progress runs for the same branch/PR to avoid wasted runner time.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
 
+  # ─── Unit Tests ─────────────────────────────────────────────────────────────
+  # Fast feedback: builds the solution and runs all *.UnitTests projects.
+  # No Docker infrastructure required — pure in-process xUnit tests.
+  unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    permissions:
+      contents: read
 
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
-
-      - name: Start containers
-        run: docker compose --profile ci up -d
 
       - name: Cache NuGet packages
         uses: actions/cache@v4
@@ -40,18 +62,92 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.102
-          dotnet-quality: ga
+          dotnet-version: 10.0.x
 
-      - name: Restore dependencies (NuGet packages)
+      - name: Restore dependencies
         run: dotnet restore
 
       - name: Build
-        run: dotnet build --no-restore
+        run: dotnet build --no-restore --configuration Release
 
-      - name: Test
-        run: dotnet test --no-build --logger:"console;verbosity=normal" -- -parallel none
+      - name: Run Unit Tests
+        run: |
+          find tests -name "*.UnitTests.csproj" -print0 |
+            while IFS= read -r -d '' project; do
+              name=$(basename "$project" .csproj)
+              echo "::group::$name"
+              dotnet test "$project" \
+                --no-build \
+                --configuration Release \
+                --logger "console;verbosity=normal" \
+                --logger "trx;LogFileName=${name}-results.trx"
+              echo "::endgroup::"
+            done
 
-      - name: Stop containers
+      - name: Upload Unit Test Results
         if: always()
-        run: docker compose --profile ci down
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results-${{ github.run_number }}
+          path: '**/TestResults/**/*.trx'
+          retention-days: 30
+
+  # ─── Integration Tests ───────────────────────────────────────────────────────
+  # Runs all *.Api.IntegrationTests projects.
+  # Each test fixture spins up its own isolated PostgreSQL container via
+  # Testcontainers (no shared docker-compose infrastructure needed).
+  # External Wolverine transports (RabbitMQ) are disabled in every fixture.
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Run Integration Tests
+        run: |
+          find tests -name "*.IntegrationTests.csproj" -print0 |
+            while IFS= read -r -d '' project; do
+              name=$(basename "$project" .csproj)
+              echo "::group::$name"
+              dotnet test "$project" \
+                --no-build \
+                --configuration Release \
+                --logger "console;verbosity=normal" \
+                --logger "trx;LogFileName=${name}-results.trx"
+              echo "::endgroup::"
+            done
+        env:
+          DOCKER_HOST: unix:///var/run/docker.sock
+          TESTCONTAINERS_RYUK_DISABLED: false
+
+      - name: Upload Integration Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results-${{ github.run_number }}
+          path: '**/TestResults/**/*.trx'
+          retention-days: 30

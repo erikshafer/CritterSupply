@@ -4,7 +4,36 @@
 
 ---
 
-## Current State (as of 2026-02-05)
+## Current State (as of 2026-03-11) — Phases 1 & 2 Implemented
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│   Two Parallel Jobs (unit-tests + integration-tests)            │
+│                                                                 │
+│  ┌──────────────────────────┐  ┌───────────────────────────┐   │
+│  │     unit-tests job       │  │  integration-tests job    │   │
+│  │ 1. Checkout code         │  │ 1. Checkout code          │   │
+│  │ 2. Restore NuGet (cache) │  │ 2. Restore NuGet (cache)  │   │
+│  │ 3. Build solution        │  │ 3. Build solution         │   │
+│  │ 4. Run unit tests        │  │ 4. Run integration tests  │   │
+│  │ 5. Upload .trx artifacts │  │    (Testcontainers)       │   │
+│  │                          │  │ 5. Upload .trx artifacts  │   │
+│  └──────────────────────────┘  └───────────────────────────┘   │
+│  Runtime: ~3-4 minutes          Runtime: ~8-10 minutes         │
+│                                                                 │
+│  ✅ Path-based triggering (skips docs changes)                  │
+│  ✅ Test result artifacts (.trx)                                │
+│  ✅ Parallel jobs (faster feedback)                             │
+│  ✅ Concurrency group (cancels stale runs)                      │
+│  ✅ CodeQL scanning (codeql.yml)                                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Total wall-clock time:** ~8-10 minutes (parallel — limited by integration-tests job)
+
+---
+
+## Previous State (as of 2026-02-05)
 
 ```
 ┌─────────────────────────────────────────┐
@@ -21,7 +50,7 @@
 └─────────────────────────────────────────┘
 ```
 
-**Limitations:**
+**Limitations (now resolved):**
 - 🐌 Everything rebuilds even if only one BC changes
 - 🐌 Tests run serially (no parallelization)
 - ❌ No deployment automation
@@ -32,7 +61,7 @@
 
 ## Future State (Phased Roadmap)
 
-### Phase 1: Quick Wins (Immediate - 2 hours effort) ✅ RECOMMENDED NOW
+### Phase 1: Quick Wins (Immediate - 2 hours effort) ✅ IMPLEMENTED (2026-03-11)
 
 **Goal:** Improve performance without architectural changes
 
@@ -40,7 +69,7 @@
 - ✅ Enable test parallelization (remove `-parallel none`)
 - ✅ Add test result artifacts (upload `.trx` files)
 - ✅ Add path-based triggering (skip docs-only changes)
-- ✅ Add CodeQL security scanning
+- ✅ Add CodeQL security scanning (`.github/workflows/codeql.yml`)
 
 **Expected Benefits:**
 - ⚡ 30-50% faster test execution
@@ -51,48 +80,42 @@
 
 ---
 
-### Phase 2: Multi-Job Pipeline (After Frontend is Stable)
+### Phase 2: Multi-Job Pipeline (After Frontend is Stable) ✅ IMPLEMENTED (2026-03-11)
 
 **Goal:** Enable independent BC builds and frontend integration
 
-**Trigger:** After Cycle 16 (Customer Experience BFF) is complete
+**Trigger:** After Cycle 16 (Customer Experience BFF) is complete — ✅ Now complete
 
-**Architecture:**
+**Architecture implemented:**
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     Changes Detection                       │
-│  (Which BCs changed? Which tests to run?)                   │
-└─────────────────────────────────────────────────────────────┘
-                            │
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-        ▼                   ▼                   ▼
-┌───────────────┐   ┌───────────────┐   ┌───────────────┐
-│ Build Orders  │   │Build Payments │   │ Build Shopping│
-│   BC (2 min)  │   │   BC (2 min)  │   │   BC (2 min)  │
-└───────────────┘   └───────────────┘   └───────────────┘
-        │                   │                   │
-        └───────────────────┼───────────────────┘
-                            │
-                            ▼
-                ┌─────────────────────┐
-                │ Build Frontend (BFF) │
-                │      (3 min)         │
-                └─────────────────────┘
-                            │
-                            ▼
-                ┌─────────────────────┐
-                │ Integration Smoke   │
-                │      Tests          │
-                └─────────────────────┘
+PR / Push to main
+        │
+        ├──────────────────────────────────────────────┐
+        │                                              │
+        ▼                                              ▼
+┌────────────────────┐                   ┌─────────────────────────┐
+│   Unit Tests Job   │                   │ Integration Tests Job   │
+│  (build + xUnit)   │                   │  (build + Testcontainers│
+│  No Docker needed  │                   │   integration tests)    │
+│  ~3-4 minutes      │                   │  ~8-10 minutes          │
+└────────────────────┘                   └─────────────────────────┘
+        │                                              │
+        ▼                                              ▼
+  Test results .trx                         Test results .trx
+  (uploaded artifact)                       (uploaded artifact)
 ```
 
-**Benefits:**
-- ⚡ Parallel builds (10 min → 3-4 min typical case)
-- 🎯 Only build what changed
-- 🎨 Frontend-specific tooling (Bunit, Playwright)
+**Key Decisions:**
+- ✅ All test fixtures use Testcontainers for Postgres (no docker-compose needed in CI)
+- ✅ All test fixtures call `DisableAllExternalWolverineTransports()` (no RabbitMQ needed in CI)
+- ✅ Two parallel jobs: `unit-tests` and `integration-tests` run in parallel
+- ✅ `concurrency` group added to cancel stale runs on same branch/PR
 
-**Timeline:** After Blazor frontend is stable
+**Benefits achieved:**
+- ⚡ Parallel builds (total time ≈ max of both jobs instead of sum)
+- 🎯 Separate status indicators in GitHub Actions UI
+- 🔍 Distinct visibility: unit test failures vs integration test failures
+- 🧹 Removed unnecessary `docker compose --profile ci` step (not needed — Testcontainers handles its own containers)
 
 ---
 
@@ -165,34 +188,35 @@ Option C: Managed Services
 
 ---
 
-## Recommended Implementation Order
+## Implementation Status
 
-| Phase | Priority | Effort | Timeline | Blocker |
-|-------|----------|--------|----------|---------|
-| Phase 1: Quick Wins | 🔴 High | 2 hours | **Immediate** | None - Can start now |
-| Phase 5: Security | 🔴 High | 1 day | After Phase 1 | None - Part of Phase 1 |
-| Phase 2: Multi-Job | 🟡 Medium | 1-2 days | After frontend | Needs Blazor frontend (Cycle 16+) |
-| Phase 3: Docker Images | 🟡 Medium | 2-3 days | When deploying | Needs hosting platform decision |
-| Phase 4: Deployment | 🟢 Low | 1-2 weeks | When ready | Needs infrastructure setup |
-| Phase 6: Performance | 🟢 Low | 3-5 days | When needed | Needs performance SLAs defined |
+| Phase | Priority | Effort | Status |
+|-------|----------|--------|--------|
+| Phase 1: Quick Wins | 🔴 High | 2 hours | ✅ **Implemented** (2026-03-11) |
+| Phase 2: Multi-Job | 🟡 Medium | 1-2 days | ✅ **Implemented** (2026-03-11) |
+| Phase 5: Security (CodeQL) | 🔴 High | 1 day | ✅ **Implemented** (2026-03-11) |
+| Phase 3: Docker Images | 🟡 Medium | 2-3 days | 📋 Planned — needs hosting platform decision |
+| Phase 4: Deployment | 🟢 Low | 1-2 weeks | 📋 Planned — needs infrastructure setup |
+| Phase 6: Performance | 🟢 Low | 3-5 days | 📋 Planned — needs performance SLAs defined |
 
 ---
 
 ## Next Steps
 
-### For Immediate Implementation (Phase 1)
+### Completed (Phases 1, 2 & Security)
 
-1. **Review ADR 0007** - [Read full proposal](../../../decisions/0007-github-workflow-improvements.md)
-2. **Approve Phase 1** - Low risk, high reward improvements
-3. **Implement changes** - See [implementation-guide.md](./implementation-guide.md)
-4. **Measure impact** - Compare CI times before/after
+- ✅ Parallel `unit-tests` and `integration-tests` jobs in `dotnet.yml`
+- ✅ Path-based CI triggering (only fires on code/build changes)
+- ✅ Test result `.trx` artifact upload
+- ✅ CodeQL security scanning (`codeql.yml`)
+- ✅ Concurrency group cancels stale PR runs
+- ✅ Removed unnecessary `docker compose` step (Testcontainers is self-contained)
 
 ### For Future Planning
 
-1. **Complete Cycle 16** - Customer Experience BFF provides frontend requirements
-2. **Choose hosting platform** - AWS vs Azure vs GCP vs self-hosted
-3. **Define performance SLAs** - Informs Phase 6 requirements
-4. **Revisit quarterly** - Adjust priorities based on project needs
+1. **Choose hosting platform** - AWS vs Azure vs GCP vs self-hosted → unblocks Phase 3 & 4
+2. **Define performance SLAs** - Informs Phase 6 requirements
+3. **Revisit quarterly** - Adjust priorities based on project needs
 
 ---
 
@@ -200,15 +224,12 @@ Option C: Managed Services
 
 Before implementing each phase, answer these questions:
 
-### Phase 1 (Immediate)
+### Phase 1 & 2 (Completed)
 - [x] Is the team comfortable with test parallelization?
 - [x] Do we want test result artifacts?
 - [x] Should we enable CodeQL security scanning?
-
-### Phase 2 (After Frontend is Stable)
-- [ ] Is the Blazor frontend stable enough for dedicated CI jobs?
-- [ ] Do we want separate jobs per BC or just backend/frontend split?
-- [ ] What frontend testing tools do we need? (Bunit, Playwright, Cypress)
+- [x] Is the Blazor frontend stable enough for dedicated CI jobs?
+- [x] Do we want separate jobs per BC or just backend/frontend split? → unit vs integration split chosen
 
 ### Phase 3 (When Deployment is Planned)
 - [ ] Which container registry? (GHCR, Docker Hub, ECR, ACR)
@@ -244,6 +265,6 @@ Before implementing each phase, answer these questions:
 
 ---
 
-**Last Updated:** 2026-02-05
+**Last Updated:** 2026-03-11
 **Owner:** Erik Shafer
-**Status:** Proposal / Discussion Phase
+**Status:** Phases 1, 2 & Security implemented ✅

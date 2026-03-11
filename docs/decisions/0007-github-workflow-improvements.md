@@ -1,8 +1,9 @@
 # ADR 0007: GitHub Workflow Improvements for Growing Microservices Architecture
 
-**Status:** ⚠️ Proposed (Discussion Document)
+**Status:** ✅ Accepted — Phase 1 (Quick Wins) and Phase 2 (Multi-Job Pipeline) implemented 2026-03-11
 
 **Date:** 2026-02-05
+**Implemented:** 2026-03-11
 
 **Context:**
 
