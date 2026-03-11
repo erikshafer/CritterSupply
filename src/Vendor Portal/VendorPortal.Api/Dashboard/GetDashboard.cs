@@ -2,8 +2,11 @@ using System.Security.Claims;
 using Marten;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using VendorPortal.Analytics;
 using VendorPortal.ChangeRequests;
+using VendorPortal.VendorProductCatalog;
 using Wolverine.Http;
+using VendorAccountDocument = VendorPortal.VendorAccount.VendorAccount;
 
 namespace VendorPortal.Api.Dashboard;
 
@@ -48,15 +51,32 @@ public sealed class GetDashboardEndpoint
                  r.Status == ChangeRequestStatus.NeedsMoreInfo),
                 ct);
 
+        // Query real SKU count from VendorProductCatalogEntry documents.
+        // Returns 0 in a fresh dev environment without upstream ProductCatalog.Api running.
+        var totalSkus = await querySession.Query<VendorProductCatalogEntry>()
+            .CountAsync(e => e.VendorTenantId == tenantId && e.IsActive, ct);
+
+        // Query real active low-stock alert count.
+        // Returns 0 in a fresh dev environment without upstream Inventory.Api running.
+        var activeLowStockAlerts = await querySession.Query<LowStockAlert>()
+            .CountAsync(a => a.VendorTenantId == tenantId && a.IsActive, ct);
+
+        // Resolve organization name from the VendorAccount document (set on onboarding).
+        // Falls back to "Your Account" if the account has not yet been seeded — neutral and
+        // non-alarming while the seed data completes; in practice VendorPortalSeedData.cs
+        // creates the document at startup so this branch should never display.
+        var account = await querySession.LoadAsync<VendorAccountDocument>(tenantId, ct);
+        var tenantName = account?.OrganizationName ?? "Your Account";
+
         var summary = new DashboardSummary(
             VendorTenantId: tenantId,
-            TenantName: "Acme Pet Supplies",
+            TenantName: tenantName,
             UserEmail: userEmail ?? "unknown",
             UserRole: role ?? "unknown",
-            TotalSkus: 42,
+            TotalSkus: (int)totalSkus,
             PendingChangeRequests: (int)pendingCount,
-            ActiveLowStockAlerts: 0,
-            Message: "Welcome to VendorPortal.Api — Phase 4 dashboard with live change request count.");
+            ActiveLowStockAlerts: (int)activeLowStockAlerts,
+            Message: "Welcome to VendorPortal.Api — dashboard with live data.");
 
         return Results.Ok(summary);
     }

@@ -75,13 +75,12 @@
 
         <MudDivider Class="my-4" />
 
-        @* POC only — remove before staging deployment *@
-        <MudAlert Severity="Severity.Info" Dense="true">
-            <strong>Demo accounts</strong> (password: <em>password</em>)<br />
-            Admin: <code>admin@acmepets.test</code><br />
-            Catalog Manager: <code>catalog@acmepets.test</code><br />
-            Read Only: <code>readonly@acmepets.test</code>
-        </MudAlert>
+        @if (!string.IsNullOrEmpty(_signedOutMessage))
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" data-testid="signed-out-message">
+                @_signedOutMessage
+            </MudAlert>
+        }
     </MudPaper>
 </MudContainer>
 
@@ -93,16 +92,24 @@
     private string? _errorMessage;
     private bool _isLoading;
     private bool _showPassword;
+    private string? _signedOutMessage;
 
     [Parameter, SupplyParameterFromQuery(Name = "returnUrl")]
     public string? ReturnUrl { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "signedOut")]
+    public string? SignedOut { get; set; }
 
     protected override void OnInitialized()
     {
         if (AuthState.IsAuthenticated)
         {
             Navigation.NavigateTo(ReturnUrl ?? "/dashboard");
+            return;
         }
+
+        if (SignedOut == "true")
+            _signedOutMessage = "You have been signed out.";
     }
 
     private async Task HandleLogin()

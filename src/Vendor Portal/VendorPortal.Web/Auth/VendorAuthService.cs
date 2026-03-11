@@ -127,7 +127,7 @@ public sealed class VendorAuthService
         finally
         {
             _authState.ClearAuthentication();
-            _navigationManager.NavigateTo("/login");
+            _navigationManager.NavigateTo("/login?signedOut=true");
         }
     }
 

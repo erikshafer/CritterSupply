@@ -289,13 +289,13 @@ The PO understood it was a POC-only aid, but unprompted noted that a real vendor
 | Severity | Issue | Root Cause | Fixed? |
 |---|---|---|---|
 | 🔴 P0 (dev) | `PUT /api/vendor-portal/account/preferences` → 404 | `VendorAccount` Marten document not seeded; dev seed bypasses event bus | ✅ Fixed — `VendorPortalSeedData.cs` added |
-| 🔴 P1 | "Manage Users" button does nothing | No `Href` / `OnClick` on the Dashboard Quick Actions button — visual stub | ❌ Not yet implemented |
-| 🟡 P1 | `TotalSkus: 42` is a hardcoded stub | `GetDashboard` returns a literal `42` instead of querying `VendorProductCatalogEntry` count | ❌ Not yet implemented |
-| 🟡 P1 | `ActiveLowStockAlerts: 0` is hardcoded | Dashboard endpoint does not query `LowStockAlert` documents | ❌ Not yet implemented |
-| 🟡 P2 | No persistent navigation | `MainLayout.razor` has no sidebar or top nav links — only Quick Actions on Dashboard | ❌ Navigation not yet designed |
-| 🟡 P2 | SKU field is free-text with no product picker | `SubmitChangeRequest.razor` has no catalog-backed autocomplete or dropdown | ❌ Requires product catalog integration |
-| 🟢 P3 | No "signed out" confirmation message | Login page shows no contextual message after logout | ❌ Minor polish gap |
-| 🟢 P3 | Action buttons (Submit/Withdraw) are below the fold on detail page | Layout puts actions at bottom of left column after potentially long Details text | ❌ Layout refinement needed |
+| 🔴 P1 | "Manage Users" button does nothing | No `Href` / `OnClick` on the Dashboard Quick Actions button — visual stub | ✅ Fixed — disabled with `MudTooltip` "Team management — coming soon" |
+| 🟡 P1 | `TotalSkus: 42` is a hardcoded stub | `GetDashboard` returns a literal `42` instead of querying `VendorProductCatalogEntry` count | ✅ Fixed — real Marten query against `VendorProductCatalogEntry` |
+| 🟡 P1 | `ActiveLowStockAlerts: 0` is hardcoded | Dashboard endpoint does not query `LowStockAlert` documents | ✅ Fixed — real Marten query against `LowStockAlert` |
+| 🟡 P2 | No persistent navigation | `MainLayout.razor` has no sidebar or top nav links — only Quick Actions on Dashboard | ✅ Fixed — `MudDrawer` with `DrawerVariant.Responsive` + `MudNavMenu` added |
+| 🟡 P2 | SKU field is free-text with no product picker | `SubmitChangeRequest.razor` has no catalog-backed autocomplete or dropdown | ⏳ Deferred — requires `ProductCatalog.Api` integration |
+| 🟢 P3 | No "signed out" confirmation message | Login page shows no contextual message after logout | ✅ Fixed — `?signedOut=true` query param + info message on login page |
+| 🟢 P3 | Action buttons (Submit/Withdraw) are below the fold on detail page | Layout puts actions at bottom of right column after potentially long Details text | ✅ Fixed — actions moved to header row alongside status chip |
 
 ---
 
@@ -324,53 +324,92 @@ The PO understood it was a POC-only aid, but unprompted noted that a real vendor
 
 **Interaction design:**
 - The `_isLoading` pattern on the login submit button (spinner + "Signing in..." text) prevents double-submits and gives clear feedback. Well done.
-- The delete draft confirmation **is not guarded** — clicking "Delete" on a draft immediately fires the API without a confirmation dialog. Withdraw is a destructive action that should prompt *"Are you sure you want to withdraw this draft? This cannot be undone."*
+- ~~The delete draft confirmation **is not guarded** — clicking "Delete" on a draft immediately fires the API without a confirmation dialog.~~ ✅ Fixed — `MudMessageBox` confirmation added to both the list page and the detail page.
 - Token refresh (every 13 minutes, silent) is not detectable by the user. If the session runs long (demo, PO session), this works transparently. The tab-throttling recovery (`CheckAndRefreshIfNeededAsync`) is a thoughtful addition.
 
 **Microcopy:**
 - `"Change request saved as draft."` (Info snackbar) — clear.
 - `"Change request submitted successfully."` (Success snackbar) — clear.
-- `"Failed to save preferences. Please try again."` — too generic for a persistent failure. Should be: *"We couldn't save your preferences. If this keeps happening, please contact support."*
+- ~~`"Failed to save preferences. Please try again."` — too generic for a persistent failure.~~ ✅ Fixed — now reads: *"We couldn't save your preferences. If this keeps happening, please contact support."*
 - `"Draft deleted."` — the action button says "Delete" but drafts are technically "Withdrawn" at the API level. The domain term should be consistent. The user-facing label could stay "Delete Draft" (clearer to non-domain users) but the snackbar should match: *"Draft deleted."* vs *"Draft withdrawn."* Pick one and use it consistently.
 
 **Consistency gaps:**
-- Dashboard calls the action "Submit Change Request." Change Requests list also has a button labeled "Submit Change Request." But the form's primary button says "Submit Request." The word "Change" is dropped inconsistently.
+- ~~Dashboard calls the action "Submit Change Request." Change Requests list also has a button labeled "Submit Change Request." But the form's primary button says "Submit Request."~~ ✅ Fixed — standardized to "Submit Change Request" on the form and "Submit for Review" on the detail page.
 - "Request History" is mentioned in the feature spec and event modeling, but the Change Requests list has no "History" tab or "Active / History" toggle — all requests (including terminal states like Approved, Rejected, Withdrawn) appear in the same flat list, filterable by status chip. This is acceptable, but the event modeling's notion of "Request History" as a distinct view should be resolved.
 
 ---
 
 ## Prioritized Findings
 
-| Priority | Finding | Affected Flow | Suggested Fix |
-|---|---|---|---|
-| P0 (dev) | `VendorAccount` not seeded in dev → PUT preferences → 404 | Settings → Save | ✅ `VendorPortalSeedData.cs` added — seeds account on first boot |
-| P1 | No persistent navigation (no sidebar, no top nav links) | All flows post-login | Add `<MudNavMenu>` sidebar in `MainLayout.razor` with links to Dashboard, Change Requests, Settings |
-| P1 | Dashboard KPI stubs (`TotalSkus: 42`, `ActiveLowStockAlerts: 0`) | Dashboard orientation | Query real data from Marten; show 0 until real data arrives |
-| P1 | "Manage Users" stub button is visually present but non-functional | Dashboard → Admin flow | Remove button until implemented, or disable with tooltip: *"Team management — coming soon"* |
-| P2 | SKU free-text field — no catalog picker or autocomplete | Change Request submission | Add product picker seeded from `VendorProductCatalogEntry` documents |
-| P2 | Action buttons on change request detail page are below the fold | Change Request detail | Move Submit/Withdraw to a sticky footer or the top of the page alongside the status chip |
-| P2 | Settings save error message is too generic | Settings → Save failure | Show persistent inline error at form level; improve message text |
-| P2 | Demo credentials banner on login page | Login | Remove or hide behind a developer tools flag; not for vendor-facing use |
-| P3 | No "signed out" message after logout | Logout → Login | Add `?signedOut=true` query param and show a brief info message on the login page |
-| P3 | Delete draft fires without confirmation dialog | Change Requests list → Delete | Add `IDialogService` confirmation dialog before calling withdraw |
-| P3 | Logout button has no visible text label | Header | Add visible "Sign Out" text on desktop; icon-only is ambiguous on mobile |
-| P3 | Microcopy inconsistency: "Submit Change Request" vs "Submit Request" | Change request submission | Standardize to "Submit Change Request" throughout |
+| Priority | Finding | Affected Flow | Suggested Fix | Status |
+|---|---|---|---|---|
+| P0 (dev) | `VendorAccount` not seeded in dev → PUT preferences → 404 | Settings → Save | `VendorPortalSeedData.cs` added — seeds account on first boot | ✅ Done |
+| P1 | No persistent navigation (no sidebar, no top nav links) | All flows post-login | Added `MudDrawer` with `DrawerVariant.Responsive` + `MudNavMenu` with Dashboard, Change Requests, Settings | ✅ Done |
+| P1 | Dashboard KPI stubs (`TotalSkus: 42`, `ActiveLowStockAlerts: 0`) | Dashboard orientation | Real Marten queries against `VendorProductCatalogEntry` and `LowStockAlert`; `TenantName` reads from `VendorAccount.OrganizationName` | ✅ Done |
+| P1 | "Manage Users" stub button is visually present but non-functional | Dashboard → Admin flow | Disabled with `MudTooltip` "Team management — coming soon"; `<span>` wrapper enables tooltip on disabled button | ✅ Done |
+| P2 | SKU free-text field — no catalog picker or autocomplete | Change Request submission | Add product picker seeded from `VendorProductCatalogEntry` documents | ⏳ Deferred — requires `ProductCatalog.Api` integration |
+| P2 | Action buttons on change request detail page are below the fold | Change Request detail | Actions moved to header row alongside status chip; always visible above the fold | ✅ Done |
+| P2 | Settings save error message is too generic | Settings → Save failure | Updated to "We couldn't save your preferences. If this keeps happening, please contact support." | ✅ Done |
+| P2 | Demo credentials banner on login page | Login | Removed `<MudAlert>` block; added `?signedOut=true` info message for post-logout return | ✅ Done |
+| P3 | No "signed out" message after logout | Logout → Login | `?signedOut=true` query param + "You have been signed out." info message | ✅ Done |
+| P3 | Delete draft fires without confirmation dialog | Change Requests list → Delete | `MudMessageBox` confirmation added to both list page and detail page | ✅ Done |
+| P3 | Logout button has no visible text label | Header | Upgraded from icon-only `MudIconButton` to labelled "Sign Out" `MudButton` | ✅ Done |
+| P3 | Microcopy inconsistency: "Submit Change Request" vs "Submit Request" | Change request submission | Form button: "Submit Change Request"; detail page draft button: "Submit for Review" | ✅ Done |
 
 ---
 
 ## Recommended Next Steps
 
-1. **Add a sidebar navigation to `MainLayout.razor`** — this is the single highest-impact UX improvement. A vendor should always be able to navigate to Dashboard, Change Requests, and Settings without going back through a hub page. Use `MudNavMenu` with `MudNavLink` items for each section.
+> **Note:** Items 1–3 below are complete. Items 4–7 remain open.
 
-2. **Replace hardcoded dashboard stubs with real queries** — `TotalSkus: 42` and `ActiveLowStockAlerts: 0` should either come from real Marten queries or be omitted from the dashboard until the upstream data sources are connected. Showing false data to the PO (or a vendor in a demo) destroys trust faster than showing an empty state.
+1. ~~**Add a sidebar navigation to `MainLayout.razor`**~~ ✅ Done — `MudDrawer` with `DrawerVariant.Responsive` + `MudNavMenu`.
 
-3. **Hide or properly stub the "Manage Users" button** — a button that does nothing is worse UX than no button. If the feature is coming in a future cycle, disable it with an explanatory tooltip or remove it from this release.
+2. ~~**Replace hardcoded dashboard stubs with real queries**~~ ✅ Done — `TotalSkus`, `ActiveLowStockAlerts`, and `TenantName` all query live Marten data.
 
-4. **Add a product picker to the change request form** — even a basic list of `VendorProductCatalogEntry` documents filtered by the logged-in tenant, searchable by SKU or name, would dramatically reduce friction for the core vendor workflow.
+3. ~~**Hide or properly stub the "Manage Users" button**~~ ✅ Done — disabled with "Team management — coming soon" tooltip.
+
+4. **Add a product picker to the change request form** — even a basic list of `VendorProductCatalogEntry` documents filtered by the logged-in tenant, searchable by SKU or name, would dramatically reduce friction for the core vendor workflow. ⏳ *Requires `ProductCatalog.Api` integration.*
 
 5. **Test with the CatalogManager role next** — this session used Admin. A follow-up session with `catalog@acmepets.test` (CatalogManager) would reveal whether role-gated flows (user management blocked, change request submission allowed) behave as expected from the vendor's perspective.
 
 6. **Test with the ReadOnly role** — `readonly@acmepets.test` should surface empty states and read-only affordances. Verify that the "Submit Change Request" button is correctly hidden and that the empty state message directs the vendor to contact their Admin.
 
 7. **Connect upstream BCs for a full integration session** — without ProductCatalog.Api, Inventory.Api, and Orders.Api running, the Vendor Portal's real-time features (SignalR alerts, change request approvals) cannot be exercised. Schedule a second session once the environment is fully wired.
+
+---
+
+## Implementation Log
+
+Tracks what was acted on from this research session, by whom, and when.
+
+### 2026-03-11 — Session 1 (PSA / Principal Software Architect)
+
+UX Engineer and Product Owner sign-off obtained before implementation. All P1 items and most P2/P3 items addressed.
+
+| Item | Files Changed | Notes |
+|---|---|---|
+| P1: Sidebar navigation | `MainLayout.razor` | `MudDrawer` + `DrawerVariant.Responsive`; hamburger toggle in app bar; tenant name in drawer header |
+| P1: Dashboard KPI stubs | `GetDashboard.cs` | Real Marten queries for `TotalSkus`, `ActiveLowStockAlerts`, `TenantName` |
+| P1: Manage Users stub button | `Dashboard.razor` | `Disabled="true"` + `<span>` wrapper + `MudTooltip` "Team management — coming soon" |
+| P2: Demo credentials banner | `Login.razor` | Removed `<MudAlert>` block; see also "signed out" message below |
+| P2: Settings error message | `Settings.razor` | "Failed to save preferences. Please try again." → "We couldn't save your preferences. If this keeps happening, please contact support." |
+| P3: Signed out message | `Login.razor`, `VendorAuthService.cs` | `?signedOut=true` query param; `LogoutAsync` navigates to `/login?signedOut=true` |
+| P3: Delete draft confirmation (list) | `ChangeRequests.razor` | `IDialogService` + `MudMessageBox` before withdraw API call |
+| P3: Logout text label | `MainLayout.razor` | Icon-only button replaced with labelled "Sign Out" `MudButton` |
+
+### 2026-03-11 — Session 2 (PSA / Principal Software Architect)
+
+| Item | Files Changed | Notes |
+|---|---|---|
+| P2: Action buttons below the fold | `ChangeRequestDetail.razor` | Actions moved from right-column panel to header row alongside status chip; right column now Timeline only |
+| P3: Microcopy — "Submit Request" | `SubmitChangeRequest.razor` | "Submit Request" → "Submit Change Request" |
+| P3: Microcopy — detail page | `ChangeRequestDetail.razor` | "Submit Request" → "Submit for Review" (contextually distinct: submitting an existing draft for catalog team review) |
+
+### Deferred Items
+
+| Item | Reason | Owner |
+|---|---|---|
+| P2: SKU catalog picker on change request form | Requires `ProductCatalog.Api` running and vendor-scoped product data flowing through | Backlog — next integration cycle |
+| Follow-up session: CatalogManager role | Session used Admin; CatalogManager/ReadOnly role flows not yet validated | UX Engineer to schedule |
+| Follow-up session: Full integration stack | SignalR alerts and change request approvals require upstream BCs | UX Engineer + DevOps to schedule |
 

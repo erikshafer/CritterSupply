@@ -198,13 +198,13 @@
             }
             else
             {
-                Snackbar.Add("Failed to save preferences. Please try again.", Severity.Error);
+                Snackbar.Add("We couldn't save your preferences. If this keeps happening, please contact support.", Severity.Error);
             }
         }
         catch (Exception ex)
         {
             Logger.LogDebug(ex, "Failed to save notification preferences");
-            Snackbar.Add("Failed to save preferences.", Severity.Error);
+            Snackbar.Add("We couldn't save your preferences. If this keeps happening, please contact support.", Severity.Error);
         }
         finally
         {

@@ -9,7 +9,17 @@
 
 <MudLayout>
     <MudAppBar Elevation="1" Dense="true">
-        <MudIconButton Icon="@Icons.Material.Filled.Pets" Color="Color.Inherit" />
+        @if (AuthState.IsAuthenticated)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                           Color="Color.Inherit"
+                           aria-label="Toggle navigation"
+                           OnClick="ToggleDrawer" />
+        }
+        else
+        {
+            <MudIcon Icon="@Icons.Material.Filled.Pets" Color="Color.Inherit" aria-hidden="true" />
+        }
         <MudText Typo="Typo.h6" Class="ml-2">Vendor Portal</MudText>
 
         @if (AuthState.IsAuthenticated)
@@ -17,7 +27,7 @@
             <MudSpacer />
 
             <MudTooltip Text="@HubStatusText">
-                @* P2-A: Show text label for non-connected states — icon-only is ambiguous and invisible on touch devices *@
+                @* Show text label for non-connected states — icon-only is ambiguous and invisible on touch devices *@
                 <div class="d-flex align-center gap-1" aria-label="@HubStatusText" role="status"
                      data-testid="hub-status-indicator">
                     <MudIcon Icon="@HubStatusIcon"
@@ -43,20 +53,47 @@
                 @AuthState.RoleDisplayName
             </MudChip>
 
-            <MudIconButton Icon="@Icons.Material.Filled.Settings"
-                           Color="Color.Inherit"
-                           Title="Settings"
-                           aria-label="Settings"
-                           Href="/settings" />
-
-            <MudIconButton Icon="@Icons.Material.Filled.Logout"
-                           Color="Color.Inherit"
-                           Title="Sign Out"
-                           aria-label="Sign Out"
-                           OnClick="HandleLogout"
-                           data-testid="logout-btn" />
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Inherit"
+                       StartIcon="@Icons.Material.Filled.Logout"
+                       OnClick="HandleLogout"
+                       aria-label="Sign Out"
+                       data-testid="logout-btn">
+                Sign Out
+            </MudButton>
         }
     </MudAppBar>
+
+    @if (AuthState.IsAuthenticated)
+    {
+        <MudDrawer @bind-Open="_drawerOpen"
+                   Variant="DrawerVariant.Responsive"
+                   Breakpoint="Breakpoint.Md"
+                   Elevation="2"
+                   ClipMode="DrawerClipMode.Always"
+                   data-testid="nav-drawer">
+            <MudDrawerHeader>
+                <MudText Typo="Typo.subtitle1" Style="font-weight:600;">
+                    @AuthState.TenantName
+                </MudText>
+            </MudDrawerHeader>
+            <MudNavMenu>
+                <MudNavLink Href="/dashboard"
+                            Icon="@Icons.Material.Filled.Dashboard"
+                            Match="NavLinkMatch.All">
+                    Dashboard
+                </MudNavLink>
+                <MudNavLink Href="/change-requests"
+                            Icon="@Icons.Material.Filled.EditNote">
+                    Change Requests
+                </MudNavLink>
+                <MudNavLink Href="/settings"
+                            Icon="@Icons.Material.Filled.Settings">
+                    Settings
+                </MudNavLink>
+            </MudNavMenu>
+        </MudDrawer>
+    }
 
     <MudMainContent Class="pt-10">
         <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
@@ -68,6 +105,8 @@
 @code {
     [Inject] private VendorAuthService AuthService { get; set; } = default!;
 
+    private bool _drawerOpen = true;
+
     protected override void OnInitialized()
     {
         AuthState.OnChange += StateHasChanged;
@@ -75,6 +114,8 @@
 
         TokenRefreshService.Start();
     }
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 
     private string HubStatusIcon => HubService.State switch
     {
