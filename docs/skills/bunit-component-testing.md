@@ -1,0 +1,405 @@
+# bUnit Component Testing
+
+> **Scope:** This skill covers unit testing Blazor components with bUnit in CritterSupply. For API-level integration tests, see `critterstack-testing-patterns.md`. For browser-level E2E tests, see `e2e-playwright-testing.md`.
+
+Best practices for testing Blazor Server components using bUnit v2+ with MudBlazor in CritterSupply.
+
+## When to Use bUnit vs. Playwright
+
+| Use bUnit when…                                        | Use Playwright when…                                   |
+|--------------------------------------------------------|--------------------------------------------------------|
+| Testing rendering logic (conditional display, loops)   | Testing multi-step workflows (checkout wizard)         |
+| Testing parameter-driven behavior                      | Testing SignalR/real-time push updates                 |
+| Verifying markup structure (links, headings, labels)   | Testing JS interop heavy flows (login cookie, logout)  |
+| Testing auth-gated rendering (loading vs. data states) | Testing cross-component navigation (cart → checkout)   |
+| Millisecond feedback (runs in-process, no browser)     | Testing visual fidelity (screenshots, layout)          |
+
+**Rule of thumb:** If the component's behavior depends primarily on *rendering logic and injected services*, bUnit is the right tool. If it depends on *browser APIs, JS interop, or real HTTP round-trips*, prefer Playwright.
+
+## Testing Tools
+
+| Tool          | Purpose                                          |
+|---------------|--------------------------------------------------|
+| **bUnit 2+**  | Blazor component unit testing (in-process)       |
+| **xUnit**     | Test framework                                   |
+| **Shouldly**  | Readable assertions                              |
+| **MudBlazor** | UI component library (requires special setup)    |
+
+## Project Setup
+
+### Project File (`.csproj`)
+
+bUnit projects that test MudBlazor components must use the **Razor SDK** so that `.razor` test files compile correctly (if used). Even for C#-only tests, the Razor SDK is recommended for consistency.
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="bunit" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="path/to/YourBlazorProject.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Shouldly" />
+    <Using Include="Bunit" />
+  </ItemGroup>
+</Project>
+```
+
+### `_Imports.razor`
+
+Add an `_Imports.razor` to the test project root for Razor-file tests and global usings:
+
+```razor
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using Microsoft.Extensions.DependencyInjection
+@using AngleSharp.Dom
+@using Bunit
+@using Bunit.TestDoubles
+@using Xunit
+@using Shouldly
+```
+
+## MudBlazor Setup (Critical)
+
+MudBlazor v9+ requires specific setup in bUnit tests. Without this, components using MudBlazor controls will throw `MissingServiceException` or `MudPopoverProvider` errors.
+
+### Base Test Class Pattern
+
+```csharp
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
+using MudBlazor;
+using MudBlazor.Services;
+
+public abstract class BunitTestBase : BunitContext, IAsyncLifetime
+{
+    protected BunitTestBase()
+    {
+        // MudBlazor components use internal JS interop — loose mode
+        // prevents bUnit from throwing on unhandled JS calls.
+        JSInterop.Mode = JSRuntimeMode.Loose;
+
+        // Register all MudBlazor services (ISnackbar, IDialogService, etc.)
+        Services.AddMudServices();
+    }
+
+    // IAsyncLifetime ensures MudBlazor's IAsyncDisposable services
+    // (like PointerEventsNoneService) are disposed correctly.
+    // Without this, xUnit's synchronous Dispose throws InvalidOperationException.
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public new async Task DisposeAsync()
+    {
+        await base.DisposeAsync();
+    }
+
+    /// <summary>
+    /// Renders a component with MudPopoverProvider pre-rendered.
+    /// Required for components using MudSelect, MudMenu, MudTable,
+    /// MudAutocomplete, or any popover-based MudBlazor control.
+    /// </summary>
+    protected IRenderedComponent<TComponent> RenderWithMud<TComponent>(
+        Action<ComponentParameterCollectionBuilder<TComponent>>? parameterBuilder = null)
+        where TComponent : IComponent
+    {
+        Render<MudPopoverProvider>();
+
+        return parameterBuilder is null
+            ? Render<TComponent>()
+            : Render<TComponent>(parameterBuilder);
+    }
+}
+```
+
+### Key MudBlazor + bUnit Gotchas
+
+1. **`IAsyncLifetime` is mandatory** — MudBlazor 9+ registers services that only implement `IAsyncDisposable`. Without implementing `IAsyncLifetime` on the test class, xUnit's synchronous `Dispose()` throws `InvalidOperationException`.
+
+2. **`JSInterop.Mode = JSRuntimeMode.Loose`** — MudBlazor components make many internal JS interop calls. Strict mode (bUnit's default) throws on any unhandled call.
+
+3. **`MudPopoverProvider` must be pre-rendered** — Components using `MudSelect`, `MudMenu`, `MudTable`, `MudAutocomplete`, etc. require a `MudPopoverProvider` in the render tree. The `RenderWithMud<T>()` helper method handles this. **Do NOT** use `RenderTree.TryAdd<MudPopoverProvider>()` — that component doesn't have a `ChildContent` parameter and will throw `ArgumentException`.
+
+4. **Use `Render<T>()` for simple components** — Components that only use basic MudBlazor controls (MudText, MudButton, MudIcon, MudGrid, MudPaper, MudAlert) work fine with plain `Render<T>()` — no `MudPopoverProvider` needed.
+
+5. **Currency formatting is locale-dependent** — `ToString("C")` produces `$129.99` in `en-US` but `¤129.99` in `C.UTF-8` (common in CI). Assert on the numeric portion (e.g., `"129.99"`) rather than the formatted string.
+
+## Writing Tests
+
+### Rendering Simple Components
+
+For components with no service dependencies (pure presentation):
+
+```csharp
+public sealed class HomeTests : BunitTestBase
+{
+    [Fact]
+    public void Home_RendersHeroBanner()
+    {
+        var cut = Render<Home>();
+
+        cut.Markup.ShouldContain("Everything Your Pet Needs");
+    }
+
+    [Fact]
+    public void Home_QuickLinks_HaveCorrectHrefs()
+    {
+        var cut = Render<Home>();
+
+        var links = cut.FindAll("a[href]");
+        var hrefs = links.Select(l => l.GetAttribute("href")).ToList();
+
+        hrefs.ShouldContain("/products");
+        hrefs.ShouldContain("/cart");
+    }
+}
+```
+
+### Testing Click Interactions
+
+```csharp
+[Fact]
+public void Counter_ClickButton_IncrementsCount()
+{
+    var cut = Render<Counter>();
+
+    cut.Find("button").Click();
+
+    cut.Find("p[role='status']").TextContent.ShouldContain("Current count: 1");
+}
+```
+
+### Emulating Authentication State
+
+bUnit v2 provides `AddAuthorization()` on `BunitContext` for testing `[Authorize]`-gated components and `<AuthorizeView>`:
+
+```csharp
+public sealed class AccountTests : BunitTestBase
+{
+    [Fact]
+    public void Account_WhenAuthenticated_RendersCustomerInfo()
+    {
+        var authContext = this.AddAuthorization();
+        authContext.SetAuthorized("alice@critter.test");
+        authContext.SetClaims(
+            new Claim("CustomerId", "a1b2c3d4-..."),
+            new Claim(ClaimTypes.Email, "alice@critter.test"),
+            new Claim(ClaimTypes.GivenName, "Alice"),
+            new Claim(ClaimTypes.Surname, "Wonder")
+        );
+
+        var cut = Render<Account>();
+
+        cut.Markup.ShouldContain("Alice");
+        cut.Markup.ShouldContain("alice@critter.test");
+    }
+
+    [Fact]
+    public void Account_WhenNotAuthenticated_ShowsLoadingState()
+    {
+        var authContext = this.AddAuthorization();
+        authContext.SetNotAuthorized();
+
+        var cut = Render<Account>();
+
+        cut.Markup.ShouldContain("Loading account information");
+    }
+}
+```
+
+> **Note:** In bUnit v2, use `this.AddAuthorization()` (not `AddTestAuthorization()` from v1).
+
+### Mocking HttpClient / IHttpClientFactory
+
+Components that call APIs via `IHttpClientFactory` need a mock. Create a reusable `MockHttpMessageHandler`:
+
+```csharp
+public sealed class MockHttpMessageHandler : HttpMessageHandler
+{
+    private readonly Dictionary<string, Func<HttpResponseMessage>> _responses = new();
+
+    public void SetResponse<T>(string pathPrefix, T content)
+    {
+        _responses[pathPrefix] = () => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(content, options: new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            })
+        };
+    }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var path = request.RequestUri?.PathAndQuery ?? "";
+        foreach (var (prefix, factory) in _responses)
+        {
+            if (path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return factory();
+        }
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+    }
+}
+
+public sealed class MockHttpClientFactory(MockHttpMessageHandler handler) : IHttpClientFactory
+{
+    public HttpClient CreateClient(string name) =>
+        new(handler) { BaseAddress = new Uri("http://localhost:5237") };
+}
+```
+
+Usage in tests:
+
+```csharp
+public sealed class ProductsTests : BunitTestBase
+{
+    private readonly MockHttpMessageHandler _mockHandler = new();
+
+    public ProductsTests()
+    {
+        this.AddAuthorization().SetNotAuthorized();
+        Services.AddSingleton<IHttpClientFactory>(new MockHttpClientFactory(_mockHandler));
+    }
+
+    [Fact]
+    public void Products_WhenNoProducts_ShowsEmptyMessage()
+    {
+        _mockHandler.SetResponse("/api/storefront/products",
+            new { Products = Array.Empty<object>(), TotalCount = 0, Page = 1, PageSize = 20 });
+
+        var cut = RenderWithMud<Products>();
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.ShouldContain("No products found");
+        });
+    }
+}
+```
+
+### Async Data Loading and `WaitForAssertion`
+
+Components that load data in `OnInitializedAsync` need `WaitForAssertion` to wait for the async render cycle:
+
+```csharp
+[Fact]
+public void Products_WhenProductsExist_RendersProductCards()
+{
+    _mockHandler.SetResponse("/api/storefront/products", testData);
+
+    var cut = RenderWithMud<Products>();
+
+    // WaitForAssertion retries until assertion passes or timeout expires
+    cut.WaitForAssertion(() =>
+    {
+        cut.Markup.ShouldContain("Premium Dog Food");
+    });
+}
+```
+
+### Components Using MudTable
+
+`MudTable` requires `MudPopoverProvider`. Use `RenderWithMud<T>()`:
+
+```csharp
+[Fact]
+public void OrderHistory_RendersTableHeaders()
+{
+    var cut = RenderWithMud<OrderHistory>();
+
+    cut.Markup.ShouldContain("Order ID");
+    cut.Markup.ShouldContain("Status");
+}
+```
+
+## What NOT to Test with bUnit
+
+These components/behaviors are better tested with Playwright E2E:
+
+| Component/Feature          | Reason bUnit is inadequate                           |
+|----------------------------|------------------------------------------------------|
+| **Checkout.razor**         | MudStepper has heavy JS interop; step navigation     |
+| **Cart.razor SignalR**     | Real WebSocket subscription, `[JSInvokable]` updates |
+| **InteractiveAppBar.razor**| SignalR subscription, logout JS interop               |
+| **Login.razor submit**     | `authHelper.login` JS call sets browser cookie       |
+| **ReconnectModal.razor**   | Pure JS interop component                            |
+| **Navigation flows**       | Full-page navigation with `forceLoad: true`          |
+
+**Rule:** If a component's critical behavior flows through `IJSRuntime`, test it with Playwright.
+
+## Test Organization
+
+Mirror the source project structure:
+
+```
+tests/Customer Experience/Storefront.Web.Tests/
+├── BunitTestBase.cs                      # Shared base class
+├── _Imports.razor                        # Global usings for .razor tests
+├── Storefront.Web.Tests.csproj
+├── Components/
+│   ├── Pages/
+│   │   ├── CounterTests.cs
+│   │   ├── HomeTests.cs
+│   │   ├── NotFoundTests.cs
+│   │   ├── LoginTests.cs
+│   │   ├── AccountTests.cs
+│   │   ├── OrderHistoryTests.cs
+│   │   └── ProductsTests.cs
+│   └── Layout/
+│       └── (future layout component tests)
+```
+
+## Naming Conventions
+
+Follow the existing CritterSupply pattern: `ComponentName_Scenario_ExpectedBehavior`
+
+```
+Counter_ClickButton_IncrementsCount
+Home_RendersFourTrustItems
+Account_WhenNotAuthenticated_ShowsLoadingState
+Products_OutOfStockItem_AddToCartButtonIsDisabled
+OrderHistory_RendersThreeHardcodedOrders
+```
+
+## CI Integration
+
+bUnit tests run as part of the standard `dotnet test` pipeline — no browser installation or Docker needed:
+
+```bash
+dotnet test "tests/Customer Experience/Storefront.Web.Tests/Storefront.Web.Tests.csproj"
+```
+
+Typical execution: **< 2 seconds** for 40+ tests (vs. 30+ seconds for Playwright E2E).
+
+## Checklist: Adding a New bUnit Test
+
+1. Identify the component's dependencies (services, auth, JS interop)
+2. Choose `Render<T>()` (simple) or `RenderWithMud<T>()` (popover-dependent)
+3. Register required services (`IHttpClientFactory`, auth, `IConfiguration`)
+4. Set up JSInterop expectations if needed (usually loose mode handles this)
+5. Use `WaitForAssertion()` for components with async data loading
+6. Assert on markup content, not exact HTML structure (MudBlazor generates complex markup)
+7. Avoid currency-symbol assertions — use numeric values only
+
+## References
+
+- [bUnit Documentation](https://bunit.dev/docs/getting-started)
+- [bUnit v2 Migration Guide](https://bunit.dev/docs/migrations)
+- [MudBlazor Documentation](https://mudblazor.com)
+- [CritterSupply E2E Testing](e2e-playwright-testing.md) — Playwright patterns for full browser tests
+- [CritterSupply Testing Patterns](critterstack-testing-patterns.md) — Alba integration test patterns
