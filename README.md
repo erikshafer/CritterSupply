@@ -190,6 +190,16 @@ The Payments BC includes a reference implementation for third-party payment inte
 
 ## ⏩ How to Run <a id='5.0'></a>
 
+### Quick start (one command)
+
+If you just want to get a running storefront quickly (infrastructure + Storefront API), run:
+
+```bash
+./scripts/dev-start.sh quick-start
+```
+
+This starts Postgres, RabbitMQ, Jaeger (infrastructure) and runs the Storefront API locally (launchSettings.json uses port 5237 by convention).
+
 ### Requirements <a id='5.2'></a>
 
 - [.NET 10](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
