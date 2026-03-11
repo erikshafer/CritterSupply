@@ -55,21 +55,14 @@ public sealed class LoginTests : BunitTestBase
     }
 
     [Fact]
-    public void Login_RendersDemoAccountInfo()
+    public void Login_DoesNotRenderDemoCredentials()
     {
         var cut = Render<Login>();
 
-        cut.Markup.ShouldContain("Demo accounts");
-        cut.Markup.ShouldContain("alice@critter.test");
-        cut.Markup.ShouldContain("bob@critter.test");
-        cut.Markup.ShouldContain("charlie@critter.test");
-    }
-
-    [Fact]
-    public void Login_RendersDemoPassword()
-    {
-        var cut = Render<Login>();
-
-        cut.Markup.ShouldContain("password");
+        // Demo credentials must not appear in consumer-facing UI
+        cut.Markup.ShouldNotContain("Demo accounts");
+        cut.Markup.ShouldNotContain("alice@critter.test");
+        cut.Markup.ShouldNotContain("bob@critter.test");
+        cut.Markup.ShouldNotContain("charlie@critter.test");
     }
 }

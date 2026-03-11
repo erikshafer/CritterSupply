@@ -1,14 +1,16 @@
 using Storefront.Clients;
 using Storefront.RealTime;
+using Wolverine.SignalR;
 
 namespace Storefront.Notifications;
 
 /// <summary>
 /// Handles Shopping.ItemRemoved integration message and publishes SignalR update via Wolverine.
+/// Scoped to the authenticated customer's group to prevent cross-customer event leakage.
 /// </summary>
 public static class ItemRemovedHandler
 {
-    public static async Task<CartUpdated?> Handle(
+    public static async Task<SignalRMessage<CartUpdated>?> Handle(
         Messages.Contracts.Shopping.ItemRemoved message,
         IShoppingClient shoppingClient,
         CancellationToken ct)
@@ -22,12 +24,14 @@ public static class ItemRemovedHandler
         // Calculate total from items
         var totalAmount = cart.Items.Sum(item => item.Quantity * item.UnitPrice);
 
-        // Return SignalR message — Wolverine routes to hub based on IStorefrontWebSocketMessage
-        return new CartUpdated(
+        var cartUpdated = new CartUpdated(
             cart.Id,
             message.CustomerId,
             cart.Items.Count,
             totalAmount,
             message.RemovedAt);
+
+        // Send only to the authenticated customer's group — not broadcast to all clients
+        return cartUpdated.ToWebSocketGroup($"customer:{message.CustomerId}");
     }
 }

@@ -45,7 +45,7 @@ else
                         </div>
                         <div class="d-flex mb-2">
                             <MudText Typo="Typo.body2" Class="mr-2" Style="font-weight: 600;">Status:</MudText>
-                            <MudChip T="string" Color="@GetStatusColor(_currentStatus)" Size="Size.Small" data-testid="order-status">@_currentStatus</MudChip>
+                            <MudChip T="string" Color="@GetStatusColor(_currentStatus)" Size="Size.Small" data-testid="order-status">@GetDisplayStatus(_currentStatus)</MudChip>
                         </div>
                         <div class="d-flex mb-2">
                             <MudText Typo="Typo.body2" Class="mr-2" Style="font-weight: 600;">Order Date:</MudText>
@@ -91,7 +91,7 @@ else
 
                 <MudDivider Class="my-4" />
 
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" Class="mr-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/products" Class="mr-2">
                     Continue Shopping
                 </MudButton>
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/orders">
@@ -276,6 +276,16 @@ else
         "Shipped" => Color.Primary,
         "Delivered" => Color.Success,
         _ => Color.Default
+    };
+
+    private static string GetDisplayStatus(string domainStatus) => domainStatus switch
+    {
+        "Placed" => "Order Received",
+        "PaymentAuthorized" or "Payment Confirmed" => "Payment Confirmed",
+        "InventoryReserved" => "Preparing Your Order",
+        "Shipped" => "Shipped",
+        "Delivered" => "Delivered",
+        _ => "Processing"  // Safe consumer fallback for any unexpected domain status
     };
 
     public async ValueTask DisposeAsync()

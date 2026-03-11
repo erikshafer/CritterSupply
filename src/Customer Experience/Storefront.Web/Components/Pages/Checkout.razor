@@ -64,9 +64,9 @@ else
                         <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Select Shipping Method</MudText>
 
                         <MudRadioGroup @bind-Value="_selectedShippingMethod" Disabled="@_isProcessing" data-testid="shipping-method-group">
-                            <MudRadio Value="@("Standard")" data-testid="shipping-method-standard">Standard Ground (5-7 days) - $5.99</MudRadio>
-                            <MudRadio Value="@("Express")" data-testid="shipping-method-express">Express Shipping (2-3 days) - $12.99</MudRadio>
-                            <MudRadio Value="@("NextDay")" data-testid="shipping-method-nextday">Next Day Air (1 day) - $24.99</MudRadio>
+                            <MudRadio Value="@("Standard")" data-testid="shipping-method-standard">Standard Ground (5–7 days) — $5.99</MudRadio>
+                            <MudRadio Value="@("Express")" data-testid="shipping-method-express">Express Shipping (2–3 days) — $12.99</MudRadio>
+                            <MudRadio Value="@("NextDay")" data-testid="shipping-method-nextday">Next Day Air (1 day) — $24.99</MudRadio>
                         </MudRadioGroup>
 
                         @if (_isProcessing)
@@ -85,9 +85,9 @@ else
                     <ChildContent>
                         <MudText Typo="Typo.h6" Class="mb-4" data-testid="checkout-step-title">Provide Payment Method</MudText>
 
-                        <MudTextField @bind-Value="_paymentToken" Label="Payment Token (stub)" Variant="Variant.Outlined" Placeholder="tok_visa_test_12345" Disabled="@_isProcessing" data-testid="payment-token-input" />
+                        <MudTextField @bind-Value="_paymentToken" Label="Payment Method" Variant="Variant.Outlined" Placeholder="Enter your card details" Disabled="@_isProcessing" data-testid="payment-token-input" />
                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
-                            In production, this would integrate with Stripe/PayPal for tokenized payment processing.
+                            Your payment information is handled securely. Full payment provider integration coming soon.
                         </MudText>
 
                         @if (_isProcessing)
@@ -116,7 +116,7 @@ else
                         }
                     </MudPaper>
 
-                    <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@PlaceOrder" Class="mt-4" data-testid="btn-place-order">
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@PlaceOrder" Disabled="@_isProcessing" Class="mt-4" data-testid="btn-place-order">
                         Place Order
                     </MudButton>
                 </MudStep>
@@ -425,8 +425,8 @@ else
     {
         if (string.IsNullOrWhiteSpace(_paymentToken))
         {
-            Snackbar.Add("Please enter a payment token to continue", Severity.Warning);
-            throw new InvalidOperationException("No payment token entered");
+            Snackbar.Add("Please enter your payment details to continue", Severity.Warning);
+            throw new InvalidOperationException("No payment method entered");
         }
 
         _isProcessing = true;

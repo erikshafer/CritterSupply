@@ -30,7 +30,8 @@ public sealed class AccountTests : BunitTestBase
         cut.Markup.ShouldContain("Alice");
         cut.Markup.ShouldContain("Wonder");
         cut.Markup.ShouldContain("alice@critter.test");
-        cut.Markup.ShouldContain("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+        // Customer ID (GUID) must not be shown to consumers
+        cut.Markup.ShouldNotContain("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
     }
 
     [Fact]

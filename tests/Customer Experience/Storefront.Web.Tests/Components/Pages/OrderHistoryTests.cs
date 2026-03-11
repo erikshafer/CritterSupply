@@ -21,36 +21,32 @@ public sealed class OrderHistoryTests : BunitTestBase
     }
 
     [Fact]
-    public void OrderHistory_RendersTableHeaders()
+    public void OrderHistory_RendersEmptyState()
     {
         var cut = RenderWithMud<OrderHistory>();
 
-        cut.Markup.ShouldContain("Order ID");
-        cut.Markup.ShouldContain("Date");
-        cut.Markup.ShouldContain("Status");
-        cut.Markup.ShouldContain("Total");
+        cut.Markup.ShouldContain("No orders yet");
+        cut.Markup.ShouldContain("Your order history will appear here once you've placed an order.");
     }
 
     [Fact]
-    public void OrderHistory_RendersThreeHardcodedOrders()
+    public void OrderHistory_EmptyState_HasStartShoppingLink()
     {
         var cut = RenderWithMud<OrderHistory>();
 
-        // The component has 3 hardcoded orders: Delivered, Shipped, Placed
-        cut.Markup.ShouldContain("Delivered");
-        cut.Markup.ShouldContain("Shipped");
-        cut.Markup.ShouldContain("Placed");
+        var links = cut.FindAll("a[href]");
+        var hrefs = links.Select(l => l.GetAttribute("href")).ToList();
+        hrefs.ShouldContain("/products");
     }
 
     [Fact]
-    public void OrderHistory_RendersOrderTotals()
+    public void OrderHistory_DoesNotRenderStubOrders()
     {
         var cut = RenderWithMud<OrderHistory>();
 
-        // Hardcoded totals: 129.99, 45.00, 89.99
-        // Use numeric portion only — currency symbol varies by locale
-        cut.Markup.ShouldContain("129.99");
-        cut.Markup.ShouldContain("45.00");
-        cut.Markup.ShouldContain("89.99");
+        // Stub orders with fake order IDs and dollar amounts must not appear
+        cut.Markup.ShouldNotContain("129.99");
+        cut.Markup.ShouldNotContain("45.00");
+        cut.Markup.ShouldNotContain("89.99");
     }
 }

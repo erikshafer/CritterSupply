@@ -11,7 +11,7 @@
 
 > **This document is a working artifact** for PO + UX collaboration. Open questions are tracked in the [`🤔 Open Questions`](#-open-questions-for-product-owner--ux) section.
 
-> 🔴 **PRODUCTION BLOCKER — Privacy Breach:** The current SSE implementation broadcasts all cart/order events to **every connected client**, not just the customer who owns that cart. Any authenticated user can see other customers' cart updates. This must be resolved before any production deployment. See [Off-Path Scenario 4](#off-path-scenarios) and the Gaps table.
+> ✅ **RESOLVED (Cycle 19):** The SSE/SignalR customer isolation issue has been fixed. All six notification handlers now return `SignalRMessage<T>.ToWebSocketGroup($"customer:{customerId}")` — events are delivered only to the authenticated customer's hub group. See `docs/research/storefront-ux-session/WOLVERINE-SIGNALR-OBSERVATIONS.md` for the full technical write-up and upstream contribution recommendations.
 
 ## What This BC Does
 
