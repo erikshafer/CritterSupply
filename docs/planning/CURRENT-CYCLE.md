@@ -13,29 +13,46 @@
 
 ---
 
-**Cycle:** 23 — Vendor Portal E2E Testing
-**Status:** ✅ **COMPLETE**
-**GitHub Milestone:** [Cycle 23: Vendor Portal E2E Testing](https://github.com/erikshafer/CritterSupply/milestone/18)
+**Cycle:** 24 — Fulfillment Integrity + Returns Prerequisites
+**Status:** 📋 **PLANNED** — post-Cycle 23 priority review complete; Cycle 24 scope revised
+**GitHub Milestone:** Cycle 24: Fulfillment Integrity + Returns Prerequisites *(create before starting)*
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 
 ---
 
 ## Current Status
 
-**Cycle 23 is COMPLETE!** E2E browser testing infrastructure for the Vendor Portal (Blazor WASM) has been delivered.
+**Cycle 23 is COMPLETE.** A cross-functional priority review was conducted before starting Cycle 24 (see [`docs/planning/priority-review-post-cycle-23.md`](priority-review-post-cycle-23.md)).
 
-**Cycle 23 Deliverables:**
-- 3-server E2E test fixture (VendorIdentity.Api + VendorPortal.Api + WASM static host + TestContainers PostgreSQL)
-- 12 BDD scenarios across 3 feature files (P0 + P1a)
-- 5 Page Object Models (Login, Dashboard, ChangeRequests, SubmitChangeRequest, Settings)
-- `data-testid` attributes added to Login.razor, MainLayout.razor, Dashboard.razor
-- CI workflow updated to run both Storefront + Vendor Portal E2E tests
-- E2E skills documentation updated with Blazor WASM patterns
-- Collaborative design: Principal Architect + QA Engineer + Product Owner sign-off
-- Sign-offs: Principal Architect ✅, QA Engineer ✅, Product Owner ✅
+**Key finding:** The previously planned Cycle 24 (Admin Portal Phase 1) has been **deferred to Cycle 28+** based on unanimous agreement from Product Owner, UX Engineer, and Principal Software Architect. Customer-facing gaps (Fulfillment bugs, Returns, Notifications) take precedence.
 
-**Next cycles:**
-- **Cycle 24:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling ([Milestone 17](https://github.com/erikshafer/CritterSupply/milestone/17))
+**Cycle 24 Scope (revised):**
+
+*Fulfillment bug fix sweep — must land atomically:*
+- 🔴 Wire RabbitMQ transport in `Fulfillment.Api/Program.cs` (ADR 0008; classified P0.5 → P0 since delivery-failure fix is dark without it)
+- 🔴 `ShipmentDeliveryFailed` cascade: add `RecordDeliveryFailure` endpoint + publish `Messages.Contracts.Fulfillment.ShipmentDeliveryFailed` integration message
+- 🔴 Add `shipment-delivery-failed` SSE case in `OrderConfirmation.razor` (frontend must ship with backend)
+- 🔴 `Shipment.Create()`: remove `Guid.CreateVersion7()` — use Marten-supplied stream ID
+- 🔴 Remove dead `Picking`/`Packing` from `ShipmentStatus` enum (no events drive them)
+- 🔴 `FulfillmentRequestedHandler`: apply UUID v5 from `OrderId` for idempotent shipment creation (ADR 0016)
+
+*`ShippingAddress` consolidation Phase A (non-breaking):*
+- 🟡 Introduce `Messages.Contracts.Shared.ShippingAddress` with dual `[JsonPropertyName]` annotations for both naming conventions
+- 🟡 Both Orders and Fulfillment BCs adopt shared type; legacy-named properties marked `[Obsolete]`
+
+*Orders saga prerequisites for Returns BC (must precede Cycle 25):*
+- 🔴 Add `bool IsReturnInProgress` and `Guid? ActiveReturnId` to `Order` saga
+- 🔴 Guard `Handle(ReturnWindowExpired)` to only call `MarkCompleted()` when `!IsReturnInProgress`
+- 🔴 Add `Handle(Returns.ReturnRequested)` to set `IsReturnInProgress = true`
+- 🔴 Add `Handle(Returns.ReturnCompleted)` to publish `Payments.RefundRequested` then `MarkCompleted()`
+- 🔴 Add `Handle(Returns.ReturnDenied)` to reset `IsReturnInProgress` and conditionally close saga
+- 🔴 Add `GET /api/orders/{orderId}/returnable-items` endpoint (required by Returns BC FR-01)
+
+**Next cycles (revised roadmap):**
+- **Cycle 25:** Returns BC Phase 1 — Self-Service Returns + Order History page
+- **Cycle 26:** Notifications BC Phase 1 — Transactional email (OrderPlaced, ShipmentDispatched; Phase 1b: Returns events)
+- **Cycle 27:** Promotions BC Phase 1 — Coupons and discounts; RBAC ADR for Admin Portal authored during this cycle
+- **Cycle 28+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling (previously Cycle 24)
 
 ---
 
@@ -102,26 +119,49 @@
 
 ## Upcoming (Planned)
 
-### Next 3 Cycles (Milestones Created, Issues Ready/TBD)
+### Next 4 Cycles (Revised after Post-Cycle 23 Priority Review)
 
-- **Cycle 24:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling ([Milestone 17](https://github.com/erikshafer/CritterSupply/milestone/17), Issues TBD)
+> **See** [`docs/planning/priority-review-post-cycle-23.md`](priority-review-post-cycle-23.md) for the full cross-functional analysis (Product Owner + UX Engineer + Principal Architect) that produced this revised roadmap.
+
+- **Cycle 24:** Fulfillment Integrity + Returns Prerequisites *(scope revised — previously Admin Portal Phase 1)*
+  - Fulfillment bug fix sweep: RabbitMQ transport, `ShipmentDeliveryFailed` cascade, `Shipment.Create()` ID, dead states, idempotent handler
+  - `ShippingAddress` consolidation Phase A (shared type, dual-read JSON annotations)
+  - Orders saga prerequisites for Returns: `IsReturnInProgress` guard, new handlers, `returnable-items` endpoint
+  - Frontend: add `shipment-delivery-failed` SSE case in `OrderConfirmation.razor`
+
+- **Cycle 25:** Returns BC Phase 1 — Self-Service Returns + Order History page
+  - Domain spec ready: [`docs/returns/RETURNS-BC-SPEC.md`](../../returns/RETURNS-BC-SPEC.md)
+  - Prerequisite: Cycle 24 Fulfillment + saga work must be complete
+
+- **Cycle 26:** Notifications BC Phase 1 — Transactional email
+  - Phase 1a: `OrderPlaced`, `ShipmentDispatched` (existing BC events)
+  - Phase 1b: Returns events (`ReturnApproved`, `ReturnDenied`, `ReturnCompleted`, `ReturnExpired`)
+
+- **Cycle 27:** Promotions BC Phase 1 — Coupons and discounts
+  - RBAC ADR for Admin Portal to be authored during this cycle
+  - Shopping BC already has `CouponApplied`/`CouponRemoved` placeholder events
+
+- **Cycle 28+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling *(deferred from Cycle 24)*
   - Event Modeling: [`docs/planning/admin-portal-event-modeling.md`](admin-portal-event-modeling.md)
+  - UX Research: [`docs/planning/admin-portal-ux-research.md`](admin-portal-ux-research.md)
   - Gherkin features: [`docs/features/admin-portal/`](../features/admin-portal/)
-  - **E2E strategy ready** — Cycle 23 patterns (WASM hosting, 3-server fixture) directly applicable
+  - RBAC ADR must exist before implementation begins
 
 ### Future BCs (Priority Roadmap)
 
 **High Priority (Customer-Facing Gaps):**
-- 🔴 **Notifications BC** — Transactional emails, SMS, push notifications
-- 🔴 **Promotions BC** — Discount codes, percentage-off campaigns, BOGO
-- 🔴 **Returns BC** — Return authorization, refund processing, restocking
+- 🔴 **Returns BC** — Return authorization, refund processing, restocking *(Cycle 25)*
+- 🔴 **Notifications BC** — Transactional emails, SMS, push notifications *(Cycle 26)*
+- 🔴 **Promotions BC** — Discount codes, percentage-off campaigns, BOGO *(Cycle 27)*
 
 **Medium Priority (Scaling + Internal Tooling):**
+- 🟡 **Admin Portal** — Internal operations portal *(Cycle 28+, after RBAC ADR)*
 - 🟡 **Search BC** — Full-text product search, faceted navigation
 - 🟡 **Recommendations BC** — Personalized product recommendations
 - 🟡 **Analytics BC** — Business intelligence, reporting, dashboards
 
 **Low Priority (Strategic/Retention):**
+- 🟢 **Product Catalog Evolution** — Variants, Listings, Marketplaces *(blocked on D2–D10 decisions)*
 - 🟢 **Store Credit BC** — Gift cards, store credit issuance, balance tracking
 - 🟢 **Loyalty BC** — Rewards program, points accumulation
 - 🟢 **Operations Dashboard** — Developer/SRE event stream visualization (React + SignalR)
@@ -141,5 +181,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-11 (Cycle 23 closed — Vendor Portal E2E testing, 12 BDD scenarios)*
+*Last Updated: 2026-03-11 (Cycle 23 closed; priority review complete — Cycle 24 scope revised to Fulfillment Integrity + Returns Prerequisites)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*
