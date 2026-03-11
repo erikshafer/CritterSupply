@@ -35,6 +35,19 @@ docker-compose --profile all down
 - Optional: start all .NET services via Aspire (optional workflow):
 See `CLAUDE.md` for more information.
 
+- Convenience script: run the repository helper script to start the full stack via Docker Compose:
+
+```bash
+./start-all.sh
+```
+
+- Aspire AppHost (optional): the project `src/CritterSupply.AppHost/` can start all .NET services with the Aspire dashboard. Run:
+
+```bash
+dotnet run --project "src/CritterSupply.AppHost"
+# Aspire dashboard (default): http://localhost:15000
+```
+
 ## 3) Project-specific conventions & patterns (where to look + examples)
 - Immutability & types: domain types prefer `record`, `IReadOnlyList<T>`, and `sealed` for commands/events. See `docs/skills/modern-csharp-coding-standards.md` referenced from `CLAUDE.md`.
 - Handler discovery: API `Program.cs` includes API and domain assemblies in Wolverine discovery. Example: `opts.Discovery.IncludeAssembly(typeof(Program).Assembly);` and `opts.Discovery.IncludeAssembly(typeof(Storefront.Notifications.IEventBroadcaster).Assembly);` in `src/Customer Experience/Storefront.Api/Program.cs`.
