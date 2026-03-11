@@ -1,0 +1,345 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Marten;
+using Testcontainers.PostgreSql;
+using VendorIdentity.Api.Auth;
+using Wolverine;
+
+// VendorLoginEndpoint: used as WebApplicationFactory anchor for VendorIdentity.Api
+using VendorLoginEndpoint = VendorIdentity.Api.Auth.VendorLoginEndpoint;
+
+namespace VendorPortal.E2ETests;
+
+/// <summary>
+/// E2E test fixture that starts real Kestrel servers for VendorIdentity.Api,
+/// VendorPortal.Api, and a static file host serving VendorPortal.Web (Blazor WASM),
+/// backed by TestContainers PostgreSQL instances.
+///
+/// Architecture:
+///   Playwright Browser (Chromium)
+///         │
+///         ▼
+///   VendorPortal.Web (WASM static files served by thin ASP.NET host, random port)
+///         │ (cross-origin HTTP + WebSocket)
+///         ├──────────────────────────┐
+///         ▼                          ▼
+///   VendorPortal.Api              VendorIdentity.Api
+///   (Kestrel, random port)        (Kestrel, random port)
+///   ├── Marten (vendorportal)     ├── EF Core (vendoridentity)
+///   ├── SignalR hub               ├── JWT issuance
+///   ├── Wolverine (local only)    └── Demo account seeding
+///   └── JWT validation
+///         │                          │
+///         └── Shared PostgreSQL ─────┘
+///             (TestContainers)
+///
+/// Key constraints:
+///   - All services use REAL Kestrel (not TestServer) — Playwright requires TCP ports.
+///   - VendorIdentity.Api is a real server (not stubbed) — E2E tests need real JWTs.
+///   - CORS is opened to allow the WASM host's random-port origin.
+///   - RabbitMQ transports are disabled — Wolverine runs in local-only mode.
+/// </summary>
+public sealed class E2ETestFixture : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
+        .WithDatabase("vendor_e2e_test_db")
+        .WithName($"vendor-e2e-postgres-{Guid.NewGuid():N}")
+        .WithCleanUp(true)
+        .Build();
+
+    private VendorIdentityApiKestrelFactory? _identityFactory;
+    private VendorPortalApiKestrelFactory? _portalApiFactory;
+    private WasmStaticFileHost? _wasmHost;
+
+    /// <summary>Base URL of VendorPortal.Web WASM host — what Playwright navigates to.</summary>
+    public string WasmBaseUrl { get; private set; } = string.Empty;
+
+    /// <summary>Base URL of VendorPortal.Api — for direct API calls in test hooks.</summary>
+    public string PortalApiBaseUrl { get; private set; } = string.Empty;
+
+    /// <summary>Base URL of VendorIdentity.Api — for direct API calls in test hooks.</summary>
+    public string IdentityApiBaseUrl { get; private set; } = string.Empty;
+
+    /// <summary>Direct access to VendorPortal.Api host for SignalR hub context injection.</summary>
+    public IHost PortalApiHost { get; private set; } = null!;
+
+    public async Task InitializeAsync()
+    {
+        // Step 1: Start TestContainers PostgreSQL
+        await _postgres.StartAsync();
+        var connectionString = _postgres.GetConnectionString();
+
+        // Step 2: Start VendorIdentity.Api (EF Core — JWT issuer)
+        _identityFactory = new VendorIdentityApiKestrelFactory(connectionString);
+        _identityFactory.StartKestrel();
+        IdentityApiBaseUrl = _identityFactory.ServerAddress;
+
+        // Step 3: Start VendorPortal.Api (Marten — analytics, change requests, SignalR)
+        _portalApiFactory = new VendorPortalApiKestrelFactory(connectionString, IdentityApiBaseUrl);
+        _portalApiFactory.StartKestrel();
+        PortalApiBaseUrl = _portalApiFactory.ServerAddress;
+        PortalApiHost = _portalApiFactory.Services.GetRequiredService<IHost>();
+
+        // Step 4: Start WASM static file host serving VendorPortal.Web with test API URLs
+        _wasmHost = new WasmStaticFileHost(IdentityApiBaseUrl, PortalApiBaseUrl);
+        await _wasmHost.StartAsync();
+        WasmBaseUrl = _wasmHost.BaseUrl;
+    }
+
+    public async Task DisposeAsync()
+    {
+        if (_wasmHost != null) await _wasmHost.DisposeAsync();
+        if (_portalApiFactory != null) await _portalApiFactory.DisposeAsync();
+        if (_identityFactory != null) await _identityFactory.DisposeAsync();
+        await _postgres.DisposeAsync();
+    }
+
+    /// <summary>
+    /// Cleans all Marten document/event data from the VendorPortal test database.
+    /// Call in DataHooks.AfterScenario for complete test isolation.
+    /// Note: VendorIdentity EF Core seed data (tenant + users) is NOT cleaned — it's shared.
+    /// </summary>
+    public async Task CleanMartenDataAsync()
+    {
+        var store = _portalApiFactory?.Services.GetRequiredService<IDocumentStore>();
+        if (store != null)
+        {
+            await store.Advanced.Clean.DeleteAllDocumentsAsync();
+            await store.Advanced.Clean.DeleteAllEventDataAsync();
+        }
+    }
+}
+
+
+/// <summary>
+/// WebApplicationFactory for VendorIdentity.Api that binds to a real Kestrel TCP port.
+/// Runs the real EF Core service with auto-seeded demo accounts.
+/// Uses VendorLoginEndpoint as the anchor type (Program is ambiguous across assemblies).
+/// </summary>
+internal sealed class VendorIdentityApiKestrelFactory(string connectionString)
+    : WebApplicationFactory<VendorLoginEndpoint>
+{
+    public string ServerAddress { get; private set; } = string.Empty;
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureAppConfiguration(config =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:postgres"] = connectionString
+            });
+        });
+
+        builder.ConfigureServices(services =>
+        {
+            // Disable external Wolverine transports (RabbitMQ)
+            services.DisableAllExternalWolverineTransports();
+
+            // Open CORS for test (random ports)
+            services.AddCors(opts =>
+            {
+                opts.AddDefaultPolicy(policy => policy
+                    .SetIsOriginAllowed(_ => true)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials());
+            });
+        });
+    }
+
+    internal void StartKestrel()
+    {
+        UseKestrel(0);
+        CreateDefaultClient();
+
+        var serverAddresses = Services
+            .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
+            .Features
+            .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
+
+        var rawAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
+        ServerAddress = NormalizeAddress(rawAddress);
+    }
+
+    internal static string NormalizeAddress(string rawAddress) => rawAddress
+        .Replace("//[::]:", "//localhost:")
+        .Replace("//0.0.0.0:", "//localhost:");
+}
+
+/// <summary>
+/// WebApplicationFactory for VendorPortal.Api that binds to a real Kestrel TCP port.
+/// Uses TestContainers Postgres for Marten and validates JWTs from the test VendorIdentity.Api.
+/// Uses VendorPortalHub as the anchor type (Program is ambiguous across assemblies).
+/// </summary>
+internal sealed class VendorPortalApiKestrelFactory(string connectionString, string identityApiUrl)
+    : WebApplicationFactory<VendorPortal.Api.Hubs.VendorPortalHub>
+{
+    public string ServerAddress { get; private set; } = string.Empty;
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureAppConfiguration(config =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:postgres"] = connectionString,
+                ["ApiClients:VendorIdentityApiUrl"] = identityApiUrl
+            });
+        });
+
+        builder.ConfigureServices(services =>
+        {
+            // Override Marten connection to use TestContainers Postgres
+            services.ConfigureMarten(opts => opts.Connection(connectionString));
+
+            // Disable external Wolverine transports (RabbitMQ)
+            services.DisableAllExternalWolverineTransports();
+
+            // Open CORS for test (random ports)
+            services.AddCors(opts =>
+            {
+                opts.AddDefaultPolicy(policy => policy
+                    .SetIsOriginAllowed(_ => true)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials());
+            });
+        });
+    }
+
+    internal void StartKestrel()
+    {
+        UseKestrel(0);
+        CreateDefaultClient();
+
+        var serverAddresses = Services
+            .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
+            .Features
+            .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
+
+        var rawAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
+        ServerAddress = VendorIdentityApiKestrelFactory.NormalizeAddress(rawAddress);
+    }
+}
+
+/// <summary>
+/// Lightweight ASP.NET Core host that serves the compiled Blazor WASM static files
+/// from VendorPortal.Web's build output, with a test-specific appsettings.json
+/// that points at the test API server URLs.
+///
+/// Blazor WASM apps fetch appsettings.json via HTTP from their own origin at startup.
+/// This host intercepts that request and returns the test configuration dynamically.
+/// </summary>
+internal sealed class WasmStaticFileHost : IAsyncDisposable
+{
+    private readonly string _identityApiUrl;
+    private readonly string _portalApiUrl;
+    private WebApplication? _app;
+
+    public string BaseUrl { get; private set; } = string.Empty;
+
+    public WasmStaticFileHost(string identityApiUrl, string portalApiUrl)
+    {
+        _identityApiUrl = identityApiUrl;
+        _portalApiUrl = portalApiUrl;
+    }
+
+    public async Task StartAsync()
+    {
+        // Locate the VendorPortal.Web wwwroot output directory
+        // In test builds, the WASM files are in the VendorPortal.Web project's wwwroot
+        var wasmRoot = FindWasmRoot();
+
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0"); // Random port
+
+        // Open CORS for cross-origin API calls from WASM
+        builder.Services.AddCors(opts =>
+        {
+            opts.AddDefaultPolicy(policy => policy
+                .SetIsOriginAllowed(_ => true)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials());
+        });
+
+        _app = builder.Build();
+
+        _app.UseCors();
+
+        // Intercept appsettings.json requests to inject test API URLs
+        _app.MapGet("/appsettings.json", () => Results.Json(new
+        {
+            ApiClients = new
+            {
+                VendorIdentityApiUrl = _identityApiUrl,
+                VendorPortalApiUrl = _portalApiUrl
+            }
+        }));
+
+        // Serve static WASM files
+        _app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wasmRoot),
+            ServeUnknownFileTypes = true // Required for .wasm, .dll, .dat files
+        });
+
+        // SPA fallback — serve index.html for all non-file routes (Blazor client-side routing)
+        _app.MapFallbackToFile("index.html", new StaticFileOptions
+        {
+            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wasmRoot)
+        });
+
+        await _app.StartAsync();
+
+        var addresses = _app.Services
+            .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
+            .Features
+            .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
+
+        BaseUrl = VendorIdentityApiKestrelFactory.NormalizeAddress(
+            addresses?.Addresses.FirstOrDefault() ?? string.Empty);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_app != null) await _app.DisposeAsync();
+    }
+
+    /// <summary>
+    /// Locates the VendorPortal.Web wwwroot directory containing compiled WASM files.
+    /// Walks up from the test output directory to find the source project.
+    /// </summary>
+    private static string FindWasmRoot()
+    {
+        // Strategy: find the VendorPortal.Web project's wwwroot from the repo root
+        var current = AppContext.BaseDirectory;
+        while (current != null)
+        {
+            var candidate = Path.Combine(current, "src", "Vendor Portal", "VendorPortal.Web", "wwwroot");
+            if (Directory.Exists(candidate))
+                return candidate;
+
+            // Also check for the published output (bin/Debug or bin/Release)
+            var binCandidate = Directory.GetDirectories(current, "VendorPortal.Web", SearchOption.AllDirectories)
+                .Select(d => Path.Combine(d, "wwwroot"))
+                .FirstOrDefault(Directory.Exists);
+
+            if (binCandidate != null)
+                return binCandidate;
+
+            current = Directory.GetParent(current)?.FullName;
+        }
+
+        throw new InvalidOperationException(
+            "Could not locate VendorPortal.Web/wwwroot directory. " +
+            "Ensure the VendorPortal.Web project is built before running E2E tests.");
+    }
+}

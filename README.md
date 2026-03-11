@@ -94,8 +94,8 @@ CritterSupply includes specialized GitHub Copilot agents with domain expertise t
 
 - **Core:** C# 14+ (.NET 10), [Wolverine](https://wolverine.netlify.app/), [Marten](https://martendb.io/), [EF Core](https://learn.microsoft.com/en-us/ef/core/)
 - **Infrastructure:** PostgreSQL, RabbitMQ, Docker, [.NET Aspire](https://learn.microsoft.com/en-us/dotnet/aspire/)
-- **Testing:** [Alba](https://jasperfx.github.io/alba/), [Testcontainers](https://dotnet.testcontainers.org/), xUnit, [Reqnroll](https://reqnroll.net/)
-- **UI:** [Blazor Server](https://learn.microsoft.com/en-us/aspnet/core/blazor/), [MudBlazor](https://mudblazor.com/), SignalR
+- **Testing:** [Alba](https://jasperfx.github.io/alba/), [Testcontainers](https://dotnet.testcontainers.org/), xUnit, [Reqnroll](https://reqnroll.net/), [Playwright](https://playwright.dev/dotnet/) (E2E)
+- **UI:** [Blazor Server](https://learn.microsoft.com/en-us/aspnet/core/blazor/) + [Blazor WASM](https://learn.microsoft.com/en-us/aspnet/core/blazor/hosting-models#blazor-webassembly), [MudBlazor](https://mudblazor.com/), SignalR
 - **Observability:** OpenTelemetry, Jaeger (distributed tracing)
 
 See [CLAUDE.md](./CLAUDE.md) for complete technology details and development guidelines.
@@ -172,8 +172,8 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 | 👤 **Customer Identity**   | Addresses and saved payment methods            | ✅ Complete |
 | 📦 **Product Catalog**     | Product definitions and pricing                | ✅ Complete |
 | 🎁 **Customer Experience** | Storefront BFF (Blazor + SignalR)              | ✅ Complete |
-| 🏢 **Vendor Identity**     | Vendor user authentication & tenant management | 🚧 In Progress |
-| 📊 **Vendor Portal**       | Vendor analytics, insights, change requests    | 🚧 In Progress |
+| 🏢 **Vendor Identity**     | Vendor user authentication & tenant management | ✅ Complete |
+| 📊 **Vendor Portal**       | Vendor analytics, insights, change requests    | ✅ Complete |
 | 🔄 **Returns**             | Return authorization and processing            | 🔜 Planned |
 | 💰 **Pricing**             | Server-authoritative pricing, scheduled price changes | 🔜 Planned |
 | 🖥️ **Admin Portal**        | Internal operations portal (gateway BFF)       | 🔜 Planned |

@@ -77,17 +77,29 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 0
 
-      - name: Run E2E Tests
+      - name: Run Storefront E2E Tests
         run: |
           dotnet test "tests/Customer Experience/Storefront.E2ETests/Storefront.E2ETests.csproj" \
             --no-build \
             --configuration Release \
             --logger "console;verbosity=normal" \
-            --logger "trx;LogFileName=e2e-results.trx" \
+            --logger "trx;LogFileName=storefront-e2e-results.trx" \
             -- -parallel none
         env:
           PLAYWRIGHT_HEADLESS: ${{ github.event.inputs.headless || 'true' }}
-          # TestContainers: allow Docker socket access (ubuntu-latest has Docker pre-installed)
+          DOCKER_HOST: unix:///var/run/docker.sock
+          TESTCONTAINERS_RYUK_DISABLED: false
+
+      - name: Run Vendor Portal E2E Tests
+        run: |
+          dotnet test "tests/Vendor Portal/VendorPortal.E2ETests/VendorPortal.E2ETests.csproj" \
+            --no-build \
+            --configuration Release \
+            --logger "console;verbosity=normal" \
+            --logger "trx;LogFileName=vendor-e2e-results.trx" \
+            -- -parallel none
+        env:
+          PLAYWRIGHT_HEADLESS: ${{ github.event.inputs.headless || 'true' }}
           DOCKER_HOST: unix:///var/run/docker.sock
           TESTCONTAINERS_RYUK_DISABLED: false
 
@@ -117,6 +129,10 @@ jobs:
           echo "**Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Suites" >> $GITHUB_STEP_SUMMARY
+          echo "- **Storefront E2E** (Blazor Server): Checkout, SignalR, Protected Routes" >> $GITHUB_STEP_SUMMARY
+          echo "- **Vendor Portal E2E** (Blazor WASM): Auth, Dashboard, Change Requests, RBAC" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "If this run failed, download the **playwright-traces** artifact and open it with:" >> $GITHUB_STEP_SUMMARY
           echo "\`playwright show-trace <trace-file.zip>\`" >> $GITHUB_STEP_SUMMARY

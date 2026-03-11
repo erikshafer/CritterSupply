@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <AssemblyName>VendorPortal.E2ETests</AssemblyName>
+        <RootNamespace>VendorPortal.E2ETests</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="coverlet.collector" />
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="Microsoft.Playwright" />
+        <PackageReference Include="Reqnroll" />
+        <PackageReference Include="Reqnroll.xUnit" />
+        <PackageReference Include="Shouldly" />
+        <PackageReference Include="Testcontainers.PostgreSql" />
+        <PackageReference Include="xunit" />
+        <PackageReference Include="xunit.runner.visualstudio" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="Xunit" />
+        <Using Include="Shouldly" />
+        <Using Include="Reqnroll" />
+        <Using Include="Microsoft.Playwright" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- VendorIdentity.Api (EF Core auth service — real Kestrel server in E2E) -->
+        <ProjectReference Include="..\..\..\src\Vendor Identity\VendorIdentity.Api\VendorIdentity.Api.csproj" />
+        <!-- VendorPortal.Api (Marten analytics + SignalR hub — real Kestrel server in E2E) -->
+        <ProjectReference Include="..\..\..\src\Vendor Portal\VendorPortal.Api\VendorPortal.Api.csproj" />
+        <!-- VendorPortal.Web (Blazor WASM — served as static files in E2E) -->
+        <ProjectReference Include="..\..\..\src\Vendor Portal\VendorPortal.Web\VendorPortal.Web.csproj" />
+    </ItemGroup>
+
+    <!-- xUnit configuration for test execution (disable parallelization for E2E tests) -->
+    <ItemGroup>
+        <None Update="xunit.runner.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+    <!-- Playwright browser installation target (run once after build) -->
+    <Target Name="InstallPlaywrightBrowsers" AfterTargets="Build">
+        <Exec Command="pwsh bin/$(Configuration)/$(TargetFramework)/playwright.ps1 install chromium" Condition="'$(PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD)' != '1'" />
+    </Target>
+
+</Project>

@@ -51,7 +51,8 @@
         <MudGrid>
             <MudItem xs="12" sm="4">
                 <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center"
-                          aria-label="@($"Low Stock Alerts: {_activeLowStockAlerts}")">
+                          aria-label="@($"Low Stock Alerts: {_activeLowStockAlerts}")"
+                          data-testid="kpi-low-stock-alerts">>
                     <MudIcon Icon="@Icons.Material.Filled.Warning"
                              Color="@(_activeLowStockAlerts > 0 ? Color.Error : Color.Success)"
                              Style="font-size:2rem;" aria-hidden="true" />
@@ -65,7 +66,8 @@
 
             <MudItem xs="12" sm="4">
                 <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center"
-                          aria-label="@($"Pending Change Requests: {_summary.PendingChangeRequests}")">
+                          aria-label="@($"Pending Change Requests: {_summary.PendingChangeRequests}")"
+                          data-testid="kpi-pending-change-requests">>
                     <MudIcon Icon="@Icons.Material.Filled.EditNote"
                              Color="@(_summary.PendingChangeRequests > 0 ? Color.Warning : Color.Success)"
                              Style="font-size:2rem;" aria-hidden="true" />
@@ -76,7 +78,8 @@
 
             <MudItem xs="12" sm="4">
                 <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center"
-                          aria-label="@($"Total SKUs: {_summary.TotalSkus}")">
+                          aria-label="@($"Total SKUs: {_summary.TotalSkus}")"
+                          data-testid="kpi-total-skus">>
                     <MudIcon Icon="@Icons.Material.Filled.Inventory"
                              Color="Color.Primary"
                              Style="font-size:2rem;" aria-hidden="true" />
