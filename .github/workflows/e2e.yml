@@ -68,9 +68,19 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
 
-      - name: Install Playwright browsers
-        # Cache Playwright browser binaries between runs to speed up CI
+      # Cache dotnet global tools (~/.dotnet/tools) so installing the Playwright CLI is faster
+      - name: Cache dotnet tools
+        id: dotnet-tools-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.dotnet/tools
+          key: ${{ runner.os }}-dotnet-tools-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-dotnet-tools-
+
+      # Cache Playwright browser binaries between runs to speed up CI
       - name: Cache Playwright browsers
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: |
@@ -90,6 +100,15 @@ jobs:
           playwright install chromium --with-deps
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 0
+
+      - name: Cache status
+        if: always()
+        run: |
+          echo "## Playwright & dotnet-tools cache status" >> $GITHUB_STEP_SUMMARY || true
+          echo "Playwright cache hit: ${{ steps.playwright-cache.outputs.cache-hit }}" >> $GITHUB_STEP_SUMMARY || true
+          echo "Dotnet tools cache hit: ${{ steps.dotnet-tools-cache.outputs.cache-hit }}" >> $GITHUB_STEP_SUMMARY || true
+          echo "Playwright cache hit: ${{ steps.playwright-cache.outputs.cache-hit }}"
+          echo "Dotnet tools cache hit: ${{ steps.dotnet-tools-cache.outputs.cache-hit }}"
 
       - name: Run Storefront E2E Tests
         run: |
