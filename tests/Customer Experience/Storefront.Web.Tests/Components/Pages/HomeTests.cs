@@ -59,7 +59,7 @@ public sealed class HomeTests : BunitTestBase
 
         var markup = cut.Markup;
         markup.ShouldContain("Browse Products");
-        markup.ShouldContain("Shopping Cart");
+        markup.ShouldContain("Cart");
         markup.ShouldContain("Checkout");
         markup.ShouldContain("Order History");
     }

@@ -1,4 +1,6 @@
 @page "/"
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
 
 <PageTitle>Home - CritterSupply</PageTitle>
 
@@ -80,7 +82,7 @@
         <MudCard Style="height: 100%;">
             <MudCardContent Class="d-flex flex-column align-center py-6">
                 <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Size="Size.Large" Color="Color.Primary" Class="mb-3" />
-                <MudText Typo="Typo.h6" Align="Align.Center">Shopping Cart</MudText>
+                <MudText Typo="Typo.h6" Align="Align.Center">Cart</MudText>
                 <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary" Class="mt-2">
                     Review your items and proceed to checkout
                 </MudText>
@@ -131,3 +133,21 @@
 <MudAlert Severity="Severity.Info" Class="mt-8" Dense="true">
     <strong>Demo Mode:</strong> This is a reference architecture demonstrating Backend-for-Frontend (BFF) patterns with Server-Sent Events (SSE) real-time updates.
 </MudAlert>
+
+@code {
+    [SupplyParameterFromQuery(Name = "signedOut")]
+    public string? SignedOut { get; set; }
+
+    private bool _signedOutSnackbarShown;
+
+    protected override void OnParametersSet()
+    {
+        if (SignedOut == "true" && !_signedOutSnackbarShown)
+        {
+            _signedOutSnackbarShown = true;
+            Snackbar.Add("You have been signed out.", Severity.Success);
+            // Remove the query parameter to prevent re-showing on navigation
+            Navigation.NavigateTo("/", replace: true);
+        }
+    }
+}

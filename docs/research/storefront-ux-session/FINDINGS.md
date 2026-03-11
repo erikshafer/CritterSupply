@@ -401,21 +401,21 @@ The PO understood it was a development aid but noted that even in a demo or stak
 
 | Severity | Issue | Root Cause | Fixed? |
 |---|---|---|---|
-| 🔴 P0 (security) | SignalR/SSE cart events broadcast to ALL connected clients | `StorefrontHub` has no customer isolation — all subscribers receive all `cart-updated` events regardless of which customer's cart changed. See `src/Customer Experience/Storefront.Api/StorefrontHub.cs` and the Production Blockers section of `Storefront.Api/README.md` | ❌ Not yet fixed — documented in `Storefront.Api/README.md` as production blocker |
-| 🔴 P1 | Order History shows hardcoded fake orders | `OrderHistory.razor` renders three static mock rows; no integration with Orders BC | ❌ Not yet implemented |
-| 🟡 P1 | Payment field label "Payment Token (stub)" — developer language visible to consumer | Field uses internal terminology; placeholder `tok_visa_test_12345` reinforces test/dev framing | ❌ Not yet fixed |
-| 🟡 P1 | Product images broken / missing in dev environment | No image seeding; `<img src>` points to placeholder or non-existent URLs in development | ❌ Requires image seeding or styled fallback |
-| 🟡 P2 | Demo credentials banner on the login page | `<MudAlert>` block on `Login.razor` shows all dev account emails + shared password in plaintext | ❌ Marked as POC-only in code; must be removed before any stakeholder/customer exposure |
-| 🟡 P2 | No "Continue Shopping" link on Order Confirmation page | Page has no secondary affordance back to Products after a successful order | ❌ Missing |
-| 🟡 P2 | Customer ID (GUID) displayed on Account page | `Account.razor` displays the internal `CustomerId` claim, which is not meaningful to a consumer | ❌ Should be hidden |
-| 🟡 P2 | No address management in the Storefront | Customers cannot add, edit, or remove saved addresses from within the Storefront UI | ❌ Not yet implemented |
-| 🟡 P2 | Order status does not advance from "Placed" in a typical dev session | Advancing order status requires Orders BC → Payments BC → back to Orders → event emission over RabbitMQ — all services must run and events must flow | ❌ Service integration gap; expected in current development stage |
-| 🟢 P3 | Nav drawer (hamburger icon) is not discoverable on desktop | The `☰` icon is small, unlabeled, and unconventional on desktop; most users expect a persistent sidebar or top nav links | ❌ Navigation architecture needs revisiting |
-| 🟢 P3 | No sign-out confirmation message | Logout returns to `/` with no feedback message confirming the session ended | ❌ Minor polish gap |
-| 🟢 P3 | "Active" stock status label is domain language, not consumer language | `Active` is shown on product cards; customers expect "In Stock" or "Available" | ❌ Copy/label gap |
-| 🟢 P3 | Shipping cost not previewed before checkout | Cart page shows "Shipping: TBD" with no "from $X.XX" hint; customer must enter checkout to see cost | ❌ Minor friction |
-| 🟢 P3 | No "save for later" / wishlist feature | Customers cannot save items without adding to cart; no wishlist affordance | ❌ Not yet designed |
-| 🟢 P3 | Shipping method cost update not visually connected to stepper action | Changing shipping radio selection updates the right-side summary panel, but the panel is not in the PO's primary focus area while interacting with the stepper | ❌ Layout/feedback gap |
+| 🔴 P0 (security) | SignalR/SSE cart events broadcast to ALL connected clients | `StorefrontHub` has no customer isolation — all subscribers receive all `cart-updated` events regardless of which customer's cart changed. See `src/Customer Experience/Storefront.Api/StorefrontHub.cs` and the Production Blockers section of `Storefront.Api/README.md` | ✅ Fixed — handlers now use `.ToWebSocketGroup($"customer:{customerId}")` |
+| 🔴 P1 | Order History shows hardcoded fake orders | `OrderHistory.razor` renders three static mock rows; no integration with Orders BC | ✅ Fixed — empty state replaces stub rows |
+| 🟡 P1 | Payment field label "Payment Token (stub)" — developer language visible to consumer | Field uses internal terminology; placeholder `tok_visa_test_12345` reinforces test/dev framing | ✅ Fixed — relabeled to "Payment Method" |
+| 🟡 P1 | Product images broken / missing in dev environment | No image seeding; `<img src>` points to placeholder or non-existent URLs in development | ✅ Fixed — styled pet icon placeholder shown when `PrimaryImageUrl` is empty |
+| 🟡 P2 | Demo credentials banner on the login page | `<MudAlert>` block on `Login.razor` shows all dev account emails + shared password in plaintext | ✅ Fixed — `<MudAlert>` block removed |
+| 🟡 P2 | No "Continue Shopping" link on Order Confirmation page | Page has no secondary affordance back to Products after a successful order | ✅ Fixed — "Continue Shopping" links to `/products`; status label humanized |
+| 🟡 P2 | Customer ID (GUID) displayed on Account page | `Account.razor` displays the internal `CustomerId` claim, which is not meaningful to a consumer | ✅ Fixed — field removed |
+| 🟡 P2 | No address management in the Storefront | Customers cannot add, edit, or remove saved addresses from within the Storefront UI | ⏳ Deferred to next cycle |
+| 🟡 P2 | Order status does not advance from "Placed" in a typical dev session | Advancing order status requires Orders BC → Payments BC → back to Orders → event emission over RabbitMQ — all services must run and events must flow | ⏳ Service integration gap; expected in current development stage |
+| 🟢 P3 | Nav drawer (hamburger icon) is not discoverable on desktop | The `☰` icon is small, unlabeled, and unconventional on desktop; most users expect a persistent sidebar or top nav links | ✅ Fixed — desktop nav links added to app bar |
+| 🟢 P3 | No sign-out confirmation message | Logout returns to `/` with no feedback message confirming the session ended | ✅ Fixed — `?signedOut=true` triggers snackbar on home page |
+| 🟢 P3 | "Active" stock status label is domain language, not consumer language | `Active` is shown on product cards; customers expect "In Stock" or "Available" | ✅ Fixed — "In Stock" / "Out of Stock" labels used |
+| 🟢 P3 | Shipping cost not previewed before checkout | Cart page shows "Shipping: TBD" with no "from $X.XX" hint; customer must enter checkout to see cost | ✅ Fixed — "From $5.99" hint added to cart summary |
+| 🟢 P3 | No "save for later" / wishlist feature | Customers cannot save items without adding to cart; no wishlist affordance | ⏳ Deferred — future cycle |
+| 🟢 P3 | Shipping method cost update not visually connected to stepper action | Changing shipping radio selection updates the right-side summary panel, but the panel is not in the PO's primary focus area while interacting with the stepper | ✅ Fixed — inline cost labels added to each shipping radio option |
 
 ---
 
@@ -509,3 +509,42 @@ The PO understood it was a development aid but noted that even in a demo or stak
 8. **Revisit the global navigation architecture.** The current hamburger drawer is appropriate for mobile but insufficient for desktop. Consider adding labeled navigation links to the top app bar (Products, Cart, Orders), retaining the drawer for narrow viewports.
 
 9. **Run this session with a new participant and no prior e-commerce product context.** The Product Owner's industry experience made them gracious about developer artifacts. A participant with less e-commerce background would likely fail earlier and more abruptly on the payment token field and the Order History stub data.
+
+---
+
+## Implementation Status
+
+> Updated after Cycle 19 implementation. Items marked ✅ are resolved in PR `copilot/act-on-storefront-findings`.
+
+| Priority | Finding | Status | Notes |
+|---|---|---|---|
+| P0 (security) | SignalR/SSE broadcasts cart events to all clients | ✅ Fixed | All 6 notification handlers now return `SignalRMessage<T>.ToWebSocketGroup($"customer:{customerId}")` — scoped to the authenticated customer's hub group. See `WOLVERINE-SIGNALR-OBSERVATIONS.md` for detailed API findings. |
+| P1 | Order History shows hardcoded fake orders | ✅ Fixed | Replaced stub table with an honest empty state ("No orders yet") and a "Start Shopping" CTA to `/products`. No fake data shown. |
+| P1 | "Payment Token (stub)" label on checkout Step 3 | ✅ Fixed | Label changed to "Payment Method". Placeholder updated to "Enter your card details". Helper text rewritten for consumers. Warning snackbar copy updated. |
+| P1 | Product images broken/missing | ✅ Fixed | Products page and Cart page now show a pet icon (`Icons.Material.Filled.Pets`) placeholder when `PrimaryImageUrl` is null or empty. No more broken browser default placeholder. |
+| P2 | Demo credentials banner on login page | ✅ Fixed | `<MudAlert>` dev credentials block removed from `Login.razor`. |
+| P2 | No "Continue Shopping" or "Track Order" on Order Confirmation | ✅ Fixed | "Continue Shopping" now links to `/products`. "View Order History" link already present. Order status label maps `"Placed"` → `"Order Received"` for consumers via `GetDisplayStatus()`. |
+| P2 | Customer ID (GUID) shown on Account page | ✅ Fixed | `CustomerId` field removed from `Account.razor`. |
+| P2 | No address management in the Storefront | ⏳ Deferred | Significant feature work. Deferred to next cycle. |
+| P2 | Nav drawer not discoverable on desktop | ✅ Fixed | Added visible navigation links (Products, Cart, Orders) to the top app bar for `Breakpoint.MdAndUp` screens. Hamburger retained for mobile. |
+| P3 | No sign-out confirmation message | ✅ Fixed | Logout now redirects to `/?signedOut=true`. Home page reads the query parameter and shows a "You have been signed out." snackbar. |
+| P3 | "Active" stock status — domain language | ✅ Fixed | Product cards now show "In Stock" badge (green) when `IsInStock` is true. "Out of Stock" badge (red) when false. Domain term "Active" removed from consumer UI. |
+| P3 | Shipping cost not previewed on Cart page | ✅ Fixed | Cart order summary now shows a "Shipping — From $5.99" hint line. |
+| P3 | Shipping method selection feedback not visible | ✅ Fixed | Shipping radio button labels updated to include cost inline: "Standard Ground (5–7 days) — $5.99", etc. |
+| P3 | Cart quantity below 1 behavior | ✅ Already correct | Verified: `Disabled="@(item.Quantity <= 1 || _isProcessing)"` on the − button. No change needed. |
+| P3 | Home page "Shopping Cart" vs "Cart" inconsistency | ✅ Fixed | Home page quick-link card renamed to "Cart" to match the nav drawer and app bar. |
+| P3 (UXE) | Hamburger `<MudIconButton>` missing `aria-label` | ✅ Fixed | Added `aria-label="Toggle navigation menu"`. |
+| P3 (UXE) | Cart badge missing `aria-label` with item count | ✅ Fixed | Cart icon button now has `aria-label="Shopping cart, N items"` (dynamic based on count). |
+| P3 (UXE) | "Place Order" button not guarded by `_isProcessing` | ✅ Fixed | Added `Disabled="@_isProcessing"` to the Place Order button on checkout Step 4. |
+| P3 (UXE) | Checkout stepper `aria-live` on step changes | ⏳ Deferred | MudStepper does not natively expose an `aria-live` hook on step change. Requires custom JS interop or waiting for MudBlazor component enhancement. |
+| P3 (UXE) | `Item removed` snackbar copy | ℹ️ Already correct | The snackbar already says "Item removed from cart" — no change needed. |
+| P3 (No action) | Wishlist / save for later | ⏳ Deferred | Future cycle — feature design required. |
+
+### Wolverine + SignalR Observations
+
+Discovered during the P0 fix. Documented in full at [`WOLVERINE-SIGNALR-OBSERVATIONS.md`](./WOLVERINE-SIGNALR-OBSERVATIONS.md).
+
+Key findings for potential upstream contribution to [JasperFx/wolverine](https://github.com/JasperFx/wolverine):
+1. `.ToSignalR()` publish rule broadcasts to ALL connected clients — it does NOT respect hub group membership
+2. Handler return type change (`T` → `SignalRMessage<T>`) breaks existing `ITrackedSession.Sent.MessagesOf<T>()` test assertions
+3. `SignalRMessage<T>.Locator` exposes `ILocator` which is an internal interface — `GroupName` cannot be accessed without reflection or `ToString()` parsing

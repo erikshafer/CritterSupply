@@ -47,7 +47,17 @@ else
         {
             <MudItem xs="12" sm="6" md="4" lg="3">
                 <MudCard>
-                    <MudCardMedia Image="@product.PrimaryImageUrl" Height="200" />
+                    @if (string.IsNullOrEmpty(product.PrimaryImageUrl))
+                    {
+        // Add role="img" and aria-label for screen readers — the placeholder is a visual substitute for a product photo
+                        <div class="d-flex align-center justify-center" role="img" aria-label="Product image not available" style="height: 200px; background: #f5f5f5; border-radius: 4px 4px 0 0;">
+                            <MudIcon Icon="@Icons.Material.Filled.Pets" Style="font-size: 4rem;" Color="Color.Secondary" />
+                        </div>
+                    }
+                    else
+                    {
+                        <MudCardMedia Image="@product.PrimaryImageUrl" Height="200" />
+                    }
                     <MudCardContent>
                         <MudText Typo="Typo.h6">@product.Name</MudText>
                         <MudText Typo="Typo.body2" Color="Color.Secondary">@product.Category</MudText>
@@ -55,6 +65,10 @@ else
                         @if (!product.IsInStock)
                         {
                             <MudChip T="string" Color="Color.Error" Size="Size.Small" Class="mt-1">Out of Stock</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Class="mt-1">In Stock</MudChip>
                         }
                     </MudCardContent>
                     <MudCardActions>

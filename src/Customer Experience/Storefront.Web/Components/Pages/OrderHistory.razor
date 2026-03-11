@@ -3,45 +3,20 @@
 <PageTitle>Order History - CritterSupply</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-1">Order History</MudText>
-<MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+<MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
     Track your past orders and shipment status
 </MudText>
 
-<MudTable Items="@_orders" Hover="true" Striped="true" Class="mt-2">
-    <HeaderContent>
-        <MudTh>Order ID</MudTh>
-        <MudTh>Date</MudTh>
-        <MudTh>Status</MudTh>
-        <MudTh>Total</MudTh>
-    </HeaderContent>
-    <RowTemplate>
-        <MudTd>@context.OrderId</MudTd>
-        <MudTd>@context.PlacedAt.ToString("d")</MudTd>
-        <MudTd>
-            <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">@context.Status</MudChip>
-        </MudTd>
-        <MudTd>@context.Total.ToString("C")</MudTd>
-    </RowTemplate>
-    <NoRecordsContent>
-        <MudText>No orders found.</MudText>
-    </NoRecordsContent>
-</MudTable>
-
-@code {
-    private readonly List<OrderSummary> _orders = new()
-    {
-        new OrderSummary(Guid.NewGuid(), DateTimeOffset.Now.AddDays(-5), "Delivered", 129.99m),
-        new OrderSummary(Guid.NewGuid(), DateTimeOffset.Now.AddDays(-2), "Shipped", 45.00m),
-        new OrderSummary(Guid.NewGuid(), DateTimeOffset.Now.AddDays(-1), "Placed", 89.99m)
-    };
-
-    private Color GetStatusColor(string status) => status switch
-    {
-        "Placed" => Color.Info,
-        "Shipped" => Color.Primary,
-        "Delivered" => Color.Success,
-        _ => Color.Default
-    };
-
-    private sealed record OrderSummary(Guid OrderId, DateTimeOffset PlacedAt, string Status, decimal Total);
-}
+<MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="0" Style="border: 1px dashed rgba(0,0,0,0.12); border-radius: 12px;">
+    <MudIcon Icon="@Icons.Material.Filled.Receipt" Color="Color.Secondary" Style="font-size: 4rem;" Class="mb-4" />
+    <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-2">No orders yet</MudText>
+    <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center" Class="mb-6">
+        Your order history will appear here once you've placed an order.
+    </MudText>
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               Href="/products"
+               StartIcon="@Icons.Material.Filled.Storefront">
+        Start Shopping
+    </MudButton>
+</MudPaper>

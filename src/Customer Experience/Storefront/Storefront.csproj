@@ -11,8 +11,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- No packages needed - this is pure domain logic with HTTP client interfaces -->
-    <!-- Wolverine handlers are discovered from Storefront.Api assembly reference -->
+    <!-- WolverineFx.SignalR required for ToWebSocketGroup — scopes events to customer:{customerId} group -->
+    <PackageReference Include="WolverineFx.SignalR" />
   </ItemGroup>
 
 </Project>

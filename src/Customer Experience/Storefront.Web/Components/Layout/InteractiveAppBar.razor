@@ -8,14 +8,19 @@
 @implements IAsyncDisposable
 
 <MudAppBar Elevation="2">
-    <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
+    <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" aria-label="Toggle navigation menu" />
     <span class="cs-brand">
         <MudIcon Icon="@Icons.Material.Filled.Pets" Size="Size.Small" Class="cs-brand-icon" />
         <MudText Typo="Typo.h6" Style="font-weight: 700; letter-spacing: -0.01em;">CritterSupply</MudText>
     </span>
+    <MudHidden Breakpoint="Breakpoint.SmAndDown">
+        <MudButton Color="Color.Inherit" Href="/products" Style="margin-left: 8px;">Products</MudButton>
+        <MudButton Color="Color.Inherit" Href="/cart">Cart</MudButton>
+        <MudButton Color="Color.Inherit" Href="/orders">Orders</MudButton>
+    </MudHidden>
     <MudSpacer />
     <MudBadge Content="@_cartItemCount" Color="Color.Secondary" Overlap="true" Visible="@(_cartItemCount > 0)">
-        <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" />
+        <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" aria-label="@(_cartItemCount > 0 ? $"Shopping cart, {_cartItemCount} items" : "Shopping cart")" />
     </MudBadge>
 
     <AuthorizeView>
@@ -106,7 +111,7 @@
 
             if (success)
             {
-                Navigation.NavigateTo("/", forceLoad: true);
+                Navigation.NavigateTo("/?signedOut=true", forceLoad: true);
             }
             else
             {
