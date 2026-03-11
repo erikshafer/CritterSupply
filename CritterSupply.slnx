@@ -120,6 +120,7 @@
     <Project Path="src/Fulfillment/Fulfillment.Api/Fulfillment.Api.csproj" />
     <Project Path="src/Fulfillment/Fulfillment/Fulfillment.csproj" />
     <Project Path="tests/Fulfillment/Fulfillment.Api.IntegrationTests/Fulfillment.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Fulfillment/Fulfillment.UnitTests/Fulfillment.UnitTests.csproj" />
   </Folder>
   <Folder Name="/Inventory/">
     <Project Path="src/Inventory/Inventory.Api/Inventory.Api.csproj" />
@@ -131,6 +132,7 @@
     <Project Path="src/Shopping/Shopping.Api/Shopping.Api.csproj" />
     <Project Path="src/Shopping/Shopping/Shopping.csproj" />
     <Project Path="tests/Shopping/Shopping.Api.IntegrationTests/Shopping.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Shopping/Shopping.UnitTests/Shopping.UnitTests.csproj" />
   </Folder>
   <Folder Name="/Customer Identity/">
     <Project Path="src/Customer Identity/CustomerIdentity.Api/CustomerIdentity.Api.csproj" />
@@ -141,6 +143,7 @@
     <Project Path="src/Product Catalog/ProductCatalog.Api/ProductCatalog.Api.csproj" />
     <Project Path="src/Product Catalog/ProductCatalog/ProductCatalog.csproj" />
     <Project Path="tests/Product Catalog/ProductCatalog.Api.IntegrationTests/ProductCatalog.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Product Catalog/ProductCatalog.UnitTests/ProductCatalog.UnitTests.csproj" />
   </Folder>
   <Folder Name="/Customer Experience/">
     <Project Path="src/Customer Experience/Storefront.Api/Storefront.Api.csproj" />
@@ -173,6 +176,7 @@
     <Project Path="src/Vendor Portal/VendorPortal/VendorPortal.csproj" />
     <Project Path="src/Vendor Portal/VendorPortal.Web/VendorPortal.Web.csproj" />
     <Project Path="tests/Vendor Portal/VendorPortal.Api.IntegrationTests/VendorPortal.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Vendor Portal/VendorPortal.UnitTests/VendorPortal.UnitTests.csproj" />
     <Project Path="tests/Vendor Portal/VendorPortal.E2ETests/VendorPortal.E2ETests.csproj" />
   </Folder>
 </Solution>
