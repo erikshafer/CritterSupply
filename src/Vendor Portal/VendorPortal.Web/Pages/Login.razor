@@ -30,7 +30,8 @@
                           RequiredError="Email is required"
                           InputType="InputType.Email"
                           autocomplete="username"
-                          Class="mb-4" />
+                          Class="mb-4"
+                          data-testid="email-field" />
 
             <MudTextField @bind-Value="_password"
                           Label="Password"
@@ -43,11 +44,13 @@
                           Required="true"
                           RequiredError="Password is required"
                           autocomplete="current-password"
-                          Class="mb-4" />
+                          Class="mb-4"
+                          data-testid="password-field" />
 
             @if (!string.IsNullOrEmpty(_errorMessage))
             {
-                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-4" aria-live="assertive">
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-4" aria-live="assertive"
+                          data-testid="login-error-alert">
                     @_errorMessage
                 </MudAlert>
             }
@@ -56,7 +59,8 @@
                        Color="Color.Primary"
                        FullWidth="true"
                        OnClick="HandleLogin"
-                       Disabled="_isLoading">
+                       Disabled="_isLoading"
+                       data-testid="login-btn">
                 @if (_isLoading)
                 {
                     <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />

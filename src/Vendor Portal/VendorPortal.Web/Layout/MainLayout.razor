@@ -18,7 +18,8 @@
 
             <MudTooltip Text="@HubStatusText">
                 @* P2-A: Show text label for non-connected states — icon-only is ambiguous and invisible on touch devices *@
-                <div class="d-flex align-center gap-1" aria-label="@HubStatusText" role="status">
+                <div class="d-flex align-center gap-1" aria-label="@HubStatusText" role="status"
+                     data-testid="hub-status-indicator">
                     <MudIcon Icon="@HubStatusIcon"
                              Color="@HubStatusColor"
                              Size="Size.Small"
@@ -32,12 +33,13 @@
                 </div>
             </MudTooltip>
 
-            <MudText Typo="Typo.body2" Class="mr-2">
+            <MudText Typo="Typo.body2" Class="mr-2" data-testid="user-info-text">
                 @AuthState.FirstName — @AuthState.TenantName
             </MudText>
 
             <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Class="mr-2"
-                     aria-label="@($"Your role: {AuthState.RoleDisplayName}")">
+                     aria-label="@($"Your role: {AuthState.RoleDisplayName}")"
+                     data-testid="role-badge">>
                 @AuthState.RoleDisplayName
             </MudChip>
 
@@ -51,7 +53,8 @@
                            Color="Color.Inherit"
                            Title="Sign Out"
                            aria-label="Sign Out"
-                           OnClick="HandleLogout" />
+                           OnClick="HandleLogout"
+                           data-testid="logout-btn" />
         }
     </MudAppBar>
 

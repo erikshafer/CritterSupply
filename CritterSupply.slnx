@@ -171,5 +171,6 @@
     <Project Path="src/Vendor Portal/VendorPortal/VendorPortal.csproj" />
     <Project Path="src/Vendor Portal/VendorPortal.Web/VendorPortal.Web.csproj" />
     <Project Path="tests/Vendor Portal/VendorPortal.Api.IntegrationTests/VendorPortal.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Vendor Portal/VendorPortal.E2ETests/VendorPortal.E2ETests.csproj" />
   </Folder>
 </Solution>
