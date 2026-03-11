@@ -1,0 +1,7 @@
+﻿<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="All Frontends" type="CompoundRunConfigurationType">
+    <toRun name="Storefront.Web: StorefrontWeb" type="LaunchSettings" />
+    <toRun name="VendorPortal.Web" type="DotNetProject" />
+    <method v="2" />
+  </configuration>
+</component>

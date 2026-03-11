@@ -1,5 +1,5 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="All APIs (Complete System)" type="CompoundRunConfigurationType">
+﻿<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="All APIs" type="CompoundRunConfigurationType">
     <toRun name="CustomerIdentity.Api: CustomerIdentityApi" type="LaunchSettings" />
     <toRun name="Fulfillment.Api: FulfillmentApi" type="LaunchSettings" />
     <toRun name="Inventory.Api: InventoryApi" type="LaunchSettings" />
@@ -8,7 +8,8 @@
     <toRun name="ProductCatalog.Api: ProductCatalogApi" type="LaunchSettings" />
     <toRun name="Shopping.Api: ShoppingApi" type="LaunchSettings" />
     <toRun name="Storefront.Api: StorefrontApi" type="LaunchSettings" />
-    <toRun name="Storefront.Web: StorefrontWeb" type="LaunchSettings" />
+    <toRun name="VendorIdentity.Api: VendorIdentityApi" type="LaunchSettings" />
+    <toRun name="VendorPortal.Api: VendorPortalApi" type="LaunchSettings" />
     <method v="2" />
   </configuration>
 </component>
