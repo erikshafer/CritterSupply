@@ -17,16 +17,6 @@ public enum ShipmentStatus
     Assigned,
 
     /// <summary>
-    /// Items being pulled from bins.
-    /// </summary>
-    Picking,
-
-    /// <summary>
-    /// Items boxed, shipping label generated.
-    /// </summary>
-    Packing,
-
-    /// <summary>
     /// Handed to carrier, tracking number assigned.
     /// </summary>
     Shipped,

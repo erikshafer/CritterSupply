@@ -26,7 +26,7 @@ public sealed record Shipment(
     /// This is used by Marten to create the aggregate from the first event in the stream.
     /// </summary>
     public static Shipment Create(FulfillmentRequested @event) =>
-        new(Guid.CreateVersion7(),
+        new(Guid.Empty,  // Marten will populate Id from the stream key
             @event.OrderId,
             @event.CustomerId,
             @event.ShippingAddress,

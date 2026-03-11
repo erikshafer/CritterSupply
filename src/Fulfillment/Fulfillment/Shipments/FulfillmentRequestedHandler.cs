@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Marten;
 using IntegrationMessages = Messages.Contracts.Fulfillment;
 
@@ -35,9 +36,30 @@ public static class FulfillmentRequestedHandler
             message.ShippingMethod,
             message.RequestedAt);
 
-        // Start the shipment event stream with a deterministic ID based on OrderId
-        // This ensures idempotency - multiple FulfillmentRequested messages for same order create same stream
-        var shipmentId = Guid.CreateVersion7();
+        // Create a deterministic UUID v5 from the OrderId to ensure idempotency.
+        // Multiple FulfillmentRequested messages for the same OrderId always create the same stream.
+        var shipmentId = CreateVersion5Guid(message.OrderId);
         session.Events.StartStream<Shipment>(shipmentId, domainEvent);
+    }
+
+    /// <summary>
+    /// Creates a deterministic UUID v5 from an input Guid using the DNS namespace.
+    /// Ensures idempotency: the same OrderId always produces the same ShipmentId.
+    /// </summary>
+    private static Guid CreateVersion5Guid(Guid orderId)
+    {
+        // Use a CritterSupply-specific namespace UUID for the fulfillment domain
+        var namespaceId = new Guid("6ba7b812-9dad-11d1-80b4-00c04fd430c8"); // DNS namespace UUID
+        var nameBytes = orderId.ToByteArray();
+        var namespaceBytes = namespaceId.ToByteArray();
+
+        using var sha1 = SHA1.Create();
+        var combined = namespaceBytes.Concat(nameBytes).ToArray();
+        var hash = sha1.ComputeHash(combined);
+
+        hash[6] = (byte)((hash[6] & 0x0F) | 0x50); // Version 5
+        hash[8] = (byte)((hash[8] & 0x3F) | 0x80); // Variant
+
+        return new Guid(hash.Take(16).ToArray());
     }
 }

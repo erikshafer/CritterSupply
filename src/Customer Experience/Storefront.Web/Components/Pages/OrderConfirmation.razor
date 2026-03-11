@@ -262,6 +262,12 @@ else
                     _latestUpdate = "Order delivered successfully";
                     StateHasChanged();
                     break;
+
+                case "shipment-delivery-failed":
+                    _currentStatus = "Delivery Failed";
+                    _latestUpdate = "Your delivery was unsuccessful — our team has been notified. Please check your order for next steps.";
+                    StateHasChanged();
+                    break;
             }
         }
     }
@@ -272,6 +278,7 @@ else
         "Payment Confirmed" => Color.Success,
         "Shipped" => Color.Primary,
         "Delivered" => Color.Success,
+        "Delivery Failed" => Color.Error,
         _ => Color.Default
     };
 
@@ -282,6 +289,7 @@ else
         "InventoryReserved" => "Preparing Your Order",
         "Shipped" => "Shipped",
         "Delivered" => "Delivered",
+        "Delivery Failed" => "Delivery Issue",
         _ => "Processing"  // Safe consumer fallback for any unexpected domain status
     };
 

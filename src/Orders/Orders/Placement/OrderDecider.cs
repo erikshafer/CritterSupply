@@ -2,6 +2,7 @@ using Messages.Contracts.Inventory;
 using Messages.Contracts.Payments;
 using IntegrationMessages = Messages.Contracts.Orders;
 using FulfillmentMessages = Messages.Contracts.Fulfillment;
+using CommonMessages = Messages.Contracts.Common;
 
 namespace Orders.Placement;
 
@@ -171,6 +172,7 @@ public static class OrderDecider
         {
             Status = OrderStatus.PaymentConfirmed,
             IsPaymentCaptured = true,
+            PaymentId = message.PaymentId,
             Messages = messages
         };
     }
@@ -407,13 +409,15 @@ public static class OrderDecider
                     li.Quantity))
                 .ToList();
 
-            var shippingAddress = new FulfillmentMessages.ShippingAddress(
-                current.ShippingAddress.Street,
-                current.ShippingAddress.Street2,
-                current.ShippingAddress.City,
-                current.ShippingAddress.State,
-                current.ShippingAddress.PostalCode,
-                current.ShippingAddress.Country);
+            var shippingAddress = new CommonMessages.SharedShippingAddress
+            {
+                AddressLine1 = current.ShippingAddress.Street,
+                AddressLine2 = current.ShippingAddress.Street2,
+                City = current.ShippingAddress.City,
+                StateProvince = current.ShippingAddress.State,
+                PostalCode = current.ShippingAddress.PostalCode,
+                Country = current.ShippingAddress.Country
+            };
 
             messages.Add(new FulfillmentMessages.FulfillmentRequested(
                 current.Id,
@@ -500,6 +504,7 @@ public sealed record OrderDecision
 {
     public OrderStatus? Status { get; init; }
     public bool? IsPaymentCaptured { get; init; }
+    public Guid? PaymentId { get; init; }
     public int? ConfirmedReservationCount { get; init; }
     public Dictionary<Guid, string>? ReservationIds { get; init; }
     public HashSet<Guid>? CommittedReservationIds { get; init; }
