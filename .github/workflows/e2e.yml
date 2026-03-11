@@ -68,20 +68,6 @@ jobs:
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
 
-      # Cache dotnet global tools (~/.dotnet/tools) so installing the Playwright CLI is faster
-      - name: Cache dotnet tools
-        id: dotnet-tools-cache
-        uses: actions/cache@v4
-        with:
-          # cache dotnet global tools on both Unix and Windows runners
-          path: |
-            ~/.dotnet/tools
-            $HOME/.dotnet/tools
-            %USERPROFILE%\\.dotnet\\tools
-          key: ${{ runner.os }}-dotnet-tools-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-dotnet-tools-
-
       # Cache Playwright browser binaries between runs to speed up CI
       - name: Cache Playwright browsers
         id: playwright-cache
@@ -98,24 +84,19 @@ jobs:
 
       - name: Install Playwright browsers
         run: |
-          # Install the Playwright CLI as a dotnet global tool (idempotent)
-          dotnet tool update --global Microsoft.Playwright.CLI || dotnet tool install --global Microsoft.Playwright.CLI
-          export PATH="$PATH:$HOME/.dotnet/tools"
-
-          # Use the Playwright CLI directly so we don't rely on pwsh being available on ubuntu runners.
-          # --with-deps installs system dependencies for Chromium on Ubuntu images.
-          playwright install chromium --with-deps
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 0
+          # Use the Node.js CLI bundled inside the Microsoft.Playwright NuGet package
+          # so we don't need pwsh or the outdated Microsoft.Playwright.CLI dotnet tool.
+          E2E_BIN="tests/Customer Experience/Storefront.E2ETests/bin/Release/net10.0"
+          "$E2E_BIN/.playwright/node/linux-x64/node" \
+            "$E2E_BIN/.playwright/package/cli.js" \
+            install chromium --with-deps
 
       - name: Cache status
         if: always()
         run: |
-          echo "## Playwright & dotnet-tools cache status" >> $GITHUB_STEP_SUMMARY || true
+          echo "## Playwright cache status" >> $GITHUB_STEP_SUMMARY || true
           echo "Playwright cache hit: ${{ steps.playwright-cache.outputs.cache-hit }}" >> $GITHUB_STEP_SUMMARY || true
-          echo "Dotnet tools cache hit: ${{ steps.dotnet-tools-cache.outputs.cache-hit }}" >> $GITHUB_STEP_SUMMARY || true
           echo "Playwright cache hit: ${{ steps.playwright-cache.outputs.cache-hit }}"
-          echo "Dotnet tools cache hit: ${{ steps.dotnet-tools-cache.outputs.cache-hit }}"
 
       - name: Run Storefront E2E Tests
         run: |
