@@ -133,12 +133,16 @@ public class ShipmentCreateTests
         shipment.FailureReason.ShouldBeNull();
     }
 
-    /// <summary>The auto-generated shipment Id is not empty.</summary>
+    /// <summary>
+    /// The shipment Id is <see cref="Guid.Empty"/> immediately after Create — Marten sets it
+    /// from the stream key when replaying the event stream. Pure-function Create() never
+    /// generates an Id.
+    /// </summary>
     [Fact]
-    public void Create_Assigns_Non_Empty_Id()
+    public void Create_Id_Is_Empty_Guid_Before_Marten_Sets_It()
     {
         var shipment = Shipment.Create(BuildEvent());
 
-        shipment.Id.ShouldNotBe(Guid.Empty);
+        shipment.Id.ShouldBe(Guid.Empty);
     }
 }

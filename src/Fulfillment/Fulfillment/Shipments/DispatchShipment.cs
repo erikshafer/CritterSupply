@@ -1,7 +1,9 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using Wolverine;
 using Wolverine.Http;
 using Wolverine.Marten;
+using IntegrationMessages = Messages.Contracts.Fulfillment;
 
 namespace Fulfillment.Shipments;
 
@@ -41,13 +43,30 @@ public static class DispatchShipmentHandler
     }
 
     [WolverinePost("/api/fulfillment/shipments/{shipmentId}/dispatch")]
-    public static ShipmentDispatched Handle(
+    public static (Events, OutgoingMessages) Handle(
         DispatchShipment command,
         [WriteAggregate] Shipment shipment)
     {
-        return new ShipmentDispatched(
+        var dispatchedAt = DateTimeOffset.UtcNow;
+
+        var domainEvent = new ShipmentDispatched(
             command.Carrier,
             command.TrackingNumber,
-            DateTimeOffset.UtcNow);
+            dispatchedAt);
+
+        var events = new Events();
+        events.Add(domainEvent);
+
+        var integrationMessage = new IntegrationMessages.ShipmentDispatched(
+            shipment.OrderId,
+            command.ShipmentId,
+            command.Carrier,
+            command.TrackingNumber,
+            dispatchedAt);
+
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(integrationMessage);
+
+        return (events, outgoing);
     }
 }

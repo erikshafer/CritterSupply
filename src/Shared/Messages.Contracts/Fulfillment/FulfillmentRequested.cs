@@ -1,3 +1,5 @@
+using Messages.Contracts.Common;
+
 namespace Messages.Contracts.Fulfillment;
 
 /// <summary>
@@ -7,18 +9,10 @@ namespace Messages.Contracts.Fulfillment;
 public sealed record FulfillmentRequested(
     Guid OrderId,
     Guid CustomerId,
-    ShippingAddress ShippingAddress,
+    SharedShippingAddress ShippingAddress,
     IReadOnlyList<FulfillmentLineItem> LineItems,
     string ShippingMethod,
     DateTimeOffset RequestedAt);
-
-public sealed record ShippingAddress(
-    string AddressLine1,
-    string? AddressLine2,
-    string City,
-    string StateProvince,
-    string PostalCode,
-    string Country);
 
 public sealed record FulfillmentLineItem(
     string Sku,

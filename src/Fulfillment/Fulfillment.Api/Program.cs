@@ -21,6 +21,7 @@ using Wolverine.FluentValidation;
 using Wolverine.Http;
 using Wolverine.Http.FluentValidation;
 using Wolverine.Marten;
+using Wolverine.RabbitMQ;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -74,6 +75,36 @@ builder.Host.UseWolverine(opts =>
         .Then.Discard();
 
     opts.UseFluentValidation();
+
+    // Configure RabbitMQ for integration messaging
+    var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");
+    opts.UseRabbitMq(rabbit =>
+    {
+        rabbit.HostName = rabbitConfig["hostname"] ?? "localhost";
+        rabbit.VirtualHost = rabbitConfig["virtualhost"] ?? "/";
+        rabbit.Port = rabbitConfig.GetValue<int?>("port") ?? 5672;
+        rabbit.UserName = rabbitConfig["username"] ?? "guest";
+        rabbit.Password = rabbitConfig["password"] ?? "guest";
+    }).AutoProvision();
+
+    // Listen for FulfillmentRequested from Orders BC
+    opts.ListenToRabbitQueue("fulfillment-requests").ProcessInline();
+
+    // Publish fulfillment integration messages to Orders BC
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDispatched>()
+        .ToRabbitQueue("orders-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
+        .ToRabbitQueue("orders-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDeliveryFailed>()
+        .ToRabbitQueue("orders-fulfillment-events");
+
+    // Also publish to Storefront for real-time customer updates
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDispatched>()
+        .ToRabbitQueue("storefront-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
+        .ToRabbitQueue("storefront-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDeliveryFailed>()
+        .ToRabbitQueue("storefront-fulfillment-events");
 });
 
 builder.Services.AddEndpointsApiExplorer();
