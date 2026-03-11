@@ -125,7 +125,7 @@ public class RecordDeliveryFailureTests : IAsyncLifetime
         await _fixture.Host.Scenario(s =>
         {
             s.Post
-                .Json(new { Reason = "Cannot fail a pending shipment" })
+                .Json(new { ShipmentId = shipmentId, Reason = "Cannot fail a pending shipment" })
                 .ToUrl($"/api/fulfillment/shipments/{shipmentId}/record-delivery-failure");
             s.StatusCodeShouldBe(400);
         });

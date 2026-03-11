@@ -24,11 +24,18 @@ public sealed record RecordDeliveryFailure(
 
 public static class RecordDeliveryFailureHandler
 {
+    // NOTE: We load the Shipment snapshot manually here rather than using the standard
+    // compound-handler pattern (nullable Shipment? with [WriteAggregate] on Handle())
+    // because Wolverine's [WriteAggregate] short-circuits the pipeline with a 400 when
+    // the event stream doesn't exist, preventing Before() from returning a 404.
+    // LoadAsync<Shipment> reads the inline snapshot document, which is always current
+    // (SnapshotLifecycle.Inline).
     public static async Task<ProblemDetails> Before(
         RecordDeliveryFailure command,
-        IDocumentSession session)
+        IDocumentSession session,
+        CancellationToken cancellationToken)
     {
-        var shipment = await session.LoadAsync<Shipment>(command.ShipmentId);
+        var shipment = await session.LoadAsync<Shipment>(command.ShipmentId, cancellationToken);
 
         if (shipment is null)
             return new ProblemDetails { Detail = "Shipment not found", Status = 404 };
