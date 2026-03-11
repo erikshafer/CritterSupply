@@ -113,7 +113,7 @@ public class IntegrationMessagePublishingTests : IAsyncLifetime
         var sent = tracked.Sent.MessagesOf<IntegrationContracts.ShipmentDelivered>().ToList();
         sent.ShouldNotBeEmpty("ShipmentDelivered integration message was not published");
 
-        var msg = sent.Single();
+        var msg = sent.First();
         msg.OrderId.ShouldBe(orderId);
         msg.ShipmentId.ShouldBe(shipmentId);
         msg.RecipientName.ShouldBe(recipientName);

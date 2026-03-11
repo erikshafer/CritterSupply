@@ -1,4 +1,5 @@
 using FluentValidation;
+using Marten;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -23,10 +24,12 @@ public sealed record RecordDeliveryFailure(
 
 public static class RecordDeliveryFailureHandler
 {
-    public static ProblemDetails Before(
+    public static async Task<ProblemDetails> Before(
         RecordDeliveryFailure command,
-        Shipment? shipment)
+        IDocumentSession session)
     {
+        var shipment = await session.LoadAsync<Shipment>(command.ShipmentId);
+
         if (shipment is null)
             return new ProblemDetails { Detail = "Shipment not found", Status = 404 };
 

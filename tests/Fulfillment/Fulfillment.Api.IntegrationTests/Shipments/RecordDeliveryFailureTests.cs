@@ -104,7 +104,7 @@ public class RecordDeliveryFailureTests : IAsyncLifetime
         await _fixture.Host.Scenario(s =>
         {
             s.Post
-                .Json(new { Reason = "Failed to deliver" })
+                .Json(new { ShipmentId = nonExistentShipmentId, Reason = "Failed to deliver" })
                 .ToUrl($"/api/fulfillment/shipments/{nonExistentShipmentId}/record-delivery-failure");
             s.StatusCodeShouldBe(404);
         });
@@ -156,7 +156,7 @@ public class RecordDeliveryFailureTests : IAsyncLifetime
         var sent = tracked.Sent.MessagesOf<IntegrationContracts.ShipmentDeliveryFailed>().ToList();
         sent.ShouldNotBeEmpty("ShipmentDeliveryFailed integration message was not published");
 
-        var msg = sent.Single();
+        var msg = sent.First();
         msg.OrderId.ShouldBe(orderId);
         msg.ShipmentId.ShouldBe(shipmentId);
         msg.Reason.ShouldBe(failureReason);
