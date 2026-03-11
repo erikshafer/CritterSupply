@@ -192,6 +192,8 @@ if (app.Environment.IsDevelopment())
         opts.RoutePrefix = "api";
         opts.SwaggerEndpoint("/api/v1/swagger.json", "Vendor Portal API");
     });
+
+    await VendorPortalSeedData.SeedAsync(app.Services.GetRequiredService<IDocumentStore>());
 }
 
 app.MapDefaultEndpoints();
