@@ -1205,3 +1205,105 @@ Use this checklist when adding a new Gherkin scenario to `checkout-flow.feature`
 - [testcontainers-integration-tests.md](./testcontainers-integration-tests.md) — TestContainers lifecycle and fixture patterns
 - [critterstack-testing-patterns.md](./critterstack-testing-patterns.md) — Alba integration test patterns
 - [bff-realtime-patterns.md](./bff-realtime-patterns.md) — Storefront BFF architecture and SignalR hub design
+
+---
+
+## Vendor Portal E2E Architecture (Cycle 23)
+
+The Vendor Portal uses a different architecture than the Storefront because it's **Blazor WASM** (not Blazor Server):
+
+### 3-Server Fixture
+
+```
+Playwright Browser (Chromium, headless)
+     │
+     ▼
+VendorPortal.Web (WASM static files via thin ASP.NET host, port=0)
+     │ (cross-origin HTTP + WebSocket)
+     ├─────────────────────────┐
+     ▼                         ▼
+VendorPortal.Api            VendorIdentity.Api
+(real Kestrel, port=0)      (real Kestrel, port=0)
+├── Marten (events/docs)    ├── EF Core (users/tenants)
+├── SignalR hub              ├── JWT issuance
+└── JWT validation           └── Auto-seeded demo accounts
+     │                         │
+     └── Shared PostgreSQL ────┘
+         (TestContainers)
+```
+
+### Key Differences from Storefront E2E
+
+| Concern | Storefront (Blazor Server) | Vendor Portal (Blazor WASM) |
+|---------|---------------------------|----------------------------|
+| **WebApplicationFactory** | Both Storefront.Web + Storefront.Api use WAF | Only API projects use WAF; WASM uses custom static host |
+| **Auth** | Session cookie (stubbed handler) | Real JWT from real VendorIdentity.Api |
+| **WASM hydration** | Instant (SSR) | 5–30s cold start (.NET runtime download) |
+| **Configuration injection** | `IConfiguration` in WAF | Intercept `/appsettings.json` HTTP fetch |
+| **CORS** | Same-origin (Blazor Server) | Cross-origin (WASM → API) |
+| **Anchor type** | `StorefrontHub`, `StorefrontWebMarker` | `VendorPortalHub`, `VendorLoginEndpoint` |
+| **Downstream stubs** | All 4 BC clients stubbed | No stubs — real APIs with real DB |
+
+### WASM Static File Host Pattern
+
+```csharp
+// Blazor WASM apps fetch wwwroot/appsettings.json via HTTP at boot.
+// Intercept this to inject test API URLs:
+app.MapGet("/appsettings.json", () => Results.Json(new
+{
+    ApiClients = new
+    {
+        VendorIdentityApiUrl = identityApiUrl,  // random port from test
+        VendorPortalApiUrl = portalApiUrl        // random port from test
+    }
+}));
+
+// Serve compiled WASM files + SPA fallback
+app.UseStaticFiles(new StaticFileOptions { FileProvider = wasmRoot, ServeUnknownFileTypes = true });
+app.MapFallbackToFile("index.html", staticOptions);
+```
+
+### Two-Program-Class Problem
+
+When referencing VendorPortal.Api AND VendorIdentity.Api, both have a top-level `public partial class Program { }`. The compiler can't disambiguate `Program` as a type parameter.
+
+**Solution:** Use domain-specific types as `WebApplicationFactory<T>` anchors:
+- `WebApplicationFactory<VendorPortal.Api.Hubs.VendorPortalHub>` — for VendorPortal.Api
+- `WebApplicationFactory<VendorIdentity.Api.Auth.VendorLoginEndpoint>` — for VendorIdentity.Api
+
+### WASM Hydration Wait
+
+Blazor WASM requires downloading the .NET runtime and all assemblies before any Blazor component renders. This takes 5–30 seconds on first load:
+
+```csharp
+// Wait for WASM to hydrate — must wait for a real Blazor element, not just NetworkIdle
+await page.WaitForSelectorAsync("[data-testid='login-btn']", new PageWaitForSelectorOptions
+{
+    Timeout = 30000 // WASM cold start can take up to 30s
+});
+```
+
+### SignalR Hub Message Injection
+
+For testing real-time features, inject messages via `IHubContext` directly:
+
+```csharp
+var hubContext = fixture.PortalApiHost.Services
+    .GetRequiredService<IHubContext<VendorPortalHub>>();
+
+// Wolverine CloudEvents envelope format
+var envelope = new { type = "LowStockAlertRaised", data = new { sku = "DOG-BOWL-01" } };
+
+await hubContext.Clients
+    .Group($"vendor:{tenantId}")
+    .SendAsync("ReceiveMessage", JsonSerializer.SerializeToElement(envelope));
+```
+
+### Reference Files
+
+- **Fixture:** `tests/Vendor Portal/VendorPortal.E2ETests/E2ETestFixture.cs`
+- **Hooks:** `DataHooks.cs`, `PlaywrightHooks.cs`
+- **Page Objects:** `VendorLoginPage.cs`, `VendorDashboardPage.cs`, `ChangeRequestsPage.cs`, `SubmitChangeRequestPage.cs`
+- **Feature Files:** `vendor-auth.feature`, `vendor-dashboard.feature`, `vendor-change-requests.feature`
+- **Test Data:** `WellKnownVendorTestData.cs` — matches VendorIdentitySeedData demo accounts
+- **Cycle Plan:** `docs/planning/cycles/cycle-23-vendor-portal-e2e-testing.md`

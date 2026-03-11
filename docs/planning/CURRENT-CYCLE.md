@@ -13,43 +13,41 @@
 
 ---
 
-**Cycle:** 22 — Vendor Portal + Vendor Identity Phase 1
-**Status:** ✅ **COMPLETE** (All phases 1–6 implemented)
-**GitHub Milestone:** [Cycle 22: Vendor Portal + Vendor Identity Phase 1](https://github.com/erikshafer/CritterSupply/milestone/16)
+**Cycle:** 23 — Vendor Portal E2E Testing
+**Status:** ✅ **COMPLETE**
+**GitHub Milestone:** [Cycle 23: Vendor Portal E2E Testing](https://github.com/erikshafer/CritterSupply/milestone/18)
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
-**Epic Issue:** [#249](https://github.com/erikshafer/CritterSupply/issues/249)
 
 ---
 
 ## Current Status
 
-**Cycle 22 is COMPLETE!** All 6 phases of the Vendor Portal initial build-out have been delivered.
+**Cycle 23 is COMPLETE!** E2E browser testing infrastructure for the Vendor Portal (Blazor WASM) has been delivered.
 
-**Phase 6 Deliverables (Full Identity Lifecycle + Admin Tools):**
-- 8 new admin API endpoints: ResendInvitation, RevokeInvitation, DeactivateUser, ReactivateUser, ChangeRole, SuspendTenant, ReinstateTenant, TerminateTenant
-- Last-admin protection invariant (cannot deactivate/demote last Admin in tenant)
-- VendorTenantTerminated compensation handler (auto-rejects in-flight change requests)
-- 2 new integration events: VendorUserInvitationResent, VendorUserInvitationRevoked
-- VendorTenantTerminated event updated with Reason field
-- EF Core migration: AddTerminationReason
-- 31 integration tests for Phase 6 (57 total for VendorIdentity, 143 total across Vendor Portal + Identity)
-- Sign-offs: UX Engineer ✅, QA Engineer ✅, Product Owner ✅
-
-**Completed Phases:**
-- ✅ Phase 1: JWT Auth Infrastructure (VendorIdentity.Api, EF Core, token issuance)
-- ✅ Phase 2: Vendor Portal API (analytics, alerts, dashboard, multi-tenant isolation)
-- ✅ Phase 3: Blazor WASM Frontend (SignalR hub, in-memory JWT, live updates)
-- ✅ Phase 4: Change Request Workflow (7-state machine, Catalog BC integration)
-- ✅ Phase 5: Saved Views + VendorAccount (notification preferences, saved dashboard views)
-- ✅ Phase 6: Full Identity Lifecycle + Admin Tools (suspend/reinstate/terminate tenants, user management, compensation)
+**Cycle 23 Deliverables:**
+- 3-server E2E test fixture (VendorIdentity.Api + VendorPortal.Api + WASM static host + TestContainers PostgreSQL)
+- 12 BDD scenarios across 3 feature files (P0 + P1a)
+- 5 Page Object Models (Login, Dashboard, ChangeRequests, SubmitChangeRequest, Settings)
+- `data-testid` attributes added to Login.razor, MainLayout.razor, Dashboard.razor
+- CI workflow updated to run both Storefront + Vendor Portal E2E tests
+- E2E skills documentation updated with Blazor WASM patterns
+- Collaborative design: Principal Architect + QA Engineer + Product Owner sign-off
+- Sign-offs: Principal Architect ✅, QA Engineer ✅, Product Owner ✅
 
 **Next cycles:**
-- **Cycle 23:** Vendor Portal Phase 2 — Advanced analytics, "Load View" dashboard action, E2E testing, email notification preferences
 - **Cycle 24:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling ([Milestone 17](https://github.com/erikshafer/CritterSupply/milestone/17))
 
 ---
 
 ## Recently Completed
+
+- ✅ **Cycle 23:** Vendor Portal E2E Testing (2026-03-11) — **COMPLETE**
+  - 3-server E2E fixture (VendorIdentity.Api + VendorPortal.Api + WASM static host)
+  - 12 BDD scenarios (P0 + P1a) across 3 feature files
+  - Page Object Models for Login, Dashboard, Change Requests, Submit, Settings
+  - SignalR hub message injection testing via IHubContext
+  - Collaborative design: PA + QA + PO
+  - [Plan](./cycles/cycle-23-vendor-portal-e2e-testing.md) | [Skills Update](../skills/e2e-playwright-testing.md)
 
 - ✅ **Cycle 22:** Vendor Portal + Vendor Identity Phase 1 (2026-03-08 to 2026-03-10) — **ALL 6 PHASES COMPLETE**
   - Phase 1: JWT Auth (VendorIdentity.Api, EF Core, token lifecycle)
@@ -106,15 +104,10 @@
 
 ### Next 3 Cycles (Milestones Created, Issues Ready/TBD)
 
-- **Cycle 23:** Vendor Portal Phase 2 — Advanced analytics, "Load View" dashboard action, email notification preferences
-  - Builds on Cycle 22 Phase 5 infrastructure
-  - Dashboard filter state management + "Load Saved View" action
-  - Email notification preference integration (requires Notifications BC)
-  - Advanced analytics dashboard with live charts
-
 - **Cycle 24:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling ([Milestone 17](https://github.com/erikshafer/CritterSupply/milestone/17), Issues TBD)
   - Event Modeling: [`docs/planning/admin-portal-event-modeling.md`](admin-portal-event-modeling.md)
   - Gherkin features: [`docs/features/admin-portal/`](../features/admin-portal/)
+  - **E2E strategy ready** — Cycle 23 patterns (WASM hosting, 3-server fixture) directly applicable
 
 ### Future BCs (Priority Roadmap)
 
@@ -148,5 +141,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-10 (Cycle 22 closed — all 6 phases complete, 143 integration tests passing)*
+*Last Updated: 2026-03-11 (Cycle 23 closed — Vendor Portal E2E testing, 12 BDD scenarios)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*
