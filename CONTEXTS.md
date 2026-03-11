@@ -1928,7 +1928,7 @@ public static class ProductSeeder
 
 The Vendor Identity context manages authentication, authorization, and user lifecycle for vendor personnel accessing CritterSupply systems. Structurally similar to Customer Identity, but serving a distinct user population with **JWT Bearer authentication** (diverges from Customer Identity's session cookies — required for SignalR hub security and cross-service tenant claim propagation).
 
-**Status**: 🔜 Planned (Phase 1 of Vendor implementation)
+**Status**: ✅ Implemented (Cycle 22 Phases 1 + 6)
 
 **Persistence Strategy**: Entity Framework Core (following Customer Identity pattern)
 
@@ -2127,32 +2127,31 @@ TerminateVendorTenant (command from admin — permanent)
           (Vendor Portal auto-rejects all in-flight change requests)
 ```
 
-### HTTP Endpoints (Planned)
+### HTTP Endpoints
 
-**Authentication:**
+**Authentication (Implemented — Phase 1):**
 - `POST /api/vendor-auth/login` - Authenticate vendor user, issue JWT + refresh token cookie
 - `POST /api/vendor-auth/refresh` - Exchange refresh token for new access JWT
 - `POST /api/vendor-auth/logout` - Invalidate refresh token
-- `POST /api/vendor-auth/reset-password` - Initiate password reset
+- `POST /api/vendor-auth/reset-password` - Initiate password reset (planned)
 
-**Admin (Tenant Management):**
-- `POST /api/admin/vendor-tenants` - Create new vendor organization
-- `GET /api/admin/vendor-tenants` - List all vendor tenants
-- `GET /api/admin/vendor-tenants/{tenantId}` - Get tenant details
-- `POST /api/admin/vendor-tenants/{tenantId}/suspend` - Suspend tenant
-- `POST /api/admin/vendor-tenants/{tenantId}/reinstate` - Reinstate suspended tenant
-- `POST /api/admin/vendor-tenants/{tenantId}/terminate` - Terminate tenant (permanent)
+**Tenant Management (Implemented — Phases 1 + 6):**
+- `POST /api/vendor-identity/tenants` - Create new vendor organization
+- `POST /api/vendor-identity/tenants/{tenantId}/suspend` - Suspend tenant (requires reason)
+- `POST /api/vendor-identity/tenants/{tenantId}/reinstate` - Reinstate suspended tenant
+- `POST /api/vendor-identity/tenants/{tenantId}/terminate` - Terminate tenant (permanent, requires reason)
 
-**Admin (User Management):**
-- `POST /api/admin/vendor-tenants/{tenantId}/users/invite` - Invite vendor user (carries Role)
-- `POST /api/admin/vendor-tenants/{tenantId}/users/{userId}/invitation/resend` - Resend expired/pending invitation
-- `POST /api/admin/vendor-tenants/{tenantId}/users/{userId}/invitation/revoke` - Revoke pending invitation
-- `GET /api/admin/vendor-tenants/{tenantId}/users` - List users for tenant
-- `PATCH /api/admin/vendor-users/{userId}/deactivate` - Deactivate user
-- `PATCH /api/admin/vendor-users/{userId}/reactivate` - Reactivate deactivated user
-- `PATCH /api/admin/vendor-users/{userId}/role` - Change user role
+**User Invitation Management (Implemented — Phases 1 + 6):**
+- `POST /api/vendor-identity/tenants/{tenantId}/users/invite` - Invite vendor user (carries Role)
+- `POST /api/vendor-identity/tenants/{tenantId}/users/{userId}/invitation/resend` - Resend invitation (new token, +72h TTL)
+- `POST /api/vendor-identity/tenants/{tenantId}/users/{userId}/invitation/revoke` - Revoke pending invitation (requires reason)
 
-**User Self-Service:**
+**User Lifecycle Management (Implemented — Phase 6):**
+- `POST /api/vendor-identity/tenants/{tenantId}/users/{userId}/deactivate` - Deactivate user (last-admin protected, requires reason)
+- `POST /api/vendor-identity/tenants/{tenantId}/users/{userId}/reactivate` - Reactivate deactivated user
+- `PATCH /api/vendor-identity/tenants/{tenantId}/users/{userId}/role` - Change user role (last-admin demotion protected)
+
+**User Self-Service (Planned):**
 - `POST /api/vendor-users/complete-registration` - Complete invited user registration
 - `POST /api/vendor-users/change-password` - Change password (authenticated)
 
@@ -2194,7 +2193,7 @@ The divergence on authentication (JWT vs cookies) is **intentional** — require
 
 The Vendor Portal context provides partnered vendors with a private, tenant-isolated view into how their products perform within CritterSupply. Vendors can see real-time sales analytics, monitor inventory levels, and submit product change requests. The portal uses **SignalR** (via Wolverine's native transport) for bidirectional real-time communication — live analytics updates, change request decisions, and inventory alerts.
 
-**Status**: 🚧 In Progress (Cycle 22 — Phases 1–5 complete: VendorProductCatalog subscription, JWT auth + SignalR hub, live analytics dashboard, Change Request full lifecycle, VendorAccount + Saved Views + Notification Preferences; Phase 6+ deferred to backlog)
+**Status**: ✅ Implemented (Cycle 22 — Phases 1–6 complete: VendorProductCatalog subscription, JWT auth + SignalR hub, live analytics dashboard, Change Request full lifecycle, VendorAccount + Saved Views + Notification Preferences, Full Identity Lifecycle + Admin Tools)
 
 **Persistence Strategy**: Marten (document store for accounts/requests, projections for read models)
 

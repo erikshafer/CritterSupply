@@ -1,8 +1,8 @@
-# Cycle 22 Retrospective: Vendor Portal Phases 1–5
+# Cycle 22 Retrospective: Vendor Portal Phases 1–6
 
 **Dates:** 2026-03-08 to 2026-03-10
-**Duration:** 3 days (phased delivery across 5 sign-off sessions)
-**Status:** ✅ **COMPLETE** — all sign-offs obtained (UX, QA, PO, Principal Architect) for all 5 phases
+**Duration:** 3 days (phased delivery across 6 sign-off sessions)
+**Status:** ✅ **COMPLETE** — all sign-offs obtained (UX, QA, PO, Principal Architect) for all 6 phases
 
 ---
 
@@ -80,6 +80,39 @@ isolation, and cross-BC messaging through a realistic change request workflow.
 - POST→GET and DELETE→GET round-trip verification tests
 - Full DashboardFilterCriteria 5-field serialization round-trip
 - UpdatedAt timestamp assertions
+
+### Phase 6 — Full Identity Lifecycle + Admin Tools
+- 8 new admin HTTP endpoints in VendorIdentity.Api:
+  - `POST .../users/{userId}/invitation/resend` — new SHA-256 token, reset 72h TTL, increment ResendCount
+  - `POST .../users/{userId}/invitation/revoke` — cancel pending invitation with reason
+  - `POST .../users/{userId}/deactivate` — deactivate user with last-admin protection
+  - `POST .../users/{userId}/reactivate` — restore deactivated user to Active
+  - `PATCH .../users/{userId}/role` — change user role with last-admin demotion protection
+  - `POST .../tenants/{tenantId}/suspend` — suspend tenant with reason
+  - `POST .../tenants/{tenantId}/reinstate` — lift suspension
+  - `POST .../tenants/{tenantId}/terminate` — permanent termination with reason (per UX review)
+- 2 new integration events: `VendorUserInvitationResent`, `VendorUserInvitationRevoked`
+- `VendorTenantTerminated` event updated with `Reason` field (breaking contract change, all consumers updated)
+- `VendorTenantTerminatedHandler` in Vendor Portal: auto-rejects in-flight change requests with "Vendor contract ended"
+- EF Core migration `AddTerminationReason` for `TerminationReason` column on `VendorTenant`
+- Last-admin protection invariant covers both deactivation and role demotion
+- FluentValidation validators for all 8 commands with state transition guards
+- 31 new integration tests (57 total for VendorIdentity, 143 total across Vendor Portal + Identity)
+
+**Phase 6 UX Improvements (from UX Engineer sign-off):**
+- Added `Reason` field to `TerminateVendorTenant` — every irreversible destructive action must carry an audit reason
+- Consistent error messages: aligned "Cannot terminate an already terminated tenant" with pattern used by suspend/reinstate
+- Advisory notes for future admin UI: confirmation friction on terminate, disable-with-tooltip for last-admin protection, visual distinction for auto-rejected change requests
+
+**Phase 6 QA Improvements (from QA Engineer sign-off):**
+- Not-found (404/400) tests for deactivate user, suspend tenant, terminate tenant
+- Terminate tenant missing reason validation test
+- Reinstate-terminated-tenant guard test (terminal state protection)
+- Operations on suspended tenants (deactivate, change role, reactivate) — documents that identity-layer operations succeed on suspended tenants (enforcement at BFF layer)
+- Operations on terminated tenants (deactivate, change role, invite) — same pattern
+- Consecutive resend invitation token verification (proves different random bytes per call)
+- Same-role assignment no-op test
+- Deactivate already-deactivated user guard test
 
 ---
 
@@ -363,6 +396,35 @@ and executed. Update the ADR in the same PR that completes the implementation.
 
 ---
 
+### L11 — Identity Operations Succeed on Suspended/Terminated Tenants (By Design)
+
+**What happened:** QA edge case tests (Phase 6) revealed that user identity operations (deactivate,
+change role, reactivate, invite) succeed even when the tenant is Suspended or Terminated. Validators
+only check `db.Tenants.AnyAsync(t => t.Id == tenantId)` — existence, not status.
+
+**Why this is correct:** Suspension/termination enforcement happens at the Vendor Portal (BFF/login)
+layer, not at the identity API layer. An admin may need to deactivate a user in a terminated tenant
+(security cleanup), change roles in a suspended tenant (preparation for reinstatement), or revoke
+invitations after suspension. Blocking these operations at the identity layer would make administrative
+recovery workflows impossible.
+
+**Rule:** Identity-layer validators should check entity existence, not business status constraints.
+Business status enforcement belongs in the downstream consuming layers (BFF, login endpoints).
+
+### L12 — Every Irreversible Destructive Action Must Carry an Audit Reason
+
+**What happened:** Initial `TerminateVendorTenant` command had only `TenantId` (no reason). UX
+Engineer review flagged this as a gap — every irreversible, destructive admin action should carry
+a mandatory reason for audit trail parity with Suspend/Deactivate commands.
+
+**Resolution:** Added `Reason` field to `TerminateVendorTenant` command, `TerminationReason` to
+`VendorTenant` entity, `Reason` to `VendorTenantTerminated` integration event, and EF Core migration.
+
+**Rule:** For irreversible operations, require a reason field even if it seems optional. Reasons
+enable post-incident investigation, compliance audits, and customer support escalations.
+
+---
+
 ## What Went Well
 
 - **Phase-gate delivery** — each phase had explicit sign-offs before the next began; issues were caught early
@@ -387,10 +449,10 @@ and executed. Update the ADR in the same PR that completes the implementation.
 |--------|-------|
 | Integration tests added (Phases 1–4) | 59 |
 | Integration tests added (Phase 5) | 27 |
-| Total integration tests | 86 |
-| Test pass rate at Phase 5 close | 100% (86/86) |
+| Total integration tests | 143 (86 Vendor Portal + 57 Vendor Identity) |
+| Test pass rate at Phase 6 close | 100% (143/143) |
 | ADRs updated | 2 (0004 superseded, 0013 accepted) |
-| CONTEXTS.md corrections at final review | 7 (Phase 4) + 5 endpoint URL updates (Phase 5) |
+| CONTEXTS.md corrections at final review | 7 (Phase 4) + 5 endpoint URL updates (Phase 5) + Phase 6 endpoints added |
 | Skills updated | 4 (marten-document-store, wolverine-signalr, wolverine-message-handlers, blazor-wasm-jwt) |
 | New skills created | 0 |
 | Code review iterations | 2 (initial review, post-PO-blocker review) |
@@ -405,8 +467,11 @@ and executed. Update the ADR in the same PR that completes the implementation.
 |------|--------|------|
 | UX Engineer (Phase 3) | ✅ | Cycle 22 Phase 3 |
 | UX Engineer (Phase 5) | ✅ | Cycle 22 Phase 5 (B1: helper text, B2: delete confirmation, B3: ARIA grouping) |
+| UX Engineer (Phase 6) | ✅ | Cycle 22 Phase 6 (Reason on terminate, error message consistency, advisory notes) |
 | QA Engineer (Phase 4) | ✅ | Cycle 22 Phase 4 |
 | QA Engineer (Phase 5) | ✅ | Cycle 22 Phase 5 (3 required + 5 recommended, 86/86 tests) |
+| QA Engineer (Phase 6) | ✅ | Cycle 22 Phase 6 (10 edge case tests, 57/57 VendorIdentity tests) |
 | Product Owner (Phase 4) | ✅ | 2026-03-10 |
 | Product Owner (Phase 5) | ✅ | 2026-03-10 (CONTEXTS.md URL updates + feature file corrections) |
+| Product Owner (Phase 6) | ✅ | 2026-03-10 (8 admin endpoints, compensation handler, last-admin protection) |
 | Principal Architect | ✅ | 2026-03-10 |

@@ -167,6 +167,10 @@ builder.Host.UseWolverine(opts =>
 
     opts.ListenToRabbitQueue("vendor-portal-more-info-requested")
         .ProcessInline();
+
+    // Subscribe to VendorTenantTerminated events for compensation (auto-reject in-flight change requests).
+    opts.ListenToRabbitQueue("vendor-portal-tenant-terminated")
+        .ProcessInline();
 });
 
 builder.Services.AddEndpointsApiExplorer();

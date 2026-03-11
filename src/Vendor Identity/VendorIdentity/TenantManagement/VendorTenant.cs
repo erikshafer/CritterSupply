@@ -12,6 +12,7 @@ public sealed class VendorTenant
     public DateTimeOffset? SuspendedAt { get; set; }
     public string? SuspensionReason { get; set; }
     public DateTimeOffset? TerminatedAt { get; set; }
+    public string? TerminationReason { get; set; }
 
     // Navigation properties
     public ICollection<VendorUser> Users { get; set; } = new List<VendorUser>();
