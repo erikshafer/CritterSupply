@@ -45,7 +45,7 @@ Alice is the standard development seed customer created automatically by the Cus
 | # | Task | Completed? | Difficulty | Key Finding |
 |---|---|---|---|---|
 | 1 | Sign In | ✅ Yes | 🟢 Easy | Demo credentials banner on login page — visible, functional, breaks customer immersion |
-| 2 | Get Your Bearings | ✅ Partial | 🟡 Moderate | Hamburger icon for nav drawer not intuitive; quick-link cards served as primary navigation |
+| 2 | Get Your Bearings | ✅ Partial | 🟡 Moderate | Hamburger menu icon (☰) for nav drawer not intuitive; quick-link cards served as primary navigation |
 | 3 | Browse Products | ✅ Yes | 🟢 Easy | Category filtering works; product cards are clear; no product images in dev (broken placeholder) |
 | 4 | Add to Cart | ✅ Yes | 🟢 Easy | Real-time cart badge update delighted the PO; toast confirmation is clear |
 | 5 | Review Cart | ✅ Yes | 🟢 Easy | Quantity adjusters and remove work correctly; totals update correctly |
@@ -401,7 +401,7 @@ The PO understood it was a development aid but noted that even in a demo or stak
 
 | Severity | Issue | Root Cause | Fixed? |
 |---|---|---|---|
-| 🔴 P0 (security) | SignalR/SSE cart events broadcast to ALL connected clients | `StorefrontHub` has no customer isolation — all subscribers receive all `cart-updated` events regardless of which customer's cart changed | ❌ Not yet fixed — documented in `Storefront.Api/README.md` as production blocker |
+| 🔴 P0 (security) | SignalR/SSE cart events broadcast to ALL connected clients | `StorefrontHub` has no customer isolation — all subscribers receive all `cart-updated` events regardless of which customer's cart changed. See `src/Customer Experience/Storefront.Api/StorefrontHub.cs` and the Production Blockers section of `Storefront.Api/README.md` | ❌ Not yet fixed — documented in `Storefront.Api/README.md` as production blocker |
 | 🔴 P1 | Order History shows hardcoded fake orders | `OrderHistory.razor` renders three static mock rows; no integration with Orders BC | ❌ Not yet implemented |
 | 🟡 P1 | Payment field label "Payment Token (stub)" — developer language visible to consumer | Field uses internal terminology; placeholder `tok_visa_test_12345` reinforces test/dev framing | ❌ Not yet fixed |
 | 🟡 P1 | Product images broken / missing in dev environment | No image seeding; `<img src>` points to placeholder or non-existent URLs in development | ❌ Requires image seeding or styled fallback |
