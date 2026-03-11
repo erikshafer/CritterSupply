@@ -35,7 +35,7 @@ public sealed record SharedShippingAddress
     public string? Street
     {
         get => AddressLine1;
-        init => AddressLine1 = value ?? AddressLine1;
+        init => AddressLine1 = value!;
     }
 
     [JsonPropertyName("street2")]
@@ -43,7 +43,7 @@ public sealed record SharedShippingAddress
     public string? Street2
     {
         get => AddressLine2;
-        init => AddressLine2 = value ?? AddressLine2;
+        init => AddressLine2 = value;
     }
 
     [JsonPropertyName("state")]
@@ -51,6 +51,6 @@ public sealed record SharedShippingAddress
     public string? State
     {
         get => StateProvince;
-        init => StateProvince = value ?? StateProvince;
+        init => StateProvince = value!;
     }
 }

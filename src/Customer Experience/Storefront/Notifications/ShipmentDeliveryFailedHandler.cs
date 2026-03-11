@@ -12,7 +12,10 @@ public static class ShipmentDeliveryFailedHandler
 {
     public static SignalRMessage<ShipmentDeliveryFailed> Handle(FulfillmentContracts.ShipmentDeliveryFailed message)
     {
-        var customerId = Guid.Empty; // Stub - TODO: query Orders BC for CustomerId in future cycle
+        // TODO: Query Orders BC for the actual CustomerId so SignalR group targeting works.
+        // Currently sends to group "customer:00000000-..." which no real customer is subscribed to.
+        // Tracked for future cycle — requires an HTTP call to Orders API or a read-model lookup.
+        var customerId = Guid.Empty;
 
         var deliveryFailed = new ShipmentDeliveryFailed(
             message.ShipmentId,

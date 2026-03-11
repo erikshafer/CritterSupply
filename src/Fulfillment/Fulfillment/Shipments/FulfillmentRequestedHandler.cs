@@ -43,13 +43,14 @@ public static class FulfillmentRequestedHandler
     }
 
     /// <summary>
-    /// Creates a deterministic UUID v5 from an input Guid using the DNS namespace.
+    /// Creates a deterministic UUID v5 from an input Guid using the RFC 4122 DNS namespace UUID.
     /// Ensures idempotency: the same OrderId always produces the same ShipmentId.
+    /// A domain-specific namespace could be substituted per ADR if cross-domain collision avoidance is needed.
     /// </summary>
     private static Guid CreateVersion5Guid(Guid orderId)
     {
-        // Use a CritterSupply-specific namespace UUID for the fulfillment domain
-        var namespaceId = new Guid("6ba7b812-9dad-11d1-80b4-00c04fd430c8"); // DNS namespace UUID
+        // RFC 4122 DNS namespace UUID used as the hashing namespace for deterministic ID generation
+        var namespaceId = new Guid("6ba7b812-9dad-11d1-80b4-00c04fd430c8"); // RFC 4122 DNS namespace
         var nameBytes = orderId.ToByteArray();
         var namespaceBytes = namespaceId.ToByteArray();
 

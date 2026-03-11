@@ -12,7 +12,10 @@ public static class ShipmentDeliveredHandler
 {
     public static SignalRMessage<ShipmentStatusChanged> Handle(ShipmentDelivered message)
     {
-        var customerId = Guid.Empty; // Stub - TODO: query Orders BC for CustomerId in future cycle
+        // TODO: Query Orders BC for the actual CustomerId so SignalR group targeting works.
+        // Currently sends to group "customer:00000000-..." which no real customer is subscribed to.
+        // Tracked for future cycle — requires an HTTP call to Orders API or a read-model lookup.
+        var customerId = Guid.Empty;
 
         var shipmentStatusChanged = new ShipmentStatusChanged(
             message.ShipmentId,
