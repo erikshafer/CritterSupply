@@ -64,16 +64,30 @@ jobs:
 
       - name: Build solution
         run: dotnet build --no-restore --configuration Release
+        # Prevent project-level Playwright install Exec from running in CI.
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Install Playwright browsers
+        # Cache Playwright browser binaries between runs to speed up CI
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-${{ hashFiles('**/tests/**/*E2ETests.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-ms-playwright-
 
       - name: Install Playwright browsers
         run: |
+          # Install the Playwright CLI as a dotnet global tool (idempotent)
           dotnet tool update --global Microsoft.Playwright.CLI || dotnet tool install --global Microsoft.Playwright.CLI
-          playwright_script=$(find "tests/Customer Experience/Storefront.E2ETests/bin/Release" -maxdepth 2 -type f -name 'playwright.ps1' | head -n 1)
-          if [ -z "$playwright_script" ]; then
-            echo "playwright.ps1 not found under tests/Customer Experience/Storefront.E2ETests/bin/Release" >&2
-            exit 1
-          fi
-          pwsh "$playwright_script" install chromium --with-deps
+          export PATH="$PATH:$HOME/.dotnet/tools"
+
+          # Use the Playwright CLI directly so we don't rely on pwsh being available on ubuntu runners.
+          # --with-deps installs system dependencies for Chromium on Ubuntu images.
+          playwright install chromium --with-deps
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 0
 

@@ -43,9 +43,19 @@
         </None>
     </ItemGroup>
 
-    <!-- Playwright browser installation target (run once after build) -->
+    <!-- Playwright browser installation target (run once after build).
+         Use pwsh on Windows and bash on Unix-like systems so builds are cross-platform
+         (macOS/Linux don't necessarily have pwsh installed). Honor PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD. -->
     <Target Name="InstallPlaywrightBrowsers" AfterTargets="Build">
-        <Exec Command="pwsh bin/$(Configuration)/$(TargetFramework)/playwright.ps1 install chromium" Condition="'$(PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD)' != '1'" />
+        <!-- Windows: prefer pwsh -> playwright.ps1. Don't fail the build if pwsh is missing (IgnoreExitCode). -->
+        <Exec Command="pwsh bin/$(Configuration)/$(TargetFramework)/playwright.ps1 install chromium"
+              Condition="'$(OS)' == 'Windows_NT' and '$(PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD)' != '1'"
+              IgnoreExitCode="true" />
+
+        <!-- Non-Windows: Try pwsh if present, otherwise fallback to playwright.sh. If neither is possible, print a message but don't fail the build. -->
+        <Exec Condition="'$(OS)' != 'Windows_NT' and '$(PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD)' != '1'"
+              Command="bash -c 'if command -v pwsh &gt;/dev/null 2&gt;&amp;1; then pwsh bin/$(Configuration)/$(TargetFramework)/playwright.ps1 install chromium; elif [ -x bin/$(Configuration)/$(TargetFramework)/playwright.sh ]; then bash bin/$(Configuration)/$(TargetFramework)/playwright.sh install chromium; else echo &quot;Playwright browser install skipped: no pwsh and no playwright.sh found. Set PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 to suppress this.&quot;; fi'"
+              IgnoreExitCode="true" />
     </Target>
 
 </Project>
