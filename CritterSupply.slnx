@@ -147,6 +147,7 @@
     <Project Path="src/Customer Experience/Storefront/Storefront.csproj" />
     <Project Path="tests/Customer Experience/Storefront.Api.IntegrationTests/Storefront.Api.IntegrationTests.csproj" />
     <Project Path="tests/Customer Experience/Storefront.E2ETests/Storefront.E2ETests.csproj" />
+    <Project Path="tests/Customer Experience/Storefront.Web.Tests/Storefront.Web.Tests.csproj" />
   </Folder>
   <Folder Name="/Shared/">
     <Project Path="src/Shared/Messages.Contracts/Messages.Contracts.csproj" />
