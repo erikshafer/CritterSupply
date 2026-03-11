@@ -778,6 +778,19 @@ Covers:
 - SignalR antiforgery configuration
 - Test lifecycle with Reqnroll hooks
 
+For Blazor component unit testing with bUnit:
+
+**Read:** `docs/skills/bunit-component-testing.md`
+
+Covers:
+- When to use bUnit vs Playwright (decision matrix)
+- MudBlazor v9+ setup (MudPopoverProvider, IAsyncLifetime, loose JSInterop)
+- BunitTestBase shared base class pattern
+- Authentication state emulation with `AddAuthorization()`
+- Mocking IHttpClientFactory for API-calling components
+- Async data loading with `WaitForAssertion`
+- CI-safe currency and locale-independent assertions
+
 ---
 
 ## Project Creation Workflow
