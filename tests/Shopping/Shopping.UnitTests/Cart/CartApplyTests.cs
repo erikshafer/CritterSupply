@@ -1,6 +1,3 @@
-using JasperFx.Events;
-using NSubstitute;
-
 namespace Shopping.UnitTests.Cart;
 
 /// <summary>
@@ -24,19 +21,6 @@ public class CartApplyTests
             InitializedAt: DateTimeOffset.UtcNow,
             Items: items ?? new Dictionary<string, CartLineItem>(),
             Status: CartStatus.Active);
-
-    private static IEvent<CartInitialized> BuildCreateEvent(Guid streamId) =>
-        BuildCreateEventWith(streamId, Guid.NewGuid(), null, DateTimeOffset.UtcNow);
-
-    private static IEvent<CartInitialized> BuildCreateEventWith(
-        Guid streamId, Guid? customerId, string? sessionId, DateTimeOffset initializedAt)
-    {
-        var data = new CartInitialized(customerId, sessionId, initializedAt);
-        var evt = Substitute.For<IEvent<CartInitialized>>();
-        evt.StreamId.Returns(streamId);
-        evt.Data.Returns(data);
-        return evt;
-    }
 
     // ---------------------------------------------------------------------------
     // Apply(ItemAdded) — new SKU
