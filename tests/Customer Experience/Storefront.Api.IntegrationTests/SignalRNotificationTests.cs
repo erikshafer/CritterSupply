@@ -1,4 +1,5 @@
 using Storefront.Clients;
+using Storefront.Notifications;
 using Storefront.RealTime;
 using Wolverine.SignalR;
 using Wolverine.Tracking;
@@ -13,14 +14,20 @@ namespace Storefront.Api.IntegrationTests;
 /// 2. Target the customer-specific group ("customer:{customerId}") — preventing cross-customer leakage
 /// 3. Include the correct payload in the inner Message property
 ///
-/// NOTE on Wolverine.SignalR tracking behavior:
-/// When a handler returns T.ToWebSocketGroup(...), Wolverine wraps the outgoing message as
-/// SignalRMessage&lt;T&gt;. Wolverine's ITrackedSession.Sent.MessagesOf&lt;T&gt;() looks for the RAW T type,
-/// NOT the wrapped type. To assert on group-scoped SignalR messages you must use
-/// MessagesOf&lt;SignalRMessage&lt;T&gt;&gt;() and access the .Message property for payload assertions.
-/// This is a significant API discoverability gap worth reporting upstream to JasperFx.
-/// See: docs/research/storefront-ux-session/WOLVERINE-SIGNALR-OBSERVATIONS.md
+/// IMPORTANT — Why tests call handlers directly instead of InvokeMessageAndWaitAsync:
 ///
+/// When a handler returns SignalRMessage&lt;T&gt; (via .ToWebSocketGroup()), Wolverine routes the message
+/// through the SignalR transport. In tests, DisableAllExternalWolverineTransports() disables the
+/// SignalR transport. When the transport is disabled, messages sent to it are NOT recorded in
+/// ITrackedSession.Sent — they are dropped silently. As a result, calling
+/// tracked.Sent.MessagesOf&lt;SignalRMessage&lt;T&gt;&gt;() always returns empty in this test setup.
+///
+/// The correct approach: call the static handler methods directly and assert on the return value.
+/// This verifies the handler logic (correct payload, correct group name) without depending on
+/// Wolverine transport tracking infrastructure. Since all notification handlers are pure static
+/// methods, they can be invoked and inspected directly.
+///
+/// This is documented as Observation 6 in WOLVERINE-SIGNALR-OBSERVATIONS.md.
 /// Actual SignalR hub delivery requires full Kestrel (not TestServer) — verified via E2E tests.
 /// </summary>
 [Collection("Sequential")]
@@ -32,6 +39,7 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
     /// TODO: Replace with real customerId lookup from Orders BC when implemented.
     /// </summary>
     private static readonly Guid StubCustomerId = Guid.Empty;
+
     public Task InitializeAsync()
     {
         // Clear stub data before each test
@@ -43,7 +51,7 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task ItemAdded_IntegrationMessage_ReturnsGroupScopedCartUpdatedMessage()
+    public async Task ItemAdded_Handler_ReturnsGroupScopedCartUpdatedMessage()
     {
         // Arrange
         var customerId = Guid.NewGuid();
@@ -62,29 +70,23 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
             29.99m,
             DateTimeOffset.UtcNow);
 
-        // Act
-        var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+        // Act — call handler directly (SignalRMessage<T> is not recorded in ITrackedSession.Sent
+        // when the SignalR transport is disabled in tests; see class-level doc comment)
+        var result = await ItemAddedHandler.Handle(message, fixture.StubShoppingClient, CancellationToken.None);
 
-        // Assert — handler returns SignalRMessage<CartUpdated> (group-scoped), NOT raw CartUpdated.
-        // Use MessagesOf<SignalRMessage<CartUpdated>>() to access the wrapper.
-        var published = tracked.Sent.MessagesOf<SignalRMessage<CartUpdated>>();
-        published.ShouldNotBeEmpty();
-
-        var signalRMessage = published.Single();
-
+        // Assert
+        result.ShouldNotBeNull();
         // Verify customer isolation: group must be "customer:{customerId}"
-        signalRMessage.Locator.ToString()!.ShouldContain($"customer:{customerId}");
-
-        // Verify payload via the inner Message property
-        var cartUpdated = signalRMessage.Message;
-        cartUpdated.CartId.ShouldBe(cartId);
-        cartUpdated.CustomerId.ShouldBe(customerId);
-        cartUpdated.ItemCount.ShouldBe(1); // 1 unique SKU
-        cartUpdated.TotalAmount.ShouldBe(59.98m); // 2 * 29.99
+        result!.Locator.ToString()!.ShouldContain($"customer:{customerId}");
+        // Verify payload
+        result.Message.CartId.ShouldBe(cartId);
+        result.Message.CustomerId.ShouldBe(customerId);
+        result.Message.ItemCount.ShouldBe(1); // 1 unique SKU
+        result.Message.TotalAmount.ShouldBe(59.98m); // 2 * 29.99
     }
 
     [Fact]
-    public async Task ItemRemoved_IntegrationMessage_ReturnsGroupScopedCartUpdatedMessage()
+    public async Task ItemRemoved_Handler_ReturnsGroupScopedCartUpdatedMessage()
     {
         // Arrange
         var customerId = Guid.NewGuid();
@@ -99,24 +101,19 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
             DateTimeOffset.UtcNow);
 
         // Act
-        var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+        var result = await ItemRemovedHandler.Handle(message, fixture.StubShoppingClient, CancellationToken.None);
 
-        // Assert — handler returns SignalRMessage<CartUpdated> (group-scoped)
-        var published = tracked.Sent.MessagesOf<SignalRMessage<CartUpdated>>();
-        published.ShouldNotBeEmpty();
-
-        var signalRMessage = published.Single();
-        signalRMessage.Locator.ToString()!.ShouldContain($"customer:{customerId}");
-
-        var cartUpdated = signalRMessage.Message;
-        cartUpdated.CartId.ShouldBe(cartId);
-        cartUpdated.CustomerId.ShouldBe(customerId);
-        cartUpdated.ItemCount.ShouldBe(0); // Empty cart
-        cartUpdated.TotalAmount.ShouldBe(0m);
+        // Assert
+        result.ShouldNotBeNull();
+        result!.Locator.ToString()!.ShouldContain($"customer:{customerId}");
+        result.Message.CartId.ShouldBe(cartId);
+        result.Message.CustomerId.ShouldBe(customerId);
+        result.Message.ItemCount.ShouldBe(0); // Empty cart
+        result.Message.TotalAmount.ShouldBe(0m);
     }
 
     [Fact]
-    public async Task ItemQuantityChanged_IntegrationMessage_ReturnsGroupScopedCartUpdatedMessage()
+    public async Task ItemQuantityChanged_Handler_ReturnsGroupScopedCartUpdatedMessage()
     {
         // Arrange
         var customerId = Guid.NewGuid();
@@ -136,24 +133,19 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
             DateTimeOffset.UtcNow);
 
         // Act
-        var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+        var result = await ItemQuantityChangedHandler.Handle(message, fixture.StubShoppingClient, CancellationToken.None);
 
-        // Assert — handler returns SignalRMessage<CartUpdated> (group-scoped)
-        var published = tracked.Sent.MessagesOf<SignalRMessage<CartUpdated>>();
-        published.ShouldNotBeEmpty();
-
-        var signalRMessage = published.Single();
-        signalRMessage.Locator.ToString()!.ShouldContain($"customer:{customerId}");
-
-        var cartUpdated = signalRMessage.Message;
-        cartUpdated.CartId.ShouldBe(cartId);
-        cartUpdated.CustomerId.ShouldBe(customerId);
-        cartUpdated.ItemCount.ShouldBe(1);
-        cartUpdated.TotalAmount.ShouldBe(149.95m); // 5 * 29.99
+        // Assert
+        result.ShouldNotBeNull();
+        result!.Locator.ToString()!.ShouldContain($"customer:{customerId}");
+        result.Message.CartId.ShouldBe(cartId);
+        result.Message.CustomerId.ShouldBe(customerId);
+        result.Message.ItemCount.ShouldBe(1);
+        result.Message.TotalAmount.ShouldBe(149.95m); // 5 * 29.99
     }
 
     [Fact]
-    public async Task OrderPlaced_IntegrationMessage_ReturnsGroupScopedOrderStatusChangedMessage()
+    public void OrderPlaced_Handler_ReturnsGroupScopedOrderStatusChangedMessage()
     {
         // Arrange
         var customerId = Guid.NewGuid();
@@ -176,19 +168,14 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
             DateTimeOffset.UtcNow);
 
         // Act
-        var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+        var result = OrderPlacedHandler.Handle(message);
 
-        // Assert — handler returns SignalRMessage<OrderStatusChanged> (group-scoped)
-        var published = tracked.Sent.MessagesOf<SignalRMessage<OrderStatusChanged>>();
-        published.ShouldNotBeEmpty();
-
-        var signalRMessage = published.Single();
-        signalRMessage.Locator.ToString()!.ShouldContain($"customer:{customerId}");
-
-        var orderStatusChanged = signalRMessage.Message;
-        orderStatusChanged.OrderId.ShouldBe(orderId);
-        orderStatusChanged.CustomerId.ShouldBe(customerId);
-        orderStatusChanged.NewStatus.ShouldBe("Placed");
+        // Assert
+        result.ShouldNotBeNull();
+        result.Locator.ToString()!.ShouldContain($"customer:{customerId}");
+        result.Message.OrderId.ShouldBe(orderId);
+        result.Message.CustomerId.ShouldBe(customerId);
+        result.Message.NewStatus.ShouldBe("Placed");
     }
 
     [Fact]
@@ -234,7 +221,7 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
     }
 
     [Fact]
-    public async Task PaymentAuthorized_IntegrationMessage_ReturnsGroupScopedOrderStatusChangedMessage()
+    public void PaymentAuthorized_Handler_ReturnsGroupScopedOrderStatusChangedMessage()
     {
         // Arrange
         var paymentId = Guid.NewGuid();
@@ -249,23 +236,18 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
             DateTimeOffset.UtcNow.AddHours(1));
 
         // Act
-        var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+        var result = PaymentAuthorizedHandler.Handle(message);
 
-        // Assert — handler returns SignalRMessage<OrderStatusChanged> (group-scoped)
-        var published = tracked.Sent.MessagesOf<SignalRMessage<OrderStatusChanged>>();
-        published.ShouldNotBeEmpty();
-
-        var signalRMessage = published.Single();
+        // Assert
+        result.ShouldNotBeNull();
         // Note: CustomerId is Guid.Empty (stub — Orders BC query not yet implemented)
-        signalRMessage.Locator.ToString()!.ShouldContain($"customer:{StubCustomerId}");
-
-        var orderStatusChanged = signalRMessage.Message;
-        orderStatusChanged.OrderId.ShouldBe(orderId);
-        orderStatusChanged.NewStatus.ShouldBe("PaymentAuthorized");
+        result.Locator.ToString()!.ShouldContain($"customer:{StubCustomerId}");
+        result.Message.OrderId.ShouldBe(orderId);
+        result.Message.NewStatus.ShouldBe("PaymentAuthorized");
     }
 
     [Fact]
-    public async Task ReservationConfirmed_IntegrationMessage_ReturnsGroupScopedOrderStatusChangedMessage()
+    public void ReservationConfirmed_Handler_ReturnsGroupScopedOrderStatusChangedMessage()
     {
         // Arrange
         var orderId = Guid.NewGuid();
@@ -282,22 +264,17 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
             DateTimeOffset.UtcNow);
 
         // Act
-        var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+        var result = ReservationConfirmedHandler.Handle(message);
 
-        // Assert — handler returns SignalRMessage<OrderStatusChanged> (group-scoped)
-        var published = tracked.Sent.MessagesOf<SignalRMessage<OrderStatusChanged>>();
-        published.ShouldNotBeEmpty();
-
-        var signalRMessage = published.Single();
-        signalRMessage.Locator.ToString()!.ShouldContain($"customer:{StubCustomerId}"); // Stub
-
-        var orderStatusChanged = signalRMessage.Message;
-        orderStatusChanged.OrderId.ShouldBe(orderId);
-        orderStatusChanged.NewStatus.ShouldBe("InventoryReserved");
+        // Assert
+        result.ShouldNotBeNull();
+        result.Locator.ToString()!.ShouldContain($"customer:{StubCustomerId}"); // Stub
+        result.Message.OrderId.ShouldBe(orderId);
+        result.Message.NewStatus.ShouldBe("InventoryReserved");
     }
 
     [Fact]
-    public async Task ShipmentDispatched_IntegrationMessage_ReturnsGroupScopedShipmentStatusChangedMessage()
+    public void ShipmentDispatched_Handler_ReturnsGroupScopedShipmentStatusChangedMessage()
     {
         // Arrange
         var shipmentId = Guid.NewGuid();
@@ -311,20 +288,15 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
             DateTimeOffset.UtcNow);
 
         // Act
-        var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+        var result = ShipmentDispatchedHandler.Handle(message);
 
-        // Assert — handler returns SignalRMessage<ShipmentStatusChanged> (group-scoped)
-        var published = tracked.Sent.MessagesOf<SignalRMessage<ShipmentStatusChanged>>();
-        published.ShouldNotBeEmpty();
-
-        var signalRMessage = published.Single();
-        signalRMessage.Locator.ToString()!.ShouldContain($"customer:{StubCustomerId}"); // Stub
-
-        var shipmentStatusChanged = signalRMessage.Message;
-        shipmentStatusChanged.ShipmentId.ShouldBe(shipmentId);
-        shipmentStatusChanged.OrderId.ShouldBe(orderId);
-        shipmentStatusChanged.NewStatus.ShouldBe("Dispatched");
-        shipmentStatusChanged.TrackingNumber.ShouldBe("TRACK123");
+        // Assert
+        result.ShouldNotBeNull();
+        result.Locator.ToString()!.ShouldContain($"customer:{StubCustomerId}"); // Stub
+        result.Message.ShipmentId.ShouldBe(shipmentId);
+        result.Message.OrderId.ShouldBe(orderId);
+        result.Message.NewStatus.ShouldBe("Dispatched");
+        result.Message.TrackingNumber.ShouldBe("TRACK123");
     }
 
     [Fact]
@@ -342,11 +314,10 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
             19.99m,
             DateTimeOffset.UtcNow);
 
-        // Act
-        var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+        // Act — call handler directly; null return = no SignalR message produced
+        var result = await ItemAddedHandler.Handle(message, fixture.StubShoppingClient, CancellationToken.None);
 
-        // Assert — null return means no SignalR message of any kind was sent.
-        // Verifying the wrapped type (SignalRMessage<CartUpdated>) is empty confirms no broadcast occurred.
-        tracked.Sent.MessagesOf<SignalRMessage<CartUpdated>>().ShouldBeEmpty();
+        // Assert
+        result.ShouldBeNull();
     }
 }

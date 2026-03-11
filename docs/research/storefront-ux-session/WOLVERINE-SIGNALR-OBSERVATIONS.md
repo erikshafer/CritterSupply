@@ -220,3 +220,73 @@ if SignalR group targeting is needed, to keep the domain project transport-free.
 ---
 
 *Discovered during CritterSupply Cycle 19 — Storefront UX Improvements. WolverineFx.SignalR 5.17.0.*
+
+---
+
+## Observation 6: `SignalRMessage<T>` Returned from Handlers Is NOT Tracked in `ITrackedSession.Sent` When Transport Is Disabled
+
+### Behavior
+
+When `DisableAllExternalWolverineTransports()` is called in test setup (the standard Alba test pattern),
+the SignalR transport is disabled alongside RabbitMQ and other external transports.
+
+When a handler returns `SignalRMessage<T>` (from `.ToWebSocketGroup()`), Wolverine routes it through
+the SignalR transport. With the transport disabled, the message is **not recorded** in
+`ITrackedSession.Sent` — it is dropped silently. As a result:
+
+```csharp
+// ❌ Always returns empty when SignalR transport is disabled in tests
+var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+var published = tracked.Sent.MessagesOf<SignalRMessage<CartUpdated>>();
+published.ShouldNotBeEmpty(); // FAILS — published is empty
+```
+
+This caused 7 failing integration tests in CI after switching handlers from raw `T` to
+`SignalRMessage<T>` returns.
+
+Contrast with the old pattern (raw `T` + publish rule routing to SignalR):
+
+```csharp
+// ✅ Worked with the old approach (raw T returned, publish rule routes to stubbed transport)
+var tracked = await fixture.Host.InvokeMessageAndWaitAsync(message);
+var published = tracked.Sent.MessagesOf<CartUpdated>();
+published.ShouldNotBeEmpty(); // PASSES — raw T is tracked before transport delivery
+```
+
+### Why They Behave Differently
+
+When a handler returns raw `T` and a publish rule routes it to SignalR, Wolverine records the
+outgoing message as an envelope in `Sent` **before** attempting to deliver to the (stubbed) transport.
+
+When a handler returns `SignalRMessage<T>`, Wolverine processes this as a direct SignalR transport
+operation. The SignalR transport, when disabled, appears to discard the message without recording it
+in the tracking session.
+
+### Recommended Approach in Tests
+
+Call the static handler method directly and assert on the return value:
+
+```csharp
+// ✅ Correct approach for testing SignalRMessage<T> handler return values
+var result = await ItemAddedHandler.Handle(message, shoppingClient, CancellationToken.None);
+
+result.ShouldNotBeNull();
+result!.Locator.ToString()!.ShouldContain($"customer:{customerId}"); // group assertion
+result.Message.CartId.ShouldBe(cartId);                              // payload assertion
+```
+
+This directly tests handler logic (correct group name, correct payload) without depending on
+Wolverine's transport tracking infrastructure.
+
+### Potential Upstream Contribution
+
+- **Bug report / docs:** `DisableAllExternalWolverineTransports()` disables the SignalR transport,
+  causing `SignalRMessage<T>` returned from handlers to be silently dropped from `ITrackedSession.Sent`.
+  This is surprising behavior and should be documented or fixed so that stubbed SignalR transport
+  still records messages in the tracking session (consistent with how raw `T` + publish rule behaves).
+
+- **API improvement:** `ITrackedSession.Sent` should capture `SignalRMessage<T>` envelopes even
+  when the SignalR transport is disabled in test mode, for parity with how other stubbed transports
+  are tracked.
+
+*Discovered during CritterSupply Cycle 19 CI failure investigation.*
