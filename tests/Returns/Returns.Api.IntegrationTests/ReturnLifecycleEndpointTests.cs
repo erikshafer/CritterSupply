@@ -738,7 +738,7 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
                 Results:
                 [
                     new InspectionLineResult("DOG-BOWL-01", 2, ItemCondition.AsExpected,
-                        "Confirmed defective, cracked base", false, DispositionDecision.Restockable, "A-12")
+                        "Confirmed defective, cracked base", true, DispositionDecision.Restockable, "A-12")
                 ]
             )).ToUrl($"/api/returns/{returnId}/inspection");
             s.StatusCodeShouldBe(HttpStatusCode.OK);
