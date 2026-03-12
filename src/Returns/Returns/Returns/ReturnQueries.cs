@@ -65,16 +65,15 @@ public static class GetReturnsForOrderHandler
         IQuerySession session,
         CancellationToken ct)
     {
-        // Query all return streams for this order
-        // Phase 1: use lightweight query via Marten's event store
-        var streams = await session.Events
-            .QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "return_requested")
+        // Query inline snapshots — Marten persists the full Return aggregate
+        // as a document after every event append via Snapshot<Return>(Inline)
+        var returns = await session.Query<Return>()
+            .Where(r => r.OrderId == orderId)
             .ToListAsync(ct);
 
-        // For Phase 1, we use a simple document query via snapshots
-        // This will be replaced with a proper projection in Phase 2
-        var returns = new List<ReturnSummaryResponse>();
-        return returns.AsReadOnly();
+        return returns
+            .Select(GetReturnHandler.ToResponse)
+            .ToList()
+            .AsReadOnly();
     }
 }

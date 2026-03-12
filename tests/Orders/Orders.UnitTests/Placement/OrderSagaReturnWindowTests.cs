@@ -108,7 +108,7 @@ public class OrderSagaReturnWindowTests
         var returnId = Guid.NewGuid();
         const decimal refundAmount = 85.50m;
 
-        var outgoing = order.Handle(new ReturnCompleted(returnId, order.Id, refundAmount, DateTimeOffset.UtcNow));
+        var outgoing = order.Handle(new ReturnCompleted(returnId, order.Id, order.CustomerId, refundAmount, [], DateTimeOffset.UtcNow));
 
         // Saga state
         order.IsReturnInProgress.ShouldBeFalse();
@@ -132,7 +132,7 @@ public class OrderSagaReturnWindowTests
         var order = BuildDeliveredOrder(isReturnInProgress: true, returnWindowFired: false);
         var returnId = Guid.NewGuid();
 
-        var outgoing = order.Handle(new ReturnCompleted(returnId, order.Id, 50m, DateTimeOffset.UtcNow));
+        var outgoing = order.Handle(new ReturnCompleted(returnId, order.Id, order.CustomerId, 50m, [], DateTimeOffset.UtcNow));
 
         order.Status.ShouldBe(OrderStatus.Closed);
         order.IsCompleted().ShouldBeTrue();
@@ -155,7 +155,7 @@ public class OrderSagaReturnWindowTests
             returnWindowFired: true,
             activeReturnId: Guid.NewGuid());
 
-        order.Handle(new ReturnDenied(Guid.NewGuid(), order.Id, "Items not eligible for return", DateTimeOffset.UtcNow));
+        order.Handle(new ReturnDenied(Guid.NewGuid(), order.Id, order.CustomerId, "Items not eligible for return", null, DateTimeOffset.UtcNow));
 
         order.IsReturnInProgress.ShouldBeFalse();
         order.ActiveReturnId.ShouldBeNull();
@@ -176,7 +176,7 @@ public class OrderSagaReturnWindowTests
             returnWindowFired: false,
             activeReturnId: Guid.NewGuid());
 
-        order.Handle(new ReturnDenied(Guid.NewGuid(), order.Id, "Items not eligible for return", DateTimeOffset.UtcNow));
+        order.Handle(new ReturnDenied(Guid.NewGuid(), order.Id, order.CustomerId, "Items not eligible for return", null, DateTimeOffset.UtcNow));
 
         order.IsReturnInProgress.ShouldBeFalse();
         order.ActiveReturnId.ShouldBeNull();

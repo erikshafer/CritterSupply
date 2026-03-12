@@ -84,12 +84,22 @@ public static class RequestReturnHandler
             // Schedule expiration
             await bus.ScheduleAsync(new ExpireReturn(returnId), shipByDeadline);
 
-            // Publish integration event
+            // Publish integration events
             await bus.PublishAsync(new Messages.Contracts.Returns.ReturnRequested(
                 ReturnId: returnId,
                 OrderId: command.OrderId,
                 CustomerId: command.CustomerId,
                 RequestedAt: now));
+
+            // Publish ReturnApproved for Customer Experience BC / Notifications BC
+            await bus.PublishAsync(new Messages.Contracts.Returns.ReturnApproved(
+                ReturnId: returnId,
+                OrderId: command.OrderId,
+                CustomerId: command.CustomerId,
+                EstimatedRefundAmount: estimatedRefund,
+                RestockingFeeAmount: restockingFee,
+                ShipByDeadline: shipByDeadline,
+                ApprovedAt: now));
 
             return RequestReturnResponse.Approved(
                 returnId, command.OrderId, items, estimatedRefund,

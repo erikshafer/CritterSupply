@@ -105,6 +105,10 @@ builder.Host.UseWolverine(opts =>
         .ToRabbitQueue("storefront-fulfillment-events");
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDeliveryFailed>()
         .ToRabbitQueue("storefront-fulfillment-events");
+
+    // Publish to Returns BC for return eligibility window establishment
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
+        .ToRabbitQueue("returns-fulfillment-events");
 });
 
 builder.Services.AddEndpointsApiExplorer();
