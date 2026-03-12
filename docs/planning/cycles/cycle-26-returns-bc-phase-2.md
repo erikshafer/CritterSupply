@@ -74,6 +74,8 @@ public sealed record ReturnedItem(
 
 **Why separate file:** Follows the existing Messages.Contracts pattern (one record per file). `RestockCondition` uses string (not enum) because it's an integration boundary — the consuming BCs interpret the value; Returns BC doesn't enforce a fixed set.
 
+**Known `RestockCondition` values:** `"New"`, `"LikeNew"`, `"Opened"`. Document these in the XML summary comment so downstream BCs have a reference. If additional conditions emerge (e.g., `"Refurbished"`), they can be added without breaking the contract.
+
 #### 1b. Expand `ReturnCompleted` contract
 
 **File:** `src/Shared/Messages.Contracts/Returns/ReturnCompleted.cs` *(MODIFY)*
@@ -116,6 +118,9 @@ var returnedItems = command.Results.Select(r => new Messages.Contracts.Returns.R
     {
         ItemCondition.AsExpected => "LikeNew",
         ItemCondition.BetterThanExpected => "New",
+        // WorseThanExpected should never reach here (filtered to failed partition),
+        // but handle defensively
+        ItemCondition.WorseThanExpected => "Opened",
         _ => "Opened"
     })).ToList().AsReadOnly();
 
@@ -255,9 +260,12 @@ public sealed record ReturnRejected(
 
 **File:** `src/Returns/Returns/Returns/ReturnCommandHandlers.cs` *(MODIFY — `SubmitInspectionHandler.Handle`, the `hasFailures` branch)*
 
-Currently the failure branch only appends a domain event. Add integration message:
+Currently the failure branch only appends a domain event. Add integration message and extract the rejection reason to a constant:
 
 ```csharp
+// In ReturnCommandHandlers.cs or a shared constants location:
+private const string InspectionFailureReason = "Inspection found items in unacceptable condition.";
+
 // In the hasFailures (all-fail) branch — will be updated again in D6 for mixed:
 var rejectedItems = command.Results.Select(r => new Messages.Contracts.Returns.ReturnedItem(
     Sku: r.Sku,
@@ -567,32 +575,31 @@ public static (Events, OutgoingMessages) Handle(
             StartedAt: now));
     }
 
-    // Partition results into passed and failed
-    var passed = command.Results.Where(r =>
-        r.Condition is not ItemCondition.WorseThanExpected &&
-        r.Disposition is not (DispositionDecision.Dispose
-            or DispositionDecision.Quarantine
-            or DispositionDecision.ReturnToCustomer)).ToList();
-
-    var failed = command.Results.Where(r =>
+    // Partition results into passed and failed using a shared predicate
+    static bool IsFailedResult(InspectionLineResult r) =>
         r.Condition is ItemCondition.WorseThanExpected ||
         r.Disposition is DispositionDecision.Dispose
             or DispositionDecision.Quarantine
-            or DispositionDecision.ReturnToCustomer).ToList();
+            or DispositionDecision.ReturnToCustomer;
+
+    var passed = command.Results.Where(r => !IsFailedResult(r)).ToList();
+    var failed = command.Results.Where(IsFailedResult).ToList();
 
     // Helper: map InspectionLineResult → ReturnedItem (for integration events)
+    // passedInspection: true for items that passed inspection, false for failed items
     static IReadOnlyList<Messages.Contracts.Returns.ReturnedItem> ToReturnedItems(
-        List<InspectionLineResult> results, bool isRestockable) =>
+        List<InspectionLineResult> results, bool passedInspection) =>
         results.Select(r => new Messages.Contracts.Returns.ReturnedItem(
             Sku: r.Sku,
             Quantity: r.Quantity,
-            IsRestockable: isRestockable && r.IsRestockable,
+            IsRestockable: passedInspection && r.IsRestockable,
             WarehouseId: r.WarehouseLocation,
-            RestockCondition: isRestockable
+            RestockCondition: passedInspection
                 ? r.Condition switch
                 {
                     ItemCondition.AsExpected => "LikeNew",
                     ItemCondition.BetterThanExpected => "New",
+                    ItemCondition.WorseThanExpected => "Opened",
                     _ => "Opened"
                 }
                 : null)).ToList().AsReadOnly();
@@ -614,7 +621,7 @@ public static (Events, OutgoingMessages) Handle(
             OrderId: aggregate.OrderId,
             CustomerId: aggregate.CustomerId,
             FinalRefundAmount: finalRefund,
-            Items: ToReturnedItems(passed, isRestockable: true),
+            Items: ToReturnedItems(passed, passedInspection: true),
             CompletedAt: now));
     }
     else if (passed.Count == 0)
@@ -631,7 +638,7 @@ public static (Events, OutgoingMessages) Handle(
             OrderId: aggregate.OrderId,
             CustomerId: aggregate.CustomerId,
             Reason: "Inspection found items in unacceptable condition.",
-            Items: ToReturnedItems(failed, isRestockable: false),
+            Items: ToReturnedItems(failed, passedInspection: false),
             RejectedAt: now));
     }
     else
@@ -651,11 +658,13 @@ public static (Events, OutgoingMessages) Handle(
             RestockingFeeAmount: restockingFee,
             CompletedAt: now));
 
-        // Publish ReturnCompleted with ALL items — passed items are restockable,
-        // failed items are not. This gives Inventory BC complete disposition data
-        // and Orders BC the partial refund amount.
-        var allItems = ToReturnedItems(passed, isRestockable: true)
-            .Concat(ToReturnedItems(failed, isRestockable: false))
+        // Publish ReturnCompleted with ALL items (passed + failed).
+        // Passed items have IsRestockable based on inspection; failed items are IsRestockable: false.
+        // This gives Inventory BC complete disposition data and Orders BC the partial refund amount.
+        // NOTE: ReturnCompleted is published for all-pass and mixed scenarios.
+        // All-fail publishes ReturnRejected instead (see branch above).
+        var allItems = ToReturnedItems(passed, passedInspection: true)
+            .Concat(ToReturnedItems(failed, passedInspection: false))
             .ToList().AsReadOnly();
 
         outgoing.Add(new Messages.Contracts.Returns.ReturnCompleted(
@@ -728,6 +737,8 @@ public static class GetReturnsForOrderHandler
 
 **Why this works:** Marten inline snapshots persist the full `Return` aggregate as a document after every event append. `session.Query<Return>()` queries this document store. No additional projection is needed.
 
+**Note on `ToResponse`:** This reuses the `internal static` method already defined in `GetReturnHandler` (in `ReturnQueries.cs`). Both handlers are in the same file, so no coupling issue.
+
 #### 7b. Add Marten index for `OrderId` queries
 
 **File:** `src/Returns/Returns.Api/Program.cs` *(MODIFY — Marten configuration)*
@@ -740,9 +751,9 @@ opts.Schema.For<Return>()
     .Index(x => x.OrderId);
 ```
 
-#### 7c. Add `[FromQuery]` attribute import
+#### 7c. Ensure `[FromQuery]` attribute import
 
-The `[FromQuery]` attribute is in `Microsoft.AspNetCore.Mvc`. Verify the `using` is present in `ReturnQueries.cs`. Currently it has `using Microsoft.AspNetCore.Http;` — add `using Microsoft.AspNetCore.Mvc;` if not present.
+Ensure the `using Microsoft.AspNetCore.Mvc;` directive is present in `ReturnQueries.cs` for the `[FromQuery]` attribute. Add it if not already present.
 
 ### Use Cases Supported
 
