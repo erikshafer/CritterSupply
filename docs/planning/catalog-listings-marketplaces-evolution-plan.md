@@ -1,15 +1,17 @@
 # Product Catalog · Listings · Marketplaces BC: Architecture Evolution Plan
 
 **Document Owner:** Principal Software Architect  
-**Status:** 🟡 Active — D1 (variant model) decided ✅; D2, D3, D6, D7, D8, D9, D10 outstanding  
+**Status:** ✅ All decisions resolved (D1–D10) — Cycle-by-cycle execution plan approved  
 **Date:** 2026-03-10  
-**Last Updated:** 2026-03-10  
+**Last Updated:** 2026-03-12  
 **Triggered by:** PO + UX Engineer discovery session on Product Catalog evolution and marketplace selling  
 **Source documents:**
 - [`docs/planning/catalog-listings-marketplaces-discovery.md`](catalog-listings-marketplaces-discovery.md)
 - [`CONTEXTS.md`](../../CONTEXTS.md) — Product Catalog BC section
 - Current implementation: `src/Product Catalog/`
 - ADR references: ADR 0016 (UUID v5), ADR 0008 (RabbitMQ consistency)
+
+**Execution plan:** [`catalog-listings-marketplaces-cycle-plan.md`](catalog-listings-marketplaces-cycle-plan.md) — Concrete cycle-by-cycle plan (Cycles 29–35) with task-level breakdowns, cross-BC coordination points, risk register, and acceptance criteria. All three sign-offs obtained (PSA ✅, PO ✅, UXE ✅).
 
 ---
 
@@ -531,21 +533,25 @@ The following decisions require Owner input before implementation begins. They a
 
 ---
 
-**D2 — Is Own Website a Formal Channel?** 🟡 Blocks Listings initial scope
+**D2 — Is Own Website a Formal Channel?** ✅ **DECIDED — Yes, formal channel**
 
 > Is `OWN_WEBSITE` a `ChannelCode` in the Listings + Marketplaces model, or is the own storefront handled separately (i.e., the Storefront BC directly reads Product Catalog, not a Listings record)?
 >
 > **Architect's recommendation: Yes, formal channel.** Treating OwnWebsite as a Listings channel means every product visible on the CritterSupply storefront goes through the same Draft → Live lifecycle. This gives you a single point of truth for "is this product active on channel X?" including the own website. It also means the recall cascade automatically covers the own website. The Storefront BC reads `Listings.ListingActivated` events to show/hide products.
+>
+> **PO Decision (2026-03-12):** YES — Agree with architect. Recall cascade covering the storefront automatically is the primary business driver. Unified "where is this product live?" query from a single BC eliminates data inconsistency. Caveat: `OWN_WEBSITE` listing lifecycle should be simpler — `Draft → Live` is near-instant, no marketplace review queue. See [`catalog-listings-marketplaces-cycle-plan.md` §1](catalog-listings-marketplaces-cycle-plan.md#1-decision-summary-d1d10) for full rationale.
 
 ---
 
-**D3 — Does Listings BC Own Marketplace API Calls?** 🔴 Blocks Marketplaces BC scope
+**D3 — Does Listings BC Own Marketplace API Calls?** ✅ **DECIDED — Marketplaces BC owns API calls**
 
 > When a listing reaches `Submitted` state, which BC makes the actual API call to Amazon/Walmart/eBay?
 >
 > **Architect's recommendation: Marketplaces BC.** Listings BC owns the *intent* (a listing should exist on channel X). Marketplaces BC owns the *mechanism* (how to actually call Amazon's API, what credentials to use, how to handle throttling and error responses). Listings BC publishes `ListingSubmittedToMarketplace`; Marketplaces BC handles it and publishes `MarketplaceListingActivated` back. This is clean separation of domain concern (what we're listing) from integration concern (how marketplace APIs work).
 >
 > **Risk if deferred:** Listings BC grows API call logic and becomes a God-BC managing both its own lifecycle and marketplace integration protocols.
+>
+> **PO Decision (2026-03-12):** Agree with architect. Listings BC = merchandising team (what to sell where). Marketplaces BC = channel integrations team (API plumbing). If submission is rejected, Marketplaces BC publishes `MarketplaceSubmissionRejected(Reason, FieldErrors)` and Listings BC transitions listing back to `Draft`. See [`catalog-listings-marketplaces-cycle-plan.md` §1](catalog-listings-marketplaces-cycle-plan.md#1-decision-summary-d1d10) for full rationale.
 
 ---
 
@@ -561,43 +567,53 @@ The following decisions require Owner input before implementation begins. They a
 
 ---
 
-**D6 — API Credentials: Marketplaces BC or Vault?** 🟡 Blocks Marketplaces implementation
+**D6 — API Credentials: Marketplaces BC or Vault?** ✅ **DECIDED — Vault (non-negotiable)**
 
 > Should marketplace API credentials (Amazon SP-API client ID/secret, Walmart API key) live in Vault (injected as environment variables at startup), or managed as documents within Marketplaces BC?
 >
 > **Architect's recommendation: Vault (or equivalent secrets manager), with the Vault path stored on the `Marketplace` document.** Never store API credentials in Postgres or in appsettings.json. The `Marketplace` document stores the Vault path (e.g., `secret/marketplaces/amazon-us`); the Marketplaces BC service retrieves the credential at startup or on demand via the Vault client. This is the correct security boundary.
+>
+> **PO Decision (2026-03-12):** Agree — non-negotiable. Marketplace credentials are the keys to seller accounts; if they leak, someone could list products under our brand, change prices, or delist everything. Vault path on document is fine. Credential rotation without deployment is a hard requirement. Vault stub/mock acceptable in dev, but pattern must be correct. See [`catalog-listings-marketplaces-cycle-plan.md` §1](catalog-listings-marketplaces-cycle-plan.md#1-decision-summary-d1d10).
 
 ---
 
-**D7 — Lot/Batch Tracking Scope** 🟡 Affects recall cascade precision
+**D7 — Lot/Batch Tracking Scope** ✅ **DECIDED — Defer to Phase 3; full-SKU cascade at launch**
 
 > If a product recall is lot-specific (only units from manufacturing batch X are affected), does the Listings BC need to track which lot a listing represents? Is lot tracking in scope for Listings launch, or deferred?
 >
 > If deferred: the recall cascade forces down ALL active listings for the SKU regardless of lot. This is the safe default — more aggressive than necessary for lot-specific recalls, but not harmful. **Architect's recommendation: Defer to Phase 3.** Launch with full-SKU cascade. Add lot-specific targeting as a Phase 3 enhancement once Inventory BC has lot tracking wired.
+>
+> **PO Decision (2026-03-12):** Agree — defer. In real pet supply recalls, the typical action is immediate full-SKU pull from all channels. Lot-level investigation happens *after* the product is already down. Full-SKU cascade is the correct operational behavior for initial response. Phase 3 acceptance criteria: catalog manager can re-activate a recalled product with a lot exclusion filter. See [`catalog-listings-marketplaces-cycle-plan.md` §1](catalog-listings-marketplaces-cycle-plan.md#1-decision-summary-d1d10).
 
 ---
 
-**D8 — Compliance Metadata: Listings Launch or Deferred?** 🔴 Blocks Amazon/Walmart listing submission
+**D8 — Compliance Metadata: Listings Launch or Deferred?** ✅ **DECIDED — Minimum viable (IsHazmat + HazmatClass enum) at launch**
 
 > Amazon and Walmart reject listings for hazmat products without proper hazmat classification. If CritterSupply sells *any* products that require hazmat classification (batteries, certain chemicals, some medications), those products cannot be listed without compliance fields.
 >
 > **Architect's recommendation: Minimum viable compliance at Listings launch.** `IsHazmat: bool` and `HazmatClass: string?` on the Product aggregate (matching the existing `FulfillmentLineItem` field established in Fulfillment BC Q6 answer). Full compliance suite (PropSixtyFive, AgeRestriction, RestrictedStates) as Phase 2. This unblocks marketplace submission while avoiding the full regulatory schema.
+>
+> **PO Decision (2026-03-12):** Agree — minimum viable is enough. `HazmatClass` must use standard UN/DOT classification values (Class 1–9), not free-text — should be an enum or constrained value object. Covers ~95% of pet supply hazmat requirements (flea/tick treatments = Class 9, batteries in electronic toys = Class 9). Full compliance suite (Prop65, AgeRestriction, RestrictedStates) deferred to Phase 2. See [`catalog-listings-marketplaces-cycle-plan.md` §1](catalog-listings-marketplaces-cycle-plan.md#1-decision-summary-d1d10).
 
 ---
 
-**D9 — Automated Seasonal Reactivation** 🟢 Low urgency
+**D9 — Automated Seasonal Reactivation** ✅ **DECIDED — Manual for Phase 1, scheduled for Phase 2**
 
 > Should OutOfSeason products reactivate automatically on a scheduled date, or manually by a catalog manager?
 >
 > **Architect's recommendation: Manual for launch, scheduled for Phase 2.** A Wolverine scheduled message (`ScheduledActivation`) stored at the time of `ProductSetToOutOfSeason` is the correct pattern. The scheduled message fires a `ProductActivated` command at the planned date. Phase 1: manual only. Phase 2: add `PlannedReactivationDate?` to `ProductSetToOutOfSeason` event and wire the scheduler.
+>
+> **PO Decision (2026-03-12):** Agree. Phase 2's `PlannedReactivationDate` should create a scheduled *reminder* for the catalog manager to review and approve — not auto-reactivate (marketplace content may need updating). Exception: for `OWN_WEBSITE` listings, auto-reactivation is fine since we control the experience. Engineer should design the scheduled message to distinguish these cases. See [`catalog-listings-marketplaces-cycle-plan.md` §1](catalog-listings-marketplaces-cycle-plan.md#1-decision-summary-d1d10).
 
 ---
 
-**D10 — Schema Versioning for Marketplace Attribute Definitions** 🟡 Blocks Listings content completeness
+**D10 — Schema Versioning for Marketplace Attribute Definitions** ✅ **DECIDED — Warn, don't block**
 
 > When Amazon updates their attribute schema (new required field for dog bowls), how does CritterSupply detect and respond? Does the Marketplaces BC expose a schema version that Listings BC stamps on each draft listing? What is the migration path for existing draft listings when a breaking schema change is published?
 >
 > **Architect's recommendation: Semantic versioning on `MarketplaceAttributeSchema` documents.** `MarketplaceAttributeSchemaPublished(IsBreakingChange: true)` triggers Listings BC to flag all draft listings for that channel as `RequiresSchemaReview`. Non-breaking schema changes (new optional fields) do not trigger a flag. **Owner must decide:** Do breaking schema changes block submission of existing drafts, or merely warn? This is a business policy decision, not a technical one.
+>
+> **PO Decision (2026-03-12):** **WARN, don't block.** Marketplace schema changes aren't always instant — Amazon may provide a 30-day grace period. Let the marketplace API be the enforcer. `RequiresSchemaReview` flag + yellow warning badge on affected drafts; listings can still be submitted. If Amazon rejects it, standard `MarketplaceSubmissionRejected` flow handles it. Blocking takes away the catalog manager's flexibility to submit before the grace period ends. See [`catalog-listings-marketplaces-cycle-plan.md` §1](catalog-listings-marketplaces-cycle-plan.md#1-decision-summary-d1d10).
 
 ---
 
@@ -691,20 +707,23 @@ The following decisions require Owner input before implementation begins. They a
 
 These ADRs must be written before Phase 0 implementation begins. They capture the "why" behind decisions that will otherwise be revisited by every developer who touches the codebase.
 
-| ADR # | Decision | Covers |
-|---|---|---|
-| **0022** | Product Catalog BC migration to event sourcing | Why ES now (not at launch), migration strategy, `ProductMigrated` bootstrap event pattern |
-| **0023** | `catalog:` namespace prefix for UUID v5 stream IDs | Extends ADR 0016 with Product Catalog BC's namespace, preventing collision with `pricing:` streams |
-| **0024** | Granular Product Catalog integration messages (retire `ProductUpdated`) | Why `ProductContentUpdated` + `ProductCategoryChanged` replace `ProductUpdated`; backward compatibility strategy |
-| **0025** | Recall cascade via dedicated priority RabbitMQ exchange | Why priority queue over synchronous call; near-synchronous vs. fully-synchronous trade-off; `ListingForcedDown` vs. normal `ListingPaused` |
-| **0026** | Listings BC event-sourced aggregate with UUID v5 composite key | `listing:{sku}:{channelCode}` key design; why not UUID v7; why Listing is ES and Marketplace is not |
-| **0027** | Marketplace identity as document entity (not enum/aggregate/config) | D4 decision rationale; `ChannelCode` stability contract; why event sourcing is not warranted for marketplace config |
-| **0028** | Category-to-marketplace mapping ownership in Marketplaces BC | D5 decision; change-rate alignment; anti-corruption layer via `CategoryMappingView` local read model in Listings BC |
-| **0029** | Listings BC local `ProductSummaryView` (no HTTP to Catalog) | Why Listings BC never calls Product Catalog HTTP API at runtime; how `ProductSummaryView` is maintained via integration messages |
+> **⚠️ Numbering update (2026-03-12):** The original plan proposed ADRs 0022–0029, but those numbers are now taken by existing ADRs (0022–0025 already exist). The renumbered assignments are documented in [`catalog-listings-marketplaces-cycle-plan.md` §8](catalog-listings-marketplaces-cycle-plan.md#8-adr-schedule). Summary:
+
+| Original # | New # | Decision | Covers |
+|---|---|---|---|
+| ~~0022~~ | **0026** | Product Catalog BC migration to event sourcing | Why ES now (not at launch), migration strategy, `ProductMigrated` bootstrap event pattern |
+| ~~0023~~ | **0027** | `catalog:` namespace prefix for UUID v5 stream IDs | Extends ADR 0016 with Product Catalog BC's namespace, preventing collision with `pricing:` streams |
+| ~~0024~~ | **0028** | Granular Product Catalog integration messages (retire `ProductUpdated`) | Why `ProductContentUpdated` + `ProductCategoryChanged` replace `ProductUpdated`; backward compatibility strategy |
+| ~~0025~~ | **0029** | Recall cascade via dedicated priority RabbitMQ exchange | Why priority queue over synchronous call; near-synchronous vs. fully-synchronous trade-off; `ListingForcedDown` vs. normal `ListingPaused` |
+| ~~0026~~ | **0030** | Listings BC event-sourced aggregate with UUID v5 composite key | `listing:{sku}:{channelCode}` key design; why not UUID v7; why Listing is ES and Marketplace is not |
+| ~~0027~~ | **0031** | Marketplace identity as document entity (not enum/aggregate/config) | D4 decision rationale; `ChannelCode` stability contract; why event sourcing is not warranted for marketplace config |
+| ~~0028~~ | **0032** | Category-to-marketplace mapping ownership in Marketplaces BC | D5 decision; change-rate alignment; anti-corruption layer via `CategoryMappingView` local read model in Listings BC |
+| ~~0029~~ | **0033** | Listings BC local `ProductSummaryView` (no HTTP to Catalog) | Why Listings BC never calls Product Catalog HTTP API at runtime; how `ProductSummaryView` is maintained via integration messages |
+| *(new)* | **0034** | Parent/Child variant model for ProductFamily aggregate | D1 decision rationale; UUID v7 stream key for families; dual-stream write pattern |
 
 ---
 
-*This document should be updated when Owner decisions D1–D10 are received. Convert phase plans into cycle-specific task breakdowns in `docs/planning/cycles/` once Owner gates are cleared.*
+*All Owner decisions D1–D10 are now resolved (2026-03-12). The cycle-specific task breakdowns are in [`catalog-listings-marketplaces-cycle-plan.md`](catalog-listings-marketplaces-cycle-plan.md) — Cycles 29–35.*
 
 ---
 
