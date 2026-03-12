@@ -8,55 +8,73 @@
 > 1. **GitHub MCP server** configured in your AI tool's MCP settings
 > 2. **GitHub auth** (personal access token with `repo` + `project` scopes)
 >
-> With both configured, query GitHub directly: `list_issues(milestone="Cycle 19", state="open")`  
+> With both configured, query GitHub directly: `list_issues(milestone="Cycle 25", state="open")`  
 > This works identically on any machine — MacBook, Windows PC, Linux laptop.
 
 ---
 
-**Cycle:** 24 — Fulfillment Integrity + Returns Prerequisites
-**Status:** 📋 **PLANNED** — post-Cycle 23 priority review complete; Cycle 24 scope revised
-**GitHub Milestone:** Cycle 24: Fulfillment Integrity + Returns Prerequisites *(create before starting)*
+**Cycle:** 25 — Returns BC Phase 1
+**Status:** 📋 **PLANNED** — Cycle 24 complete; all prerequisites in place; sign-offs obtained
+**GitHub Milestone:** Cycle 25: Returns BC Phase 1 *(create before starting)*
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 
 ---
 
 ## Current Status
 
-**Cycle 23 is COMPLETE.** A cross-functional priority review was conducted before starting Cycle 24 (see [`docs/planning/priority-review-post-cycle-23.md`](priority-review-post-cycle-23.md)).
+**Cycle 24 is COMPLETE.** All Fulfillment integrity bugs fixed, Orders saga return handlers implemented, and Returns prerequisites in place. Sign-offs obtained from Product Owner, UX Engineer, and Principal Software Architect.
 
-**Key finding:** The previously planned Cycle 24 (Admin Portal Phase 1) has been **deferred to Cycle 28+** based on unanimous agreement from Product Owner, UX Engineer, and Principal Software Architect. Customer-facing gaps (Fulfillment bugs, Returns, Notifications) take precedence.
+**What Cycle 24 delivered:**
+- ✅ RabbitMQ transport wired in Fulfillment.Api (messages cross process boundaries)
+- ✅ `RecordDeliveryFailure` endpoint + `ShipmentDeliveryFailed` cascade
+- ✅ `shipment-delivery-failed` SSE case in OrderConfirmation.razor
+- ✅ UUID v5 idempotent shipment creation + clean ShipmentStatus enum
+- ✅ `SharedShippingAddress` with dual JSON annotations (Phase A)
+- ✅ Orders saga return handlers: `ReturnRequested`, `ReturnCompleted`, `ReturnDenied`
+- ✅ `IsReturnInProgress` guard on `ReturnWindowExpired` (critical bug fix)
+- ✅ `GET /api/orders/{orderId}/returnable-items` endpoint
+- ✅ Returns integration message contracts + RabbitMQ routing
 
-**Cycle 24 Scope (revised):**
+**Cycle 24 Plan:** [`docs/planning/cycles/cycle-24-fulfillment-integrity-returns-prerequisites.md`](cycles/cycle-24-fulfillment-integrity-returns-prerequisites.md)
 
-*Fulfillment bug fix sweep — must land atomically:*
-- 🔴 Wire RabbitMQ transport in `Fulfillment.Api/Program.cs` (ADR 0008; classified P0.5 → P0 since delivery-failure fix is dark without it)
-- 🔴 `ShipmentDeliveryFailed` cascade: add `RecordDeliveryFailure` endpoint + publish `Messages.Contracts.Fulfillment.ShipmentDeliveryFailed` integration message
-- 🔴 Add `shipment-delivery-failed` SSE case in `OrderConfirmation.razor` (frontend must ship with backend)
-- 🔴 `Shipment.Create()`: remove `Guid.CreateVersion7()` — use Marten-supplied stream ID
-- 🔴 Remove dead `Picking`/`Packing` from `ShipmentStatus` enum (no events drive them)
-- 🔴 `FulfillmentRequestedHandler`: apply UUID v5 from `OrderId` for idempotent shipment creation (ADR 0016)
+**Cycle 25 Scope (Returns BC Phase 1):**
 
-*`ShippingAddress` consolidation Phase A (non-breaking):*
-- 🟡 Introduce `Messages.Contracts.Shared.ShippingAddress` with dual `[JsonPropertyName]` annotations for both naming conventions
-- 🟡 Both Orders and Fulfillment BCs adopt shared type; legacy-named properties marked `[Obsolete]`
+*Pre-implementation tasks (from Cycle 24 stakeholder observations):*
+- 🔴 Add `DeliveredAt` persistence to Order saga's `Handle(ShipmentDelivered)` handler
+- 🟡 Add exchange workflow placeholder feature file
+- 🟡 Add mixed-inspection-results scenario to `return-inspection.feature`
+- 🔴 Write CS agent runbook for manual return approvals (Option A — API + runbook)
+- 🟡 Decide on `ReturnCompleted` contract expansion for Inventory BC item dispositions
 
-*Orders saga prerequisites for Returns BC (must precede Cycle 25):*
-- 🔴 Add `bool IsReturnInProgress` and `Guid? ActiveReturnId` to `Order` saga
-- 🔴 Guard `Handle(ReturnWindowExpired)` to only call `MarkCompleted()` when `!IsReturnInProgress`
-- 🔴 Add `Handle(Returns.ReturnRequested)` to set `IsReturnInProgress = true`
-- 🔴 Add `Handle(Returns.ReturnCompleted)` to publish `Payments.RefundRequested` then `MarkCompleted()`
-- 🔴 Add `Handle(Returns.ReturnDenied)` to reset `IsReturnInProgress` and conditionally close saga
-- 🔴 Add `GET /api/orders/{orderId}/returnable-items` endpoint (required by Returns BC FR-01)
+*Core Returns BC implementation:*
+- 🔴 Returns BC domain project (`src/Returns/Returns/`) with event-sourced Return aggregate
+- 🔴 Returns BC API project (`src/Returns/Returns.Api/`) with Wolverine + Marten configuration
+- 🔴 Return lifecycle: Requested → Approved → LabelGenerated → InTransit → Received → Inspecting → Completed/Denied/Expired/Rejected
+- 🔴 Return eligibility: 30-day window, non-returnable categories, duplicate prevention
+- 🔴 Return inspection: disposition logic (restock, dispose, quarantine, return-to-customer)
+- 🔴 Return expiration: auto-expiry of unshipped approved returns
+- 🟡 Order History page in Storefront.Web (prerequisite for return initiation UX)
 
-**Next cycles (revised roadmap):**
-- **Cycle 25:** Returns BC Phase 1 — Self-Service Returns + Order History page
+**Next cycles (roadmap):**
 - **Cycle 26:** Notifications BC Phase 1 — Transactional email (OrderPlaced, ShipmentDispatched; Phase 1b: Returns events)
-- **Cycle 27:** Promotions BC Phase 1 — Coupons and discounts; RBAC ADR for Admin Portal authored during this cycle
-- **Cycle 28+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling (previously Cycle 24)
+- **Cycle 27:** Promotions BC Phase 1 — Coupons and discounts; RBAC ADR for Admin Portal
+- **Cycle 28+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
 
 ---
 
 ## Recently Completed
+
+- ✅ **Cycle 24:** Fulfillment Integrity + Returns Prerequisites (2026-03-12) — **COMPLETE**
+  - RabbitMQ transport wired in Fulfillment.Api
+  - `RecordDeliveryFailure` endpoint + ShipmentDeliveryFailed cascade
+  - `shipment-delivery-failed` SSE case in OrderConfirmation.razor
+  - UUID v5 idempotent shipment creation + clean ShipmentStatus enum
+  - SharedShippingAddress with dual JSON annotations (Phase A)
+  - Orders saga return handlers + IsReturnInProgress guard
+  - `GET /api/orders/{orderId}/returnable-items` endpoint
+  - Event modeling exercise conducted with PO + UXE
+  - Sign-offs: PO ✅, UXE ✅, PSA ✅
+  - [Plan](./cycles/cycle-24-fulfillment-integrity-returns-prerequisites.md)
 
 - ✅ **Cycle 23:** Vendor Portal E2E Testing (2026-03-11) — **COMPLETE**
   - 3-server E2E fixture (VendorIdentity.Api + VendorPortal.Api + WASM static host)
@@ -122,23 +140,19 @@
 ### Next 4 Cycles (Revised after Post-Cycle 23 Priority Review)
 
 > **See** [`docs/planning/priority-review-post-cycle-23.md`](priority-review-post-cycle-23.md) for the full cross-functional analysis (Product Owner + UX Engineer + Principal Architect) that produced this revised roadmap.
+> **See** [`docs/planning/cycles/cycle-24-fulfillment-integrity-returns-prerequisites.md`](cycles/cycle-24-fulfillment-integrity-returns-prerequisites.md) for Cycle 24 plan with event modeling exercise and stakeholder observations for Cycle 25.
 
-- **Cycle 24:** Fulfillment Integrity + Returns Prerequisites *(scope revised — previously Admin Portal Phase 1)*
-  - Fulfillment bug fix sweep: RabbitMQ transport, `ShipmentDeliveryFailed` cascade, `Shipment.Create()` ID, dead states, idempotent handler
-  - `ShippingAddress` consolidation Phase A (shared type, dual-read JSON annotations)
-  - Orders saga prerequisites for Returns: `IsReturnInProgress` guard, new handlers, `returnable-items` endpoint
-  - Frontend: add `shipment-delivery-failed` SSE case in `OrderConfirmation.razor`
-
-- **Cycle 25:** Returns BC Phase 1 — Self-Service Returns + Order History page
-  - Domain spec ready: [`docs/returns/RETURNS-BC-SPEC.md`](../../returns/RETURNS-BC-SPEC.md)
-  - Prerequisite: Cycle 24 Fulfillment + saga work must be complete
+- **Cycle 25:** Returns BC Phase 1 — Self-Service Returns + Order History page *(current — ready to start)*
+  - Domain spec ready: `docs/features/returns/` (4 feature files)
+  - Prerequisite: Cycle 24 Fulfillment + saga work ✅ COMPLETE
+  - Pre-implementation tasks documented in Cycle 24 stakeholder observations
 
 - **Cycle 26:** Notifications BC Phase 1 — Transactional email
   - Phase 1a: `OrderPlaced`, `ShipmentDispatched` (existing BC events)
   - Phase 1b: Returns events (`ReturnApproved`, `ReturnDenied`, `ReturnCompleted`, `ReturnExpired`)
 
 - **Cycle 27:** Promotions BC Phase 1 — Coupons and discounts
-  - RBAC ADR for Admin Portal to be authored during this cycle
+  - RBAC ADR for Admin Portal to be authored during this cycle (PO suggests moving to Cycle 26)
   - Shopping BC already has `CouponApplied`/`CouponRemoved` placeholder events
 
 - **Cycle 28+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling *(deferred from Cycle 24)*
@@ -181,5 +195,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-11 (Cycle 23 closed; priority review complete — Cycle 24 scope revised to Fulfillment Integrity + Returns Prerequisites)*
+*Last Updated: 2026-03-12 (Cycle 24 closed; all sign-offs obtained — Cycle 25 Returns BC Phase 1 ready to start)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*
