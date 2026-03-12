@@ -275,7 +275,7 @@ The `CritterSupply.AppHost` project currently references `Aspire.Hosting.Postgre
 - [ ] **P0-5:** Add SQL Server 2025 container to `docker-compose.yml` (`infrastructure` profile)
   - Image: `mcr.microsoft.com/mssql/server:2025-latest`
   - Port: host `1434` → container `1433`
-  - Health check: `sqlcmd -Q "SELECT 1"`
+  - Health check: `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "..." -Q "SELECT 1" -C -b`
   - Database init script: `docker/sqlserver/create-databases.sql`
 - [ ] **P0-6:** Add `Testcontainers.MsSql` to `Directory.Packages.props`
 - [ ] **P0-7:** Verify SQL Server 2025 Docker image availability on GitHub Actions runners
@@ -547,4 +547,4 @@ Both Blazor frontends (Storefront.Web and VendorPortal.Web) are fully decoupled 
 - [CONTEXTS.md](../../CONTEXTS.md) — Bounded context definitions for the 4 affected BCs
 - [ADR 0002: EF Core for Customer Identity](0002-ef-core-for-customer-identity.md) — Original EF Core decision
 - [ADR 0015: Per-BC Postgres Databases](0015-per-bc-postgres-databases.md) — Database isolation pattern
-- [ADR 0015: JWT for Vendor Identity](0015-jwt-for-vendor-identity.md) — JWT architecture
+- [ADR 0015: JWT for Vendor Identity](0015-jwt-for-vendor-identity.md) — JWT architecture (note: multiple ADRs share the 0015 number in this repo)

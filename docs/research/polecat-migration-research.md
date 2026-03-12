@@ -330,7 +330,7 @@ Both Blazor frontends are fully decoupled from the database layer. No `.razor`, 
 8. **Bulk operations:** Does Polecat support batch inserts comparable to Marten's `BulkInsert`?
 9. **Composite string ID behavior and collation:** Does Polecat respect SQL Server collation for document ID lookups? Can we configure case-sensitive collation per database/table? This is critical for SKU-based document IDs.
 10. **`IDocumentSession` lifecycle in Wolverine handlers:** Without `.IntegrateWithWolverine()`, how should Polecat's `IDocumentSession` be injected into Wolverine handlers? Does `WolverineFx.SqlServer` manage the session lifecycle, or do we need custom middleware?
-11. **`LoadManyAsync<T>()` support:** The Vendor Portal's analytics handlers use `session.LoadManyAsync<VendorProductCatalogEntry>(ct, skus)` to batch-load catalog entries. Is this API available in Polecat? It's critical for the analytics fan-out pattern.
+11. **`LoadManyAsync<T>()` support:** The Vendor Portal's analytics handlers use `session.LoadManyAsync<VendorProductCatalogEntry>(ct, skus)` to batch-load multiple catalog entries by ID in a single database round-trip (a fan-out pattern where one incoming message triggers lookups for multiple related documents). Is this API available in Polecat?
 
 ---
 
