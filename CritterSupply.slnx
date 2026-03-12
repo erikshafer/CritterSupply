@@ -179,4 +179,10 @@
     <Project Path="tests/Vendor Portal/VendorPortal.UnitTests/VendorPortal.UnitTests.csproj" />
     <Project Path="tests/Vendor Portal/VendorPortal.E2ETests/VendorPortal.E2ETests.csproj" />
   </Folder>
+  <Folder Name="/Returns/">
+    <Project Path="src/Returns/Returns/Returns.csproj" />
+    <Project Path="src/Returns/Returns.Api/Returns.Api.csproj" />
+    <Project Path="tests/Returns/Returns.UnitTests/Returns.UnitTests.csproj" />
+    <Project Path="tests/Returns/Returns.Api.IntegrationTests/Returns.Api.IntegrationTests.csproj" />
+  </Folder>
 </Solution>
