@@ -1,6 +1,7 @@
 using Messages.Contracts.Returns;
 using Messages.Contracts.Payments;
 using Orders.Placement;
+using FulfillmentMessages = Messages.Contracts.Fulfillment;
 
 namespace Orders.UnitTests.Placement;
 
@@ -182,5 +183,133 @@ public class OrderSagaReturnWindowTests
         order.ActiveReturnId.ShouldBeNull();
         order.Status.ShouldBe(OrderStatus.Delivered); // still open
         order.IsCompleted().ShouldBeFalse();
+    }
+
+    // ===========================================================================
+    // Handle(ReturnRejected) — inspection failure
+    // ===========================================================================
+
+    /// <summary>
+    /// When a return is rejected (inspection failure) AFTER the return window has already fired,
+    /// the saga must close immediately — same pattern as ReturnDenied.
+    /// </summary>
+    [Fact]
+    public void ReturnRejected_After_Window_Fires_Closes_Saga()
+    {
+        var order = BuildDeliveredOrder(
+            isReturnInProgress: true,
+            returnWindowFired: true,
+            activeReturnId: Guid.NewGuid());
+
+        order.Handle(new Messages.Contracts.Returns.ReturnRejected(
+            Guid.NewGuid(), order.Id, order.CustomerId,
+            "Inspection found items in unacceptable condition.", [], DateTimeOffset.UtcNow));
+
+        order.IsReturnInProgress.ShouldBeFalse();
+        order.ActiveReturnId.ShouldBeNull();
+        order.Status.ShouldBe(OrderStatus.Closed);
+        order.IsCompleted().ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// When a return is rejected BEFORE the return window fires, the saga must stay open.
+    /// The customer's return failed inspection, but the window hasn't expired yet.
+    /// </summary>
+    [Fact]
+    public void ReturnRejected_Before_Window_Fires_Does_Not_Close_Saga()
+    {
+        var order = BuildDeliveredOrder(
+            isReturnInProgress: true,
+            returnWindowFired: false,
+            activeReturnId: Guid.NewGuid());
+
+        order.Handle(new Messages.Contracts.Returns.ReturnRejected(
+            Guid.NewGuid(), order.Id, order.CustomerId,
+            "Inspection found items in unacceptable condition.", [], DateTimeOffset.UtcNow));
+
+        order.IsReturnInProgress.ShouldBeFalse();
+        order.ActiveReturnId.ShouldBeNull();
+        order.Status.ShouldBe(OrderStatus.Delivered); // still open
+        order.IsCompleted().ShouldBeFalse();
+    }
+
+    // ===========================================================================
+    // Handle(ReturnExpired) — return ship-by deadline missed
+    // ===========================================================================
+
+    /// <summary>
+    /// When a return expires AFTER the return window has already fired,
+    /// the saga must close immediately.
+    /// </summary>
+    [Fact]
+    public void ReturnExpired_After_Window_Fires_Closes_Saga()
+    {
+        var order = BuildDeliveredOrder(
+            isReturnInProgress: true,
+            returnWindowFired: true,
+            activeReturnId: Guid.NewGuid());
+
+        order.Handle(new Messages.Contracts.Returns.ReturnExpired(
+            Guid.NewGuid(), order.Id, order.CustomerId, DateTimeOffset.UtcNow));
+
+        order.IsReturnInProgress.ShouldBeFalse();
+        order.ActiveReturnId.ShouldBeNull();
+        order.Status.ShouldBe(OrderStatus.Closed);
+        order.IsCompleted().ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// When a return expires BEFORE the return window fires, the saga must stay open.
+    /// </summary>
+    [Fact]
+    public void ReturnExpired_Before_Window_Fires_Does_Not_Close_Saga()
+    {
+        var order = BuildDeliveredOrder(
+            isReturnInProgress: true,
+            returnWindowFired: false,
+            activeReturnId: Guid.NewGuid());
+
+        order.Handle(new Messages.Contracts.Returns.ReturnExpired(
+            Guid.NewGuid(), order.Id, order.CustomerId, DateTimeOffset.UtcNow));
+
+        order.IsReturnInProgress.ShouldBeFalse();
+        order.ActiveReturnId.ShouldBeNull();
+        order.Status.ShouldBe(OrderStatus.Delivered); // still open
+        order.IsCompleted().ShouldBeFalse();
+    }
+
+    // ===========================================================================
+    // Handle(ShipmentDelivered) — DeliveredAt persistence
+    // ===========================================================================
+
+    /// <summary>
+    /// ShipmentDelivered must persist DeliveredAt on the saga state.
+    /// This timestamp is used by the BFF for "Return by {date}" display.
+    /// </summary>
+    [Fact]
+    public void ShipmentDelivered_Persists_DeliveredAt()
+    {
+        var orderId = Guid.NewGuid();
+        var order = new Order
+        {
+            Id = orderId,
+            CustomerId = Guid.NewGuid(),
+            Status = OrderStatus.Shipped,
+            IsPaymentCaptured = true,
+            PaymentId = Guid.NewGuid(),
+            ShippingAddress = new ShippingAddress("1 Main St", null, "City", "ST", "00001", "US"),
+            ShippingMethod = "Standard",
+            TotalAmount = 120.00m,
+            ExpectedReservationCount = 1,
+        };
+
+        var deliveredAt = DateTimeOffset.UtcNow;
+        var shipmentId = Guid.NewGuid();
+
+        order.Handle(new FulfillmentMessages.ShipmentDelivered(orderId, shipmentId, deliveredAt));
+
+        order.DeliveredAt.ShouldNotBeNull();
+        order.DeliveredAt.ShouldBe(deliveredAt);
+        order.Status.ShouldBe(OrderStatus.Delivered);
     }
 }

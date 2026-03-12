@@ -706,6 +706,153 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
 
     #endregion
 
+    #region POST /api/returns/{id}/inspection — mixed
+
+    [Fact]
+    public async Task POST_inspection_mixed_results_transitions_to_Completed_with_partial_refund()
+    {
+        var orderId = Guid.CreateVersion7();
+        var customerId = Guid.CreateVersion7();
+        await SeedEligibilityWindow(orderId, customerId);
+
+        // Create a multi-item return via POST
+        var createResult = await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new RequestReturn(
+                OrderId: orderId,
+                CustomerId: customerId,
+                Items:
+                [
+                    new RequestReturnItem("DOG-BOWL-01", "Ceramic Dog Bowl", 2, 19.99m,
+                        ReturnReason.Defective),
+                    new RequestReturnItem("CAT-TOY-05", "Interactive Laser", 1, 29.99m,
+                        ReturnReason.Unwanted),
+                    new RequestReturnItem("CAT-BED-01", "Cat Bed", 1, 49.99m,
+                        ReturnReason.Defective)
+                ]
+            )).ToUrl("/api/returns");
+
+            s.StatusCodeShouldBe(HttpStatusCode.OK);
+        });
+
+        var createResponse = createResult.ReadAsJson<RequestReturnResponse>();
+        createResponse.ShouldNotBeNull();
+        createResponse.Status.ShouldBe("Approved");
+        var returnId = createResponse.ReturnId!.Value;
+
+        // Receive
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new ReceiveReturn(returnId))
+                .ToUrl($"/api/returns/{returnId}/receive");
+            s.StatusCodeShouldBe(HttpStatusCode.OK);
+        });
+
+        // Submit mixed inspection: 2 pass, 1 fail
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new SubmitInspection(
+                ReturnId: returnId,
+                Results:
+                [
+                    new InspectionLineResult("DOG-BOWL-01", 2, ItemCondition.AsExpected,
+                        "Confirmed defective", true, DispositionDecision.Restockable, "A-12"),
+                    new InspectionLineResult("CAT-TOY-05", 1, ItemCondition.WorseThanExpected,
+                        "Customer damage visible", false, DispositionDecision.Dispose, null),
+                    new InspectionLineResult("CAT-BED-01", 1, ItemCondition.AsExpected,
+                        "Confirmed defective", true, DispositionDecision.Restockable, "B-05")
+                ]
+            )).ToUrl($"/api/returns/{returnId}/inspection");
+
+            s.StatusCodeShouldBe(HttpStatusCode.OK);
+        });
+
+        // Verify Completed state with partial refund
+        var getResult = await _fixture.Host.Scenario(s =>
+        {
+            s.Get.Url($"/api/returns/{returnId}");
+            s.StatusCodeShouldBe(HttpStatusCode.OK);
+        });
+
+        var summary = getResult.ReadAsJson<ReturnSummaryResponse>();
+        summary.ShouldNotBeNull();
+        summary.Status.ShouldBe("Completed");
+        summary.FinalRefundAmount.ShouldNotBeNull();
+        // Partial refund covers only passed items (DOG-BOWL defective $39.98 + CAT-BED defective $49.99 = $89.97)
+        summary.FinalRefundAmount!.Value.ShouldBe(89.97m);
+        summary.CompletedAt.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task POST_inspection_mixed_persists_InspectionMixed_event()
+    {
+        var orderId = Guid.CreateVersion7();
+        var customerId = Guid.CreateVersion7();
+        await SeedEligibilityWindow(orderId, customerId);
+
+        // Create a multi-item return
+        var createResult = await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new RequestReturn(
+                OrderId: orderId,
+                CustomerId: customerId,
+                Items:
+                [
+                    new RequestReturnItem("DOG-BOWL-01", "Ceramic Dog Bowl", 1, 19.99m,
+                        ReturnReason.Defective),
+                    new RequestReturnItem("CAT-TOY-05", "Interactive Laser", 1, 29.99m,
+                        ReturnReason.Unwanted)
+                ]
+            )).ToUrl("/api/returns");
+
+            s.StatusCodeShouldBe(HttpStatusCode.OK);
+        });
+
+        var createResponse = createResult.ReadAsJson<RequestReturnResponse>();
+        createResponse.ShouldNotBeNull();
+        var returnId = createResponse.ReturnId!.Value;
+
+        // Receive
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new ReceiveReturn(returnId))
+                .ToUrl($"/api/returns/{returnId}/receive");
+            s.StatusCodeShouldBe(HttpStatusCode.OK);
+        });
+
+        // Submit mixed inspection: 1 pass, 1 fail
+        await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new SubmitInspection(
+                ReturnId: returnId,
+                Results:
+                [
+                    new InspectionLineResult("DOG-BOWL-01", 1, ItemCondition.AsExpected,
+                        "Good", true, DispositionDecision.Restockable, "A-1"),
+                    new InspectionLineResult("CAT-TOY-05", 1, ItemCondition.WorseThanExpected,
+                        "Damaged", false, DispositionDecision.Dispose, null)
+                ]
+            )).ToUrl($"/api/returns/{returnId}/inspection");
+
+            s.StatusCodeShouldBe(HttpStatusCode.OK);
+        });
+
+        // Verify the event stream contains InspectionMixed (not InspectionPassed or InspectionFailed)
+        using var session = _fixture.GetDocumentSession();
+        var events = await session.Events.FetchStreamAsync(returnId);
+
+        events.ShouldNotBeNull();
+        events.Count.ShouldBeGreaterThanOrEqualTo(5);
+        // ReturnRequested → ReturnApproved → ReturnReceived → InspectionStarted → InspectionMixed
+        events[0].EventType.ShouldBe(typeof(ReturnRequested));
+        events[1].EventType.ShouldBe(typeof(ReturnApproved));
+        events[2].EventType.ShouldBe(typeof(ReturnReceived));
+        events[3].EventType.ShouldBe(typeof(InspectionStarted));
+        events[4].EventType.ShouldBe(typeof(InspectionMixed));
+    }
+
+    #endregion
+
     #region Full lifecycle through HTTP
 
     [Fact]
