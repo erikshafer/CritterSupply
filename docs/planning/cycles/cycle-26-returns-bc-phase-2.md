@@ -1,6 +1,6 @@
 # Cycle 26: Returns BC Phase 2 — Implementation Plan
 
-**Status:** 📋 **PLANNED**  
+**Status:** ✅ **COMPLETE**  
 **Date:** 2026-03-13  
 **BC:** Returns  
 **Port:** 5245  
@@ -10,7 +10,7 @@
 
 ## Objective
 
-Phase 2 closes the critical integration gaps identified in the Phase 1 retrospective. After this cycle, the Returns BC publishes contracts rich enough for Inventory BC to restock autonomously and for Customer Experience BC to show real-time return status via SSE. Mixed inspection results are supported, the `GetReturnsForOrder` query works, and a CS agent runbook exists.
+Phase 2 closes the critical integration gaps identified in the Phase 1 retrospective. After this cycle, the Returns BC publishes contracts rich enough for Inventory BC to restock autonomously and for Customer Experience BC to show real-time return status via SignalR (see ADR 0013). Mixed inspection results are supported, the `GetReturnsForOrder` query works, and a CS agent runbook exists.
 
 ### What Phase 2 Does NOT Include
 
@@ -230,7 +230,7 @@ Phase 1 handles rejection internally (`InspectionFailed` → `Rejected` terminal
 
 > `ReturnRejected` — inspection failed; disposition applied (Dispose, ReturnToCustomer, Quarantine)
 
-Customer Experience BC needs this for real-time SSE updates. Notifications BC needs it to send rejection emails. Orders BC needs it to clear the in-progress flag (currently only `ReturnDenied` clears it, but rejection after inspection is a different terminal path).
+Customer Experience BC needs this for real-time SignalR updates. Notifications BC needs it to send rejection emails. Orders BC needs it to clear the in-progress flag (currently only `ReturnDenied` clears it, but rejection after inspection is a different terminal path).
 
 ### Changes
 
@@ -317,7 +317,7 @@ This mirrors the existing `Handle(ReturnDenied)` logic — rejection and denial 
 
 ### Why
 
-Per CONTEXTS.md, Returns BC publishes `ReturnApproved` for Customer Experience BC (real-time UI updates via SSE) and Notifications BC (approval confirmation email). Phase 1 handles approval internally but only publishes `ReturnRequested` to the Orders queue.
+Per CONTEXTS.md, Returns BC publishes `ReturnApproved` for Customer Experience BC (real-time UI updates via SignalR) and Notifications BC (approval confirmation email). Phase 1 handles approval internally but only publishes `ReturnRequested` to the Orders queue.
 
 ### Changes
 
@@ -405,7 +405,7 @@ public static async Task<(ReturnApproved, OutgoingMessages)> Handle(
 
 ### Use Cases Supported
 
-- Customer Experience BC: Real-time SSE push of "Your return has been approved"
+- Customer Experience BC: Real-time SignalR push of "Your return has been approved"
 - Notifications BC: Approval confirmation email with ship-by deadline
 
 ---
@@ -798,7 +798,7 @@ opts.PublishMessage<Messages.Contracts.Returns.ReturnExpired>()
     .ToRabbitQueue("orders-returns-events");
 
 // === Outbound: Customer Experience BC (Storefront) ===
-// Real-time SSE updates for return status
+// Real-time SignalR updates for return status (see ADR 0013)
 opts.PublishMessage<Messages.Contracts.Returns.ReturnRequested>()
     .ToRabbitQueue("storefront-returns-events");
 opts.PublishMessage<Messages.Contracts.Returns.ReturnApproved>()
