@@ -185,7 +185,8 @@
 **Polecat Compatibility Assessment:**
 - ✅ Basic document store — Low risk, minimal usage
 - ✅ Schema configuration — Supported
-- ⚠️ `.IntegrateWithWolverine()` — Same gap as Vendor Portal, but lower impact since Storefront doesn't heavily use Marten for persistence
+- ✅ Storefront does **NOT** use `.IntegrateWithWolverine()` — this is a clean library swap, no Wolverine integration gap
+- Note: This makes Storefront the simpler of the two Marten→Polecat migrations. Recommend migrating Storefront before Vendor Portal.
 
 ---
 
@@ -201,16 +202,40 @@ The `WolverineFx.Http.Marten` package provides:
 
 ### Post-Migration Wolverine Stack
 
-For the 4 migrated BCs:
+For the 4 migrated BCs (differentiated by actual integration needs):
+
+**Vendor Portal** (highest complexity — needs full outbox integration):
 
 | Layer | Current | Target |
 |-------|---------|--------|
 | **Document Store** | Marten (Postgres) | Polecat (SQL Server) |
 | **Wolverine Outbox** | WolverineFx.Http.Marten | WolverineFx.SqlServer |
 | **Wolverine Inbox** | WolverineFx.Http.Marten | WolverineFx.SqlServer |
-| **Saga Storage** | Marten documents | WolverineFx.SqlServer (if no Polecat integration) |
 | **Message Transport** | WolverineFx.RabbitMQ | WolverineFx.RabbitMQ (unchanged) |
 | **SignalR Transport** | WolverineFx.SignalR | WolverineFx.SignalR (unchanged) |
+
+**Vendor Identity** (moderate — EF Core outbox transition):
+
+| Layer | Current | Target |
+|-------|---------|--------|
+| **Entity Store** | EF Core (Npgsql) | EF Core (SQL Server) |
+| **Wolverine Outbox** | WolverineFx.EntityFrameworkCore (Npgsql) | WolverineFx.SqlServer or WolverineFx.EntityFrameworkCore (SqlServer provider) |
+| **Message Transport** | WolverineFx.RabbitMQ | WolverineFx.RabbitMQ (unchanged) |
+
+**Customer Experience / Storefront** (simplest — no Wolverine+Marten integration):
+
+| Layer | Current | Target |
+|-------|---------|--------|
+| **Document Store** | Marten (Postgres) — standalone, NOT integrated with Wolverine | Polecat (SQL Server) — standalone |
+| **Message Transport** | WolverineFx.RabbitMQ (ProcessInline) | WolverineFx.RabbitMQ (unchanged) |
+| **SignalR Transport** | WolverineFx.SignalR | WolverineFx.SignalR (unchanged) |
+
+**Customer Identity** (simplest — no outbox, no RabbitMQ):
+
+| Layer | Current | Target |
+|-------|---------|--------|
+| **Entity Store** | EF Core (Npgsql) | EF Core (SQL Server) |
+| **Wolverine** | Local queues only, no outbox to RabbitMQ | Local queues only (unchanged pattern) |
 
 ### Key Integration Question
 
@@ -303,6 +328,9 @@ Both Blazor frontends are fully decoupled from the database layer. No `.razor`, 
 6. **SQL Server 2025 feature gates:** Which SQL Server 2025-specific features does Polecat require? (JSON type is mandatory — anything else?)
 7. **Connection pooling:** Does Polecat manage its own connection pool, or does it use `Microsoft.Data.SqlClient`'s built-in pooling?
 8. **Bulk operations:** Does Polecat support batch inserts comparable to Marten's `BulkInsert`?
+9. **Composite string ID behavior and collation:** Does Polecat respect SQL Server collation for document ID lookups? Can we configure case-sensitive collation per database/table? This is critical for SKU-based document IDs.
+10. **`IDocumentSession` lifecycle in Wolverine handlers:** Without `.IntegrateWithWolverine()`, how should Polecat's `IDocumentSession` be injected into Wolverine handlers? Does `WolverineFx.SqlServer` manage the session lifecycle, or do we need custom middleware?
+11. **`LoadManyAsync<T>()` support:** The Vendor Portal's analytics handlers use `session.LoadManyAsync<VendorProductCatalogEntry>(ct, skus)` to batch-load catalog entries. Is this API available in Polecat? It's critical for the analytics fan-out pattern.
 
 ---
 

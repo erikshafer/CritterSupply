@@ -169,9 +169,39 @@ Current convention: all BCs use `ConnectionStrings:postgres` (or `ConnectionStri
 
 ---
 
+#### R8: SQL Server String Collation and Composite Document IDs
+
+**Impact: MEDIUM** | **Likelihood: HIGH**
+
+Vendor Portal uses composite string IDs for documents (e.g., `VendorProductCatalogEntry` uses SKU as its ID). SQL Server's default collation (`SQL_Latin1_General_CP1_CI_AS`) is **case-insensitive**, while PostgreSQL is case-sensitive by default.
+
+This means `SKU-1001` and `sku-1001` would resolve to the **same document** on SQL Server but **different documents** on PostgreSQL. This is a silent behavioral change that could affect:
+- `VendorProductCatalogEntry` lookups by SKU
+- Any composite ID patterns using `{VendorTenantId}:{Sku}` or `{VendorTenantId}:{Sku}:{WarehouseId}`
+- LINQ `.Where()` string comparisons
+
+**Mitigation:**
+1. Test composite ID lookups with mixed-case SKUs on Polecat (Phase 0 task).
+2. Determine if Polecat allows explicit collation configuration per database or table.
+3. Consider creating SQL Server databases with `COLLATE Latin1_General_CS_AS` (case-sensitive) if Polecat doesn't manage this.
+
+#### R9: CONTEXTS.md / Code Mismatch on Vendor Portal Persistence
+
+**Impact: MEDIUM** | **Likelihood: CERTAIN**
+
+CONTEXTS.md describes Vendor Portal aggregates as "event-sourced in Marten," but the actual implementation uses **document store patterns** exclusively (`session.Store()`, `session.LoadAsync<T>()`, `session.SaveChangesAsync()`). There are zero calls to `session.Events.*` anywhere in the Vendor Portal.
+
+This mismatch must be resolved before migration to avoid scope ambiguity: migrating a document store is different from migrating an event store.
+
+**Mitigation:**
+1. Update CONTEXTS.md to accurately describe Vendor Portal as using Marten's document store (not event sourcing) — this should happen regardless of whether the migration proceeds.
+2. If the intent is to add event sourcing later, document that as a post-migration future enhancement.
+
+---
+
 ### Tier 3 — Moderate Risks (Monitor and Mitigate)
 
-#### R8: Polecat API Surface Differences from Marten
+#### R10: Polecat API Surface Differences from Marten
 
 While Polecat mirrors Marten's API, there are known differences:
 
@@ -188,7 +218,7 @@ While Polecat mirrors Marten's API, there are known differences:
 
 **CritterSupply already uses STJ only** — no Newtonsoft risk. But the polling-based change notification (vs Postgres `LISTEN/NOTIFY`) may affect async daemon behavior in the Vendor Portal.
 
-#### R9: SignalR Reconnection During Migration
+#### R11: SignalR Reconnection During Migration
 
 Both Storefront and Vendor Portal use SignalR with limited reconnect policies:
 - Storefront: JS client with `0ms → 2s → 10s → 30s` retry, terminal after ~42s
@@ -201,7 +231,7 @@ During BC migration (service restart), SignalR connections drop and may not reco
 2. Add a visible connection health indicator to both frontends.
 3. Add vendor session expiry warning toast (instead of silent JWT expiry).
 
-#### R10: Wolverine Outbox Message Loss During Cutover
+#### R12: Wolverine Outbox Message Loss During Cutover
 
 If Marten's outbox has undelivered messages when the service stops for migration, those messages won't exist in Polecat's tables after migration. They are permanently lost from the messaging perspective.
 
@@ -210,7 +240,7 @@ If Marten's outbox has undelivered messages when the service stops for migration
 2. Monitor the outbox table count (`mt_doc_wolverine_outgoing_envelope`) before shutdown.
 3. Post-migration, verify no orphaned messages remain.
 
-#### R11: CI/CD Pipeline Updates
+#### R13: CI/CD Pipeline Updates
 
 GitHub Actions workflows need:
 - SQL Server 2025 service container (or Testcontainers in CI)
@@ -218,7 +248,7 @@ GitHub Actions workflows need:
 - Docker image caching for SQL Server
 - Potentially separate test jobs for Postgres-backed vs SQL Server-backed BCs
 
-#### R12: Aspire AppHost Updates
+#### R14: Aspire AppHost Updates
 
 The `CritterSupply.AppHost` project currently references `Aspire.Hosting.PostgreSQL`. After migration:
 - Vendor Identity and Vendor Portal remain excluded from Aspire (RabbitMQ transport incompatibility).
@@ -249,6 +279,10 @@ The `CritterSupply.AppHost` project currently references `Aspire.Hosting.Postgre
   - Database init script: `docker/sqlserver/create-databases.sql`
 - [ ] **P0-6:** Add `Testcontainers.MsSql` to `Directory.Packages.props`
 - [ ] **P0-7:** Verify SQL Server 2025 Docker image availability on GitHub Actions runners
+- [ ] **P0-8:** Reconcile CONTEXTS.md Vendor Portal persistence description — update "event-sourced in Marten" to "document store in Marten" to match actual implementation (blocking — clarifies migration scope)
+- [ ] **P0-9:** Test composite string ID lookups with mixed-case SKUs on Polecat — verify collation behavior for `VendorProductCatalogEntry` and similar documents
+- [ ] **P0-10:** Align `WolverineFx.*` package versions — current `Directory.Packages.props` pins at 5.17.0, but `WolverineFx.SqlServer` is at 5.18.2. Upgrade all Wolverine packages to 5.18.x for consistency.
+- [ ] **P0-11:** Add open questions Q9–Q11 for JasperFx: composite ID collation behavior, `IDocumentSession` lifecycle in Wolverine handlers without `.IntegrateWithWolverine()`, and `LoadManyAsync<T>()` support in Polecat
 
 ### Phase 1: Identity BCs — EF Core Provider Swap (1 cycle)
 
@@ -279,36 +313,40 @@ The `CritterSupply.AppHost` project currently references `Aspire.Hosting.Postgre
 
 ### Phase 2: Portal/Experience BCs — Marten→Polecat Swap (1–2 cycles)
 
-**Goal:** Migrate Vendor Portal and Customer Experience from Marten/Postgres to Polecat/SQL Server.
+**Goal:** Migrate Customer Experience and Vendor Portal from Marten/Postgres to Polecat/SQL Server.
 
 **Why second:** This involves replacing Marten with Polecat — a library-level change, not just a provider swap. Higher risk, but Phase 1 validates the infrastructure.
 
-- [ ] **P2-1:** Vendor Portal (Marten → Polecat)
+**Ordering rationale (Storefront first, Vendor Portal second):** Storefront has minimal Marten usage (BFF pattern, no domain documents, no `.IntegrateWithWolverine()`) — the migration is essentially a config swap. Vendor Portal has 5+ document types, complex LINQ queries, composite string IDs, Wolverine outbox integration, and SignalR notifications. Proving Polecat works on the simpler BC first de-risks the harder one.
+
+- [ ] **P2-1:** Customer Experience / Storefront (Marten → Polecat) — **migrate first (simpler)**
   - Replace `Marten` NuGet with `Polecat` in project references
   - Update `Program.cs`: `AddMarten()` → `AddPolecat()`
-  - Update schema config: `opts.DatabaseSchemaName = "vendorportal"` → `opts.DatabaseSchemaName = "vendorportal"` (Polecat default is `dbo`)
+  - Note: Storefront does NOT use `.IntegrateWithWolverine()` — this is a clean library swap
+  - Minimal document store usage (BFF pattern — Storefront doesn't heavily use document storage)
+  - Update Wolverine configuration for SQL Server durable messaging (if needed; Storefront uses `ProcessInline()` queues)
+  - Verify: SignalR real-time notifications for cart updates, order status, payment events
+  - Verify: BFF composition queries still work
+  - Update connection string and docker-compose environment
+  - Update test fixture: Marten → Polecat configuration, Testcontainers.MsSql
+  - Run full integration and E2E test suites
+- [ ] **P2-2:** Vendor Portal (Marten → Polecat) — **migrate second (complex)**
+  - Replace `Marten` NuGet with `Polecat` in project references
+  - Update `Program.cs`: `AddMarten()` → `AddPolecat()`
+  - Update schema config: `opts.DatabaseSchemaName = "vendorportal"` (Polecat defaults to `dbo`, must be explicit)
   - Replace `.IntegrateWithWolverine()` with `WolverineFx.SqlServer` durable messaging
   - Update all document operations (`session.Store()`, `session.Load()`, `session.Query()`)
-  - Verify: `VendorProductCatalogEntry` document CRUD
+  - Verify: `VendorProductCatalogEntry` document CRUD (including composite string ID behavior with case sensitivity)
   - Verify: `ChangeRequest` document CRUD and query patterns
   - Verify: `VendorAccount` document operations
   - Verify: `InventorySnapshot` document operations
+  - Verify: `LoadManyAsync<T>()` batch loading (used in analytics handlers)
   - Verify: Wolverine message handler integration with Polecat sessions
   - Verify: SignalR real-time notifications still fire correctly
   - Update connection string and docker-compose environment
   - Update test fixture: Marten → Polecat configuration, Testcontainers.MsSql
   - Run full integration test suite
   - Run E2E test suite (Playwright)
-- [ ] **P2-2:** Customer Experience / Storefront (Marten → Polecat)
-  - Replace `Marten` NuGet with `Polecat` in project references
-  - Update `Program.cs`: `AddMarten()` → `AddPolecat()`
-  - Minimal document store usage (BFF pattern — Storefront doesn't heavily use document storage)
-  - Update Wolverine integration for SQL Server outbox
-  - Verify: SignalR real-time notifications for cart updates, order status, payment events
-  - Verify: BFF composition queries still work
-  - Update connection string and docker-compose environment
-  - Update test fixture: Marten → Polecat configuration, Testcontainers.MsSql
-  - Run full integration and E2E test suites
 - [ ] **P2-3:** Update `docker/postgres/create-databases.sh` (remove `storefront` and `vendorportal`)
 - [ ] **P2-4:** Update `docker/sqlserver/create-databases.sql` (add `storefront` and `vendorportal`)
 - [ ] **P2-5:** Final cross-BC smoke test (all 12 BCs running together, mixed databases)
@@ -334,12 +372,13 @@ The `CritterSupply.AppHost` project currently references `Aspire.Hosting.Postgre
 | Package | Version | Purpose |
 |---------|---------|---------|
 | `Polecat` | 0.9.0 | SQL Server document store (replaces Marten for 2 BCs) |
-| `Polecat.EntityFrameworkCore` | 0.9.0 | EF Core integration for Polecat projections |
 | `Microsoft.EntityFrameworkCore.SqlServer` | 10.0.x | EF Core SQL Server provider (replaces Npgsql for 2 BCs) |
 | `WolverineFx.SqlServer` | 5.18.2 | Wolverine durable messaging on SQL Server |
 | `Testcontainers.MsSql` | 4.11.0 | SQL Server test containers |
 | `AspNetCore.HealthChecks.SqlServer` | (latest) | SQL Server health checks |
 | `Aspire.Hosting.SqlServer` | (latest) | Aspire SQL Server resource |
+
+> **Note:** `Polecat.EntityFrameworkCore` (v0.9.0) exists for EF Core integration within Polecat projections, but is **deferred** — none of the 4 target BCs use EF Core projections on Polecat. Add when there's a concrete use case.
 
 ### Packages Retained (Still Used by Other BCs)
 
@@ -418,13 +457,15 @@ GO
 
 ## Complexity Estimate
 
-| Phase | Effort | Risk | Cycle Estimate |
-|-------|--------|------|----------------|
-| Phase 0 (Prerequisites) | Medium | Low | 1 cycle |
-| Phase 1 (EF Core BCs) | Medium | Low-Medium | 1 cycle |
-| Phase 2 (Marten→Polecat BCs) | High | Medium-High | 1–2 cycles |
-| Phase 3 (Validation) | Low | Low | Ongoing |
-| **Total** | **High** | **Medium** | **3–4 cycles** |
+| Phase | Effort | Risk | Cycle Estimate | Confidence |
+|-------|--------|------|----------------|------------|
+| Phase 0 (Prerequisites + PoC) | Medium | Medium | 1–2 cycles | Medium (JasperFx external dependency) |
+| Phase 1 (EF Core BCs) | Medium | Low-Medium | 1 cycle | High |
+| Phase 2 (Marten→Polecat BCs) | High | Medium-High | 1.5–2 cycles | Medium (first real Polecat usage) |
+| Phase 3 (Validation) | Low | Low | Ongoing | — |
+| **Total** | **High** | **Medium** | **4–5 cycles** | **Medium** |
+
+> **Note:** The 1-cycle variance comes from Phase 0 external dependency risk. If JasperFx is responsive and the PoC works first try, 4 cycles is achievable. If the Wolverine+Polecat transaction question (R1) requires escalation or custom middleware, add a cycle.
 
 ---
 
@@ -488,6 +529,11 @@ Both Blazor frontends (Storefront.Web and VendorPortal.Web) are fully decoupled 
 - No impact on the 8 BCs remaining on PostgreSQL
 - No impact on RabbitMQ, Jaeger, or Aspire infrastructure
 - Message contracts (`Messages.Contracts`) are database-agnostic and unchanged
+
+### Security Notes
+- Docker Compose SQL Server password (`CritterSupply2025!`) is for local development only. CI/CD should use environment-variable injection.
+- `TrustServerCertificate=true` in connection strings is a dev-only setting — document this explicitly.
+- `sa` account usage is acceptable for a reference architecture but production would use least-privilege accounts.
 
 ---
 
