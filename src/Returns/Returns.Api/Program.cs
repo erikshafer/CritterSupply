@@ -42,6 +42,12 @@ builder.Services.AddMarten(opts =>
         // Configure Return as an event-sourced aggregate with inline snapshots
         opts.Events.StreamIdentity = StreamIdentity.AsGuid;
         opts.Projections.Snapshot<Return>(SnapshotLifecycle.Inline);
+
+        // Configure ReturnEligibilityWindow document with OrderId as primary key
+        opts.Schema.For<ReturnEligibilityWindow>()
+            .Identity(x => x.Id) // Use Id (which equals OrderId) as primary key
+            .Index(x => x.CustomerId) // Index for customer queries
+            .Index(x => x.WindowExpiresAt); // Index for expiry queries
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()
