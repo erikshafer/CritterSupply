@@ -16,124 +16,125 @@ This document tracks active and recent development cycles. For complete historic
 
 ## Current Cycle
 
-*No active cycle - ready to begin Cycle 19*
+*Cycle 24 complete — ready to begin Cycle 25 (Returns BC Phase 1)*
 
 ---
 
 ## Recently Completed (Last 5 Cycles)
 
-### Cycle 18: Customer Experience Enhancement (Phase 2) - ✅ Complete (2026-02-14)
+### Cycle 24: Fulfillment Integrity + Returns Prerequisites - ✅ Complete (2026-03-12)
 
-**Objective:** Wire everything together—RabbitMQ → SSE → Blazor, UI commands → API, real data queries
+**Objective:** Fix critical Fulfillment BC bugs and add Orders saga prerequisites required before the Returns BC can ship.
 
 **Key Deliverables:**
-- Shopping command integration (5 methods: InitializeCart, AddItem, RemoveItem, ChangeQuantity, ClearCart)
-- Product Catalog integration with value object unwrapping (Sku, ProductName)
-- Checkout command integration (4 methods: ProvideShippingAddress, SelectShippingMethod, ProvidePaymentMethod, CompleteCheckout)
-- Order lifecycle SSE handlers (PaymentAuthorized, ReservationConfirmed, ShipmentDispatched)
-- UI polish (MudSnackbar toasts, loading states, enhanced empty states)
+- RabbitMQ transport wired in Fulfillment.Api (messages now cross process boundaries)
+- `RecordDeliveryFailure` endpoint + `ShipmentDeliveryFailed` cascade to Orders + Storefront
+- `shipment-delivery-failed` SSE case in OrderConfirmation.razor
+- UUID v5 idempotent shipment creation, clean ShipmentStatus enum
+- `SharedShippingAddress` with dual JSON annotations (Phase A migration)
+- Orders saga return handlers: `ReturnRequested`, `ReturnCompleted`, `ReturnDenied`
+- `IsReturnInProgress` guard on `ReturnWindowExpired` (critical bug fix)
+- `GET /api/orders/{orderId}/returnable-items` endpoint
+- Returns integration message contracts + RabbitMQ routing
 
-**Results:** Build succeeded with 0 warnings/0 errors. All 5 phases complete.
-
-**Key Achievements:**
-- Typed HTTP Clients pattern (IShoppingClient, IOrdersClient, ICatalogClient)
-- Real-time cart badge updates via SSE
-- Complete error handling with user feedback toasts
-- Enhanced UX with loading indicators and disabled states
+**Results:** All deliverables complete. Build clean (0 warnings). Sign-offs: PO ✅, UXE ✅, PSA ✅
 
 **Key Learnings:**
-- **Integration testing gaps** - 80% of bugs found during manual testing would have been caught by Alba + TestContainers
-- **API contract verification** - Always verify actual API responses before creating DTOs (3 bugs from field name/type mismatches)
-- **Wolverine Events collection pattern** - CRITICAL: `[WriteAggregate]` handlers MUST return `Events` collection (plural), not single event
-- **Testing pyramid** - Need to shift from 90% manual testing to 70% integration tests + 20% unit tests + 10% manual
-- **BDD test coverage** - Gherkin scenarios written but no Reqnroll step definitions implemented (deferred to Cycle 19+)
+- Event modeling exercise confirmed feature file coverage is comprehensive
+- `ReturnWindowExpired` guard pattern (boolean flag) is simpler than attempting to cancel scheduled messages
+- SharedShippingAddress dual-annotation approach avoids Marten event stream migration
 
-**Bugs Fixed Post-Implementation:**
-1. CartDto field name mismatch (`"Id"` vs `"cartId"`)
-2. Product Catalog value object assumptions (expected `CatalogSku` but API returns `string`)
-3. Product Status type mismatch (`string` vs `int`)
-4. Hardcoded stub GUIDs in Blazor UI (workaround documented until authentication in Cycle 19)
-5. **CRITICAL:** Cart events not persisting to database (wrong return type - single event vs Events collection)
-
-**Recommendations for Future Cycles:**
-- Write integration tests BEFORE manual testing (add test milestone to cycle workflow)
-- Verify typed HTTP clients against real APIs with TestContainers
-- Always assert event persistence in Wolverine handler tests
-- Update skills documentation with Events collection pattern + typed client testing
-- Create reusable test fixtures (`StorefrontTestFixture`) for BFF testing
-
-**Retrospective:** [CYCLE-18-RETROSPECTIVE.md](../CYCLE-18-RETROSPECTIVE.md)
-**Details:** [cycle-18-customer-experience-phase-2.md](./cycles/cycle-18-customer-experience-phase-2.md)
+**Details:** [cycle-24-fulfillment-integrity-returns-prerequisites.md](./cycles/cycle-24-fulfillment-integrity-returns-prerequisites.md)
 
 ---
 
-### Cycle 17: Customer Identity Integration - ✅ Complete (2026-02-13)
+### Cycle 23: Vendor Portal E2E Testing - ✅ Complete (2026-03-11)
 
-**Objective:** Integrate Customer Identity BC with Shopping BC to enable real customer data throughout the order lifecycle
+**Objective:** Build Playwright + Reqnroll E2E browser tests for Vendor Portal with 3-server test fixture.
 
 **Key Deliverables:**
-- Customer CRUD endpoints (`POST /api/customers`, `GET /api/customers/{id}`)
-- Customer Address CRUD endpoints (add, get, list, update, delete)
-- Shopping BC integration: `InitializeCart` now accepts real `customerId`
-- Checkout aggregate updated to reference legitimate customer records
-- Comprehensive data seeding guide (`docs/DATA-SEEDING.http`)
-- End-to-end manual testing verified (Customer → Cart → Checkout → Order)
+- 3-server E2E fixture (VendorIdentity.Api + VendorPortal.Api + Blazor WASM static host)
+- 12 BDD scenarios across 3 feature files (P0 + P1a coverage)
+- Page Object Models for Login, Dashboard, Change Requests, Submit, Settings
+- SignalR hub message injection testing via IHubContext
+- Playwright tracing for CI failure diagnosis
 
-**Results:** 158/162 tests passing (97.5%). All integration flows validated.
+**Results:** All E2E scenarios passing. Collaborative design: PA + QA + PO.
 
 **Key Learnings:**
-- Route parameter binding: `{customerId}` binds to `Guid customerId` parameter (not query object)
-- DELETE endpoints can accept JSON bodies (not just path parameters)
-- Foreign key validation catches invalid references early (fail fast at data layer)
-- HTTP files serve as living documentation + testing scripts
+- WASM static host requires special handling vs standard WebApplicationFactory
+- SignalR hub testing via IHubContext injection works well for push verification
+- Page Object Model pattern proved directly reusable across Storefront and Vendor Portal E2E projects
 
-**Details:** [cycle-17-customer-identity-integration.md](./cycles/cycle-17-customer-identity-integration.md)
-
----
-
-### Cycle 16: Customer Experience BC (BFF + Blazor) - ✅ Complete (2026-02-05)
-
-**Objective:** Build customer-facing storefront using Backend-for-Frontend (BFF) pattern with Blazor Server and Server-Sent Events (SSE)
-
-**Key Deliverables:**
-- 3-project BFF structure (Storefront domain, Storefront.Api, Storefront.Web)
-- EventBroadcaster pattern with `Channel<T>` for in-memory pub/sub
-- SSE real-time integration (discriminated unions, customer isolation)
-- Blazor Server frontend with MudBlazor Material Design components
-- 4 pages: Home, Cart (SSE-enabled), Checkout (MudStepper), Order History (MudTable)
-- JavaScript EventSource client for SSE subscriptions
-- Interactive component pattern (solving Blazor render mode limitation)
-- Comprehensive skills documentation (`docs/skills/bff-realtime-patterns.md`)
-
-**Results:** 13/17 tests passing (4 deferred - real data integration). Manual browser testing passed all acceptance criteria.
-
-**Key Decisions:**
-- [ADR 0004: SSE over SignalR](../decisions/0004-sse-over-signalr.md)
-- [ADR 0005: MudBlazor UI Framework](../decisions/0005-mudblazor-ui-framework.md)
-- [ADR 0006: Reqnroll BDD Framework](../decisions/0006-reqnroll-bdd-framework.md)
-
-**Deferred to Future Cycles:**
-- Backend RabbitMQ integration (end-to-end SSE flow)
-- Real cart/checkout data integration
-- Authentication with Customer Identity BC
-- Automated browser testing (Playwright/Selenium/bUnit)
-
-**Details:** [cycle-16-customer-experience.md](./cycles/cycle-16-customer-experience.md)
+**Details:** [cycle-23-vendor-portal-e2e-testing.md](./cycles/cycle-23-vendor-portal-e2e-testing.md) | [Retrospective](./cycles/cycle-23-retrospective.md)
 
 ---
 
-### Cycle 15: Customer Experience Prerequisites - ✅ Complete (2026-02-03)
+### Cycle 22: Vendor Portal + Vendor Identity Phase 1 - ✅ Complete (2026-03-08 to 2026-03-10)
 
-**Objective:** Add query endpoints and standardize configuration for BFF readiness
+**Objective:** Build complete Vendor Portal ecosystem with JWT auth, multi-tenant API, Blazor WASM frontend, and admin tooling.
 
 **Key Deliverables:**
-- Query endpoints: `GET /api/carts/{cartId}`, `GET /api/checkouts/{checkoutId}`, `GET /api/orders?customerId={customerId}`
-- Connection string standardization across all API projects (port 5433, single database)
-- Port allocation table documented in CLAUDE.md
+- Phase 1: JWT Auth (VendorIdentity.Api, EF Core, token lifecycle)
+- Phase 2: Vendor Portal API (analytics, alerts, dashboard, multi-tenant)
+- Phase 3: Blazor WASM Frontend (SignalR hub, in-memory JWT, live updates)
+- Phase 4: Change Request Workflow (7-state machine, Catalog BC integration)
+- Phase 5: Saved Views + VendorAccount (notification preferences, saved dashboard views)
+- Phase 6: Full Identity Lifecycle + Admin Tools (8 admin endpoints, compensation handler, last-admin protection)
 
-**Results:** All 133 tests passing. All APIs start cleanly with docker-compose.
+**Results:** 143 integration tests across Vendor Portal + Identity (100% pass rate).
 
-**Details:** [cycle-15-customer-experience-prerequisites.md](./cycles/cycle-15-customer-experience-prerequisites.md)
+**Key Learnings:**
+- Blazor WASM requires named HttpClient registrations with explicit BaseAddress
+- In-memory JWT storage safer than localStorage (XSS risk)
+- Background token refresh via System.Threading.Timer (no IHostedService in WASM)
+
+**Details:** [cycle-22-retrospective.md](./cycles/cycle-22-retrospective.md)
+
+---
+
+### Cycle 21: Pricing BC Phase 1 - ✅ Complete (2026-03-07 to 2026-03-08)
+
+**Objective:** Build Pricing BC with event-sourced ProductPrice aggregate and Money value object.
+
+**Key Deliverables:**
+- ProductPrice event-sourced aggregate (UUID v5 deterministic stream ID)
+- Money value object (140 unit tests for arithmetic, rounding, currency safety)
+- CurrentPriceView inline projection (zero-lag queries)
+- Shopping BC security fix (server-authoritative pricing)
+- 5 ADRs written (UUID v5, price freeze, Money VO, bulk jobs, MAP vs Floor)
+
+**Results:** 151 Pricing tests + 56 Shopping tests (all passing). 11 issues closed.
+
+**Key Learnings:**
+- Money value object eliminates entire class of decimal arithmetic bugs
+- Server-authoritative pricing prevents client-side price tampering
+- UUID v5 deterministic IDs enable idempotent cross-BC event handling
+
+**Details:** [cycle-21-retrospective.md](./cycles/cycle-21-retrospective.md)
+
+---
+
+### Cycle 20: Automated Browser Testing - ✅ Complete (2026-03-04 to 2026-03-07)
+
+**Objective:** Establish Playwright + Reqnroll E2E testing infrastructure for Storefront.
+
+**Key Deliverables:**
+- Playwright + Reqnroll E2E testing infrastructure
+- Real Kestrel servers (not TestServer) for SignalR testing
+- Page Object Model with data-testid selectors
+- MudBlazor component interaction patterns (MudSelect)
+- Stub coordination via TestIdProvider (deterministic IDs)
+- Playwright tracing for CI failure diagnosis
+
+**Results:** Full coverage: product browsing, cart, checkout wizard, order history, SignalR real-time updates.
+
+**Key Learnings:**
+- TestServer doesn't support WebSocket/SignalR — must use real Kestrel
+- data-testid selectors are more stable than CSS class selectors for MudBlazor
+- Playwright tracing is essential for diagnosing CI-only failures
+
+**Details:** [cycle-20-automated-browser-testing.md](./cycles/cycle-20-automated-browser-testing.md) | [Retrospective](./cycles/cycle-20-retrospective.md)
 
 ---
 
@@ -218,52 +219,60 @@ This document tracks active and recent development cycles. For complete historic
 
 ## Upcoming Cycles (Planned)
 
-**Cycle 19:** Authentication & Authorization
-- Customer Identity BC authentication integration
-- Replace stub customerId with real session
-- Login/logout pages
-- Protected routes
+**Cycle 25:** Returns BC Phase 1 — Self-Service Returns + Order History page
+- Domain spec ready: `docs/features/returns/` (4 feature files)
+- Prerequisite: Cycle 24 Fulfillment + saga work complete ✅
+- Pre-implementation tasks from stakeholder observations documented in Cycle 24 plan
 
-**Cycle 20+:** Automated Browser Testing
-- ADR for browser testing framework (Playwright vs Selenium vs bUnit)
-- Automated tests for key scenarios
-- CI/CD pipeline integration
+**Cycle 26:** Notifications BC Phase 1 — Transactional email
+- Phase 1a: `OrderPlaced`, `ShipmentDispatched` (existing BC events)
+- Phase 1b: Returns events (`ReturnApproved`, `ReturnDenied`, `ReturnCompleted`, `ReturnExpired`)
 
-**Cycle 21+:** Product Catalog Phase 2 (Category Management), Vendor Identity + Vendor Portal Phase 1, Returns BC
+**Cycle 27:** Promotions BC Phase 1 — Coupons and discounts
+- Shopping BC already has `CouponApplied`/`CouponRemoved` placeholder events
 
-[View Backlog](./BACKLOG.md)
+**Cycle 28+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
+- Event Modeling: `docs/planning/admin-portal-event-modeling.md`
+- RBAC ADR must exist before implementation begins
 
 ---
 
-## Historical Cycles (Cycles 1-7)
+## Historical Cycles (Cycles 1-18)
 
-For brevity, early cycles (Payments, Inventory, Fulfillment, Shopping, refactoring cycles) are summarized here. Full details available in [ARCHIVE.md](./cycles/ARCHIVE.md).
+For brevity, early cycles are summarized here. Full details available in individual cycle docs under [cycles/](./cycles/).
 
 **Cycle 1-3:** Core BC development (Payments, Inventory, Fulfillment) with Orders saga integration
 **Cycle 4:** Shopping BC (Cart + Checkout)
 **Cycle 5-7:** Modern Critter Stack refactoring (write-only aggregates, `[WriteAggregate]` pattern)
+**Cycle 8-9:** Checkout Migration to Orders BC + Checkout-to-Orders integration
+**Cycle 13:** Customer Identity BC — EF Core migration
+**Cycle 14:** Product Catalog BC Phase 1 — Core CRUD
+**Cycle 15:** Customer Experience Prerequisites — Query endpoints + standardization
+**Cycle 16:** Customer Experience BFF + Blazor — Storefront with SSE real-time
+**Cycle 17:** Customer Identity Integration — Real customer data flow
+**Cycle 18:** Customer Experience Phase 2 — Shopping commands, real data, UI polish
+**Cycle 19:** Authentication & Authorization — Cookie-based auth, protected routes
+**Cycle 19.5:** Complete Checkout Workflow — Wired checkout stepper to backend APIs
 
 ---
 
 ## Key Metrics
 
-**Solution-Wide Test Results:** ✅ 158/162 tests passing (97.5% success rate)
+**Solution-Wide Test Results:** ✅ ~895 tests ([Fact] + [Theory] attributes)
 - Payments: 30 tests (11 unit + 19 integration)
 - Inventory: 16 integration tests
-- Fulfillment: 6 integration tests
-- Shopping: 13 integration tests
-- Orders: 32 integration tests
+- Fulfillment: 38 tests (14 unit + 24 integration)
+- Shopping: ~56 integration tests
+- Orders: ~45 tests (unit + integration)
 - Customer Identity: 12 integration tests
 - Product Catalog: 24 integration tests
-- Customer Experience (Storefront): 13 integration tests (4 deferred to Phase 2)
-- **Note:** Exact test count to be verified after full test run
+- Customer Experience (Storefront): 13 integration tests
+- Pricing: ~151 tests (140 Money unit + 11 integration)
+- Vendor Identity: ~57 integration tests
+- Vendor Portal: ~86 integration tests
 
-**Bounded Contexts In Progress:** 0/10
-- (None - ready for next cycle)
-
-**Bounded Contexts Complete:** 8/10 (80%)
-- ✅ Orders, Payments, Shopping, Inventory, Fulfillment, Customer Identity, Product Catalog, Customer Experience
-- 📋 Vendor Identity, Vendor Portal (Future)
+**Bounded Contexts Complete:** 10/10 Phase 1 (100%)
+- ✅ Orders, Payments, Shopping, Inventory, Fulfillment, Customer Identity, Product Catalog, Customer Experience, Pricing, Vendor Portal + Vendor Identity
 
 ---
 
@@ -299,5 +308,5 @@ For non-feature development work (CI/CD, monitoring, tooling):
 
 ---
 
-**Last Updated:** 2026-02-14 (Cycle 18 Complete + Retrospective)
+**Last Updated:** 2026-03-12 (Cycle 24 Complete — Fulfillment Integrity + Returns Prerequisites)
 **Maintained By:** Erik Shafer / Claude AI Assistant
