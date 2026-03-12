@@ -94,7 +94,7 @@ Feature: Checkout Flow (E2E)
     And I am on the order confirmation page
     And the SignalR connection is established
     When the Payments BC publishes a payment authorized event for my order
-    Then the order status should update to "PaymentAuthorized" within 5 seconds
+    Then the order status should update to "Payment Confirmed" within 5 seconds
     And I should see a payment notification message
 
   @checkout @signalr
