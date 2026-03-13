@@ -1,3 +1,6 @@
+extern alias OrdersApi;
+extern alias FulfillmentApi;
+
 using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
@@ -64,13 +67,8 @@ public class CrossBcTestFixture : IAsyncLifetime
         // Enable JasperFx auto-start for WebApplicationFactory
         JasperFxEnvironment.AutoStartHost = true;
 
-        // Load Program classes from each assembly using reflection
-        var returnsProgram = GetProgramType("Returns.Api");
-        var ordersProgram = GetProgramType("Orders.Api");
-        var fulfillmentProgram = GetProgramType("Fulfillment.Api");
-
-        // Start all 3 Alba hosts in parallel
-        var returnsTask = AlbaHost.For(returnsProgram, builder =>
+        // Start all 3 Alba hosts in parallel using extern aliases
+        var returnsTask = AlbaHost.For<Program>(builder =>
         {
             builder.ConfigureServices(services =>
             {
@@ -84,7 +82,7 @@ public class CrossBcTestFixture : IAsyncLifetime
             });
         });
 
-        var ordersTask = AlbaHost.For(ordersProgram, builder =>
+        var ordersTask = AlbaHost.For<OrdersApi::Program>(builder =>
         {
             builder.ConfigureServices(services =>
             {
@@ -98,7 +96,7 @@ public class CrossBcTestFixture : IAsyncLifetime
             });
         });
 
-        var fulfillmentTask = AlbaHost.For(fulfillmentProgram, builder =>
+        var fulfillmentTask = AlbaHost.For<FulfillmentApi::Program>(builder =>
         {
             builder.ConfigureServices(services =>
             {
@@ -117,14 +115,6 @@ public class CrossBcTestFixture : IAsyncLifetime
         ReturnsHost = hosts[0];
         OrdersHost = hosts[1];
         FulfillmentHost = hosts[2];
-    }
-
-    private static Type GetProgramType(string assemblyName)
-    {
-        var assembly = Assembly.Load(assemblyName);
-        var programType = assembly.GetType("Program")
-            ?? throw new InvalidOperationException($"Program class not found in assembly {assemblyName}");
-        return programType;
     }
 
     public async Task DisposeAsync()
