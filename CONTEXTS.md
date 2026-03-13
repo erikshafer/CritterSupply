@@ -664,12 +664,14 @@ The Returns context owns the reverse logistics flow—handling customer return r
 - InTransit — carrier scan received; package on its way back
 - Received — items arrived at warehouse/FC
 - Inspecting — verifying condition and determining disposition
-- Completed — inspection passed; `ReturnCompleted` published (terminal)
+- **ExchangeShipping** — **(Phase 3, Cycle 27)** exchange-specific state; replacement item is being shipped after inspection passes
+- Completed — inspection passed; `ReturnCompleted` published for refunds, or `ExchangeCompleted` published for exchanges (terminal)
 - Rejected — inspection failed; disposition applied (terminal)
 - Expired — customer never shipped within approval window (terminal)
 
 ### What it publishes
 
+**Refund Workflow (Phase 2):**
 - `ReturnRequested` — return request submitted; **Customer Experience BC updates UI via SignalR** (Cycle 27), Orders saga tracks return in-progress
 - `ReturnApproved` — return authorized; includes return label, ship-by deadline; **Customer Experience BC pushes real-time update** (Cycle 27)
 - `ReturnDenied` — request rejected; reason code included; **Customer Experience BC notifies customer via SignalR** (Cycle 27)
@@ -678,14 +680,31 @@ The Returns context owns the reverse logistics flow—handling customer return r
 - `ReturnCompleted` — inspection passed; **carries full item disposition** (SKU, qty, IsRestockable, warehouse, condition) for Orders BC (refund) and Inventory BC (restocking); **Customer Experience BC pushes refund confirmation** (Cycle 27)
 - `ReturnRejected` — inspection failed; disposition applied (Dispose, ReturnToCustomer, Quarantine); **Customer Experience BC notifies customer** (Cycle 27)
 
+**Exchange Workflow (Phase 3, Cycle 27):**
+- `ExchangeRequested` — customer requests item exchange; Orders saga tracks exchange in-progress
+- `ExchangeApproved` — exchange authorized after stock availability check; includes price difference (if replacement is cheaper); ship-by deadline applies
+- `ExchangeDenied` — exchange rejected (out of stock, replacement too expensive, outside window); **Customer Experience BC notifies** with reason
+- `ExchangeReplacementShipped` — replacement item shipped with tracking; **Customer Experience BC updates UI**
+- `ExchangeCompleted` — exchange successfully completed; Orders BC issues price difference refund (if any)
+- `ExchangeRejected` — inspection failed; no replacement shipped, no refund issued; **Customer Experience BC notifies**
+
 ### Core Invariants
 
+**Refund Workflow:**
 - A return cannot be approved outside the 30-day eligibility window (established from `ShipmentDelivered`)
 - A return cannot be approved for non-returnable items (personalized, opened consumables, final sale)
 - A return cannot transition to Received without prior approval
 - A return cannot be marked Completed without physical receipt and passed inspection
 - A return cannot be processed for an order that has no `ReturnEligibilityWindow` record
 - Restockable disposition requires inspection completion
+
+**Exchange Workflow (Phase 3, Cycle 27):**
+- An exchange cannot be approved if the replacement item costs more than the original (no upcharge collection in v1)
+- An exchange must be for same-SKU family items (e.g., Medium → Large pet carrier); different products require refund + new order
+- An exchange cannot be approved without stock availability check (manual CS verification in Phase 3; automated in future)
+- An exchange that fails inspection (any failed items) is rejected with no replacement shipped and no refund issued
+- An exchange that passes inspection enters ExchangeShipping state; replacement shipment required to complete
+- An exchange completion triggers price difference refund if replacement was cheaper (e.g., $50 original → $40 replacement = $10 refund)
 
 ### What it doesn't own
 

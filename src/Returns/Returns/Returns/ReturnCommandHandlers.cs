@@ -196,6 +196,43 @@ public static class SubmitInspectionHandler
         var passed = command.Results.Where(r => !IsFailedResult(r)).ToList();
         var failed = command.Results.Where(IsFailedResult).ToList();
 
+        // EXCHANGE WORKFLOW: Inspection failure downgrades to rejection (no replacement, no refund)
+        if (aggregate.Type == ReturnType.Exchange && failed.Count > 0)
+        {
+            // Exchange rejected — original item did not pass inspection
+            events.Add(new ExchangeRejected(
+                ReturnId: command.ReturnId,
+                FailureReason: "Item condition does not qualify for exchange. Return rejected.",
+                RejectedAt: now));
+
+            outgoing.Add(new Messages.Contracts.Returns.ExchangeRejected(
+                ReturnId: command.ReturnId,
+                OrderId: aggregate.OrderId,
+                CustomerId: aggregate.CustomerId,
+                FailureReason: "Item condition does not qualify for exchange. Return rejected.",
+                RejectedAt: now));
+
+            return (events, outgoing);
+        }
+
+        // EXCHANGE WORKFLOW: Inspection passed — replacement item will be shipped (handled by ShipReplacementItem)
+        if (aggregate.Type == ReturnType.Exchange && failed.Count == 0)
+        {
+            // Exchange inspection passed — transition to ExchangeShipping status
+            // Note: ShipReplacementItem handler will append ExchangeReplacementShipped + ExchangeCompleted events
+            events.Add(new InspectionPassed(
+                ReturnId: command.ReturnId,
+                Results: command.Results,
+                FinalRefundAmount: aggregate.PriceDifference ?? 0m, // Price difference refund (if any)
+                RestockingFeeAmount: 0m, // No restocking fee for exchanges
+                CompletedAt: now));
+
+            // For exchanges, we do NOT publish ReturnCompleted here.
+            // ShipReplacementItem will publish ExchangeCompleted instead.
+            return (events, outgoing);
+        }
+
+        // REFUND WORKFLOW: Standard refund logic (all-pass, all-fail, or mixed)
         if (failed.Count == 0)
         {
             // ALL PASSED — full refund
