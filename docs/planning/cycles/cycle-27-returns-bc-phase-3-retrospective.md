@@ -332,7 +332,103 @@ Phase 3 is ready for implementation with clear sign-off criteria, comprehensive 
 
 ---
 
-*Created: 2026-03-13*
+## Implementation Updates (In Progress)
+
+### Completed Deliverables (6 of 9)
+
+**Date:** 2026-03-13 (same day as planning)
+
+**P2 Quick Wins (Actual: 0.5 sessions vs Planned: 1.35 sessions):**
+- ✅ DeliveredAt endpoint fix — `GetReturnableItems` now returns `order.DeliveredAt`
+- ✅ $0 refund guard — Defensive check in Orders saga `ReturnCompleted` handler
+- ✅ Anticorruption layer — `EnumTranslations` static class with 4 translation methods
+- ✅ SSE→SignalR doc fix — No code changes needed (already corrected)
+
+**P1 Core Features (Actual: 2 sessions vs Planned: 2 sessions):**
+- ✅ **CE SignalR handlers** — 7 handlers in `Storefront/Notifications/`, `ReturnStatusChanged` event added to discriminated union, `storefront-returns-events` queue wired
+- ✅ **Sequential returns** — Orders saga refactored: `bool IsReturnInProgress` → `IReadOnlyList<Guid> ActiveReturnIds`, closure logic updated, all 134 tests pass
+
+**Commits:**
+- `6c11fe3`: P2 quick wins (anticorruption layer + DeliveredAt + $0 guard)
+- `17109f4`: P1 CE SignalR handlers + sequential returns support
+
+**Remaining:**
+- 🔄 P3: Cross-BC smoke tests (1 session)
+- 🔄 P3: Fraud detection patterns doc (0.5 sessions)
+- 🔄 P0: Exchange workflow (2.5 sessions)
+
+### Early Implementation Lessons
+
+**L6: Immutable List Pattern for Saga State**
+
+When refactoring Orders saga for multiple returns, pattern: `ToList()` → mutate → `AsReadOnly()`.
+
+```csharp
+var activeReturns = ActiveReturnIds.ToList();
+activeReturns.Remove(message.ReturnId);
+ActiveReturnIds = activeReturns.AsReadOnly();
+```
+
+**Why:** Marten requires `IReadOnlyList<T>` for persistence. Cannot modify in-place.
+
+**L7: Compiler-Driven Test Refactoring**
+
+Updated helper method signature (`BuildDeliveredOrder`) first → all test compilation fails → compiler errors become your todo list → no silent test failures.
+
+**Time saved:** ~15 minutes vs manual search-and-replace.
+
+**L8: Context-Aware Enum Translations**
+
+Translation methods accept optional context:
+```csharp
+ToCustomerFacingText(ReturnStatus.Approved, shipByDeadline: message.ShipByDeadline)
+// → "Return approved — ship by Feb 15, 2026"
+```
+
+**Why:** Enum values are static; context comes from aggregate state.
+
+**L9: SignalR Handler Copy-Paste Success**
+
+7 handlers created in ~20 minutes following existing pattern (`OrderPlacedHandler`, `ShipmentDispatchedHandler`). Wolverine assembly discovery "just worked" with no manual registration.
+
+**L10: CONTEXTS.md Inline Annotations**
+
+After wiring SignalR handlers, annotated "What it publishes" section:
+```markdown
+- `ReturnApproved` — **Customer Experience BC pushes real-time update** (Cycle 27)
+```
+
+Pattern: Use bold + cycle annotation for new integrations.
+
+### Technical Debt Identified
+
+**TD1: Saga Stays Open Longer Now**
+
+After sequential returns refactoring, saga waits for `ReturnWindowExpired` even when all returns complete. This is correct behavior but increases open saga count.
+
+**Severity:** 🟡 Low — Monitor saga storage growth in production.
+
+**TD2: No Integration Test for SignalR Handlers Yet**
+
+Created 7 handlers but haven't verified RabbitMQ → Wolverine → SignalR pipeline end-to-end.
+
+**Action:** Add integration test in `Storefront.Api.IntegrationTests` (or part of P3 cross-BC smoke tests).
+
+### What Went Well So Far
+
+1. **P2 quick wins completed 63% faster** (0.5 vs 1.35 sessions planned)
+2. **SignalR handlers zero build errors** — existing patterns provided clear template
+3. **Sequential returns had 100% test coverage** — compiler guided refactoring
+
+### What Could Be Improved
+
+1. **Closure logic is subtle** — Need comment explaining `ActiveReturnIds.Count == 0 AND ReturnWindowFired`
+2. **Race condition edge case** — Add integration test for concurrent `ReturnCompleted` + `ReturnWindowExpired`
+
+---
+
+*Created: 2026-03-13 (Planning Session)*
+*Updated: 2026-03-13 (Implementation — P2 and P1 complete)*
 *Planning Document: [cycle-27-returns-bc-phase-3.md](cycle-27-returns-bc-phase-3.md)*
 *Feature File: [../../features/returns/exchange-workflow.feature](../../features/returns/exchange-workflow.feature)*
 *Phase 2 Retrospective: [cycle-26-returns-bc-phase-2-retrospective.md](cycle-26-returns-bc-phase-2-retrospective.md)*
