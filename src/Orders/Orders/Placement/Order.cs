@@ -112,19 +112,15 @@ public sealed class Order : Saga
     public Guid? PaymentId { get; set; }
 
     /// <summary>
-    /// True when a return request is actively in progress.
-    /// Prevents premature saga closure when ReturnWindowExpired fires while a return is being processed.
+    /// List of active return IDs currently in progress.
+    /// Prevents premature saga closure when ReturnWindowExpired fires while returns are being processed.
+    /// Supports multiple concurrent returns (sequential returns from same order).
     /// </summary>
-    public bool IsReturnInProgress { get; set; }
-
-    /// <summary>
-    /// The active return ID (if a return is in progress).
-    /// </summary>
-    public Guid? ActiveReturnId { get; set; }
+    public IReadOnlyList<Guid> ActiveReturnIds { get; set; } = [];
 
     /// <summary>
     /// True if the ReturnWindowExpired message has already fired.
-    /// Used to close the saga when a return is eventually denied after window expiry.
+    /// Used to close the saga when all returns are eventually completed/denied after window expiry.
     /// </summary>
     public bool ReturnWindowFired { get; set; }
 
@@ -393,55 +389,83 @@ public sealed class Order : Saga
     /// <summary>
     /// Saga handler for return window expiration.
     /// The return window is scheduled at delivery time. When it fires, the order
-    /// moves to Closed status and the saga completes — no return was requested.
-    /// If a return was requested before expiry, the return process in the Returns BC handles it.
+    /// moves to Closed status and the saga completes — unless returns are still in progress.
+    /// Supports multiple concurrent returns: saga stays open until all returns terminate.
     /// </summary>
     /// <param name="message">Return window expired scheduled message.</param>
     public void Handle(ReturnWindowExpired message)
     {
         ReturnWindowFired = true;
-        if (IsReturnInProgress) return; // Stay open; return completion will close the saga
+        if (ActiveReturnIds.Count > 0) return; // Stay open; return completion will close the saga
         Status = OrderStatus.Closed;
         MarkCompleted();
     }
 
     /// <summary>
     /// Saga handler for return request initiation from Returns BC.
-    /// Marks the return as in-progress to prevent premature saga closure when ReturnWindowExpired fires.
+    /// Adds the return to the active list to prevent premature saga closure when ReturnWindowExpired fires.
+    /// Supports multiple concurrent returns from the same order.
     /// </summary>
     public void Handle(Messages.Contracts.Returns.ReturnRequested message)
     {
-        IsReturnInProgress = true;
-        ActiveReturnId = message.ReturnId;
+        // Add this return to active list (immutable update pattern)
+        var activeReturns = ActiveReturnIds.ToList();
+        if (!activeReturns.Contains(message.ReturnId))
+        {
+            activeReturns.Add(message.ReturnId);
+            ActiveReturnIds = activeReturns.AsReadOnly();
+        }
     }
 
     /// <summary>
     /// Saga handler for return completion from Returns BC.
-    /// Publishes a refund request to Payments BC and closes the saga.
+    /// Publishes a refund request to Payments BC and removes the return from active list.
+    /// Closes the saga only when all returns are terminal AND return window has expired.
+    /// Supports multiple concurrent returns (sequential refunds).
     /// </summary>
     public OutgoingMessages Handle(Messages.Contracts.Returns.ReturnCompleted message)
     {
-        IsReturnInProgress = false;
+        // Remove this return from active list (immutable update pattern)
+        var activeReturns = ActiveReturnIds.ToList();
+        activeReturns.Remove(message.ReturnId);
+        ActiveReturnIds = activeReturns.AsReadOnly();
+
         var outgoing = new OutgoingMessages();
-        outgoing.Add(new Messages.Contracts.Payments.RefundRequested(
-            Id,
-            message.FinalRefundAmount,
-            "Customer return approved and completed",
-            DateTimeOffset.UtcNow));
-        Status = OrderStatus.Closed;
-        MarkCompleted();
+
+        // Defensive guard: only request refund if amount is positive
+        // (edge case: all items failed inspection or zero-value return)
+        if (message.FinalRefundAmount > 0m)
+        {
+            outgoing.Add(new Messages.Contracts.Payments.RefundRequested(
+                Id,
+                message.FinalRefundAmount,
+                "Customer return approved and completed",
+                DateTimeOffset.UtcNow));
+        }
+
+        // Close saga if: (1) no active returns remaining, AND (2) return window already expired
+        if (ActiveReturnIds.Count == 0 && ReturnWindowFired)
+        {
+            Status = OrderStatus.Closed;
+            MarkCompleted();
+        }
+
         return outgoing;
     }
 
     /// <summary>
     /// Saga handler for return denial from Returns BC.
-    /// Clears the in-progress flag. If ReturnWindowExpired already fired, closes the saga now.
+    /// Removes the return from active list. If all returns terminal AND return window expired, closes saga.
     /// </summary>
     public void Handle(Messages.Contracts.Returns.ReturnDenied message)
     {
-        IsReturnInProgress = false;
-        ActiveReturnId = null;
-        if (ReturnWindowFired)
+        // Remove this return from active list (immutable update pattern)
+        var activeReturns = ActiveReturnIds.ToList();
+        activeReturns.Remove(message.ReturnId);
+        ActiveReturnIds = activeReturns.AsReadOnly();
+
+        // Close saga if: (1) no active returns remaining, AND (2) return window already expired
+        if (ActiveReturnIds.Count == 0 && ReturnWindowFired)
         {
             Status = OrderStatus.Closed;
             MarkCompleted();
@@ -450,13 +474,17 @@ public sealed class Order : Saga
 
     /// <summary>
     /// Saga handler for return rejection from Returns BC (inspection failed).
-    /// Clears the return-in-progress flag. If return window already expired, closes saga.
+    /// Removes the return from active list. If all returns terminal AND return window expired, closes saga.
     /// </summary>
     public void Handle(Messages.Contracts.Returns.ReturnRejected message)
     {
-        IsReturnInProgress = false;
-        ActiveReturnId = null;
-        if (ReturnWindowFired)
+        // Remove this return from active list (immutable update pattern)
+        var activeReturns = ActiveReturnIds.ToList();
+        activeReturns.Remove(message.ReturnId);
+        ActiveReturnIds = activeReturns.AsReadOnly();
+
+        // Close saga if: (1) no active returns remaining, AND (2) return window already expired
+        if (ActiveReturnIds.Count == 0 && ReturnWindowFired)
         {
             Status = OrderStatus.Closed;
             MarkCompleted();
@@ -465,13 +493,17 @@ public sealed class Order : Saga
 
     /// <summary>
     /// Saga handler for return expiration from Returns BC.
-    /// Customer never shipped; clears return-in-progress flag and closes saga if window already fired.
+    /// Customer never shipped; removes return from active list and closes saga if window already fired.
     /// </summary>
     public void Handle(Messages.Contracts.Returns.ReturnExpired message)
     {
-        IsReturnInProgress = false;
-        ActiveReturnId = null;
-        if (ReturnWindowFired)
+        // Remove this return from active list (immutable update pattern)
+        var activeReturns = ActiveReturnIds.ToList();
+        activeReturns.Remove(message.ReturnId);
+        ActiveReturnIds = activeReturns.AsReadOnly();
+
+        // Close saga if: (1) no active returns remaining, AND (2) return window already expired
+        if (ActiveReturnIds.Count == 0 && ReturnWindowFired)
         {
             Status = OrderStatus.Closed;
             MarkCompleted();

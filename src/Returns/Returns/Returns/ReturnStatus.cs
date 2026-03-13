@@ -9,6 +9,7 @@ public enum ReturnStatus
     InTransit,      // Phase 2 — carrier integration
     Received,
     Inspecting,
+    ExchangeShipping, // Exchange-specific: replacement item is being shipped
     Completed,
     Rejected,
     Expired

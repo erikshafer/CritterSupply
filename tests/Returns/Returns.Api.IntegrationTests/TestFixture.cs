@@ -106,9 +106,9 @@ public class TestFixture : IAsyncLifetime
         return await Host.TrackActivity(TimeSpan.FromSeconds(timeoutSeconds))
             .DoNotAssertOnExceptionsDetected()
             .AlsoTrack(Host)
-            .ExecuteAndWaitAsync((Func<IMessageContext, Task>)(async ctx =>
+            .ExecuteAndWaitAsync(ctx =>
             {
-                await ctx.InvokeAsync(message);
-            }));
+                return ctx.InvokeAsync(message);
+            });
     }
 }

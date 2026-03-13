@@ -9,11 +9,22 @@ public sealed record ReturnLineItem(
     ReturnReason Reason,
     string? Explanation = null);
 
+/// <summary>
+/// Exchange request details for same-SKU returns.
+/// Phase 1: Replacement must cost same or less (no upcharge payment collection).
+/// </summary>
+public sealed record ExchangeRequest(
+    string ReplacementSku,
+    int ReplacementQuantity,
+    decimal ReplacementUnitPrice);
+
 public sealed record ReturnRequested(
     Guid ReturnId,
     Guid OrderId,
     Guid CustomerId,
     IReadOnlyList<ReturnLineItem> Items,
+    ReturnType Type,
+    ExchangeRequest? ExchangeRequest,
     DateTimeOffset RequestedAt);
 
 public sealed record ReturnApproved(
@@ -75,3 +86,52 @@ public sealed record InspectionMixed(
 public sealed record ReturnExpired(
     Guid ReturnId,
     DateTimeOffset ExpiredAt);
+
+// ---------------------------------------------------------------------------
+// Exchange-specific domain events
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// Exchange approved after stock availability check.
+/// Carries estimated refund for price difference (if replacement is cheaper).
+/// </summary>
+public sealed record ExchangeApproved(
+    Guid ReturnId,
+    decimal PriceDifference,
+    DateTimeOffset ShipByDeadline,
+    DateTimeOffset ApprovedAt);
+
+/// <summary>
+/// Exchange denied (out of stock, outside window, or replacement too expensive).
+/// </summary>
+public sealed record ExchangeDenied(
+    Guid ReturnId,
+    string Reason,
+    string Message,
+    DateTimeOffset DeniedAt);
+
+/// <summary>
+/// Published when the replacement item ships after inspection passes.
+/// </summary>
+public sealed record ExchangeReplacementShipped(
+    Guid ReturnId,
+    string ShipmentId,
+    string TrackingNumber,
+    DateTimeOffset ShippedAt);
+
+/// <summary>
+/// Exchange completed successfully — original item inspected, replacement shipped.
+/// Carries final price difference refund (if any).
+/// </summary>
+public sealed record ExchangeCompleted(
+    Guid ReturnId,
+    decimal? PriceDifferenceRefund,
+    DateTimeOffset CompletedAt);
+
+/// <summary>
+/// Exchange rejected due to inspection failure. No replacement shipped, no refund issued.
+/// </summary>
+public sealed record ExchangeRejected(
+    Guid ReturnId,
+    string FailureReason,
+    DateTimeOffset RejectedAt);

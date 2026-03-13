@@ -19,7 +19,9 @@ public sealed class ReturnAggregateTests
                 unitPrice * quantity, reason)
         };
 
-        return new ReturnRequested(ReturnId, OrderId, CustomerId, items, DateTimeOffset.UtcNow);
+        return new ReturnRequested(
+            ReturnId, OrderId, CustomerId, items,
+            ReturnType.Refund, null, DateTimeOffset.UtcNow);
     }
 
     [Fact]

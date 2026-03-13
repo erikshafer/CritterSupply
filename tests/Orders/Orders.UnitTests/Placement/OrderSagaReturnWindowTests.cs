@@ -18,9 +18,8 @@ public class OrderSagaReturnWindowTests
 
     private static Order BuildDeliveredOrder(
         Guid? id = null,
-        bool isReturnInProgress = false,
-        bool returnWindowFired = false,
-        Guid? activeReturnId = null) =>
+        IReadOnlyList<Guid>? activeReturnIds = null,
+        bool returnWindowFired = false) =>
         new()
         {
             Id = id ?? Guid.NewGuid(),
@@ -28,8 +27,7 @@ public class OrderSagaReturnWindowTests
             Status = OrderStatus.Delivered,
             IsPaymentCaptured = true,
             PaymentId = Guid.NewGuid(),
-            IsReturnInProgress = isReturnInProgress,
-            ActiveReturnId = activeReturnId,
+            ActiveReturnIds = activeReturnIds ?? [],
             ReturnWindowFired = returnWindowFired,
             ShippingAddress = new ShippingAddress("1 Main St", null, "City", "ST", "00001", "US"),
             ShippingMethod = "Standard",
@@ -48,7 +46,7 @@ public class OrderSagaReturnWindowTests
     [Fact]
     public void ReturnWindowExpired_With_No_Return_In_Progress_Closes_Saga()
     {
-        var order = BuildDeliveredOrder(isReturnInProgress: false);
+        var order = BuildDeliveredOrder(activeReturnIds: []);
 
         order.Handle(new ReturnWindowExpired(order.Id));
 
@@ -65,7 +63,8 @@ public class OrderSagaReturnWindowTests
     [Fact]
     public void ReturnWindowExpired_With_Return_In_Progress_Does_Not_Close_Saga()
     {
-        var order = BuildDeliveredOrder(isReturnInProgress: true, activeReturnId: Guid.NewGuid());
+        var returnId = Guid.NewGuid();
+        var order = BuildDeliveredOrder(activeReturnIds: new[] { returnId }.AsReadOnly());
 
         order.Handle(new ReturnWindowExpired(order.Id));
 
@@ -79,19 +78,19 @@ public class OrderSagaReturnWindowTests
     // ===========================================================================
 
     /// <summary>
-    /// ReturnRequested must set IsReturnInProgress = true and capture the ActiveReturnId.
+    /// ReturnRequested must add the return ID to ActiveReturnIds list.
     /// This prevents premature saga closure if ReturnWindowExpired fires concurrently.
     /// </summary>
     [Fact]
-    public void ReturnRequested_Sets_IsReturnInProgress_And_ActiveReturnId()
+    public void ReturnRequested_Adds_Return_To_ActiveReturnIds()
     {
         var order = BuildDeliveredOrder();
         var returnId = Guid.NewGuid();
 
         order.Handle(new ReturnRequested(returnId, order.Id, order.CustomerId, DateTimeOffset.UtcNow));
 
-        order.IsReturnInProgress.ShouldBeTrue();
-        order.ActiveReturnId.ShouldBe(returnId);
+        order.ActiveReturnIds.Count.ShouldBe(1);
+        order.ActiveReturnIds.ShouldContain(returnId);
     }
 
     // ===========================================================================
@@ -100,19 +99,21 @@ public class OrderSagaReturnWindowTests
 
     /// <summary>
     /// ReturnCompleted must close the saga, emit a RefundRequested for the final refund amount,
-    /// and clear the in-progress flag. This applies regardless of whether the return window fired.
+    /// and remove the return from active list. Closes saga if window already fired and no other returns active.
     /// </summary>
     [Fact]
     public void ReturnCompleted_Closes_Saga_And_Emits_RefundRequested()
     {
-        var order = BuildDeliveredOrder(isReturnInProgress: true, returnWindowFired: true);
         var returnId = Guid.NewGuid();
+        var order = BuildDeliveredOrder(
+            activeReturnIds: new[] { returnId }.AsReadOnly(),
+            returnWindowFired: true);
         const decimal refundAmount = 85.50m;
 
         var outgoing = order.Handle(new ReturnCompleted(returnId, order.Id, order.CustomerId, refundAmount, [], DateTimeOffset.UtcNow));
 
         // Saga state
-        order.IsReturnInProgress.ShouldBeFalse();
+        order.ActiveReturnIds.Count.ShouldBe(0);
         order.Status.ShouldBe(OrderStatus.Closed);
         order.IsCompleted().ShouldBeTrue();
 
@@ -124,19 +125,23 @@ public class OrderSagaReturnWindowTests
     }
 
     /// <summary>
-    /// ReturnCompleted before the return window fires must also close the saga.
-    /// (Customer returned and refund approved within the 30-day window.)
+    /// ReturnCompleted before the return window fires must NOT close the saga.
+    /// (Customer returned and refund approved within the 30-day window, but window hasn't expired yet.)
+    /// Saga stays open until ReturnWindowExpired fires.
     /// </summary>
     [Fact]
-    public void ReturnCompleted_Before_Window_Fires_Also_Closes_Saga()
+    public void ReturnCompleted_Before_Window_Fires_Does_Not_Close_Saga()
     {
-        var order = BuildDeliveredOrder(isReturnInProgress: true, returnWindowFired: false);
         var returnId = Guid.NewGuid();
+        var order = BuildDeliveredOrder(
+            activeReturnIds: new[] { returnId }.AsReadOnly(),
+            returnWindowFired: false);
 
         var outgoing = order.Handle(new ReturnCompleted(returnId, order.Id, order.CustomerId, 50m, [], DateTimeOffset.UtcNow));
 
-        order.Status.ShouldBe(OrderStatus.Closed);
-        order.IsCompleted().ShouldBeTrue();
+        order.ActiveReturnIds.Count.ShouldBe(0);
+        order.Status.ShouldBe(OrderStatus.Delivered); // still open, waiting for window expiry
+        order.IsCompleted().ShouldBeFalse();
         outgoing.OfType<RefundRequested>().ShouldNotBeEmpty();
     }
 
@@ -151,15 +156,14 @@ public class OrderSagaReturnWindowTests
     [Fact]
     public void ReturnDenied_After_Window_Fires_Closes_Saga()
     {
+        var returnId = Guid.NewGuid();
         var order = BuildDeliveredOrder(
-            isReturnInProgress: true,
-            returnWindowFired: true,
-            activeReturnId: Guid.NewGuid());
+            activeReturnIds: new[] { returnId }.AsReadOnly(),
+            returnWindowFired: true);
 
-        order.Handle(new ReturnDenied(Guid.NewGuid(), order.Id, order.CustomerId, "Items not eligible for return", null, DateTimeOffset.UtcNow));
+        order.Handle(new ReturnDenied(returnId, order.Id, order.CustomerId, "Items not eligible for return", null, DateTimeOffset.UtcNow));
 
-        order.IsReturnInProgress.ShouldBeFalse();
-        order.ActiveReturnId.ShouldBeNull();
+        order.ActiveReturnIds.Count.ShouldBe(0);
         order.Status.ShouldBe(OrderStatus.Closed);
         order.IsCompleted().ShouldBeTrue();
     }
@@ -172,15 +176,14 @@ public class OrderSagaReturnWindowTests
     [Fact]
     public void ReturnDenied_Before_Window_Fires_Does_Not_Close_Saga()
     {
+        var returnId = Guid.NewGuid();
         var order = BuildDeliveredOrder(
-            isReturnInProgress: true,
-            returnWindowFired: false,
-            activeReturnId: Guid.NewGuid());
+            activeReturnIds: new[] { returnId }.AsReadOnly(),
+            returnWindowFired: false);
 
-        order.Handle(new ReturnDenied(Guid.NewGuid(), order.Id, order.CustomerId, "Items not eligible for return", null, DateTimeOffset.UtcNow));
+        order.Handle(new ReturnDenied(returnId, order.Id, order.CustomerId, "Items not eligible for return", null, DateTimeOffset.UtcNow));
 
-        order.IsReturnInProgress.ShouldBeFalse();
-        order.ActiveReturnId.ShouldBeNull();
+        order.ActiveReturnIds.Count.ShouldBe(0);
         order.Status.ShouldBe(OrderStatus.Delivered); // still open
         order.IsCompleted().ShouldBeFalse();
     }
@@ -196,17 +199,16 @@ public class OrderSagaReturnWindowTests
     [Fact]
     public void ReturnRejected_After_Window_Fires_Closes_Saga()
     {
+        var returnId = Guid.NewGuid();
         var order = BuildDeliveredOrder(
-            isReturnInProgress: true,
-            returnWindowFired: true,
-            activeReturnId: Guid.NewGuid());
+            activeReturnIds: new[] { returnId }.AsReadOnly(),
+            returnWindowFired: true);
 
         order.Handle(new Messages.Contracts.Returns.ReturnRejected(
-            Guid.NewGuid(), order.Id, order.CustomerId,
+            returnId, order.Id, order.CustomerId,
             "Inspection found items in unacceptable condition.", [], DateTimeOffset.UtcNow));
 
-        order.IsReturnInProgress.ShouldBeFalse();
-        order.ActiveReturnId.ShouldBeNull();
+        order.ActiveReturnIds.Count.ShouldBe(0);
         order.Status.ShouldBe(OrderStatus.Closed);
         order.IsCompleted().ShouldBeTrue();
     }
@@ -218,17 +220,16 @@ public class OrderSagaReturnWindowTests
     [Fact]
     public void ReturnRejected_Before_Window_Fires_Does_Not_Close_Saga()
     {
+        var returnId = Guid.NewGuid();
         var order = BuildDeliveredOrder(
-            isReturnInProgress: true,
-            returnWindowFired: false,
-            activeReturnId: Guid.NewGuid());
+            activeReturnIds: new[] { returnId }.AsReadOnly(),
+            returnWindowFired: false);
 
         order.Handle(new Messages.Contracts.Returns.ReturnRejected(
-            Guid.NewGuid(), order.Id, order.CustomerId,
+            returnId, order.Id, order.CustomerId,
             "Inspection found items in unacceptable condition.", [], DateTimeOffset.UtcNow));
 
-        order.IsReturnInProgress.ShouldBeFalse();
-        order.ActiveReturnId.ShouldBeNull();
+        order.ActiveReturnIds.Count.ShouldBe(0);
         order.Status.ShouldBe(OrderStatus.Delivered); // still open
         order.IsCompleted().ShouldBeFalse();
     }
@@ -244,16 +245,15 @@ public class OrderSagaReturnWindowTests
     [Fact]
     public void ReturnExpired_After_Window_Fires_Closes_Saga()
     {
+        var returnId = Guid.NewGuid();
         var order = BuildDeliveredOrder(
-            isReturnInProgress: true,
-            returnWindowFired: true,
-            activeReturnId: Guid.NewGuid());
+            activeReturnIds: new[] { returnId }.AsReadOnly(),
+            returnWindowFired: true);
 
         order.Handle(new Messages.Contracts.Returns.ReturnExpired(
-            Guid.NewGuid(), order.Id, order.CustomerId, DateTimeOffset.UtcNow));
+            returnId, order.Id, order.CustomerId, DateTimeOffset.UtcNow));
 
-        order.IsReturnInProgress.ShouldBeFalse();
-        order.ActiveReturnId.ShouldBeNull();
+        order.ActiveReturnIds.Count.ShouldBe(0);
         order.Status.ShouldBe(OrderStatus.Closed);
         order.IsCompleted().ShouldBeTrue();
     }
@@ -264,16 +264,15 @@ public class OrderSagaReturnWindowTests
     [Fact]
     public void ReturnExpired_Before_Window_Fires_Does_Not_Close_Saga()
     {
+        var returnId = Guid.NewGuid();
         var order = BuildDeliveredOrder(
-            isReturnInProgress: true,
-            returnWindowFired: false,
-            activeReturnId: Guid.NewGuid());
+            activeReturnIds: new[] { returnId }.AsReadOnly(),
+            returnWindowFired: false);
 
         order.Handle(new Messages.Contracts.Returns.ReturnExpired(
-            Guid.NewGuid(), order.Id, order.CustomerId, DateTimeOffset.UtcNow));
+            returnId, order.Id, order.CustomerId, DateTimeOffset.UtcNow));
 
-        order.IsReturnInProgress.ShouldBeFalse();
-        order.ActiveReturnId.ShouldBeNull();
+        order.ActiveReturnIds.Count.ShouldBe(0);
         order.Status.ShouldBe(OrderStatus.Delivered); // still open
         order.IsCompleted().ShouldBeFalse();
     }

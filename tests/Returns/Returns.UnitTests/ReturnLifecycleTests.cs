@@ -19,7 +19,7 @@ public sealed class ReturnLifecycleTests
     };
 
     private static Return CreateRequestedReturn() =>
-        Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, DefaultItems, DateTimeOffset.UtcNow));
+        Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, DefaultItems, ReturnType.Refund, null, DateTimeOffset.UtcNow));
 
     private static Return CreateApprovedReturn()
     {
@@ -148,7 +148,7 @@ public sealed class ReturnLifecycleTests
             new("CAT-TOY-05", 1, ItemCondition.AsExpected, "Intact packaging", true, DispositionDecision.Restockable, "A-12-3")
         };
 
-        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, DefaultItems, requestedAt))
+        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, DefaultItems, ReturnType.Refund, null, requestedAt))
             .Apply(new ReturnApproved(ReturnId, 65.47m, 4.50m, shipByDeadline, approvedAt))
             .Apply(new ReturnReceived(ReturnId, receivedAt))
             .Apply(new InspectionStarted(ReturnId, "inspector-w01", inspectedAt))
@@ -188,7 +188,7 @@ public sealed class ReturnLifecycleTests
             new("DOG-BOWL-01", 2, ItemCondition.WorseThanExpected, "Customer damage visible", false, DispositionDecision.Dispose, null)
         };
 
-        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, DefaultItems, requestedAt))
+        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, DefaultItems, ReturnType.Refund, null, requestedAt))
             .Apply(new ReturnApproved(ReturnId, 65.47m, 4.50m, DateTimeOffset.UtcNow.AddDays(30), DateTimeOffset.UtcNow))
             .Apply(new ReturnReceived(ReturnId, DateTimeOffset.UtcNow))
             .Apply(new InspectionStarted(ReturnId, "inspector-01", DateTimeOffset.UtcNow))
@@ -210,7 +210,7 @@ public sealed class ReturnLifecycleTests
         var approvedAt = requestedAt.AddMinutes(1);
         var expiredAt = approvedAt.AddDays(31);
 
-        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, DefaultItems, requestedAt))
+        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, DefaultItems, ReturnType.Refund, null, requestedAt))
             .Apply(new ReturnApproved(ReturnId, 65.47m, 4.50m, approvedAt.AddDays(30), approvedAt))
             .Apply(new ReturnExpired(ReturnId, expiredAt));
 
@@ -230,7 +230,7 @@ public sealed class ReturnLifecycleTests
         var requestedAt = DateTimeOffset.UtcNow;
         var deniedAt = requestedAt.AddHours(1);
 
-        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, DefaultItems, requestedAt))
+        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, DefaultItems, ReturnType.Refund, null, requestedAt))
             .Apply(new ReturnDenied(ReturnId, "OutsideReturnWindow", "Order delivered more than 30 days ago.", deniedAt));
 
         returnAggregate.Status.ShouldBe(ReturnStatus.Denied);
@@ -282,7 +282,7 @@ public sealed class ReturnLifecycleTests
         // Partial refund: only passed items (DOG-BOWL defective $39.98 + CAT-BED defective $49.99 = $89.97, no fee)
         var partialRefund = 89.97m;
 
-        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, items, requestedAt))
+        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, items, ReturnType.Refund, null, requestedAt))
             .Apply(new ReturnApproved(ReturnId, 115.46m, 4.50m, shipByDeadline, approvedAt))
             .Apply(new ReturnReceived(ReturnId, receivedAt))
             .Apply(new InspectionStarted(ReturnId, "inspector-w01", inspectedAt))
@@ -339,7 +339,7 @@ public sealed class ReturnLifecycleTests
         var expectedFee = 4.50m + 7.50m;
         var expectedRefund = 30.00m + 50.00m - expectedFee;
 
-        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, items, DateTimeOffset.UtcNow))
+        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, items, ReturnType.Refund, null, DateTimeOffset.UtcNow))
             .Apply(new ReturnApproved(ReturnId, 88.00m, 12.00m,
                 DateTimeOffset.UtcNow.AddDays(30), DateTimeOffset.UtcNow))
             .Apply(new ReturnReceived(ReturnId, DateTimeOffset.UtcNow))
@@ -361,7 +361,8 @@ public sealed class ReturnLifecycleTests
     public void Create_preserves_multi_item_data()
     {
         var returnAggregate = Return.Create(new ReturnRequested(
-            ReturnId, OrderId, CustomerId, DefaultItems, DateTimeOffset.UtcNow));
+            ReturnId, OrderId, CustomerId, DefaultItems,
+            ReturnType.Refund, null, DateTimeOffset.UtcNow));
 
         returnAggregate.Items.Count.ShouldBe(2);
         returnAggregate.Items[0].Sku.ShouldBe("DOG-BOWL-01");
@@ -376,7 +377,8 @@ public sealed class ReturnLifecycleTests
     public void Create_calculates_estimated_refund_from_items()
     {
         var returnAggregate = Return.Create(new ReturnRequested(
-            ReturnId, OrderId, CustomerId, DefaultItems, DateTimeOffset.UtcNow));
+            ReturnId, OrderId, CustomerId, DefaultItems,
+            ReturnType.Refund, null, DateTimeOffset.UtcNow));
 
         // Defective DOG-BOWL: $39.98, no fee
         // Unwanted CAT-TOY: $29.99, 15% fee = $4.50
