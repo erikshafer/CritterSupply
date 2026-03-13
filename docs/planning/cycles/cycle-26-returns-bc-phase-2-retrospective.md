@@ -121,9 +121,18 @@ Phase 1 only handled 3 of 6 return terminal events (ReturnRequested, ReturnCompl
 **Propagated to:** Future plan documents should cross-reference relevant ADRs.
 
 ### L4 — Saga Terminal State Handlers Must Cover All Terminal Events
-**What happened:** Orders saga only handled 3 of 6 return-related messages. ReturnRejected and ReturnExpired left the saga in a dangling state.  
-**Root cause:** Phase 1 only implemented the events it published; downstream handlers weren't verified.  
+**What happened:** Orders saga only handled 3 of 6 return-related messages. ReturnRejected and ReturnExpired left the saga in a dangling state.
+**Root cause:** Phase 1 only implemented the events it published; downstream handlers weren't verified.
 **Propagated to:** When adding integration events, always verify ALL consumers handle ALL terminal states.
+
+### L5 — Event Sourcing Race Conditions in HTTP-Based Integration Tests
+**What happened:** Returns integration tests failed with 409 (Conflict) status codes when expecting 200. Command handlers with `[WriteAggregate]` returned domain events, but Wolverine's transaction middleware committed asynchronously AFTER the HTTP response was sent. Subsequent GET requests read stale aggregate state before Marten's inline snapshot projections updated.
+**Root cause:** HTTP-based testing pattern (POST command → immediate GET verification) doesn't respect eventual consistency in event sourcing. Inline projections update asynchronously after transaction commit.
+**Initial attempted fix:** Added delays (50ms → 100ms → 500ms) via `TrackedHttpCall()` wrapper. Failed — timing-based solutions are inherently unreliable.
+**Successful solution:** Refactored tests to use **direct Wolverine command invocation** instead of HTTP calls. Use `ExecuteAndWaitAsync()` to invoke commands (ensures all transactions complete before returning), query event store directly via `session.Events.AggregateStreamAsync<Return>()` for aggregate state assertions, still verify HTTP GET endpoints work after state changes.
+**Why this is better:** Tests the aggregate directly (source of truth in event sourcing), eliminates race conditions by waiting for all side effects to complete, separates concerns: integration tests verify business logic (commands → events → aggregate state), HTTP endpoints verified separately, aligns with eventual consistency best practices.
+**Propagated to:** All event-sourced BCs should prefer direct command invocation for state-changing integration tests. HTTP-based testing better suited for E2E tests where eventual consistency delays are expected and acceptable. Skill documentation updated in `critterstack-testing-patterns.md` section "Event Sourcing Race Conditions and Direct Command Invocation".
+**References:** Returns integration test refactoring PR, commit 61affb0 (fix 8 remaining tests), commit 7a56a95 (refactor to direct command invocation pattern).
 
 ---
 
