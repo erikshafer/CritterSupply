@@ -164,7 +164,7 @@ Name: product.Name ?? "Unknown Product",
 
 **Lesson Learned:**
 - **Don't assume value objects without checking actual API contracts**
-- Product Catalog uses plain strings for queryable fields (see [ADR 0003](./decisions/0003-value-objects-vs-primitives-queryable-fields.md))
+- Product Catalog uses plain strings for queryable fields (see [ADR 0003](../../decisions/0003-value-objects-vs-primitives-queryable-fields.md))
 - Integration tests with TestContainers would reveal DTO mismatches immediately
 
 **Files Changed:**

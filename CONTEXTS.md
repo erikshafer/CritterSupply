@@ -1952,7 +1952,7 @@ The Vendor Identity context manages authentication, authorization, and user life
 
 **Persistence Strategy**: Entity Framework Core (following Customer Identity pattern)
 
-**Authentication**: JWT Bearer tokens — see [ADR 0015: JWT for Vendor Identity](docs/decisions/0015-jwt-for-vendor-identity.md)
+**Authentication**: JWT Bearer tokens — see [ADR 0028: JWT for Vendor Identity](docs/decisions/0028-jwt-for-vendor-identity.md)
 
 **Event Modeling Session**: See [docs/planning/vendor-portal-event-modeling.md](docs/planning/vendor-portal-event-modeling.md) for full planning output.
 
@@ -2184,7 +2184,7 @@ Vendor Identity follows many patterns established in Customer Identity, but dive
 | Persistence | EF Core | EF Core ✅ Same |
 | Schema | `customeridentity` | `vendoridentity` ✅ Same |
 | EF Core patterns | DbContext + navigation properties | DbContext + navigation properties ✅ Same |
-| Auth mechanism | Session cookies (ADR 0012) | **JWT Bearer** (ADR 0015) ❌ Diverges |
+| Auth mechanism | Session cookies (ADR 0012) | **JWT Bearer** (ADR 0028) ❌ Diverges |
 | Password hashing | Plaintext (dev convenience) | **Argon2id from day one** |
 | Multi-tenant model | N/A (single user type) | VendorTenantId on every entity |
 | Invitation flow | N/A | VendorUserInvitation table with TTL |
@@ -2192,7 +2192,7 @@ Vendor Identity follows many patterns established in Customer Identity, but dive
 | Published events | None | All lifecycle events via RabbitMQ |
 | User reactivation | N/A | Allowed (Deactivated → Active) |
 
-The divergence on authentication (JWT vs cookies) is **intentional** — required for SignalR hub security and cross-service claim propagation. See ADR 0015 for rationale.
+The divergence on authentication (JWT vs cookies) is **intentional** — required for SignalR hub security and cross-service claim propagation. See ADR 0028 for rationale.
 
 ### Privacy and Compliance Considerations
 
@@ -2233,14 +2233,14 @@ The Vendor Portal context provides partnered vendors with a private, tenant-isol
 |---|---|---|
 | Blazor hosting model | Server | **WASM** |
 | Session duration | Minutes (browse-and-buy) | Hours (ambient awareness, B2B) |
-| Auth mechanism | Session cookies (ADR 0012) | JWT Bearer (ADR 0015) |
+| Auth mechanism | Session cookies (ADR 0012) | JWT Bearer (ADR 0028) |
 | Hub identity source | Query-string GUID (session-backed) | JWT claims only (cryptographic) |
 | Deployment | Kestrel (.NET container) | Nginx (static files) |
 | WebSocket connections/user | 2 (circuit + hub) | 1 (hub only) |
 
 **Event Modeling Session**: See [docs/planning/vendor-portal-event-modeling.md](docs/planning/vendor-portal-event-modeling.md) for full planning output including event diagrams, risks, and phased roadmap.
 
-**ADRs**: [ADR 0015: JWT for Vendor Identity](docs/decisions/0015-jwt-for-vendor-identity.md) · [ADR 0021: Blazor WASM for VendorPortal.Web](docs/decisions/0021-blazor-wasm-for-vendor-portal-web.md)
+**ADRs**: [ADR 0028: JWT for Vendor Identity](docs/decisions/0028-jwt-for-vendor-identity.md) · [ADR 0021: Blazor WASM for VendorPortal.Web](docs/decisions/0021-blazor-wasm-for-vendor-portal-web.md)
 
 ### Purpose
 

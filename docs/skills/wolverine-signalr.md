@@ -423,7 +423,7 @@ public sealed class StorefrontHub : Hub
 
 ### Pattern B: JWT Bearer (Vendor Portal BC)
 
-The Vendor Portal uses JWT auth (ADR 0015). WebSocket upgrade requests cannot carry an `Authorization` header in all browsers, so the JWT is extracted from the query string (`?access_token=...`) via `JwtBearerEvents.OnMessageReceived`:
+The Vendor Portal uses JWT auth (ADR 0028). WebSocket upgrade requests cannot carry an `Authorization` header in all browsers, so the JWT is extracted from the query string (`?access_token=...`) via `JwtBearerEvents.OnMessageReceived`:
 
 ```csharp
 // VendorPortal.Api/Program.cs
@@ -1002,7 +1002,7 @@ Look for the "Message Routing" table in the output. SignalR-routed messages appe
 - **[Marten Event Sourcing](./marten-event-sourcing.md)** — Projection side effects, RaiseSideEffects hook
 - **[E2E Testing with Playwright](./e2e-playwright-testing.md)** — SignalR in browser E2E tests, antiforgery configuration
 - **[ADR 0013: SignalR Migration from SSE](../decisions/0013-signalr-migration-from-sse.md)** — Full cost/benefit analysis of the SSE→SignalR migration
-- **[ADR 0015: JWT for Vendor Identity](../decisions/0015-jwt-for-vendor-identity.md)** — JWT Bearer auth for SignalR hubs, VendorTenantId claim invariant
+- **[ADR 0028: JWT for Vendor Identity](../decisions/0028-jwt-for-vendor-identity.md)** — JWT Bearer auth for SignalR hubs, VendorTenantId claim invariant
 - **[Vendor Portal Event Modeling](../planning/vendor-portal-event-modeling.md)** — Dual hub group design, `VendorPortalHub` specification
 - **[CONTEXTS.md — Customer Experience](../../CONTEXTS.md#customer-experience)** — Storefront BC SignalR integration contract
 - **[CONTEXTS.md — Vendor Portal](../../CONTEXTS.md#vendor-portal)** — Vendor Portal BC SignalR integration contract

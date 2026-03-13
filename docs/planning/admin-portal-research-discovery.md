@@ -5,7 +5,7 @@
 > **Authors:** Principal Software Architect, Product Owner, UX Engineer
 > **Scope:** Technical recommendations, business validation, and UX design for the Admin Portal bounded context — spanning AdminIdentity BC, AdminPortal BFF, multi-issuer JWT, frontend technology, SignalR hub design, API extension strategy, audit trail pattern, role-based navigation, and phased implementation
 > **Prerequisite Reading:** [CONTEXTS.md — Admin Portal §](../../CONTEXTS.md), [Admin Portal Event Modeling](admin-portal-event-modeling.md), [Admin Portal UX Research](admin-portal-ux-research.md)
-> **Companion Documents:** [Admin Portal Feature Files](../features/admin-portal/), [ADR 0015 (JWT)](../decisions/0015-jwt-for-vendor-identity.md), [ADR 0025 (Blazor WASM Learnings)](../decisions/0025-blazor-wasm-jwt-poc-learnings.md)
+> **Companion Documents:** [Admin Portal Feature Files](../features/admin-portal/), [ADR 0028 (JWT)](../decisions/0028-jwt-for-vendor-identity.md), [ADR 0025 (Blazor WASM Learnings)](../decisions/0025-blazor-wasm-jwt-poc-learnings.md)
 
 ---
 
@@ -128,7 +128,7 @@ var token = new JwtSecurityToken(
 
 ### Token Lifecycle
 
-Same pattern as VendorIdentity (ADR 0015):
+Same pattern as VendorIdentity (ADR 0028):
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|

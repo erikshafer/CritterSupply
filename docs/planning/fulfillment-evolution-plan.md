@@ -390,7 +390,7 @@ public sealed record ShippingAddress(
 // Mutable Dictionary required: Marten serializes/deserializes saga state as JSON.
 // NOTE: string keys are used here for planning clarity.
 // Production implementation should use strongly-typed value objects for Sku
-// (see docs/decisions/0003-value-objects-vs-primitives.md for the established pattern).
+// (see docs/decisions/0003-value-objects-vs-primitives-queryable-fields.md for the established pattern).
 public Dictionary<string, string> SkuToWarehouseId { get; set; } = new(); // SKU → WarehouseId
 
 // Orders/Placement/OrderDecider.cs — HandleReservationConfirmed
