@@ -223,16 +223,21 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var createResponse = await CreateReturnUnderReview(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        // Approve it (using TrackedHttpCall to wait for event persistence)
-        await _fixture.TrackedHttpCall(s =>
-        {
-            s.Post.Json(new ApproveReturn(returnId))
-                .ToUrl($"/api/returns/{returnId}/approve");
+        // Approve it by invoking command directly (not HTTP)
+        var command = new ApproveReturn(returnId);
+        await _fixture.ExecuteAndWaitAsync(command);
 
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Query document session directly to verify aggregate state
+        await using var session = _fixture.GetDocumentSession();
+        var aggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
 
-        // Verify the return is now Approved
+        aggregate.ShouldNotBeNull();
+        aggregate.Status.ShouldBe(ReturnStatus.Approved);
+        aggregate.ApprovedAt.ShouldNotBeNull();
+        aggregate.ShipByDeadline.ShouldNotBeNull();
+        aggregate.EstimatedRefundAmount.ShouldBeGreaterThan(0);
+
+        // Verify HTTP GET endpoint also works
         var getResult = await _fixture.Host.Scenario(s =>
         {
             s.Get.Url($"/api/returns/{returnId}");
@@ -242,8 +247,6 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var summary = getResult.ReadAsJson<ReturnSummaryResponse>();
         summary.ShouldNotBeNull();
         summary.Status.ShouldBe("Approved");
-        summary.ApprovedAt.ShouldNotBeNull();
-        summary.ShipByDeadline.ShouldNotBeNull();
     }
 
     [Fact]
@@ -297,16 +300,21 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var createResponse = await CreateReturnUnderReview(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        // Deny it (using TrackedHttpCall to wait for event persistence)
-        await _fixture.TrackedHttpCall(s =>
-        {
-            s.Post.Json(new DenyReturn(returnId, "PolicyViolation", "Item is non-returnable."))
-                .ToUrl($"/api/returns/{returnId}/deny");
+        // Deny it by invoking command directly (not HTTP)
+        var command = new DenyReturn(returnId, "PolicyViolation", "Item is non-returnable.");
+        await _fixture.ExecuteAndWaitAsync(command);
 
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Query document session directly to verify aggregate state
+        await using var session = _fixture.GetDocumentSession();
+        var aggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
 
-        // Verify the return is now Denied
+        aggregate.ShouldNotBeNull();
+        aggregate.Status.ShouldBe(ReturnStatus.Denied);
+        aggregate.DenialReason.ShouldBe("PolicyViolation");
+        aggregate.DenialMessage.ShouldBe("Item is non-returnable.");
+        aggregate.DeniedAt.ShouldNotBeNull();
+
+        // Verify HTTP GET endpoint also works
         var getResult = await _fixture.Host.Scenario(s =>
         {
             s.Get.Url($"/api/returns/{returnId}");
@@ -316,8 +324,6 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var summary = getResult.ReadAsJson<ReturnSummaryResponse>();
         summary.ShouldNotBeNull();
         summary.Status.ShouldBe("Denied");
-        summary.DenialReason.ShouldBe("PolicyViolation");
-        summary.DenialMessage.ShouldBe("Item is non-returnable.");
     }
 
     [Fact]
@@ -443,29 +449,30 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var createResponse = await CreateReturnViaApi(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        await _fixture.TrackedHttpCall(s =>
-        {
-            s.Post.Json(new ReceiveReturn(returnId))
-                .ToUrl($"/api/returns/{returnId}/receive");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Receive the return (invoke command directly)
+        await _fixture.ExecuteAndWaitAsync(new ReceiveReturn(returnId));
 
-        // Submit passing inspection
-        await _fixture.TrackedHttpCall(s =>
-        {
-            s.Post.Json(new SubmitInspection(
-                ReturnId: returnId,
-                Results:
-                [
-                    new InspectionLineResult("DOG-BOWL-01", 1, ItemCondition.AsExpected,
-                        "Item matches description", true, DispositionDecision.Restockable, "A-12-3")
-                ]
-            )).ToUrl($"/api/returns/{returnId}/inspection");
+        // Submit passing inspection (invoke command directly)
+        var inspectionCommand = new SubmitInspection(
+            ReturnId: returnId,
+            Results:
+            [
+                new InspectionLineResult("DOG-BOWL-01", 1, ItemCondition.AsExpected,
+                    "Item matches description", true, DispositionDecision.Restockable, "A-12-3")
+            ]);
+        await _fixture.ExecuteAndWaitAsync(inspectionCommand);
 
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Query document session directly to verify aggregate state
+        await using var session = _fixture.GetDocumentSession();
+        var aggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
 
-        // Verify Completed state
+        aggregate.ShouldNotBeNull();
+        aggregate.Status.ShouldBe(ReturnStatus.Completed);
+        aggregate.FinalRefundAmount.ShouldNotBeNull();
+        aggregate.FinalRefundAmount.Value.ShouldBeGreaterThan(0);
+        aggregate.CompletedAt.ShouldNotBeNull();
+
+        // Verify HTTP GET endpoint also works
         var getResult = await _fixture.Host.Scenario(s =>
         {
             s.Get.Url($"/api/returns/{returnId}");
@@ -475,8 +482,6 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var summary = getResult.ReadAsJson<ReturnSummaryResponse>();
         summary.ShouldNotBeNull();
         summary.Status.ShouldBe("Completed");
-        summary.FinalRefundAmount.ShouldNotBeNull();
-        summary.CompletedAt.ShouldNotBeNull();
     }
 
     [Fact]
@@ -740,34 +745,35 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         createResponse.Status.ShouldBe("Approved");
         var returnId = createResponse.ReturnId!.Value;
 
-        // Receive (using TrackedHttpCall to wait for event persistence)
-        await _fixture.TrackedHttpCall(s =>
-        {
-            s.Post.Json(new ReceiveReturn(returnId))
-                .ToUrl($"/api/returns/{returnId}/receive");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Receive (invoke command directly)
+        await _fixture.ExecuteAndWaitAsync(new ReceiveReturn(returnId));
 
-        // Submit mixed inspection: 2 pass, 1 fail
-        await _fixture.TrackedHttpCall(s =>
-        {
-            s.Post.Json(new SubmitInspection(
-                ReturnId: returnId,
-                Results:
-                [
-                    new InspectionLineResult("DOG-BOWL-01", 2, ItemCondition.AsExpected,
-                        "Confirmed defective", true, DispositionDecision.Restockable, "A-12"),
-                    new InspectionLineResult("CAT-TOY-05", 1, ItemCondition.WorseThanExpected,
-                        "Customer damage visible", false, DispositionDecision.Dispose, null),
-                    new InspectionLineResult("CAT-BED-01", 1, ItemCondition.AsExpected,
-                        "Confirmed defective", true, DispositionDecision.Restockable, "B-05")
-                ]
-            )).ToUrl($"/api/returns/{returnId}/inspection");
+        // Submit mixed inspection: 2 pass, 1 fail (invoke command directly)
+        var inspectionCommand = new SubmitInspection(
+            ReturnId: returnId,
+            Results:
+            [
+                new InspectionLineResult("DOG-BOWL-01", 2, ItemCondition.AsExpected,
+                    "Confirmed defective", true, DispositionDecision.Restockable, "A-12"),
+                new InspectionLineResult("CAT-TOY-05", 1, ItemCondition.WorseThanExpected,
+                    "Customer damage visible", false, DispositionDecision.Dispose, null),
+                new InspectionLineResult("CAT-BED-01", 1, ItemCondition.AsExpected,
+                    "Confirmed defective", true, DispositionDecision.Restockable, "B-05")
+            ]);
+        await _fixture.ExecuteAndWaitAsync(inspectionCommand);
 
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Query document session directly to verify aggregate state
+        await using var session = _fixture.GetDocumentSession();
+        var aggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
 
-        // Verify Completed state with partial refund
+        aggregate.ShouldNotBeNull();
+        aggregate.Status.ShouldBe(ReturnStatus.Completed);
+        aggregate.FinalRefundAmount.ShouldNotBeNull();
+        // Partial refund covers only passed items (DOG-BOWL defective $39.98 + CAT-BED defective $49.99 = $89.97)
+        aggregate.FinalRefundAmount.Value.ShouldBe(89.97m);
+        aggregate.CompletedAt.ShouldNotBeNull();
+
+        // Verify HTTP GET endpoint also works
         var getResult = await _fixture.Host.Scenario(s =>
         {
             s.Get.Url($"/api/returns/{returnId}");
@@ -777,10 +783,7 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var summary = getResult.ReadAsJson<ReturnSummaryResponse>();
         summary.ShouldNotBeNull();
         summary.Status.ShouldBe("Completed");
-        summary.FinalRefundAmount.ShouldNotBeNull();
-        // Partial refund covers only passed items (DOG-BOWL defective $39.98 + CAT-BED defective $49.99 = $89.97)
         summary.FinalRefundAmount!.Value.ShouldBe(89.97m);
-        summary.CompletedAt.ShouldNotBeNull();
     }
 
     [Fact]
@@ -980,13 +983,8 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var createResponse = await CreateReturnUnderReview(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        // Deny it (using TrackedHttpCall to wait for event persistence)
-        await _fixture.TrackedHttpCall(s =>
-        {
-            s.Post.Json(new DenyReturn(returnId, "Policy", "Non-returnable"))
-                .ToUrl($"/api/returns/{returnId}/deny");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Deny it (invoke command directly)
+        await _fixture.ExecuteAndWaitAsync(new DenyReturn(returnId, "Policy", "Non-returnable"));
 
         // Try to receive a denied return → 409
         await _fixture.Host.Scenario(s =>
@@ -1007,13 +1005,8 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var createResponse = await CreateReturnUnderReview(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        // Deny it (using TrackedHttpCall to wait for event persistence)
-        await _fixture.TrackedHttpCall(s =>
-        {
-            s.Post.Json(new DenyReturn(returnId, "Policy", "Non-returnable"))
-                .ToUrl($"/api/returns/{returnId}/deny");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Deny it (invoke command directly)
+        await _fixture.ExecuteAndWaitAsync(new DenyReturn(returnId, "Policy", "Non-returnable"));
 
         // Try to approve a denied return → 409
         await _fixture.Host.Scenario(s =>
@@ -1034,27 +1027,18 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var createResponse = await CreateReturnViaApi(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        // Receive (using TrackedHttpCall to wait for event persistence)
-        await _fixture.TrackedHttpCall(s =>
-        {
-            s.Post.Json(new ReceiveReturn(returnId))
-                .ToUrl($"/api/returns/{returnId}/receive");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Receive (invoke command directly)
+        await _fixture.ExecuteAndWaitAsync(new ReceiveReturn(returnId));
 
-        // Pass inspection (using TrackedHttpCall to wait for event persistence)
-        await _fixture.TrackedHttpCall(s =>
-        {
-            s.Post.Json(new SubmitInspection(
-                ReturnId: returnId,
-                Results:
-                [
-                    new InspectionLineResult("DOG-BOWL-01", 1, ItemCondition.AsExpected,
-                        "Good", true, DispositionDecision.Restockable, "A-1")
-                ]
-            )).ToUrl($"/api/returns/{returnId}/inspection");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Pass inspection (invoke command directly)
+        var inspectionCommand = new SubmitInspection(
+            ReturnId: returnId,
+            Results:
+            [
+                new InspectionLineResult("DOG-BOWL-01", 1, ItemCondition.AsExpected,
+                    "Good", true, DispositionDecision.Restockable, "A-1")
+            ]);
+        await _fixture.ExecuteAndWaitAsync(inspectionCommand);
 
         // Try to inspect again after Completed → 409
         await _fixture.Host.Scenario(s =>

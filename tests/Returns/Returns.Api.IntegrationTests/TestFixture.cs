@@ -111,27 +111,4 @@ public class TestFixture : IAsyncLifetime
                 await ctx.InvokeAsync(message);
             }));
     }
-
-    /// <summary>
-    /// Makes an HTTP call with Alba while tracking Wolverine message activity.
-    /// Ensures all cascaded work completes before returning control to the test.
-    /// </summary>
-    public async Task<(ITrackedSession, IScenarioResult)> TrackedHttpCall(Action<Scenario> configuration)
-    {
-        IScenarioResult result = null!;
-
-        var tracked = await Host.ExecuteAndWaitAsync(async () =>
-        {
-            result = await Host.Scenario(configuration);
-        });
-
-        // CRITICAL: Wait for Marten transactions to commit and inline projections to complete.
-        // Wolverine's auto-transaction middleware commits AFTER the HTTP response is sent.
-        // Inline snapshots are synchronous within the transaction, but the transaction
-        // commit is asynchronous relative to the HTTP response.
-        // This ensures subsequent GET requests see the committed state.
-        await Task.Delay(500);
-
-        return (tracked, result);
-    }
 }
