@@ -68,6 +68,21 @@ jobs:
         env:
           EXTRA_LABELS: ${{ steps.drift.outputs.extra_labels }}
         run: |
+          # Skip if an open drift issue already exists (prevents duplicate noise issues)
+          EXISTING=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --label "type:technical-debt" \
+            --label "bc:infrastructure" \
+            --search "Label Drift Detected in:title" \
+            --json number \
+            --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [ -n "$EXISTING" ]; then
+            echo "Open drift issue #${EXISTING} already exists — skipping creation to avoid duplicates."
+            exit 0
+          fi
+
           {
             echo "## Label Drift Report"
             echo ""
@@ -96,4 +111,4 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "⚠️ Label Drift Detected" \
             --label "type:technical-debt,bc:infrastructure" \
-            --body-file /tmp/drift-issue-body.md || echo "Issue already exists or creation failed"
+            --body-file /tmp/drift-issue-body.md
