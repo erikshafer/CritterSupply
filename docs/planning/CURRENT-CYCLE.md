@@ -184,13 +184,13 @@
 - 🔴 **Promotions BC** — Discount codes, percentage-off campaigns, BOGO *(Cycle 29)*
 
 **Medium Priority (Scaling + Internal Tooling):**
-- 🟡 **Admin Portal** — Internal operations portal *(Cycle 30+, after RBAC ADR)*
+- 🟡 **Admin Portal** — Internal operations portal *(Cycle 28+, after RBAC ADR)*
+- 🟡 **Product Catalog Evolution** — Variants, Listings, Marketplaces *(D2–D10 decisions resolved; [cycle plan](catalog-listings-marketplaces-cycle-plan.md) approved — Cycles 29–35)*
 - 🟡 **Search BC** — Full-text product search, faceted navigation
 - 🟡 **Recommendations BC** — Personalized product recommendations
 - 🟡 **Analytics BC** — Business intelligence, reporting, dashboards
 
 **Low Priority (Strategic/Retention):**
-- 🟢 **Product Catalog Evolution** — Variants, Listings, Marketplaces *(blocked on D2–D10 decisions)*
 - 🟢 **Store Credit BC** — Gift cards, store credit issuance, balance tracking
 - 🟢 **Loyalty BC** — Rewards program, points accumulation
 - 🟢 **Operations Dashboard** — Developer/SRE event stream visualization (React + SignalR)
