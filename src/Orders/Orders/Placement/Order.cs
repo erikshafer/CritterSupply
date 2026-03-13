@@ -423,11 +423,18 @@ public sealed class Order : Saga
     {
         IsReturnInProgress = false;
         var outgoing = new OutgoingMessages();
-        outgoing.Add(new Messages.Contracts.Payments.RefundRequested(
-            Id,
-            message.FinalRefundAmount,
-            "Customer return approved and completed",
-            DateTimeOffset.UtcNow));
+
+        // Defensive guard: only request refund if amount is positive
+        // (edge case: all items failed inspection or zero-value return)
+        if (message.FinalRefundAmount > 0m)
+        {
+            outgoing.Add(new Messages.Contracts.Payments.RefundRequested(
+                Id,
+                message.FinalRefundAmount,
+                "Customer return approved and completed",
+                DateTimeOffset.UtcNow));
+        }
+
         Status = OrderStatus.Closed;
         MarkCompleted();
         return outgoing;

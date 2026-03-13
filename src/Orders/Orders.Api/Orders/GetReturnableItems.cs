@@ -40,9 +40,7 @@ public static class GetReturnableItemsEndpoint
             .Select(li => new ReturnableItem(li.Sku, li.Quantity, li.UnitPrice, li.LineTotal))
             .ToList();
 
-        // DeliveredAt is not persisted on the Order saga (it belongs to the Shipment aggregate).
-        // A future enhancement could query the Fulfillment BC for this value.
-        // For now, null signals to consumers that the delivery timestamp is unavailable here.
-        return Results.Ok(new ReturnableItemsResponse(orderId, items, null));
+        // DeliveredAt is persisted on the Order saga from Fulfillment.ShipmentDelivered (Phase 2).
+        return Results.Ok(new ReturnableItemsResponse(orderId, items, order.DeliveredAt));
     }
 }
