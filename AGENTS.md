@@ -38,7 +38,7 @@ See `CLAUDE.md` for more information.
 - Convenience script: run the repository helper script to start the full stack via Docker Compose:
 
 ```bash
-./start-all.sh
+./scripts/start-all.sh
 ```
 
 - Aspire AppHost (optional): the project `src/CritterSupply.AppHost/` can start all .NET services with the Aspire dashboard. Run:

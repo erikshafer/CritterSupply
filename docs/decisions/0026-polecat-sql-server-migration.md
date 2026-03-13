@@ -109,7 +109,7 @@ After migration, developers run **two** database engines simultaneously:
 
 **Mitigation:**
 1. Add Docker Compose profiles for granular control (`profile: sqlserver`, `profile: postgres`).
-2. Update `start-all.sh` to report container health status clearly.
+2. Update `scripts/start-all.sh` to report container health status clearly.
 3. Document minimum system requirements in README (16 GB+ RAM recommended).
 
 #### R5: Test Infrastructure Rewrite
