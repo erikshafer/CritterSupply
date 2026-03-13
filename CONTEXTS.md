@@ -199,7 +199,7 @@ See "Saga states" section below for complete state machine.
 - Stock level management (Inventory)
 - Physical fulfillment operations (Fulfillment)
 - Return eligibility rules or inspection (Returns)
-- Customer notification delivery (Notifications)
+- Customer correspondence delivery (Correspondence BC)
 
 ### Core Invariants
 
@@ -547,7 +547,7 @@ The ORE evaluates FCs in strict priority order. **Inventory is reserved at order
 - Payment status or order validity (Orders BC has already confirmed)
 - Carrier contract negotiation or rate shopping decisions (informed by Logistics/Carrier config)
 - Return eligibility or refund decisions (Returns BC and Orders BC)
-- Customer communication content (Notifications layer)
+- Customer communication content (Correspondence BC)
 - Duty and tax calculation for international orders (landed cost engine at checkout in Orders/Pricing)
 
 ### Integration Flows
@@ -711,7 +711,7 @@ The Returns context owns the reverse logistics flow—handling customer return r
 - Refund processing (Payments, orchestrated by Orders — Orders holds the PaymentId)
 - Refund amount calculation disputes (Orders or policy service)
 - Inventory restocking execution (Inventory BC reacts to `ReturnCompleted`)
-- Customer communication (Notifications BC reacts to Returns integration events)
+- Customer communication (Correspondence BC reacts to Returns integration events)
 - Original order state management (Orders saga tracks return status)
 - Carrier API integration (Fulfillment BC owns all carrier interactions)
 - Store credit ledger (future dedicated BC)
@@ -3011,17 +3011,19 @@ See [`docs/planning/pricing-event-modeling.md`](docs/planning/pricing-event-mode
 
 The following bounded contexts have been identified as high-value additions for CritterSupply's next phase of growth. They are ordered by business priority: customer-facing gaps first, then commercial infrastructure, then operational intelligence and internal tooling.
 
-> **Note:** The first four (Notifications, Pricing, Promotions, Search) are recommended for the near-term roadmap. Recommendations, Store Credit, and Analytics follow once foundational commercial infrastructure is in place. **Admin Portal** and **Operations Dashboard** address internal tooling needs for the executive team and engineering team — both leveraging the richness of our event-sourced data streams via SignalR and SSR-capable frontends. Reviews, Procurement/Supply Chain, and Shipping/Logistics round out the long-term vision.
+> **Note:** The first four (Correspondence, Pricing, Promotions, Search) are recommended for the near-term roadmap. Recommendations, Store Credit, and Analytics follow once foundational commercial infrastructure is in place. **Admin Portal** and **Operations Dashboard** address internal tooling needs for the executive team and engineering team — both leveraging the richness of our event-sourced data streams via SignalR and SSR-capable frontends. Reviews, Procurement/Supply Chain, and Shipping/Logistics round out the long-term vision.
 
 ---
 
-## Notifications
+## Correspondence
 
-The Notifications context owns all customer-facing transactional communication — order confirmations, shipping updates, delivery confirmations, return status changes, and refund notices. It reacts to integration events already published by existing BCs and delivers messages through the customer's preferred channel (email, SMS, push notification).
+The Correspondence context owns all customer-facing transactional communication — order confirmations, shipping updates, delivery confirmations, return status changes, and refund notices. It reacts to integration events already published by existing BCs and delivers messages through the customer's preferred channel (email, SMS, push notification).
 
-**Why this matters:** CritterSupply's saga already fires every event a Notifications BC needs (`OrderPlaced`, `ShipmentDispatched`, `ShipmentDelivered`, `RefundCompleted`). Without this BC, customers receive zero communication after checkout unless they are actively watching the Blazor storefront — a gap that drives support tickets and erodes trust. Transactional emails see 40–50% open rates. This is the single highest-impact gap in the current customer experience.
+**Why this matters:** CritterSupply's saga already fires every event a Correspondence BC needs (`OrderPlaced`, `ShipmentDispatched`, `ShipmentDelivered`, `RefundCompleted`). Without this BC, customers receive zero communication after checkout unless they are actively watching the Blazor storefront — a gap that drives support tickets and erodes trust. Transactional emails see 40–50% open rates. This is the single highest-impact gap in the current customer experience.
 
 **Priority:** 🔴 High — implement immediately after Returns BC is live. Pure choreography: no orchestration needed.
+
+**Note:** This BC was originally named "Notifications" but was renamed to "Correspondence" in Cycle 28 to avoid ambiguity with real-time UI updates (handled by Customer Experience BC via SignalR) and align with domain language. See [ADR 0030](../docs/decisions/0030-notifications-to-correspondence-rename.md) for rationale.
 
 ### What it receives
 
@@ -3038,22 +3040,22 @@ The Notifications context owns all customer-facing transactional communication �
 
 ### What it publishes
 
-- `NotificationQueued` — notification scheduled for delivery (internal tracking)
-- `NotificationDelivered` — message successfully delivered by provider
-- `NotificationFailed` — delivery failed; includes reason and retry count
+- `CorrespondenceQueued` — correspondence scheduled for delivery (internal tracking)
+- `CorrespondenceDelivered` — message successfully delivered by provider
+- `CorrespondenceFailed` — delivery failed; includes reason and retry count
 
 ### Core Invariants
 
-- A notification cannot be sent to an opted-out channel (check preferences before dispatch)
-- Notification delivery must be idempotent — re-processing an event must not send duplicate messages
-- Failed notifications must be retried with exponential backoff before marking as permanently failed
-- Notification content must never include raw payment details (PCI compliance)
+- Correspondence cannot be sent to an opted-out channel (check preferences before dispatch)
+- Correspondence delivery must be idempotent — re-processing an event must not send duplicate messages
+- Failed correspondence must be retried with exponential backoff before marking as permanently failed
+- Correspondence content must never include raw payment details (PCI compliance)
 
 ### What it doesn't own
 
 - Real-time in-app updates (Customer Experience BC via SignalR — see ADR 0013)
 - Marketing/promotional email campaigns (Promotions BC or a future Marketing BC)
-- Notification preference storage — preferences live in Customer Identity BC
+- Customer communication preferences — preferences live in Customer Identity BC
 - Template content management (could be a future content management concern)
 
 ### Integration Flows
@@ -3064,7 +3066,7 @@ OrderPlaced (from Orders via RabbitMQ)
       ├─> Query Customer Identity: GET /api/customers/{customerId} (email address + prefs)
       ├─> Compose order confirmation email (order summary, items, shipping address)
       └─> Send via email provider (SendGrid, Postmark, etc.)
-          └─> NotificationDelivered OR NotificationFailed
+          └─> CorrespondenceDelivered OR CorrespondenceFailed
 
 ShipmentDispatched (from Fulfillment via RabbitMQ)
   └─> ShipmentDispatchedNotificationHandler
@@ -3076,7 +3078,7 @@ ShipmentDispatched (from Fulfillment via RabbitMQ)
 ### Key Design Decisions
 
 - **Idempotency:** Handler stores `MessageId` to prevent duplicate sends (at-least-once delivery guarantee from Wolverine)
-- **Channel abstraction:** `INotificationChannel` interface (email, SMS, push) — swap providers without changing handlers
+- **Channel abstraction:** `ICorrespondenceChannel` interface (email, SMS, push) — swap providers without changing handlers
 - **Template rendering:** Razor templates or external template service (Sendgrid Dynamic Templates) for rich HTML emails
 - **Preference check:** Always consult Customer Identity BC before dispatching — never cache preferences
 
@@ -3324,7 +3326,7 @@ The Store Credit context maintains an immutable ledger of credit balances per cu
 
 **Why this matters:** Offering store credit instead of a cash refund on returns tends to have strong acceptance rates in e-commerce (industry benchmarks suggest the majority of customers will accept store credit when the amount is at or above refund parity). This keeps money in the CritterSupply ecosystem, drives repeat purchases, and reduces the net cost of the returns program. It also unlocks gift cards and referral bonuses as growth mechanics. The Returns BC spec already identifies store credit as a future feature — this BC is the logical next step after Returns is live.
 
-**Priority:** 🟢 Low — high retention value; requires Returns BC to be live first. Lower priority than acquiring new customers (Notifications, Pricing, Promotions) but high impact on repeat-purchase retention.
+**Priority:** 🟢 Low — high retention value; requires Returns BC to be live first. Lower priority than acquiring new customers (Correspondence, Pricing, Promotions) but high impact on repeat-purchase retention.
 
 ### What it receives
 
@@ -3343,7 +3345,7 @@ The Store Credit context maintains an immutable ledger of credit balances per cu
 
 - `StoreCreditIssued` — credit added to customer account (Customer Experience may notify customer)
 - `StoreCreditApplied` — credit deducted at checkout (Orders uses to adjust Payments charge)
-- `StoreCreditExpired` — credit lapsed; customer may be notified by Notifications BC
+- `StoreCreditExpired` — credit lapsed; customer may be notified by Correspondence BC
 - `StoreCreditBalanceUpdated` — current balance changed (Customer Experience may display)
 
 ### Core Invariants
@@ -4066,7 +4068,7 @@ The Reviews context owns customer product ratings and reviews — the social pro
 
 **Status:** 📋 Future — lower priority than transactional and commercial infrastructure.
 
-**Key concepts:** `ReviewSubmitted`, `ReviewApproved` / `ReviewRejected` (moderation), `ReviewFlagged`, star rating aggregate per SKU. Integration with Notifications BC (trigger review request after `ShipmentDelivered`), Product Catalog BC (display average rating on listings).
+**Key concepts:** `ReviewSubmitted`, `ReviewApproved` / `ReviewRejected` (moderation), `ReviewFlagged`, star rating aggregate per SKU. Integration with Correspondence BC (trigger review request after `ShipmentDelivered`), Product Catalog BC (display average rating on listings).
 
 ---
 

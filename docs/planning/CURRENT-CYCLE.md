@@ -60,7 +60,7 @@
 - [Phase 3 Retrospective](cycles/cycle-27-returns-bc-phase-3-retrospective.md)
 
 **Next cycles (roadmap):**
-- **Cycle 28:** Notifications BC Phase 1 — Transactional email (OrderPlaced, ShipmentDispatched, Returns events)
+- **Cycle 28:** Correspondence BC Phase 1 — Transactional email (OrderPlaced, ShipmentDispatched, Returns events)
 - **Cycle 29:** Promotions BC Phase 1 — Coupons and discounts; RBAC ADR for Admin Portal
 - **Cycle 30+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
 
@@ -179,7 +179,7 @@
 
 > **See** [`docs/planning/cycles/cycle-27-returns-bc-phase-3-retrospective.md`](cycles/cycle-27-returns-bc-phase-3-retrospective.md) for Phase 4 priorities agreed in the Cycle 27 retrospective.
 
-- **Cycle 28:** Notifications BC Phase 1 — Transactional email
+- **Cycle 28:** Correspondence BC Phase 1 — Transactional email
   - Phase 1a: `OrderPlaced`, `ShipmentDispatched` (existing BC events)
   - Phase 1b: Returns events (`ReturnApproved`, `ReturnDenied`, `ReturnCompleted`, `ReturnExpired`, `ReturnReceived`, `ReturnRejected`)
 
@@ -196,7 +196,7 @@
 ### Future BCs (Priority Roadmap)
 
 **High Priority (Customer-Facing Gaps):**
-- 🔴 **Notifications BC** — Transactional emails, SMS, push notifications *(Cycle 28)*
+- 🔴 **Correspondence BC** — Transactional emails, SMS, push notifications *(Cycle 28)*
 - 🔴 **Promotions BC** — Discount codes, percentage-off campaigns, BOGO *(Cycle 29)*
 - 🔴 **Exchange v2** — Cross-product exchanges, upcharge payment collection *(future)*
 
