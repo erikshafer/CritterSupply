@@ -48,7 +48,7 @@ Project state lives in GitHub's cloud, not in local files. Any machine with the 
 - See [GITHUB-ACCESS-GUIDE.md](./docs/planning/GITHUB-ACCESS-GUIDE.md) for complete setup instructions (PAT creation, MCP config JSON, domain allowlist, verification checklist)
 
 **Legacy Markdown (Read-Only Archives):**
-- **[docs/planning/CYCLES.md](./docs/planning/CYCLES.md)** — Historical cycle records (Cycles 1–18); **deprecated for new cycles**
+- **[docs/planning/CYCLES.md](./docs/planning/CYCLES.md)** — Historical cycle records (Cycles 1–18); **deprecated and outdated** — use CURRENT-CYCLE.md for active cycle tracking
 - **[docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md)** — Historical backlog; **deprecated** (items migrated to GitHub Issues)
 - **[docs/planning/cycles/](./docs/planning/cycles/)** — Per-cycle retrospective docs; still created as markdown after each cycle
 
@@ -187,7 +187,7 @@ docs/features/
 
 **DEVPROGRESS.md** — Deprecated as of 2026-02-04. Kept for historical reference only.
 
-**docs/planning/CYCLES.md** — Deprecated for new cycles as of 2026-02-23 (migration to GitHub Issues). Kept as historical archive (Cycles 1–18).
+**docs/planning/CYCLES.md** — Deprecated as of 2026-02-23 and no longer maintained. Use **CURRENT-CYCLE.md** for active cycle tracking. CYCLES.md kept as historical archive (Cycles 1–18) but is outdated.
 
 **docs/planning/BACKLOG.md** — Deprecated as of 2026-02-23 (migrated to GitHub Issues). Kept as historical reference.
 

@@ -167,7 +167,7 @@ When discussing CritterSupply architecture with me, reference these documents:
 
 - **[CONTEXTS.md](../../CONTEXTS.md)**: Source of truth for bounded context definitions, event lifecycles, integration flows
 - **[docs/decisions/](../../docs/decisions/)**: ADRs explaining architectural choices
-- **[docs/planning/CYCLES.md](../../docs/planning/CYCLES.md)**: Current and recent development cycles
+- **[docs/planning/CURRENT-CYCLE.md](../../docs/planning/CURRENT-CYCLE.md)**: Current and recent development cycles
 - **[docs/features/](../../docs/features/)**: Gherkin feature files (BDD specifications)
 - **[CLAUDE.md](../../CLAUDE.md)**: Development guidelines (useful for context, but I'm not here to enforce coding standards)
 

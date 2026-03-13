@@ -230,6 +230,6 @@ Create video tutorials demonstrating CritterSupply patterns.
 
 ## Notes
 
-- Items move from backlog to CYCLES.md when scheduled
+- Items move from backlog to CURRENT-CYCLE.md when scheduled
 - Priority: High (next 1-2 cycles), Medium (3-6 cycles), Low (nice to have)
 - Effort: Estimated in 2-hour sessions

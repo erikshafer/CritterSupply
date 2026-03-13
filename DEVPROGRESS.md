@@ -3,7 +3,7 @@
 > **⚠️ DEPRECATION NOTICE (2026-02-04):**
 > This file is being phased out in favor of a more modular documentation structure.
 > **Please see the new documentation:**
-> - **Active Cycles & Progress:** [docs/planning/CYCLES.md](./docs/planning/CYCLES.md)
+> - **Active Cycles & Progress:** [docs/planning/CURRENT-CYCLE.md](./docs/planning/CURRENT-CYCLE.md)
 > - **Detailed Cycle Plans:** [docs/planning/cycles/](./docs/planning/cycles/)
 > - **Architectural Decisions (ADRs):** [docs/decisions/](./docs/decisions/)
 > - **BDD Feature Specifications:** [docs/features/](./docs/features/)
