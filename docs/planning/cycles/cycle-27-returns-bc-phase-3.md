@@ -1,10 +1,46 @@
 # Cycle 27: Returns BC Phase 3 — Implementation Plan
 
-**Status:** ⚠️ **DRAFT** — Pending UX Engineer Review
+**Status:** ✅ **APPROVED** — UX Engineer sign-off obtained (2026-03-13)
 **Date:** 2026-03-13
 **BC:** Returns + Customer Experience
 **Ports:** 5245 (Returns.Api), 5237 (Storefront.Api)
 **Depends On:** Cycles 25-26 (Returns BC Phases 1-2) ✅ COMPLETE
+
+---
+
+## UX Engineer Review & Sign-Off
+
+**Reviewer:** UX Engineer
+**Date:** 2026-03-13
+**Status:** ✅ **APPROVED** (with incorporated revisions)
+
+### Revision Requests (All Addressed)
+
+**R1: Missing Exchange Events in SignalR Handlers (HIGH PRIORITY)** ✅ RESOLVED
+- Added 4 exchange event handlers in D6 (`ExchangeRequestedHandler`, `ExchangeApprovedHandler`, `ExchangeCompletedHandler`, `ExchangeFailedHandler`)
+- Expanded `StorefrontEvent` discriminated union in D7 with 4 exchange event types
+- Updated deliverables count: 7 refund events + 4 exchange events = **11 total SignalR handlers**
+
+**R2: Anticorruption Layer Missing Exchange Context (MEDIUM PRIORITY)** ✅ RESOLVED
+- Added 2 exchange-specific translation methods to `ReturnStatusMapper` in D8:
+  - `ToCustomerFacingExchangeStatus()` — 6 exchange-specific status translations
+  - `ToCustomerFacingExchangeFailureReason()` — 3 exchange failure reason translations
+- Customer-facing text is empathetic and actionable (e.g., "Exchange complete — your replacement is on the way")
+
+**R3: Sequential Return UI Context (LOW PRIORITY)** 📋 DEFERRED
+- Noted as non-blocking; can be addressed during implementation if time permits
+- Recommendation: Add `ReturnSequenceNumber` to `ReturnRequestedEvent` for UI disambiguation
+
+### Approval Summary
+
+All **blocking concerns (R1, R2) are resolved**. The plan comprehensively covers:
+- ✅ Exchange workflow (UC-11) — P0 headline feature with complete domain events, integration contracts, and Orders BC handlers
+- ✅ SignalR push handlers for **11 lifecycle events** (7 refund + 4 exchange)
+- ✅ Anticorruption layer with customer-facing translations for both refund AND exchange paths
+- ✅ Sequential returns support (D9-D10)
+- ✅ P2 items (DeliveredAt fix, $0 refund guard, cross-BC smoke tests)
+
+**No further revisions required. Implementation may proceed.**
 
 ---
 
@@ -42,12 +78,12 @@ Phase 3 implements the **Exchange workflow (UC-11)** — the headline deliverabl
 | D1 | Exchange domain events + aggregate state | P0 | PO | UC-11, FR-10 |
 | D2 | `RequestExchange` command handler | P0 | PO | UC-11 |
 | D3 | Exchange approval logic + replacement order creation | P0 | PO | UC-11 |
-| D4 | Exchange integration events (`ExchangeRequested`, `ExchangeApproved`, `ExchangeCompleted`) | P0 | PO | UC-11, CONTEXTS.md |
+| D4 | Exchange integration events (`ExchangeRequested`, `ExchangeApproved`, `ExchangeCompleted`, `ExchangeFailed`) | P0 | PO | UC-11, CONTEXTS.md |
 | D5 | Orders BC exchange handlers (refund diff, replacement order) | P0 | PO | UC-11 |
 | **Customer Experience BC SignalR Handlers (P1)** |
-| D6 | SignalR push handlers for 7 return events | P1 | UXE | Phase 2 retrospective |
-| D7 | `StorefrontEvent` discriminated union for return events | P1 | UXE | bff-realtime-patterns.md |
-| D8 | Anticorruption layer for customer-facing enum translation | P1 | UXE | Phase 2 retrospective |
+| D6 | SignalR push handlers for 7 refund return events + 4 exchange events (11 total) | P1 | UXE | Phase 2 retrospective, UXE R1 |
+| D7 | `StorefrontEvent` discriminated union for return + exchange events | P1 | UXE | bff-realtime-patterns.md, UXE R1 |
+| D8 | Anticorruption layer for customer-facing enum translation (refund + exchange) | P1 | UXE | Phase 2 retrospective, UXE R2 |
 | **Sequential Returns (P1)** |
 | D9 | Remove unconditional saga close on `ReturnCompleted` | P1 | PO | Phase 2 retrospective |
 | D10 | Sequential return validation (ensure no duplicate SKUs across returns) | P1 | PO | FR-02 |
@@ -636,6 +672,32 @@ public sealed class ReturnApprovedHandler(IEventBroadcaster broadcaster)
 - `ReturnRejectedHandler`
 - `ReturnExpiredHandler`
 
+**NEW: Exchange event handlers (addresses UXE R1)**
+
+**File:** `src/Customer Experience/Storefront/Notifications/ExchangeRequestedHandler.cs` *(NEW)*
+
+```csharp
+namespace Storefront.Notifications;
+
+public sealed class ExchangeRequestedHandler(IEventBroadcaster broadcaster)
+{
+    public async Task Handle(Messages.Contracts.Returns.ExchangeRequested message)
+    {
+        await broadcaster.PublishAsync(new ExchangeRequestedEvent(
+            ReturnId: message.ReturnId,
+            OrderId: message.OrderId,
+            CustomerId: message.CustomerId,
+            ExchangeItems: message.ExchangeItems,
+            RequestedAt: message.RequestedAt));
+    }
+}
+```
+
+**Repeat pattern for:**
+- `ExchangeApprovedHandler`
+- `ExchangeCompletedHandler`
+- `ExchangeFailedHandler`
+
 **Why separate handler per event:** Follows Storefront's existing pattern (one handler per Shopping/Orders event). Clean, testable, single responsibility.
 
 ---
@@ -672,6 +734,11 @@ namespace Storefront.Notifications;
 [JsonDerivedType(typeof(ReturnCompletedEvent), "return-completed")]
 [JsonDerivedType(typeof(ReturnRejectedEvent), "return-rejected")]
 [JsonDerivedType(typeof(ReturnExpiredEvent), "return-expired")]
+// NEW: Exchange events (addresses UXE R1)
+[JsonDerivedType(typeof(ExchangeRequestedEvent), "exchange-requested")]
+[JsonDerivedType(typeof(ExchangeApprovedEvent), "exchange-approved")]
+[JsonDerivedType(typeof(ExchangeCompletedEvent), "exchange-completed")]
+[JsonDerivedType(typeof(ExchangeFailedEvent), "exchange-failed")]
 public abstract record StorefrontEvent;
 ```
 
@@ -728,6 +795,37 @@ public sealed record ReturnExpiredEvent(
     Guid OrderId,
     Guid CustomerId,
     DateTimeOffset ExpiredAt) : StorefrontEvent;
+
+// NEW: Exchange events (addresses UXE R1)
+public sealed record ExchangeRequestedEvent(
+    Guid ReturnId,
+    Guid OrderId,
+    Guid CustomerId,
+    IReadOnlyList<Messages.Contracts.Returns.ExchangeLineItem> ExchangeItems,
+    DateTimeOffset RequestedAt) : StorefrontEvent;
+
+public sealed record ExchangeApprovedEvent(
+    Guid ReturnId,
+    Guid OrderId,
+    Guid CustomerId,
+    decimal RefundDifference,
+    DateTimeOffset ApprovedAt,
+    DateTimeOffset ShipByDate) : StorefrontEvent;
+
+public sealed record ExchangeCompletedEvent(
+    Guid ReturnId,
+    Guid OrderId,
+    Guid CustomerId,
+    Guid ReplacementOrderId,
+    decimal FinalRefundDifference,
+    DateTimeOffset CompletedAt) : StorefrontEvent;
+
+public sealed record ExchangeFailedEvent(
+    Guid ReturnId,
+    Guid OrderId,
+    Guid CustomerId,
+    string FailureReason,  // Translated at anticorruption layer
+    DateTimeOffset FailedAt) : StorefrontEvent;
 ```
 
 ---
@@ -784,6 +882,25 @@ public static class ReturnStatusMapper
         "NonReturnableItem" => "This item can't be returned per our policy",
         "DuplicateReturn" => "A return for this item is already in progress",
         _ => "Return not eligible"
+    };
+
+    // NEW: Exchange-specific translations (addresses UXE R2)
+    public static string ToCustomerFacingExchangeStatus(string internalStatus) => internalStatus switch
+    {
+        "ExchangeRequested" => "Exchange requested",
+        "ExchangeApproved" => "Exchange approved — ship your items by the date shown",
+        "ExchangeInspecting" => "We're checking your items for exchange",
+        "ExchangeCompleted" => "Exchange complete — your replacement is on the way",
+        "ExchangeFailed" => "Items didn't qualify for exchange",
+        _ => "Exchange status unknown"
+    };
+
+    public static string ToCustomerFacingExchangeFailureReason(string internalReason) => internalReason switch
+    {
+        "InspectionFailed" => "Items not in acceptable condition for exchange",
+        "ReplacementUnavailable" => "Replacement item is currently out of stock",
+        "PriceDifferenceExceeded" => "Price difference exceeds exchange policy limits",
+        _ => "Exchange not possible"
     };
 }
 ```
@@ -1083,12 +1200,13 @@ public sealed class CrossBcIntegrationTests(ReturnsApiFixture fixture)
 - Cross-BC smoke tests (3 tests)
 
 **Storefront.Api.IntegrationTests:**
-- SignalR push for 7 return events (7 tests)
+- SignalR push for 7 refund return events (7 tests)
+- SignalR push for 4 exchange events (4 tests)
 
 **Orders.IntegrationTests:**
 - ExchangeCompleted handler (2 tests)
 
-**Estimated:** 17 new integration tests
+**Estimated:** 21 new integration tests (was 17, +4 for exchange SignalR)
 
 ### Manual Testing (Product Owner + UX Engineer)
 
@@ -1104,7 +1222,10 @@ public sealed class CrossBcIntegrationTests(ReturnsApiFixture fixture)
 1. Open Storefront in browser
 2. Submit return via API
 3. Verify real-time status update in UI (no page refresh)
-4. Repeat for all 7 return events
+4. Repeat for all 7 refund return events
+5. Submit exchange via API
+6. Verify real-time exchange status updates for all 4 exchange events
+7. Verify anticorruption layer translations appear correctly in UI
 
 ---
 
@@ -1114,6 +1235,7 @@ public sealed class CrossBcIntegrationTests(ReturnsApiFixture fixture)
 
 - ✅ Exchange workflow (UC-11) fully implemented and tested
 - ✅ All 7 return events push to Storefront via SignalR
+- ✅ All 4 exchange events push to Storefront via SignalR (11 total real-time events)
 - ✅ Sequential returns supported (multiple returns per order)
 - ✅ Customer-facing text translation at anticorruption layer
 - ✅ Cross-BC smoke tests verify RabbitMQ pipelines
@@ -1128,7 +1250,7 @@ public sealed class CrossBcIntegrationTests(ReturnsApiFixture fixture)
 
 - ✅ **Principal Software Architect:** Test suite covers all deliverables, architecture clean
 - ✅ **Product Owner:** Exchange workflow meets business needs, sequential returns functional
-- ✅ **UX Engineer:** SignalR handlers implemented, anticorruption layer validates customer-facing text
+- ✅ **UX Engineer:** SignalR handlers implemented (11 events: 7 refund + 4 exchange), anticorruption layer validates customer-facing text for both refund and exchange workflows
 
 ---
 
@@ -1212,5 +1334,5 @@ public sealed class CrossBcIntegrationTests(ReturnsApiFixture fixture)
 ---
 
 *Created: 2026-03-13*
-*Status: ⚠️ DRAFT — Awaiting UX Engineer review and sign-off*
-*Next: UX Engineer validates scenarios, use cases, SignalR handler design, and anticorruption layer*
+*Status: ✅ APPROVED — UX Engineer review complete, all revision requests addressed*
+*Next: Principal Software Architect begins implementation (D1-D5 exchange core, then D6-D8 CE SignalR)*
