@@ -176,6 +176,7 @@ npm install -g @shopify/cli@latest
 shopify app dev --client-id {your-app-id}
 
 # Or trigger test webhook events manually
+# Port 5247 is the Marketplaces.Api port per CLAUDE.md port allocation table
 shopify webhook trigger \
   --topic orders/create \
   --delivery-method http \

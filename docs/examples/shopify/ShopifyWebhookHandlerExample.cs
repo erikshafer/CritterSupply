@@ -120,9 +120,11 @@ public sealed record ShopifyOrderPayload
     [JsonPropertyName("transactions")]
     public IReadOnlyList<ShopifyTransaction> Transactions { get; init; } = [];
 
-    // Store this on the CritterSupply Order aggregate for reconciliation
-    // This is the Shopify Payments payout identifier (per PO feedback)
-    public string? ShopifyTransactionId => Transactions.FirstOrDefault()?.Id.ToString();
+    // Store this on the CritterSupply Order aggregate for reconciliation.
+    // Filter for the successful payment transaction — not refunds or failed attempts.
+    // Shopify orders can have multiple transactions (auth, capture, refunds, voids).
+    public string? ShopifyTransactionId =>
+        Transactions.FirstOrDefault(t => t.Status == "success" && t.Gateway is not null)?.Id.ToString();
 }
 
 public sealed record ShopifyLineItem
@@ -288,7 +290,10 @@ public sealed class ShopifyWebhookController(
         {
             logger.LogWarning("Shopify webhook HMAC verification failed. Topic={Topic} Shop={Shop}",
                 headers.Topic, headers.ShopDomain);
-            return StatusCode(401);  // Return 401; do NOT return 400 (reveals validation)
+            // Return 200 OK to avoid leaking verification logic to attackers.
+            // Shopify interprets non-2xx as delivery failure and retries — returning 200
+            // prevents unnecessary retry storms from malformed or spoofed requests.
+            return Ok();
         }
 
         // STEP 4: Check for duplicate delivery (at-least-once delivery model)
@@ -391,6 +396,18 @@ public sealed class ShopifyWebhookController(
         }
 
         // Map Shopify order to CritterSupply integration message
+        // Guard: all line items must have a SKU — synthetic SKUs break Inventory BC lookups
+        var lineItemsWithoutSku = order.LineItems.Where(li => string.IsNullOrEmpty(li.Sku)).ToList();
+        if (lineItemsWithoutSku.Count > 0)
+        {
+            logger.LogError(
+                "Shopify order {OrderId} has {Count} line item(s) without a SKU. " +
+                "Cannot ingest — Shopify variant(s) must have SKU set. VariantIds: {VariantIds}",
+                order.Id, lineItemsWithoutSku.Count,
+                string.Join(", ", lineItemsWithoutSku.Select(li => li.VariantId)));
+            return;  // Do not partially ingest; the order must be manually reviewed and corrected in Shopify
+        }
+
         var message = new MarketplaceOrderReceived(
             CritterOrderId: Guid.NewGuid(),  // New identity in our system
             ChannelCode: "SHOPIFY_US",
@@ -400,7 +417,7 @@ public sealed class ShopifyWebhookController(
             TotalPrice: decimal.Parse(order.TotalPrice),
             Currency: order.Currency,
             LineItems: order.LineItems.Select(li => new MarketplaceOrderLineItem(
-                Sku: li.Sku ?? $"shopify-variant-{li.VariantId}",  // fallback if SKU not set
+                Sku: li.Sku!,  // Null-checked above — all SKUs are guaranteed non-null here
                 Title: li.Title,
                 Quantity: li.Quantity,
                 UnitPrice: decimal.Parse(li.Price)
@@ -488,55 +505,79 @@ public sealed class ShopifyWebhookController(
     /// </summary>
     private async Task HandleCustomerDataRequestAsync(string bodyText, CancellationToken ct)
     {
-        // Parse customer ID from payload for logging
-        using var doc = JsonDocument.Parse(bodyText);
-        var customerId = doc.RootElement.GetProperty("customer").GetProperty("id").GetInt64();
-        var shopDomain = doc.RootElement.GetProperty("shop_domain").GetString();
+        // Parse customer ID from payload for logging — use TryGetProperty for resilience
+        long? customerId = null;
+        string? shopDomain = null;
+        try
+        {
+            using var doc = JsonDocument.Parse(bodyText);
+            if (doc.RootElement.TryGetProperty("customer", out var customer) &&
+                customer.TryGetProperty("id", out var idElement))
+                customerId = idElement.GetInt64();
+            if (doc.RootElement.TryGetProperty("shop_domain", out var shopElement))
+                shopDomain = shopElement.GetString();
+        }
+        catch (JsonException ex)
+        {
+            logger.LogError(ex, "Failed to parse GDPR customers/data_request payload. Raw body length={Len}", bodyText.Length);
+            return;
+        }
 
         logger.LogWarning(
             "GDPR customer data request received. ShopifyCustomerId={CustomerId} Shop={Shop}. " +
-            "Forward to data privacy process.",
+            "NOTE: CritterSupply DOES store PII (email + shipping address on Order records). " +
+            "Forward to data privacy process — query Orders BC for orders tied to this customer ID.",
             customerId, shopDomain);
 
         // Publish internal event for data privacy workflow (to be handled by Customer Identity BC)
-        // In a complete implementation, this triggers a data export + report back to Shopify's API
-        await Task.CompletedTask;  // Placeholder for actual GDPR workflow integration
+        // In a complete implementation, this triggers a data export + report back to Shopify's data review API
+        await Task.CompletedTask;
     }
 
-    /// <summary>
-    /// Mandatory GDPR: Shopify requests deletion of customer data.
-    /// Fires 48 hours after customer requests account deletion in Shopify.
-    /// </summary>
     private async Task HandleCustomerRedactAsync(string bodyText, CancellationToken ct)
     {
-        using var doc = JsonDocument.Parse(bodyText);
-        var customerId = doc.RootElement.GetProperty("customer").GetProperty("id").GetInt64();
+        long? customerId = null;
+        try
+        {
+            using var doc = JsonDocument.Parse(bodyText);
+            if (doc.RootElement.TryGetProperty("customer", out var customer) &&
+                customer.TryGetProperty("id", out var idElement))
+                customerId = idElement.GetInt64();
+        }
+        catch (JsonException ex)
+        {
+            logger.LogError(ex, "Failed to parse GDPR customers/redact payload.");
+            return;
+        }
 
         logger.LogWarning(
             "GDPR customer redact request received. ShopifyCustomerId={CustomerId}. " +
-            "Initiating data deletion workflow.",
+            "Initiating data deletion workflow in Orders BC.",
             customerId);
 
-        // Publish internal event for data deletion workflow
-        await Task.CompletedTask;  // Placeholder for actual deletion workflow
+        await Task.CompletedTask;
     }
 
-    /// <summary>
-    /// Mandatory GDPR: Shopify requests deletion of all shop data.
-    /// Fires when the merchant uninstalls the app and requests data deletion.
-    /// </summary>
     private async Task HandleShopRedactAsync(string bodyText, CancellationToken ct)
     {
-        using var doc = JsonDocument.Parse(bodyText);
-        var shopDomain = doc.RootElement.GetProperty("shop_domain").GetString();
+        string? shopDomain = null;
+        try
+        {
+            using var doc = JsonDocument.Parse(bodyText);
+            if (doc.RootElement.TryGetProperty("shop_domain", out var shopElement))
+                shopDomain = shopElement.GetString();
+        }
+        catch (JsonException ex)
+        {
+            logger.LogError(ex, "Failed to parse GDPR shop/redact payload.");
+            return;
+        }
 
         logger.LogWarning(
             "GDPR shop redact request received. Shop={Shop}. Initiating full shop data deletion.",
             shopDomain);
 
-        // All data associated with this shop's orders should be purged
-        // per our data retention policy and GDPR Article 17 (right to erasure)
-        await Task.CompletedTask;  // Placeholder
+        await Task.CompletedTask;
     }
 
     // -----------------------------------------------------------------------

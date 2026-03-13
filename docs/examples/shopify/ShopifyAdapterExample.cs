@@ -208,7 +208,11 @@ public sealed record ListingVariant(
     double WeightPounds,
     string? Barcode,
     bool IsHazmat,
-    string? HazmatClass);
+    string? HazmatClass,
+    IReadOnlyList<VariantOptionValue>? OptionValues = null);
+
+/// <summary>Maps a variant to a specific option selection (e.g., Size=5lb, Flavor=Salmon).</summary>
+public sealed record VariantOptionValue(string OptionName, string Value);
 
 public sealed record SubmissionResult(bool Success, string? ChannelProductId, IReadOnlyList<string> Errors);
 public sealed record DeactivationResult(bool Success, IReadOnlyList<string> Errors);
@@ -301,6 +305,7 @@ public sealed class ShopifyAdapter(
                 tags = listing.Tags,
                 // Options are derived from variant structure. For pet food example:
                 // ProductVariants with different sizes → Option: "Size" with values
+                // options must be declared separately; optionValues on each variant references them
                 variants = listing.Variants.Select(v => new
                 {
                     sku = v.Sku,
@@ -314,6 +319,12 @@ public sealed class ShopifyAdapter(
                     // DENY: never allow overselling. Pet food orders are often subscription-critical.
                     inventoryPolicy = "DENY",
                     inventoryManagement = "SHOPIFY",
+                    // optionValues maps this variant to specific option selections (e.g., Size=5lb).
+                    // Populated from the variant's option attributes in the real implementation.
+                    // Without this, Shopify cannot associate variants with options.
+                    // Example: optionValues = [ { optionName: "Size", name: v.SizeName } ]
+                    optionValues = v.OptionValues?.Select(o => new { optionName = o.OptionName, name = o.Value })
+                                   ?? Array.Empty<object>(),
                     // Compliance metafields (elevated to P1 by PO review)
                     metafields = BuildComplianceMetafields(v)
                 })
@@ -633,14 +644,17 @@ public sealed class ShopifyAdapter(
                ?? throw new InvalidOperationException("Shopify returned null response");
     }
 
-    private static string? BuildTrackingUrl(string carrier, string trackingNumber) =>
-        carrier.ToUpperInvariant() switch
+    private static string? BuildTrackingUrl(string carrier, string trackingNumber)
+    {
+        var encoded = Uri.EscapeDataString(trackingNumber);
+        return carrier.ToUpperInvariant() switch
         {
-            "UPS" => $"https://www.ups.com/track?tracknum={trackingNumber}",
-            "FEDEX" => $"https://www.fedex.com/fedextrack/?trknbr={trackingNumber}",
-            "USPS" => $"https://tools.usps.com/go/TrackConfirmAction?qtc_tLabels1={trackingNumber}",
+            "UPS" => $"https://www.ups.com/track?tracknum={encoded}",
+            "FEDEX" => $"https://www.fedex.com/fedextrack/?trknbr={encoded}",
+            "USPS" => $"https://tools.usps.com/go/TrackConfirmAction?qtc_tLabels1={encoded}",
             _ => null
         };
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -11,7 +11,7 @@
 
 This document provides a comprehensive overview of Shopify's API structure and integration patterns to guide implementation of a production-ready Shopify channel adapter within CritterSupply's Marketplaces bounded context. The research was preceded by a Product Owner discovery session — PO feedback is captured at the end of this document.
 
-**Relationship Model:** CritterSupply operates a Shopify storefront as an **additional D2C sales channel** — `SHOPIFY_US` is a `ChannelCode` in our Marketplaces BC, alongside `AMAZON_US`, `WALMART_US`, and `OWN_WEBSITE`. This is distinct from our own Blazor-based Storefront, which remains our primary brand experience and reference architecture showcase. Shopify provides access to customers who discover products via Shopify's ecosystem, the Shop app, and social shopping integrations (Instagram Shop, TikTok Shopping).
+**Relationship Model:** CritterSupply operates a Shopify storefront as an **additional D2C sales channel** — `SHOPIFY_US` is a `ChannelCode` in our Marketplaces BC, alongside `AMAZON_US`, `WALMART_US`, and `OWN_WEBSITE`. The Shopify storefront is a separate consumer-facing URL (e.g., `critter-supply.myshopify.com`) marketed under the same CritterSupply brand. It is not a replacement for our own Blazor Storefront (`Storefront.Web`), which remains the primary brand experience and reference architecture showcase. Shopify provides access to customers who discover products via Shopify's ecosystem, the Shop app, and social shopping integrations (Instagram Shop, TikTok Shopping).
 
 **Key Findings:**
 - Shopify's **GraphQL Admin API** is the recommended path for new integrations; the REST Admin API's Product endpoints were deprecated as of API version `2024-04`
@@ -131,6 +131,8 @@ ProductVariant ──1:1── InventoryItem ──1:N── InventoryLevel
                                                └─ Location B: qty=12
 ```
 
+**Note on location selection:** Shopify decrements the location with the lowest numeric ID at order placement. CritterSupply starts with a single warehouse location — in the single-location case, there is no ambiguity about which location Shopify decrements. When multi-location support is added (Section 11.2 deferred), the adapter must specify the correct `locationId` in all inventory sync calls.
+
 **Critical behavior — Dual-Decrement Problem:** When an order is placed on Shopify, Shopify **automatically decrements** its own inventory counter at the location with the lowest ID. When CritterSupply then ingests the order and our Inventory BC creates a reservation, that is a **second decrement** of the same stock. This creates a race condition:
 
 ```
@@ -203,7 +205,7 @@ A Shopify `Order` represents a completed customer purchase. For CritterSupply's 
 
 **Critical distinction:** The `financialStatus` is already `PAID` when we receive the order. Shopify collects payment at checkout — see [Section 6: The Payment Seam](#6-the-payment-seam).
 
-**Payment holds:** Some Shopify orders arrive with `financialStatus: "pending"` when the payment is under fraud review. **Do not ingest these as CritterSupply orders.** The webhook handler must check `financialStatus === "paid"` before proceeding. Subscribe to `orders/updated` to re-trigger ingestion when a held order's status later transitions to `"paid"`. This edge case must be handled, not silently ignored.
+**Payment holds:** Some Shopify orders arrive with `financialStatus: "pending"` when the payment is under fraud review. **Do not ingest these as CritterSupply orders.** The webhook handler must check `financialStatus === "paid"` before proceeding. Subscribe to `orders/updated` to re-trigger ingestion when a held order's status later transitions to `"paid"`. **Expiry policy for stuck pending orders (requires pre-Cycle 35 decision, see Section 11.3):** if an order remains in `"pending"` status for more than 72 hours (Shopify's typical fraud review window), discard it and log a structured warning. CS staff can manually evaluate if needed.
 
 **Draft Order origin:** Orders in Shopify can be created manually by CS reps via Shopify's Draft Orders feature (for phone-in or goodwill orders). When a draft order is completed, Shopify fires the standard `orders/create` webhook with the same payload shape. The adapter does not need to distinguish draft-origin orders; they should be ingested identically. However, draft orders may have: zero shipping, manual discounts, or custom note fields that standard storefront orders don't carry. These additional fields don't affect ingestion but should be stored on the Order record's metadata for CS use.
 
@@ -764,6 +766,8 @@ When a customer requests a refund for a Shopify order, the refund is processed i
 
 **Note on deferral scope (corrected from initial draft):** The `refunds/create` webhook handler should be implemented in Cycle 35 as a "capture and store" operation — not fully deferred. Deferring the entire handler means we have no record that Shopify issued a refund, creating a reconciliation gap from day one. The Shopify Payments payout will reflect the refund; our Order record won't. Full Returns BC integration (processing the refund through our Returns flow) is deferred to Cycle 36. The handler itself is not.
 
+**Refund data structure (requires pre-Cycle 35 decision, see Section 11.3):** The captured `ShopifyRefundReceived` event data (Shopify refund transaction ID + amount) must be stored somewhere. Options: (a) on the Order aggregate as a `ShopifyRefunds` list — simplest, no new document; (b) a new Refund document in the Marketplaces BC; (c) an audit log table. This decision requires coordination with the Orders BC team before the `refunds/create` handler is implemented.
+
 ---
 
 ## 7. Rate Limits & Bulk Operations
@@ -1087,10 +1091,12 @@ These items are not implementation tasks — they are decisions, configurations,
 |------|-------|---------|
 | Write Payment Seam ADR (Option A formalized) | UX Engineer / Principal Architect | Before Cycle 35 planning |
 | Shopify development store set up; Location ID discovered | Engineering | Before Cycle 35 sprint day 1 |
-| `compareAtPrice` source of truth resolved (MSRP vs. MAP) | Product Owner + Product Catalog team | Before catalog sync implementation |
-| Reverse cancel propagation decision (build now vs. CS SOP) | Product Owner + CS Operations | Before Cycle 35 planning |
-| Smart Collections configured in Shopify dev store | Ops / Catalog Manager | Before Cycle 35 testing |
-| GDPR compliance posture — full procedure for data requests/deletion | Legal / Compliance | Before production launch |
+| `compareAtPrice` source of truth resolved (MSRP vs. MAP; see Section 4.1) | Product Owner + Product Catalog team | Before catalog sync implementation |
+| Pending order expiry policy defined (payment holds; see Section 1.4) | Product Owner + CS Operations | Before Cycle 35 planning |
+| Reverse cancel propagation decision (build now vs. CS SOP; see Section 6.4) | Product Owner + CS Operations | Before Cycle 35 planning |
+| Smart Collections configured in Shopify dev store (see Section 9.3) | Ops / Catalog Manager | Before Cycle 35 testing |
+| GDPR compliance procedure — data request + deletion formal process | Legal / Compliance + Customer Identity BC | Before production launch |
+| Refund capture data structure decided (Order aggregate vs. new document; see Section 6.5) | Engineering + Orders BC team | Before `refunds/create` implementation |
 
 ---
 
