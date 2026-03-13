@@ -166,6 +166,17 @@
     <Project Path="src/CritterSupply.AppHost/CritterSupply.AppHost.csproj" />
     <Project Path="src/CritterSupply.ServiceDefaults/CritterSupply.ServiceDefaults.csproj" />
   </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Correspondence/">
+    <Project Path="src/Correspondence/Correspondence.Api/Correspondence.Api.csproj" />
+    <Project Path="src/Correspondence/Correspondence/Correspondence.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/" />
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/Correspondence/">
+    <Project Path="tests/Correspondence/Correspondence.Api.IntegrationTests/Correspondence.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Correspondence/Correspondence.UnitTests/Correspondence.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/Vendor Identity/">
     <Project Path="src/Vendor Identity/VendorIdentity.Api/VendorIdentity.Api.csproj" />
     <Project Path="src/Vendor Identity/VendorIdentity/VendorIdentity.csproj" />
