@@ -72,7 +72,14 @@ public class CrossBcTestFixture : IAsyncLifetime
         {
             builder.ConfigureServices(services =>
             {
-                services.ConfigureMarten(opts => opts.Connection(_returnsPostgres.GetConnectionString()));
+                services.ConfigureMarten(opts =>
+                {
+                    opts.Connection(_returnsPostgres.GetConnectionString());
+
+                    // CRITICAL: Returns BC uses custom "returns" schema
+                    // Without this, documents are stored in default schema but Wolverine looks in "returns" schema
+                    opts.DatabaseSchemaName = "returns";
+                });
                 services.ConfigureWolverine(opts =>
                 {
                     opts.UseRabbitMq(rabbitMqUri);
@@ -89,7 +96,14 @@ public class CrossBcTestFixture : IAsyncLifetime
         {
             builder.ConfigureServices(services =>
             {
-                services.ConfigureMarten(opts => opts.Connection(_ordersPostgres.GetConnectionString()));
+                services.ConfigureMarten(opts =>
+                {
+                    opts.Connection(_ordersPostgres.GetConnectionString());
+
+                    // CRITICAL: Orders BC uses custom "orders" schema
+                    // Without this, saga documents are stored in default schema but Wolverine looks in "orders" schema
+                    opts.DatabaseSchemaName = "orders";
+                });
                 services.ConfigureWolverine(opts =>
                 {
                     opts.UseRabbitMq(rabbitMqUri);
@@ -112,7 +126,14 @@ public class CrossBcTestFixture : IAsyncLifetime
         {
             builder.ConfigureServices(services =>
             {
-                services.ConfigureMarten(opts => opts.Connection(_fulfillmentPostgres.GetConnectionString()));
+                services.ConfigureMarten(opts =>
+                {
+                    opts.Connection(_fulfillmentPostgres.GetConnectionString());
+
+                    // CRITICAL: Fulfillment BC uses custom "fulfillment" schema
+                    // Without this, documents are stored in default schema but Wolverine looks in "fulfillment" schema
+                    opts.DatabaseSchemaName = "fulfillment";
+                });
                 services.ConfigureWolverine(opts =>
                 {
                     opts.UseRabbitMq(rabbitMqUri);
@@ -261,5 +282,43 @@ public class CrossBcTestFixture : IAsyncLifetime
             {
                 return ctx.InvokeAsync(message);
             });
+    }
+
+    /// <summary>
+    /// Creates an Order saga by invoking CheckoutCompleted message directly on Orders BC.
+    /// IMPORTANT: Use this instead of publishing CheckoutCompleted via RabbitMQ, since Orders BC
+    /// routes CheckoutCompleted internally (not via RabbitMQ).
+    ///
+    /// Wolverine requires sagas to be created through message handling, not manual storage.
+    /// This method uses InvokeAsync directly (without tracking) to avoid waiting for cascading OrderPlaced messages.
+    /// </summary>
+    public async Task<Guid> CreateOrderSagaAsync(
+        Guid orderId,
+        Guid customerId,
+        Messages.Contracts.Shopping.CheckoutCompleted checkoutCompleted)
+    {
+        // Invoke CheckoutCompleted directly on Orders host WITHOUT tracking
+        // This triggers PlaceOrderHandler which returns (Order saga, OrderPlaced event)
+        // Wolverine will store the saga AND publish OrderPlaced to RabbitMQ
+        // We don't track because OrderPlaced goes to Inventory/Storefront BCs which aren't running in this fixture
+        using var scope = OrdersHost.Services.CreateScope();
+        var messageContext = scope.ServiceProvider.GetRequiredService<Wolverine.IMessageBus>();
+
+        try
+        {
+            await messageContext.InvokeAsync(checkoutCompleted);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Failed to create Order saga {orderId} via CheckoutCompleted message. " +
+                $"Handler invocation failed: {ex.Message}", ex);
+        }
+
+        // Give Wolverine/Marten a moment to persist the saga
+        // InvokeAsync commits the transaction, but we need to ensure it's flushed to database
+        await Task.Delay(500); // Increased to 500ms to ensure persistence
+
+        return orderId;
     }
 }

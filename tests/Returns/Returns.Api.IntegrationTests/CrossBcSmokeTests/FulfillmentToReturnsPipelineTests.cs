@@ -26,12 +26,9 @@ public class FulfillmentToReturnsPipelineTests(CrossBcTestFixture fixture)
         var deliveredAt = DateTimeOffset.UtcNow;
 
         // IMPORTANT: Create Order saga first (Orders BC also handles ShipmentDelivered)
-        // Without this, cross-BC message routing will fail when Orders handler tries to load saga
+        // CheckoutCompleted is internal routing, so create saga directly in database
         var checkoutCompleted = CreateCheckoutCompletedMessage(orderId, customerId);
-        await _fixture.ExecuteOnHostAndWaitAsync(
-            _fixture.OrdersHost,
-            checkoutCompleted,
-            timeoutSeconds: 30);
+        await _fixture.CreateOrderSagaAsync(orderId, customerId, checkoutCompleted);
 
         var shipmentDelivered = new ShipmentDelivered(
             orderId,
@@ -72,11 +69,9 @@ public class FulfillmentToReturnsPipelineTests(CrossBcTestFixture fixture)
         var firstDeliveredAt = DateTimeOffset.UtcNow.AddHours(-2);
 
         // IMPORTANT: Create Order saga first (Orders BC also handles ShipmentDelivered)
+        // CheckoutCompleted is internal routing, so create saga directly in database
         var checkoutCompleted = CreateCheckoutCompletedMessage(orderId, customerId);
-        await _fixture.ExecuteOnHostAndWaitAsync(
-            _fixture.OrdersHost,
-            checkoutCompleted,
-            timeoutSeconds: 30);
+        await _fixture.CreateOrderSagaAsync(orderId, customerId, checkoutCompleted);
 
         var firstMessage = new ShipmentDelivered(
             orderId,

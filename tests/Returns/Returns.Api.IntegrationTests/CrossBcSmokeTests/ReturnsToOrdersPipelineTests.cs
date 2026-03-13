@@ -26,10 +26,8 @@ public class ReturnsToOrdersPipelineTests(CrossBcTestFixture fixture)
         var customerId = Guid.CreateVersion7();
         var checkoutCompleted = CreateCheckoutCompletedMessage(orderId, customerId);
 
-        await _fixture.ExecuteOnHostAndWaitAsync(
-            _fixture.OrdersHost,
-            checkoutCompleted,
-            timeoutSeconds: 30);
+        // IMPORTANT: Create saga directly in database (CheckoutCompleted is internal routing, not RabbitMQ)
+        await _fixture.CreateOrderSagaAsync(orderId, customerId, checkoutCompleted);
 
         // Step 2: Deliver the shipment to get Order to Delivered status
         var shipmentDelivered = new Messages.Contracts.Fulfillment.ShipmentDelivered(
@@ -107,10 +105,8 @@ public class ReturnsToOrdersPipelineTests(CrossBcTestFixture fixture)
         var customerId = Guid.CreateVersion7();
         var checkoutCompleted = CreateCheckoutCompletedMessage(orderId, customerId);
 
-        await _fixture.ExecuteOnHostAndWaitAsync(
-            _fixture.OrdersHost,
-            checkoutCompleted,
-            timeoutSeconds: 30);
+        // IMPORTANT: Create saga directly in database (CheckoutCompleted is internal routing, not RabbitMQ)
+        await _fixture.CreateOrderSagaAsync(orderId, customerId, checkoutCompleted);
 
         // Step 2: Deliver the shipment
         var shipmentDelivered = new Messages.Contracts.Fulfillment.ShipmentDelivered(
