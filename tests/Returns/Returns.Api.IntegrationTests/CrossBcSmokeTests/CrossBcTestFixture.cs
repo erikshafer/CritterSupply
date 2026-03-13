@@ -78,6 +78,9 @@ public class CrossBcTestFixture : IAsyncLifetime
                     opts.UseRabbitMq(rabbitMqUri);
                     opts.Policies.AutoApplyTransactions();
                     opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
+
+                    // IMPORTANT: Include Returns domain assembly for handler discovery
+                    opts.Discovery.IncludeAssembly(typeof(Returns.Return).Assembly);
                 });
             });
         });
@@ -92,6 +95,15 @@ public class CrossBcTestFixture : IAsyncLifetime
                     opts.UseRabbitMq(rabbitMqUri);
                     opts.Policies.AutoApplyTransactions();
                     opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
+
+                    // IMPORTANT: Include Orders domain assembly for saga discovery
+                    // Without this, Wolverine won't find the Order saga and will throw UnknownSagaException
+                    // Use reflection to find the Orders assembly since we're using extern aliases
+                    var ordersAssembly = typeof(OrdersApi::Program).Assembly
+                        .GetReferencedAssemblies()
+                        .Select(Assembly.Load)
+                        .First(a => a.GetName().Name == "Orders");
+                    opts.Discovery.IncludeAssembly(ordersAssembly);
                 });
             });
         });
@@ -106,6 +118,14 @@ public class CrossBcTestFixture : IAsyncLifetime
                     opts.UseRabbitMq(rabbitMqUri);
                     opts.Policies.AutoApplyTransactions();
                     opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
+
+                    // IMPORTANT: Include Fulfillment domain assembly for handler discovery
+                    // Use reflection to find the Fulfillment assembly since we're using extern aliases
+                    var fulfillmentAssembly = typeof(FulfillmentApi::Program).Assembly
+                        .GetReferencedAssemblies()
+                        .Select(Assembly.Load)
+                        .First(a => a.GetName().Name == "Fulfillment");
+                    opts.Discovery.IncludeAssembly(fulfillmentAssembly);
                 });
             });
         });

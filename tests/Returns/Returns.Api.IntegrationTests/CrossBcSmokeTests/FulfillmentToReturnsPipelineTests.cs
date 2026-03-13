@@ -21,8 +21,17 @@ public class FulfillmentToReturnsPipelineTests(CrossBcTestFixture fixture)
         await _fixture.CleanAllDataAsync();
 
         var orderId = Guid.CreateVersion7();
+        var customerId = Guid.CreateVersion7();
         var shipmentId = Guid.CreateVersion7();
         var deliveredAt = DateTimeOffset.UtcNow;
+
+        // IMPORTANT: Create Order saga first (Orders BC also handles ShipmentDelivered)
+        // Without this, cross-BC message routing will fail when Orders handler tries to load saga
+        var checkoutCompleted = CreateCheckoutCompletedMessage(orderId, customerId);
+        await _fixture.ExecuteOnHostAndWaitAsync(
+            _fixture.OrdersHost,
+            checkoutCompleted,
+            timeoutSeconds: 30);
 
         var shipmentDelivered = new ShipmentDelivered(
             orderId,
@@ -58,8 +67,16 @@ public class FulfillmentToReturnsPipelineTests(CrossBcTestFixture fixture)
         await _fixture.CleanAllDataAsync();
 
         var orderId = Guid.CreateVersion7();
+        var customerId = Guid.CreateVersion7();
         var shipmentId = Guid.CreateVersion7();
         var firstDeliveredAt = DateTimeOffset.UtcNow.AddHours(-2);
+
+        // IMPORTANT: Create Order saga first (Orders BC also handles ShipmentDelivered)
+        var checkoutCompleted = CreateCheckoutCompletedMessage(orderId, customerId);
+        await _fixture.ExecuteOnHostAndWaitAsync(
+            _fixture.OrdersHost,
+            checkoutCompleted,
+            timeoutSeconds: 30);
 
         var firstMessage = new ShipmentDelivered(
             orderId,
@@ -95,5 +112,39 @@ public class FulfillmentToReturnsPipelineTests(CrossBcTestFixture fixture)
         secondWindow.ShouldNotBeNull();
         secondWindow.DeliveredAt.ShouldBe(firstDeliveredAt); // Original timestamp preserved
         secondWindow.WindowExpiresAt.ShouldBe(firstWindowExpiry); // Expiry unchanged
+    }
+
+    // ---------------------------------------------------------------------------
+    // Helper Methods
+    // ---------------------------------------------------------------------------
+
+    private static Messages.Contracts.Shopping.CheckoutCompleted CreateCheckoutCompletedMessage(
+        Guid orderId,
+        Guid customerId)
+    {
+        var lineItems = new List<Messages.Contracts.Shopping.CheckoutLineItem>
+        {
+            new("SKU-001", 2, 19.99m),
+            new("SKU-002", 1, 29.99m)
+        };
+
+        var address = new Messages.Contracts.CustomerIdentity.AddressSnapshot(
+            "123 Main St",
+            null,
+            "Springfield",
+            "IL",
+            "62701",
+            "USA");
+
+        return new Messages.Contracts.Shopping.CheckoutCompleted(
+            orderId,
+            Guid.CreateVersion7(),
+            customerId,
+            lineItems,
+            address,
+            "Standard",
+            5.99m,
+            "tok_visa_4242",
+            DateTimeOffset.UtcNow);
     }
 }
