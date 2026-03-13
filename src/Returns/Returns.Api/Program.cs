@@ -54,7 +54,6 @@ builder.Services.AddMarten(opts =>
             .Index(x => x.OrderId);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
-    .UseLightweightSessions()
     .IntegrateWithWolverine(config =>
     {
         config.UseWolverineManagedEventSubscriptionDistribution = true;

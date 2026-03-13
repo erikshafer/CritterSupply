@@ -125,6 +125,13 @@ public class TestFixture : IAsyncLifetime
             result = await Host.Scenario(configuration);
         });
 
+        // CRITICAL: Wait for Marten transactions to commit and inline projections to complete.
+        // Wolverine's auto-transaction middleware commits AFTER the HTTP response is sent.
+        // Inline snapshots are synchronous within the transaction, but the transaction
+        // commit is asynchronous relative to the HTTP response.
+        // This ensures subsequent GET requests see the committed state.
+        await Task.Delay(500);
+
         return (tracked, result);
     }
 }

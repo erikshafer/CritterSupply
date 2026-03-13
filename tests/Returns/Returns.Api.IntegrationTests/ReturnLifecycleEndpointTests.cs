@@ -223,8 +223,8 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var createResponse = await CreateReturnUnderReview(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        // Approve it
-        await _fixture.Host.Scenario(s =>
+        // Approve it (using TrackedHttpCall to wait for event persistence)
+        await _fixture.TrackedHttpCall(s =>
         {
             s.Post.Json(new ApproveReturn(returnId))
                 .ToUrl($"/api/returns/{returnId}/approve");
@@ -297,8 +297,8 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var createResponse = await CreateReturnUnderReview(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        // Deny it
-        await _fixture.Host.Scenario(s =>
+        // Deny it (using TrackedHttpCall to wait for event persistence)
+        await _fixture.TrackedHttpCall(s =>
         {
             s.Post.Json(new DenyReturn(returnId, "PolicyViolation", "Item is non-returnable."))
                 .ToUrl($"/api/returns/{returnId}/deny");
@@ -443,7 +443,7 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var createResponse = await CreateReturnViaApi(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        await _fixture.Host.Scenario(s =>
+        await _fixture.TrackedHttpCall(s =>
         {
             s.Post.Json(new ReceiveReturn(returnId))
                 .ToUrl($"/api/returns/{returnId}/receive");
@@ -451,7 +451,7 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         });
 
         // Submit passing inspection
-        await _fixture.Host.Scenario(s =>
+        await _fixture.TrackedHttpCall(s =>
         {
             s.Post.Json(new SubmitInspection(
                 ReturnId: returnId,
@@ -740,8 +740,8 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         createResponse.Status.ShouldBe("Approved");
         var returnId = createResponse.ReturnId!.Value;
 
-        // Receive
-        await _fixture.Host.Scenario(s =>
+        // Receive (using TrackedHttpCall to wait for event persistence)
+        await _fixture.TrackedHttpCall(s =>
         {
             s.Post.Json(new ReceiveReturn(returnId))
                 .ToUrl($"/api/returns/{returnId}/receive");
@@ -749,7 +749,7 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         });
 
         // Submit mixed inspection: 2 pass, 1 fail
-        await _fixture.Host.Scenario(s =>
+        await _fixture.TrackedHttpCall(s =>
         {
             s.Post.Json(new SubmitInspection(
                 ReturnId: returnId,
@@ -980,8 +980,8 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var createResponse = await CreateReturnUnderReview(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        // Deny it
-        await _fixture.Host.Scenario(s =>
+        // Deny it (using TrackedHttpCall to wait for event persistence)
+        await _fixture.TrackedHttpCall(s =>
         {
             s.Post.Json(new DenyReturn(returnId, "Policy", "Non-returnable"))
                 .ToUrl($"/api/returns/{returnId}/deny");
@@ -1007,8 +1007,8 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var createResponse = await CreateReturnUnderReview(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        // Deny it
-        await _fixture.Host.Scenario(s =>
+        // Deny it (using TrackedHttpCall to wait for event persistence)
+        await _fixture.TrackedHttpCall(s =>
         {
             s.Post.Json(new DenyReturn(returnId, "Policy", "Non-returnable"))
                 .ToUrl($"/api/returns/{returnId}/deny");
@@ -1034,16 +1034,16 @@ public sealed class ReturnLifecycleEndpointTests : IAsyncLifetime
         var createResponse = await CreateReturnViaApi(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        // Receive
-        await _fixture.Host.Scenario(s =>
+        // Receive (using TrackedHttpCall to wait for event persistence)
+        await _fixture.TrackedHttpCall(s =>
         {
             s.Post.Json(new ReceiveReturn(returnId))
                 .ToUrl($"/api/returns/{returnId}/receive");
             s.StatusCodeShouldBe(HttpStatusCode.OK);
         });
 
-        // Pass inspection
-        await _fixture.Host.Scenario(s =>
+        // Pass inspection (using TrackedHttpCall to wait for event persistence)
+        await _fixture.TrackedHttpCall(s =>
         {
             s.Post.Json(new SubmitInspection(
                 ReturnId: returnId,
