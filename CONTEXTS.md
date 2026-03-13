@@ -670,12 +670,13 @@ The Returns context owns the reverse logistics flow—handling customer return r
 
 ### What it publishes
 
-- `ReturnRequested` — return request submitted; Customer Experience BC updates UI
-- `ReturnApproved` — return authorized; includes return label, ship-by deadline
-- `ReturnDenied` — request rejected; reason code included
-- `ReturnExpired` — approval window closed; customer never shipped
-- `ReturnCompleted` — inspection passed; **carries full item disposition** (SKU, qty, IsRestockable, warehouse, condition) for Orders BC (refund) and Inventory BC (restocking)
-- `ReturnRejected` — inspection failed; disposition applied (Dispose, ReturnToCustomer, Quarantine)
+- `ReturnRequested` — return request submitted; **Customer Experience BC updates UI via SignalR** (Cycle 27), Orders saga tracks return in-progress
+- `ReturnApproved` — return authorized; includes return label, ship-by deadline; **Customer Experience BC pushes real-time update** (Cycle 27)
+- `ReturnDenied` — request rejected; reason code included; **Customer Experience BC notifies customer via SignalR** (Cycle 27)
+- `ReturnReceived` — items arrived at warehouse; **Customer Experience BC updates status UI** (Cycle 27)
+- `ReturnExpired` — approval window closed; customer never shipped; **Customer Experience BC notifies** (Cycle 27)
+- `ReturnCompleted` — inspection passed; **carries full item disposition** (SKU, qty, IsRestockable, warehouse, condition) for Orders BC (refund) and Inventory BC (restocking); **Customer Experience BC pushes refund confirmation** (Cycle 27)
+- `ReturnRejected` — inspection failed; disposition applied (Dispose, ReturnToCustomer, Quarantine); **Customer Experience BC notifies customer** (Cycle 27)
 
 ### Core Invariants
 

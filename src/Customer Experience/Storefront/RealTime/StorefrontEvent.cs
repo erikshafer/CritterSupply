@@ -12,6 +12,7 @@ namespace Storefront.RealTime;
 [JsonDerivedType(typeof(OrderStatusChanged), typeDiscriminator: "order-status-changed")]
 [JsonDerivedType(typeof(ShipmentStatusChanged), typeDiscriminator: "shipment-status-changed")]
 [JsonDerivedType(typeof(ShipmentDeliveryFailed), typeDiscriminator: "shipment-delivery-failed")]
+[JsonDerivedType(typeof(ReturnStatusChanged), typeDiscriminator: "return-status-changed")]
 public abstract record StorefrontEvent(DateTimeOffset OccurredAt);
 
 /// <summary>
@@ -52,4 +53,16 @@ public sealed record ShipmentDeliveryFailed(
     Guid OrderId,
     Guid CustomerId,
     string Reason,
+    DateTimeOffset OccurredAt) : StorefrontEvent(OccurredAt), IStorefrontWebSocketMessage;
+
+/// <summary>
+/// Return status changed (requested → approved → received → completed/rejected/expired).
+/// Provides real-time updates on return lifecycle to customer UI.
+/// </summary>
+public sealed record ReturnStatusChanged(
+    Guid ReturnId,
+    Guid OrderId,
+    Guid CustomerId,
+    string NewStatus,
+    string? Details,
     DateTimeOffset OccurredAt) : StorefrontEvent(OccurredAt), IStorefrontWebSocketMessage;
