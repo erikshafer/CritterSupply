@@ -192,4 +192,79 @@ public sealed class RequestReturnEndpointTests
             s.StatusCodeShouldBe(HttpStatusCode.NotFound);
         });
     }
+
+    #region GET /api/returns?orderId= — query by order
+
+    [Fact]
+    public async Task GET_returns_for_order_returns_matching_returns()
+    {
+        await _fixture.CleanAllDataAsync();
+
+        var orderId = Guid.CreateVersion7();
+        var customerId = Guid.CreateVersion7();
+
+        // Seed eligibility window
+        using var session = _fixture.GetDocumentSession();
+        session.Store(new ReturnEligibilityWindow
+        {
+            Id = orderId,
+            OrderId = orderId,
+            CustomerId = customerId,
+            DeliveredAt = DateTimeOffset.UtcNow.AddDays(-5),
+            WindowExpiresAt = DateTimeOffset.UtcNow.AddDays(25),
+            EligibleItems = []
+        });
+        await session.SaveChangesAsync();
+
+        // Create a return
+        var createResult = await _fixture.Host.Scenario(s =>
+        {
+            s.Post.Json(new RequestReturn(
+                OrderId: orderId,
+                CustomerId: customerId,
+                Items:
+                [
+                    new RequestReturnItem("DOG-BOWL-01", "Ceramic Dog Bowl", 1, 19.99m,
+                        ReturnReason.Defective)
+                ]
+            )).ToUrl("/api/returns");
+
+            s.StatusCodeShouldBe(HttpStatusCode.OK);
+        });
+
+        var createResponse = createResult.ReadAsJson<RequestReturnResponse>();
+        createResponse.ShouldNotBeNull();
+        createResponse.ReturnId.ShouldNotBeNull();
+
+        // Query returns for this order
+        var getResult = await _fixture.Host.Scenario(s =>
+        {
+            s.Get.Url($"/api/returns?orderId={orderId}");
+            s.StatusCodeShouldBe(HttpStatusCode.OK);
+        });
+
+        var returns = getResult.ReadAsJson<List<ReturnSummaryResponse>>();
+        returns.ShouldNotBeNull();
+        returns.Count.ShouldBeGreaterThanOrEqualTo(1);
+        returns.ShouldContain(r => r.ReturnId == createResponse.ReturnId!.Value);
+        returns[0].OrderId.ShouldBe(orderId);
+    }
+
+    [Fact]
+    public async Task GET_returns_for_order_returns_empty_for_no_returns()
+    {
+        var randomOrderId = Guid.CreateVersion7();
+
+        var getResult = await _fixture.Host.Scenario(s =>
+        {
+            s.Get.Url($"/api/returns?orderId={randomOrderId}");
+            s.StatusCodeShouldBe(HttpStatusCode.OK);
+        });
+
+        var returns = getResult.ReadAsJson<List<ReturnSummaryResponse>>();
+        returns.ShouldNotBeNull();
+        returns.Count.ShouldBe(0);
+    }
+
+    #endregion
 }

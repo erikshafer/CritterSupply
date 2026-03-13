@@ -188,4 +188,70 @@ public sealed class ReturnAggregateTests
         restockingFee.ShouldBe(4.50m);
         estimatedRefund.ShouldBe(39.98m + 29.99m - 4.50m);
     }
+
+    #region Apply InspectionMixed
+
+    [Fact]
+    public void Apply_InspectionMixed_transitions_to_Completed_terminal()
+    {
+        var passedItems = new List<InspectionLineResult>
+        {
+            new("DOG-BOWL-01", 2, ItemCondition.AsExpected, "Matches defect report",
+                true, DispositionDecision.Restockable, "A-12-3")
+        };
+        var failedItems = new List<InspectionLineResult>
+        {
+            new("CAT-TOY-05", 1, ItemCondition.WorseThanExpected, "Customer damage",
+                false, DispositionDecision.Dispose, null)
+        };
+
+        var returnAggregate = Return.Create(CreateReturnRequested())
+            .Apply(new ReturnApproved(ReturnId, 39.98m, 0m,
+                DateTimeOffset.UtcNow.AddDays(30), DateTimeOffset.UtcNow))
+            .Apply(new ReturnReceived(ReturnId, DateTimeOffset.UtcNow))
+            .Apply(new InspectionStarted(ReturnId, "inspector-01", DateTimeOffset.UtcNow));
+
+        var completedAt = DateTimeOffset.UtcNow;
+        var result = returnAggregate.Apply(new InspectionMixed(
+            ReturnId, passedItems, failedItems, 39.98m, 0m, completedAt));
+
+        result.Status.ShouldBe(ReturnStatus.Completed);
+        result.IsTerminal.ShouldBeTrue();
+        result.FinalRefundAmount.ShouldBe(39.98m);
+        result.RestockingFeeAmount.ShouldBe(0m);
+        result.CompletedAt.ShouldBe(completedAt);
+        result.InspectionResults.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void Apply_InspectionMixed_merges_passed_and_failed_results()
+    {
+        var passedItems = new List<InspectionLineResult>
+        {
+            new("DOG-BOWL-01", 2, ItemCondition.AsExpected, "Good condition",
+                true, DispositionDecision.Restockable, "A-12-3")
+        };
+        var failedItems = new List<InspectionLineResult>
+        {
+            new("CAT-TOY-05", 1, ItemCondition.WorseThanExpected, "Damaged",
+                false, DispositionDecision.Dispose, null)
+        };
+
+        var returnAggregate = Return.Create(CreateReturnRequested())
+            .Apply(new ReturnApproved(ReturnId, 39.98m, 0m,
+                DateTimeOffset.UtcNow.AddDays(30), DateTimeOffset.UtcNow))
+            .Apply(new ReturnReceived(ReturnId, DateTimeOffset.UtcNow))
+            .Apply(new InspectionStarted(ReturnId, "inspector-01", DateTimeOffset.UtcNow));
+
+        var result = returnAggregate.Apply(new InspectionMixed(
+            ReturnId, passedItems, failedItems, 39.98m, 0m, DateTimeOffset.UtcNow));
+
+        // InspectionResults should contain both passed and failed items merged
+        result.InspectionResults.ShouldNotBeNull();
+        result.InspectionResults.Count.ShouldBe(2);
+        result.InspectionResults.ShouldContain(r => r.Sku == "DOG-BOWL-01");
+        result.InspectionResults.ShouldContain(r => r.Sku == "CAT-TOY-05");
+    }
+
+    #endregion
 }

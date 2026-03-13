@@ -370,6 +370,262 @@ public class YourFeatureTests
 
 > **Reference:** [Alba Documentation](https://jasperfx.github.io/alba/)
 
+## Event Sourcing Race Conditions and Direct Command Invocation
+
+### The Problem: HTTP-Based Testing with Event Sourcing
+
+When testing event-sourced aggregates via HTTP endpoints, a subtle race condition can occur:
+
+1. **Command handler** with `[WriteAggregate]` returns domain events
+2. **Wolverine's transaction middleware** commits asynchronously
+3. **HTTP 200 response** is sent BEFORE transaction commits
+4. **Subsequent GET request** reads stale aggregate state before Marten's inline snapshot projections update
+5. **Test fails** with unexpected status codes or stale data
+
+**Example of the Problem:**
+
+```csharp
+// ❌ BAD: HTTP-based test with race condition
+[Fact]
+public async Task POST_approve_transitions_return_to_Approved()
+{
+    var returnId = Guid.CreateVersion7();
+
+    // Create return (works fine)
+    await CreateReturnUnderReview(returnId);
+
+    // Approve return via HTTP POST
+    await _fixture.Host.Scenario(s =>
+    {
+        s.Post.Json(new ApproveReturn(returnId))
+            .ToUrl($"/api/returns/{returnId}/approve");
+        s.StatusCodeShouldBe(200); // ✅ HTTP response sent
+    });
+
+    // RACE CONDITION: Transaction may not be committed yet!
+
+    // Immediate GET to verify state
+    await _fixture.Host.Scenario(s =>
+    {
+        s.Get.Url($"/api/returns/{returnId}");
+        s.StatusCodeShouldBe(200); // ❌ May fail with 409 or stale data
+    });
+}
+```
+
+**Why This Happens:**
+
+- Wolverine's `AutoApplyTransactions()` policy commits transactions **asynchronously**
+- HTTP response returns **before** transaction completes
+- Marten inline snapshot projections update **after** transaction commits
+- Subsequent reads see stale data
+
+**Why Delays Don't Work:**
+
+```csharp
+// ❌ BAD: Adding delays is unreliable
+await _fixture.Host.Scenario(s => { /* POST */ });
+await Task.Delay(500); // Still fails sometimes!
+await _fixture.Host.Scenario(s => { /* GET */ });
+```
+
+Timing-based solutions are inherently fragile — they depend on system load, CI environment, and other unpredictable factors.
+
+### The Solution: Direct Command Invocation
+
+Instead of testing via HTTP, invoke commands **directly through Wolverine's message bus** and query the **event store directly**:
+
+```csharp
+// ✅ GOOD: Direct command invocation with no race condition
+[Fact]
+public async Task POST_approve_transitions_return_to_Approved()
+{
+    var orderId = Guid.CreateVersion7();
+    var customerId = Guid.CreateVersion7();
+    await SeedEligibilityWindow(orderId, customerId);
+
+    // Create return under review
+    var createResponse = await CreateReturnUnderReview(orderId, customerId);
+    var returnId = createResponse.ReturnId!.Value;
+
+    // ✅ Invoke command directly through Wolverine (not HTTP)
+    var command = new ApproveReturn(returnId);
+    await _fixture.ExecuteAndWaitAsync(command);
+
+    // ✅ Query event store directly (guaranteed to see committed events)
+    await using var session = _fixture.GetDocumentSession();
+    var aggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
+
+    aggregate.ShouldNotBeNull();
+    aggregate.Status.ShouldBe(ReturnStatus.Approved);
+    aggregate.ApprovedAt.ShouldNotBeNull();
+    aggregate.ShipByDeadline.ShouldNotBeNull();
+
+    // ✅ Still verify HTTP GET endpoint works (optional)
+    var getResult = await _fixture.Host.Scenario(s =>
+    {
+        s.Get.Url($"/api/returns/{returnId}");
+        s.StatusCodeShouldBe(200);
+    });
+
+    var summary = getResult.ReadAsJson<ReturnSummaryResponse>();
+    summary.ShouldNotBeNull();
+    summary.Status.ShouldBe("Approved");
+}
+```
+
+### Why This Pattern Works
+
+1. **ExecuteAndWaitAsync guarantees completion** — Wolverine's tracking API ensures ALL side effects (events, outgoing messages, projections) complete before returning
+2. **Query event store directly** — Event-sourced aggregates are the source of truth; query them directly instead of relying on projections
+3. **Separate concerns** — Integration tests verify business logic (commands → events → aggregate state); HTTP endpoints verified separately
+4. **Aligns with eventual consistency** — Respects that projections are eventually consistent, not immediately consistent
+
+### TestFixture Helper Method
+
+All Marten-based TestFixtures provide this helper:
+
+```csharp
+/// <summary>
+/// Executes a message through Wolverine and waits for all cascading messages to complete.
+/// This ensures all side effects are persisted before assertions.
+/// </summary>
+public async Task<ITrackedSession> ExecuteAndWaitAsync<T>(T message, int timeoutSeconds = 15)
+    where T : class
+{
+    return await Host.TrackActivity(TimeSpan.FromSeconds(timeoutSeconds))
+        .DoNotAssertOnExceptionsDetected()
+        .AlsoTrack(Host)
+        .ExecuteAndWaitAsync((Func<IMessageContext, Task>)(async ctx =>
+        {
+            await ctx.InvokeAsync(message);
+        }));
+}
+```
+
+### When to Use Each Pattern
+
+| Pattern | Use Case | Example |
+|---------|----------|---------|
+| **Direct Command Invocation** | State-changing operations on event-sourced aggregates | `ApproveReturn`, `DenyReturn`, `SubmitInspection` |
+| **HTTP POST Tests** | Testing HTTP contract (status codes, validation errors, error messages) | Invalid command payloads, authorization failures |
+| **HTTP GET Tests** | Testing query endpoints and projections | `GetReturnById`, `GetReturnsForOrder` |
+| **E2E Tests (future)** | Testing full user flows with eventual consistency | Playwright/Reqnroll scenarios |
+
+### Complete Example: Returns BC
+
+**Before (HTTP-based, race condition):**
+
+```csharp
+[Fact]
+public async Task POST_deny_transitions_return_to_Denied()
+{
+    var returnId = CreateReturn();
+
+    // ❌ Race condition here
+    await _fixture.Host.Scenario(s =>
+    {
+        s.Post.Json(new DenyReturn(returnId, "Policy violation"))
+            .ToUrl($"/api/returns/{returnId}/deny");
+        s.StatusCodeShouldBe(200);
+    });
+
+    // May read stale data
+    await _fixture.Host.Scenario(s =>
+    {
+        s.Get.Url($"/api/returns/{returnId}");
+        s.StatusCodeShouldBe(200);
+    });
+}
+```
+
+**After (Direct invocation, no race condition):**
+
+```csharp
+[Fact]
+public async Task POST_deny_transitions_return_to_Denied()
+{
+    var orderId = Guid.CreateVersion7();
+    var customerId = Guid.CreateVersion7();
+    await SeedEligibilityWindow(orderId, customerId);
+
+    var createResponse = await CreateReturnUnderReview(orderId, customerId);
+    var returnId = createResponse.ReturnId!.Value;
+
+    // ✅ Direct invocation
+    var command = new DenyReturn(returnId, "Policy violation");
+    await _fixture.ExecuteAndWaitAsync(command);
+
+    // ✅ Query event store directly
+    await using var session = _fixture.GetDocumentSession();
+    var aggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
+
+    aggregate.ShouldNotBeNull();
+    aggregate.Status.ShouldBe(ReturnStatus.Denied);
+    aggregate.DenialReason.ShouldBe("Policy violation");
+    aggregate.DeniedAt.ShouldNotBeNull();
+
+    // ✅ Verify HTTP GET still works
+    var getResult = await _fixture.Host.Scenario(s =>
+    {
+        s.Get.Url($"/api/returns/{returnId}");
+        s.StatusCodeShouldBe(200);
+    });
+
+    var summary = getResult.ReadAsJson<ReturnSummaryResponse>();
+    summary.Status.ShouldBe("Denied");
+}
+```
+
+### Benefits of This Approach
+
+1. **No race conditions** — `ExecuteAndWaitAsync()` guarantees all side effects complete
+2. **Tests the source of truth** — Event-sourced aggregates, not projections
+3. **Faster tests** — No artificial delays needed
+4. **More reliable** — No flaky tests due to timing issues
+5. **Better separation of concerns** — Business logic tested separately from HTTP layer
+6. **Aligns with eventual consistency** — Respects that projections are eventually consistent
+
+### HTTP Testing Still Has a Place
+
+You should still test HTTP endpoints for:
+
+- **Validation errors** — Ensure bad requests return 400 with correct error messages
+- **Authorization failures** — Ensure unauthorized requests return 401/403
+- **Not found scenarios** — Ensure missing resources return 404
+- **HTTP contract compliance** — Ensure response formats match API specification
+
+**Example: Testing HTTP validation:**
+
+```csharp
+[Fact]
+public async Task POST_approve_returns_404_when_return_not_found()
+{
+    var nonExistentId = Guid.CreateVersion7();
+
+    // HTTP test is appropriate here - testing HTTP contract
+    await _fixture.Host.Scenario(s =>
+    {
+        s.Post.Json(new ApproveReturn(nonExistentId))
+            .ToUrl($"/api/returns/{nonExistentId}/approve");
+        s.StatusCodeShouldBe(404);
+    });
+}
+```
+
+### Key Takeaway
+
+For event-sourced aggregates:
+- ✅ **DO** use direct command invocation (`ExecuteAndWaitAsync`) for state-changing operations
+- ✅ **DO** query event store directly (`session.Events.AggregateStreamAsync`) for aggregate assertions
+- ✅ **DO** verify HTTP GET endpoints work after state changes
+- ❌ **DON'T** rely on HTTP POST → immediate GET pattern for event-sourced aggregates
+- ❌ **DON'T** add delays to work around race conditions
+
+This pattern respects eventual consistency, tests the source of truth, and eliminates flaky tests.
+
+---
+
 ## Integration Test Pattern
 
 ### Using Alba for HTTP Integration Tests

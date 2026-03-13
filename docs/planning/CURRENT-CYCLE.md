@@ -8,61 +8,76 @@
 > 1. **GitHub MCP server** configured in your AI tool's MCP settings
 > 2. **GitHub auth** (personal access token with `repo` + `project` scopes)
 >
-> With both configured, query GitHub directly: `list_issues(milestone="Cycle 25", state="open")`  
+> With both configured, query GitHub directly: `list_issues(milestone="Cycle 27", state="open")`  
 > This works identically on any machine — MacBook, Windows PC, Linux laptop.
 
 ---
 
-**Cycle:** 25 — Returns BC Phase 1
-**Status:** 📋 **PLANNED** — Cycle 24 complete; all prerequisites in place; sign-offs obtained
-**GitHub Milestone:** Cycle 25: Returns BC Phase 1 *(create before starting)*
+**Cycle:** 26 — Returns BC Phase 2 *(just completed)*  
+**Status:** ✅ **COMPLETE** — All sign-offs obtained (PSA, PO, UXE)  
+**GitHub Milestone:** Cycle 26: Returns BC Phase 2  
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 
 ---
 
 ## Current Status
 
-**Cycle 24 is COMPLETE.** All Fulfillment integrity bugs fixed, Orders saga return handlers implemented, and Returns prerequisites in place. Sign-offs obtained from Product Owner, UX Engineer, and Principal Software Architect.
+**Cycles 25 and 26 are COMPLETE.** Returns BC Phase 1 (core domain + API) and Phase 2 (integration events, mixed inspection, contract expansion) are both delivered. All stakeholder sign-offs obtained.
 
-**What Cycle 24 delivered:**
-- ✅ RabbitMQ transport wired in Fulfillment.Api (messages cross process boundaries)
-- ✅ `RecordDeliveryFailure` endpoint + `ShipmentDeliveryFailed` cascade
-- ✅ `shipment-delivery-failed` SSE case in OrderConfirmation.razor
-- ✅ UUID v5 idempotent shipment creation + clean ShipmentStatus enum
-- ✅ `SharedShippingAddress` with dual JSON annotations (Phase A)
-- ✅ Orders saga return handlers: `ReturnRequested`, `ReturnCompleted`, `ReturnDenied`
-- ✅ `IsReturnInProgress` guard on `ReturnWindowExpired` (critical bug fix)
-- ✅ `GET /api/orders/{orderId}/returnable-items` endpoint
-- ✅ Returns integration message contracts + RabbitMQ routing
+**What Cycle 25 delivered (Returns BC Phase 1):**
+- ✅ Event-sourced Return aggregate (10 lifecycle states, 9 domain events)
+- ✅ 6 command handlers: RequestReturn, ApproveReturn, DenyReturn, ReceiveReturn, SubmitInspection, ExpireReturn
+- ✅ ReturnEligibilityWindow (from Fulfillment.ShipmentDelivered)
+- ✅ Auto-approval logic + restocking fee calculation
+- ✅ 7 API endpoints (port 5245, schema `returns`)
+- ✅ 48 unit tests + 5 integration tests
+- [Phase 1 Retrospective](cycles/cycle-25-returns-bc-phase-1.md)
 
-**Cycle 24 Plan:** [`docs/planning/cycles/cycle-24-fulfillment-integrity-returns-prerequisites.md`](cycles/cycle-24-fulfillment-integrity-returns-prerequisites.md)
-
-**Cycle 25 Scope (Returns BC Phase 1):**
-
-*Pre-implementation tasks (from Cycle 24 stakeholder observations):*
-- 🔴 Add `DeliveredAt` persistence to Order saga's `Handle(ShipmentDelivered)` handler
-- 🟡 Add exchange workflow placeholder feature file
-- 🟡 Add mixed-inspection-results scenario to `return-inspection.feature`
-- 🔴 Write CS agent runbook for manual return approvals (Option A — API + runbook)
-- 🟡 Decide on `ReturnCompleted` contract expansion for Inventory BC item dispositions
-
-*Core Returns BC implementation:*
-- 🔴 Returns BC domain project (`src/Returns/Returns/`) with event-sourced Return aggregate
-- 🔴 Returns BC API project (`src/Returns/Returns.Api/`) with Wolverine + Marten configuration
-- 🔴 Return lifecycle: Requested → Approved → LabelGenerated → InTransit → Received → Inspecting → Completed/Denied/Expired/Rejected
-- 🔴 Return eligibility: 30-day window, non-returnable categories, duplicate prevention
-- 🔴 Return inspection: disposition logic (restock, dispose, quarantine, return-to-customer)
-- 🔴 Return expiration: auto-expiry of unshipped approved returns
-- 🟡 Order History page in Storefront.Web (prerequisite for return initiation UX)
+**What Cycle 26 delivered (Returns BC Phase 2):**
+- ✅ `ReturnCompleted` expanded with per-item disposition (CustomerId, IReadOnlyList\<ReturnedItem\>)
+- ✅ 5 new integration events: ReturnApproved, ReturnRejected, ReturnExpired, ReturnReceived, ReturnedItem
+- ✅ `ReturnDenied` expanded with CustomerId and customer-facing Message
+- ✅ Mixed inspection three-way logic (all-pass/all-fail/mixed → partial refund)
+- ✅ `GetReturnsForOrder` query implemented (Marten inline snapshots)
+- ✅ RabbitMQ dual-queue routing (orders-returns-events + storefront-returns-events)
+- ✅ Fulfillment → Returns queue wiring fix (production bug)
+- ✅ Orders saga: DeliveredAt persistence + ReturnRejected/ReturnExpired handlers
+- ✅ CS agent runbook
+- ✅ 53 Returns unit tests + 34 integration tests + 12 Orders return saga tests = ~99 total
+- [Phase 2 Implementation Plan](cycles/cycle-26-returns-bc-phase-2.md)
+- [Phase 2 Retrospective](cycles/cycle-26-returns-bc-phase-2-retrospective.md)
 
 **Next cycles (roadmap):**
-- **Cycle 26:** Notifications BC Phase 1 — Transactional email (OrderPlaced, ShipmentDispatched; Phase 1b: Returns events)
-- **Cycle 27:** Promotions BC Phase 1 — Coupons and discounts; RBAC ADR for Admin Portal
-- **Cycle 28+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
+- **Cycle 27:** Returns BC Phase 3 — Exchange workflow (UC-11, ~20-30% of return volume) + CE SignalR handlers
+- **Cycle 28:** Notifications BC Phase 1 — Transactional email (OrderPlaced, ShipmentDispatched, Returns events)
+- **Cycle 29:** Promotions BC Phase 1 — Coupons and discounts; RBAC ADR for Admin Portal
+- **Cycle 30+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
 
 ---
 
 ## Recently Completed
+
+- ✅ **Cycle 26:** Returns BC Phase 2 (2026-03-12 to 2026-03-13) — **COMPLETE**
+  - ReturnCompleted expanded with per-item disposition (CustomerId, ReturnedItem[])
+  - 5 new integration events (ReturnApproved, ReturnRejected, ReturnExpired, ReturnReceived, ReturnedItem)
+  - ReturnDenied expanded with CustomerId and Message
+  - Mixed inspection three-way logic (all-pass/all-fail/mixed → partial refund)
+  - GetReturnsForOrder query implemented (Marten inline snapshots)
+  - RabbitMQ dual-queue routing + Fulfillment queue wiring fix
+  - Orders saga: DeliveredAt + ReturnRejected/ReturnExpired handlers
+  - CS agent runbook
+  - ~99 total return-related tests (53 unit + 34 integration + 12 saga)
+  - Sign-offs: PSA ✅, PO ✅, UXE ✅
+  - [Plan](./cycles/cycle-26-returns-bc-phase-2.md) | [Retrospective](./cycles/cycle-26-returns-bc-phase-2-retrospective.md)
+
+- ✅ **Cycle 25:** Returns BC Phase 1 (2026-03-12) — **COMPLETE**
+  - Event-sourced Return aggregate (10 lifecycle states, 9 domain events)
+  - 6 command handlers + 7 API endpoints (port 5245)
+  - ReturnEligibilityWindow from Fulfillment.ShipmentDelivered
+  - Auto-approval logic + restocking fee calculation
+  - 48 unit tests + 5 integration tests
+  - Sign-offs: PO ✅, UXE ✅, QA ✅, PSA ✅
+  - [Plan & Retrospective](./cycles/cycle-25-returns-bc-phase-1.md)
 
 - ✅ **Cycle 24:** Fulfillment Integrity + Returns Prerequisites (2026-03-12) — **COMPLETE**
   - RabbitMQ transport wired in Fulfillment.Api
@@ -137,25 +152,25 @@
 
 ## Upcoming (Planned)
 
-### Next 4 Cycles (Revised after Post-Cycle 23 Priority Review)
+### Next 4 Cycles (Revised after Phase 2 Retrospective)
 
-> **See** [`docs/planning/priority-review-post-cycle-23.md`](priority-review-post-cycle-23.md) for the full cross-functional analysis (Product Owner + UX Engineer + Principal Architect) that produced this revised roadmap.
-> **See** [`docs/planning/cycles/cycle-24-fulfillment-integrity-returns-prerequisites.md`](cycles/cycle-24-fulfillment-integrity-returns-prerequisites.md) for Cycle 24 plan with event modeling exercise and stakeholder observations for Cycle 25.
+> **See** [`docs/planning/cycles/cycle-26-returns-bc-phase-2-retrospective.md`](cycles/cycle-26-returns-bc-phase-2-retrospective.md) for Phase 3 priorities from PSA, PO, and UXE sign-offs.
 
-- **Cycle 25:** Returns BC Phase 1 — Self-Service Returns + Order History page *(current — ready to start)*
-  - Domain spec ready: `docs/features/returns/` (4 feature files)
-  - Prerequisite: Cycle 24 Fulfillment + saga work ✅ COMPLETE
-  - Pre-implementation tasks documented in Cycle 24 stakeholder observations
+- **Cycle 27:** Returns BC Phase 3 — Exchange workflow (UC-11, ~20-30% return volume) + CE SignalR handlers
+  - 🔴 Exchange workflow: customer returns item A and gets item B in exchange
+  - 🟡 Customer Experience BC SignalR handlers for 7 return events
+  - 🟡 Sequential returns (multiple returns per order before window expires)
+  - Prerequisite: Cycles 25-26 Returns Phase 1-2 ✅ COMPLETE
 
-- **Cycle 26:** Notifications BC Phase 1 — Transactional email
+- **Cycle 28:** Notifications BC Phase 1 — Transactional email
   - Phase 1a: `OrderPlaced`, `ShipmentDispatched` (existing BC events)
-  - Phase 1b: Returns events (`ReturnApproved`, `ReturnDenied`, `ReturnCompleted`, `ReturnExpired`)
+  - Phase 1b: Returns events (`ReturnApproved`, `ReturnDenied`, `ReturnCompleted`, `ReturnExpired`, `ReturnReceived`, `ReturnRejected`)
 
-- **Cycle 27:** Promotions BC Phase 1 — Coupons and discounts
-  - RBAC ADR for Admin Portal to be authored during this cycle (PO suggests moving to Cycle 26)
+- **Cycle 29:** Promotions BC Phase 1 — Coupons and discounts
+  - RBAC ADR for Admin Portal to be authored during this cycle
   - Shopping BC already has `CouponApplied`/`CouponRemoved` placeholder events
 
-- **Cycle 28+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling *(deferred from Cycle 24)*
+- **Cycle 30+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
   - Event Modeling: [`docs/planning/admin-portal-event-modeling.md`](admin-portal-event-modeling.md)
   - UX Research: [`docs/planning/admin-portal-ux-research.md`](admin-portal-ux-research.md)
   - Gherkin features: [`docs/features/admin-portal/`](../features/admin-portal/)
@@ -164,9 +179,9 @@
 ### Future BCs (Priority Roadmap)
 
 **High Priority (Customer-Facing Gaps):**
-- 🔴 **Returns BC** — Return authorization, refund processing, restocking *(Cycle 25)*
-- 🔴 **Notifications BC** — Transactional emails, SMS, push notifications *(Cycle 26)*
-- 🔴 **Promotions BC** — Discount codes, percentage-off campaigns, BOGO *(Cycle 27)*
+- 🔴 **Returns BC Phase 3** — Exchange workflow, CE SignalR handlers, sequential returns *(Cycle 27)*
+- 🔴 **Notifications BC** — Transactional emails, SMS, push notifications *(Cycle 28)*
+- 🔴 **Promotions BC** — Discount codes, percentage-off campaigns, BOGO *(Cycle 29)*
 
 **Medium Priority (Scaling + Internal Tooling):**
 - 🟡 **Admin Portal** — Internal operations portal *(Cycle 28+, after RBAC ADR)*
@@ -195,5 +210,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-12 (Cycle 24 closed; all sign-offs obtained — Cycle 25 Returns BC Phase 1 ready to start)*
+*Last Updated: 2026-03-13 (Cycle 26 closed; Returns BC Phase 2 complete — all sign-offs obtained)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*

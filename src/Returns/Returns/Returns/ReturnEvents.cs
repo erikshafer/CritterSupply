@@ -60,6 +60,18 @@ public sealed record InspectionFailed(
     string FailureReason,
     DateTimeOffset CompletedAt);
 
+/// <summary>
+/// Some items passed inspection and some failed. The return completes
+/// with a partial refund for passed items. Failed items get their own disposition.
+/// </summary>
+public sealed record InspectionMixed(
+    Guid ReturnId,
+    IReadOnlyList<InspectionLineResult> PassedItems,
+    IReadOnlyList<InspectionLineResult> FailedItems,
+    decimal FinalRefundAmount,
+    decimal RestockingFeeAmount,
+    DateTimeOffset CompletedAt);
+
 public sealed record ReturnExpired(
     Guid ReturnId,
     DateTimeOffset ExpiredAt);

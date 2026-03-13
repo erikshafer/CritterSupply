@@ -103,6 +103,15 @@ public sealed record Return(
         CompletedAt = @event.CompletedAt
     };
 
+    public Return Apply(InspectionMixed @event) => this with
+    {
+        Status = ReturnStatus.Completed,
+        InspectionResults = @event.PassedItems.Concat(@event.FailedItems).ToList().AsReadOnly(),
+        FinalRefundAmount = @event.FinalRefundAmount,
+        RestockingFeeAmount = @event.RestockingFeeAmount,
+        CompletedAt = @event.CompletedAt
+    };
+
     public Return Apply(ReturnExpired @event) => this with
     {
         Status = ReturnStatus.Expired,

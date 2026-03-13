@@ -150,4 +150,26 @@ public sealed class ReturnCalculationTests
 
         (estimatedRefund + restockingFee).ShouldBe(totalLineAmount);
     }
+
+    #region Mixed inspection refund calculation
+
+    [Fact]
+    public void CalculateEstimatedRefund_subset_of_items_for_mixed_inspection()
+    {
+        // Given: 3 items in original return (defective DOG-BOWL, unwanted CAT-TOY, defective CAT-BED)
+        // When: Only 2 passed inspection (DOG-BOWL + CAT-BED), calculate refund on those only
+        var passedItems = new List<ReturnLineItem>
+        {
+            new("DOG-BOWL-01", "Ceramic Dog Bowl", 1, 19.99m, 19.99m, ReturnReason.Defective),
+            new("CAT-BED-01", "Cat Bed", 1, 49.99m, 49.99m, ReturnReason.Defective)
+        };
+
+        var (estimatedRefund, restockingFee) = Return.CalculateEstimatedRefund(passedItems);
+
+        // Defective items: 0% restocking fee
+        restockingFee.ShouldBe(0m);
+        estimatedRefund.ShouldBe(19.99m + 49.99m);
+    }
+
+    #endregion
 }

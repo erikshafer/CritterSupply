@@ -9,6 +9,7 @@ namespace Returns.Returns;
 
 /// <summary>
 /// CS agent approves a return that is in Requested state (manual review required).
+/// Publishes ReturnApproved integration event for Customer Experience BC and Notifications BC.
 /// </summary>
 public static class ApproveReturnHandler
 {
@@ -28,7 +29,7 @@ public static class ApproveReturnHandler
     }
 
     [WolverinePost("/api/returns/{returnId}/approve")]
-    public static async Task<ReturnApproved> Handle(
+    public static async Task<(ReturnApproved, OutgoingMessages)> Handle(
         ApproveReturn command,
         [WriteAggregate] Return aggregate,
         IMessageBus bus)
@@ -41,17 +42,30 @@ public static class ApproveReturnHandler
         // Schedule expiration
         await bus.ScheduleAsync(new ExpireReturn(command.ReturnId), shipByDeadline);
 
-        return new ReturnApproved(
+        var domainEvent = new ReturnApproved(
             ReturnId: command.ReturnId,
             EstimatedRefundAmount: estimatedRefund,
             RestockingFeeAmount: restockingFee,
             ShipByDeadline: shipByDeadline,
             ApprovedAt: now);
+
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new Messages.Contracts.Returns.ReturnApproved(
+            ReturnId: command.ReturnId,
+            OrderId: aggregate.OrderId,
+            CustomerId: aggregate.CustomerId,
+            EstimatedRefundAmount: estimatedRefund,
+            RestockingFeeAmount: restockingFee,
+            ShipByDeadline: shipByDeadline,
+            ApprovedAt: now));
+
+        return (domainEvent, outgoing);
     }
 }
 
 /// <summary>
 /// CS agent denies a return that is in Requested state.
+/// Publishes ReturnDenied integration event with customer-facing message.
 /// </summary>
 public static class DenyReturnHandler
 {
@@ -86,7 +100,9 @@ public static class DenyReturnHandler
         outgoing.Add(new Messages.Contracts.Returns.ReturnDenied(
             ReturnId: command.ReturnId,
             OrderId: aggregate.OrderId,
+            CustomerId: aggregate.CustomerId,
             Reason: command.Reason,
+            Message: command.Message,
             DeniedAt: now));
 
         return (denied, outgoing);
@@ -95,6 +111,8 @@ public static class DenyReturnHandler
 
 /// <summary>
 /// Warehouse records physical receipt of a return shipment.
+/// Publishes ReturnReceived integration event so Customer Experience BC
+/// can show "We received your package" — the #1 anxiety-reducer in return flows.
 /// </summary>
 public static class ReceiveReturnHandler
 {
@@ -114,19 +132,30 @@ public static class ReceiveReturnHandler
     }
 
     [WolverinePost("/api/returns/{returnId}/receive")]
-    public static ReturnReceived Handle(
+    public static (ReturnReceived, OutgoingMessages) Handle(
         ReceiveReturn command,
         [WriteAggregate] Return aggregate)
     {
-        return new ReturnReceived(
+        var now = DateTimeOffset.UtcNow;
+        var domainEvent = new ReturnReceived(
             ReturnId: command.ReturnId,
-            ReceivedAt: DateTimeOffset.UtcNow);
+            ReceivedAt: now);
+
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new Messages.Contracts.Returns.ReturnReceived(
+            ReturnId: command.ReturnId,
+            OrderId: aggregate.OrderId,
+            CustomerId: aggregate.CustomerId,
+            ReceivedAt: now));
+
+        return (domainEvent, outgoing);
     }
 }
 
 /// <summary>
 /// Inspector submits inspection results for a received return.
-/// Determines whether inspection passes (Completed) or fails (Rejected).
+/// Three-way logic: all-pass (Completed), all-fail (Rejected), or mixed (Completed with partial refund).
+/// Publishes appropriate integration events for downstream BCs.
 /// </summary>
 public static class SubmitInspectionHandler
 {
@@ -159,20 +188,17 @@ public static class SubmitInspectionHandler
         {
             events.Add(new InspectionStarted(
                 ReturnId: command.ReturnId,
-                InspectorId: "system", // Phase 1: no inspector auth
+                InspectorId: "system", // Phase 2: no inspector auth yet
                 StartedAt: now));
         }
 
-        // Determine pass/fail based on disposition
-        var hasFailures = command.Results.Any(r =>
-            r.Condition == ItemCondition.WorseThanExpected ||
-            r.Disposition is DispositionDecision.Dispose
-                or DispositionDecision.Quarantine
-                or DispositionDecision.ReturnToCustomer);
+        // Partition results into passed and failed
+        var passed = command.Results.Where(r => !IsFailedResult(r)).ToList();
+        var failed = command.Results.Where(IsFailedResult).ToList();
 
-        if (!hasFailures)
+        if (failed.Count == 0)
         {
-            // Inspection passed — calculate final refund
+            // ALL PASSED — full refund
             var (finalRefund, restockingFee) = Return.CalculateEstimatedRefund(aggregate.Items);
 
             events.Add(new InspectionPassed(
@@ -182,30 +208,117 @@ public static class SubmitInspectionHandler
                 RestockingFeeAmount: restockingFee,
                 CompletedAt: now));
 
-            // Publish ReturnCompleted integration event
             outgoing.Add(new Messages.Contracts.Returns.ReturnCompleted(
                 ReturnId: command.ReturnId,
                 OrderId: aggregate.OrderId,
+                CustomerId: aggregate.CustomerId,
                 FinalRefundAmount: finalRefund,
+                Items: ToReturnedItems(passed, aggregate.Items, passedInspection: true),
                 CompletedAt: now));
         }
-        else
+        else if (passed.Count == 0)
         {
-            // Inspection failed
+            // ALL FAILED — no refund
             events.Add(new InspectionFailed(
                 ReturnId: command.ReturnId,
                 Results: command.Results,
                 FailureReason: "Inspection found items in unacceptable condition.",
                 CompletedAt: now));
+
+            outgoing.Add(new Messages.Contracts.Returns.ReturnRejected(
+                ReturnId: command.ReturnId,
+                OrderId: aggregate.OrderId,
+                CustomerId: aggregate.CustomerId,
+                Reason: "Inspection found items in unacceptable condition.",
+                Items: ToReturnedItems(failed, aggregate.Items, passedInspection: false),
+                RejectedAt: now));
+        }
+        else
+        {
+            // MIXED — partial refund for passed items only
+            var passedSkus = passed.Select(p => p.Sku).ToHashSet();
+            var passedLineItems = aggregate.Items
+                .Where(li => passedSkus.Contains(li.Sku))
+                .ToList().AsReadOnly();
+            var (partialRefund, restockingFee) = Return.CalculateEstimatedRefund(passedLineItems);
+
+            events.Add(new InspectionMixed(
+                ReturnId: command.ReturnId,
+                PassedItems: passed.AsReadOnly(),
+                FailedItems: failed.AsReadOnly(),
+                FinalRefundAmount: partialRefund,
+                RestockingFeeAmount: restockingFee,
+                CompletedAt: now));
+
+            // Publish ReturnCompleted with ALL items (passed + failed).
+            // Passed items have IsRestockable based on inspection; failed items are IsRestockable: false.
+            var allItems = ToReturnedItems(passed, aggregate.Items, passedInspection: true)
+                .Concat(ToReturnedItems(failed, aggregate.Items, passedInspection: false))
+                .ToList().AsReadOnly();
+
+            outgoing.Add(new Messages.Contracts.Returns.ReturnCompleted(
+                ReturnId: command.ReturnId,
+                OrderId: aggregate.OrderId,
+                CustomerId: aggregate.CustomerId,
+                FinalRefundAmount: partialRefund,
+                Items: allItems,
+                CompletedAt: now));
         }
 
         return (events, outgoing);
+    }
+
+    private static bool IsFailedResult(InspectionLineResult r) =>
+        r.Condition is ItemCondition.WorseThanExpected ||
+        r.Disposition is DispositionDecision.Dispose
+            or DispositionDecision.Quarantine
+            or DispositionDecision.ReturnToCustomer;
+
+    private static IReadOnlyList<Messages.Contracts.Returns.ReturnedItem> ToReturnedItems(
+        List<InspectionLineResult> results,
+        IReadOnlyList<ReturnLineItem> originalItems,
+        bool passedInspection)
+    {
+        return results.Select(r =>
+        {
+            var originalItem = originalItems.FirstOrDefault(li => li.Sku == r.Sku);
+            var itemRefund = passedInspection && originalItem is not null
+                ? CalculateItemRefund(originalItem)
+                : (decimal?)null;
+
+            return new Messages.Contracts.Returns.ReturnedItem(
+                Sku: r.Sku,
+                Quantity: r.Quantity,
+                IsRestockable: passedInspection && r.IsRestockable,
+                WarehouseId: r.WarehouseLocation,
+                RestockCondition: passedInspection
+                    ? r.Condition switch
+                    {
+                        ItemCondition.AsExpected => "LikeNew",
+                        ItemCondition.BetterThanExpected => "New",
+                        ItemCondition.WorseThanExpected => "Opened",
+                        _ => "Opened"
+                    }
+                    : null,
+                RefundAmount: itemRefund,
+                RejectionReason: passedInspection ? null : "Item condition did not meet return requirements.");
+        }).ToList().AsReadOnly();
+    }
+
+    private static decimal CalculateItemRefund(ReturnLineItem item)
+    {
+        const decimal restockingFeeRate = 0.15m;
+        var isFeeExempt = item.Reason is ReturnReason.Defective
+            or ReturnReason.WrongItem or ReturnReason.DamagedInTransit;
+        var fee = isFeeExempt ? 0m : Math.Round(item.LineTotal * restockingFeeRate, 2);
+        return item.LineTotal - fee;
     }
 }
 
 /// <summary>
 /// Scheduled command that fires when an approved return is never shipped.
 /// Only expires if the return is still in Approved state (no-op if already transitioned).
+/// Publishes ReturnExpired integration event for Notifications BC and Orders saga.
 /// </summary>
 public static class ExpireReturnHandler
 {
@@ -226,5 +339,12 @@ public static class ExpireReturnHandler
             ExpiredAt: DateTimeOffset.UtcNow);
 
         session.Events.Append(command.ReturnId, expired);
+
+        // Publish integration event for Notifications BC and Orders saga
+        await bus.PublishAsync(new Messages.Contracts.Returns.ReturnExpired(
+            ReturnId: command.ReturnId,
+            OrderId: aggregate.OrderId,
+            CustomerId: aggregate.CustomerId,
+            ExpiredAt: expired.ExpiredAt));
     }
 }

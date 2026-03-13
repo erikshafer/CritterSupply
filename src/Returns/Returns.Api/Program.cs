@@ -48,9 +48,12 @@ builder.Services.AddMarten(opts =>
             .Identity(x => x.Id) // Use Id (which equals OrderId) as primary key
             .Index(x => x.CustomerId) // Index for customer queries
             .Index(x => x.WindowExpiresAt); // Index for expiry queries
+
+        // Index Return snapshots for order-based queries (GetReturnsForOrder)
+        opts.Schema.For<Return>()
+            .Index(x => x.OrderId);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
-    .UseLightweightSessions()
     .IntegrateWithWolverine(config =>
     {
         config.UseWolverineManagedEventSubscriptionDistribution = true;
@@ -96,13 +99,37 @@ builder.Host.UseWolverine(opts =>
     opts.ListenToRabbitQueue("returns-fulfillment-events")
         .ProcessInline();
 
-    // Outbound: Publish return events to Orders BC
+    // === Outbound: Orders BC ===
+    // Orders saga needs: ReturnRequested, ReturnCompleted, ReturnDenied, ReturnRejected, ReturnExpired
     opts.PublishMessage<Messages.Contracts.Returns.ReturnRequested>()
         .ToRabbitQueue("orders-returns-events");
     opts.PublishMessage<Messages.Contracts.Returns.ReturnCompleted>()
         .ToRabbitQueue("orders-returns-events");
     opts.PublishMessage<Messages.Contracts.Returns.ReturnDenied>()
         .ToRabbitQueue("orders-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnRejected>()
+        .ToRabbitQueue("orders-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnExpired>()
+        .ToRabbitQueue("orders-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnReceived>()
+        .ToRabbitQueue("orders-returns-events");
+
+    // === Outbound: Customer Experience BC (Storefront) ===
+    // Real-time updates for return status via SignalR
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnRequested>()
+        .ToRabbitQueue("storefront-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnApproved>()
+        .ToRabbitQueue("storefront-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnDenied>()
+        .ToRabbitQueue("storefront-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnRejected>()
+        .ToRabbitQueue("storefront-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnExpired>()
+        .ToRabbitQueue("storefront-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnCompleted>()
+        .ToRabbitQueue("storefront-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnReceived>()
+        .ToRabbitQueue("storefront-returns-events");
 });
 
 builder.Services.AddEndpointsApiExplorer();

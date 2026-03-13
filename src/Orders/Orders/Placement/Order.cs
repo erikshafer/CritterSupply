@@ -128,6 +128,12 @@ public sealed class Order : Saga
     /// </summary>
     public bool ReturnWindowFired { get; set; }
 
+    /// <summary>
+    /// The delivery timestamp from Fulfillment BC. Used by the BFF
+    /// for "Return by {date}" display and cross-verification of return eligibility.
+    /// </summary>
+    public DateTimeOffset? DeliveredAt { get; set; }
+
     // NOTE: Saga initialization is performed in PlaceOrderHandler.cs, which constructs the initial
     // Order state and corresponding OrderPlaced event and returns them as a tuple (Order, OrderPlaced)
     // to start the saga. This keeps the saga class focused on state transitions, not initialization logic.
@@ -355,6 +361,8 @@ public sealed class Order : Saga
         if (Status is OrderStatus.Delivered or OrderStatus.Closed)
             return new OutgoingMessages();
 
+        DeliveredAt = message.DeliveredAt;
+
         var decision = OrderDecider.HandleShipmentDelivered(this, message);
 
         if (decision.Status.HasValue) Status = decision.Status.Value;
@@ -430,6 +438,36 @@ public sealed class Order : Saga
     /// Clears the in-progress flag. If ReturnWindowExpired already fired, closes the saga now.
     /// </summary>
     public void Handle(Messages.Contracts.Returns.ReturnDenied message)
+    {
+        IsReturnInProgress = false;
+        ActiveReturnId = null;
+        if (ReturnWindowFired)
+        {
+            Status = OrderStatus.Closed;
+            MarkCompleted();
+        }
+    }
+
+    /// <summary>
+    /// Saga handler for return rejection from Returns BC (inspection failed).
+    /// Clears the return-in-progress flag. If return window already expired, closes saga.
+    /// </summary>
+    public void Handle(Messages.Contracts.Returns.ReturnRejected message)
+    {
+        IsReturnInProgress = false;
+        ActiveReturnId = null;
+        if (ReturnWindowFired)
+        {
+            Status = OrderStatus.Closed;
+            MarkCompleted();
+        }
+    }
+
+    /// <summary>
+    /// Saga handler for return expiration from Returns BC.
+    /// Customer never shipped; clears return-in-progress flag and closes saga if window already fired.
+    /// </summary>
+    public void Handle(Messages.Contracts.Returns.ReturnExpired message)
     {
         IsReturnInProgress = false;
         ActiveReturnId = null;

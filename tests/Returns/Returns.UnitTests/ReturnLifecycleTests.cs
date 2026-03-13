@@ -247,6 +247,114 @@ public sealed class ReturnLifecycleTests
 
     #endregion
 
+    #region Mixed inspection lifecycle
+
+    [Fact]
+    public void Mixed_inspection_path_Requested_through_Completed_with_partial_refund()
+    {
+        var requestedAt = DateTimeOffset.UtcNow;
+        var approvedAt = requestedAt.AddMinutes(1);
+        var receivedAt = approvedAt.AddDays(5);
+        var inspectedAt = receivedAt.AddHours(2);
+        var completedAt = inspectedAt.AddMinutes(30);
+        var shipByDeadline = approvedAt.AddDays(30);
+
+        var items = new List<ReturnLineItem>
+        {
+            new("DOG-BOWL-01", "Ceramic Dog Bowl", 2, 19.99m, 39.98m, ReturnReason.Defective),
+            new("CAT-TOY-05", "Interactive Laser", 1, 29.99m, 29.99m, ReturnReason.Unwanted),
+            new("CAT-BED-01", "Cat Bed", 1, 49.99m, 49.99m, ReturnReason.Defective)
+        };
+
+        var passedResults = new List<InspectionLineResult>
+        {
+            new("DOG-BOWL-01", 2, ItemCondition.AsExpected, "Matches defect report",
+                true, DispositionDecision.Restockable, "A-12-3"),
+            new("CAT-BED-01", 1, ItemCondition.AsExpected, "Confirmed damaged in transit",
+                true, DispositionDecision.Restockable, "B-05-1")
+        };
+        var failedResults = new List<InspectionLineResult>
+        {
+            new("CAT-TOY-05", 1, ItemCondition.WorseThanExpected, "Customer damage",
+                false, DispositionDecision.Dispose, null)
+        };
+
+        // Partial refund: only passed items (DOG-BOWL defective $39.98 + CAT-BED defective $49.99 = $89.97, no fee)
+        var partialRefund = 89.97m;
+
+        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, items, requestedAt))
+            .Apply(new ReturnApproved(ReturnId, 115.46m, 4.50m, shipByDeadline, approvedAt))
+            .Apply(new ReturnReceived(ReturnId, receivedAt))
+            .Apply(new InspectionStarted(ReturnId, "inspector-w01", inspectedAt))
+            .Apply(new InspectionMixed(ReturnId, passedResults, failedResults, partialRefund, 0m, completedAt));
+
+        // Verify final state
+        returnAggregate.Status.ShouldBe(ReturnStatus.Completed);
+        returnAggregate.IsTerminal.ShouldBeTrue();
+        returnAggregate.FinalRefundAmount.ShouldBe(partialRefund);
+
+        // Verify all timestamps are populated
+        returnAggregate.RequestedAt.ShouldBe(requestedAt);
+        returnAggregate.ApprovedAt.ShouldBe(approvedAt);
+        returnAggregate.ReceivedAt.ShouldBe(receivedAt);
+        returnAggregate.InspectionStartedAt.ShouldBe(inspectedAt);
+        returnAggregate.CompletedAt.ShouldBe(completedAt);
+
+        // Verify inspection data merged
+        returnAggregate.InspectorId.ShouldBe("inspector-w01");
+        returnAggregate.InspectionResults.ShouldNotBeNull();
+        returnAggregate.InspectionResults.Count.ShouldBe(3);
+
+        // Items preserved from creation
+        returnAggregate.Items.Count.ShouldBe(3);
+    }
+
+    [Fact]
+    public void InspectionMixed_sets_correct_restocking_fee_for_passed_items_only()
+    {
+        var items = new List<ReturnLineItem>
+        {
+            new("DOG-BOWL-01", "Ceramic Dog Bowl", 1, 20.00m, 20.00m, ReturnReason.Defective),
+            new("CAT-TOY-05", "Interactive Laser", 1, 30.00m, 30.00m, ReturnReason.Unwanted),
+            new("CAT-BED-01", "Cat Bed", 1, 50.00m, 50.00m, ReturnReason.Unwanted)
+        };
+
+        var passedResults = new List<InspectionLineResult>
+        {
+            new("CAT-TOY-05", 1, ItemCondition.AsExpected, "Good",
+                true, DispositionDecision.Restockable, "A-1"),
+            new("CAT-BED-01", 1, ItemCondition.AsExpected, "Good",
+                true, DispositionDecision.Restockable, "B-2")
+        };
+        var failedResults = new List<InspectionLineResult>
+        {
+            new("DOG-BOWL-01", 1, ItemCondition.WorseThanExpected, "Damaged",
+                false, DispositionDecision.Dispose, null)
+        };
+
+        // Restocking fee only on passed items with fee-applicable reasons:
+        // CAT-TOY Unwanted: 15% of $30.00 = $4.50
+        // CAT-BED Unwanted: 15% of $50.00 = $7.50
+        // DOG-BOWL (failed, excluded): $0
+        var expectedFee = 4.50m + 7.50m;
+        var expectedRefund = 30.00m + 50.00m - expectedFee;
+
+        var returnAggregate = Return.Create(new ReturnRequested(ReturnId, OrderId, CustomerId, items, DateTimeOffset.UtcNow))
+            .Apply(new ReturnApproved(ReturnId, 88.00m, 12.00m,
+                DateTimeOffset.UtcNow.AddDays(30), DateTimeOffset.UtcNow))
+            .Apply(new ReturnReceived(ReturnId, DateTimeOffset.UtcNow))
+            .Apply(new InspectionStarted(ReturnId, "inspector-01", DateTimeOffset.UtcNow))
+            .Apply(new InspectionMixed(ReturnId, passedResults, failedResults,
+                expectedRefund, expectedFee, DateTimeOffset.UtcNow));
+
+        returnAggregate.Status.ShouldBe(ReturnStatus.Completed);
+        returnAggregate.FinalRefundAmount.ShouldBe(expectedRefund);
+        returnAggregate.RestockingFeeAmount.ShouldBe(expectedFee);
+        returnAggregate.IsTerminal.ShouldBeTrue();
+    }
+
+    #endregion
+
     #region Create preserves item data
 
     [Fact]

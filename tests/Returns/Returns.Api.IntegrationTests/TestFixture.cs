@@ -111,20 +111,4 @@ public class TestFixture : IAsyncLifetime
                 await ctx.InvokeAsync(message);
             }));
     }
-
-    /// <summary>
-    /// Makes an HTTP call with Alba while tracking Wolverine message activity.
-    /// Ensures all cascaded work completes before returning control to the test.
-    /// </summary>
-    public async Task<(ITrackedSession, IScenarioResult)> TrackedHttpCall(Action<Scenario> configuration)
-    {
-        IScenarioResult result = null!;
-
-        var tracked = await Host.ExecuteAndWaitAsync(async () =>
-        {
-            result = await Host.Scenario(configuration);
-        });
-
-        return (tracked, result);
-    }
 }
