@@ -224,7 +224,7 @@ This document tracks active and recent development cycles. For complete historic
 - Prerequisite: Cycle 24 Fulfillment + saga work complete ✅
 - Pre-implementation tasks from stakeholder observations documented in Cycle 24 plan
 
-**Cycle 26:** Notifications BC Phase 1 — Transactional email
+**Cycle 26:** Correspondence BC Phase 1 — Transactional email *(Note: Originally planned as "Notifications BC"; renamed to "Correspondence BC" in Cycle 28 — see ADR 0030)*
 - Phase 1a: `OrderPlaced`, `ShipmentDispatched` (existing BC events)
 - Phase 1b: Returns events (`ReturnApproved`, `ReturnDenied`, `ReturnCompleted`, `ReturnExpired`)
 

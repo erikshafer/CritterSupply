@@ -309,12 +309,16 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 | Product Catalog               | 5133     | ✅ Assigned  | Product Catalog/               |
 | **Customer Experience (BFF)** | **5237** | ✅ Assigned  | Customer Experience/Storefront.Api/ |
 | **Customer Experience (Web)** | **5238** | ✅ Assigned  | Customer Experience/Storefront.Web/ |
-| Vendor Portal                 | 5239     | 📋 Reserved | Vendor Portal API (future)     |
-| Vendor Identity               | 5240     | 📋 Reserved | Vendor Identity API (future)   |
-| **Vendor Portal (Web/Blazor WASM)**| **5241** | 📋 Reserved | Vendor Blazor WASM frontend (future; see ADR 0021)|
-| **Pricing**                   | **5242** | 📋 Reserved | Pricing API (future)           |
+| Vendor Portal                 | 5239     | ✅ Assigned  | Vendor Portal API              |
+| Vendor Identity               | 5240     | ✅ Assigned  | Vendor Identity API            |
+| **Vendor Portal (Web/Blazor WASM)**| **5241** | ✅ Assigned | Vendor Blazor WASM frontend (see ADR 0021)|
+| **Pricing**                   | **5242** | ✅ Assigned | Pricing API                    |
 | **Admin Portal (API)**        | **5243** | 📋 Reserved | Admin Portal API (future)      |
 | **Admin Portal (Web)**        | **5244** | 📋 Reserved | Admin Portal frontend (future; React/Vue/Blazor) |
+| **Returns**                   | **5245** | ✅ Assigned  | Returns/                       |
+| **Listings**                  | **5246** | 📋 Reserved | Listings API (future; Cycle 30+)|
+| **Marketplaces**              | **5247** | 📋 Reserved | Marketplaces API (future; Cycle 32+)|
+| **Correspondence**            | **5248** | 📋 Reserved | Correspondence/ (Cycle 28)     |
 
 **Why this matters:**
 - Allows running multiple APIs simultaneously during development

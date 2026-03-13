@@ -224,7 +224,7 @@ Alt Paths:            Denied[5]   Expired[6]                               Rejec
 
 ## Summary
 
-Cycle 26 completed the Returns BC Phase 2 initiative, closing all P0 and P1 gaps identified in the Phase 1 retrospective. The expanded `ReturnCompleted` contract with per-item disposition data unblocks Inventory BC for autonomous restocking. The three-way inspection logic handles the majority of real-world return scenarios (mixed results with partial refunds). Seven integration events provide complete lifecycle coverage for Orders, Customer Experience, Inventory, and Notifications BCs.
+Cycle 26 completed the Returns BC Phase 2 initiative, closing all P0 and P1 gaps identified in the Phase 1 retrospective. The expanded `ReturnCompleted` contract with per-item disposition data unblocks Inventory BC for autonomous restocking. The three-way inspection logic handles the majority of real-world return scenarios (mixed results with partial refunds). Seven integration events provide complete lifecycle coverage for Orders, Customer Experience, Inventory, and Correspondence BCs (originally called Notifications BC; renamed in Cycle 28 — see ADR 0030).
 
 The multi-agent workflow (PSA → UXE review → PSA implementation → QA testing → PSA test sign-off → PO/UXE show-and-tell) produced higher-quality contracts than a single-agent approach would have — the UXE's 6 revision requests added `ReturnReceived`, `ReturnDenied.Message`, and per-item `RefundAmount`/`RejectionReason`, all of which materially improve the customer experience.
 
