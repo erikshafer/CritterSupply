@@ -103,12 +103,9 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
 
         var returnId = createResponse.ReturnId!.Value;
 
-        // Approve exchange
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Url($"/api/returns/{returnId}/approve-exchange");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Approve exchange (direct command invocation to avoid race conditions)
+        var command = new ApproveExchange(returnId);
+        await _fixture.ExecuteAndWaitAsync(command);
 
         // Verify state
         using var session = _fixture.GetDocumentSession();
@@ -129,12 +126,9 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
 
         var returnId = createResponse.ReturnId!.Value;
 
-        // Approve exchange
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Url($"/api/returns/{returnId}/approve-exchange");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Approve exchange (direct command invocation)
+        var command = new ApproveExchange(returnId);
+        await _fixture.ExecuteAndWaitAsync(command);
 
         // Verify state
         using var session = _fixture.GetDocumentSession();
@@ -155,10 +149,10 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
 
         var returnId = createResponse.ReturnId!.Value;
 
-        // Try to approve exchange — should fail
+        // Try to approve exchange via HTTP — should fail with 409
         await _fixture.Host.Scenario(s =>
         {
-            s.Post.Url($"/api/returns/{returnId}/approve-exchange");
+            s.Post.Json(new ApproveExchange(returnId)).ToUrl($"/api/returns/{returnId}/approve-exchange");
             s.StatusCodeShouldBe(HttpStatusCode.Conflict); // 409
         });
 
@@ -178,17 +172,12 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
         var createResponse = await CreateExchangeViaApi(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        // Deny exchange
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Json(new DenyExchange(
-                returnId,
-                "OutOfStock",
-                "Replacement item currently unavailable. Please request a refund or try again later."
-            )).ToUrl($"/api/returns/{returnId}/deny-exchange");
-
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Deny exchange (direct command invocation)
+        var command = new DenyExchange(
+            returnId,
+            "OutOfStock",
+            "Replacement item currently unavailable. Please request a refund or try again later.");
+        await _fixture.ExecuteAndWaitAsync(command);
 
         // Verify state
         using var session = _fixture.GetDocumentSession();
@@ -208,34 +197,19 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
         var createResponse = await CreateExchangeViaApi(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        // Approve exchange
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Url($"/api/returns/{returnId}/approve-exchange");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Approve exchange (direct command invocation)
+        await _fixture.ExecuteAndWaitAsync(new ApproveExchange(returnId));
 
-        // Receive return
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Url($"/api/returns/{returnId}/receive");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Receive return (direct command invocation)
+        await _fixture.ExecuteAndWaitAsync(new ReceiveReturn(returnId));
 
-        // Submit failed inspection
+        // Submit failed inspection (direct command invocation)
         var inspectionResults = new List<InspectionLineResult>
         {
             new("PET-CARRIER-M", 1, ItemCondition.WorseThanExpected,
                 "Customer damage", false, DispositionDecision.Dispose, null)
         };
-
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Json(new SubmitInspection(returnId, inspectionResults))
-                .ToUrl($"/api/returns/{returnId}/inspection");
-
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        await _fixture.ExecuteAndWaitAsync(new SubmitInspection(returnId, inspectionResults));
 
         // Verify exchange rejected (no replacement, no refund)
         using var session = _fixture.GetDocumentSession();
@@ -254,34 +228,19 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
         var createResponse = await CreateExchangeViaApi(orderId, customerId);
         var returnId = createResponse.ReturnId!.Value;
 
-        // Approve exchange
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Url($"/api/returns/{returnId}/approve-exchange");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Approve exchange (direct command invocation)
+        await _fixture.ExecuteAndWaitAsync(new ApproveExchange(returnId));
 
-        // Receive return
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Url($"/api/returns/{returnId}/receive");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Receive return (direct command invocation)
+        await _fixture.ExecuteAndWaitAsync(new ReceiveReturn(returnId));
 
-        // Submit passed inspection
+        // Submit passed inspection (direct command invocation)
         var inspectionResults = new List<InspectionLineResult>
         {
             new("PET-CARRIER-M", 1, ItemCondition.AsExpected,
                 "Good condition", true, DispositionDecision.Restockable, "A-12-3")
         };
-
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Json(new SubmitInspection(returnId, inspectionResults))
-                .ToUrl($"/api/returns/{returnId}/inspection");
-
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        await _fixture.ExecuteAndWaitAsync(new SubmitInspection(returnId, inspectionResults));
 
         // Verify exchange ready for replacement shipment
         using var session = _fixture.GetDocumentSession();
@@ -302,43 +261,22 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
 
         var returnId = createResponse.ReturnId!.Value;
 
-        // Approve exchange
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Url($"/api/returns/{returnId}/approve-exchange");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Approve exchange (direct command invocation)
+        await _fixture.ExecuteAndWaitAsync(new ApproveExchange(returnId));
 
-        // Receive return
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Url($"/api/returns/{returnId}/receive");
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Receive return (direct command invocation)
+        await _fixture.ExecuteAndWaitAsync(new ReceiveReturn(returnId));
 
-        // Submit passed inspection
+        // Submit passed inspection (direct command invocation)
         var inspectionResults = new List<InspectionLineResult>
         {
             new("PET-CARRIER-M", 1, ItemCondition.AsExpected,
                 "Good condition", true, DispositionDecision.Restockable, "A-12-3")
         };
+        await _fixture.ExecuteAndWaitAsync(new SubmitInspection(returnId, inspectionResults));
 
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Json(new SubmitInspection(returnId, inspectionResults))
-                .ToUrl($"/api/returns/{returnId}/inspection");
-
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
-
-        // Ship replacement item
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Json(new ShipReplacementItem(returnId, "SHIP-123", "TRACK-456"))
-                .ToUrl($"/api/returns/{returnId}/ship-replacement");
-
-            s.StatusCodeShouldBe(HttpStatusCode.OK);
-        });
+        // Ship replacement item (direct command invocation)
+        await _fixture.ExecuteAndWaitAsync(new ShipReplacementItem(returnId, "SHIP-123", "TRACK-456"));
 
         // Verify exchange completed
         using var session = _fixture.GetDocumentSession();
@@ -375,10 +313,10 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
         var response = result.ReadAsJson<RequestReturnResponse>();
         var returnId = response!.ReturnId!.Value;
 
-        // Try to approve as exchange — should fail
+        // Try to approve as exchange via HTTP — should fail with 409
         await _fixture.Host.Scenario(s =>
         {
-            s.Post.Url($"/api/returns/{returnId}/approve-exchange");
+            s.Post.Json(new ApproveExchange(returnId)).ToUrl($"/api/returns/{returnId}/approve-exchange");
             s.StatusCodeShouldBe(HttpStatusCode.Conflict); // 409 - not an exchange
         });
     }

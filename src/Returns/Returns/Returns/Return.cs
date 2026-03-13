@@ -98,14 +98,23 @@ public sealed record Return(
         InspectionStartedAt = @event.StartedAt
     };
 
-    public Return Apply(InspectionPassed @event) => this with
+    public Return Apply(InspectionPassed @event)
     {
-        Status = ReturnStatus.Completed,
-        InspectionResults = @event.Results,
-        FinalRefundAmount = @event.FinalRefundAmount,
-        RestockingFeeAmount = @event.RestockingFeeAmount,
-        CompletedAt = @event.CompletedAt
-    };
+        // For exchanges, inspection passed means we stay in Inspecting state
+        // (waiting for ShipReplacementItem). For refunds, inspection passed means completed.
+        var newStatus = Type == ReturnType.Exchange
+            ? ReturnStatus.Inspecting  // Exchange: ready for replacement shipment
+            : ReturnStatus.Completed;   // Refund: completed
+
+        return this with
+        {
+            Status = newStatus,
+            InspectionResults = @event.Results,
+            FinalRefundAmount = @event.FinalRefundAmount,
+            RestockingFeeAmount = @event.RestockingFeeAmount,
+            CompletedAt = Type == ReturnType.Refund ? @event.CompletedAt : null // Only set for refunds
+        };
+    }
 
     public Return Apply(InspectionFailed @event) => this with
     {
