@@ -52,17 +52,47 @@ public static class RequestReturnHandler
         var returnId = Guid.CreateVersion7();
         var now = DateTimeOffset.UtcNow;
 
+        // Determine return type (Refund or Exchange)
+        var returnType = command.ExchangeRequest is not null ? ReturnType.Exchange : ReturnType.Refund;
+
+        // Map exchange request if present
+        ExchangeRequest? exchangeRequest = command.ExchangeRequest is not null
+            ? new ExchangeRequest(
+                ReplacementSku: command.ExchangeRequest.ReplacementSku,
+                ReplacementQuantity: command.ExchangeRequest.ReplacementQuantity,
+                ReplacementUnitPrice: command.ExchangeRequest.ReplacementUnitPrice)
+            : null;
+
         // Create the return stream with ReturnRequested event
         var requested = new ReturnRequested(
             ReturnId: returnId,
             OrderId: command.OrderId,
             CustomerId: command.CustomerId,
             Items: items,
+            Type: returnType,
+            ExchangeRequest: exchangeRequest,
             RequestedAt: now);
 
         session.Events.StartStream<Return>(returnId, requested);
 
-        // Determine auto-approval
+        // Exchanges ALWAYS require manual approval (stock check required)
+        if (returnType == ReturnType.Exchange)
+        {
+            // Publish integration event for Orders BC
+            await bus.PublishAsync(new Messages.Contracts.Returns.ExchangeRequested(
+                ReturnId: returnId,
+                OrderId: command.OrderId,
+                CustomerId: command.CustomerId,
+                ReplacementSku: exchangeRequest!.ReplacementSku,
+                ReplacementQuantity: exchangeRequest.ReplacementQuantity,
+                ReplacementUnitPrice: exchangeRequest.ReplacementUnitPrice,
+                RequestedAt: now));
+
+            return RequestReturnResponse.UnderReview(
+                returnId, command.OrderId, items, 0m, 0m, now); // No refund estimate for exchanges
+        }
+
+        // Refund path: Determine auto-approval
         var allReasons = items.Select(i => i.Reason).Distinct().ToList();
         var requiresReview = allReasons.Any(r => r == ReturnReason.Other);
 

@@ -3,6 +3,7 @@ namespace Returns.Returns;
 /// <summary>
 /// Event-sourced aggregate representing a customer return request.
 /// Lifecycle: Requested → Approved/Denied → Received → Inspecting → Completed/Rejected/Expired
+/// Exchange Lifecycle: Requested → Approved/Denied → Received → Inspecting → ExchangeShipping → ExchangeCompleted/Rejected
 /// </summary>
 public sealed record Return(
     Guid Id,
@@ -10,6 +11,7 @@ public sealed record Return(
     Guid CustomerId,
     IReadOnlyList<ReturnLineItem> Items,
     ReturnStatus Status,
+    ReturnType Type,
     decimal EstimatedRefundAmount,
     decimal RestockingFeeAmount,
     DateTimeOffset? ShipByDeadline,
@@ -18,13 +20,17 @@ public sealed record Return(
     string? InspectorId,
     IReadOnlyList<InspectionLineResult>? InspectionResults,
     decimal? FinalRefundAmount,
+    ExchangeRequest? ExchangeRequest,
+    string? ReplacementShipmentId,
+    decimal? PriceDifference,
     DateTimeOffset RequestedAt,
     DateTimeOffset? ApprovedAt,
     DateTimeOffset? DeniedAt,
     DateTimeOffset? ReceivedAt,
     DateTimeOffset? InspectionStartedAt,
     DateTimeOffset? CompletedAt,
-    DateTimeOffset? ExpiredAt)
+    DateTimeOffset? ExpiredAt,
+    DateTimeOffset? ReplacementShippedAt)
 {
     // Terminal states — no further transitions allowed
     public bool IsTerminal => Status is ReturnStatus.Denied
@@ -40,6 +46,7 @@ public sealed record Return(
             CustomerId: @event.CustomerId,
             Items: @event.Items,
             Status: ReturnStatus.Requested,
+            Type: @event.Type,
             EstimatedRefundAmount: estimatedRefund,
             RestockingFeeAmount: restockingFee,
             ShipByDeadline: null,
@@ -48,13 +55,17 @@ public sealed record Return(
             InspectorId: null,
             InspectionResults: null,
             FinalRefundAmount: null,
+            ExchangeRequest: @event.ExchangeRequest,
+            ReplacementShipmentId: null,
+            PriceDifference: null,
             RequestedAt: @event.RequestedAt,
             ApprovedAt: null,
             DeniedAt: null,
             ReceivedAt: null,
             InspectionStartedAt: null,
             CompletedAt: null,
-            ExpiredAt: null);
+            ExpiredAt: null,
+            ReplacementShippedAt: null);
     }
 
     public Return Apply(ReturnApproved @event) => this with
@@ -116,6 +127,46 @@ public sealed record Return(
     {
         Status = ReturnStatus.Expired,
         ExpiredAt = @event.ExpiredAt
+    };
+
+    // ---------------------------------------------------------------------------
+    // Exchange-specific Apply methods
+    // ---------------------------------------------------------------------------
+
+    public Return Apply(ExchangeApproved @event) => this with
+    {
+        Status = ReturnStatus.Approved,
+        PriceDifference = @event.PriceDifference,
+        ShipByDeadline = @event.ShipByDeadline,
+        ApprovedAt = @event.ApprovedAt
+    };
+
+    public Return Apply(ExchangeDenied @event) => this with
+    {
+        Status = ReturnStatus.Denied,
+        DenialReason = @event.Reason,
+        DenialMessage = @event.Message,
+        DeniedAt = @event.DeniedAt
+    };
+
+    public Return Apply(ExchangeReplacementShipped @event) => this with
+    {
+        Status = ReturnStatus.ExchangeShipping,
+        ReplacementShipmentId = @event.ShipmentId,
+        ReplacementShippedAt = @event.ShippedAt
+    };
+
+    public Return Apply(ExchangeCompleted @event) => this with
+    {
+        Status = ReturnStatus.Completed,
+        FinalRefundAmount = @event.PriceDifferenceRefund,
+        CompletedAt = @event.CompletedAt
+    };
+
+    public Return Apply(ExchangeRejected @event) => this with
+    {
+        Status = ReturnStatus.Rejected,
+        CompletedAt = @event.RejectedAt
     };
 
     /// <summary>
