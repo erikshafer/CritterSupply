@@ -4,7 +4,7 @@
 **Participants:** Product Owner, Principal Architect  
 **Status:** 🟡 Planning Complete — Awaiting Implementation Cycle Assignment  
 **Related CONTEXTS.md Sections:** [Vendor Identity](#vendor-identity), [Vendor Portal](#vendor-portal)  
-**Related ADRs:** [ADR 0015: JWT for Vendor Identity](../decisions/0015-jwt-for-vendor-identity.md)
+**Related ADRs:** [ADR 0028: JWT for Vendor Identity](../decisions/0028-jwt-for-vendor-identity.md)
 
 ---
 
@@ -784,7 +784,7 @@ Based on lessons learned during Vendor Identity design, these improvements shoul
 
 - [CONTEXTS.md — Vendor Identity](../../CONTEXTS.md#vendor-identity) — updated architectural source of truth
 - [CONTEXTS.md — Vendor Portal](../../CONTEXTS.md#vendor-portal) — updated architectural source of truth
-- [ADR 0015: JWT for Vendor Identity](../decisions/0015-jwt-for-vendor-identity.md)
+- [ADR 0028: JWT for Vendor Identity](../decisions/0028-jwt-for-vendor-identity.md)
 - [ADR 0013: SignalR Migration from SSE](../decisions/0013-signalr-migration-from-sse.md)
 - [ADR 0012: Session-Based Authentication](../decisions/0012-simple-session-based-authentication.md) — Customer Identity pattern this diverges from
 - [docs/features/vendor-portal/](../../docs/features/vendor-portal/) — BDD feature specifications

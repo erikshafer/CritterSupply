@@ -152,7 +152,7 @@ After:  var events = new List<object>();
 | 0.14 | **Migration correctness tests** — Pre-migration document snapshots == post-migration `ProductCatalogView` state (field-by-field); idempotency (run twice, assert no duplicates); post-migration `AddProduct` creates event stream, not document | `ProductCatalog.Api.IntegrationTests/MigrationTests.cs` (NEW) | 1 day |
 | 0.15 | **Event sourcing behavior tests** — `UpdateProduct` with name change emits `ProductNameChanged`; with category change emits `ProductCategoryAssigned`; with both emits both events; `ChangeProductStatus` to Discontinued emits `ProductDiscontinued` | `ProductCatalog.Api.IntegrationTests/EventSourcingTests.cs` (NEW) | 1 day |
 | 0.16 | **Existing test verification** — All 24+ existing integration tests pass without assertion changes (response bodies are identical because `ProductCatalogView` projects to same shape) | Run full test suite | 0.5 day |
-| 0.17 | **ADR writing** — ADRs 0026 (ES migration) and 0027 (catalog: namespace prefix) | `docs/decisions/0026-*.md`, `docs/decisions/0027-*.md` (NEW) | 0.5 day |
+| 0.17 | **ADR writing** — ADRs 0030 (ES migration) and 0031 (catalog: namespace prefix) | `docs/decisions/0030-*.md`, `docs/decisions/0031-*.md` (NEW) | 0.5 day |
 
 ### Phase 0 File Change Inventory
 
@@ -181,8 +181,8 @@ NEW (14+ files):
   src/Shared/Messages.Contracts/ProductCatalog/ProductRestored.cs
   tests/.../MigrationTests.cs
   tests/.../EventSourcingTests.cs
-  docs/decisions/0026-product-catalog-event-sourcing-migration.md
-  docs/decisions/0027-catalog-namespace-uuid-v5-stream-ids.md
+  docs/decisions/0030-product-catalog-event-sourcing-migration.md
+  docs/decisions/0031-catalog-namespace-uuid-v5-stream-ids.md
 
 DEPRECATED (1 file):
   src/Shared/Messages.Contracts/ProductCatalog/ProductUpdated.cs  ← mark [Obsolete]
@@ -196,7 +196,7 @@ DEPRECATED (1 file):
 ✅ `ProductCatalogView` projects to identical state as pre-migration documents  
 ✅ Granular integration messages publish correctly to RabbitMQ  
 ✅ `ProductDiscontinued(IsRecall: true)` routes to `product-recall` priority exchange  
-✅ ADRs 0026 and 0027 written
+✅ ADRs 0030 and 0031 written
 
 ---
 
@@ -288,7 +288,7 @@ ANY non-terminal → Ended (via ForcedDown from recall cascade — bypasses norm
 | 1.13 | **Product Detail enhancements** — Listings Summary widget (P1.2: "2 Live · 1 Paused · 0 Ended"); Product Change History tab (P1.1: `<MudTimeline>` with significance filtering) | 1 day |
 | 1.14 | **Pre-flight discontinuation modal (P0.1)** — `<MudDialog>` showing affected listing count, channel breakdown, reason field, recall checkbox; wired to real Listings data | 0.5 day |
 | 1.15 | **Grouped cascade notification (P0.2)** — `<CascadeNotificationCard>` renders one grouped notification per cascade, not per-listing toasts | 0.5 day |
-| 1.16 | **ADR writing** — ADRs 0028 (granular integration messages), 0029 (recall cascade priority exchange), 0030 (Listings BC composite key), 0033 (ProductSummaryView pattern) | 0.5 day |
+| 1.16 | **ADR writing** — ADRs 0032 (granular integration messages), 0033 (recall cascade priority exchange), 0034 (Listings BC composite key), 0037 (ProductSummaryView pattern) | 0.5 day |
 | 1.17 | **OWN_WEBSITE seed data** — Register `OWN_WEBSITE` as the first Marketplace document (seeded in development) | 0.25 day |
 
 ### Phase 1 Gate
@@ -302,7 +302,7 @@ ANY non-terminal → Ended (via ForcedDown from recall cascade — bypasses norm
 ✅ Integration tests cover: happy path, recall cascade (3+ listings across 2+ channels), duplicate listing prevention, terminal product rejection  
 ✅ AdminPortal.Web scaffold running with Listings Dashboard, Detail, and Create pages  
 ✅ Pre-flight discontinuation modal shows accurate affected listing count  
-✅ ADRs 0028–0030, 0033 written
+✅ ADRs 0032–0034, 0037 written
 
 ---
 
@@ -386,7 +386,7 @@ This cycle wires the first **bidirectional async messaging integration** in Crit
 | 2.13 | **Integration message contracts** — `Messages.Contracts.Marketplaces`: `MarketplaceRegistered`, `MarketplaceDeactivated`, `CategoryMappingUpdated`, `AttributeSchemaPublished`, `MarketplaceListingActivated`, `MarketplaceSubmissionRejected`, `MarketplaceListingDeactivated` | 0.5 day |
 | 2.14 | **Integration tests** — TestContainers; test classes: `MarketplaceCrudTests`, `CategoryMappingTests`, `AttributeSchemaTests`, `ListingSubmissionFlowTests` (end-to-end: listing submitted → adapter called → confirmation back), `SeedDataTests` | 2 days |
 | 2.15 | **Admin UI — Marketplace pages** — Marketplaces list (`/admin/marketplaces`), Detail (`/admin/marketplaces/{channelCode}`) with 4 tabs (Configuration, Category Mappings, Attribute Schema, Audit Log), Add Channel (`/admin/marketplaces/create`) with guided workflow, Category Mapping Editor | 2 days |
-| 2.16 | **ADR writing** — ADRs 0031 (Marketplace as document entity), 0032 (category mapping ownership) | 0.25 day |
+| 2.16 | **ADR writing** — ADRs 0035 (Marketplace as document entity), 0036 (category mapping ownership) | 0.25 day |
 
 ### Phase 2 Gate
 
@@ -399,7 +399,7 @@ This cycle wires the first **bidirectional async messaging integration** in Crit
 ✅ Submission timeout fires after 30 minutes for orphaned `Submitted` listings  
 ✅ Admin UI: Marketplace list, detail (4 tabs), create (guided workflow), category mapping editor  
 ✅ Integration tests cover: end-to-end submission flow, rejection flow, schema review flagging  
-✅ ADRs 0031 and 0032 written
+✅ ADRs 0035 and 0036 written
 
 ---
 
@@ -424,7 +424,7 @@ This cycle wires the first **bidirectional async messaging integration** in Crit
 | 3.7 | **Compliance gate on listing submission** — if `ProductSummaryView.IsHazmat == true` and `HazmatClass` is null, reject submission with 400; marketplace-specific rules handled by adapter | 0.5 day |
 | 3.8 | **Admin UI — ProductFamily pages** — Family list (`/admin/catalog/families`), Family detail (`/admin/catalog/families/{familyId}`) with variant `<MudDataGrid>`, Add Variant dialog with dynamic attribute fields | 1.5 days |
 | 3.9 | **Integration tests** — ProductFamily CRUD, dual-stream variant writes, variant-aware listing creation, compliance gate validation | 1.5 days |
-| 3.10 | **ADR writing** — ADR 0034 (parent/child variant model) | 0.25 day |
+| 3.10 | **ADR writing** — ADR 0038 (parent/child variant model) | 0.25 day |
 
 ### Cycle 35 — Phase 3b: Real API Calls + Storefront Variants + Automation
 
@@ -455,19 +455,19 @@ This cycle wires the first **bidirectional async messaging integration** in Crit
 
 ## 8. ADR Schedule
 
-The evolution plan proposed ADRs 0022–0029, but those numbers are taken. Renumbered starting from 0026:
+The evolution plan proposed ADRs 0022–0029, but those numbers are taken. Renumbered starting from 0030:
 
 | ADR # | Title | Ships Before | Phase |
 |-------|-------|-------------|-------|
-| **0026** | Product Catalog BC migration to event sourcing | Cycle 29 start | Phase 0 |
-| **0027** | `catalog:` namespace prefix for UUID v5 stream IDs | Cycle 29 start | Phase 0 |
-| **0028** | Granular Product Catalog integration messages (retire `ProductUpdated`) | Cycle 30 start | Phase 0 |
-| **0029** | Recall cascade via dedicated priority RabbitMQ exchange | Cycle 30 start | Phase 0 |
-| **0030** | Listings BC event-sourced aggregate with UUID v5 composite key | Cycle 30 start | Phase 1 |
-| **0031** | Marketplace identity as document entity (not enum/aggregate/config) | Cycle 32 start | Phase 2 |
-| **0032** | Category-to-marketplace mapping ownership in Marketplaces BC | Cycle 32 start | Phase 2 |
-| **0033** | Listings BC local `ProductSummaryView` (no HTTP to Catalog) | Cycle 30 start | Phase 1 |
-| **0034** | Parent/Child variant model for ProductFamily aggregate | Cycle 34 start | Phase 3 |
+| **0030** | Product Catalog BC migration to event sourcing | Cycle 29 start | Phase 0 |
+| **0031** | `catalog:` namespace prefix for UUID v5 stream IDs | Cycle 29 start | Phase 0 |
+| **0032** | Granular Product Catalog integration messages (retire `ProductUpdated`) | Cycle 30 start | Phase 0 |
+| **0033** | Recall cascade via dedicated priority RabbitMQ exchange | Cycle 30 start | Phase 0 |
+| **0034** | Listings BC event-sourced aggregate with UUID v5 composite key | Cycle 30 start | Phase 1 |
+| **0035** | Marketplace identity as document entity (not enum/aggregate/config) | Cycle 32 start | Phase 2 |
+| **0036** | Category-to-marketplace mapping ownership in Marketplaces BC | Cycle 32 start | Phase 2 |
+| **0037** | Listings BC local `ProductSummaryView` (no HTTP to Catalog) | Cycle 30 start | Phase 1 |
+| **0038** | Parent/Child variant model for ProductFamily aggregate | Cycle 34 start | Phase 3 |
 
 **Writing rule:** ADRs must be written *before* the phase they document begins. They capture the "why" decisions that would otherwise be re-litigated by every developer touching the codebase.
 

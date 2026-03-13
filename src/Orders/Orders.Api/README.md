@@ -433,5 +433,5 @@ sequenceDiagram
 ## 📖 Detailed Documentation
 
 → [`docs/skills/wolverine-sagas.md`](../../../docs/skills/wolverine-sagas.md) — Saga patterns, Decider pattern, idempotency, lifecycle  
-→ [`docs/decisions/0015-order-saga-design-decisions.md`](../../../docs/decisions/0015-order-saga-design-decisions.md) — ADR: why document-based saga, Decider pattern, HashSet for committed IDs  
+→ [`docs/decisions/0029-order-saga-design-decisions.md`](../../../docs/decisions/0029-order-saga-design-decisions.md) — ADR: why document-based saga, Decider pattern, HashSet for committed IDs  
 → [`docs/workflows/orders-workflows.md`](../../../docs/workflows/orders-workflows.md)

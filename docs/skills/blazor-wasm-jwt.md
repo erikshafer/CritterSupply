@@ -622,6 +622,6 @@ access to instance services:
 - `src/Vendor Portal/VendorPortal.Api/` — JWT-protected API + SignalR hub
 - `src/Vendor Identity/VendorIdentity.Api/Auth/` — JWT login/refresh/logout
 - `docs/decisions/0021-blazor-wasm-for-vendor-portal-web.md` — why WASM over Blazor Server
-- `docs/decisions/0015-jwt-for-vendor-identity.md` — why JWT over session cookies
+- `docs/decisions/0028-jwt-for-vendor-identity.md` — why JWT over session cookies
 - `docs/decisions/0025-blazor-wasm-poc-learnings.md` — POC gotchas and limitations
 - `docs/skills/wolverine-signalr.md` — SignalR hub setup and authentication patterns

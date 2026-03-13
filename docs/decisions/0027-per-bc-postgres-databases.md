@@ -1,4 +1,4 @@
-# ADR 0015: Per-Bounded-Context Postgres Databases
+# ADR 0027: Per-Bounded-Context Postgres Databases
 
 **Status:** ✅ Accepted
 

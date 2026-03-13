@@ -8,21 +8,21 @@
 > 1. **GitHub MCP server** configured in your AI tool's MCP settings
 > 2. **GitHub auth** (personal access token with `repo` + `project` scopes)
 >
-> With both configured, query GitHub directly: `list_issues(milestone="Cycle 27", state="open")`  
+> With both configured, query GitHub directly: `list_issues(milestone="Cycle 28", state="open")`  
 > This works identically on any machine — MacBook, Windows PC, Linux laptop.
 
 ---
 
-**Cycle:** 26 — Returns BC Phase 2 *(just completed)*  
-**Status:** ✅ **COMPLETE** — All sign-offs obtained (PSA, PO, UXE)  
-**GitHub Milestone:** Cycle 26: Returns BC Phase 2  
+**Cycle:** 27 — Returns BC Phase 3 *(just completed)*  
+**Status:** ✅ **COMPLETE** — P0 (Exchange workflow), P1 (CE SignalR handlers + sequential returns), and P2 (quick wins) delivered  
+**GitHub Milestone:** Cycle 27: Returns BC Phase 3  
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 
 ---
 
 ## Current Status
 
-**Cycles 25 and 26 are COMPLETE.** Returns BC Phase 1 (core domain + API) and Phase 2 (integration events, mixed inspection, contract expansion) are both delivered. All stakeholder sign-offs obtained.
+**Cycles 25, 26, and 27 are COMPLETE.** Returns BC Phase 1 (core domain + API), Phase 2 (integration events, mixed inspection, contract expansion), and Phase 3 (exchange workflow, CE SignalR handlers, sequential returns) are all delivered.
 
 **What Cycle 25 delivered (Returns BC Phase 1):**
 - ✅ Event-sourced Return aggregate (10 lifecycle states, 9 domain events)
@@ -47,8 +47,19 @@
 - [Phase 2 Implementation Plan](cycles/cycle-26-returns-bc-phase-2.md)
 - [Phase 2 Retrospective](cycles/cycle-26-returns-bc-phase-2-retrospective.md)
 
+**What Cycle 27 delivered (Returns BC Phase 3):**
+- ✅ Exchange workflow (UC-11) — `ReturnType` enum, `ExchangeRequest` record, 5 exchange domain events, 3 command handlers (ApproveExchange, DenyExchange, ShipReplacementItem), 6 integration messages
+- ✅ CE SignalR handlers — 7 handlers in `Storefront/Notifications/`, `ReturnStatusChanged` event added to discriminated union
+- ✅ Sequential returns — `IsReturnInProgress` (bool) → `ActiveReturnIds` (IReadOnlyList<Guid>) saga refactor
+- ✅ Anticorruption layer — `EnumTranslations` static class for customer-facing enum text
+- ✅ `GetReturnableItems` DeliveredAt endpoint fix
+- ✅ $0 refund guard in Orders saga `ReturnCompleted` handler
+- ✅ Cross-BC smoke tests — 3-host Alba fixture (Returns + Orders + Fulfillment)
+- ✅ Fraud detection patterns documentation
+- [Phase 3 Plan](cycles/cycle-27-returns-bc-phase-3.md)
+- [Phase 3 Retrospective](cycles/cycle-27-returns-bc-phase-3-retrospective.md)
+
 **Next cycles (roadmap):**
-- **Cycle 27:** Returns BC Phase 3 — Exchange workflow (UC-11, ~20-30% of return volume) + CE SignalR handlers
 - **Cycle 28:** Notifications BC Phase 1 — Transactional email (OrderPlaced, ShipmentDispatched, Returns events)
 - **Cycle 29:** Promotions BC Phase 1 — Coupons and discounts; RBAC ADR for Admin Portal
 - **Cycle 30+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
@@ -56,6 +67,18 @@
 ---
 
 ## Recently Completed
+
+- ✅ **Cycle 27:** Returns BC Phase 3 (2026-03-13) — **COMPLETE**
+  - Exchange workflow (UC-11) — ReturnType enum, ExchangeRequest, 5 exchange domain events, 3 command handlers
+  - 6 integration messages for exchange workflow
+  - CE SignalR handlers — 7 handlers, ReturnStatusChanged discriminated union event
+  - Sequential returns — IsReturnInProgress → ActiveReturnIds (IReadOnlyList<Guid>) saga refactor
+  - Anticorruption layer — EnumTranslations static class for customer-facing text
+  - GetReturnableItems DeliveredAt fix + $0 refund guard
+  - Cross-BC smoke tests (3-host Alba fixture: Returns + Orders + Fulfillment)
+  - Fraud detection patterns documentation
+  - Sign-offs: PSA ✅, PO ✅, UXE ✅ (planning phase)
+  - [Plan](./cycles/cycle-27-returns-bc-phase-3.md) | [Retrospective](./cycles/cycle-27-returns-bc-phase-3-retrospective.md)
 
 - ✅ **Cycle 26:** Returns BC Phase 2 (2026-03-12 to 2026-03-13) — **COMPLETE**
   - ReturnCompleted expanded with per-item disposition (CustomerId, ReturnedItem[])
@@ -154,13 +177,7 @@
 
 ### Next 4 Cycles (Revised after Phase 2 Retrospective)
 
-> **See** [`docs/planning/cycles/cycle-26-returns-bc-phase-2-retrospective.md`](cycles/cycle-26-returns-bc-phase-2-retrospective.md) for Phase 3 priorities from PSA, PO, and UXE sign-offs.
-
-- **Cycle 27:** Returns BC Phase 3 — Exchange workflow (UC-11, ~20-30% return volume) + CE SignalR handlers
-  - 🔴 Exchange workflow: customer returns item A and gets item B in exchange
-  - 🟡 Customer Experience BC SignalR handlers for 7 return events
-  - 🟡 Sequential returns (multiple returns per order before window expires)
-  - Prerequisite: Cycles 25-26 Returns Phase 1-2 ✅ COMPLETE
+> **See** [`docs/planning/cycles/cycle-27-returns-bc-phase-3-retrospective.md`](cycles/cycle-27-returns-bc-phase-3-retrospective.md) for Phase 4 priorities agreed in the Cycle 27 retrospective.
 
 - **Cycle 28:** Notifications BC Phase 1 — Transactional email
   - Phase 1a: `OrderPlaced`, `ShipmentDispatched` (existing BC events)
@@ -179,12 +196,12 @@
 ### Future BCs (Priority Roadmap)
 
 **High Priority (Customer-Facing Gaps):**
-- 🔴 **Returns BC Phase 3** — Exchange workflow, CE SignalR handlers, sequential returns *(Cycle 27)*
 - 🔴 **Notifications BC** — Transactional emails, SMS, push notifications *(Cycle 28)*
 - 🔴 **Promotions BC** — Discount codes, percentage-off campaigns, BOGO *(Cycle 29)*
+- 🔴 **Exchange v2** — Cross-product exchanges, upcharge payment collection *(future)*
 
 **Medium Priority (Scaling + Internal Tooling):**
-- 🟡 **Admin Portal** — Internal operations portal *(Cycle 28+, after RBAC ADR)*
+- 🟡 **Admin Portal** — Internal operations portal *(Cycle 30+, after RBAC ADR)*
 - 🟡 **Product Catalog Evolution** — Variants, Listings, Marketplaces *(D2–D10 decisions resolved; [cycle plan](catalog-listings-marketplaces-cycle-plan.md) approved — Cycles 29–35)*
 - 🟡 **Search BC** — Full-text product search, faceted navigation
 - 🟡 **Recommendations BC** — Personalized product recommendations
@@ -210,5 +227,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-13 (Cycle 26 closed; Returns BC Phase 2 complete — all sign-offs obtained)*
+*Last Updated: 2026-03-13 (Cycle 27 closed; Returns BC Phase 3 complete — Exchange workflow, CE SignalR handlers, sequential returns delivered)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*

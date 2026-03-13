@@ -320,7 +320,7 @@ Pre-planning documents already exist:
 - Event modeling: `docs/planning/vendor-portal-event-modeling.md` (783 lines)
 - Gherkin features: `docs/features/vendor-identity/` + `docs/features/vendor-portal/`
 - CONTEXTS.md sections: Vendor Identity + Vendor Portal (fully specified)
-- ADR 0015: JWT for Vendor Identity (exists)
+- ADR 0028: JWT for Vendor Identity (exists)
 - **ADR 0021: Blazor WASM for VendorPortal.Web (referenced but file exists)**
 
 **Phase 1 Scope (No Vendor UI Yet):**

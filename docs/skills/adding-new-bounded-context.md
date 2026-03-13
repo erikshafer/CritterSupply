@@ -7,7 +7,7 @@ description: Step-by-step checklist for adding a new bounded context (BC) to Cri
 
 A comprehensive checklist and reference guide for adding a new bounded context to CritterSupply. Every step is covered — including the infrastructure and configuration steps that are most easily forgotten.
 
-> **Reference ADR:** [ADR 0015: Per-Bounded-Context Postgres Databases](../decisions/0015-per-bc-postgres-databases.md) — explains why each BC has its own database and the init-script pattern used here.
+> **Reference ADR:** [ADR 0027: Per-Bounded-Context Postgres Databases](../decisions/0027-per-bc-postgres-databases.md) — explains why each BC has its own database and the init-script pattern used here.
 
 ---
 
@@ -382,7 +382,7 @@ public partial class Program { }
 }
 ```
 
-> **Key is always `"postgres"`** — this was consolidated across all BCs in ADR 0015. `GetConnectionString("postgres")` in `Program.cs` reads this key. The Docker Compose environment variable maps to `ConnectionStrings__postgres` (double underscore = nesting).
+> **Key is always `"postgres"`** — this was consolidated across all BCs in ADR 0027. `GetConnectionString("postgres")` in `Program.cs` reads this key. The Docker Compose environment variable maps to `ConnectionStrings__postgres` (double underscore = nesting).
 
 ### 2f. Create `Properties/launchSettings.json`
 
@@ -859,7 +859,7 @@ docker-compose --profile infrastructure up -d
 
 **Symptom:** `InvalidOperationException: Connection string 'marten' not found` or similar.
 
-**Fix:** The connection string key is `"postgres"` everywhere — in `appsettings.json`, `GetConnectionString("postgres")`, and `ConnectionStrings__postgres` in Docker Compose. See [ADR 0015](../decisions/0015-per-bc-postgres-databases.md) for the rationale.
+**Fix:** The connection string key is `"postgres"` everywhere — in `appsettings.json`, `GetConnectionString("postgres")`, and `ConnectionStrings__postgres` in Docker Compose. See [ADR 0027](../decisions/0027-per-bc-postgres-databases.md) for the rationale.
 
 ---
 
@@ -924,6 +924,6 @@ docker-compose --profile infrastructure up -d
 - [CritterStack Testing Patterns](./critterstack-testing-patterns.md) — Alba HTTP scenarios, Wolverine message tracking
 - [Reqnroll BDD Testing](./reqnroll-bdd-testing.md) — Gherkin features and step definitions
 - [Wolverine Message Handlers](./wolverine-message-handlers.md) — Command/query handlers, HTTP endpoints
-- [ADR 0015: Per-Bounded-Context Postgres Databases](../decisions/0015-per-bc-postgres-databases.md) — Why each BC has its own database
+- [ADR 0027: Per-Bounded-Context Postgres Databases](../decisions/0027-per-bc-postgres-databases.md) — Why each BC has its own database
 - **CONTEXTS.md** — Architectural source of truth for BC boundaries and integration contracts
 - **CLAUDE.md** — Port allocation table, project structure conventions, coding standards

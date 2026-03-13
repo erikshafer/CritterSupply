@@ -351,4 +351,4 @@ For the reference architecture to genuinely validate Polecat, these questions ne
 - [`Testcontainers.MsSql`](https://dotnet.testcontainers.org/modules/mssql/) — SQL Server TestContainers module
 - [CONTEXTS.md — Returns BC](../../CONTEXTS.md#returns) — existing Returns BC design
 - [CONTEXTS.md — Vendor Portal BC](../../CONTEXTS.md#vendor-portal) — existing Vendor Portal BC design
-- [ADR 0002 — EF Core for Customer Identity](../decisions/0002-efcore-for-customer-identity.md) — precedent for EF Core in this system
+- [ADR 0002 — EF Core for Customer Identity](../decisions/0002-ef-core-for-customer-identity.md) — precedent for EF Core in this system

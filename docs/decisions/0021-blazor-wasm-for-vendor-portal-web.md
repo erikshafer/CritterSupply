@@ -9,7 +9,7 @@
 **Related:**
 - [ADR 0005: MudBlazor UI Framework](./0005-mudblazor-ui-framework.md)
 - [ADR 0013: SignalR Migration from SSE](./0013-signalr-migration-from-sse.md)
-- [ADR 0015: JWT Bearer Tokens for Vendor Identity](./0015-jwt-for-vendor-identity.md)
+- [ADR 0028: JWT Bearer Tokens for Vendor Identity](./0028-jwt-for-vendor-identity.md)
 - [docs/planning/vendor-portal-event-modeling.md](../planning/vendor-portal-event-modeling.md)
 - [CONTEXTS.md — Vendor Portal](../../CONTEXTS.md#vendor-portal)
 
@@ -32,7 +32,7 @@ The evaluation was driven by four non-negotiable requirements:
 2. **Real-time bidirectional communication** — `VendorPortalHub : WolverineHub` requires a JWT-authenticated
    WebSocket connection for server→client push (alerts, decisions) and client→server routing
    (change request responses, alert acknowledgments).
-3. **JWT-native design** — ADR 0015 established JWT Bearer tokens for Vendor Identity. The
+3. **JWT-native design** — ADR 0028 established JWT Bearer tokens for Vendor Identity. The
    `accessTokenFactory` pattern (called on every hub reconnect) is a first-class design choice,
    not an afterthought. The frontend must accommodate this without architectural friction.
 4. **C#-only team** — CritterSupply's team is .NET-primary. TypeScript maintenance is a permanent
@@ -89,7 +89,7 @@ connection per user (the hub only).
 
 #### 3. JWT + accessTokenFactory is Native to WASM, Awkward in Blazor Server
 
-ADR 0015 established the `accessTokenFactory` pattern for hub connections:
+ADR 0028 established the `accessTokenFactory` pattern for hub connections:
 
 ```csharp
 // C# HubConnectionBuilder — same semantics as the JS version in wolverine-signalr.md
@@ -139,7 +139,7 @@ Blazor United scored 26 vs WASM's 30 on the weighted evaluation.
 |---|---|---|
 | Blazor hosting model | **Server** | **WASM** |
 | Session duration | Minutes (browse-and-buy) | Hours (ambient awareness, B2B) |
-| Auth mechanism | Session cookies (ADR 0012) | JWT Bearer (ADR 0015) |
+| Auth mechanism | Session cookies (ADR 0012) | JWT Bearer (ADR 0028) |
 | Hub identity source | Query-string GUID (session-backed) | JWT claims only (cryptographic) |
 | Deployment | Kestrel (.NET container) | Nginx (static files) |
 | WebSocket connections per user | 2 (circuit + hub) | 1 (hub only) |
@@ -354,7 +354,7 @@ container and its own `HubConnection`. This means:
 
 ✅ **Session stability** — no circuit to GC; long-running WASM sessions are not disrupted by server
    deployments or transient network blips  
-✅ **JWT-native** — `AccessTokenProvider` factory in C# `HubConnectionBuilder` fits ADR 0015 design
+✅ **JWT-native** — `AccessTokenProvider` factory in C# `HubConnectionBuilder` fits ADR 0028 design
    exactly; no `IHttpContextAccessor` plumbing  
 ✅ **Single WebSocket connection per user** — WASM has no circuit; only the `VendorPortalHub` connection  
 ✅ **Static file deployment** — `VendorPortal.Web` Nginx container has no .NET runtime dependency  
@@ -387,7 +387,7 @@ milestone and [CYCLES.md](../planning/CYCLES.md) for the full cycle schedule.
 |---|---|---|
 | 1 | Same-origin proxy vs CORS for dev? | Dev proxy in `launchSettings.json`; Nginx reverse proxy in prod |
 | 2 | Redis backplane for VendorPortal.Api? | Add to Phase 2 checklist — required before multi-instance deployment |
-| 3 | Argon2id hash parameters profiled? | Add perf test to Cycle 22; document parameters in ADR 0015 |
+| 3 | Argon2id hash parameters profiled? | Add perf test to Cycle 22; document parameters in ADR 0028 |
 | 4 | ApexCharts.Blazor WASM verified? | Spike in Phase 2 before dashboard build |
 | 5 | `lastSeenAt` storage confirmed as `localStorage`? | Yes — not sensitive; document in VendorHubService |
 | 6 | `VendorPortalHub : WolverineHub` from Phase 1? | Yes — scaffold with `WolverineHub` from first commit |
@@ -461,7 +461,7 @@ long-session stability and smallest .NET community footprint.
 - [ADR 0005: MudBlazor UI Framework](./0005-mudblazor-ui-framework.md)
 - [ADR 0012: Session-Based Authentication (Customer Identity)](./0012-simple-session-based-authentication.md)
 - [ADR 0013: SignalR Migration from SSE](./0013-signalr-migration-from-sse.md)
-- [ADR 0015: JWT Bearer Tokens for Vendor Identity](./0015-jwt-for-vendor-identity.md)
+- [ADR 0028: JWT Bearer Tokens for Vendor Identity](./0028-jwt-for-vendor-identity.md)
 - [docs/planning/vendor-portal-event-modeling.md](../planning/vendor-portal-event-modeling.md)
 - [docs/skills/wolverine-signalr.md](../skills/wolverine-signalr.md) — VendorPortalHub patterns, WolverineHub distinction
 - [docs/skills/bff-realtime-patterns.md](../skills/bff-realtime-patterns.md) — accessTokenFactory, reconnect-and-catch-up

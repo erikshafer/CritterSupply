@@ -1,4 +1,4 @@
-# ADR 0015: JWT Bearer Tokens for Vendor Identity (Diverges from Customer Identity)
+# ADR 0028: JWT Bearer Tokens for Vendor Identity (Diverges from Customer Identity)
 
 **Status:** ✅ Accepted
 
@@ -182,7 +182,7 @@ aud                 = "vendor-portal"
 
 ---
 
-## Comparison: Customer Identity (ADR 0012) vs Vendor Identity (ADR 0015)
+## Comparison: Customer Identity (ADR 0012) vs Vendor Identity (ADR 0028)
 
 | Aspect | Customer Identity | Vendor Identity |
 |---|---|---|

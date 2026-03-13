@@ -546,5 +546,5 @@ Both Blazor frontends (Storefront.Web and VendorPortal.Web) are fully decoupled 
 - [Testcontainers.MsSql NuGet](https://www.nuget.org/packages/Testcontainers.MsSql) — SQL Server test containers
 - [CONTEXTS.md](../../CONTEXTS.md) — Bounded context definitions for the 4 affected BCs
 - [ADR 0002: EF Core for Customer Identity](0002-ef-core-for-customer-identity.md) — Original EF Core decision
-- [ADR 0015: Per-BC Postgres Databases](0015-per-bc-postgres-databases.md) — Database isolation pattern
-- [ADR 0015: JWT for Vendor Identity](0015-jwt-for-vendor-identity.md) — JWT architecture (note: multiple ADRs share the 0015 number in this repo)
+- [ADR 0027: Per-BC Postgres Databases](0027-per-bc-postgres-databases.md) — Database isolation pattern
+- [ADR 0028: JWT for Vendor Identity](0028-jwt-for-vendor-identity.md) — JWT architecture
