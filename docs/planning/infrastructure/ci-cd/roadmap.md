@@ -261,7 +261,7 @@ Before implementing each phase, answer these questions:
 - **Visual Guide:** [visual-guide.md](./visual-guide.md)
 - **Current Workflow:** [.github/workflows/dotnet.yml](../../../../.github/workflows/dotnet.yml)
 - **Bounded Contexts:** [CONTEXTS.md](../../../../CONTEXTS.md)
-- **Development Cycles:** [CYCLES.md](../CYCLES.md)
+- **Development Cycles:** [CURRENT-CYCLE.md](../CURRENT-CYCLE.md)
 
 ---
 

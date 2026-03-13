@@ -382,7 +382,7 @@ docker logs rabbitmq
 ## Next Steps After Testing
 
 **If all tests pass:**
-1. Mark Cycle 18 complete in `docs/planning/CYCLES.md` ✅ (Already done!)
+1. Mark Cycle 18 complete in `docs/planning/CURRENT-CYCLE.md` ✅ (Already done!)
 2. Document any bugs/issues in GitHub Issues
 3. Plan **Cycle 19: Authentication & Authorization**
    - Customer Identity BC authentication integration
