@@ -1,6 +1,7 @@
 using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
+using System.Reflection;
 using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.Tracking;
@@ -31,7 +32,9 @@ public class TestFixture : IAsyncLifetime
 
         JasperFxEnvironment.AutoStartHost = true;
 
-        Host = await AlbaHost.For<Program>(builder =>
+        var programType = GetProgramType("Returns.Api");
+
+        Host = await AlbaHost.For(programType, builder =>
         {
             builder.ConfigureServices(services =>
             {
@@ -44,6 +47,14 @@ public class TestFixture : IAsyncLifetime
                 services.DisableAllExternalWolverineTransports();
             });
         });
+    }
+
+    private static Type GetProgramType(string assemblyName)
+    {
+        var assembly = Assembly.Load(assemblyName);
+        var programType = assembly.GetType("Program")
+            ?? throw new InvalidOperationException($"Program class not found in assembly {assemblyName}");
+        return programType;
     }
 
     public async Task DisposeAsync()
@@ -106,9 +117,9 @@ public class TestFixture : IAsyncLifetime
         return await Host.TrackActivity(TimeSpan.FromSeconds(timeoutSeconds))
             .DoNotAssertOnExceptionsDetected()
             .AlsoTrack(Host)
-            .ExecuteAndWaitAsync((Func<IMessageContext, Task>)(async ctx =>
+            .ExecuteAndWaitAsync(ctx =>
             {
-                await ctx.InvokeAsync(message);
-            }));
+                return ctx.InvokeAsync(message);
+            });
     }
 }

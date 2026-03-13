@@ -1,0 +1,99 @@
+using Messages.Contracts.Fulfillment;
+using Returns.Returns;
+using Shouldly;
+
+namespace Returns.Api.IntegrationTests.CrossBcSmokeTests;
+
+/// <summary>
+/// Smoke tests verifying Fulfillment → Returns integration pipeline.
+/// Tests that ShipmentDelivered messages from Fulfillment BC successfully create
+/// ReturnEligibilityWindow documents in Returns BC via RabbitMQ.
+/// </summary>
+[Collection(nameof(CrossBcTestCollection))]
+public class FulfillmentToReturnsPipelineTests(CrossBcTestFixture fixture)
+{
+    private readonly CrossBcTestFixture _fixture = fixture;
+
+    [Fact]
+    public async Task ShipmentDelivered_Creates_ReturnEligibilityWindow_In_Returns_BC()
+    {
+        // Arrange
+        await _fixture.CleanAllDataAsync();
+
+        var orderId = Guid.CreateVersion7();
+        var shipmentId = Guid.CreateVersion7();
+        var deliveredAt = DateTimeOffset.UtcNow;
+
+        var shipmentDelivered = new ShipmentDelivered(
+            orderId,
+            shipmentId,
+            deliveredAt,
+            RecipientName: "John Doe");
+
+        // Act - Publish from Fulfillment BC
+        var tracked = await _fixture.ExecuteOnHostAndWaitAsync(
+            _fixture.FulfillmentHost,
+            shipmentDelivered,
+            timeoutSeconds: 30);
+
+        // Assert - Verify message was published to RabbitMQ
+        tracked.Sent.SingleMessage<ShipmentDelivered>()
+            .OrderId.ShouldBe(orderId);
+
+        // Assert - Verify ReturnEligibilityWindow created in Returns BC database
+        using var returnsSession = _fixture.GetReturnsSession();
+        var eligibilityWindow = await returnsSession.LoadAsync<ReturnEligibilityWindow>(orderId);
+
+        eligibilityWindow.ShouldNotBeNull();
+        eligibilityWindow.OrderId.ShouldBe(orderId);
+        eligibilityWindow.DeliveredAt.ShouldBe(deliveredAt);
+        eligibilityWindow.WindowExpiresAt.ShouldBe(deliveredAt.AddDays(ReturnEligibilityWindow.ReturnWindowDays));
+        eligibilityWindow.IsExpired.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ShipmentDelivered_Is_Idempotent_When_Redelivered()
+    {
+        // Arrange
+        await _fixture.CleanAllDataAsync();
+
+        var orderId = Guid.CreateVersion7();
+        var shipmentId = Guid.CreateVersion7();
+        var firstDeliveredAt = DateTimeOffset.UtcNow.AddHours(-2);
+
+        var firstMessage = new ShipmentDelivered(
+            orderId,
+            shipmentId,
+            firstDeliveredAt);
+
+        // Act - Deliver first message
+        await _fixture.ExecuteOnHostAndWaitAsync(
+            _fixture.FulfillmentHost,
+            firstMessage,
+            timeoutSeconds: 30);
+
+        // Capture first window state
+        using var session1 = _fixture.GetReturnsSession();
+        var firstWindow = await session1.LoadAsync<ReturnEligibilityWindow>(orderId);
+        var firstWindowExpiry = firstWindow!.WindowExpiresAt;
+
+        // Act - Redeliver same message (RabbitMQ redelivery scenario)
+        var secondMessage = new ShipmentDelivered(
+            orderId,
+            shipmentId,
+            DateTimeOffset.UtcNow); // Different timestamp!
+
+        await _fixture.ExecuteOnHostAndWaitAsync(
+            _fixture.FulfillmentHost,
+            secondMessage,
+            timeoutSeconds: 30);
+
+        // Assert - Second delivery should NOT change the window
+        using var session2 = _fixture.GetReturnsSession();
+        var secondWindow = await session2.LoadAsync<ReturnEligibilityWindow>(orderId);
+
+        secondWindow.ShouldNotBeNull();
+        secondWindow.DeliveredAt.ShouldBe(firstDeliveredAt); // Original timestamp preserved
+        secondWindow.WindowExpiresAt.ShouldBe(firstWindowExpiry); // Expiry unchanged
+    }
+}

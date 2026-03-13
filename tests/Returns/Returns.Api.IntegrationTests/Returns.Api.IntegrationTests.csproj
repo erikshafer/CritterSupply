@@ -11,6 +11,8 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.RabbitMq" />
+    <PackageReference Include="WolverineFx.RabbitMQ" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -24,6 +26,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Returns\Returns.Api\Returns.Api.csproj" />
+    <ProjectReference Include="..\..\..\src\Orders\Orders.Api\Orders.Api.csproj" />
+    <ProjectReference Include="..\..\..\src\Fulfillment\Fulfillment.Api\Fulfillment.Api.csproj" />
   </ItemGroup>
 
 </Project>
