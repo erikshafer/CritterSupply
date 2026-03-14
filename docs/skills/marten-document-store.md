@@ -1,191 +1,1237 @@
 # Marten Document Store
 
-Patterns for using Marten as a document database (not event sourcing) in CritterSupply.
+Practical patterns for using Marten as a document database (not event sourcing) in CritterSupply.
 
-## When to Use Document Store vs Event Sourcing
+**Document store vs event store:** Marten supports both paradigms in the same database. This document covers document storage only — read models, projections, and reference data that doesn't benefit from an event history. For event-sourced aggregates, see `marten-event-sourcing.md`.
 
-**Use Marten Document Store when:**
+---
+
+## Table of Contents
+
+1. [When to Use the Document Store (vs. the Event Store)](#1-when-to-use-the-document-store-vs-the-event-store)
+2. [Document Identity](#2-document-identity)
+3. [Session Usage: IDocumentSession vs IQuerySession](#3-session-usage-idocumentsession-vs-iquerysession)
+4. [Basic CRUD Patterns](#4-basic-crud-patterns)
+5. [Querying with LINQ](#5-querying-with-linq)
+6. [Compiled Queries](#6-compiled-queries)
+7. [Batched Queries](#7-batched-queries)
+8. [Projections as Documents](#8-projections-as-documents)
+9. [Indexing](#9-indexing)
+10. [Schema Management](#10-schema-management)
+11. [Multi-Tenancy](#11-multi-tenancy)
+12. [Anti-Patterns to Avoid](#12-anti-patterns-to-avoid)
+13. [File Organization and Conventions](#13-file-organization-and-conventions)
+
+---
+
+## 1. When to Use the Document Store (vs. the Event Store)
+
+Marten stores documents as JSONB in PostgreSQL. Use document storage when you need **current state only** and event history provides no value.
+
+**Use Document Store for:**
 - Master data with infrequent changes (Product Catalog)
-- Current state is all that matters (no need for historical replay)
-- Read-heavy workload (90%+ reads, few writes)
-- Document model fits naturally (flexible schema, nested objects)
-- State machine with lifecycle transitions, but another BC owns the audit trail
+- Read models and projections (built from events, but stored as documents)
+- Reference data (categories, configuration, lookup tables)
+- State machines where another BC owns the audit trail
+- Read-heavy workloads (90%+ reads, few writes)
 
-**Use Marten Event Store when:**
+**Use Event Store for:**
 - Transaction data with frequent state changes (Orders, Payments, Inventory)
-- Historical changes are valuable (audit trail, temporal queries)
+- Historical changes are valuable (audit trail, temporal queries, "what happened when?")
 - Complex business logic benefits from event sourcing patterns
 - This BC is the authoritative owner of the lifecycle
 
 **CritterSupply examples:**
-- **Document Store:** Product Catalog (products are master data), ChangeRequest (7-state machine — Catalog BC owns the audit trail)
-- **Event Store:** Orders, Payments, Inventory, Fulfillment
+- **Document Store:** Product Catalog BC (master product data), projection read models (OrderSummary, CartView)
+- **Event Store:** Orders, Payments, Inventory, Fulfillment, Shopping, Returns
 
-**Decision heuristic for state machines:**
+**Key insight:** In CritterSupply, event sourcing is the dominant pattern. Document storage is used for:
+1. Product Catalog BC (the only pure document store BC)
+2. **Projection read models** — stored as JSONB documents even when sourced from event-sourced BCs
 
-| Signal | Document Store | Event Sourcing |
-|--------|---------------|----------------|
-| Need replay / temporal queries | No | ✅ Yes |
-| Another BC owns the history | ✅ Yes — just track status | No |
-| Audit trail required in this BC | No | ✅ Yes |
-| Complex business logic with transitions | ✅ Mutable document works | Only if history is also needed |
-| Simple CRUD with occasional status changes | ✅ | — |
+Everything in this skill applies to both.
 
-**Anti-pattern:** CONTEXTS.md for the Vendor Portal ChangeRequest originally described it as
-event-sourced (with `IStartStream`, `[ReadAggregate]`, and domain events). The actual implementation
-correctly used a plain Marten document (mutation pattern) because the Catalog BC owns the authoritative
-workflow history and the Vendor Portal only needs current state. When CONTEXTS.md uses event-sourcing
-language for a document-store BC, the implementation will diverge from the spec.
+---
 
-## Value Objects and Queryable Fields
+## 2. Document Identity
 
-**IMPORTANT:** When using Marten's document store with LINQ queries, value objects on queryable fields create friction.
+Marten requires documents to have an identity field named `Id` with one of these types:
+- `Guid` (default, auto-assigned if not provided)
+- `string` (application-assigned)
+- `int` or `long` (database-assigned via sequence)
 
-### The Architecture Signal
+**CritterSupply convention:** Prefer `Guid` with application-assigned IDs to avoid database round trips.
 
-Value objects + JSON serialization + Marten LINQ queries = translation issues.
-
-**Marten cannot translate** expressions like:
-- `p.Category.Value == "Dogs"` ❌
-- `p.Category.ToString() == "Dogs"` ❌
-- `(string)p.Category == "Dogs"` ❌
-
-Even with custom JSON converters that serialize value objects as simple strings, Marten's LINQ-to-SQL translator doesn't understand how to access nested properties or call methods on custom types.
-
-### When to Use Value Objects with Marten
-
-**✅ Use Value Objects for:**
-- **Complex nested objects** (Address, Dimensions, Money)
-  ```csharp
-  public IReadOnlyList<ProductImage> Images { get; init; }  // Not queried
-  public ProductDimensions? Dimensions { get; init; }       // Not queried
-  public ShippingAddress Address { get; init; }            // Not queried
-  ```
-- **Non-queryable fields** (descriptions, metadata, nested structures)
-- **Strong domain concepts with behavior** (Money with currency conversion, DateRange with overlap logic)
-
-**❌ Use Primitives for:**
-- **Queryable filter fields** - Any field you'll filter on in LINQ
-  ```csharp
-  public string Category { get; init; }      // Queried: WHERE category = 'Dogs'
-  public ProductStatus Status { get; init; } // Queried: WHERE status = 'Active'
-  public string Brand { get; init; }         // Queried: WHERE brand = 'Acme'
-  ```
-- **Simple string wrappers with no behavior** - If it's just a string with validation, keep it a string
-- **Sort/filter/group fields** - Marten needs direct primitive access
-
-**🤔 Identity Fields (Special Case):**
-- Can use value objects (like `Sku`) if you also provide a primitive `Id` property
-  ```csharp
-  public string Id { get; init; }      // For Marten's identity system
-  public Sku Sku { get; init; }        // For domain logic
-  ```
-
-### Validation Strategy
-
-Since queryable fields should be primitives, **validate at the boundary** with FluentValidation:
+**Example: Product Catalog uses string identity (SKU):**
 
 ```csharp
-public sealed record AddProduct(string Category, string Name, string Description);
-
-public class AddProductValidator : AbstractValidator<AddProduct>
+public sealed record Product
 {
-    public AddProductValidator()
-    {
-        RuleFor(x => x.Category)
-            .NotEmpty()
-            .MaximumLength(50)
-            .WithMessage("Category is required and cannot exceed 50 characters");
+    // Marten identity field - must be named "Id"
+    public string Id { get; init; } = null!;
 
-        RuleFor(x => x.Name)
-            .NotEmpty()
-            .MaximumLength(100)
-            .Matches(@"^[A-Za-z0-9\s.,!&()\-]+$")
-            .WithMessage("Name contains invalid characters");
+    // Domain identity as value object - implicit string conversion
+    public Sku Sku { get; init; } = null!;
+
+    public string Name { get; init; } = null!;
+    public string Category { get; init; } = null!;
+    // ...
+}
+
+// Value object with implicit conversion to string
+[JsonConverter(typeof(SkuJsonConverter))]
+public sealed record Sku
+{
+    public string Value { get; init; } = null!;
+
+    public static Sku From(string value)
+    {
+        // Validation logic
+        return new Sku { Value = value };
+    }
+
+    public static implicit operator string(Sku sku) => sku.Value;
+}
+
+// Factory method assigns Id from SKU
+public static Product Create(string sku, string name, string category)
+{
+    return new Product
+    {
+        Id = sku,                    // String identity for Marten
+        Sku = Sku.From(sku),         // Value object for domain
+        Name = name,
+        Category = category,
+        AddedAt = DateTimeOffset.UtcNow
+    };
+}
+```
+
+**Why this pattern works:**
+- `Id = sku` allows direct document lookup: `session.LoadAsync<Product>("DOG-BOWL-001")`
+- `Sku` value object provides domain validation and type safety
+- Implicit conversion means `Id = sku` just works without ceremony
+
+**Alternative: Guid identity with value object**
+
+```csharp
+public sealed record Order
+{
+    public Guid Id { get; init; }          // Marten identity
+    public OrderId OrderId { get; init; }   // Domain value object
+
+    public static Order Create()
+    {
+        var id = Guid.NewGuid();
+        return new Order
+        {
+            Id = id,
+            OrderId = OrderId.From(id)
+        };
     }
 }
 ```
 
-This gives you:
-- ✅ Type safety at the domain boundary
-- ✅ 400 errors for bad input (not 500s)
-- ✅ Simple queries: `p.Category == "Dogs"`
-- ✅ No LINQ translation issues
+**Configuration:**
 
-### JSON Serialization Assumption
-
-**Work Pattern:** Any non-primitive property in a Marten document requires explicit JSON serialization handling.
-
-When adding custom types to Marten documents, **immediately consider**:
-1. **Does this need a JSON converter?** (Value objects, enums, complex types)
-2. **Will this be queried in LINQ?** (If yes, strongly consider primitives)
-3. **Does Marten need special configuration?** (Indexes, identity fields)
-
-This applies to:
-- Value objects
-- Aggregates as nested documents
-- Projections with custom types
-- Any non-C# primitive
-
-### Real Example: Product Catalog
-
-**Initial attempt (failed):**
 ```csharp
-public CategoryName Category { get; init; }  // Value object
+builder.Services.AddMarten(opts =>
+{
+    // Guid identity (default - no configuration needed)
+    opts.Schema.For<Order>();
 
-// Query (doesn't work):
-query.Where(p => p.Category.Value == "Dogs")  // Marten can't translate
+    // String identity (explicit)
+    opts.Schema.For<Product>()
+        .Identity(x => x.Id);  // Not strictly needed if property is named "Id"
+});
 ```
 
-**Pragmatic solution:**
-```csharp
-public string Category { get; init; }  // Primitive
+**Key takeaway:** Application-assigned IDs (Guid or string) avoid extra database round trips. CritterSupply uses Guid for most BCs, string for Product Catalog (natural key).
 
-// Query (works):
-query.Where(p => p.Category == "Dogs")  // Direct SQL: WHERE data->>'Category' = 'Dogs'
-```
-
-**Validation moved to FluentValidation:**
-```csharp
-RuleFor(x => x.Category)
-    .NotEmpty()
-    .MaximumLength(50);
-```
-
-### Lessons Learned from Product Catalog BC
-
-**Cycle 14 - Value Object vs Primitive Queryable Fields:**
-
-During initial implementation, we experienced:
-1. Tests passed for CRUD operations ✅
-2. Tests failed for category filtering ❌ (Marten LINQ translation error)
-3. Changed `CategoryName` value object → `string` primitive
-4. All tests passed ✅
-
-**The signal:** When 22/24 tests pass, then you change a value object to a primitive and get 24/24, that's an **architecture signal**, not a test problem.
+> **Reference:** [Marten Document Identity](https://martendb.io/documents/identity.html)
 
 ---
 
-**Cycle 19 - Test Flakiness from Seed Data in Program.cs:**
+## 3. Session Usage: IDocumentSession vs IQuerySession
 
-After Cycle 18, Product Catalog tests became "flaky" (passing sometimes, failing other times):
+Marten provides two session types:
 
-**Root Cause:**
-- `Program.cs` was seeding data at startup when `app.Environment.IsDevelopment()` was true
-- Alba creates the test host in "Development" environment
-- Seed data ran ONCE when TestFixture initialized the AlbaHost
-- Tests called `CleanAllDocumentsAsync()` which deleted the seed data
-- Subsequent tests had inconsistent state depending on execution order
-
-**Solution:**
+**IQuerySession** — Read-only queries
 ```csharp
-// BAD - Seeds data during test runs
-if (app.Environment.IsDevelopment())
+public static async Task<Product?> Handle(
+    string sku,
+    IQuerySession session,  // Read-only
+    CancellationToken ct)
 {
-    await SeedData.SeedProductsAsync(store);
+    return await session.LoadAsync<Product>(sku, ct);
+}
+```
+
+**IDocumentSession** — Reads + writes
+```csharp
+public static async Task Handle(
+    AddProduct command,
+    IDocumentSession session,  // Read + write
+    CancellationToken ct)
+{
+    var product = Product.Create(command.Sku, command.Name, command.Category);
+    session.Store(product);
+    await session.SaveChangesAsync(ct);
+}
+```
+
+**When to use which:**
+- Use `IQuerySession` for read-only endpoints (GET requests) — lighter weight, no transaction overhead
+- Use `IDocumentSession` for mutations (POST/PUT/PATCH/DELETE)
+
+**Wolverine integration:** When you inject `IDocumentSession` into a Wolverine handler, Wolverine's transactional middleware manages the session lifecycle:
+- Opens the session at handler start
+- Calls `SaveChangesAsync()` after handler completes successfully
+- Rolls back on exceptions
+
+**❌ DO NOT call `SaveChangesAsync()` manually inside Wolverine handlers** — the middleware handles it:
+
+```csharp
+// ❌ WRONG - SaveChangesAsync called manually
+public static async Task Handle(AddProduct cmd, IDocumentSession session)
+{
+    var product = Product.Create(cmd.Sku, cmd.Name, cmd.Category);
+    session.Store(product);
+    await session.SaveChangesAsync();  // ❌ Wolverine will call this again
 }
 
-// GOOD - Skip seed data when running in test context
+// ✅ CORRECT - Let Wolverine call SaveChangesAsync
+public static async Task Handle(AddProduct cmd, IDocumentSession session)
+{
+    var product = Product.Create(cmd.Sku, cmd.Name, cmd.Category);
+    session.Store(product);
+    // Wolverine calls SaveChangesAsync after handler returns
+}
+```
+
+**Exception:** Call `SaveChangesAsync()` manually only when:
+1. Not using Wolverine (raw Marten usage)
+2. Explicitly testing with `GetDocumentSession()` in test fixtures
+3. Seed data initialization (outside handler context)
+
+> **Reference:** [Marten Sessions](https://martendb.io/documents/sessions.html)
+
+---
+
+## 4. Basic CRUD Patterns
+
+Marten's document session provides a unit-of-work pattern: batch writes and commit with `SaveChangesAsync()`.
+
+### Store (Upsert)
+
+`session.Store()` performs insert-or-update:
+
+```csharp
+public static async Task Handle(
+    AddProduct command,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    // Check for duplicate (prevents overwrite)
+    var existing = await session.LoadAsync<Product>(command.Sku, ct);
+    if (existing is not null)
+        return Results.Conflict(new { Message = "Product already exists" });
+
+    var product = Product.Create(
+        command.Sku,
+        command.Name,
+        command.Description,
+        command.Category);
+
+    session.Store(product);  // Batches write operation
+    // Wolverine calls SaveChangesAsync() after handler completes
+
+    return Results.Created($"/api/products/{command.Sku}", new { Sku = command.Sku });
+}
+```
+
+### Load (Read)
+
+`session.LoadAsync<T>(id)` loads a single document by ID:
+
+```csharp
+public static Task<Product?> Load(
+    string sku,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    return session.LoadAsync<Product>(sku, ct);
+}
+```
+
+Returns `null` if document doesn't exist.
+
+### Update (Immutable Pattern)
+
+Use `with` expressions for immutable updates:
+
+```csharp
+public static async Task Handle(
+    UpdateProduct command,
+    Product product,  // Loaded via Wolverine compound handler
+    IDocumentSession session)
+{
+    var updated = product.Update(
+        name: command.Name,
+        description: command.Description,
+        category: command.Category);
+
+    session.Store(updated);  // Store updated document
+    // Wolverine calls SaveChangesAsync()
+}
+
+// In Product.cs
+public Product Update(string? name = null, string? description = null, string? category = null)
+{
+    return this with
+    {
+        Name = name ?? Name,
+        Description = description ?? Description,
+        Category = category ?? Category,
+        UpdatedAt = DateTimeOffset.UtcNow
+    };
+}
+```
+
+### Delete vs HardDelete
+
+**Soft delete** (recommended):
+
+```csharp
+// Configuration
+opts.Schema.For<Product>().SoftDeleted();
+
+// Handler
+public static async Task Handle(
+    DeleteProduct command,
+    Product product,
+    IDocumentSession session)
+{
+    session.Delete(product);  // Marks IsDeleted = true
+    // Queries automatically filter out soft-deleted documents
+}
+```
+
+**Hard delete** (permanent removal):
+
+```csharp
+public static async Task Handle(
+    HardDeleteProduct command,
+    Product product,
+    IDocumentSession session)
+{
+    session.HardDelete(product);  // Removes from database
+}
+```
+
+CritterSupply convention: Use soft delete for all business data. Hard delete only for test cleanup.
+
+### Batch Operations
+
+Multiple stores in single transaction:
+
+```csharp
+public static async Task Handle(
+    BulkAddProducts command,
+    IDocumentSession session)
+{
+    foreach (var item in command.Products)
+    {
+        var product = Product.Create(item.Sku, item.Name, item.Category);
+        session.Store(product);  // Batches all writes
+    }
+
+    // Single SaveChangesAsync commits all products atomically
+}
+```
+
+**Key insight:** Marten batches all `Store()` calls within a session. One `SaveChangesAsync()` commits everything in a single database transaction.
+
+> **Reference:** [Marten Document Operations](https://martendb.io/documents/)
+
+---
+
+## 5. Querying with LINQ
+
+Marten translates LINQ expressions to PostgreSQL JSONB queries.
+
+### Basic Query
+
+```csharp
+public static async Task<IReadOnlyList<Product>> Handle(
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    return await session.Query<Product>()
+        .Where(p => !p.IsDeleted)  // Automatic with .SoftDeleted() config
+        .OrderBy(p => p.AddedAt)
+        .ToListAsync(ct);
+}
+```
+
+### Filtering
+
+```csharp
+public static async Task<IReadOnlyList<Product>> Handle(
+    string category,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    return await session.Query<Product>()
+        .Where(p => p.Category == category)
+        .Where(p => p.Status == ProductStatus.Active)
+        .ToListAsync(ct);
+}
+```
+
+Marten generates: `WHERE data->>'Category' = 'Dogs' AND data->>'Status' = 'Active'`
+
+### Pagination
+
+```csharp
+public static async Task<ProductListResult> Handle(
+    int page,
+    int pageSize,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    var query = session.Query<Product>()
+        .Where(p => !p.IsDeleted);
+
+    // Get total count (for pagination metadata)
+    var totalCount = await query.CountAsync(ct);
+
+    // Get page of results
+    var products = await query
+        .OrderBy(p => p.Name)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToListAsync(ct);
+
+    return new ProductListResult(products, page, pageSize, totalCount);
+}
+```
+
+### Async Enumerable (Streaming Large Datasets)
+
+For large result sets, `ToAsyncEnumerable()` streams results without loading the entire dataset into memory:
+
+```csharp
+public static async Task ProcessAllProducts(
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    var products = session.Query<Product>()
+        .Where(p => !p.IsDeleted)
+        .ToAsyncEnumerable();  // Streams results
+
+    await foreach (var product in products.WithCancellation(ct))
+    {
+        // Process one product at a time
+        await DoSomethingWith(product);
+    }
+}
+```
+
+**When to use:** Bulk operations, exports, reports where result set could be thousands of documents. Avoids loading everything into memory at once.
+
+**Warning:** Keep the session alive while enumerating. Don't dispose the session before iteration completes.
+
+### LINQ Limitations
+
+**❌ Enum arrays cannot be parameterized:**
+
+```csharp
+// ❌ FAILS - Npgsql cannot serialize enum arrays
+var activeStatuses = new[] { ProductStatus.Active, ProductStatus.ComingSoon };
+query.Where(p => activeStatuses.Contains(p.Status));
+// InvalidCastException: Writing values of 'ProductStatus[]' is not supported
+
+// ✅ Use explicit OR conditions
+query.Where(p => p.Status == ProductStatus.Active ||
+                 p.Status == ProductStatus.ComingSoon);
+```
+
+**❌ Nullable `.Value` cannot be evaluated in LINQ:**
+
+```csharp
+// ❌ Throws if 'since' is null
+query.Where(p => p.AddedAt > since.Value);
+
+// ✅ Build query conditionally
+var baseQuery = session.Query<Product>();
+var filtered = since.HasValue
+    ? baseQuery.Where(p => p.AddedAt > since.Value)
+    : baseQuery;
+```
+
+**❌ Value objects on queryable fields:**
+
+```csharp
+// ❌ Marten cannot translate nested property access
+query.Where(p => p.Category.Value == "Dogs");
+
+// ✅ Use primitives for queryable fields (see ADR 0003)
+query.Where(p => p.Category == "Dogs");
+```
+
+**Lesson from Cycle 22 (ChangeRequest queries):** Static enum arrays are fine for documentation and in-memory checks. Use explicit OR conditions in LINQ queries.
+
+> **Reference:** [Marten LINQ Querying](https://martendb.io/documents/querying/linq/)
+
+---
+
+## 6. Compiled Queries
+
+**Why compiled queries matter:** Marten's LINQ provider translates C# expression trees to SQL on every query execution. This is computationally expensive. Compiled queries cache the SQL translation, making repeated query execution 5-10x cheaper.
+
+**When to use:**
+- Any query executed frequently on a hot path
+- Queries with parameters that change but structure stays the same
+- APIs with high read traffic (GET endpoints, dashboards, reports)
+
+**Pattern:**
+
+```csharp
+public sealed class FindProductsByCategoryQuery : ICompiledQuery<Product, IReadOnlyList<Product>>
+{
+    public string Category { get; init; } = null!;
+
+    public Expression<Func<IMartenQueryable<Product>, IReadOnlyList<Product>>> QueryIs()
+    {
+        return query => query
+            .Where(p => p.Category == Category)
+            .Where(p => p.Status == ProductStatus.Active)
+            .OrderBy(p => p.Name)
+            .ToList();
+    }
+}
+
+// Usage in handler
+public static async Task<IReadOnlyList<Product>> Handle(
+    string category,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    return await session.QueryAsync(
+        new FindProductsByCategoryQuery { Category = category },
+        ct);
+}
+```
+
+**Key points:**
+- Implement `ICompiledQuery<TDoc, TResult>`
+- `TDoc` = document type (Product)
+- `TResult` = query return type (IReadOnlyList<Product>, single Product, int count, etc.)
+- Properties on the query class become SQL parameters
+- Marten caches the SQL translation per compiled query type
+
+**Example: Single document query**
+
+```csharp
+public sealed class FindProductBySkuQuery : ICompiledQuery<Product, Product?>
+{
+    public string Sku { get; init; } = null!;
+
+    public Expression<Func<IMartenQueryable<Product>, Product?>> QueryIs()
+    {
+        return query => query.FirstOrDefault(p => p.Id == Sku);
+    }
+}
+
+// Usage
+var product = await session.QueryAsync(
+    new FindProductBySkuQuery { Sku = "DOG-BOWL-001" });
+```
+
+**Example: Count query**
+
+```csharp
+public sealed class CountProductsInCategoryQuery : ICompiledQuery<Product, int>
+{
+    public string Category { get; init; } = null!;
+
+    public Expression<Func<IMartenQueryable<Product>, int>> QueryIs()
+    {
+        return query => query.Count(p => p.Category == Category);
+    }
+}
+```
+
+**When NOT to use:**
+- One-off queries (overhead of creating query class not worth it)
+- Queries with highly dynamic structure (compiled queries require fixed structure)
+- Test-only queries
+
+**CritterSupply status:** Product Catalog doesn't currently use compiled queries (read traffic not high enough yet). Pattern established here for future use in high-traffic BFF queries (Storefront, Vendor Portal dashboards).
+
+> **Reference:** [Marten Compiled Queries](https://martendb.io/documents/querying/compiled-queries.html)
+
+---
+
+## 7. Batched Queries
+
+**Problem:** N+1 query problem — multiple round trips to database kills performance.
+
+**Solution:** `IBatchedQuery` combines multiple queries into a single database call.
+
+**Pattern:**
+
+```csharp
+public static async Task<CartView> Handle(
+    Guid cartId,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    var batch = session.CreateBatchQuery();
+
+    // Queue up multiple queries
+    var cartTask = batch.LoadAsync<Cart>(cartId, ct);
+    var productsTask = batch.Query<Product>()
+        .Where(p => p.Category == "Dogs")
+        .Take(10)
+        .ToList();
+    var countTask = batch.Query<Product>().Count();
+
+    // Execute all queries in single database call
+    await batch.Execute(ct);
+
+    // Results available from Tasks
+    var cart = await cartTask;
+    var products = await productsTask;
+    var totalProducts = await countTask;
+
+    return new CartView(cart, products, totalProducts);
+}
+```
+
+**Example: BFF composition query**
+
+```csharp
+public static async Task<CheckoutView> Handle(
+    Guid customerId,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    var batch = session.CreateBatchQuery();
+
+    // Fetch customer, cart, and order history in one database call
+    var customerTask = batch.LoadAsync<Customer>(customerId, ct);
+    var cartTask = batch.Query<Cart>()
+        .FirstOrDefault(c => c.CustomerId == customerId);
+    var ordersTask = batch.Query<Order>()
+        .Where(o => o.CustomerId == customerId)
+        .OrderByDescending(o => o.PlacedAt)
+        .Take(5)
+        .ToList();
+
+    await batch.Execute(ct);
+
+    var customer = await customerTask;
+    var cart = await cartTask;
+    var recentOrders = await ordersTask;
+
+    return new CheckoutView(customer, cart, recentOrders);
+}
+```
+
+**Combining with compiled queries:**
+
+```csharp
+public static async Task<DashboardView> Handle(
+    Guid vendorId,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    var batch = session.CreateBatchQuery();
+
+    // Mix compiled queries and regular queries
+    var productsTask = batch.Query(new FindProductsByVendorQuery { VendorId = vendorId });
+    var ordersTask = batch.Query(new FindRecentOrdersQuery { VendorId = vendorId });
+    var statsTask = batch.Query<Product>()
+        .Where(p => p.VendorTenantId == vendorId)
+        .Count();
+
+    await batch.Execute(ct);
+
+    return new DashboardView(
+        await productsTask,
+        await ordersTask,
+        await statsTask);
+}
+```
+
+**When to use:**
+- BFF composition queries (fetching related data from multiple BCs)
+- Dashboard queries (aggregating multiple metrics)
+- Any time you need data from multiple document types or multiple filters
+- API endpoints that would otherwise make 3+ separate queries
+
+**Performance impact:** Reduces 5 database round trips to 1. On production systems, this can cut API response time from 200ms to 40ms.
+
+**CritterSupply status:** Not yet used, but critical pattern for BFF layers (Storefront, Vendor Portal) when we optimize read performance.
+
+> **Reference:** [Marten Batched Queries](https://martendb.io/documents/querying/batched-queries.html)
+
+---
+
+## 8. Projections as Documents
+
+**Critical insight:** Read models generated from event projections are stored as JSONB documents in PostgreSQL. Every querying, indexing, and session pattern in this document applies to projection read models.
+
+**Example: OrderSummary projection**
+
+```csharp
+// Event-sourced Order aggregate emits events
+public sealed record OrderPlaced(Guid OrderId, Guid CustomerId, DateTimeOffset PlacedAt);
+public sealed record OrderConfirmed(Guid OrderId, DateTimeOffset ConfirmedAt);
+
+// Projection builds read model document
+public sealed class OrderSummaryProjection : SingleStreamProjection<OrderSummary>
+{
+    public OrderSummary Create(OrderPlaced evt)
+    {
+        return new OrderSummary
+        {
+            Id = evt.OrderId,
+            CustomerId = evt.CustomerId,
+            PlacedAt = evt.PlacedAt,
+            Status = "Placed"
+        };
+    }
+
+    public OrderSummary Apply(OrderConfirmed evt, OrderSummary current)
+    {
+        return current with
+        {
+            Status = "Confirmed",
+            ConfirmedAt = evt.ConfirmedAt
+        };
+    }
+}
+
+// Stored as JSONB document - same as Product Catalog documents
+public sealed record OrderSummary
+{
+    public Guid Id { get; init; }
+    public Guid CustomerId { get; init; }
+    public string Status { get; init; } = null!;
+    public DateTimeOffset PlacedAt { get; init; }
+    public DateTimeOffset? ConfirmedAt { get; init; }
+}
+
+// Query projection documents with LINQ (same as Product)
+public static async Task<IReadOnlyList<OrderSummary>> Handle(
+    Guid customerId,
+    IQuerySession session,
+    CancellationToken ct)
+{
+    return await session.Query<OrderSummary>()
+        .Where(o => o.CustomerId == customerId)
+        .OrderByDescending(o => o.PlacedAt)
+        .ToListAsync(ct);
+}
+```
+
+**Key points:**
+- Projections update documents via event handlers, not direct mutations
+- Projection documents are queryable with same LINQ patterns as Product Catalog
+- Indexing, compiled queries, batched queries — all work the same
+- Soft delete configuration works the same
+
+**BFF pattern: Projections + HTTP clients**
+
+BFFs use projections for data owned by event-sourced BCs:
+
+```csharp
+// Storefront queries OrderSummary projection (document) from Orders BC
+public static async Task<IReadOnlyList<OrderSummary>> Handle(
+    Guid customerId,
+    IOrdersClient client,  // HTTP client to Orders BC
+    CancellationToken ct)
+{
+    return await client.GetCustomerOrders(customerId, ct);
+}
+
+// Orders BC exposes projection via HTTP endpoint
+[WolverineGet("/api/orders/customer/{customerId}")]
+public static async Task<IReadOnlyList<OrderSummary>> Handle(
+    Guid customerId,
+    IQuerySession session,  // Queries OrderSummary documents
+    CancellationToken ct)
+{
+    return await session.Query<OrderSummary>()
+        .Where(o => o.CustomerId == customerId)
+        .ToListAsync(ct);
+}
+```
+
+**This is the bridge:** Product Catalog is being migrated to event sourcing, but the patterns here — querying documents, indexing, compiled queries — outlive that migration because projections are documents.
+
+> **Reference:** [Marten Projections](https://martendb.io/events/projections/)
+
+---
+
+## 9. Indexing
+
+JSONB queries are slower than indexed column queries. Marten provides indexing strategies to improve performance.
+
+### GIN Index (Default)
+
+Marten automatically creates a GIN index on the entire JSONB column:
+
+```csharp
+opts.Schema.For<Product>()
+    .GinIndexJsonData();  // Default - indexes entire JSONB document
+```
+
+**When to use:** General-purpose. Good for queries on any field, but not as fast as duplicated field indexes.
+
+### Duplicated Field Index
+
+For frequently queried fields, duplicate them as database columns:
+
+```csharp
+opts.Schema.For<Product>()
+    .Index(x => x.Category)   // Creates separate 'category' column
+    .Index(x => x.Status)     // Creates separate 'status' column
+    .Index(x => x.Sku);       // Creates separate 'sku' column
+```
+
+**Generated SQL:**
+```sql
+CREATE INDEX idx_product_category ON productcatalog.mt_doc_product (category);
+CREATE INDEX idx_product_status ON productcatalog.mt_doc_product (status);
+```
+
+Marten keeps the duplicated column in sync automatically.
+
+**Performance difference:**
+- JSONB path query: `WHERE data->>'Category' = 'Dogs'` (slower)
+- Duplicated field query: `WHERE category = 'Dogs'` (5-10x faster)
+
+**When to use:** Any field used in `WHERE`, `ORDER BY`, or `GROUP BY` clauses on hot paths.
+
+### Unique Index
+
+Enforce uniqueness at database level:
+
+```csharp
+opts.Schema.For<Product>()
+    .UniqueIndex(UniqueIndexType.DuplicatedField, x => x.Sku);
+```
+
+**Result:** Database constraint prevents duplicate SKUs. `Store()` throws on violation.
+
+**Alternative:** Check uniqueness in handler (CritterSupply pattern):
+
+```csharp
+public static async Task Handle(AddProduct cmd, IDocumentSession session)
+{
+    var existing = await session.LoadAsync<Product>(cmd.Sku);
+    if (existing is not null)
+        return Results.Conflict(new { Message = "Product already exists" });
+
+    var product = Product.Create(cmd.Sku, cmd.Name, cmd.Category);
+    session.Store(product);
+}
+```
+
+**Trade-off:** Unique index is faster (database-level check), but throws exception. Handler check returns friendly HTTP 409.
+
+### Soft Delete Index
+
+When using soft deletes, index the `mt_deleted` column:
+
+```csharp
+opts.Schema.For<Product>()
+    .SoftDeleted()           // Adds mt_deleted column
+    .SoftDeletedWithIndex(); // Indexes mt_deleted for faster queries
+```
+
+Queries with `.Where(p => !p.IsDeleted)` become much faster.
+
+### Composite Index
+
+Index multiple fields together:
+
+```csharp
+opts.Schema.For<Product>()
+    .Index(x => x.Category, x => x.Status);  // Composite index
+```
+
+**When to use:** Queries that filter on both fields simultaneously:
+
+```csharp
+query.Where(p => p.Category == "Dogs" && p.Status == ProductStatus.Active);
+```
+
+**CritterSupply Product Catalog indexes:**
+
+```csharp
+opts.Schema.For<Product>()
+    .Index(x => x.Sku)      // Fast SKU lookups
+    .Index(x => x.Category) // Category filtering
+    .Index(x => x.Status)   // Status filtering
+    .SoftDeleted();         // Soft delete support
+```
+
+**Configuration location:** All indexing configuration lives in `Program.cs` Marten setup, not scattered in handlers.
+
+> **Reference:** [Marten Indexing](https://martendb.io/documents/indexing/)
+
+---
+
+## 10. Schema Management
+
+### Lightweight Sessions
+
+CritterSupply uses lightweight sessions for document store BCs:
+
+```csharp
+builder.Services.AddMarten(opts =>
+{
+    opts.Connection(connectionString);
+    opts.DatabaseSchemaName = "productcatalog";
+
+    // Document configuration
+    opts.Schema.For<Product>()
+        .Index(x => x.Category)
+        .SoftDeleted();
+})
+.UseLightweightSessions()  // Stateless, minimal overhead
+.IntegrateWithWolverine();
+```
+
+**Lightweight vs. Default Sessions:**
+- **Lightweight:** Stateless, no identity map, faster for read-heavy workloads
+- **Default:** Tracks loaded documents, enforces single instance per ID, heavier
+
+**CritterSupply convention:** Use lightweight sessions for document store BCs. Use default sessions for event-sourced BCs (identity map prevents duplicate aggregate instances).
+
+### Schema Isolation
+
+Each BC uses its own PostgreSQL schema within the shared `postgres` database:
+
+```csharp
+opts.DatabaseSchemaName = "productcatalog";  // Product Catalog BC
+opts.DatabaseSchemaName = "orders";          // Orders BC
+opts.DatabaseSchemaName = "shopping";        // Shopping BC
+```
+
+**Result:** Documents stored in separate schemas:
+- `productcatalog.mt_doc_product`
+- `orders.mt_doc_ordersummary`
+- `shopping.mt_doc_cart`
+
+**Why:** Logical isolation, easier backups, clearer ownership.
+
+### Auto-Create Schema
+
+**Development:**
+```csharp
+if (app.Environment.IsDevelopment())
+{
+    await app.Services.GetRequiredService<IDocumentStore>()
+        .Storage.ApplyAllConfiguredChangesToDatabaseAsync();
+}
+```
+
+**Production:** Never auto-create. Use Marten migrations or explicit schema scripts.
+
+**CritterSupply convention:** Auto-create in development, explicit migrations in production (not yet implemented — future work).
+
+### Schema Patching
+
+Marten detects schema differences and generates patches:
+
+```bash
+# Generate schema patch SQL
+dotnet run --project src/ProductCatalog.Api -- marten:patch schema-patch.sql
+
+# Review and apply manually
+psql -U postgres -d critter_supply -f schema-patch.sql
+```
+
+**Not yet used in CritterSupply** — schema changes are rare (only Product Catalog, which is stable).
+
+> **Reference:** [Marten Schema Management](https://martendb.io/documents/storage.html)
+
+---
+
+## 11. Multi-Tenancy
+
+Marten supports tenant-scoped sessions. When enabled, all queries automatically filter by tenant ID.
+
+**Configuration:**
+
+```csharp
+opts.Schema.For<Product>()
+    .MultiTenanted();  // Adds tenant_id column
+```
+
+**Usage:**
+
+```csharp
+public static async Task<IReadOnlyList<Product>> Handle(
+    string category,
+    IDocumentSession session,  // Wolverine injects tenant-scoped session
+    CancellationToken ct)
+{
+    // Query automatically scoped to current tenant
+    return await session.Query<Product>()
+        .Where(p => p.Category == category)
+        .ToListAsync(ct);
+}
+```
+
+Wolverine extracts tenant ID from HTTP headers or JWT claims and injects a scoped session.
+
+**CritterSupply usage:**
+- **Product Catalog:** Not tenant-scoped (global product catalog)
+- **Vendor Portal:** Tenant-scoped documents (ChangeRequest per vendor)
+- **Returns BC:** Tenant-scoped documents (Return per vendor)
+
+**Pattern from Vendor Portal ChangeRequest:**
+
+```csharp
+// Document with tenant ID
+public sealed record ChangeRequest
+{
+    public Guid Id { get; init; }
+    public Guid TenantId { get; init; }  // Vendor tenant ID
+    public ChangeRequestStatus Status { get; init; }
+    // ...
+}
+
+// Marten configuration
+opts.Schema.For<ChangeRequest>()
+    .MultiTenanted()
+    .Index(x => x.Status);
+
+// Query (automatically scoped to tenant)
+var requests = await session.Query<ChangeRequest>()
+    .Where(r => r.Status == ChangeRequestStatus.Draft)
+    .ToListAsync();
+// SQL: WHERE tenant_id = 'current-tenant-id' AND data->>'Status' = 'Draft'
+```
+
+**Key insight:** Don't bypass tenancy on documents that belong to a tenant. Follow Wolverine's tenant ID conventions upstream.
+
+> **Reference:** [Marten Multi-Tenancy](https://martendb.io/documents/multi-tenancy.html)
+
+---
+
+## 12. Anti-Patterns to Avoid
+
+### ❌ Calling SaveChangesAsync Manually in Wolverine Handlers
+
+**Wrong:**
+```csharp
+public static async Task Handle(AddProduct cmd, IDocumentSession session)
+{
+    var product = Product.Create(cmd.Sku, cmd.Name, cmd.Category);
+    session.Store(product);
+    await session.SaveChangesAsync();  // ❌ Wolverine will call this again
+}
+```
+
+**Right:**
+```csharp
+public static async Task Handle(AddProduct cmd, IDocumentSession session)
+{
+    var product = Product.Create(cmd.Sku, cmd.Name, cmd.Category);
+    session.Store(product);
+    // Wolverine calls SaveChangesAsync after handler returns
+}
+```
+
+**Why:** Wolverine's transactional middleware manages session lifecycle. Manual `SaveChangesAsync()` bypasses transaction management and can cause double-commits.
+
+---
+
+### ❌ Opening IDocumentSession Manually
+
+**Wrong:**
+```csharp
+public static async Task Handle(AddProduct cmd, IDocumentStore store)
+{
+    using var session = store.LightweightSession();  // ❌ Manual session
+    var product = Product.Create(cmd.Sku, cmd.Name, cmd.Category);
+    session.Store(product);
+    await session.SaveChangesAsync();
+}
+```
+
+**Right:**
+```csharp
+public static async Task Handle(AddProduct cmd, IDocumentSession session)
+{
+    // Wolverine injects session
+    var product = Product.Create(cmd.Sku, cmd.Name, cmd.Category);
+    session.Store(product);
+}
+```
+
+**Why:** Wolverine manages session scope, transaction boundaries, and disposal. Manual sessions bypass middleware.
+
+---
+
+### ❌ Using Document Storage for Data with Meaningful History
+
+**Wrong:**
+```csharp
+// Order lifecycle stored as document (no event history)
+public sealed record Order
+{
+    public Guid Id { get; init; }
+    public OrderStatus Status { get; init; }  // Placed → Confirmed → Shipped
+}
+
+// Update replaces previous state (history lost)
+public static async Task Handle(ConfirmOrder cmd, Order order, IDocumentSession session)
+{
+    var updated = order with { Status = OrderStatus.Confirmed };
+    session.Store(updated);  // ❌ Previous status lost forever
+}
+```
+
+**Right:** Use event sourcing for data with meaningful history:
+
+```csharp
+// Event-sourced Order aggregate
+public sealed record OrderPlaced(Guid OrderId, DateTimeOffset PlacedAt);
+public sealed record OrderConfirmed(Guid OrderId, DateTimeOffset ConfirmedAt);
+
+public static (Order, OrderPlaced) Handle(PlaceOrder cmd)
+{
+    var order = Order.Create(cmd.CustomerId, cmd.Items);
+    return (order, new OrderPlaced(order.Id, DateTimeOffset.UtcNow));
+}
+```
+
+**Why:** Document storage is for current state only. If you need "what happened when?" use event sourcing.
+
+---
+
+### ❌ Querying JSONB Without Indexes on Hot Paths
+
+**Wrong:**
+```csharp
+// High-traffic query with no index on Category
+public static async Task<IReadOnlyList<Product>> Handle(
+    string category,
+    IDocumentSession session)
+{
+    return await session.Query<Product>()
+        .Where(p => p.Category == category)  // Full JSONB scan
+        .ToListAsync();
+}
+```
+
+**Right:**
+```csharp
+// Add index in Program.cs
+opts.Schema.For<Product>()
+    .Index(x => x.Category);  // Duplicated field index
+
+// Query runs 5-10x faster
+```
+
+**Why:** JSONB queries without indexes require full table scans. On high-traffic endpoints, this kills performance.
+
+---
+
+### ❌ Skipping Compiled Queries on Frequently Executed LINQ Queries
+
+**Wrong:**
+```csharp
+// Dashboard endpoint called 1000x/day - LINQ translation overhead every time
+public static async Task<IReadOnlyList<Product>> Handle(
+    string category,
+    IDocumentSession session)
+{
+    return await session.Query<Product>()
+        .Where(p => p.Category == category)  // Translation overhead on every call
+        .ToListAsync();
+}
+```
+
+**Right:**
+```csharp
+// Compiled query - SQL cached after first execution
+public sealed class FindProductsByCategoryQuery : ICompiledQuery<Product, IReadOnlyList<Product>>
+{
+    public string Category { get; init; } = null!;
+
+    public Expression<Func<IMartenQueryable<Product>, IReadOnlyList<Product>>> QueryIs()
+    {
+        return q => q.Where(p => p.Category == Category).ToList();
+    }
+}
+
+public static async Task<IReadOnlyList<Product>> Handle(
+    string category,
+    IDocumentSession session)
+{
+    return await session.QueryAsync(new FindProductsByCategoryQuery { Category = category });
+}
+```
+
+**Why:** LINQ translation is expensive. On hot paths, compiled queries pay for themselves immediately.
+
+---
+
+### ❌ Treating Projection Documents Differently from Other Documents
+
+**Wrong assumption:**
+```csharp
+// "Projection documents are special, I can't query them with LINQ"
+```
+
+**Right:**
+```csharp
+// Projection documents ARE documents - same LINQ queries work
+public static async Task<IReadOnlyList<OrderSummary>> Handle(
+    Guid customerId,
+    IQuerySession session,
+    CancellationToken ct)
+{
+    return await session.Query<OrderSummary>()
+        .Where(o => o.CustomerId == customerId)
+        .ToListAsync(ct);
+}
+```
+
+**Why:** Projection documents are stored as JSONB, just like Product documents. All querying, indexing, and optimization patterns apply equally.
+
+---
+
+### ❌ Seed Data in Program.cs During Test Runs
+
+**Wrong:**
+```csharp
+// Program.cs
+if (app.Environment.IsDevelopment())
+{
+    await SeedData.SeedProductsAsync(store);  // ❌ Runs during test runs
+}
+```
+
+**Why it breaks tests:**
+- Alba creates test host in "Development" environment
+- Seed data runs once when TestFixture initializes
+- Tests call `CleanAllDocumentsAsync()` which deletes seed data
+- Subsequent tests have inconsistent state
+
+**Right:**
+```csharp
+// Skip seed data when running in test context
 if (app.Environment.IsDevelopment() && !IsRunningInTests())
 {
     await SeedData.SeedProductsAsync(store);
@@ -198,341 +1244,180 @@ static bool IsRunningInTests()
 }
 ```
 
-**Alternative Approaches:**
-1. Create explicit seed endpoint: `POST /api/_seed` (only called during manual testing)
-2. Use environment variable: `SKIP_SEED_DATA=true` (set in test configuration)
-3. Seed via HTTP file in development: `docs/DATA-SEEDING.http`
+**Alternative:** Explicit seed endpoint (`POST /api/_seed`) only called during manual testing.
 
-**Key Takeaway:** Seed data in `Program.cs` breaks test isolation. Tests must seed their own data per-test.
-
-## Document Model Design
-
-Use immutable records with factory methods, same as event-sourced aggregates:
-
-```csharp
-public sealed record Product
-{
-    public Sku Sku { get; init; } = null!;           // Value object as ID
-    public ProductName Name { get; init; } = null!;  // Value object
-    public string Description { get; init; } = null!;
-    public CategoryName Category { get; init; } = null!;
-    public IReadOnlyList<ProductImage> Images { get; init; } = [];
-    public ProductStatus Status { get; init; }
-    public DateTimeOffset AddedAt { get; init; }
-    public DateTimeOffset? UpdatedAt { get; init; }
-
-    private Product() { }  // Required by Marten
-
-    public static Product Create(
-        string sku,
-        string name,
-        string description,
-        string category,
-        IReadOnlyList<ProductImage> images)
-    {
-        return new Product
-        {
-            Sku = Sku.From(sku),
-            Name = ProductName.From(name),
-            Description = description,
-            Category = CategoryName.From(category),
-            Images = images,
-            Status = ProductStatus.Active,
-            AddedAt = DateTimeOffset.UtcNow
-        };
-    }
-
-    public Product Update(string? name = null, string? description = null)
-    {
-        return this with
-        {
-            Name = name is not null ? ProductName.From(name) : Name,
-            Description = description ?? Description,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-    }
-
-    public Product ChangeStatus(ProductStatus newStatus) =>
-        this with { Status = newStatus, UpdatedAt = DateTimeOffset.UtcNow };
-}
-```
-
-> **Reference:** [Marten Document Store](https://martendb.io/documents/)
-
-## Marten Configuration
-
-```csharp
-builder.Services.AddMarten(opts =>
-{
-    opts.Connection(connectionString);
-
-    opts.Schema.For<Product>()
-        .Identity(x => x.Sku)      // Use SKU as identifier (not Guid)
-        .UniqueIndex(x => x.Sku)   // Enforce uniqueness
-        .Index(x => x.Category)    // Index for queries
-        .Index(x => x.Status)      // Index for filtering
-        .SoftDeleted();            // Built-in soft delete
-});
-```
-
-> **Reference:** [Marten Document Configuration](https://martendb.io/documents/configuration/)
-
-## CRUD Handler Patterns
-
-### Create
-
-```csharp
-public sealed record AddProduct(string Sku, string Name, string Description, string Category)
-{
-    public class AddProductValidator : AbstractValidator<AddProduct>
-    {
-        public AddProductValidator()
-        {
-            RuleFor(x => x.Sku).NotEmpty().MaximumLength(24);
-            RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
-        }
-    }
-}
-
-public static class AddProductHandler
-{
-    [WolverinePost("/api/products")]
-    public static async Task<CreationResponse> Handle(
-        AddProduct command,
-        IDocumentSession session,
-        CancellationToken ct)
-    {
-        // Check for duplicate
-        var existing = await session.Query<Product>()
-            .FirstOrDefaultAsync(p => p.Sku == Sku.From(command.Sku), ct);
-
-        if (existing is not null)
-            throw new InvalidOperationException($"Product {command.Sku} already exists");
-
-        var product = Product.Create(
-            command.Sku,
-            command.Name,
-            command.Description,
-            command.Category,
-            []);
-
-        session.Store(product);  // Direct document insert
-        await session.SaveChangesAsync(ct);
-
-        return new CreationResponse($"/api/products/{command.Sku}");
-    }
-}
-```
-
-### Read
-
-```csharp
-public static class GetProductHandler
-{
-    [WolverineGet("/api/products/{sku}")]
-    public static async Task<Product?> Handle(
-        string sku,
-        IDocumentSession session,
-        CancellationToken ct)
-    {
-        return await session.LoadAsync<Product>(Sku.From(sku), ct);
-    }
-}
-```
-
-### Update
-
-```csharp
-public static class UpdateProductHandler
-{
-    [WolverinePut("/api/products/{sku}")]
-    public static async Task Handle(
-        string sku,
-        UpdateProduct command,
-        IDocumentSession session,
-        CancellationToken ct)
-    {
-        var product = await session.LoadAsync<Product>(Sku.From(sku), ct);
-
-        if (product is null)
-            return;  // 404
-
-        var updated = product.Update(
-            name: command.Name,
-            description: command.Description);
-
-        session.Store(updated);  // Marten detects changes
-        await session.SaveChangesAsync(ct);
-    }
-}
-```
-
-### Query with Filtering
-
-```csharp
-public static class GetProductListingHandler
-{
-    [WolverineGet("/api/products")]
-    public static async Task<PagedResult<ProductSummary>> Handle(
-        CategoryName? category,
-        ProductStatus? status,
-        int pageNumber,
-        int pageSize,
-        IDocumentSession session,
-        CancellationToken ct)
-    {
-        var query = session.Query<Product>()
-            .Where(p => !p.IsDeleted);  // Soft delete filter
-
-        if (category is not null)
-            query = query.Where(p => p.Category == category);
-
-        if (status.HasValue)
-            query = query.Where(p => p.Status == status.Value);
-
-        var total = await query.CountAsync(ct);
-
-        var products = await query
-            .OrderBy(p => p.Name)
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .Select(p => new ProductSummary(p.Sku, p.Name, p.Category, p.Status))
-            .ToListAsync(ct);
-
-        return new PagedResult<ProductSummary>(products, total, pageNumber, pageSize);
-    }
-}
-```
-
-> **Reference:** [Marten LINQ Queries](https://martendb.io/documents/querying/linq/)
-
-## Key Differences: Document Store vs Event Sourcing
-
-| Aspect | Document Store | Event Sourcing |
-|--------|---------------|----------------|
-| **Session Type** | `IDocumentSession` | `IDocumentSession` (same) |
-| **Write Operation** | `session.Store(document)` | `session.Events.Append(id, event)` |
-| **Read Operation** | `session.Query<T>()` or `LoadAsync<T>()` | `session.Events.AggregateStreamAsync<T>()` |
-| **Identity** | Any type (string, Guid, int) | Stream ID (typically Guid) |
-| **Persistence** | Document stored directly | Events stored, aggregate rebuilt |
-| **Updates** | In-place document updates | Append new events |
-| **History** | No historical changes | Full event history preserved |
-
-## Soft Delete
-
-Configure soft delete in Marten:
-
-```csharp
-opts.Schema.For<Product>().SoftDeleted();
-```
-
-Documents are marked as deleted but not removed:
-
-```csharp
-// Soft delete
-session.Delete(product);
-
-// Query automatically filters deleted documents
-var active = await session.Query<Product>().ToListAsync();  // Excludes deleted
-
-// Include deleted if needed
-var all = await session.Query<Product>()
-    .Where(x => x.MaybeDeleted())
-    .ToListAsync();
-```
-
-> **Reference:** [Marten Soft Deletes](https://martendb.io/documents/deletes.html#soft-deletes)
-
-## Integration Messages
-
-Document store BCs still publish integration messages for cross-context communication:
-
-```csharp
-public static async Task<CreationResponse> Handle(
-    AddProduct command,
-    IDocumentSession session,
-    IMessageBus bus,
-    CancellationToken ct)
-{
-    var product = Product.Create(/* ... */);
-    session.Store(product);
-    await session.SaveChangesAsync(ct);
-
-    // Publish integration message (not a domain event)
-    await bus.PublishAsync(new ProductAdded(product.Sku, product.Name, product.Category));
-
-    return new CreationResponse($"/api/products/{product.Sku}");
-}
-```
-
-Note: These are **integration messages**, not domain events. They're not persisted in an event stream.
+**Lesson from Cycle 19:** Seed data in `Program.cs` breaks test isolation. Tests must seed their own data.
 
 ---
 
-## LINQ Limitations
+## 13. File Organization and Conventions
 
-### Enum Arrays Cannot Be Parameterized
+### Document Type Location
 
-Marten's LINQ provider (backed by Npgsql) cannot serialize C# enum arrays as PostgreSQL query
-parameters. Using `Contains()` on an enum array variable will throw at runtime:
+**Pattern:** Document types live in the domain project, colocated with their feature:
 
 ```
-InvalidCastException: Writing values of 'MyStatus[]' is not supported for
-parameters having NpgsqlDbType '-2147483639'.
+src/Product Catalog/
+├── ProductCatalog/                      # Domain project
+│   └── Products/
+│       ├── Product.cs                   # Document type
+│       ├── Sku.cs                       # Value object (identity)
+│       ├── ProductImage.cs              # Value object (nested)
+│       ├── ProductDimensions.cs         # Value object (nested)
+│       └── ProductStatus.cs             # Enum
+└── ProductCatalog.Api/                  # API project
+    ├── Program.cs                       # Marten configuration
+    └── Products/
+        ├── AddProduct.cs                # Command + handler
+        ├── GetProduct.cs                # Query handler
+        ├── UpdateProduct.cs             # Update handler
+        └── ListProducts.cs              # List query handler
 ```
 
-This limitation applies even when you capture the array into a local variable — the underlying
-Npgsql serialization issue is not resolved by the capture:
+**Why:** Document types are domain concepts, not infrastructure. API project references domain project.
+
+---
+
+### Marten Configuration Location
+
+**Pattern:** All Marten configuration in `Program.cs`, not scattered:
 
 ```csharp
-// ❌ Does NOT work — Npgsql cannot serialize the enum array
-var activeStatuses = new[] { Status.Draft, Status.Submitted, Status.NeedsMoreInfo };
-.Where(r => activeStatuses.Contains(r.Status))
+// Program.cs
+builder.Services.AddMarten(opts =>
+{
+    opts.Connection(connectionString);
+    opts.DatabaseSchemaName = "productcatalog";
 
-// ❌ Also fails — local variable capture doesn't help
-var active = MyDoc.ActiveStatuses;  // static readonly Status[]
-.Where(r => active.Contains(r.Status))
-
-// ✅ Use explicit OR conditions
-.Where(r => r.Status == Status.Draft ||
-            r.Status == Status.Submitted ||
-            r.Status == Status.NeedsMoreInfo)
+    // All Product document configuration in one place
+    opts.Schema.For<Product>()
+        .Identity(x => x.Id)
+        .Index(x => x.Sku)
+        .Index(x => x.Category)
+        .Index(x => x.Status)
+        .SoftDeleted();
+})
+.UseLightweightSessions()
+.IntegrateWithWolverine();
 ```
 
-**Pattern for shared active-status definitions:**
+**Don't:** Scatter index configuration across multiple files or add indexes in migration scripts without updating `Program.cs`.
 
-Define a static array on the document class for documentation and in-memory checks. Explain in
-XML docs why LINQ queries must use explicit OR conditions:
+---
+
+### Projection Document Naming
+
+**Pattern:** Projection documents named `{Aggregate}Summary` or `{Aggregate}View`:
 
 ```csharp
-/// <summary>
-/// The set of "active" (non-terminal) statuses.
-/// ⚠️ Marten LINQ limitation: enum arrays cannot be parameterized in LINQ queries.
-/// Use explicit OR conditions in queries: r.Status == S1 || r.Status == S2 || ...
-/// Use <see cref="IsActive"/> for in-memory checks (uses 'is' pattern — O(1)).
-/// </summary>
-public static readonly MyStatus[] ActiveStatuses = [Draft, Submitted, NeedsMoreInfo];
+// Projection document (read model)
+public sealed record OrderSummary  // Not "Order" (that's the aggregate)
+{
+    public Guid Id { get; init; }
+    public Guid CustomerId { get; init; }
+    public string Status { get; init; } = null!;
+}
 
-// ✅ In-memory check — use C# 'is' pattern, not array.Contains()
-public bool IsActive => Status is MyStatus.Draft or MyStatus.Submitted or MyStatus.NeedsMoreInfo;
+// Projection class
+public sealed class OrderSummaryProjection : SingleStreamProjection<OrderSummary>
+{
+    // ...
+}
 ```
 
-> **See also:** Cycle 22 Retrospective — Lesson L1 (ChangeRequest.ActiveStatuses implementation)
+**Why:** Clear distinction between aggregate (Order) and read model (OrderSummary).
 
-### Nullable `.Value` Cannot Be Evaluated in LINQ Expressions
+---
 
-Marten's LINQ provider cannot evaluate `nullable.Value` inside an expression when the nullable is
-`null`. Build queries conditionally at the C# level:
+### Value Objects vs Primitives for Queryable Fields
+
+**Rule (from ADR 0003):** Use primitives for any field queried in LINQ.
 
 ```csharp
-// ❌ Throws if 'since' is null — Marten evaluates since.Value inside the expression
-.Where(a => a.Date > since.Value)
+// ✅ Queryable fields = primitives
+public sealed record Product
+{
+    public string Id { get; init; }        // String identity (queryable)
+    public string Category { get; init; }  // Queryable field
+    public ProductStatus Status { get; init; }  // Enum (queryable)
 
-// ✅ Build query conditionally
-var baseQuery = session.Query<MyDoc>().Where(a => a.TenantId == tenantId);
-var filteredQuery = since.HasValue
-    ? baseQuery.Where(a => a.Date > since.Value)
-    : baseQuery;
+    // ✅ Non-queryable fields = value objects
+    public Sku Sku { get; init; }                        // Value object (identity, not queried)
+    public IReadOnlyList<ProductImage> Images { get; init; }  // Nested objects (not queried)
+    public ProductDimensions? Dimensions { get; init; }       // Nested object (not queried)
+}
 ```
 
-This applies to any `Nullable<T>.Value` access inside a LINQ expression — not just `DateTimeOffset?`.
+**Validation at boundary:**
+```csharp
+public class AddProductValidator : AbstractValidator<AddProduct>
+{
+    public AddProductValidator()
+    {
+        RuleFor(x => x.Category)
+            .NotEmpty()
+            .MaximumLength(50);
+    }
+}
+```
+
+---
+
+### Test Data Setup
+
+**Pattern:** Tests seed their own data via `InitializeAsync()`:
+
+```csharp
+[Collection(IntegrationTestCollection.Name)]
+public sealed class ListProductsTests : IAsyncLifetime
+{
+    private readonly TestFixture _fixture;
+
+    public ListProductsTests(TestFixture fixture) => _fixture = fixture;
+
+    public async Task InitializeAsync()
+    {
+        await _fixture.CleanAllDocumentsAsync();
+
+        // Seed test data
+        var products = new[]
+        {
+            Product.Create("DOG-BOWL-001", "Dog Bowl", "Dogs"),
+            Product.Create("CAT-TOY-001", "Cat Toy", "Cats")
+        };
+
+        using var session = _fixture.GetDocumentSession();
+        foreach (var product in products)
+            session.Store(product);
+        await session.SaveChangesAsync();
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task CanListProducts() { /* ... */ }
+}
+```
+
+**Why:** Test isolation. Each test controls its own data setup.
+
+---
+
+## Key Takeaways
+
+1. **Document store is for current state** — Product Catalog (master data) and projections (read models)
+2. **Event store is for history** — Orders, Payments, Inventory (transactional data)
+3. **Projections are documents** — All patterns here apply to event-sourced projection read models
+4. **Primitives for queryable fields** — Value objects break Marten LINQ translation (ADR 0003)
+5. **Wolverine manages sessions** — Don't call `SaveChangesAsync()` manually in handlers
+6. **Index hot paths** — Duplicated field indexes for frequently queried fields
+7. **Compiled queries for repeated execution** — Cache SQL translation on high-traffic endpoints
+8. **Batched queries reduce round trips** — BFF composition queries benefit most
+9. **Seed data breaks tests** — Tests seed their own data; never seed in `Program.cs` during test runs
+10. **Async enumerable for large datasets** — Stream results without loading everything into memory
+
+---
+
+**CritterSupply's document store journey:** Product Catalog is the reference implementation, but it's being migrated to event sourcing. The patterns here outlive that migration because **projection read models are documents** — queried, indexed, and optimized with the same tools.
+
+This document is the bridge between pure document storage (Product Catalog today) and projection document usage (everywhere, forever).
