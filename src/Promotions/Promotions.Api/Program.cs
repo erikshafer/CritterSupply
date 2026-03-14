@@ -4,9 +4,12 @@ using JasperFx;
 using JasperFx.Core;
 using JasperFx.Events;
 using JasperFx.Events.Daemon;
+using JasperFx.Events.Projections;
 using JasperFx.Resources;
 using Marten;
+using Marten.Events.Projections;
 using Promotions;
+using Promotions.Coupon;
 using Promotions.Promotion;
 using Weasel.Core;
 using Wolverine;
@@ -38,6 +41,13 @@ builder.Services.AddMarten(opts =>
 
         // Configure Promotion and Coupon as event-sourced aggregates
         opts.Events.StreamIdentity = StreamIdentity.AsGuid;
+
+        // Configure snapshots for queryable aggregates
+        opts.Projections.Snapshot<Promotions.Promotion.Promotion>(SnapshotLifecycle.Inline);
+        opts.Projections.Snapshot<Promotions.Coupon.Coupon>(SnapshotLifecycle.Inline);
+
+        // Configure CouponLookupView inline projection for hot-path queries
+        opts.Projections.Add<CouponLookupViewProjection>(ProjectionLifecycle.Inline);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()

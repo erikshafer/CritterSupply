@@ -1,26 +1,15 @@
-using Marten;
 using Wolverine;
+using Wolverine.Marten;
 
 namespace Promotions.Promotion;
 
 public static class CreatePromotionHandler
 {
-    public static (Promotion, PromotionCreated) Handle(CreatePromotion command)
+    public static IStartStream Handle(CreatePromotion command)
     {
         // Phase 1: Using Guid.CreateVersion7() for time-ordered IDs
         var promotionId = Guid.CreateVersion7();
         var now = DateTimeOffset.UtcNow;
-
-        var promotion = Promotions.Promotion.Promotion.Create(
-            id: promotionId,
-            name: command.Name,
-            description: command.Description,
-            discountType: command.DiscountType,
-            discountValue: command.DiscountValue,
-            startDate: command.StartDate,
-            endDate: command.EndDate,
-            usageLimit: command.UsageLimit,
-            createdAt: now);
 
         var evt = new PromotionCreated(
             PromotionId: promotionId,
@@ -33,6 +22,7 @@ public static class CreatePromotionHandler
             UsageLimit: command.UsageLimit,
             CreatedAt: now);
 
-        return (promotion, evt);
+        // Start new event stream for the promotion
+        return MartenOps.StartStream<Promotions.Promotion.Promotion>(promotionId, evt);
     }
 }

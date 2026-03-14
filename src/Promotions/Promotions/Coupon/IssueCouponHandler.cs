@@ -1,11 +1,12 @@
 using Marten;
 using Wolverine;
+using Wolverine.Marten;
 
 namespace Promotions.Coupon;
 
 public static class IssueCouponHandler
 {
-    public static async Task<(Promotions.Coupon.Coupon, CouponIssued)> Handle(
+    public static async Task<IStartStream> Handle(
         IssueCoupon command,
         IDocumentSession session,
         CancellationToken ct)
@@ -42,16 +43,12 @@ public static class IssueCouponHandler
 
         var now = DateTimeOffset.UtcNow;
 
-        var coupon = Promotions.Coupon.Coupon.Create(
-            code: command.CouponCode,
-            promotionId: command.PromotionId,
-            issuedAt: now);
-
         var evt = new CouponIssued(
             CouponCode: command.CouponCode,
             PromotionId: command.PromotionId,
             IssuedAt: now);
 
-        return (coupon, evt);
+        // Start new event stream for the coupon
+        return MartenOps.StartStream<Promotions.Coupon.Coupon>(streamId, evt);
     }
 }
