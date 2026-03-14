@@ -1,0 +1,40 @@
+using AdminIdentity.Authentication;
+using Wolverine.Http;
+
+namespace AdminIdentity.Api.Auth;
+
+/// <summary>
+/// HTTP endpoint for admin user logout.
+/// POST /api/admin-identity/auth/logout
+/// Invalidates refresh token and deletes HttpOnly cookie.
+/// </summary>
+public static class LogoutEndpoint
+{
+    [WolverinePost("/api/admin-identity/auth/logout")]
+    public static IResult Handle(bool success, HttpContext httpContext)
+    {
+        // Delete refresh token cookie
+        httpContext.Response.Cookies.Delete("RefreshToken", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict
+        });
+
+        return Results.Ok(new { Message = "Logged out successfully." });
+    }
+
+    /// <summary>
+    /// Wolverine Before method to extract refresh token from HttpOnly cookie.
+    /// </summary>
+    public static (Logout?, ProblemDetails?) Before(HttpContext httpContext)
+    {
+        if (!httpContext.Request.Cookies.TryGetValue("RefreshToken", out var refreshToken) || string.IsNullOrWhiteSpace(refreshToken))
+        {
+            // Idempotent: return success even if no refresh token (already logged out)
+            return (new Logout(string.Empty), null);
+        }
+
+        return (new Logout(refreshToken), null);
+    }
+}
