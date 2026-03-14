@@ -257,14 +257,13 @@
 | Frontend | 0 | 1 | 1 | 0 |
 | Phasing | 0 | 3 | 0 | 3 |
 | Port/Numbering | 0 | 2 | 0 | 0 |
-| Roles/Permissions | 0 | 0 | 0 | 3 |
+| Roles/Permissions | 0 | 2 | 0 | 3 |
 | Naming | 1 | 2 | 0 | 0 |
 | Aggregates | 0 | 0 | 0 | 2 |
 | Removed | 0 | 0 | 3 | 0 |
-| **Implementation-confirmed** | 0 | 2 | 0 | 0 |
 | **Total** | **6** | **10** | **4** | **8** |
 
-All original 26 decisions reached **3/3 consensus**. 2 additional decisions (D-18a: password hashing, D-18b: user provisioning) were resolved by the Cycle 29 Phase 1 implementation.
+All original 26 decisions reached **3/3 consensus**. 2 additional decisions (D-18a: password hashing, D-18b: user provisioning) were resolved by the Cycle 29 Phase 1 implementation — these are counted in the "Changed" column under Roles/Permissions.
 
 > **Post-implementation update (2026-03-14):** Decisions D-4, D-5, D-14, D-15, and D-21 have been confirmed by the Admin Identity BC implementation (PR #375). D-18a and D-18b are new decisions that emerged from comparing the original research doc assumptions against the actual implementation.
 

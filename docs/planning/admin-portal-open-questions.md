@@ -155,7 +155,7 @@ The UX research document listed 7 open questions. Here is each question's dispos
 
 ## Summary
 
-> **Update (2026-03-14):** Q-13 resolved by Cycle 29 Phase 1 implementation. Q-8 priority reduced (Phase 0 is complete; this is now a Phase 0.5 concern).
+> **Update (2026-03-14):** Q-13 resolved by Cycle 29 Phase 1 implementation. Phase 0 is now complete — remaining items block Phase 0.5 and Phase 1, not Phase 0.
 
 | Status | Count |
 |--------|-------|
