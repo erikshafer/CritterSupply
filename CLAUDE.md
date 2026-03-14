@@ -737,8 +737,12 @@ For file structure and vertical slice organization:
 **Read:** `docs/skills/vertical-slice-organization.md`
 
 Covers:
-- Command/Handler/Validator colocation
-- File and folder naming conventions
+- Feature-oriented folder structure (not technical layers)
+- File naming conventions with anti-pattern warnings
+- Command/Handler/Validator colocation patterns
+- Event file organization
+- Good vs anti-pattern examples from Shopping, Returns, and Vendor Identity BCs
+- Lessons learned from Cycle 22 refactoring (ADR 0023)
 - Solution structure mirroring BC boundaries
 
 ### For C# Standards
@@ -907,7 +911,7 @@ See [DEVPROGRESS.md](./DEVPROGRESS.md) for current development status.
 | `bff-realtime-patterns.md` | Backend-for-Frontend, real-time updates (SSE + SignalR) |
 | `wolverine-signalr.md` | Wolverine SignalR transport, hub auth, group routing, WASM client |
 | `blazor-wasm-jwt.md` | Blazor WASM + JWT: named HTTP clients, in-memory tokens, SignalR AccessTokenProvider, RBAC |
-| `vertical-slice-organization.md` | File structure, colocation patterns |
+| `vertical-slice-organization.md` | File structure, naming conventions, colocation patterns, anti-pattern warnings |
 | `modern-csharp-coding-standards.md` | C# language features, immutability |
 | `critterstack-testing-patterns.md` | Unit and integration testing |
 | `testcontainers-integration-tests.md` | TestContainers setup, patterns for Marten and EF Core |
