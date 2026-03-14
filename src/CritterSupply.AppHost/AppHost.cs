@@ -42,6 +42,9 @@ var storefrontApi = builder.AddProject<Projects.Storefront_Api>("crittersupply-a
     .WithReference(customerIdentityApi)
     .WithReference(productCatalogApi);
 
+// Admin Identity BC - JWT-based authentication for internal admin users (port 5249)
+var adminIdentityApi = builder.AddProject<Projects.AdminIdentity_Api>("crittersupply-aspire-adminidentity-api");
+
 // ===== BLAZOR WEB APP =====
 
 // Storefront Web - Customer-facing Blazor Server app
@@ -54,8 +57,9 @@ builder.AddProject<Projects.Storefront_Web>("crittersupply-aspire-storefront-web
 
 builder.Build().Run();
 
-// NOTE: VendorIdentity.Api (port 5240), VendorPortal.Api (port 5239), and Pricing.Api
-// (port 5242) are intentionally not registered in Aspire AppHost. They use RabbitMQ
-// transports that are not compatible with Aspire's dynamic service discovery model, and
-// their connection strings are managed via appsettings.json / environment variables.
-// Use docker-compose --profile vendor (or --profile pricing) to run them locally.
+// NOTE: VendorIdentity.Api (port 5240), VendorPortal.Api (port 5239), Pricing.Api
+// (port 5242), and Returns.Api (port 5245) are intentionally not registered in Aspire
+// AppHost. They use RabbitMQ transports that are not compatible with Aspire's dynamic
+// service discovery model, and their connection strings are managed via appsettings.json
+// / environment variables. Use docker-compose --profile vendor / --profile pricing /
+// --profile returns to run them locally.

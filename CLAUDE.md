@@ -318,7 +318,8 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 | **Returns**                   | **5245** | ✅ Assigned  | Returns/                       |
 | **Listings**                  | **5246** | 📋 Reserved | Listings API (future; Cycle 30+)|
 | **Marketplaces**              | **5247** | 📋 Reserved | Marketplaces API (future; Cycle 32+)|
-| **Correspondence**            | **5248** | 📋 Reserved | Correspondence/ (Cycle 28)     |
+| **Correspondence**            | **5248** | ✅ Assigned | Correspondence/ (Cycle 28)     |
+| **Admin Identity**            | **5249** | ✅ Assigned | Admin Identity/ (Cycle 29)     |
 
 **Why this matters:**
 - Allows running multiple APIs simultaneously during development

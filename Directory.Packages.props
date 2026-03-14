@@ -17,6 +17,8 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="5.17.0" />
+    <PackageVersion Include="WolverineFx.Http" Version="5.17.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.3" />
     <PackageVersion Include="MudBlazor" Version="9.1.0" />
     <!-- Test -->
     <PackageVersion Include="bunit" Version="2.6.2" />

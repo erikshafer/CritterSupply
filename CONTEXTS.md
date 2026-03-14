@@ -22,6 +22,7 @@ This document defines the bounded contexts (BCs) within CritterSupply, an e-comm
 - [Vendor Portal](#vendor-portal) — BFF for vendor operations
 - [Pricing](#pricing) — Price rules, MAP/floor prices
 - [Correspondence](#correspondence) — Transactional emails/SMS (⚠️ Phase 1 - Cycle 28)
+- [Admin Identity](#admin-identity) — JWT-based authentication for internal admin users
 
 ### Planned Bounded Contexts (Priority Order)
 - [Promotions](#promotions) — Coupons, discounts (🔴 High - blocks commerce)
@@ -638,6 +639,101 @@ The following BCs are identified for future implementation. Detailed planning do
 - **Cycles:** [cycle-28-correspondence-bc-phase-1-retrospective.md](docs/planning/cycles/cycle-28-correspondence-bc-phase-1-retrospective.md)
 - **Skills:** `wolverine-message-handlers.md`, `marten-event-sourcing.md`
 - **ADRs:** [ADR 0030](docs/decisions/0030-notifications-to-correspondence-rename.md)
+
+---
+
+## Admin Identity
+
+**Folder:** `Admin Identity/`
+**Status:** ✅ **Implemented (Cycle 29 Phase 1)** — Authentication and user management
+**Docs:** `docs/planning/cycles/cycle-29-admin-identity-phase-1-retrospective.md`, [ADR 0031](docs/decisions/0031-admin-portal-rbac-model.md)
+
+**Purpose:** JWT-based authentication and authorization for internal admin users. Provides access tokens for Admin Portal-managed bounded contexts (Pricing, Promotions, Listings, Marketplaces, future admin tools).
+
+### Entities
+
+**AdminUser** (EF Core)
+- **Properties:** Id, Email, PasswordHash, FirstName, LastName, Role, Status, CreatedAt, LastLoginAt, DeactivatedAt, DeactivationReason, RefreshToken, RefreshTokenExpiresAt
+- **Roles (AdminRole enum):** CopyWriter, PricingManager, WarehouseClerk, CustomerService, OperationsManager, Executive, SystemAdmin
+- **Status (AdminUserStatus enum):** Active, Deactivated
+
+### Authorization Model
+
+**Policy-Based Authorization** (per ADR 0031):
+- **Leaf Policies:** One per role (e.g., `PricingManager` requires PricingManager OR SystemAdmin)
+- **Composite Policies:** Role hierarchies (e.g., `PricingManagerOrAbove` = PricingManager, OperationsManager, SystemAdmin)
+- **JWT Claims:** Single `"role"` claim (Phase 1 constraint: one role per user)
+- **SystemAdmin:** Superuser included in all policy checks
+
+**7 Roles (Phase 1):**
+1. **CopyWriter** — Edit product descriptions, SEO metadata (Listings BC)
+2. **PricingManager** — Manage prices, MAP enforcement, promotional pricing (Pricing BC, Promotions BC)
+3. **WarehouseClerk** — Manage inventory levels, warehouse transfers (Inventory BC — future Admin Portal integration)
+4. **CustomerService** — View orders, issue refunds, manage returns (Orders/Returns BCs — future Admin Portal integration)
+5. **OperationsManager** — PricingManager + WarehouseClerk + CustomerService permissions
+6. **Executive** — Read-only access to analytics/reports (Analytics BC — future)
+7. **SystemAdmin** — All permissions (superuser)
+
+### Integration Contract
+
+**Phase 1 (Implemented):**
+
+| Receives | Publishes |
+|----------|-----------|
+| _(none — initiates auth flow)_ | JWT access tokens (15-min expiry) |
+| | Refresh tokens (7-day expiry, HttpOnly cookie) |
+
+**Phase 2+ (Planned):**
+
+| Receives | Publishes |
+|----------|-----------|
+| `AdminUserDeactivated` (internal) | `AdminUserDeactivated` → Admin Portal (logout other sessions) |
+| Commands from Admin Portal UI | Audit events (`AdminActionLogged`) → Analytics BC |
+
+### Core Invariants
+
+- Email addresses must be unique (unique index on `Email` column)
+- Passwords hashed using ASP.NET Core Identity PasswordHasher (PBKDF2-SHA256)
+- Refresh tokens unique (unique partial index on `RefreshToken` where not null)
+- Refresh tokens expire after 7 days; rotation required (token reuse prevention)
+- Admin users cannot change their own role (requires another SystemAdmin)
+- Deactivated users cannot log in (checked in Login handler)
+- Single role per user (Phase 1); multi-role support deferred to Phase 2+
+
+### What it doesn't own
+
+- Admin Portal UI (separate BC — planned Cycle 30+)
+- Audit logging (future: Analytics BC integration)
+- Password reset workflows (Phase 2+)
+- Multi-factor authentication (Phase 3+)
+- SSO/OIDC integration (future consideration)
+- Business logic for Pricing, Promotions, Listings BCs (only provides auth tokens)
+
+### Phase 1 Implementation
+
+**Authentication Features:**
+- Login endpoint (`POST /auth/login`) — Returns JWT access token + refresh token
+- Refresh endpoint (`POST /auth/refresh`) — Token rotation pattern
+- Logout endpoint (`POST /auth/logout`) — Invalidates refresh token
+
+**User Management Features:**
+- Create admin user (`POST /admin-users`) — Requires SystemAdmin policy
+- List admin users (`GET /admin-users`) — Requires SystemAdmin policy
+- Change user role (`PUT /admin-users/{id}/role`) — Requires SystemAdmin policy
+- Deactivate user (`DELETE /admin-users/{id}`) — Requires SystemAdmin policy (soft delete)
+
+**Technology Stack:**
+- **Database:** PostgreSQL with `adminidentity` schema (EF Core)
+- **Authentication:** JWT Bearer (Microsoft.AspNetCore.Authentication.JwtBearer)
+- **Authorization:** Policy-based (7 leaf + 3 composite policies)
+- **Password Hashing:** ASP.NET Core Identity PasswordHasher<AdminUser>
+- **Validation:** FluentValidation for all commands
+
+### References
+
+- **Cycles:** [cycle-29-admin-identity-phase-1-retrospective.md](docs/planning/cycles/cycle-29-admin-identity-phase-1-retrospective.md)
+- **Skills:** `efcore-wolverine-integration.md`, `wolverine-message-handlers.md`
+- **ADRs:** [ADR 0031](docs/decisions/0031-admin-portal-rbac-model.md) (RBAC model, policy-based auth)
 
 ---
 
