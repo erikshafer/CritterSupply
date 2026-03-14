@@ -6,11 +6,81 @@ It serves as a reference architecture for idiomatically leveraging the "Critter 
 
 > **Universal Applicability**: While demonstrated in C#/.NET, these patterns apply to any language. Concepts are influenced by pragmatic Domain-Driven Design (DDD) and CQRS.
 
+---
+
+## 📋 Table of Contents
+
+- [Quick Start (First 5 Minutes)](#quick-start-first-5-minutes)
+- [CritterSupply Overview](#critterSupply)
+- [Architectural North Star](#architectural-north-star)
+- [Documentation Hierarchy](#documentation-hierarchy)
+- [Quick Reference: Common Tasks](#quick-reference-common-tasks)
+- [Glossary](#glossary)
+- [Documentation Structure](#documentation-structure)
+- [Quick References](#quick-references)
+- [Solution Organization](#solution-organization)
+- [API Project Configuration](#api-project-configuration)
+- [Local Development Options](#local-development-options)
+- [How Skill Files Work with AI Agents](#how-skill-files-work-with-ai-agents)
+- [Skill Invocation Guide](#skill-invocation-guide)
+- [Testing Strategy](#testing-strategy)
+- [Integration Patterns](#integration-patterns)
+- [Common Mistakes & Anti-patterns](#common-mistakes--anti-patterns)
+- [Project Creation Workflow](#project-creation-workflow)
+- [Cross-Context Refactoring](#cross-context-refactoring)
+- [When to Use Context7](#when-to-use-context7)
+- [Available Skills](#available-skills)
+
+---
+
+## Quick Start (First 5 Minutes)
+
+**New to CritterSupply? Start here:**
+
+1. **Understand what you're looking at:**
+   - Monorepo with 11+ bounded contexts (BCs) under `src/`
+   - Event-driven architecture using Marten (event sourcing) + Wolverine (message handling)
+   - Each BC has a domain project + optional `.Api` project
+
+2. **Run the system locally:**
+   ```bash
+   # Start infrastructure (Postgres, RabbitMQ, Jaeger)
+   docker-compose --profile infrastructure up -d
+
+   # Run a service natively (fast, hot reload, debuggable)
+   dotnet run --project "src/Customer Experience/Storefront.Web/Storefront.Web.csproj"
+
+   # OR run everything in containers (full stack demo)
+   docker-compose --profile all up --build
+   ```
+
+3. **Key files to orient yourself:**
+   - **[CONTEXTS.md](./CONTEXTS.md)** — What each BC owns and who it talks to
+   - **[AGENTS.md](./AGENTS.md)** — 5-minute quick guide (exact commands, copy-paste snippets)
+   - **[docs/skills/README.md](./docs/skills/README.md)** — Implementation patterns by use case
+
+4. **Before implementing anything:**
+   - Check [CONTEXTS.md](./CONTEXTS.md) for BC boundaries
+   - Read the relevant skill file from [docs/skills/](./docs/skills/) (see [Skill Invocation Guide](#skill-invocation-guide))
+   - Look for existing examples in the codebase (code is the source of truth)
+
+5. **Common first tasks:**
+   - Adding a command handler? → Read `docs/skills/wolverine-message-handlers.md`
+   - Creating a saga? → Read `docs/skills/wolverine-sagas.md`
+   - Adding a new BC? → Read `docs/skills/adding-new-bounded-context.md`
+   - Writing tests? → Read `docs/skills/critterstack-testing-patterns.md`
+
+**Still confused?** See [AGENTS.md](./AGENTS.md) for copy-paste snippets showing exact wiring patterns.
+
+---
+
 ## CritterSupply
 
 CritterSupply is a fictional pet supply retailer—the name a playful nod to the Critter Stack powering it, with the tagline "Stocked for every season."
 
 E-commerce was chosen because it's a domain most developers intuitively understand. Nearly everyone has placed an order online. That familiarity lets us focus on *how* the system is built rather than explaining *what* it does.
+
+---
 
 ## Architectural North Star
 
@@ -23,6 +93,168 @@ When implementing integrations between bounded contexts:
 1. **Consult CONTEXTS.md for orientation** — It shows BC ownership and communication directions
 2. **Consult the codebase for contracts** — Events, commands, and message shapes live in code (especially `src/Shared/Messages.Contracts/` and BC handler files)
 3. **Do not add implementation details to CONTEXTS.md** — If something requires ongoing updates to stay accurate, it does not belong there
+
+---
+
+## Documentation Hierarchy
+
+**AI agents: follow this hierarchy when seeking information:**
+
+```
+Code (src/, tests/)                     ← Source of truth for all implementation details
+    ↑
+CONTEXTS.md                             ← BC ownership, integration directions
+    ↑
+CLAUDE.md (this file)                   ← Development workflows, tool configuration
+    ↑
+docs/skills/*.md                        ← Implementation patterns (read on demand)
+    ↑
+docs/decisions/*.md (ADRs)              ← Architectural decisions with rationale
+    ↑
+docs/planning/CURRENT-CYCLE.md          ← Active work tracking
+```
+
+**When in doubt:** Read code first, then CONTEXTS.md, then skill files. Documentation describes patterns; code shows reality.
+
+---
+
+## Quick Reference: Common Tasks
+
+### Top 10 Tasks (with file locations)
+
+1. **Add a command handler**
+   - Skill: `docs/skills/wolverine-message-handlers.md`
+   - Example: `src/Shopping/Shopping/Cart/AddItemToCart.cs`
+
+2. **Create an event-sourced aggregate**
+   - Skill: `docs/skills/marten-event-sourcing.md`
+   - Example: `src/Orders/Orders/Order/Order.cs`
+
+3. **Build a saga (multi-BC orchestration)**
+   - Skill: `docs/skills/wolverine-sagas.md`
+   - Example: `src/Orders/Orders/Order/OrderSaga.cs`
+
+4. **Add a new bounded context**
+   - Skill: `docs/skills/adding-new-bounded-context.md`
+   - Checklist: Projects → Docker → Postgres → Aspire → CONTEXTS.md → Tests
+
+5. **Write an integration test**
+   - Skill: `docs/skills/critterstack-testing-patterns.md`
+   - Example: `tests/Orders/Orders.IntegrationTests/OrdersTestFixture.cs`
+
+6. **Add an HTTP endpoint**
+   - Skill: `docs/skills/wolverine-message-handlers.md` (section: HTTP Endpoints)
+   - Example: `src/Shopping/Shopping.Api/Queries/GetCartQuery.cs`
+
+7. **Integrate an external service**
+   - Skill: `docs/skills/external-service-integration.md`
+   - Example: `src/Payments/Payments/PaymentGateway/` (Strategy pattern)
+
+8. **Add real-time SignalR updates**
+   - Skill: `docs/skills/wolverine-signalr.md`
+   - Example: `src/Customer Experience/Storefront.Api/StorefrontHub.cs`
+
+9. **Create a Marten projection**
+   - Skill: `docs/skills/marten-event-sourcing.md` (section: Projections)
+   - Example: `src/Orders/Orders.Api/Program.cs` (Marten projection configuration)
+
+10. **Add a BDD feature test**
+    - Skill: `docs/skills/reqnroll-bdd-testing.md`
+    - Example: `docs/features/orders/order-placement.feature`
+
+### Copy-Paste Snippets
+
+**Handler with validation:**
+```csharp
+public sealed record AddItemToCart(Guid CartId, string Sku, int Quantity);
+
+public sealed class AddItemToCartValidator : AbstractValidator<AddItemToCart>
+{
+    public AddItemToCartValidator()
+    {
+        RuleFor(x => x.Quantity).GreaterThan(0);
+    }
+}
+
+public static class AddItemToCartHandler
+{
+    public static ShoppingCartItemAdded Handle(AddItemToCart cmd, ShoppingCart cart)
+    {
+        // Pure function - returns event
+        return new ShoppingCartItemAdded(cart.Id, cmd.Sku, cmd.Quantity);
+    }
+}
+```
+
+**Saga initialization:**
+```csharp
+public static class PlaceOrderHandler
+{
+    public static (Order order, OrderPlaced @event) Handle(PlaceOrder cmd)
+    {
+        var order = Order.Create(cmd.CustomerId, cmd.Items);
+        return (order, new OrderPlaced(order.Id, cmd.CustomerId));
+    }
+}
+```
+
+**HTTP endpoint:**
+```csharp
+public static class GetCartQuery
+{
+    [WolverineGet("/api/cart/{cartId}")]
+    public static Task<CartView> Get(Guid cartId, ICartClient client)
+        => client.GetCart(cartId);
+}
+```
+
+---
+
+## Glossary
+
+**Core Domain Concepts:**
+
+- **Aggregate** — Boundary for atomic transactions. Event-sourced aggregates are reconstituted from their event stream. Example: `Order`, `ShoppingCart`.
+
+- **Bounded Context (BC)** — Logical boundary within which domain terms have consistent meaning. Each BC is a separate folder under `src/`. Example: `Orders`, `Payments`, `Shopping`.
+
+- **BFF (Backend-for-Frontend)** — API layer tailored to a specific UI. Composes data from multiple BCs. Examples: `Storefront.Api` (customer-facing), `VendorPortal.Api` (vendor-facing).
+
+- **Choreography** — Integration pattern where BCs autonomously react to events from other BCs. No central orchestrator. Example: Inventory reacts to `OrderPlaced`.
+
+- **Command** — Imperative request to change state. Named with verbs: `PlaceOrder`, `AddItemToCart`, `CapturePayment`.
+
+- **Event** — Immutable fact describing something that happened. Named with past tense: `OrderPlaced`, `ItemAddedToCart`, `PaymentCaptured`.
+
+- **Event Sourcing** — Storing events as the source of truth instead of storing current state. Aggregates are reconstituted by replaying their event stream.
+
+- **Integration Message** — Event published across BC boundaries via RabbitMQ. Defined in `src/Shared/Messages.Contracts/`.
+
+- **Orchestration** — Integration pattern where one BC actively coordinates others (via commands/requests). Example: `OrderSaga` orchestrates `Payments`, `Inventory`, `Fulfillment`.
+
+- **Projection** — Denormalized read model built from events. Can be in-memory, Marten document, or relational table (EF Core). Example: `OrderSummary` projection.
+
+- **Query** — Read-only request for data. Examples: `GetOrderDetails`, `GetCartView`.
+
+- **Saga** — Stateful orchestrator coordinating multiple BCs over time. Stored as a Marten document with numeric revisions for optimistic concurrency. Example: `OrderSaga`, `ReturnSaga`.
+
+- **Snapshot** — Immutable data captured at a point in time to preserve temporal consistency. Example: Address at checkout, price at add-to-cart.
+
+- **Value Object** — Immutable object without identity, defined by its properties. Examples: `Money`, `Address`, `OrderLineItem`.
+
+**Technology Stack:**
+
+- **Marten** — Event sourcing + document store library for Postgres. Used for event-sourced aggregates, sagas, and document storage.
+
+- **Wolverine** — Message handling + orchestration library. Discovers handlers via convention, manages inbox/outbox, routes messages to RabbitMQ.
+
+- **Alba** — Integration testing library built on ASP.NET Core's `TestServer`. Used for HTTP endpoint testing.
+
+- **Reqnroll** — BDD testing framework (successor to SpecFlow). Executes Gherkin `.feature` files.
+
+- **TestContainers** — Library for spinning up Docker containers in tests. Used for real Postgres/RabbitMQ infrastructure.
+
+---
 
 ## Documentation Structure
 
@@ -190,6 +422,8 @@ docs/features/
 
 **docs/planning/BACKLOG.md** — Deprecated as of 2026-02-23 (migrated to GitHub Issues). Kept as historical reference.
 
+---
+
 ## Quick References
 
 ### Preferred Tools
@@ -220,6 +454,8 @@ Each bounded context API includes a comprehensive `.http` file with test scenari
 - **A-Frame architecture** — Infrastructure at edges, pure logic in the middle
 - **Always update .sln** — When creating new projects, immediately add them to `CritterSupply.sln` using `dotnet sln add`
 
+---
+
 ## Solution Organization
 
 ```
@@ -248,6 +484,8 @@ src/
 ```
 
 See `docs/skills/vertical-slice-organization.md` for complete file organization patterns.
+
+---
 
 ## API Project Configuration
 
@@ -816,6 +1054,490 @@ Covers:
 
 ---
 
+## Testing Strategy
+
+**CritterSupply's testing pyramid:**
+
+```
+        E2E Tests (Playwright)           ← Real browser, full stack, Gherkin scenarios
+       /                      \
+      /                        \
+    BDD Tests (Reqnroll)        ← Alba + TestContainers, Gherkin scenarios
+   /                              \
+  /                                \
+Integration Tests (Alba)            ← HTTP endpoints, complete vertical slices
+|                                    |
+|                                    |
+Unit Tests (xUnit)                   ← Pure function handlers, domain logic
+```
+
+### When to Use Each Test Type
+
+**Unit Tests** — Fast, isolated, pure function testing
+- **What:** Test handler logic in isolation (no DB, no HTTP, no external services)
+- **When:** Handler is a pure function (input → output, no side effects)
+- **Example:** `AddItemToCartHandler` logic, decider pattern functions
+- **Tools:** xUnit, Shouldly
+- **Speed:** < 100ms per test
+- **Location:** `tests/*/UnitTests/` (optional — only if BC has significant pure logic)
+
+**Integration Tests** — Real infrastructure, HTTP endpoints, complete workflows
+- **What:** Test entire vertical slices with real Postgres, RabbitMQ, Marten, EF Core
+- **When:** Testing handlers that persist data, publish messages, or call other BCs
+- **Example:** `POST /api/cart/add-item` → cart persisted → event published
+- **Tools:** Alba, TestContainers, xUnit, Shouldly
+- **Speed:** 100-500ms per test
+- **Location:** `tests/*/IntegrationTests/` (every BC has one)
+
+**BDD Tests** — Gherkin scenarios, executable specifications
+- **What:** Same as integration tests, but driven by Gherkin `.feature` files
+- **When:** User-facing features with clear acceptance criteria
+- **Example:** `Given a customer with items in cart, When they check out, Then order is placed`
+- **Tools:** Reqnroll, Alba, TestContainers, xUnit
+- **Speed:** 100-500ms per scenario
+- **Location:** `tests/*/IntegrationTests/` (step definitions), `docs/features/*/` (feature files)
+
+**E2E Tests** — Real browser, real Kestrel, full stack
+- **What:** Browser automation testing the complete UI + API + SignalR flow
+- **When:** Critical user journeys (checkout, order placement, vendor dashboard)
+- **Example:** Open storefront → add item → checkout → verify order confirmation
+- **Tools:** Playwright, Reqnroll (optional), xUnit
+- **Speed:** 2-10 seconds per test
+- **Location:** `tests/Storefront.E2ETests/`, `tests/VendorPortal.E2ETests/`
+
+### Expected Test Ratios
+
+For a mature BC like Orders:
+- **~60% Integration Tests** — Most tests are Alba + TestContainers integration tests
+- **~20% Unit Tests** — Pure function logic (deciders, validators, value objects)
+- **~15% BDD Tests** — Key user scenarios in Gherkin format
+- **~5% E2E Tests** — Critical happy paths only
+
+### Common Testing Patterns
+
+**Integration test with Alba + TestContainers:**
+```csharp
+public class OrdersTests : IClassFixture<OrdersTestFixture>
+{
+    private readonly OrdersTestFixture _fixture;
+
+    public OrdersTests(OrdersTestFixture fixture) => _fixture = fixture;
+
+    [Fact]
+    public async Task PlaceOrder_WithValidData_ReturnsOrderId()
+    {
+        // Arrange
+        var cmd = new PlaceOrder(Guid.NewGuid(), new[] { new OrderLineItem("SKU123", 2) });
+
+        // Act
+        var result = await _fixture.Host.PostJson($"/api/orders", cmd)
+            .Receive<PlaceOrderResult>();
+
+        // Assert
+        result.OrderId.ShouldNotBe(Guid.Empty);
+    }
+}
+```
+
+**BDD test with Reqnroll:**
+```gherkin
+# docs/features/orders/order-placement.feature
+Feature: Order Placement
+  As a customer
+  I want to place an order
+  So that I can purchase products
+
+  Scenario: Place order with valid items
+    Given a customer with ID "cust-123"
+    And items in their cart: "SKU123" (2), "SKU456" (1)
+    When they place an order
+    Then the order is created
+    And a payment is authorized
+    And inventory is reserved
+```
+
+**E2E test with Playwright:**
+```csharp
+[Fact]
+public async Task Checkout_HappyPath_CreatesOrder()
+{
+    await Page.GotoAsync("http://localhost:5238");
+    await Page.GetByTestId("product-sku123").ClickAsync();
+    await Page.GetByTestId("add-to-cart").ClickAsync();
+    await Page.GetByTestId("checkout-button").ClickAsync();
+    await Page.GetByTestId("confirm-order").ClickAsync();
+
+    await Expect(Page.GetByTestId("order-confirmation")).ToBeVisibleAsync();
+}
+```
+
+---
+
+## Integration Patterns
+
+**CritterSupply uses two primary integration patterns:**
+
+### 1. Choreography (Event-Driven, Autonomous)
+
+**Pattern:** BCs autonomously react to events published by other BCs. No central coordinator.
+
+**When to use:**
+- Loose coupling is more important than strict ordering
+- Downstream BCs can handle events asynchronously
+- No need for error compensation across BCs
+
+**Example:** Inventory reacts to `OrderPlaced`
+```csharp
+// In Inventory BC
+public static class OrderPlacedHandler
+{
+    public static async Task<StockReserved> Handle(OrderPlaced evt, IInventoryRepository repo)
+    {
+        await repo.ReserveStock(evt.OrderId, evt.Items);
+        return new StockReserved(evt.OrderId);
+    }
+}
+```
+
+**Pros:**
+- ✅ Loose coupling
+- ✅ High autonomy
+- ✅ Easy to add new subscribers
+
+**Cons:**
+- ❌ Hard to trace end-to-end flow
+- ❌ No centralized error handling
+- ❌ Eventual consistency can confuse users
+
+**Examples in CritterSupply:**
+- Inventory → Orders (stock reserved)
+- Correspondence → Orders, Fulfillment, Payments (transactional emails)
+- Customer Experience → Shopping, Orders, Fulfillment (real-time UI updates)
+
+---
+
+### 2. Orchestration (Saga-Driven, Coordinated)
+
+**Pattern:** One BC (the orchestrator) actively coordinates others via commands/requests. Centralized state machine.
+
+**When to use:**
+- Need strict ordering of operations (payment before fulfillment)
+- Need error compensation (refund if fulfillment fails)
+- Business logic spans multiple BCs
+
+**Example:** OrderSaga orchestrates Payments, Inventory, Fulfillment
+```csharp
+public class OrderSaga : Saga
+{
+    public Guid Id { get; set; }
+    public OrderStatus Status { get; set; }
+
+    public OutgoingMessages Handle(OrderPlaced evt, IMessageContext ctx)
+    {
+        Status = OrderStatus.PaymentPending;
+        return new OutgoingMessages()
+            .Add(new AuthorizePayment(evt.OrderId, evt.TotalAmount))
+            .Add(new ReserveStock(evt.OrderId, evt.Items))
+            .ScheduleTimeout(TimeSpan.FromMinutes(10));
+    }
+
+    public void Handle(PaymentAuthorized evt)
+    {
+        if (Status == OrderStatus.PaymentPending && StockReserved)
+        {
+            Status = OrderStatus.Confirmed;
+            Publish(new RequestFulfillment(Id));
+        }
+    }
+
+    public void Handle(PaymentFailed evt)
+    {
+        Status = OrderStatus.Cancelled;
+        Publish(new ReleaseStockReservation(Id));
+        MarkCompleted();
+    }
+}
+```
+
+**Pros:**
+- ✅ Clear end-to-end flow
+- ✅ Centralized error handling
+- ✅ Easy to add compensation logic
+
+**Cons:**
+- ❌ Orchestrator becomes a bottleneck
+- ❌ Tight coupling to orchestrated BCs
+- ❌ Harder to test in isolation
+
+**Examples in CritterSupply:**
+- OrderSaga (Orders → Payments, Inventory, Fulfillment)
+- ReturnSaga (Returns → Fulfillment, Payments)
+- BulkPricingJobSaga (Pricing → internal approval workflow)
+
+---
+
+### 3. Query-Only (BFF Pattern)
+
+**Pattern:** BFF queries multiple BCs synchronously via HTTP to compose a view. No state, no persistence.
+
+**When to use:**
+- UI needs data from multiple BCs
+- No domain logic, pure composition
+- Read-only operations
+
+**Example:** Storefront BFF composes CartView
+```csharp
+public static class GetCartViewQuery
+{
+    [WolverineGet("/api/cart/{cartId}")]
+    public static async Task<CartView> Get(
+        Guid cartId,
+        IShoppingClient shopping,
+        ICatalogClient catalog)
+    {
+        var cart = await shopping.GetCart(cartId);
+        var products = await catalog.GetProducts(cart.Items.Select(i => i.Sku));
+
+        return new CartView(
+            cart.Id,
+            cart.Items.Select(i => new CartItemView(
+                i.Sku,
+                products[i.Sku].Name,
+                i.Quantity,
+                products[i.Sku].Price
+            ))
+        );
+    }
+}
+```
+
+**Examples in CritterSupply:**
+- Customer Experience (Storefront) queries Shopping, Orders, Catalog, Customer Identity
+- Vendor Portal queries Vendor Identity, Orders, Fulfillment, Pricing
+
+---
+
+### Decision Matrix
+
+| Scenario | Pattern | Rationale |
+|----------|---------|-----------|
+| Order placement requires payment, stock reservation, and fulfillment | **Orchestration (Saga)** | Strict ordering, compensation needed |
+| Send email when order is placed | **Choreography** | Loose coupling, no compensation needed |
+| Show customer their order history | **Query-Only (BFF)** | Read-only, no domain logic |
+| Return approval triggers refund and replacement order | **Orchestration (Saga)** | Multi-step workflow with compensation |
+| Update inventory when shipment is dispatched | **Choreography** | Autonomous reaction, eventual consistency OK |
+
+---
+
+## Common Mistakes & Anti-patterns
+
+**AI agents: avoid these patterns at all costs.**
+
+### 1. ❌ Mutable Aggregates
+
+**Wrong:**
+```csharp
+public class Order
+{
+    public Guid Id { get; set; }  // ❌ Setter allows mutation
+    public List<OrderLineItem> Items { get; set; }  // ❌ Mutable list
+}
+```
+
+**Right:**
+```csharp
+public sealed record Order(Guid Id, IReadOnlyList<OrderLineItem> Items);
+```
+
+**Why:** Immutability prevents accidental state corruption. Event-sourced aggregates must be reconstitutable from events.
+
+---
+
+### 2. ❌ Handlers with Side Effects
+
+**Wrong:**
+```csharp
+public static class AddItemHandler
+{
+    public static void Handle(AddItem cmd, ShoppingCart cart, IDocumentSession session)
+    {
+        cart.AddItem(cmd.Sku, cmd.Quantity);
+        session.Store(cart);  // ❌ Side effect in handler
+    }
+}
+```
+
+**Right:**
+```csharp
+public static class AddItemHandler
+{
+    public static ItemAdded Handle(AddItem cmd, ShoppingCart cart)
+    {
+        // Pure function - returns event, no side effects
+        return new ItemAdded(cart.Id, cmd.Sku, cmd.Quantity);
+    }
+}
+```
+
+**Why:** Wolverine manages persistence. Handlers should be pure functions.
+
+---
+
+### 3. ❌ Forgetting `MarkCompleted()` in Sagas
+
+**Wrong:**
+```csharp
+public void Handle(OrderCancelled evt)
+{
+    Status = OrderStatus.Cancelled;
+    // ❌ Saga never completes, stays in database forever
+}
+```
+
+**Right:**
+```csharp
+public void Handle(OrderCancelled evt)
+{
+    Status = OrderStatus.Cancelled;
+    MarkCompleted();  // ✅ Saga is removed from storage
+}
+```
+
+**Why:** Orphaned sagas accumulate in the database and waste resources.
+
+---
+
+### 4. ❌ Forgetting to Add Projects to Solution Files
+
+**Wrong:**
+```bash
+dotnet new classlib -n MyNewBC -o "src/MyNewBC"
+# ❌ Forget to add to .sln and .slnx
+```
+
+**Right:**
+```bash
+dotnet new classlib -n MyNewBC -o "src/MyNewBC"
+dotnet sln add "src/MyNewBC/MyNewBC.csproj"  # ✅ Add to .sln
+# ✅ Manually add to .slnx as well (for IDE Solution Explorer)
+```
+
+**Why:** Project won't build in CI, won't appear in IDE Solution Explorer.
+
+---
+
+### 5. ❌ Using Mutable Collections
+
+**Wrong:**
+```csharp
+public List<OrderLineItem> Items { get; init; }  // ❌ List<T> is mutable
+```
+
+**Right:**
+```csharp
+public IReadOnlyList<OrderLineItem> Items { get; init; }  // ✅ Immutable
+```
+
+**Why:** Caller could mutate the collection, breaking immutability guarantees.
+
+---
+
+### 6. ❌ Not Sealed by Default
+
+**Wrong:**
+```csharp
+public record AddItemToCart(Guid CartId, string Sku, int Quantity);  // ❌ Not sealed
+```
+
+**Right:**
+```csharp
+public sealed record AddItemToCart(Guid CartId, string Sku, int Quantity);  // ✅ Sealed
+```
+
+**Why:** Commands, events, and models should be sealed by default. Inheritance is rarely needed.
+
+---
+
+### 7. ❌ Adding Implementation Details to CONTEXTS.md
+
+**Wrong:**
+```markdown
+### Orders BC
+Owns order lifecycle. Publishes `OrderPlaced`, `OrderConfirmed`, `OrderShipped`.
+Handlers: `PlaceOrderHandler`, `ConfirmOrderHandler`.
+```
+
+**Right:**
+```markdown
+### Orders BC
+Owns commercial commitment — checkout aggregate and order lifecycle saga that orchestrates Payments, Inventory, Fulfillment.
+```
+
+**Why:** CONTEXTS.md describes "what and who", not "how". Implementation details live in code.
+
+---
+
+### 8. ❌ Mixing Domain Logic in API Projects
+
+**Wrong:**
+```
+src/Orders/
+└── Orders.Api/                         # ❌ API project
+    ├── PlaceOrderHandler.cs            # ❌ Domain logic in API project
+    └── OrderSaga.cs                    # ❌ Domain logic in API project
+```
+
+**Right:**
+```
+src/Orders/
+├── Orders/                             # ✅ Domain project
+│   ├── Order/PlaceOrderHandler.cs
+│   └── Order/OrderSaga.cs
+└── Orders.Api/                         # ✅ API project (infrastructure only)
+    ├── Program.cs
+    └── Queries/GetOrderQuery.cs
+```
+
+**Why:** Separation of concerns. Domain logic should be in domain project, infrastructure in API project.
+
+---
+
+### 9. ❌ Not Reading Skill Files Before Implementing
+
+**Wrong:**
+```
+User: "Add a saga for order placement"
+Agent: [Writes saga without reading wolverine-sagas.md]
+Agent: [Forgets MarkCompleted(), uses wrong Marten configuration, misses idempotency guards]
+```
+
+**Right:**
+```
+User: "Add a saga for order placement"
+Agent: [Reads docs/skills/wolverine-sagas.md first]
+Agent: [Implements saga correctly with all patterns from skill file]
+```
+
+**Why:** Skill files document 2+ years of lessons learned. Don't reinvent the wheel.
+
+---
+
+### 10. ❌ Using `List<T>.Add()` Instead of `with` Expressions
+
+**Wrong:**
+```csharp
+cart.Items.Add(newItem);  // ❌ Mutates existing collection
+```
+
+**Right:**
+```csharp
+var updatedCart = cart with { Items = cart.Items.Append(newItem).ToList() };  // ✅ Immutable update
+```
+
+**Why:** Immutable updates preserve original state, enable time-travel debugging, and prevent race conditions.
+
+---
+
 ## Project Creation Workflow
 
 **IMPORTANT:** When creating new projects (APIs, test projects, Blazor apps, etc.), always follow this checklist:
@@ -885,6 +1607,8 @@ dotnet test
 - ✅ All unit tests pass
 - ✅ All integration tests pass
 
+---
+
 ## When to Use Context7
 
 These skills document CritterSupply's established patterns. For exploring Wolverine/Marten capabilities beyond these patterns, use Context7:
@@ -892,6 +1616,8 @@ These skills document CritterSupply's established patterns. For exploring Wolver
 - `@context7 wolverine saga` — when evaluating saga patterns
 - `@context7 marten projections` — for advanced projection types
 - `@context7 wolverine http` — for HTTP endpoint features
+
+---
 
 ## Development Progress
 
