@@ -35,6 +35,9 @@ builder.Services.AddMarten(opts =>
 
         opts.DatabaseSchemaName = Constants.Correspondence.ToLowerInvariant();
         opts.DisableNpgsqlLogging = true;
+
+        // Register inline projection for customer message history queries
+        opts.Projections.Add<MessageListViewProjection>(JasperFx.Events.Projections.ProjectionLifecycle.Inline);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()
