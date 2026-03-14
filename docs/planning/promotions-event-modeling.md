@@ -2844,3 +2844,818 @@ Not every domain event becomes an integration message. Most events are private t
 ---
 
 *Stages 2–6 complete. This event model is ready for implementation planning and cycle scoping.*
+
+---
+
+# Stage 7: Sagas and Workflows
+
+## 7.1 Saga Candidate Analysis
+
+Three workflow candidates were identified during Stages 2–6. Each is evaluated below for whether a full Wolverine `Saga` is warranted or a simpler pattern suffices.
+
+### Candidate 1: Promotion Scheduling (Activate at StartsAt, Expire at EndsAt)
+
+**Verdict: ❌ No Saga — Use Wolverine Scheduled Messages with Stale-Message Guards**
+
+**Why not a saga?**
+- Only two scheduled points in time (start, end) — no intermediate states or compensating actions
+- No coordination across multiple aggregates or BCs
+- The Promotion aggregate itself tracks `Status` and `ActivationScheduleId` / `ExpirationScheduleId`
+- Stale-message guard pattern (compare `ScheduleId` on arrival) is proven in Returns BC (`ExpireReturn`) and Pricing BC (`ExpirePriceRule`)
+
+**Pattern:**
+```
+SchedulePromotion command
+  → Promotion.Apply(PromotionScheduled) stores ActivationScheduleId + ExpirationScheduleId
+  → Handler returns:
+      ScheduleAsync(new ActivatePromotion(PromotionId, ActivationScheduleId), StartsAt)
+
+ActivatePromotion arrives at StartsAt
+  → [WriteAggregate] handler loads Promotion
+  → Guard: if (promotion.ActivationScheduleId != command.ScheduleId) return [];  // stale
+  → Promotion.Apply(PromotionActivated) stores ExpirationScheduleId
+  → Handler returns:
+      Events([new PromotionActivated(...)]),
+      OutgoingMessages([
+        new ScheduleMessage(new ExpirePromotion(PromotionId, ExpirationScheduleId), EndsAt),
+        new Contracts.PromotionActivated(...)  // integration message → RabbitMQ
+      ])
+
+ExpirePromotion arrives at EndsAt
+  → [WriteAggregate] handler loads Promotion
+  → Guard: if (promotion.ExpirationScheduleId != command.ScheduleId) return [];  // stale
+  → Promotion.Apply(PromotionExpired)
+  → Handler returns:
+      Events([new PromotionExpired(...)]),
+      OutgoingMessages([
+        new Contracts.PromotionExpired(...),    // integration message → RabbitMQ
+        ...coupons.Select(c => new ExpireCoupon(c.Code))  // fan-out
+      ])
+```
+
+**Risk:** If the Promotions service is down at the scheduled time, Wolverine's durable inbox will deliver the message when it recovers. The stale-message guard ensures idempotency if the promotion was already cancelled/paused.
+
+---
+
+### Candidate 2: Coupon Batch Generation
+
+**Verdict: ❌ No Saga — Use Handler Fan-Out via `OutgoingMessages`**
+
+**Why not a saga?**
+- All `IssueCoupon` commands target independent Coupon aggregates — no coordination needed
+- No compensating actions (if one coupon fails to issue, the others are still valid)
+- No external BC interaction
+- The `CouponBatchGenerated` event on the Promotion aggregate records the batch metadata (count, prefix, batchId)
+- Individual `IssueCoupon` commands are idempotent (UUID v5 from code ensures deterministic IDs)
+
+**Pattern:**
+```
+GenerateCouponBatch command
+  → [WriteAggregate] handler loads Promotion
+  → Generates coupon codes: "{Prefix}-{random}" × Count
+  → Returns:
+      Events([new CouponBatchGenerated(PromotionId, BatchId, Count, Prefix, ...)]),
+      OutgoingMessages(codes.Select(code =>
+        new IssueCoupon(code, PromotionId, BatchId, MaxUsesPerCoupon, MaxUsesPerCustomer)
+      ))
+```
+
+**Scalability consideration:** For very large batches (10,000+ coupons), the `OutgoingMessages` collection could be large. Wolverine's durable outbox handles this — messages are persisted to the outbox table and dispatched asynchronously. If this proves problematic at scale, we can chunk into batches of 500 using a simple recursive pattern:
+
+```
+GenerateCouponBatchChunk(Guid PromotionId, Guid BatchId, int RemainingCount, int ChunkSize, string Prefix, ...)
+  → Issues min(RemainingCount, ChunkSize) coupons
+  → If RemainingCount > ChunkSize, enqueues another GenerateCouponBatchChunk with RemainingCount - ChunkSize
+```
+
+This is still not a saga — just recursive message dispatch. Defer chunking to Phase 2 if batch sizes stay under 1,000.
+
+---
+
+### Candidate 3: Coupon Reservation Lifecycle (Reserve → Redeem or Release)
+
+**Verdict: ❌ No Saga — Use Scheduled Message for TTL Expiry**
+
+**Why not a saga?**
+- Only two outcomes: redeem or release — no multi-step coordination
+- The Coupon aggregate tracks reservation state directly (`ReservedBy`, `ReservedUntil`)
+- TTL-based auto-release uses the same scheduled message pattern as promotion activation
+
+**Pattern:**
+```
+ValidateCoupon (sync HTTP from Shopping BC)
+  → [WriteAggregate] handler loads Coupon
+  → If valid: Apply(CouponReserved) with ReservedUntil = now + 15 minutes
+  → Returns:
+      Events([new CouponReserved(...)]),
+      OutgoingMessages([
+        new ScheduleMessage(new ReleaseCouponReservation(CouponCode, CartId), ReservedUntil)
+      ]),
+      HTTP response: CouponValidationResult { IsValid = true, ... }
+
+ReleaseCouponReservation arrives at TTL
+  → [WriteAggregate] handler loads Coupon
+  → Guard: if coupon.Status != Reserved || coupon.ReservedByCartId != CartId → skip (already redeemed/released)
+  → Apply(CouponReservationReleased)
+
+RedeemCoupon (from OrderPlacedHandler)
+  → [WriteAggregate] handler loads Coupon
+  → Guard: if coupon.Status == Redeemed → skip (idempotent)
+  → Apply(CouponRedeemed) — this implicitly cancels the pending release (guard on ReleaseCouponReservation will skip)
+```
+
+---
+
+### Candidate 4: Redemption Recording (Cross-Aggregate Coordination)
+
+**Verdict: ❌ No Saga — Use Handler Cascading Commands**
+
+When `OrderPlaced` arrives from Orders BC, the handler must update both the Promotion aggregate (increment redemption count) and the Coupon aggregate (mark redeemed). These are independent aggregates.
+
+**Why not a saga?**
+- Two independent aggregate updates with no rollback requirement
+- If one fails, Wolverine retry policy handles it
+- No ordering dependency — `RecordRedemption` and `RedeemCoupon` can execute in parallel
+
+**Pattern:**
+```csharp
+// OrderPlacedHandler.cs — cascading handler
+public static OutgoingMessages Handle(Contracts.OrderPlaced message)
+{
+    var messages = new OutgoingMessages();
+
+    foreach (var appliedPromo in message.AppliedPromotions)
+    {
+        messages.Add(new RecordRedemption(
+            appliedPromo.PromotionId,
+            message.OrderId,
+            message.CustomerId,
+            appliedPromo.CouponCode,
+            appliedPromo.DiscountApplied,
+            message.PlacedAt));
+
+        if (appliedPromo.CouponCode is not null)
+        {
+            messages.Add(new RedeemCoupon(
+                appliedPromo.CouponCode,
+                message.OrderId,
+                message.CustomerId));
+        }
+    }
+
+    return messages;
+}
+```
+
+---
+
+## 7.2 Saga Decision Summary
+
+| Candidate | Saga? | Pattern Used | Rationale |
+|-----------|-------|-------------|-----------|
+| Promotion Scheduling | ❌ No | Scheduled messages + stale-message guard | Two time points, no coordination, proven pattern |
+| Coupon Batch Generation | ❌ No | Handler fan-out via `OutgoingMessages` | Independent aggregates, no compensation needed |
+| Coupon Reservation Lifecycle | ❌ No | Scheduled message for TTL expiry | Two outcomes, aggregate tracks state directly |
+| Redemption Recording | ❌ No | Handler cascading commands | Independent updates, no ordering dependency |
+
+**Key Insight:** The Promotions BC does not require any Wolverine Sagas in Phase 1. All workflows decompose into simpler patterns: scheduled messages, handler fan-out, and cascading commands. This is a sign of well-bounded aggregate design — each aggregate owns its own state transitions without cross-aggregate coordination.
+
+**Future Consideration:** If Phase 2 introduces stacking rules that require multi-promotion coordination (e.g., "apply best 2 of 5 eligible promotions"), a `DiscountResolutionSaga` may emerge. Defer until stacking requirements are concrete.
+
+---
+
+# Stage 8: Subscribers and Reactors
+
+## 8.1 Who Subscribes TO Promotions BC Events?
+
+These are integration messages published by the Promotions BC that other BCs consume.
+
+### 8.1.1 Shopping BC → Subscribes to Promotion Lifecycle Events
+
+| Integration Message | Trigger | Shopping BC Reaction | Transport |
+|---|---|---|---|
+| `PromotionActivated` | Promotion reaches `StartsAt` | Update local `ActivePromotionCache` projection; flag affected cart items for re-pricing; show promotional badges on applicable product pages | RabbitMQ (async) |
+| `PromotionPaused` | Admin pauses promotion | Remove promotion from active cache; stop applying discount to new carts; existing carts keep discount until next recalculation | RabbitMQ (async) |
+| `PromotionResumed` | Admin resumes promotion | Restore promotion to active cache; resume applying discount | RabbitMQ (async) |
+| `PromotionExpired` | Promotion reaches `EndsAt` or cap reached | Remove promotion from active cache; recalculate any active carts that had this promotion applied | RabbitMQ (async) |
+| `PromotionCancelled` | Admin cancels promotion | Same as Expired — remove and recalculate | RabbitMQ (async) |
+
+**Shopping BC Handler Pattern:**
+```
+PromotionActivatedHandler → upsert ActivePromotionCache document
+PromotionExpiredHandler → delete from ActivePromotionCache, enqueue RecalculateAffectedCarts
+```
+
+**Note:** Shopping BC maintains its own local read model of active promotions. It does NOT query Promotions BC for every cart operation. This is the standard event-driven denormalization pattern — Shopping owns a local copy of promotion data it needs.
+
+**⚠️ Undefined Integration:** Shopping BC's `CouponApplied` event (listed in CONTEXTS.md as a future Phase 2 event) implies Shopping BC applies coupon codes to carts. The flow is:
+1. Customer enters coupon code in cart UI
+2. Shopping BC calls `POST /api/promotions/coupons/validate` (sync HTTP)
+3. Promotions BC validates and reserves the coupon
+4. Shopping BC records `CouponApplied` locally
+5. At checkout, the coupon reservation is included in `CheckoutInitiated`
+
+This sync HTTP call is already defined in Stage 3. No additional integration message needed.
+
+---
+
+### 8.1.2 Customer Experience BFF → Subscribes to Promotion Lifecycle Events
+
+| Integration Message | CE BFF Reaction | Transport |
+|---|---|---|
+| `PromotionActivated` | Push notification to SignalR hub → storefront clients show promotional banner/badge; update `ActivePromotionsCompositionView` | RabbitMQ → SignalR |
+| `PromotionPaused` | Remove promotional banner from storefront | RabbitMQ → SignalR |
+| `PromotionResumed` | Restore promotional banner | RabbitMQ → SignalR |
+| `PromotionExpired` | Remove promotional banner; show "Sale ended" toast if customer was viewing promoted product | RabbitMQ → SignalR |
+| `PromotionCancelled` | Same as Expired | RabbitMQ → SignalR |
+
+**CE BFF Handler Pattern:**
+```csharp
+// In Storefront/Notifications/PromotionNotificationHandler.cs
+public static async Task Handle(
+    Contracts.PromotionActivated message,
+    IEventBroadcaster broadcaster)
+{
+    await broadcaster.BroadcastToAll(new PromotionStartedNotification(
+        message.PromotionId, message.Name, message.DiscountType,
+        message.DiscountValue, message.StartsAt, message.EndsAt));
+}
+```
+
+**CE BFF also composes promotion data for product pages** via sync HTTP:
+- `GET /api/promotions/applicable?skus=X,Y,Z` — called when rendering product detail pages to show "20% OFF" badges
+
+---
+
+### 8.1.3 Correspondence BC → Subscribes to Promotion Lifecycle Events (Future)
+
+| Integration Message | Correspondence BC Reaction | Transport | Phase |
+|---|---|---|---|
+| `PromotionActivated` | Send "New Sale!" marketing email to opted-in customers | RabbitMQ (async) | Phase 2+ |
+| `PromotionExpired` | Send "Last chance!" reminder email (if configured) | RabbitMQ (async) | Phase 2+ |
+
+**⚠️ Undefined Integration:** CONTEXTS.md does not list Promotions → Correspondence integration. This should be added to CONTEXTS.md when Promotions BC is implemented. Phase 1 does NOT require this — marketing emails are a Phase 2+ concern.
+
+---
+
+### 8.1.4 Admin Portal BFF → Subscribes to Promotion Lifecycle Events (Future)
+
+| Integration Message | Admin Portal Reaction | Transport | Phase |
+|---|---|---|---|
+| `PromotionActivated` | Update promotion dashboard; show "now live" status | RabbitMQ → SignalR | Phase 2+ |
+| `PromotionExpired` | Update dashboard; show redemption summary | RabbitMQ → SignalR | Phase 2+ |
+| `PromotionCancelled` | Update dashboard; alert ops team | RabbitMQ → SignalR | Phase 2+ |
+
+**⚠️ Undefined Integration:** Admin Portal is a future BC (🟢 Low Priority in CONTEXTS.md). No implementation needed for Phase 1 — admin operations go directly to Promotions API endpoints.
+
+---
+
+### 8.1.5 Vendor Portal BFF → Subscribes to Promotion Events (Future Consideration)
+
+**⚠️ Not in CONTEXTS.md.** Vendors may want visibility into promotions affecting their products (e.g., "Your product X is included in a 20% off sale"). This is a Phase 3+ concern. Flag for backlog.
+
+---
+
+## 8.2 What Does Promotions BC Subscribe TO from Other BCs?
+
+### 8.2.1 Orders BC → Promotions BC
+
+| Integration Message | Trigger in Orders BC | Promotions BC Reaction | Transport |
+|---|---|---|---|
+| `OrderPlaced` (with `AppliedPromotions` payload) | Order successfully placed with applied discounts | `OrderPlacedHandler` dispatches `RecordRedemption` + `RedeemCoupon` commands to update redemption counts and mark coupons redeemed | RabbitMQ (async) |
+
+**Message Contract (inbound):**
+```csharp
+// In Messages.Contracts (shared)
+public sealed record OrderWithPromotionPlaced(
+    Guid OrderId,
+    Guid CustomerId,
+    IReadOnlyList<AppliedPromotionRef> AppliedPromotions,
+    DateTimeOffset PlacedAt);
+
+public sealed record AppliedPromotionRef(
+    Guid PromotionId,
+    string? CouponCode,
+    decimal DiscountApplied);
+```
+
+**Cross-reference with CONTEXTS.md:** ✅ Orders BC publishes `OrderPlaced` → multiple BCs. The `AppliedPromotions` payload extension needs to be added to the existing `OrderPlaced` contract when Promotions BC is implemented.
+
+---
+
+### 8.2.2 Pricing BC → Promotions BC (Sync HTTP)
+
+| Query | Trigger in Promotions BC | Purpose | Transport |
+|---|---|---|---|
+| `GET /api/pricing/{sku}` | `CalculateDiscount` handler | Fetch floor price (MAP) to clamp discount | Sync HTTP |
+| `GET /api/pricing/bulk?skus=X,Y,Z` | `CalculateDiscount` handler (multiple items) | Batch floor price lookup | Sync HTTP |
+
+**Cross-reference with CONTEXTS.md:** ✅ Pricing BC exposes price lookup endpoints. The `MAPViolationDetected` event published by Pricing BC is NOT consumed by Promotions BC — Promotions proactively queries floor prices at calculation time rather than reacting to violations.
+
+**⚠️ Resilience pattern:** If Pricing BC is unavailable, the `CalculateDiscount` handler should:
+1. Apply the discount without floor price clamping (optimistic)
+2. Log a warning for ops review
+3. OR: fail the calculation and return an error to the caller
+
+**Decision:** Fail closed — return error if floor price cannot be verified. Rationale: applying a discount below MAP is a legal/contractual risk. Better to lose a sale than violate MAP agreements. This aligns with Pricing BC's `MAPViolationDetected` invariant.
+
+---
+
+### 8.2.3 Product Catalog BC → Promotions BC (NOT subscribed — by design)
+
+**Why Promotions does NOT subscribe to Product Catalog events:**
+- Promotion scope is resolved to SKU lists at creation time (Decision #8 from Stage 6)
+- Category-to-SKU resolution happens once, not continuously
+- If a new product is added to a category after a promotion is created, it is NOT automatically included
+- This is a conscious trade-off: simplicity over dynamic scope, accepted limitation for Phase 1
+
+**Future Phase 2 consideration:** If dynamic scope is needed, Promotions BC could subscribe to `ProductAdded` / `ProductCategorized` events and maintain a local `CategoryMembershipView` projection. This would require re-evaluating Decision #8.
+
+---
+
+### 8.2.4 Shopping BC → Promotions BC (Sync HTTP)
+
+| Endpoint | Trigger in Shopping BC | Purpose | Transport |
+|---|---|---|---|
+| `POST /api/promotions/coupons/validate` | Customer enters coupon code in cart | Validate coupon, reserve if valid | Sync HTTP (request/response) |
+| `POST /api/promotions/calculate-discount` | Cart recalculation (item added/removed, checkout) | Calculate applicable discounts for cart contents | Sync HTTP (request/response) |
+| `GET /api/promotions/applicable?skus=X,Y,Z` | Product page rendering | Show promotional badges on eligible products | Sync HTTP (request/response) |
+
+**Cross-reference with CONTEXTS.md:** ✅ Shopping BC makes sync calls to Promotions for real-time pricing. These are already defined in Stage 3.
+
+---
+
+## 8.3 Subscriber and Reactor Summary
+
+### Outbound (Promotions → Other BCs)
+
+| # | Message | Consumer BCs | Transport | Phase |
+|---|---------|-------------|-----------|-------|
+| R1 | `PromotionActivated` | Shopping, CE BFF | RabbitMQ | Phase 1 |
+| R2 | `PromotionPaused` | Shopping, CE BFF | RabbitMQ | Phase 1 |
+| R3 | `PromotionResumed` | Shopping, CE BFF | RabbitMQ | Phase 1 |
+| R4 | `PromotionExpired` | Shopping, CE BFF | RabbitMQ | Phase 1 |
+| R5 | `PromotionCancelled` | Shopping, CE BFF | RabbitMQ | Phase 1 |
+| R6 | `PromotionActivated` | Correspondence | RabbitMQ | Phase 2+ |
+| R7 | `PromotionActivated` | Admin Portal BFF | RabbitMQ | Phase 2+ |
+
+### Inbound (Other BCs → Promotions)
+
+| # | Message | Source BC | Transport | Handler | Phase |
+|---|---------|----------|-----------|---------|-------|
+| R8 | `OrderWithPromotionPlaced` | Orders | RabbitMQ | `OrderPlacedHandler` | Phase 1 |
+
+### Sync HTTP (Promotions serves, other BCs call)
+
+| # | Endpoint | Caller BC | Purpose | Phase |
+|---|----------|-----------|---------|-------|
+| R9 | `POST /api/promotions/coupons/validate` | Shopping | Coupon validation + reservation | Phase 1 |
+| R10 | `POST /api/promotions/calculate-discount` | Shopping / Orders | Discount calculation | Phase 1 |
+| R11 | `GET /api/promotions/applicable?skus=X,Y,Z` | CE BFF | Product page badges | Phase 1 |
+| R12 | `GET /api/promotions/active` | CE BFF / Admin Portal | List all active promotions | Phase 1 |
+
+### Sync HTTP (Promotions calls other BCs)
+
+| # | Endpoint | Target BC | Purpose | Phase |
+|---|----------|-----------|---------|-------|
+| R13 | `GET /api/pricing/{sku}` | Pricing | Floor price (MAP) lookup | Phase 1 |
+| R14 | `GET /api/pricing/bulk?skus=X,Y,Z` | Pricing | Batch floor price lookup | Phase 1 |
+
+---
+
+## 8.4 Undefined Integrations Flagged for CONTEXTS.md Update
+
+| # | Integration | Status | Action Required |
+|---|-------------|--------|----------------|
+| F1 | Promotions → Correspondence (marketing emails) | ❌ Not in CONTEXTS.md | Add to Phase 2 integration table |
+| F2 | Promotions → Admin Portal BFF (dashboard updates) | ❌ Not in CONTEXTS.md | Add when Admin Portal BC is scoped |
+| F3 | Promotions → Vendor Portal BFF (vendor visibility) | ❌ Not in CONTEXTS.md | Backlog item — Phase 3+ |
+| F4 | `OrderPlaced` contract extension with `AppliedPromotions` | ⚠️ Needs contract update | Extend existing `OrderPlaced` contract in Messages.Contracts |
+| F5 | Shopping BC `CouponApplied` domain event | ⚠️ Listed as future in CONTEXTS.md | Confirm this is Shopping-internal, not an integration event |
+
+---
+
+# Stage 9: Naming Critique
+
+## 9.1 Aggregate Names
+
+| Name | Verdict | Notes |
+|------|---------|-------|
+| `Promotion` | ✅ **Keep** | Clear, ubiquitous language. Represents the full lifecycle of a promotional offer. Alternative "Discount" is too narrow (misses scheduling, eligibility, redemption tracking). |
+| `Coupon` | ✅ **Keep** | Clear, universally understood. Represents a single redeemable code. Alternative "CouponCode" is redundant (a coupon IS a code). Alternative "Voucher" is regionally ambiguous. |
+
+---
+
+## 9.2 Domain Events
+
+### Promotion Aggregate Events (14)
+
+| # | Event Name | Verdict | Notes |
+|---|-----------|---------|-------|
+| 1 | `PromotionCreated` | ✅ Keep | Standard `{Aggregate}Created` pattern |
+| 2 | `DiscountRulesConfigured` | ✅ Keep | "Configured" implies setup/draft phase — correct for multi-step creation |
+| 3 | `PromotionScopeConfigured` | ✅ Keep | Consistent with "Configured" verb for setup events |
+| 4 | `EligibilityRulesSet` | ⚠️ **Minor inconsistency** | Uses "Set" while others use "Configured". However, "Set" reads more naturally for rules. **Keep** — the distinction is meaningful: "Configured" = complex object, "Set" = simple properties. |
+| 5 | `RedemptionLimitsSet` | ✅ Keep | Consistent with `EligibilityRulesSet` — "Set" for simple properties |
+| 6 | `CouponBatchGenerated` | ✅ Keep | "Generated" is accurate — coupons are created in bulk |
+| 7 | `PromotionScheduled` | ✅ Keep | Clear past-tense, captures the scheduling action |
+| 8 | `PromotionActivated` | ✅ Keep | Clear lifecycle transition |
+| 9 | `PromotionPaused` | ✅ Keep | Clear admin action |
+| 10 | `PromotionResumed` | ✅ Keep | Pairs naturally with Paused |
+| 11 | `RedemptionRecorded` | ✅ Keep | "Recorded" correctly implies bookkeeping (not the act of redeeming) |
+| 12 | `RedemptionCapReached` | ✅ Keep | Descriptive — tells you exactly what happened. Past tense via "Reached". |
+| 13 | `PromotionExpired` | ✅ Keep | Clear lifecycle transition |
+| 14 | `PromotionCancelled` | ✅ Keep | Clear admin action. British spelling is fine — consistent within the BC. |
+
+### Coupon Aggregate Events (6)
+
+| # | Event Name | Verdict | Notes |
+|---|-----------|---------|-------|
+| 1 | `CouponIssued` | ✅ Keep | "Issued" correctly implies creation from an authority (Promotion) |
+| 2 | `CouponReserved` | ✅ Keep | Domain-accurate — coupon is held temporarily during checkout |
+| 3 | `CouponReservationReleased` | ⚠️ **Verbose but clear** | Alternative: `CouponReleased` — shorter but loses "reservation" context. **Keep as-is** — explicitness wins for event names that appear in event stores. |
+| 4 | `CouponRedeemed` | ✅ Keep | Standard e-commerce term |
+| 5 | `CouponExpired` | ✅ Keep | Clear lifecycle end |
+| 6 | `CouponRevoked` | ✅ Keep | "Revoked" correctly implies admin action (vs. "Expired" which is time-based) |
+
+**Summary:** All 20 domain event names pass review. No renames required.
+
+---
+
+## 9.3 Commands
+
+### Promotion Commands (13)
+
+| # | Command Name | Verdict | Notes |
+|---|-------------|---------|-------|
+| 1 | `CreatePromotion` | ✅ Keep | Standard `Create{Aggregate}` pattern |
+| 2 | `ConfigureDiscountRules` | ✅ Keep | Imperative mood, clear intent |
+| 3 | `ConfigureScope` | ⚠️ **Rename** → `ConfigurePromotionScope` | Ambiguous without aggregate prefix in message routing. Every other command includes context. |
+| 4 | `SetEligibilityRules` | ✅ Keep | Consistent with event name |
+| 5 | `SetRedemptionLimits` | ✅ Keep | Consistent with event name |
+| 6 | `GenerateCouponBatch` | ✅ Keep | Clear, imperative |
+| 7 | `SchedulePromotion` | ✅ Keep | Imperative mood, matches event |
+| 8 | `ActivatePromotion` | ✅ Keep | Clear lifecycle command |
+| 9 | `PausePromotion` | ✅ Keep | Clear admin action |
+| 10 | `ResumePromotion` | ✅ Keep | Pairs with Pause |
+| 11 | `CancelPromotion` | ✅ Keep | Clear admin action |
+| 12 | `ExpirePromotion` | ✅ Keep | Internal scheduled command, not user-facing |
+| 13 | `RecordRedemption` | ✅ Keep | "Record" correctly implies bookkeeping |
+
+### Coupon Commands (6)
+
+| # | Command Name | Verdict | Notes |
+|---|-------------|---------|-------|
+| 1 | `IssueCoupon` | ✅ Keep | Imperative, matches event |
+| 2 | `ValidateCoupon` | ⚠️ **Consider** | This command both validates AND reserves. Name only captures half the behavior. However, from the caller's perspective (Shopping BC), they're "validating" — the reservation is an implementation detail. **Keep** — caller intent wins. |
+| 3 | `ReleaseCouponReservation` | ✅ Keep | Explicit, matches event |
+| 4 | `RedeemCoupon` | ✅ Keep | Standard e-commerce term |
+| 5 | `ExpireCoupon` | ✅ Keep | Internal cascading command |
+| 6 | `RevokeCoupon` | ✅ Keep | Admin action, matches event |
+
+**Action item:** Rename `ConfigureScope` → `ConfigurePromotionScope` for consistency and routing clarity.
+
+---
+
+## 9.4 Queries
+
+| # | Query Name | Verdict | Notes |
+|---|-----------|---------|-------|
+| 1 | `GetActivePromotions` | ✅ Keep | Clear, describes what's returned |
+| 2 | `GetPromotionDetails` | ✅ Keep | Standard detail query |
+| 3 | `GetApplicablePromotions` | ✅ Keep | "Applicable" correctly implies filtering by SKU eligibility |
+| 4 | `CalculateDiscount` | ⚠️ **Consider** | This is both a query (returns data) AND has side effects (reserves coupons via handler). Strictly speaking it's a command. However, it's invoked via `POST` and the caller treats it as a calculation. **Keep** — pragmatic naming that matches the ubiquitous language. Document the side-effect clearly. |
+| 5 | `GetPromotionCalendar` | ✅ Keep | Clear, descriptive |
+| 6 | `GetCouponStatus` | ✅ Keep | Clear, returns coupon state |
+| 7 | `GetPromotionRedemptions` | ✅ Keep | Clear, returns redemption history |
+
+---
+
+## 9.5 Projections (Read Models)
+
+| # | Projection Name | Verdict | Notes |
+|---|----------------|---------|-------|
+| 1 | `ActivePromotionsView` | ✅ Keep | `{Adjective}{Aggregate}View` — clear that it's filtered to active promotions |
+| 2 | `CouponLookupView` | ✅ Keep | "Lookup" correctly implies keyed access by coupon code |
+| 3 | `CustomerRedemptionView` | ✅ Keep | Clear — tracks per-customer, per-promotion redemption data |
+| 4 | `PromotionSummaryView` | ✅ Keep | "Summary" correctly implies aggregated metrics (redemption counts, totals) |
+| 5 | `PromotionCalendarView` | ✅ Keep | Clear — temporal view for scheduling UI |
+
+**Naming convention:** All projections use `{Context}View` suffix — consistent with Pricing BC patterns.
+
+---
+
+## 9.6 Integration Messages
+
+| # | Message Name | Verdict | Notes |
+|---|-------------|---------|-------|
+| 1 | `PromotionActivated` (integration) | ⚠️ **Namespace disambiguation** | Same name as domain event. Must live in `Messages.Contracts` namespace. Code should reference as `Contracts.PromotionActivated`. This is the established CritterSupply pattern (e.g., Orders BC `OrderPlaced` domain event vs `Contracts.OrderPlaced`). **Keep** — namespace handles disambiguation. |
+| 2 | `PromotionExpired` (integration) | ✅ Keep | Same namespace pattern as above |
+| 3 | `PromotionCancelled` (integration) | ✅ Keep | Same namespace pattern |
+| 4 | `PromotionPaused` (integration) | ✅ Keep | Same namespace pattern |
+| 5 | `PromotionResumed` (integration) | ✅ Keep | Same namespace pattern |
+| 6 | `OrderWithPromotionPlaced` (inbound) | ⚠️ **Consider** | This extends the existing `OrderPlaced` contract. Two options: (a) Extend `OrderPlaced` with optional `AppliedPromotions` list, or (b) Separate message `OrderWithPromotionPlaced`. Option (a) is cleaner — avoids message proliferation. **Recommend (a)** — extend `OrderPlaced` contract. |
+
+---
+
+## 9.7 Value Objects and Supporting Types
+
+| Name | Verdict | Notes |
+|------|---------|-------|
+| `DiscountType` (enum) | ✅ Keep | `Percentage`, `FixedAmount`, `FreeShipping`, `BuyXGetY` |
+| `DiscountApplication` (enum) | ✅ Keep | `PerItem`, `PerOrder` |
+| `PromotionScope` (enum) | ✅ Keep | `StoreWide`, `ByCategory`, `BySku` |
+| `PromotionStatus` (enum) | ✅ Keep | `Draft`, `Scheduled`, `Active`, `Paused`, `Expired`, `Cancelled` |
+| `CouponStatus` (enum) | ✅ Keep | `Active`, `Reserved`, `Redeemed`, `Expired`, `Revoked` |
+| `CartItemRef` (record) | ✅ Keep | Lightweight DTO for cross-BC communication |
+| `Money` (value object) | ✅ Keep | Copied from Pricing BC — standard financial VO |
+| `DiscountCalculator` | ✅ Keep | Pure function, stateless — name clearly describes purpose |
+| `CouponValidationResult` | ✅ Keep | HTTP response DTO — clear intent |
+
+---
+
+## 9.8 Naming Critique Summary
+
+| Category | Total | ✅ Keep | ⚠️ Action |
+|----------|-------|---------|-----------|
+| Aggregates | 2 | 2 | 0 |
+| Domain Events | 20 | 20 | 0 (minor notes, no renames) |
+| Commands | 19 | 18 | 1 rename: `ConfigureScope` → `ConfigurePromotionScope` |
+| Queries | 7 | 7 | 0 (document `CalculateDiscount` side-effect) |
+| Projections | 5 | 5 | 0 |
+| Integration Messages | 6 | 5 | 1 recommendation: extend `OrderPlaced` instead of separate message |
+| Value Objects | 9 | 9 | 0 |
+
+**Overall:** Naming is strong. The ubiquitous language is consistent, events use past tense, commands use imperative mood, and projections use the `{Context}View` convention. Only one rename recommended.
+
+---
+
+# Stage 10: Risk Assessment and Implementation Phasing
+
+## 10.1 Technical Risks
+
+### Risk 1: Integration Complexity with Shopping BC (HIGH)
+
+**Description:** Shopping BC must maintain a local cache of active promotions AND make sync HTTP calls to Promotions BC for coupon validation and discount calculation. This creates two integration vectors — async events for cache updates and sync HTTP for real-time operations.
+
+**Concerns:**
+- Shopping BC's cart recalculation must handle Promotions BC being unavailable (sync HTTP dependency)
+- Stale promotion cache could apply expired promotions (eventual consistency lag)
+- Coupon reservation TTL (15 min) must align with Shopping BC's checkout flow timing
+
+**Mitigations:**
+1. Circuit breaker on sync HTTP calls — degrade gracefully (show cart without discount, prompt retry)
+2. Aggressive inline projection for `ActivePromotionsView` ensures near-zero read lag within Promotions BC
+3. Shopping BC's local `ActivePromotionCache` is eventually consistent but always behind the "truth" in Promotions BC — sync HTTP call at checkout is the final authority
+4. Coupon reservation TTL is configurable per deployment; default 15 min with monitoring
+
+**Risk Level:** HIGH — this is the most complex integration in the system. Needs thorough integration testing with Testcontainers.
+
+---
+
+### Risk 2: OrderPlaced Contract Extension (MEDIUM)
+
+**Description:** The existing `OrderPlaced` integration message (published by Orders BC) must be extended with an `AppliedPromotions` payload. This is a breaking change to an existing contract consumed by multiple BCs (Inventory, Payments, Fulfillment).
+
+**Concerns:**
+- Existing consumers must tolerate the new optional field
+- If `AppliedPromotions` is null/empty, existing behavior must be unchanged
+- Schema versioning strategy for the contract
+
+**Mitigations:**
+1. Add `AppliedPromotions` as `IReadOnlyList<AppliedPromotionRef>?` (nullable, backward-compatible)
+2. Existing consumers ignore fields they don't need (standard JSON deserialization behavior)
+3. Deploy Promotions BC AFTER contract extension is deployed and verified in Orders BC
+4. Integration test: verify `OrderPlaced` without promotions still works for all existing consumers
+
+**Risk Level:** MEDIUM — well-understood pattern, but requires coordinated deployment.
+
+---
+
+### Risk 3: Polecat / JasperFx.Events Migration (MEDIUM)
+
+**Description:** The Promotions BC is designed infrastructure-agnostic per Decision #11, but the potential migration from Marten to Polecat (JasperFx.Events) during or after implementation could require rework.
+
+**Concerns:**
+- Aggregate interface compatibility (`IAggregate<T>` vs potential new interfaces)
+- Projection registration patterns may change
+- Testing infrastructure (TestContainers configuration) may differ
+
+**Mitigations:**
+1. Aggregates use `JasperFx.Events` interfaces where available (already decided in Stage 6)
+2. No PostgreSQL-specific queries in handlers — all data access through Marten abstractions
+3. ADR required before any Polecat adoption — captures migration plan and risk assessment
+4. Promotions BC can be the "pilot" for Polecat if timing aligns, since it's greenfield
+
+**Risk Level:** MEDIUM — mitigated by infrastructure-agnostic design, but timeline uncertainty remains.
+
+---
+
+### Risk 4: Concurrency on Redemption Recording (MEDIUM)
+
+**Description:** High-traffic promotions (e.g., flash sales) could see many simultaneous `RecordRedemption` commands hitting the same Promotion aggregate, causing optimistic concurrency conflicts.
+
+**Concerns:**
+- Marten's optimistic concurrency throws `ConcurrencyException` on version conflict
+- Wolverine retry policy helps, but under extreme load, retries compound the problem
+- Redemption cap enforcement must be exact (not approximate)
+
+**Mitigations:**
+1. Wolverine retry policy: `.RetryOnce()` → `.RetryWithCooldown(100ms, 250ms)` → `.MoveToErrorQueue()`
+2. `RedemptionCapReached` check happens inside the aggregate's `Apply` method — the cap is enforced at the event level, not the handler level
+3. For extreme scenarios (>100 concurrent redemptions/second), consider moving redemption count to a Marten `FetchForWriting` with exclusive lock — but defer until proven necessary
+4. Monitor `ConcurrencyException` rate in OpenTelemetry — alert if > 5% of redemption commands fail after retries
+
+**Risk Level:** MEDIUM — Wolverine retry policy handles normal load; extreme load needs monitoring.
+
+---
+
+### Risk 5: Floor Price (MAP) Enforcement Availability (LOW)
+
+**Description:** `CalculateDiscount` makes a sync HTTP call to Pricing BC for floor prices. If Pricing BC is unavailable, Promotions BC cannot verify MAP compliance.
+
+**Concerns:**
+- Discount below MAP is a contractual/legal risk
+- Pricing BC unavailability blocks all discount calculations
+
+**Mitigations:**
+1. Decision: fail closed (return error if Pricing BC unavailable) — see Stage 8.2.2
+2. Short-lived cache (5-minute TTL) for floor prices in Promotions BC — reduces call volume and provides brief resilience
+3. Health check endpoint includes Pricing BC connectivity — ops team alerted immediately
+4. Pricing BC is expected to have 99.9%+ uptime (it's a read-heavy service with inline projections)
+
+**Risk Level:** LOW — fail-closed strategy eliminates legal risk; cache provides brief resilience.
+
+---
+
+### Risk 6: Event Versioning (LOW for Phase 1)
+
+**Description:** Domain events are immutable once written to the event store. If event schemas need to change, versioning strategy is needed.
+
+**Concerns:**
+- Adding fields to existing events (backward-compatible)
+- Removing or renaming fields (breaking change)
+- Projection replay must handle all versions
+
+**Mitigations:**
+1. Phase 1: no versioning needed — greenfield BC, no existing events
+2. Use nullable fields for future additions (standard Marten approach)
+3. Establish event versioning ADR before Phase 2 if schema changes are needed
+4. Marten supports event upcasting — transform old events to new schema during deserialization
+
+**Risk Level:** LOW — not a concern for Phase 1 greenfield implementation.
+
+---
+
+## 10.2 Risk Summary Matrix
+
+| # | Risk | Likelihood | Impact | Level | Phase |
+|---|------|-----------|--------|-------|-------|
+| R1 | Shopping BC integration complexity | High | High | **HIGH** | Phase 1 |
+| R2 | OrderPlaced contract extension | Medium | Medium | **MEDIUM** | Phase 1 |
+| R3 | Polecat migration | Low | High | **MEDIUM** | Phase 2+ |
+| R4 | Redemption concurrency | Medium | Medium | **MEDIUM** | Phase 1 |
+| R5 | Pricing BC availability | Low | Medium | **LOW** | Phase 1 |
+| R6 | Event versioning | Low | Low | **LOW** | Phase 2+ |
+
+---
+
+## 10.3 Implementation Phasing
+
+### Phase 1 — Cycle 29: Core Promotions Engine (4-5 weeks)
+
+**Objective:** Stand up the Promotions BC with coupon validation, discount calculation, and basic promotion lifecycle — the minimum viable feature set that unblocks Shopping BC cart discounts.
+
+**Deliverables:**
+
+| # | Deliverable | Aggregates/Components | Priority |
+|---|------------|----------------------|----------|
+| 1 | **Project scaffolding** | Solution structure, `Program.cs`, Marten/Wolverine config, port 5249, Docker Compose, test project | P0 |
+| 2 | **Promotion aggregate** (core lifecycle) | `CreatePromotion`, `ConfigureDiscountRules`, `ConfigurePromotionScope`, `SetEligibilityRules`, `SetRedemptionLimits` | P0 |
+| 3 | **Promotion scheduling** | `SchedulePromotion`, `ActivatePromotion`, `ExpirePromotion` with scheduled messages | P0 |
+| 4 | **Coupon aggregate** (full lifecycle) | `IssueCoupon`, `ValidateCoupon`, `RedeemCoupon`, `ExpireCoupon`, `CouponReserved`, `CouponReservationReleased` | P0 |
+| 5 | **Coupon batch generation** | `GenerateCouponBatch` → fan-out `IssueCoupon` | P0 |
+| 6 | **DiscountCalculator** (pure function) | Percentage, fixed amount, free shipping — no stacking | P0 |
+| 7 | **Inline projections** | `ActivePromotionsView`, `CouponLookupView`, `CustomerRedemptionView` | P0 |
+| 8 | **Sync HTTP endpoints** | `POST /validate`, `POST /calculate-discount`, `GET /active`, `GET /applicable` | P0 |
+| 9 | **Floor price integration** | HTTP client to Pricing BC for MAP lookup | P1 |
+| 10 | **Integration messages (outbound)** | `PromotionActivated`, `PromotionExpired`, `PromotionCancelled` → RabbitMQ | P1 |
+| 11 | **Integration messages (inbound)** | `OrderWithPromotionPlaced` → `RecordRedemption` + `RedeemCoupon` | P1 |
+| 12 | **Admin commands** | `PausePromotion`, `ResumePromotion`, `CancelPromotion`, `RevokeCoupon` | P1 |
+| 13 | **Async projections** | `PromotionSummaryView`, `PromotionCalendarView` | P2 |
+| 14 | **Query endpoints** | `GET /calendar`, `GET /{id}`, `GET /{id}/redemptions`, `GET /coupons/{code}` | P2 |
+| 15 | **Integration tests** | Alba + Testcontainers for all HTTP endpoints and message handlers | P0 |
+
+**Phase 1 exit criteria:**
+- ✅ Shopping BC can validate coupons via sync HTTP
+- ✅ Shopping BC can calculate discounts via sync HTTP
+- ✅ Orders BC's `OrderPlaced` triggers redemption recording
+- ✅ Promotion lifecycle events flow to RabbitMQ
+- ✅ All 3 inline projections operational
+- ✅ Integration tests pass with Testcontainers
+
+**Estimated effort:** 4-5 weeks (aligns with Cycle 29 scope)
+
+---
+
+### Phase 2 — Cycle 30: Shopping BC Integration + Stacking Engine (3-4 weeks)
+
+**Objective:** Wire up Shopping BC to consume promotion lifecycle events (local cache), implement BOGO discount type, and introduce basic stacking rules.
+
+**Deliverables:**
+
+| # | Deliverable | Notes |
+|---|------------|-------|
+| 1 | **Shopping BC: `ActivePromotionCache`** | Local read model updated from `PromotionActivated`/`Expired` events |
+| 2 | **Shopping BC: `CouponApplied` event** | Cart captures applied coupon codes with reservation |
+| 3 | **Shopping BC: Cart recalculation** | Recalculate discounts when promotions activate/expire |
+| 4 | **BOGO discount type** | `BuyXGetY` in `DiscountCalculator` — most complex discount logic |
+| 5 | **Basic stacking rules** | "Highest discount wins" → configurable stacking (mutual exclusion groups) |
+| 6 | **CE BFF: Promotion notifications** | SignalR push for promotion banners, product badges |
+| 7 | **CE BFF: Product page badges** | Show "20% OFF" on eligible product pages via `GET /applicable` |
+| 8 | **OrderPlaced contract extension** | Add `AppliedPromotions` to existing `OrderPlaced` message |
+| 9 | **End-to-end integration tests** | Full flow: create promo → activate → add to cart → checkout → redeem |
+
+**Phase 2 exit criteria:**
+- ✅ Customer sees promotional badges on product pages
+- ✅ Customer can apply coupon codes in cart
+- ✅ Discount persists through checkout to order placement
+- ✅ Redemption recorded and cap enforced
+- ✅ BOGO promotions work end-to-end
+
+---
+
+### Phase 3 — Cycle 31+: Advanced Features + Observability (2-3 weeks)
+
+**Objective:** Polish, advanced discount scenarios, and operational tooling.
+
+**Deliverables:**
+
+| # | Deliverable | Notes |
+|---|------------|-------|
+| 1 | **Advanced stacking engine** | Configurable stacking rules, mutual exclusion groups, priority ordering |
+| 2 | **Dynamic scope (optional)** | Subscribe to Product Catalog events for auto-updating category-based scopes |
+| 3 | **Correspondence integration** | Marketing emails on promotion activation |
+| 4 | **Admin Portal promotion management** | CRUD UI for promotions (when Admin Portal BC is scoped) |
+| 5 | **Promotion analytics dashboard** | Redemption rates, revenue impact, coupon usage metrics via `PromotionSummaryView` |
+| 6 | **Floor price cache** | Short-lived cache for Pricing BC floor prices (reduce sync HTTP calls) |
+| 7 | **Load testing** | Verify redemption concurrency under realistic flash sale load |
+| 8 | **Event versioning ADR** | Establish versioning strategy before any schema changes |
+| 9 | **Polecat evaluation** | If Polecat is ready, evaluate migration for Promotions BC as pilot |
+
+---
+
+## 10.4 Dependency Graph
+
+```
+Phase 1 Prerequisites (must exist before Promotions BC):
+  ├── Pricing BC (Cycles 22-23) ✅ — floor price API
+  ├── Product Catalog BC (Cycles 21-22) ✅ — SKU data for scope configuration
+  ├── Orders BC (Cycles 24-27) ✅ — OrderPlaced message source
+  └── Shopping BC (Cycles 16-18) ✅ — primary consumer of Promotions API
+
+Phase 1 (Cycle 29): Promotions BC Core
+  └── All prerequisites met ✅
+
+Phase 2 (Cycle 30): Shopping + CE BFF Integration
+  ├── Depends on: Phase 1 complete
+  ├── Depends on: Shopping BC handler additions (same cycle)
+  └── Depends on: CE BFF handler additions (same cycle)
+
+Phase 3 (Cycle 31+): Advanced Features
+  ├── Depends on: Phase 2 complete
+  ├── Optional: Admin Portal BC (not yet scoped)
+  └── Optional: Correspondence BC Phase 2
+```
+
+---
+
+## 10.5 Phase 1 Cycle 29 Task Breakdown
+
+Recommended vertical slice ordering for Phase 1:
+
+| Week | Slice | Description |
+|------|-------|-------------|
+| **Week 1** | Scaffolding + Promotion CRUD | Project structure, aggregate, 5 configuration commands, `ActivePromotionsView` inline projection, basic HTTP endpoints, first integration tests |
+| **Week 2** | Coupon Lifecycle | Coupon aggregate, `IssueCoupon`, `ValidateCoupon`, `CouponLookupView`, coupon HTTP endpoints, batch generation fan-out |
+| **Week 3** | Scheduling + Discount Calculation | Scheduled messages (activate/expire), `DiscountCalculator` pure function, `POST /calculate-discount`, floor price HTTP client to Pricing BC |
+| **Week 4** | Integration Messages + Redemption | `PromotionActivated`/`Expired` → RabbitMQ, `OrderWithPromotionPlaced` handler, `RecordRedemption`, `RedeemCoupon`, `CustomerRedemptionView`, admin commands |
+| **Week 5** | Polish + Async Projections + Tests | `PromotionSummaryView`, `PromotionCalendarView`, remaining query endpoints, comprehensive integration test suite, documentation updates to CONTEXTS.md |
+
+---
+
+## 10.6 Success Metrics
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Coupon validation latency (p99) | < 50ms | OpenTelemetry trace on `POST /validate` |
+| Discount calculation latency (p99) | < 100ms | OpenTelemetry trace on `POST /calculate-discount` (includes Pricing BC call) |
+| Redemption recording success rate | > 99.5% | `ConcurrencyException` rate in error queue |
+| Promotion lifecycle event delivery | < 2s from activation to Shopping BC cache update | RabbitMQ consumer lag metric |
+| Integration test coverage | All HTTP endpoints + all message handlers | Alba test count |
+| Zero MAP violations | 0 discounts below floor price | `MAPViolationDetected` event count = 0 |
+
+---
+
+*Stages 7–10 complete. The Promotions BC event model is fully specified and ready for Cycle 29 implementation.*
+
