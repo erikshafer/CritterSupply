@@ -1028,7 +1028,7 @@ These items need input from Product Owner, UX Engineer, and QA before the event 
 | Aggregate in wrong BC requiring migration (Checkout, Cycle 8) | Promotion and Coupon aggregates stay in Promotions BC — discount calculation is a query, not an aggregate |
 | Missing `ChangedBy` actor ID in commands (Order saga gap) | Every command carries `Guid ChangedBy` or `Guid ActivatedBy` — FluentValidation rejects `Guid.Empty` |
 | Deferring integration tests to manual testing (Cycle 18) | Alba integration tests written before any manual testing |
-| Port conflicts in launchSettings.json | Reserve port 5270 before writing any code |
+| Port conflicts in launchSettings.json | Reserve port 5249 before writing any code |
 | Forgetting to add projects to `.sln` and `.slnx` files | Add Promotions and Promotions.Api to both solution files immediately |
 | `NullReferenceException` in handlers without null aggregate checks | `Before()` method always checks for null aggregate |
 
