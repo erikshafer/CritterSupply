@@ -5,6 +5,8 @@
 **Source of Truth:** Codebase audit of `src/` directory, verified against `src/Shared/Messages.Contracts/`
 
 > **Important:** CONTEXTS.md is reliable for descriptions and architectural intent but NOT for exact events, commands, queries, or integration messages. All endpoint claims in this document have been verified against the actual codebase as of Cycle 28 completion.
+>
+> **Update (2026-03-14):** Admin Identity BC is now implemented (Cycle 29 Phase 1, PR #375). It issues JWTs with issuer `https://localhost:5249` and standard `role` claim. Domain BCs that need to accept admin tokens must add `JwtBearerOptions` trusting this issuer. See [ADR 0031](../decisions/0031-admin-portal-rbac-model.md) §4 for the token validation pattern.
 
 ---
 
@@ -23,6 +25,32 @@
 | **Phase 2 Blocker** | Must be created before Phase 2 write operations |
 | **Known Deferral** | Acknowledged gap with a planned resolution timeline |
 | **Newly Discovered** | Gap found during this re-modeling session, not previously documented |
+
+---
+
+## 0. Admin Identity BC — ✅ COMPLETE
+
+**Folder:** `src/Admin Identity/`
+**Technology:** EF Core + PostgreSQL (`adminidentity` schema)
+**Auth Status:** JWT Bearer auth on all user management endpoints (`[Authorize(Policy = "SystemAdmin")]`)
+**Status:** ✅ Fully implemented in Cycle 29 Phase 1 (PR #375)
+
+| Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
+|------------------|------|----------|--------|---------------|-------|
+| Admin login | Auth | `POST /api/admin-identity/auth/login` | ✅ Fully Defined | — | Returns JWT access token + refresh cookie |
+| Token refresh | Auth | `POST /api/admin-identity/auth/refresh` | ✅ Fully Defined | — | Rotates refresh token |
+| Logout | Auth | `POST /api/admin-identity/auth/logout` | ✅ Fully Defined | — | Invalidates refresh token |
+| List admin users | Query | `GET /api/admin-identity/users` | ✅ Fully Defined | — | SystemAdmin only |
+| Create admin user | Command | `POST /api/admin-identity/users` | ✅ Fully Defined | — | SystemAdmin only; PBKDF2-SHA256 password hashing |
+| Change user role | Command | `PUT /api/admin-identity/users/{id}/role` | ✅ Fully Defined | — | SystemAdmin only |
+| Deactivate user | Command | `DELETE /api/admin-identity/users/{id}` | ✅ Fully Defined | — | SystemAdmin only; soft delete with reason |
+
+**All 7 endpoints implemented. No gaps.** Admin Portal BFF will consume these endpoints via typed HTTP client for authentication and user management flows.
+
+**Deferred items (not blocking):**
+- Integration messages in `Messages.Contracts` (`AdminUserCreated`, `AdminUserDeactivated`, `AdminUserRoleChanged`) — to be added when other BCs need to react to admin user lifecycle events
+- Integration tests (Alba + TestContainers) — no test project created yet
+- Multi-audience JWT (Admin Portal API audience) — Phase 1 uses self-referential audience (`https://localhost:5249`); must be updated when Admin Portal API (port 5243) is built
 
 ---
 
@@ -232,15 +260,17 @@
 
 ## Summary
 
+> **Update (2026-03-14):** Admin Identity BC (Phase 0) is now complete. The counts below reflect the original gap analysis plus 7 newly resolved endpoints from AdminIdentity.
+
 ### Gap Count by Severity
 
 | Status | Count | Blocking Phase |
 |--------|-------|---------------|
+| ✅ Fully Defined | **25** (18 original + 7 AdminIdentity) | Ready to integrate |
 | Phase 0.5 Blockers | **8** | Must resolve before Phase 1 |
 | Phase 2 Blockers | **9** | Must resolve before Phase 2 |
 | Known Deferrals | **3** | Acknowledged, resolution planned |
-| Newly Discovered | **4** | Found during this session (all Phase 0.5) |
-| ✅ Fully Defined | **18** | Ready to integrate |
+| Newly Discovered | **4** | Found during re-modeling session (all Phase 0.5) |
 
 ### Effort Estimate for Gap Closure
 

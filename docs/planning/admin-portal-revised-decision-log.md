@@ -43,13 +43,15 @@
 
 ### D-4: JWT Authentication via AdminIdentity BC
 - **Original:** Separate AdminIdentity BC with JWT tokens
-- **Status:** **KEPT** ✅ 3/3
+- **Status:** **KEPT** ✅ 3/3 — **Now implemented** (Cycle 29 Phase 1)
 - **Rationale:** Mirrors VendorIdentity pattern. No tenant concept needed for internal employees. 7-role AdminRole enum confirmed.
+- **Implementation note:** JWT claims: `sub` (userId GUID), `role` (single role string), `email`, `name`. Issuer: `https://localhost:5249`. Audience: self-referential in Phase 1 (to be updated for Admin Portal API in Phase 2+). See [ADR 0031](../decisions/0031-admin-portal-rbac-model.md).
 
 ### D-5: Single Role Per Admin User
 - **Original (research doc §11):** Single role per user; OperationsManager as "Swiss Army knife" for small teams
-- **Status:** **KEPT** ✅ 3/3
+- **Status:** **KEPT** ✅ 3/3 — **Now implemented** (Cycle 29 Phase 1)
 - **Rationale:** PO decision confirmed. Revisit multi-role composition at 50+ admin users.
+- **Implementation note:** `AdminRole` enum enforces single role at entity level. `AdminUser.Role` is a single enum value, not a collection.
 
 ---
 
@@ -141,19 +143,19 @@
 
 ### D-14: AdminIdentity.Api Port
 - **Original (research doc):** Port 5245
-- **Status:** **CHANGED** ✅ 3/3
+- **Status:** **CHANGED** ✅ 3/3 — **Confirmed by implementation** (launchSettings.json: `http://localhost:5249`)
 - **Revised:** Port **5249**
 - **Rationale:** Returns.Api launched on port 5245 (Cycle 25). Collision. Next available port: 5249 (5243=Admin Portal.Api, 5244=Admin Portal.Web, 5245=Returns, 5246-5248 reserved/used).
 
 ### D-15: ADR Numbers for Admin Portal
 - **Original (research doc):** ADRs 0026-0029
-- **Status:** **CHANGED** ✅ 3/3
+- **Status:** **CHANGED** ✅ 3/3 — **ADR 0031 now exists** (`docs/decisions/0031-admin-portal-rbac-model.md`)
 - **Revised:** ADRs **0031-0034**
 - **Rationale:** ADRs 0026-0030 were taken by: Polecat SQL Server (0026), Per-BC Postgres DBs (0027), JWT for Vendor Identity (0028), Order Saga Design (0029), Notifications→Correspondence rename (0030). Next available: 0031.
-  - ADR 0031: AdminIdentity BC
-  - ADR 0032: Multi-Issuer JWT Strategy
-  - ADR 0033: Blazor WASM for Admin Portal
-  - ADR 0034: Admin Portal SignalR Hub Design
+  - ADR 0031: Admin Portal RBAC Model — ✅ **Accepted** (Cycle 29 Phase 1)
+  - ADR 0032: Multi-Issuer JWT Strategy — 📋 Reserved
+  - ADR 0033: Blazor WASM for Admin Portal — 📋 Reserved
+  - ADR 0034: Admin Portal SignalR Hub Design — 📋 Reserved
 
 ---
 
@@ -176,6 +178,19 @@
 - **Revised:** WarehouseClerk sees: items pending inspection + own inspection history. Does NOT see full return lifecycle or CS approval/denial flow.
 - **Rationale:** Information minimization. Clerk needs to know "what do I inspect?" not "why was this return approved?" Full lifecycle is CS/Ops territory.
 
+### D-18a: Password Hashing Algorithm [NEW — Resolved by Implementation]
+- **Original (research doc §2):** Argon2id assumed
+- **Status:** **CHANGED** (resolved by Cycle 29 Phase 1 implementation)
+- **Revised:** **PBKDF2-SHA256** via ASP.NET Core Identity `PasswordHasher<T>` (100,000 iterations by default)
+- **Rationale:** ADR 0031 explicitly documents this decision: "PBKDF2-SHA256 via ASP.NET Core Identity's `PasswordHasher<T>` ... Argon2id would require a custom `IPasswordHasher<T>` implementation and is deferred to Phase 2+ if needed." PBKDF2 is the default provided by ASP.NET Core Identity and is well-tested.
+
+### D-18b: User Provisioning — Direct Creation [NEW — Resolved by Implementation]
+- **Original (research doc §11):** Invitation flow (72-hour token, email link, self-service password setup)
+- **Status:** **CHANGED** (resolved by Cycle 29 Phase 1 implementation)
+- **Revised:** **Direct creation by SystemAdmin** via `POST /api/admin-identity/users`. SystemAdmin provides email, password, first/last name, and role in the request body.
+- **Rationale:** The implementation chose the simpler direct-creation pattern. This resolves the discrepancy in the original research doc (§11 PO Decision #3 said invitation flow; Appendix B said direct creation). **Direct creation is the implemented and correct answer.**
+- **Note:** If invitation flow is desired in the future, it can be added as a separate endpoint without changing the existing CreateAdminUser handler.
+
 ---
 
 ## Naming Decisions
@@ -194,8 +209,8 @@
 
 ### D-21: AdminRole Enum Values
 - **Original (event model):** CopyWriter, PricingManager, WarehouseClerk, CustomerService, OperationsManager, Executive, SystemAdmin
-- **Status:** **KEPT** ✅ 3/3
-- **Rationale:** All 7 roles confirmed across research doc, UX research, and feature files. No naming changes needed.
+- **Status:** **KEPT** ✅ 3/3 — **Confirmed by implementation** (`AdminIdentity.Identity.AdminRole` enum)
+- **Rationale:** All 7 roles confirmed across research doc, UX research, feature files, AND now codebase. Enum values: CopyWriter=1, PricingManager=2, WarehouseClerk=3, CustomerService=4, OperationsManager=5, Executive=6, SystemAdmin=7.
 - **UXE sign-off:** Role names used in UX wireframes match. CopyWriter (not "ContentEditor"), CustomerService (not "CSRep"), WarehouseClerk (not "Warehouse").
 
 ---
@@ -246,8 +261,11 @@
 | Naming | 1 | 2 | 0 | 0 |
 | Aggregates | 0 | 0 | 0 | 2 |
 | Removed | 0 | 0 | 3 | 0 |
-| **Total** | **6** | **8** | **4** | **8** |
+| **Implementation-confirmed** | 0 | 2 | 0 | 0 |
+| **Total** | **6** | **10** | **4** | **8** |
 
-All 26 decisions reached **3/3 consensus**. No escalations were needed for decisions in scope.
+All original 26 decisions reached **3/3 consensus**. 2 additional decisions (D-18a: password hashing, D-18b: user provisioning) were resolved by the Cycle 29 Phase 1 implementation.
+
+> **Post-implementation update (2026-03-14):** Decisions D-4, D-5, D-14, D-15, and D-21 have been confirmed by the Admin Identity BC implementation (PR #375). D-18a and D-18b are new decisions that emerged from comparing the original research doc assumptions against the actual implementation.
 
 See [Open Questions](admin-portal-open-questions.md) for items that require additional information or owner sign-off.

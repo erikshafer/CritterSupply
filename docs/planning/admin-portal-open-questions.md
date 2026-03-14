@@ -65,9 +65,9 @@ The UX research document listed 7 open questions. Here is each question's dispos
 
 > "Does the SystemAdmin create admin users directly (Admin Portal owns the identity), or do they provision from an external IdP (Azure AD, Okta)?"
 
-- **Status:** ✅ **Resolved** (3/3)
+- **Status:** ✅ **Resolved** (3/3) — **Confirmed by implementation** (Cycle 29 Phase 1)
 - **Decision:** **Direct creation via AdminIdentity BC in Phase 0-3. External IdP integration deferred to Phase 4+ (when team exceeds 50 admin users).**
-- **Rationale:** PO decision from research doc §11: "Use invitation flow (72-hour token, email link, self-service password setup). SystemAdmin is the only role that can invite." This is the VendorIdentity pattern and is well-understood. Corporate SSO adds significant complexity (SAML/OIDC integration, claim mapping, role provisioning) that is not justified for <50 users.
+- **Implementation:** `POST /api/admin-identity/users` (SystemAdmin only) creates users directly with email, password, name, and role. No invitation flow — SystemAdmin provides the initial password. (See Q-13 for the invitation vs. direct creation resolution.)
 
 ### OQ-6: Offline/degraded mode for warehouse?
 
@@ -144,20 +144,23 @@ The UX research document listed 7 open questions. Here is each question's dispos
 
 ### Q-13: AdminIdentity — Invitation Flow vs. Direct Creation Discrepancy
 
-- **Status:** ⚠️ **Provisional** (3/3)
+- **Status:** ✅ **Resolved** (by implementation — Cycle 29 Phase 1, PR #375)
 - **Question:** The research doc has a discrepancy. §11 PO Decision #3 says "Use invitation flow (72-hour token, email link, self-service password setup)." But Appendix B comparison table says "Invitation flow: Direct creation by SystemAdmin (no invitation)." Which is correct?
-- **Working answer:** **Invitation flow** is the correct answer. The Appendix B entry appears to be a documentation error. The PO decision in §11 is explicit and detailed (72-hour token, email link). The appendix contradicts it without justification.
-- **Rationale:** Invitation flow is the VendorIdentity pattern, already proven. Direct creation bypasses password self-service, which is a worse UX for new admin users.
-- **Owner action needed:** Confirm invitation flow. If confirmed, the research doc Appendix B should be corrected.
+- **Original working answer:** Invitation flow is the correct answer.
+- **Actual resolution:** **Direct creation by SystemAdmin** was implemented. `POST /api/admin-identity/users` accepts email, password, firstName, lastName, and role directly. No invitation token, no email link, no self-service password setup.
+- **Implication:** The research doc §11 PO Decision #3 (invitation flow) was overridden by the implementation. The Appendix B entry was actually correct. The research doc §11 should be considered outdated on this point.
+- **Owner action needed:** None — resolved by implementation. If invitation flow is desired in the future, it can be added as an additional endpoint alongside the existing direct creation.
 
 ---
 
 ## Summary
 
+> **Update (2026-03-14):** Q-13 resolved by Cycle 29 Phase 1 implementation. Q-8 priority reduced (Phase 0 is complete; this is now a Phase 0.5 concern).
+
 | Status | Count |
 |--------|-------|
-| ✅ Resolved (no action needed) | 5 |
-| ⚠️ Provisional (owner confirmation needed) | 6 |
+| ✅ Resolved (no action needed) | 6 |
+| ⚠️ Provisional (owner confirmation needed) | 5 |
 | 🔴 Escalated (owner decision required) | 2 |
 | **Total** | **13** |
 
@@ -168,14 +171,12 @@ The UX research document listed 7 open questions. Here is each question's dispos
 | 1 | **Q-9:** Inventory BC HTTP layer approach | Phase 0.5 | Option A/B/C for adding HTTP endpoints |
 | 2 | **Q-12:** Correspondence manual retry capability | Phase 1 scope | Read-only vs. retry capability |
 | 3 | Q-8: Order cancellation admin attribution | Phase 0.5 | Extend existing endpoint vs. admin variant |
-| 4 | Q-13: AdminIdentity invitation vs. direct creation | Phase 0 | Confirm invitation flow (fix doc discrepancy) |
-| 5 | OQ-2: Alert acknowledgment semantics | Phase 1 | Dismiss-only vs. domain event |
-| 6 | OQ-3: CS inventory visibility scope | Phase 1 | Yes/no + 3-state indicator vs. exact quantities |
-| 7 | OQ-7: Multi-tab behavior | Phase 1 | Confirm no cross-tab sync in Phase 1 |
-| 8 | Q-11: Auto-approval visibility | Phase 1 UX | Confirm dual view approach |
+| 4 | OQ-2: Alert acknowledgment semantics | Phase 1 | Dismiss-only vs. domain event |
+| 5 | OQ-3: CS inventory visibility scope | Phase 1 | Yes/no + 3-state indicator vs. exact quantities |
+| 6 | OQ-7: Multi-tab behavior | Phase 1 | Confirm no cross-tab sync in Phase 1 |
+| 7 | Q-11: Auto-approval visibility | Phase 1 UX | Confirm dual view approach |
 
-Items 1-4 should be resolved before Phase 0 implementation begins.
-Items 5-8 can be resolved during Phase 1 planning without blocking Phase 0.
+~~Items 1-4 should be resolved before Phase 0 implementation begins.~~ Phase 0 is complete. Items 1-3 should be resolved before Phase 0.5 begins. Items 4-7 can be resolved during Phase 1 planning.
 
 ---
 

@@ -1,13 +1,16 @@
 # Admin Portal: Revised Event Model & Design
 
 **Date:** 2026-03-14 (Re-modeling session)
+**Last Updated:** 2026-03-14 (Post-Cycle 29 Phase 1 reconciliation)
 **Original Document:** [admin-portal-event-modeling.md](admin-portal-event-modeling.md) (2026-03-07)
 **Participants:** Principal Software Architect, Product Owner, UX Engineer
-**Status:** 🟡 Revised Model — Awaiting Owner Sign-Off on Open Questions
-**Input Documents:** Original event model, [Research & Discovery](admin-portal-research-discovery.md), [UX Research](admin-portal-ux-research.md), Cycle 21-28 retrospectives, codebase audit
+**Status:** 🟡 Revised Model — Awaiting Owner Sign-Off on Open Questions (Phase 0 complete)
+**Input Documents:** Original event model, [Research & Discovery](admin-portal-research-discovery.md), [UX Research](admin-portal-ux-research.md), Cycle 21-28 retrospectives, codebase audit, [Cycle 29 Phase 1 Retrospective](cycles/cycle-29-admin-identity-phase-1-retrospective.md)
 **Companion Documents:** [Integration Gap Register](admin-portal-integration-gap-register.md), [Decision Log](admin-portal-revised-decision-log.md), [Open Questions](admin-portal-open-questions.md)
 
 > **Revision Note:** This document replaces the original `admin-portal-event-modeling.md` as the current-state event model. The original is preserved as-is for historical reference. All changes are marked with `[REVISED]` tags and rationale. The companion [Decision Log](admin-portal-revised-decision-log.md) records what was kept, changed, or removed from the original.
+>
+> **Post-PR #375 Update:** Admin Identity BC (Phase 0) was implemented in Cycle 29 Phase 1 and merged to main. This document has been updated to reflect Phase 0 as complete, reconcile assumptions against the actual implementation (password hashing, user provisioning, JWT claims), and update remaining phase blockers.
 
 ---
 
@@ -56,6 +59,7 @@ The Admin Portal BFF:
 
 | BC | Cycles | Key Impact on Admin Portal |
 |----|--------|---------------------------|
+| **Admin Identity** | 29 (Phase 1) | ✅ **Phase 0 prerequisite COMPLETE.** EF Core + JWT auth + 7 admin roles + 7 API endpoints (login, refresh, logout, CRUD). Port 5249. ADR 0031 accepted. Policy-based authorization with SystemAdmin superuser pattern. PBKDF2-SHA256 password hashing. Direct user creation (not invitation flow). |
 | **Returns** | 25-27 | 14 integration messages, 10 endpoints, 10 lifecycle states. CS return management is now feasible — endpoints exist for approve, deny, receive, inspect, exchange. **Original model had Returns as Phase 2 read-only; revised to Phase 1 read+write.** |
 | **Correspondence** | 28 | Renamed from "Notifications" (ADR 0030). Email delivery tracking. 2 query endpoints exist. **Not in original model; added to Phase 1 CS view.** |
 | **Pricing** | 21 | PriceRule event-sourced aggregate, BulkPricingJob saga, CurrentPriceView projection. Only 2 GET endpoints exist today — **no admin write endpoints yet**. |
@@ -123,7 +127,7 @@ The Admin Portal BFF:
 | Aspect | Decision | Change from Original? |
 |---|---|---|
 | Backend persistence | Marten (BFF-owned projections for dashboard metrics) | **[REVISED]** No Analytics BC dependency |
-| Auth mechanism | JWT Bearer (AdminIdentity BC) | Unchanged |
+| Auth mechanism | JWT Bearer (AdminIdentity BC, issuer `https://localhost:5249`) | **[UPDATED]** Phase 1: self-referential audience; Phase 2+ needs Admin Portal API audience |
 | Real-time | SignalR via `opts.UseSignalR()` | Unchanged |
 | **Frontend** | **Blazor WASM** | **[REVISED]** Changed from React/Next.js. Research doc override (consistency with Vendor Portal pattern). |
 | SignalR client | `Microsoft.AspNetCore.SignalR.Client` (native .NET) | **[REVISED]** Follows from Blazor WASM decision |
@@ -139,34 +143,56 @@ The Admin Portal BFF:
 
 ## Admin Identity: Authentication Prerequisite
 
-**Unchanged from original** except for port correction and ADR renumbering.
+> **Status: ✅ IMPLEMENTED** — Delivered in Cycle 29 Phase 1 (PR #375). See [Cycle 29 Phase 1 Retrospective](cycles/cycle-29-admin-identity-phase-1-retrospective.md) and [ADR 0031](../decisions/0031-admin-portal-rbac-model.md).
 
-- ASP.NET Core Identity + EF Core + Postgres (`adminidentity` schema)
-- Mirrors VendorIdentity pattern (no tenant concept — single-organization)
-- JWT: issuer `admin-identity`, audience `admin-portal`, 15-min access + 7-day refresh
-- 7 seed users (one per AdminRole)
-- **Port: 5249** [REVISED from 5245]
-- **ADR: 0031** [REVISED from 0026]
+- EF Core + Postgres (`adminidentity` schema) — **implemented**
+- Single-organization (no tenant concept, mirrors VendorIdentity) — **implemented**
+- JWT: issuer `https://localhost:5249`, audience `https://localhost:5249` (self-referential in Phase 1; Phase 2+ will add Admin Portal API audience), 15-min access + 7-day refresh — **implemented**
+- Password hashing: PBKDF2-SHA256 via ASP.NET Core Identity `PasswordHasher<T>` (100,000 iterations) — **implemented** (original research doc assumed Argon2id; ADR 0031 documents the decision to use PBKDF2 with Argon2id deferred to Phase 2+ if needed)
+- User provisioning: Direct creation by SystemAdmin via `POST /api/admin-identity/users` — **implemented** (no invitation flow; resolves the discrepancy in the original research doc Appendix B)
+- No seed data in migration — users are created via the CreateAdminUser endpoint at runtime
+- **Port: 5249** — **implemented**
+- **ADR: 0031** (Admin Portal RBAC Model) — **accepted**
 
-See [Research & Discovery §2](admin-portal-research-discovery.md#2-adminidentity-bc-design) for full design.
+**Implemented endpoints:**
+```
+POST   /api/admin-identity/auth/login       # Returns JWT access token + refresh cookie
+POST   /api/admin-identity/auth/refresh     # Rotates refresh token, issues new access token
+POST   /api/admin-identity/auth/logout      # Invalidates refresh token
+GET    /api/admin-identity/users            # List admin users (SystemAdmin only)
+POST   /api/admin-identity/users            # Create admin user (SystemAdmin only)
+PUT    /api/admin-identity/users/{id}/role  # Change user role (SystemAdmin only)
+DELETE /api/admin-identity/users/{id}       # Deactivate admin user (SystemAdmin only)
+```
+
+**Authorization policies (implemented in Program.cs per ADR 0031):**
+- Leaf policies: `CopyWriter`, `PricingManager`, `WarehouseClerk`, `CustomerService`, `OperationsManager`, `Executive`, `SystemAdmin`
+- Composite policies: `PricingManagerOrAbove`, `CustomerServiceOrAbove`, `WarehouseOrOperations`
+- All policies include `SystemAdmin` (superuser pattern)
 
 ---
 
 ## Revised Phased Roadmap
 
-### Phase 0: AdminIdentity BC (Prerequisite) — 1 cycle
+### Phase 0: AdminIdentity BC (Prerequisite) — ✅ COMPLETE (Cycle 29 Phase 1)
 
-**Goal:** Ship identity infrastructure. No portal, no frontend.
+> **Delivered:** PR #375, merged 2026-03-14. All deliverables shipped.
 
-| Deliverable | Notes |
-|------------|-------|
-| AdminIdentity project (EF Core, schema `adminidentity`) | Mirrors VendorIdentity structure |
-| AdminIdentity.Api (JWT issuer, login/logout/refresh, port 5249) | 7 seed users for dev testing |
-| AdminRole enum + integration messages in Messages.Contracts | `AdminUserCreated`, `AdminUserDeactivated`, `AdminUserRoleChanged` |
-| ADR 0031: AdminIdentity BC | Documents separate BC decision, role model, JWT claims |
-| Integration tests (Alba + TestContainers) | |
+| Deliverable | Status |
+|------------|--------|
+| AdminIdentity project (EF Core, schema `adminidentity`) | ✅ Implemented |
+| AdminIdentity.Api (JWT issuer, login/logout/refresh, port 5249) | ✅ Implemented |
+| AdminRole enum (CopyWriter=1 through SystemAdmin=7) | ✅ Implemented |
+| ADR 0031: Admin Portal RBAC Model | ✅ Accepted |
+| Authorization policies (7 leaf + 3 composite) | ✅ Implemented |
+| User management CRUD (SystemAdmin only) | ✅ Implemented |
 
-**Deliverable gate:** `POST /api/admin-identity/auth/login` returns a valid JWT with `AdminUserId` and `AdminRole` claims.
+**Deliverable gate:** ✅ `POST /api/admin-identity/auth/login` returns a valid JWT with `sub` (AdminUserId), `role` (AdminRole), `email`, and `name` claims.
+
+**Not yet delivered (deferred):**
+- Integration messages in Messages.Contracts (`AdminUserCreated`, `AdminUserDeactivated`, `AdminUserRoleChanged`) — not yet needed; to be added when Admin Portal BFF subscribes to these events
+- Integration tests (Alba + TestContainers) — no test project created yet
+- Seed data script — users created via CreateAdminUser endpoint
 
 ### Phase 0.5: Domain BC Endpoint Gaps (Prerequisite) — 1 cycle
 
@@ -485,6 +511,7 @@ CS agent: "I see the email failed. Let me verify your email address..."
 
 | BC | Strategy | Phase 1 | Phase 2 | Status |
 |----|----------|---------|---------|--------|
+| **Admin Identity** | JWT issuer + user management | Login, token refresh, user CRUD | — | ✅ **COMPLETE** (Cycle 29 Phase 1) |
 | **Customer Identity** | HTTP queries (typed client) | Customer lookup, address display | — | ⚠️ Missing email search endpoint |
 | **Orders** | HTTP queries + commands | Order list, detail, cancel, returnable items | — | ✅ Fully defined |
 | **Returns** | HTTP queries + commands | Return list, detail, approve, deny | Receive, inspect, exchange approve/deny, ship replacement | ✅ Fully defined |
@@ -531,7 +558,7 @@ The original event model did not identify explicit Admin Portal sagas. Reassessm
 
 | Candidate | Assessment | Decision |
 |-----------|-----------|----------|
-| **Admin user provisioning** | AdminIdentity handles user creation as a simple command, not a saga. No multi-step orchestration needed. | **Not a saga.** Simple command handler. |
+| **Admin user provisioning** | AdminIdentity implements user creation as a simple command handler (`CreateAdminUser`). Delivered in Cycle 29 Phase 1. | **Not a saga.** Simple command handler (confirmed by implementation). |
 | **Escalation workflow** (Phase 2) | CS creates escalation → Ops acknowledges → Ops resolves. Three-state lifecycle. | **Not a saga.** Simple Marten document with state transitions. No cross-BC orchestration. |
 | **Bulk pricing job** | Already a saga in Pricing BC (`BulkPricingJob`). Admin Portal triggers via HTTP, does not own the saga. | **Delegated.** Admin Portal is a client, not the orchestrator. |
 | **Order cancellation** | Already orchestrated by Order saga in Orders BC. Admin Portal calls `POST /cancel`, saga handles compensation. | **Delegated.** Admin Portal issues the command; Orders saga orchestrates the rollback. |
@@ -557,8 +584,8 @@ All names verified against the codebase ubiquitous language established in Cycle
 | `ProductDescriptionUpdated` (event model Flow 1) | Not an existing event — Product Catalog uses document updates, not events | ⚠️ | **[NOTE]** When Product Catalog evolves to event sourcing, this event name should be adopted |
 | `PriceChangeScheduled` (event model Flow 2) | `PriceChangeScheduled` exists in Pricing domain events | ✅ | No change |
 | `ScheduledPriceActivated` | `ScheduledPriceActivated` exists in Pricing domain events | ✅ | No change |
-| `AdminRole` enum values | Not yet in codebase — will be created in Phase 0 | — | Use: CopyWriter, PricingManager, WarehouseClerk, CustomerService, OperationsManager, Executive, SystemAdmin |
-| `IAdminRoleMessage` / `IAdminUserMessage` | Not yet in codebase — mirrors `IVendorTenantMessage` / `IVendorUserMessage` | — | Naming consistent with Vendor Portal pattern |
+| `AdminRole` enum values | ✅ Implemented in `AdminIdentity.Identity.AdminRole` (Cycle 29 Phase 1) | ✅ | CopyWriter=1, PricingManager=2, WarehouseClerk=3, CustomerService=4, OperationsManager=5, Executive=6, SystemAdmin=7 |
+| `IAdminRoleMessage` / `IAdminUserMessage` | Not yet in codebase — to be created when Admin Portal BFF needs SignalR routing | — | Naming consistent with Vendor Portal pattern |
 
 ---
 
@@ -593,7 +620,7 @@ All names verified against the codebase ubiquitous language established in Cycle
 
 | BC | Dependency Type | Phase | Status |
 |----|----------------|-------|--------|
-| **Admin Identity** | New BC (prerequisite) | 0 | Creating |
+| **Admin Identity** | JWT issuer (prerequisite) | 0 | ✅ **COMPLETE** (Cycle 29 Phase 1) |
 | **Customer Identity** | HTTP read (customer lookup, address) | 0.5 + 1 | ⚠️ Missing email search |
 | **Orders** | HTTP read (orders, returnable items) + HTTP write (cancel) | 1 | ✅ All endpoints exist |
 | **Returns** | HTTP read (returns) + HTTP write (approve, deny) | 1 | ✅ All endpoints exist |
