@@ -27,8 +27,8 @@ builder.AddServiceDefaults();
 
 builder.Host.ApplyJasperFxExtensions();
 
-var connectionString = builder.Configuration.GetConnectionString("marten")
-                       ?? throw new Exception("The connection string 'marten' was not found");
+var connectionString = builder.Configuration.GetConnectionString("postgres")
+                       ?? throw new Exception("The connection string 'postgres' was not found");
 
 builder.Services.AddMarten(opts =>
     {
