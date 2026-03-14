@@ -19,6 +19,7 @@ This directory contains implementation patterns and best practices for building 
 
 **Traditional Relational Data:**
 - 🗄️ [EF Core + Wolverine Integration](./efcore-wolverine-integration.md) - Entity models, DbContext setup, migrations, navigation properties
+- 🔄 [EF Core Projections with Marten](./efcore-marten-projections.md) - EF Core as projection target for Marten event streams, Polecat/SQL Server support
 
 **Building BFFs:**
 - 🎁 [BFF Real-time Patterns](./bff-realtime-patterns.md) - View composition, HTTP clients, SignalR/SSE updates, Blazor integration, MudBlazor
@@ -51,9 +52,11 @@ This directory contains implementation patterns and best practices for building 
 ### Marten
 - [Event-Sourced Aggregate Design](./marten-event-sourcing.md) - Event-sourced aggregates, projections
 - [Marten Document Store](./marten-document-store.md) - Document models, queries, value objects
+- [EF Core Projections with Marten](./efcore-marten-projections.md) - Projecting events to relational tables via EF Core
 
 ### Entity Framework Core
 - [EF Core + Wolverine Integration](./efcore-wolverine-integration.md) - Traditional relational persistence with Wolverine
+- [EF Core Projections with Marten](./efcore-marten-projections.md) - EF Core as projection target, Polecat/SQL Server patterns
 
 ### Testing Frameworks
 - [CritterStack Testing Patterns](./critterstack-testing-patterns.md) - Alba, Wolverine, Marten integration tests
@@ -77,6 +80,7 @@ This directory contains implementation patterns and best practices for building 
    - Event sourcing? → [Event-Sourced Aggregate Design](./marten-event-sourcing.md)
    - Document store? → [Marten Document Store](./marten-document-store.md)
    - Traditional relational? → [EF Core + Wolverine Integration](./efcore-wolverine-integration.md)
+   - Event sourcing with relational projections? → [EF Core Projections with Marten](./efcore-marten-projections.md)
    - Multi-BC orchestration over time? → [Wolverine Sagas](./wolverine-sagas.md)
 
 ### Implementation Phase

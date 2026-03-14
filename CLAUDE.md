@@ -655,6 +655,21 @@ Covers:
 - Wolverine handler patterns with EF Core
 - Testing with Alba + TestContainers
 
+### When Projecting Events to Relational Tables
+
+For using EF Core as a projection target for Marten event streams:
+
+**Read:** `docs/skills/efcore-marten-projections.md`
+
+Covers:
+- `Marten.EntityFrameworkCore` package and three projection base classes
+- Single-stream, multi-stream, and event projections
+- DbContext configuration with Weasel schema migration
+- Conjoined multi-tenancy patterns and limitations (ITenanted requirement)
+- Polecat/SQL Server compatibility and collation considerations
+- Testing EF Core-backed projections with TestContainers
+- When to use EF Core projections vs. native Marten projections
+
 ### When Integrating External Services
 
 For payment gateways, address verification, shipping providers:
