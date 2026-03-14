@@ -895,22 +895,14 @@ Promotions BC gets its own PostgreSQL schema. Isolated from all other BCs. Same 
 
 #### 11d. Port Allocation
 
-CritterSupply uses specific port ranges per BC. Next available port for Promotions.Api. Check current allocations:
-- Shopping: 5220
-- Orders: 5225
-- Payments: 5230
-- Inventory: 5210
-- Fulfillment: 5235
-- Returns: 5245
-- Customer Identity: 5240
-- Customer Experience: 5200 (Web), 5205 (API)
-- Product Catalog: 5100
-- Pricing: 5250
-- Vendor Identity: 5261
-- Vendor Portal: 5255 (Web), 5265 (API)
-- Correspondence: 5248
+CritterSupply uses specific port ranges per BC (see CLAUDE.md port allocation table). Current assignments end at Correspondence (5248). Next available ports:
 
-**Proposed:** Promotions.Api → port **5270** (next in sequence, keeps BC API ports in the 5200-5299 range)
+| BC | Port | Status |
+|---|---|---|
+| Correspondence | 5248 | ✅ Assigned (Cycle 28) |
+| **Promotions** | **5249** | 📋 **Proposed** (Cycle 29) |
+
+**Proposed:** Promotions.Api → port **5249** (next sequential port per CLAUDE.md convention — increment by 1 for each new BC)
 
 #### 11e. Project Structure
 
