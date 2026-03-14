@@ -13,16 +13,16 @@
 
 ---
 
-**Cycle:** 28 — Correspondence BC Phase 1 *(just completed)*
-**Status:** ✅ **COMPLETE** — Event-sourced Message aggregate, OrderPlaced handler, HTTP endpoints, tests delivered
-**GitHub Milestone:** Cycle 28: Correspondence BC Phase 1
+**Cycle:** 29 — Admin Identity BC Phase 1 *(just completed)*
+**Status:** ✅ **COMPLETE** — JWT authentication, user management, EF Core entities, policy-based authorization delivered
+**GitHub Milestone:** Cycle 29: Admin Identity BC Phase 1
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 
 ---
 
 ## Current Status
 
-**Cycles 25, 26, 27, and 28 are COMPLETE.** Returns BC (Phases 1-3) and Correspondence BC (Phase 1) are delivered.
+**Cycles 25, 26, 27, 28, and 29 Phase 1 are COMPLETE.** Returns BC (Phases 1-3), Correspondence BC (Phase 1), and Admin Identity BC (Phase 1) are delivered.
 
 **What Cycle 25 delivered (Returns BC Phase 1):**
 - ✅ Event-sourced Return aggregate (10 lifecycle states, 9 domain events)
@@ -73,14 +73,38 @@
 - ✅ Port 5248 allocated and configured
 - [Phase 1 Retrospective](cycles/cycle-28-correspondence-bc-phase-1-retrospective.md)
 
+**What Cycle 29 Phase 1 delivered (Admin Identity BC):**
+- ✅ ADR 0031: RBAC model for Admin Portal (7 roles, policy-based authorization)
+- ✅ EF Core entity model: AdminUser, AdminRole enum, AdminUserStatus enum, AdminIdentityDbContext
+- ✅ Authentication handlers: Login (JWT + refresh token), RefreshToken (rotation pattern), Logout
+- ✅ User management handlers: CreateAdminUser, GetAdminUsers, ChangeAdminUserRole, DeactivateAdminUser
+- ✅ JWT token generation with 7 authorization policies (leaf + composite)
+- ✅ API endpoints: 3 auth + 4 user management (all using Wolverine HTTP)
+- ✅ Program.cs configuration: JWT Bearer auth, EF Core, Wolverine, OpenTelemetry
+- ✅ Infrastructure: Docker Compose, Aspire, database creation script, port 5249
+- ✅ CONTEXTS.md + CLAUDE.md + CURRENT-CYCLE.md documentation updates
+- [Phase 1 Retrospective](cycles/cycle-29-admin-identity-phase-1-retrospective.md)
+
 **Next cycles (roadmap):**
-- **Cycle 29:** Promotions BC Phase 1 — Coupons and discounts; RBAC ADR for Admin Portal
+- **Cycle 29 Phase 2:** Promotions BC Phase 1 — Coupons and discounts (separate PR/branch)
 - **Cycle 30:** Correspondence BC Phase 2 — Additional integration events (Shipment, Returns, Payments), SMS channel (Twilio)
 - **Cycle 31+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
 
 ---
 
 ## Recently Completed
+
+- ✅ **Cycle 29 Phase 1:** Admin Identity BC (2026-03-14) — **COMPLETE**
+  - ADR 0031: RBAC model (7 roles, policy-based authorization)
+  - EF Core entity model: AdminUser, AdminRole, AdminUserStatus, AdminIdentityDbContext
+  - Authentication handlers: Login, RefreshToken, Logout (JWT + refresh token rotation)
+  - User management handlers: CreateAdminUser, GetAdminUsers, ChangeAdminUserRole, DeactivateAdminUser
+  - JWT token generation with 7 authorization policies
+  - API endpoints: 3 auth + 4 user management (Wolverine HTTP)
+  - Program.cs configuration: JWT Bearer auth, EF Core, Wolverine, OpenTelemetry
+  - Infrastructure: Docker Compose, Aspire, database, port 5249
+  - CONTEXTS.md + CLAUDE.md + CURRENT-CYCLE.md documentation
+  - [Retrospective](./cycles/cycle-29-admin-identity-phase-1-retrospective.md)
 
 - ✅ **Cycle 28:** Correspondence BC Phase 1 (2026-03-13 to 2026-03-14) — **COMPLETE**
   - Message aggregate (event-sourced) — 4 domain events, retry lifecycle
@@ -205,8 +229,8 @@
 
 > **See** [`docs/planning/cycles/cycle-28-correspondence-bc-phase-1-retrospective.md`](cycles/cycle-28-correspondence-bc-phase-1-retrospective.md) for Phase 2 priorities agreed in the Cycle 28 retrospective.
 
-- **Cycle 29:** Promotions BC Phase 1 — Coupons and discounts
-  - RBAC ADR for Admin Portal to be authored during this cycle
+- **Cycle 29 Phase 2:** Promotions BC Phase 1 — Coupons and discounts (separate PR/branch)
+  - RBAC ADR 0031 completed in Cycle 29 Phase 1
   - Shopping BC already has `CouponApplied`/`CouponRemoved` placeholder events
 
 - **Cycle 30:** Correspondence BC Phase 2 — Additional integration events and SMS channel
@@ -255,5 +279,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-14 (Cycle 28 closed; Correspondence BC Phase 1 complete — Message aggregate, OrderPlaced handler, HTTP endpoints, tests delivered)*
+*Last Updated: 2026-03-14 (Cycle 29 Phase 1 closed; Admin Identity BC complete — JWT auth, user management, EF Core entities, policy-based authorization delivered)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*
