@@ -120,7 +120,7 @@
 | **Acknowledge low-stock alert** | Command | `POST /api/inventory/alerts/{id}/acknowledge` | ❌ **Does not exist** | **Phase 2 Blocker** | No concept of alert acknowledgment in Inventory BC today. Admin Portal may own this (AlertAcknowledgment aggregate). |
 | Admin JWT acceptance | Auth | Named JWT Bearer scheme | ❌ **Does not exist** | **Phase 0.5 Blocker** | No HTTP layer at all |
 
-**Inventory BC is the most significant gap.** All 5 integration points require new endpoint creation. This is the highest-effort prerequisite BC for Admin Portal.
+**Inventory BC is the most significant gap.** All 6 integration points (5 endpoints + auth scheme) require new work — the BC has no HTTP layer at all today. This is the highest-effort prerequisite BC for Admin Portal.
 
 **Estimated Effort:** 2-3 sessions to add HTTP layer with query + command endpoints + admin JWT.
 
