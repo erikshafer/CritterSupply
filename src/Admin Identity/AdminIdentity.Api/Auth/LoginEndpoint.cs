@@ -31,7 +31,7 @@ public static class LoginEndpoint
         httpContext.Response.Cookies.Append("RefreshToken", response.RefreshToken, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true, // Requires HTTPS
+            Secure = httpContext.Request.IsHttps, // Secure in HTTPS environments; allows HTTP in local dev
             SameSite = SameSiteMode.Strict,
             Expires = response.ExpiresAt.AddDays(7) // 7-day refresh token
         });

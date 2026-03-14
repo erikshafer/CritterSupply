@@ -62,7 +62,7 @@ public sealed record CreateAdminUserResponse(
 
 /// <summary>
 /// Handler for creating admin users.
-/// Uses Argon2id password hashing via ASP.NET Core Identity PasswordHasher.
+/// Uses PBKDF2-SHA256 password hashing via ASP.NET Core Identity's PasswordHasher&lt;T&gt;.
 /// Enforces unique email constraint.
 /// </summary>
 public static class CreateAdminUserHandler
@@ -87,7 +87,7 @@ public static class CreateAdminUserHandler
             });
         }
 
-        // Hash password using Argon2id
+        // Hash password using PBKDF2-SHA256 (ASP.NET Core Identity PasswordHasher<T>)
         var user = new AdminUser
         {
             Id = Guid.NewGuid(),

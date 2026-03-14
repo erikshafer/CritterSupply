@@ -17,7 +17,7 @@ public static class LogoutEndpoint
         httpContext.Response.Cookies.Delete("RefreshToken", new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
+            Secure = httpContext.Request.IsHttps, // Secure in HTTPS environments; allows HTTP in local dev
             SameSite = SameSiteMode.Strict
         });
 

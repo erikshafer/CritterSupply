@@ -17,7 +17,7 @@ This retrospective documents the complete implementation of Admin Identity BC Ph
 - ✅ EF Core entity model (AdminUser, AdminRole enum, AdminUserStatus enum)
 - ✅ AdminIdentityDbContext with `adminidentity` schema
 - ✅ Initial EF Core migration (InitialCreate)
-- ✅ Authentication handlers (Login, RefreshToken, Logout) with Argon2id password hashing
+- ✅ Authentication handlers (Login, RefreshToken, Logout) with PBKDF2-SHA256 password hashing
 - ✅ User management handlers (CreateAdminUser, GetAdminUsers, ChangeAdminUserRole, DeactivateAdminUser)
 - ✅ JWT token generation with admin claims (`sub`, `role`, `email`, `name`)
 - ✅ Wolverine HTTP endpoints (auth + user management)
@@ -65,7 +65,7 @@ The Admin Portal is the third authentication system in CritterSupply (after Cust
 - **AdminUser** — Primary entity with 11 properties:
   - `Id` (Guid, PK)
   - `Email` (unique, max 256)
-  - `PasswordHash` (Argon2id via ASP.NET Core Identity PasswordHasher)
+  - `PasswordHash` (PBKDF2-SHA256 via ASP.NET Core Identity `PasswordHasher<T>`)
   - `FirstName`, `LastName` (max 100 each)
   - `Role` (AdminRole enum)
   - `Status` (AdminUserStatus enum)
@@ -94,7 +94,7 @@ The Admin Portal is the third authentication system in CritterSupply (after Cust
 - `src/Admin Identity/AdminIdentity/Authentication/Logout.cs`
 
 **Login Handler:**
-- Validates email/password using Argon2id (ASP.NET Core Identity `PasswordHasher<AdminUser>`)
+- Validates email/password using PBKDF2-SHA256 (ASP.NET Core Identity `PasswordHasher<AdminUser>`)
 - Returns 401 for invalid credentials
 - Returns 403 for deactivated users
 - Generates JWT access token (15-min expiry) + refresh token (7-day expiry)
@@ -113,7 +113,7 @@ The Admin Portal is the third authentication system in CritterSupply (after Cust
 - Idempotent operation (returns success even if already logged out)
 
 **Security Features:**
-- Argon2id password hashing (industry best practice, resistant to GPU attacks)
+- PBKDF2-SHA256 password hashing via ASP.NET Core Identity `PasswordHasher<T>` (100,000 iterations by default)
 - HttpOnly cookies for refresh tokens (not accessible to JavaScript, prevents XSS theft)
 - Refresh token rotation (prevents replay attacks)
 - Short-lived access tokens (15 minutes)
@@ -130,7 +130,7 @@ The Admin Portal is the third authentication system in CritterSupply (after Cust
 
 **CreateAdminUser:**
 - Validates email uniqueness (returns 400 if duplicate)
-- Hashes password using Argon2id
+- Hashes password using PBKDF2-SHA256 (ASP.NET Core Identity `PasswordHasher<T>`)
 - Requires: email (valid + max 256), password (min 8 chars), firstName/lastName (max 100), role (valid enum)
 - Returns: AdminUser summary (excludes password hash)
 
@@ -287,13 +287,11 @@ The Admin Portal is the third authentication system in CritterSupply (after Cust
 
 ---
 
-### D4: Argon2id Over bcrypt for Password Hashing
+### D4: PBKDF2-SHA256 Over Argon2id for Password Hashing
 
 **Context:** ASP.NET Core Identity's `PasswordHasher<T>` uses PBKDF2 by default. Alternative algorithms include bcrypt and Argon2id.
 
-**Decision:** Use ASP.NET Core Identity's default `PasswordHasher<AdminUser>` (which uses PBKDF2-SHA256, not Argon2id as initially stated in code comments).
-
-**Clarification:** The code comments in handlers incorrectly state "Argon2id". ASP.NET Core Identity 10.0's PasswordHasher uses **PBKDF2-SHA256** with 100,000 iterations by default. Argon2id would require a custom IPasswordHasher implementation.
+**Decision:** Use ASP.NET Core Identity's default `PasswordHasher<AdminUser>` (PBKDF2-SHA256 with 100,000 iterations).
 
 **Rationale for PBKDF2-SHA256:**
 1. **Built-in:** No additional dependencies required
