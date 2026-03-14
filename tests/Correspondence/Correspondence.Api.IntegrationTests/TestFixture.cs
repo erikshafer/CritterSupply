@@ -1,11 +1,9 @@
 using Alba;
 using Correspondence;
-using DotNet.Testcontainers.Builders;
-using JasperFx.CodeGeneration;
+using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
-using Testcontainers.RabbitMq;
 using Wolverine;
 using Wolverine.Tracking;
 
@@ -13,27 +11,18 @@ namespace Correspondence.Api.IntegrationTests;
 
 /// <summary>
 /// Test fixture for Correspondence BC integration tests using Alba + TestContainers.
-/// Provides isolated PostgreSQL and RabbitMQ containers for each test run.
+/// Provides isolated PostgreSQL container for each test run.
 /// </summary>
 public sealed class TestFixture : IAsyncLifetime
 {
     // PostgreSQL container (isolated per test run)
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:18-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("correspondence_test_db")
         .WithName($"correspondence-postgres-test-{Guid.NewGuid():N}")
         .WithCleanUp(true)
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5432))
         .Build();
 
-    // RabbitMQ container (for message subscriptions)
-    private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder()
-        .WithImage("rabbitmq:4-management-alpine")
-        .WithName($"correspondence-rabbitmq-test-{Guid.NewGuid():N}")
-        .WithCleanUp(true)
-        .Build();
-
-    private string _connectionString = string.Empty;
+    private string? _connectionString;
 
     public IAlbaHost Host { get; private set; } = null!;
 
@@ -42,18 +31,13 @@ public sealed class TestFixture : IAsyncLifetime
     /// </summary>
     public async Task InitializeAsync()
     {
-        // Start containers in parallel
-        await Task.WhenAll(
-            _postgres.StartAsync(),
-            _rabbitMq.StartAsync()
-        );
+        await _postgres.StartAsync();
 
         _connectionString = _postgres.GetConnectionString();
-        var rabbitMqConnectionString = _rabbitMq.GetConnectionString();
 
         JasperFxEnvironment.AutoStartHost = true;
 
-        // Configure Alba host with test containers
+        // Configure Alba host with test container
         Host = await AlbaHost.For<Program>(builder =>
         {
             builder.ConfigureServices(services =>
@@ -62,26 +46,10 @@ public sealed class TestFixture : IAsyncLifetime
                 services.ConfigureMarten(opts =>
                 {
                     opts.Connection(_connectionString);
-                    opts.DatabaseSchemaName = Constants.Correspondence.ToLowerInvariant();
-                    opts.AutoCreateSchemaObjects = Weasel.Core.AutoCreate.All;
                 });
 
-                // Override Wolverine RabbitMQ with test container
-                services.ConfigureWolverine(opts =>
-                {
-                    opts.UseRabbitMq(rabbitMqConnectionString);
-                    opts.Policies.AutoApplyTransactions();
-                    opts.Policies.UseDurableLocalQueues();
-                    opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
-
-                    // Subscribe to test queues
-                    opts.ListenToRabbitQueue("correspondence-orders-events").ProcessInline();
-                    opts.ListenToRabbitQueue("correspondence-fulfillment-events").ProcessInline();
-                    opts.ListenToRabbitQueue("correspondence-returns-events").ProcessInline();
-
-                    // Discover handlers
-                    opts.Discovery.IncludeAssembly(typeof(Messages.Message).Assembly);
-                });
+                // Disable external Wolverine transports for single-BC testing
+                services.DisableAllExternalWolverineTransports();
             });
         });
     }
@@ -109,10 +77,7 @@ public sealed class TestFixture : IAsyncLifetime
             }
         }
 
-        await Task.WhenAll(
-            _postgres.DisposeAsync().AsTask(),
-            _rabbitMq.DisposeAsync().AsTask()
-        );
+        await _postgres.DisposeAsync();
     }
 
     /// <summary>

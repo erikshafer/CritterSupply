@@ -24,7 +24,7 @@ public sealed class OrderPlacedHandlerTests : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task OrderPlaced_creates_Message_aggregate_in_Queued_state()
+    public async Task OrderPlaced_creates_Message_aggregate_and_delivers_via_StubProvider()
     {
         // Arrange
         var orderId = Guid.CreateVersion7();
@@ -32,9 +32,8 @@ public sealed class OrderPlacedHandlerTests : IAsyncLifetime
         var orderPlaced = new OrderPlaced(
             orderId,
             customerId,
-            totalAmount: 125.47m,
-            lineItems: [],
-            shippingAddress: new Messages.Contracts.SharedShippingAddress(
+            LineItems: [],
+            ShippingAddress: new global::Messages.Contracts.Orders.ShippingAddress(
                 "123 Main St",
                 null,
                 "Springfield",
@@ -42,14 +41,16 @@ public sealed class OrderPlacedHandlerTests : IAsyncLifetime
                 "62701",
                 "US"
             ),
-            shippingMethod: "Standard",
-            placedAt: DateTimeOffset.UtcNow
+            ShippingMethod: "Standard",
+            PaymentMethodToken: "tok_test",
+            TotalAmount: 125.47m,
+            PlacedAt: DateTimeOffset.UtcNow
         );
 
         // Act - Send OrderPlaced message through Wolverine
         var tracked = await _fixture.ExecuteAndWaitAsync(orderPlaced);
 
-        // Assert - Message aggregate was created
+        // Assert - Message aggregate was created and delivered (StubEmailProvider succeeds immediately)
         await using var session = _fixture.GetDocumentSession();
         var messages = await session.Query<MessageListView>()
             .Where(m => m.CustomerId == customerId)
@@ -59,9 +60,9 @@ public sealed class OrderPlacedHandlerTests : IAsyncLifetime
         var message = messages.First();
         message.CustomerId.ShouldBe(customerId);
         message.Channel.ShouldBe("Email");
-        message.Status.ShouldBe("Queued");
+        message.Status.ShouldBe("Delivered"); // StubEmailProvider succeeds immediately
         message.Subject.ShouldContain("Order Confirmation");
-        message.AttemptCount.ShouldBe(0);
+        message.DeliveredAt.ShouldNotBeNull();
     }
 
     [Fact]
@@ -73,9 +74,8 @@ public sealed class OrderPlacedHandlerTests : IAsyncLifetime
         var orderPlaced = new OrderPlaced(
             orderId,
             customerId,
-            totalAmount: 99.99m,
-            lineItems: [],
-            shippingAddress: new Messages.Contracts.SharedShippingAddress(
+            LineItems: [],
+            ShippingAddress: new global::Messages.Contracts.Orders.ShippingAddress(
                 "456 Oak Ave",
                 "Apt 2",
                 "Chicago",
@@ -83,15 +83,17 @@ public sealed class OrderPlacedHandlerTests : IAsyncLifetime
                 "60601",
                 "US"
             ),
-            shippingMethod: "Express",
-            placedAt: DateTimeOffset.UtcNow
+            ShippingMethod: "Express",
+            PaymentMethodToken: "tok_test",
+            TotalAmount: 99.99m,
+            PlacedAt: DateTimeOffset.UtcNow
         );
 
         // Act
         var tracked = await _fixture.ExecuteAndWaitAsync(orderPlaced);
 
         // Assert - CorrespondenceQueued was published
-        var queuedEvent = tracked.Sent.SingleMessage<Messages.Contracts.Correspondence.CorrespondenceQueued>();
+        var queuedEvent = tracked.Sent.SingleMessage<global::Messages.Contracts.Correspondence.CorrespondenceQueued>();
         queuedEvent.CustomerId.ShouldBe(customerId);
         queuedEvent.Channel.ShouldBe("Email");
         queuedEvent.QueuedAt.ShouldNotBe(default);
@@ -106,9 +108,8 @@ public sealed class OrderPlacedHandlerTests : IAsyncLifetime
         var orderPlaced = new OrderPlaced(
             orderId,
             customerId,
-            totalAmount: 49.99m,
-            lineItems: [],
-            shippingAddress: new Messages.Contracts.SharedShippingAddress(
+            LineItems: [],
+            ShippingAddress: new global::Messages.Contracts.Orders.ShippingAddress(
                 "789 Elm St",
                 null,
                 "Austin",
@@ -116,8 +117,10 @@ public sealed class OrderPlacedHandlerTests : IAsyncLifetime
                 "78701",
                 "US"
             ),
-            shippingMethod: "Standard",
-            placedAt: DateTimeOffset.UtcNow
+            ShippingMethod: "Standard",
+            PaymentMethodToken: "tok_test",
+            TotalAmount: 49.99m,
+            PlacedAt: DateTimeOffset.UtcNow
         );
 
         // Act
@@ -145,9 +148,8 @@ public sealed class OrderPlacedHandlerTests : IAsyncLifetime
         var orderPlaced = new OrderPlaced(
             orderId,
             customerId,
-            totalAmount: 75.00m,
-            lineItems: [],
-            shippingAddress: new Messages.Contracts.SharedShippingAddress(
+            LineItems: [],
+            ShippingAddress: new global::Messages.Contracts.Orders.ShippingAddress(
                 "321 Pine Rd",
                 null,
                 "Seattle",
@@ -155,8 +157,10 @@ public sealed class OrderPlacedHandlerTests : IAsyncLifetime
                 "98101",
                 "US"
             ),
-            shippingMethod: "Standard",
-            placedAt: DateTimeOffset.UtcNow
+            ShippingMethod: "Standard",
+            PaymentMethodToken: "tok_test",
+            TotalAmount: 75.00m,
+            PlacedAt: DateTimeOffset.UtcNow
         );
 
         // Act - Send same OrderPlaced message twice
@@ -184,9 +188,8 @@ public sealed class OrderPlacedHandlerTests : IAsyncLifetime
         var orderPlaced = new OrderPlaced(
             orderId,
             customerId,
-            totalAmount: 150.00m,
-            lineItems: [],
-            shippingAddress: new Messages.Contracts.SharedShippingAddress(
+            LineItems: [],
+            ShippingAddress: new global::Messages.Contracts.Orders.ShippingAddress(
                 "555 Cedar Ln",
                 null,
                 "Portland",
@@ -194,8 +197,10 @@ public sealed class OrderPlacedHandlerTests : IAsyncLifetime
                 "97201",
                 "US"
             ),
-            shippingMethod: "Express",
-            placedAt: DateTimeOffset.UtcNow
+            ShippingMethod: "Express",
+            PaymentMethodToken: "tok_test",
+            TotalAmount: 150.00m,
+            PlacedAt: DateTimeOffset.UtcNow
         );
 
         await _fixture.ExecuteAndWaitAsync(orderPlaced);

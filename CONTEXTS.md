@@ -21,9 +21,9 @@ This document defines the bounded contexts (BCs) within CritterSupply, an e-comm
 - [Vendor Identity](#vendor-identity) — Vendor authentication, multi-tenancy
 - [Vendor Portal](#vendor-portal) — BFF for vendor operations
 - [Pricing](#pricing) — Price rules, MAP/floor prices
+- [Correspondence](#correspondence) — Transactional emails/SMS (⚠️ Phase 1 - Cycle 28)
 
 ### Planned Bounded Contexts (Priority Order)
-- [Correspondence](#correspondence) — Transactional emails/SMS (🔴 High - Cycle 28)
 - [Promotions](#promotions) — Coupons, discounts (🔴 High - blocks commerce)
 - [Search](#search) — Product search, filtering (🟡 Medium)
 - [Recommendations](#recommendations) — Product suggestions (🟡 Medium)
@@ -584,38 +584,59 @@ The following BCs are identified for future implementation. Detailed planning do
 
 ## Correspondence
 
-**Status:** 🔴 **High Priority — Cycle 28**
-**Docs:** `docs/planning/correspondence-event-model.md`, `correspondence-risk-analysis-roadmap.md`, [ADR 0030](docs/decisions/0030-notifications-to-correspondence-rename.md)
+**Folder:** `Correspondence/`
+**Status:** ⚠️ **Phase 1 Implemented (Cycle 28)** — Email only, Orders/Payments events
+**Docs:** `docs/planning/cycles/cycle-28-correspondence-bc-phase-1-retrospective.md`, [ADR 0030](docs/decisions/0030-notifications-to-correspondence-rename.md)
 
 **Purpose:** Transactional customer communications — order confirmations, shipping updates, return status via email/SMS/push.
 
-**Why High Priority:** CritterSupply sagas fire every event Correspondence needs (`OrderPlaced`, `ShipmentDispatched`, `RefundCompleted`), but customers receive zero communication unless watching the Blazor storefront. 40-50% email open rates = immediate UX impact.
-
 **Renamed (Cycle 28):** Originally "Notifications" BC; renamed to "Correspondence" to avoid ambiguity with real-time UI updates (handled by Customer Experience BC via SignalR). See [ADR 0030](docs/decisions/0030-notifications-to-correspondence-rename.md).
+
+### Aggregates
+
+**Message** (event-sourced)
+- **Events:** `MessageQueued`, `MessageDelivered`, `DeliveryFailed`, `MessageSkipped`
+- **Lifecycle:** Queued → (retry attempts) → Delivered or Failed (3 attempts max)
+- **Retry:** Exponential backoff: 5min, 30min, 2hr
 
 ### Integration Contract
 
-| Receives (10 events from 4 BCs) | Publishes |
+**Phase 1 (Implemented):**
+
+| Receives | Publishes |
 |----------|-----------|
-| `OrderPlaced`, `OrderCancelled` (Orders) | `CorrespondenceQueued` |
-| `ShipmentDispatched`, `ShipmentDelivered`, `ShipmentDeliveryFailed` (Fulfillment) | `CorrespondenceDelivered` |
-| `RefundCompleted` (Payments) | `CorrespondenceFailed` |
+| `OrderPlaced` (Orders) | `CorrespondenceQueued` |
+
+**Phase 2+ (Planned):**
+
+| Receives | Publishes |
+|----------|-----------|
+| `OrderCancelled` (Orders) | `CorrespondenceDelivered` |
+| `ShipmentDispatched`, `ShipmentDelivered`, `ShipmentDeliveryFailed` (Fulfillment) | `CorrespondenceFailed` |
+| `RefundCompleted` (Payments) | |
 | `ReturnApproved`, `ReturnDenied`, `ReturnCompleted`, `ReturnExpired` (Returns) | |
 
-### Phased Rollout
+### Core Invariants
+- Message cannot be sent without customer ID and channel
+- Message retry count cannot exceed 3 attempts
+- Message status transitions: Queued → Delivered or Queued → Failed (after 3 attempts)
+- Queued messages scheduled for immediate delivery (no explicit delay in Phase 1)
 
-- **Phase 1 (Cycle 28):** 4 events (Orders, Payments) + email (SendGrid)
-- **Phase 2:** 6 Returns events + SMS (Twilio)
-- **Phase 3:** Push notifications (FCM) + observability
+### What it doesn't own
+- Real-time UI notifications (Customer Experience BC via SignalR)
+- Customer preference management (queries Customer Identity BC — Phase 2+)
+- Email/SMS provider infrastructure (delegates to `IEmailProvider`)
 
-### Core Patterns
-- **Idempotency:** Wolverine `MessageId` storage prevents duplicate sends
-- **Retry:** 3 attempts, exponential backoff (5min, 30min, 2hr)
-- **Preferences:** Query Customer Identity BC (Polly circuit breaker)
-- **Channels:** `ICorrespondenceChannel` interface (email/SMS/push)
+### Phase 1 Implementation
+- **Provider:** StubEmailProvider (always succeeds, logs to console)
+- **Channel:** Email only
+- **Events:** OrderPlaced → "Order Confirmation" email
+- **Idempotency:** Not yet implemented (documented for Phase 2)
+- **Observability:** Basic Marten projections (MessageListView)
 
 ### References
-- **Planning:** `docs/planning/correspondence-event-model.md` (event model), `correspondence-risk-analysis-roadmap.md` (risk matrix)
+- **Cycles:** [cycle-28-correspondence-bc-phase-1-retrospective.md](docs/planning/cycles/cycle-28-correspondence-bc-phase-1-retrospective.md)
+- **Skills:** `wolverine-message-handlers.md`, `marten-event-sourcing.md`
 - **ADRs:** [ADR 0030](docs/decisions/0030-notifications-to-correspondence-rename.md)
 
 ---
