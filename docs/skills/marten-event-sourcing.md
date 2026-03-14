@@ -1050,7 +1050,7 @@ public static (IStartStream, CreationResponse) Handle(InitializeCart command)
 |-----------|---------|-------------|
 | `[WriteAggregate]` | Load aggregate, append events, save | Command handlers that modify aggregate |
 | `[ReadAggregate]` | Load aggregate read-only (no save) | Queries, read-only operations |
-| `[AggregateHandler]` | Alternative to attributes (more explicit) | Prefer attributes for clarity |
+| `[AggregateHandler]` | Class-level attribute for aggregate workflow | Single-stream handlers (less common than `[WriteAggregate]`) |
 
 **Examples:**
 

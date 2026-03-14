@@ -264,9 +264,9 @@ The aggregate handler workflow is Wolverine's flavor of the Decider pattern. It 
 |-----------|----------|-------------|
 | `[ReadAggregate]` | Query aggregate state (no modifications) | None — read-only |
 | `[WriteAggregate]` | Modify aggregate (append events) | Automatic via return |
-| `[AggregateHandler]` | Legacy class-level attribute (avoid) | Automatic via return |
+| `[AggregateHandler]` | Class-level attribute for single-stream handlers | Automatic via return |
 
-**Prefer `[WriteAggregate]`** — It's parameter-level, supports multi-stream operations, and opts into optimistic concurrency by default.
+**Prefer `[WriteAggregate]`** — It's parameter-level and supports multi-stream operations, making it more flexible for complex scenarios.
 
 ### `[WriteAggregate]` — Standard Pattern
 
@@ -360,19 +360,24 @@ public static OrderStatusResponse GetStatus(
 - Lighter weight (no pessimistic locking)
 - Ideal for GET endpoints
 
-### `[AggregateHandler]` — Legacy Pattern (Avoid)
+### `[AggregateHandler]` — Class-Level Pattern
 
-`[AggregateHandler]` is a **class-level** attribute that was Wolverine's original aggregate workflow. **Do not use it in new code.**
+`[AggregateHandler]` is a **class-level** attribute that applies the aggregate handler workflow to all methods in the handler class.
 
-**Why avoid it:**
-- Doesn't support multi-stream operations
-- Harder to compose with other attributes
-- Less flexible than `[WriteAggregate]`
+**When to use it:**
+- Single-stream operations (one aggregate per handler)
+- You prefer class-level attribute for handler organization
+- Handler contains multiple related methods all working with the same aggregate
 
-**If you see this in old code:**
+**Why `[WriteAggregate]` is often preferred:**
+- More explicit (parameter-level vs class-level)
+- Supports multi-stream operations (multiple aggregates in one handler)
+- More flexible for complex scenarios
+
+**Example with `[AggregateHandler]`:**
 
 ```csharp
-[AggregateHandler]  // ❌ Legacy — migrate to [WriteAggregate]
+[AggregateHandler]  // ✅ Class-level — applies to all methods
 public static class MarkItemReadyHandler
 {
     public static Events Handle(MarkItemReady cmd, Order order)
@@ -382,19 +387,21 @@ public static class MarkItemReadyHandler
 }
 ```
 
-**Migrate to:**
+**Equivalent with `[WriteAggregate]`:**
 
 ```csharp
 public static class MarkItemReadyHandler
 {
     public static Events Handle(
         MarkItemReady cmd,
-        [WriteAggregate] Order order)  // ✅ Modern pattern
+        [WriteAggregate] Order order)  // ✅ Parameter-level — more explicit
     {
         return [new ItemReady(cmd.ItemName)];
     }
 }
 ```
+
+Both patterns are fully supported. Choose based on your team's preferences and the complexity of your handlers.
 
 ### Optimistic Concurrency
 
