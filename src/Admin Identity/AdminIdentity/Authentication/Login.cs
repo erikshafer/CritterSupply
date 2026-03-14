@@ -51,7 +51,7 @@ public sealed record AdminUserInfo(
 /// <summary>
 /// Handler for admin user login.
 /// Verifies email/password, generates JWT access token + refresh token.
-/// Uses Argon2id password hashing via ASP.NET Core Identity's PasswordHasher.
+/// Uses PBKDF2-SHA256 password hashing via ASP.NET Core Identity's PasswordHasher&lt;T&gt;.
 /// </summary>
 public static class LoginHandler
 {
@@ -94,7 +94,7 @@ public static class LoginHandler
             });
         }
 
-        // Verify password using Argon2id (via ASP.NET Core Identity PasswordHasher)
+        // Verify password using PBKDF2-SHA256 (via ASP.NET Core Identity PasswordHasher<T>)
         var verificationResult = PasswordHasher.VerifyHashedPassword(
             user,
             user.PasswordHash,

@@ -113,10 +113,12 @@ This forces every handler to remember to include `SystemAdmin`. Policy-based enc
   "email": "jane.doe@crittersupply.com",           // Email (for audit logs)
   "exp": 1710345600,                               // Expiry (15 minutes from issue)
   "iat": 1710344700,                               // Issued at
-  "iss": "https://localhost:5249",                 // Admin Identity BC
-  "aud": "https://localhost:5243"                  // Admin Portal API
+  "iss": "https://localhost:5249",                 // Admin Identity BC (issuer)
+  "aud": "https://localhost:5249"                  // Phase 1: Admin Identity self-validates its own protected endpoints
 }
 ```
+
+> **Phase 1 vs. Phase 2 audience:** In Phase 1, Admin Identity BC is both the token issuer *and* the audience — its own user-management endpoints (`/api/admin-identity/users`) are protected by the JWTs it issues. When Admin Portal API (port 5243) is built in a future cycle, it will configure its own `JwtBearerOptions` to accept tokens with `aud: "https://localhost:5243"`, and Admin Identity will need to issue tokens with that audience. The claim example and validator config below will need updating at that point.
 
 **Key Decisions:**
 
@@ -135,7 +137,7 @@ The Admin Identity BC is a **new bounded context** (not a shared service) that i
 **Technology Stack:**
 - **Persistence:** EF Core + PostgreSQL (`adminidentity` schema)
 - **Auth Framework:** ASP.NET Core Identity
-- **Password Hashing:** Argon2id (same as Vendor Identity — no bcrypt or plaintext)
+- **Password Hashing:** PBKDF2-SHA256 via ASP.NET Core Identity's `PasswordHasher<T>` (100,000 iterations by default). Argon2id would require a custom `IPasswordHasher<T>` implementation and is deferred to Phase 2+ if needed.
 - **Port:** `5249` (next available)
 - **Database:** `adminidentity` (added to `docker/postgres/create-databases.sh`)
 
@@ -150,25 +152,30 @@ PUT    /api/admin-identity/users/{id}/role         # Change user role (SystemAdm
 DELETE /api/admin-identity/users/{id}              # Deactivate admin user (SystemAdmin only)
 ```
 
-**Integration with Admin Portal:**
+**Integration with Admin Portal (Phase 2+):**
 
-Admin Portal.Api trusts JWTs signed by Admin Identity BC. Validation is configured via `JwtBearerOptions`:
+When Admin Portal API (port 5243) is built, it will trust JWTs signed by Admin Identity BC. Its validation is configured via `JwtBearerOptions` using the signing key directly (no OpenID Connect discovery in Phase 1):
 
 ```csharp
+// Admin Portal API (future — Phase 2+)
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opts =>
     {
-        opts.Authority = "https://localhost:5249";  // Admin Identity BC
-        opts.Audience = "https://localhost:5243";   // Admin Portal API
         opts.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
+            ValidIssuer = "https://localhost:5249",   // Admin Identity BC issuer
             ValidateAudience = true,
+            ValidAudience = "https://localhost:5243", // Admin Portal API audience (Phase 2+)
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromMinutes(1)
+            ClockSkew = TimeSpan.FromMinutes(1),
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(configuration["Jwt:SecretKey"]!))
         };
     });
 ```
+
+> **Phase 1 note:** Admin Identity API validates its own tokens in Phase 1 with `ValidIssuer` and `ValidAudience` both set to its own base URL. Audience alignment between issuer and consumer must be verified before Admin Portal API is wired up.
 
 ### 5. Audit Trail Pattern
 
