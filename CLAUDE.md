@@ -557,6 +557,7 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 | **Marketplaces**              | **5247** | 📋 Reserved | Marketplaces API (future; Cycle 32+)|
 | **Correspondence**            | **5248** | ✅ Assigned | Correspondence/ (Cycle 28)     |
 | **Admin Identity**            | **5249** | ✅ Assigned | Admin Identity/ (Cycle 29)     |
+| **Promotions**                | **5250** | ✅ Assigned | Promotions/ (Cycle 29 Phase 2) |
 
 **Why this matters:**
 - Allows running multiple APIs simultaneously during development

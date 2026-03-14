@@ -1600,6 +1600,81 @@ var aggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
 
 See [Testing Event-Sourced Systems](#testing-event-sourced-systems) for details.
 
+### ❌ 8. Forgetting Snapshot Projections for Queryable Aggregates
+
+**Problem:** `session.Query<T>()` returns empty even after successfully executing commands that create or modify the aggregate.
+
+**Symptom:**
+```csharp
+// After successful command execution:
+await _fixture.ExecuteAndWaitAsync(new CreatePromotion(...));
+
+// Query returns empty/null:
+var promotions = await session.Query<Promotion>().ToListAsync();
+// promotions.Count == 0 ❌
+
+// BUT aggregate exists in event stream:
+var promotion = await session.Events.AggregateStreamAsync<Promotion>(promotionId);
+// promotion != null ✅
+```
+
+**Root Cause:** Marten doesn't automatically make event-sourced aggregates queryable via LINQ. Without a snapshot projection configuration, the aggregate only exists as an event stream in `mt_events` table, not as a queryable document.
+
+**BAD:**
+```csharp
+// Missing snapshot configuration
+builder.Services.AddMarten(opts =>
+{
+    opts.Connection(connectionString);
+    // ❌ No projection configured for Promotion aggregate
+});
+
+// Tests fail with "Sequence contains no elements"
+var promotions = await session.Query<Promotion>().ToListAsync();
+var promotion = promotions.Single(); // ❌ Throws!
+```
+
+**GOOD:**
+```csharp
+// Configure snapshots for queryable aggregates
+builder.Services.AddMarten(opts =>
+{
+    opts.Connection(connectionString);
+
+    // ✅ Inline snapshots make aggregates queryable via LINQ
+    opts.Projections.Snapshot<Promotion>(SnapshotLifecycle.Inline);
+    opts.Projections.Snapshot<Coupon>(SnapshotLifecycle.Inline);
+});
+
+// Now queries work as expected
+var promotions = await session.Query<Promotion>().ToListAsync();
+var promotion = promotions.Single(); // ✅ Works!
+```
+
+**Why This Works:**
+- Snapshot projections create `mt_doc_<aggregate>` tables
+- `SnapshotLifecycle.Inline` = zero-lag updates in same transaction as event append
+- Makes aggregates queryable via `session.Query<T>()` and LINQ
+- Standard pattern across all CritterSupply BCs: Shopping (Cart), Orders (Checkout), Returns (Return), Pricing (ProductPrice), Promotions (Promotion, Coupon)
+
+**When to Use Snapshots:**
+- ✅ **Always** for aggregates you need to query via LINQ (e.g., `session.Query<Cart>().Where(...)`)
+- ✅ **Always** for aggregates with 10+ events (avoids replay latency)
+- ❌ **Never** for aggregates only loaded by ID (snapshot overhead not justified)
+- ❌ **Never** for short-lived aggregates deleted after use
+
+**Diagnosis Steps:**
+1. Verify events are being stored: Check `mt_events` table or Wolverine tracking output
+2. Try loading via event stream: `await session.Events.AggregateStreamAsync<T>(id)` — if this works, events exist ✅
+3. Try LINQ query: `await session.Query<T>().ToListAsync()` — if this returns empty, missing snapshot ❌
+4. Solution: Add `opts.Projections.Snapshot<T>(SnapshotLifecycle.Inline)` to Program.cs
+
+**Real-World Example:**
+- **Issue:** Promotions BC integration tests (Cycle 29 Phase 2) failing with "Sequence contains no elements"
+- **Fix:** Added snapshot projections for Promotion and Coupon aggregates
+- **Reference:** `docs/planning/cycles/cycle-29-phase-2-retrospective-notes.md` (Session 2, Lesson #3)
+- **Commit:** Promotions BC Program.cs configuration
+
 ---
 
 ## Lessons Learned from Production
