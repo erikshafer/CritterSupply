@@ -14,16 +14,15 @@ E-commerce was chosen because it's a domain most developers intuitively understa
 
 ## Architectural North Star
 
-**IMPORTANT:** `CONTEXTS.md` is the **architectural source of truth** for this system's bounded context (BC) definitions, along with the lifecycles of events, core invariants, and integration flows.
+**IMPORTANT:** `CONTEXTS.md` is a **single-file, at-a-glance reference** for all bounded contexts — what each BC owns, which adjacent BCs it communicates with, and non-obvious constraints. It is not a specification.
+
+**Code is the source of truth** for events, commands, handlers, and message contracts. `CONTEXTS.md` answers *"what does this BC own and who does it talk to?"* — nothing more.
 
 When implementing integrations between bounded contexts:
 
-1. **Always consult CONTEXTS.md first** — It defines what messages each BC receives and publishes
-2. **Implementation follows specification** — Code should match the integration contracts defined there
-3. **Orchestration vs. Choreography** — CONTEXTS.md specifies which pattern to use
-4. **Update CONTEXTS.md when architecture changes** — Keep it current
-
-If there's a discrepancy between code and CONTEXTS.md, **CONTEXTS.md wins**. This is why it's imperative to keep it update to date when plans, flows, behaviors, and integrations change.
+1. **Consult CONTEXTS.md for orientation** — It shows BC ownership and communication directions
+2. **Consult the codebase for contracts** — Events, commands, and message shapes live in code (especially `src/Shared/Messages.Contracts/` and BC handler files)
+3. **Do not add implementation details to CONTEXTS.md** — If something requires ongoing updates to stay accurate, it does not belong there
 
 ## Documentation Structure
 
@@ -164,7 +163,7 @@ docs/features/
 3. Create individual task Issues (linked to Milestone) using labels: `bc:*`, `type:feature`, `priority:*`
 4. Write 2-3 Gherkin `.feature` files for key user stories
 5. Create ADR markdown file + companion GitHub Issue for architectural decisions
-6. Review `CONTEXTS.md` for integration requirements
+6. Review `CONTEXTS.md` for BC ownership and communication directions
 7. Update `docs/planning/CURRENT-CYCLE.md` with new cycle info
 
 **During a Cycle (Implementation Phase):**
@@ -179,7 +178,7 @@ docs/features/
 2. Export closed Issues to markdown for fork compatibility:
    `bash scripts/github-migration/04-export-cycle.sh "Cycle NN: <Name>"`
    Then commit the exported file (`docs/planning/cycles/cycle-NN-issues-export.md`)
-3. Update `CONTEXTS.md` with new integration flows
+3. Update `CONTEXTS.md` only if BC ownership or communication directions changed (not for implementation details)
 4. Create retrospective doc: `docs/planning/cycles/cycle-NN-retrospective.md`
 5. Update `docs/planning/CURRENT-CYCLE.md` to next cycle
 
