@@ -1,8 +1,8 @@
 # Promotions BC: Event Modeling Workshop
 
 **Date:** 2026-03-15
-**Status:** 🟢 Stages 1–6 Complete
-**Participants:** Principal Software Architect
+**Status:** 🟢 Complete (All 10 Stages)
+**Participants:** Principal Software Architect, Product Owner, UX Engineer
 **Related:** [pricing-promotions-domain-spike.md](spikes/pricing-promotions-domain-spike.md), [pricing-event-modeling.md](pricing-event-modeling.md), [CONTEXTS.md](../../CONTEXTS.md#promotions)
 **Prerequisite:** Pricing BC Phase 1 ✅ Complete (Cycle 21-22)
 
