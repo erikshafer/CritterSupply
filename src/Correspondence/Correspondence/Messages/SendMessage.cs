@@ -1,4 +1,4 @@
-namespace Correspondence.Commands;
+namespace Correspondence.Messages;
 
 /// <summary>
 /// Internal command to send a message via the configured provider.

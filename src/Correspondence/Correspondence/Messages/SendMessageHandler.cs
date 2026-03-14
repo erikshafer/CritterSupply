@@ -1,10 +1,9 @@
-using Correspondence.Messages;
 using Correspondence.Providers;
 using Marten;
 using Messages.Contracts.Correspondence;
 using Wolverine;
 
-namespace Correspondence.Commands;
+namespace Correspondence.Messages;
 
 /// <summary>
 /// Handler for SendMessage command. Implements retry logic with exponential backoff.

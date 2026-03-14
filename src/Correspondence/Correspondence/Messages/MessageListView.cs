@@ -1,7 +1,6 @@
 using Marten.Events.Aggregation;
-using Correspondence.Messages;
 
-namespace Correspondence.Projections;
+namespace Correspondence.Messages;
 
 /// <summary>
 /// Inline projection for customer message history queries.

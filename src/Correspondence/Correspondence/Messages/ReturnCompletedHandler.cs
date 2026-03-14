@@ -1,19 +1,18 @@
-using Correspondence.Messages;
 using Marten;
 using Messages.Contracts.Correspondence;
 using Messages.Contracts.Returns;
 using Wolverine;
 
-namespace Correspondence.Handlers;
+namespace Correspondence.Messages;
 
 /// <summary>
-/// Handles ReturnApproved integration events to send return label emails.
-/// Choreography pattern: subscribes to ReturnApproved, creates Message aggregate, publishes CorrespondenceQueued.
+/// Handles ReturnCompleted integration events to send return received emails.
+/// Choreography pattern: subscribes to ReturnCompleted, creates Message aggregate, publishes CorrespondenceQueued.
 /// </summary>
-public sealed class ReturnApprovedHandler
+public sealed class ReturnCompletedHandler
 {
     public async Task<OutgoingMessages> Handle(
-        ReturnApproved @event,
+        ReturnCompleted @event,
         IDocumentSession session,
         CancellationToken ct)
     {
@@ -22,22 +21,15 @@ public sealed class ReturnApprovedHandler
         var customerEmail = "customer@example.com"; // Will be populated from CustomerIdentity query
 
         // Template rendering will be enhanced in Phase 2
-        var subject = $"Return Approved - Return #{@event.ReturnId}";
+        var subject = $"Return Received - Return #{@event.ReturnId}";
         var body = $@"
             <html>
             <body>
-                <h1>Your return has been approved</h1>
-                <p>Your return request <strong>{@event.ReturnId}</strong> has been approved.</p>
-                <p><strong>Estimated Refund:</strong> {@event.EstimatedRefundAmount:C}</p>
-                <p><strong>Restocking Fee:</strong> {@event.RestockingFeeAmount:C}</p>
-                <p><strong>Ship By:</strong> {@event.ShipByDeadline:MMMM dd, yyyy}</p>
-                <p><strong>Instructions:</strong></p>
-                <ol>
-                    <li>Package your items securely</li>
-                    <li>Print and attach the return label (link to be provided in Phase 2)</li>
-                    <li>Drop off at any authorized shipping location</li>
-                </ol>
-                <p>We'll send you another email once we receive your return.</p>
+                <h1>We've received your return</h1>
+                <p>Your return <strong>{@event.ReturnId}</strong> has been received and processed.</p>
+                <p><strong>Refund Amount:</strong> {@event.FinalRefundAmount:C}</p>
+                <p>Your refund will be processed within 3-5 business days and will appear in your original payment method.</p>
+                <p>Thank you for shopping with CritterSupply!</p>
             </body>
             </html>
         ";
@@ -46,7 +38,7 @@ public sealed class ReturnApprovedHandler
         var (message, messageQueued) = MessageFactory.Create(
             customerId: @event.CustomerId,
             channel: "Email",
-            templateId: "return-label",
+            templateId: "return-completed",
             subject: subject,
             body: body
         );
@@ -66,7 +58,7 @@ public sealed class ReturnApprovedHandler
         ));
 
         // Trigger send command
-        outgoing.Add(new Commands.SendMessage(message.Id));
+        outgoing.Add(new SendMessage(message.Id));
 
         return outgoing;
     }

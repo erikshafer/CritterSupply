@@ -1,44 +1,48 @@
-using Correspondence.Messages;
 using Marten;
 using Messages.Contracts.Correspondence;
-using Messages.Contracts.Orders;
+using Messages.Contracts.Fulfillment;
 using Wolverine;
 
-namespace Correspondence.Handlers;
+namespace Correspondence.Messages;
 
 /// <summary>
-/// Handles OrderPlaced integration events to send order confirmation emails.
-/// Choreography pattern: subscribes to OrderPlaced, creates Message aggregate, publishes CorrespondenceQueued.
+/// Handles ShipmentDispatched integration events to send tracking emails.
+/// Choreography pattern: subscribes to ShipmentDispatched, creates Message aggregate, publishes CorrespondenceQueued.
 /// </summary>
-public sealed class OrderPlacedHandler
+public sealed class ShipmentDispatchedHandler
 {
     public async Task<OutgoingMessages> Handle(
-        OrderPlaced @event,
+        ShipmentDispatched @event,
         IDocumentSession session,
         CancellationToken ct)
     {
+        // TODO: Query Orders BC to get CustomerId for this OrderId
+        // For Phase 1, we'll use a placeholder. Phase 2 will add cross-BC queries.
+        var customerId = Guid.Empty; // Placeholder - will be queried from Orders API
+
         // TODO: Query Customer Identity BC for customer preferences
         // For now, assume customer has email notifications enabled
         var customerEmail = "customer@example.com"; // Will be populated from CustomerIdentity query
 
         // Template rendering will be enhanced in Phase 2
-        var subject = $"Order Confirmation - Order #{@event.OrderId}";
+        var subject = $"Your order has shipped - Tracking #{@event.TrackingNumber}";
         var body = $@"
             <html>
             <body>
-                <h1>Thank you for your order!</h1>
-                <p>Your order <strong>{@event.OrderId}</strong> has been placed successfully.</p>
-                <p>Order Total: {@event.TotalAmount:C}</p>
-                <p>We'll send you another email when your order ships.</p>
+                <h1>Your order is on the way!</h1>
+                <p>Your order <strong>{@event.OrderId}</strong> has been shipped.</p>
+                <p><strong>Tracking Number:</strong> {@event.TrackingNumber}</p>
+                <p><strong>Carrier:</strong> {@event.Carrier}</p>
+                <p>You can track your shipment using the tracking number above.</p>
             </body>
             </html>
         ";
 
         // Create Message aggregate
         var (message, messageQueued) = MessageFactory.Create(
-            customerId: @event.CustomerId,
+            customerId: customerId,
             channel: "Email",
-            templateId: "order-confirmation",
+            templateId: "shipment-tracking",
             subject: subject,
             body: body
         );
@@ -52,13 +56,13 @@ public sealed class OrderPlacedHandler
         // Publish integration event for monitoring
         outgoing.Add(new CorrespondenceQueued(
             message.Id,
-            @event.CustomerId,
+            customerId,
             "Email",
             messageQueued.QueuedAt
         ));
 
-        // Trigger send command (will be executed by SendMessageHandler)
-        outgoing.Add(new Commands.SendMessage(message.Id));
+        // Trigger send command
+        outgoing.Add(new SendMessage(message.Id));
 
         return outgoing;
     }
