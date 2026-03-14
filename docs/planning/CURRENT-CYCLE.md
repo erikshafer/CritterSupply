@@ -13,16 +13,16 @@
 
 ---
 
-**Cycle:** 27 — Returns BC Phase 3 *(just completed)*  
-**Status:** ✅ **COMPLETE** — P0 (Exchange workflow), P1 (CE SignalR handlers + sequential returns), and P2 (quick wins) delivered  
-**GitHub Milestone:** Cycle 27: Returns BC Phase 3  
+**Cycle:** 28 — Correspondence BC Phase 1 *(just completed)*
+**Status:** ✅ **COMPLETE** — Event-sourced Message aggregate, OrderPlaced handler, HTTP endpoints, tests delivered
+**GitHub Milestone:** Cycle 28: Correspondence BC Phase 1
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 
 ---
 
 ## Current Status
 
-**Cycles 25, 26, and 27 are COMPLETE.** Returns BC Phase 1 (core domain + API), Phase 2 (integration events, mixed inspection, contract expansion), and Phase 3 (exchange workflow, CE SignalR handlers, sequential returns) are all delivered.
+**Cycles 25, 26, 27, and 28 are COMPLETE.** Returns BC (Phases 1-3) and Correspondence BC (Phase 1) are delivered.
 
 **What Cycle 25 delivered (Returns BC Phase 1):**
 - ✅ Event-sourced Return aggregate (10 lifecycle states, 9 domain events)
@@ -59,14 +59,40 @@
 - [Phase 3 Plan](cycles/cycle-27-returns-bc-phase-3.md)
 - [Phase 3 Retrospective](cycles/cycle-27-returns-bc-phase-3-retrospective.md)
 
+**What Cycle 28 delivered (Correspondence BC Phase 1):**
+- ✅ Message aggregate (event-sourced) with 4 domain events: MessageQueued, MessageDelivered, DeliveryFailed, MessageSkipped
+- ✅ Provider interfaces (IEmailProvider, StubEmailProvider)
+- ✅ Integration handler: OrderPlacedHandler (email order confirmations)
+- ✅ SendMessage handler with exponential backoff retry (3 attempts: 5min, 30min, 2hr)
+- ✅ Program.cs configuration (Marten + Wolverine + RabbitMQ)
+- ✅ MessageListView projection (inline) for customer message history
+- ✅ HTTP query endpoints (GetMessagesForCustomer, GetMessageDetails)
+- ✅ 12 unit tests (MessageAggregateTests) — all passing
+- ✅ 5 integration tests (OrderPlacedHandlerTests) — all passing
+- ✅ CONTEXTS.md updated with Phase 1 integration contracts
+- ✅ Port 5248 allocated and configured
+- [Phase 1 Retrospective](cycles/cycle-28-correspondence-bc-phase-1-retrospective.md)
+
 **Next cycles (roadmap):**
-- **Cycle 28:** Correspondence BC Phase 1 — Transactional email (OrderPlaced, ShipmentDispatched, Returns events)
 - **Cycle 29:** Promotions BC Phase 1 — Coupons and discounts; RBAC ADR for Admin Portal
-- **Cycle 30+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
+- **Cycle 30:** Correspondence BC Phase 2 — Additional integration events (Shipment, Returns, Payments), SMS channel (Twilio)
+- **Cycle 31+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
 
 ---
 
 ## Recently Completed
+
+- ✅ **Cycle 28:** Correspondence BC Phase 1 (2026-03-13 to 2026-03-14) — **COMPLETE**
+  - Message aggregate (event-sourced) — 4 domain events, retry lifecycle
+  - Provider interfaces (IEmailProvider, StubEmailProvider)
+  - OrderPlacedHandler — email order confirmations
+  - SendMessage handler — exponential backoff retry (5min, 30min, 2hr)
+  - MessageListView projection (inline)
+  - HTTP query endpoints (GetMessagesForCustomer, GetMessageDetails)
+  - 12 unit tests + 5 integration tests (all passing)
+  - CONTEXTS.md integration
+  - Sign-offs: PSA ✅, PO ✅ (planning phase)
+  - [Retrospective](./cycles/cycle-28-correspondence-bc-phase-1-retrospective.md)
 
 - ✅ **Cycle 27:** Returns BC Phase 3 (2026-03-13) — **COMPLETE**
   - Exchange workflow (UC-11) — ReturnType enum, ExchangeRequest, 5 exchange domain events, 3 command handlers
@@ -175,19 +201,21 @@
 
 ## Upcoming (Planned)
 
-### Next 4 Cycles (Revised after Phase 2 Retrospective)
+### Next 4 Cycles (Revised after Phase 1 Retrospective)
 
-> **See** [`docs/planning/cycles/cycle-27-returns-bc-phase-3-retrospective.md`](cycles/cycle-27-returns-bc-phase-3-retrospective.md) for Phase 4 priorities agreed in the Cycle 27 retrospective.
-
-- **Cycle 28:** Correspondence BC Phase 1 — Transactional email
-  - Phase 1a: `OrderPlaced`, `ShipmentDispatched` (existing BC events)
-  - Phase 1b: Returns events (`ReturnApproved`, `ReturnDenied`, `ReturnCompleted`, `ReturnExpired`, `ReturnReceived`, `ReturnRejected`)
+> **See** [`docs/planning/cycles/cycle-28-correspondence-bc-phase-1-retrospective.md`](cycles/cycle-28-correspondence-bc-phase-1-retrospective.md) for Phase 2 priorities agreed in the Cycle 28 retrospective.
 
 - **Cycle 29:** Promotions BC Phase 1 — Coupons and discounts
   - RBAC ADR for Admin Portal to be authored during this cycle
   - Shopping BC already has `CouponApplied`/`CouponRemoved` placeholder events
 
-- **Cycle 30+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
+- **Cycle 30:** Correspondence BC Phase 2 — Additional integration events and SMS channel
+  - Phase 2a: ShipmentDispatched, ShipmentDelivered, ShipmentDeliveryFailed (Fulfillment BC)
+  - Phase 2b: ReturnApproved, ReturnDenied, ReturnCompleted, ReturnExpired (Returns BC)
+  - Phase 2c: RefundCompleted (Payments BC)
+  - SMS channel (Twilio) implementation
+
+- **Cycle 31+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
   - Event Modeling: [`docs/planning/admin-portal-event-modeling.md`](admin-portal-event-modeling.md)
   - UX Research: [`docs/planning/admin-portal-ux-research.md`](admin-portal-ux-research.md)
   - Gherkin features: [`docs/features/admin-portal/`](../features/admin-portal/)
@@ -196,8 +224,8 @@
 ### Future BCs (Priority Roadmap)
 
 **High Priority (Customer-Facing Gaps):**
-- 🔴 **Correspondence BC** — Transactional emails, SMS, push notifications *(Cycle 28)*
 - 🔴 **Promotions BC** — Discount codes, percentage-off campaigns, BOGO *(Cycle 29)*
+- 🔴 **Correspondence BC Phase 2** — Additional integration events, SMS, push notifications *(Cycle 30)*
 - 🔴 **Exchange v2** — Cross-product exchanges, upcharge payment collection *(future)*
 
 **Medium Priority (Scaling + Internal Tooling):**
@@ -227,5 +255,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-13 (Cycle 27 closed; Returns BC Phase 3 complete — Exchange workflow, CE SignalR handlers, sequential returns delivered)*
+*Last Updated: 2026-03-14 (Cycle 28 closed; Correspondence BC Phase 1 complete — Message aggregate, OrderPlaced handler, HTTP endpoints, tests delivered)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*
