@@ -1,7 +1,7 @@
 # Promotions BC: Event Modeling Workshop
 
 **Date:** 2026-03-15
-**Status:** 🔵 Stage 1 — Brain Dump (Architecture Perspective)
+**Status:** 🟢 Stages 1–6 Complete
 **Participants:** Principal Software Architect
 **Related:** [pricing-promotions-domain-spike.md](spikes/pricing-promotions-domain-spike.md), [pricing-event-modeling.md](pricing-event-modeling.md), [CONTEXTS.md](../../CONTEXTS.md#promotions)
 **Prerequisite:** Pricing BC Phase 1 ✅ Complete (Cycle 21-22)
@@ -1051,4 +1051,1796 @@ These items need input from Product Owner, UX Engineer, and QA before the event 
 
 ---
 
-*This brain dump is Stage 1 input. It will be organized, debated, and refined in subsequent workshop stages with the full team.*
+*This brain dump is Stage 1 input. Stages 2–6 below organize, refine, and finalize the event model.*
+
+---
+---
+
+# Stage 2: Timeline
+
+> Arrange all events into a coherent chronological flow representing the full Promotions BC lifecycle.
+
+Each swimlane below represents a **temporal phase** of the promotion lifecycle. Events (🟠 orange stickies) are listed in order. Commands (🔵 blue) and queries (🟢 green) are tagged where they originate.
+
+---
+
+## Phase 1: Promotion Creation & Configuration (Admin)
+
+```
+Time ─────────────────────────────────────────────────────────────────►
+
+Admin Portal                          Promotions BC
+────────────                          ─────────────
+🔵 CreatePromotion ──────────────────► 🟠 PromotionCreated (Draft)
+                                        │
+🔵 ConfigureDiscountRules ───────────► 🟠 DiscountRulesConfigured
+                                        │
+🔵 ConfigureScope ───────────────────► 🟠 PromotionScopeConfigured
+                                        │
+🔵 SetEligibilityRules ─────────────► 🟠 EligibilityRulesSet
+                                        │
+🔵 SetRedemptionLimits ─────────────► 🟠 RedemptionLimitsSet
+```
+
+**Aggregate:** Promotion  
+**State after:** Draft (fully configured, not yet activatable without at least discount rules)
+
+---
+
+## Phase 2: Coupon Generation (Admin — coupon-required promotions only)
+
+```
+Time ─────────────────────────────────────────────────────────────────►
+
+Admin Portal                          Promotions BC              Coupon Aggregates
+────────────                          ─────────────              ─────────────────
+🔵 GenerateCouponBatch ─────────────► 🟠 CouponBatchGenerated   ─► 🟠 CouponIssued (×N)
+                                        (on Promotion stream)       (one per coupon stream)
+```
+
+**Fan-out pattern:** `GenerateCouponBatch` appends one `CouponBatchGenerated` event to the Promotion stream. The handler then emits N individual `IssueCoupon` commands via `OutgoingMessages` — each creates a separate Coupon aggregate.
+
+**Invariant check:** If `RequiresCouponCode = true`, at least one `CouponBatchGenerated` must exist before activation.
+
+---
+
+## Phase 3: Promotion Activation (Immediate or Scheduled)
+
+### Path A: Immediate Activation
+
+```
+Time ─────────────────────────────────────────────────────────────────►
+
+Admin Portal                          Promotions BC                    Outbound
+────────────                          ─────────────                    ────────
+🔵 ActivatePromotion ───────────────► 🟠 PromotionActivated           ─► 📤 PromotionActivated
+                                        (Draft → Active)                  (integration msg → Shopping, CE BFF)
+                                        │
+                                        ├─► ⏱️ ScheduleAsync(ExpirePromotion, EndsAt)
+```
+
+### Path B: Scheduled Activation (StartsAt is in the future)
+
+```
+Time ─────────────────────────────────────────────────────────────────►
+
+Admin Portal                          Promotions BC
+────────────                          ─────────────
+🔵 SchedulePromotion ───────────────► 🟠 PromotionScheduled (Draft → Scheduled)
+                                        │
+                                        ├─► ⏱️ ScheduleAsync(ActivatePromotion, StartsAt)
+
+        ⋯ time passes until StartsAt ⋯
+
+Wolverine Scheduler ─────────────────► 🟠 PromotionActivated (Scheduled → Active)
+                                        │
+                                        ├─► 📤 PromotionActivated (integration msg)
+                                        ├─► ⏱️ ScheduleAsync(ExpirePromotion, EndsAt)
+```
+
+**Stale-message guard:** Both scheduled messages carry a `ScheduleId`. Handler checks `promotion.PendingScheduleId == message.ScheduleId` before applying. Discards if mismatched (promotion was cancelled and recreated).
+
+---
+
+## Phase 4: Customer Discovers Promotion
+
+```
+Time ─────────────────────────────────────────────────────────────────►
+
+Customer / CE BFF                     Promotions BC
+─────────────────                     ─────────────
+🟢 GetActivePromotions ─────────────► (reads ActivePromotionsView)
+                                        │
+🟢 GetPromotionDetails(id) ────────► (reads PromotionSummaryView)
+                                        │
+🟢 GetApplicablePromotions(skus) ──► (reads ActivePromotionsView, filters by scope)
+```
+
+**Read path only — no events emitted.** Served by inline Marten projections.
+
+For **auto-applied promotions** (`RequiresCouponCode = false`): Customer sees discounted prices automatically on product pages and in cart (BFF queries Promotions on each render).
+
+---
+
+## Phase 5: Customer Applies Coupon (Coupon-Required Promotions)
+
+```
+Time ─────────────────────────────────────────────────────────────────►
+
+Shopping BC                           Promotions BC                    Coupon Aggregate
+───────────                           ─────────────                    ────────────────
+🔵 ValidateCoupon ──── sync HTTP ───► (validate against CouponLookupView
+                                        + Coupon aggregate state)
+                                        │
+                ◄────── HTTP 200 ──────┤ CouponValidationResult
+                                        │ (IsValid, PromotionId,
+                                        │  DiscountType, DiscountValue)
+                                        │
+                                      🟠 CouponReserved ──────────────► (soft-hold on Coupon)
+                                        (with ReservationTtl = 15min)
+```
+
+**Sync HTTP because:** Customer is waiting for instant "✅ Coupon applied!" / "❌ Invalid coupon" feedback.
+
+**Reservation semantics:**
+- `CouponReserved` places a soft hold with a TTL
+- If another customer tries to validate the same single-use coupon → "Coupon is currently in use"
+- If the reservation expires (customer abandons cart) → `CouponReservationReleased`
+- If the order is placed → `CouponRedeemed` (hard commit)
+
+---
+
+## Phase 6: Checkout & Discount Calculation
+
+```
+Time ─────────────────────────────────────────────────────────────────►
+
+Shopping/Orders BC                    Promotions BC                    Pricing BC
+──────────────────                    ─────────────                    ──────────
+🟢 CalculateDiscount ── sync HTTP ──► (evaluate all active promotions
+                                        + applied coupons
+                                        + stacking rules
+                                        + eligibility rules)
+                                        │
+                                        ├── 🟢 GetFloorPrice(sku) ─── sync HTTP ──► CurrentPriceView
+                                        │                     ◄───── FloorPrice ──┤
+                                        │
+                                        ├── (clamp: discount cannot push below floor)
+                                        │
+                ◄────── HTTP 200 ──────┤ DiscountBreakdown
+                                        │ (TotalDiscount,
+                                        │  LineItemDiscounts[],
+                                        │  AppliedPromotions[])
+```
+
+**Pure function:** No state mutation. No events. Stateless computation of discount given current cart, active promotions, applied coupons, and floor prices.
+
+**Stacking rule (Phase 1):** `AllowsStacking = false` for all promotions. If multiple promotions apply, **highest discount wins**. Price Schedules (Pricing BC) are applied first — promotions overlay on top of the scheduled/base price.
+
+---
+
+## Phase 7: Order Placed with Promotion
+
+```
+Time ─────────────────────────────────────────────────────────────────►
+
+Orders BC                                           Promotions BC
+─────────                                           ─────────────
+🟠 OrderPlaced (with discount fields) ── async ───► (consumed via RabbitMQ)
+```
+
+**Orders BC enhancement (ADR required):** `OrderPlaced` integration message gains optional promotion fields:
+
+```csharp
+public sealed record OrderPlaced(
+    Guid OrderId,
+    Guid CustomerId,
+    IReadOnlyList<OrderLineItem> LineItems,
+    ShippingAddress ShippingAddress,
+    string ShippingMethod,
+    string PaymentMethodToken,
+    decimal TotalAmount,
+    IReadOnlyList<AppliedPromotionRef>? AppliedPromotions,  // NEW
+    DateTimeOffset PlacedAt);
+
+public sealed record AppliedPromotionRef(
+    Guid PromotionId,
+    string? CouponCode,
+    decimal DiscountAmount);
+```
+
+---
+
+## Phase 8: Redemption Recording & Cap Enforcement
+
+```
+Time ─────────────────────────────────────────────────────────────────►
+
+Promotions BC (RabbitMQ handler)      Promotion Aggregate         Coupon Aggregate
+────────────────────────────────      ────────────────────        ────────────────
+OrderPlaced received ───────────────► 🟠 RedemptionRecorded       🟠 CouponRedeemed
+                                        (increment count)          (reservation → committed)
+                                        │
+                                        ├── IF count == cap:
+                                        │   🟠 RedemptionCapReached
+                                        │   🟠 PromotionExpired
+                                        │   📤 PromotionExpired (integration msg)
+```
+
+**Concurrency control:** Marten optimistic concurrency on the Promotion event stream. Two simultaneous `RedemptionRecorded` appends → one gets `ConcurrencyException` → Wolverine retries (standard retry policy). If the retry finds cap reached, the redemption is rejected and the order proceeds at full price.
+
+**Sequential queue (belt-and-suspenders):** For flash-sale scenarios with high contention:
+```csharp
+opts.LocalQueue("promotion-redemption").Sequential();
+```
+
+**Double-soft-reservation fallback:** If between coupon validation and order placement another customer redeemed the same coupon, the order succeeds at full price. The handler returns `CouponAlreadyRedeemed` integration message so Orders BC can record "discount not applied."
+
+---
+
+## Phase 9: Promotion Expires or Is Cancelled
+
+### Path A: Natural Expiration (scheduled message)
+
+```
+Time ─────────────────────────────────────────────────────────────────►
+
+Wolverine Scheduler                   Promotions BC                    Outbound
+───────────────────                   ─────────────                    ────────
+⏱️ ExpirePromotion fires ───────────► 🟠 PromotionExpired             📤 PromotionExpired
+  (stale-guard checks ScheduleId)      (Active → Expired)               (→ Shopping, CE BFF)
+```
+
+### Path B: Admin Cancellation
+
+```
+Admin Portal                          Promotions BC                    Outbound
+────────────                          ─────────────                    ────────
+🔵 CancelPromotion ────────────────► 🟠 PromotionCancelled            📤 PromotionCancelled
+                                        (any non-terminal → Cancelled)    (→ Shopping, CE BFF)
+```
+
+### Path C: Admin Pause / Resume
+
+```
+Admin Portal                          Promotions BC                    Outbound
+────────────                          ─────────────                    ────────
+🔵 PausePromotion ─────────────────► 🟠 PromotionPaused              📤 PromotionPaused
+                                        (Active → Paused)                (→ Shopping, CE BFF)
+        ⋯ investigation ⋯
+🔵 ResumePromotion ────────────────► 🟠 PromotionResumed             📤 PromotionResumed
+                                        (Paused → Active)                (→ Shopping, CE BFF)
+```
+
+---
+
+## Phase 10: Coupon Cleanup (Cascading from Promotion Expiry/Cancellation)
+
+```
+Time ─────────────────────────────────────────────────────────────────►
+
+Promotions BC                         Coupon Aggregates
+─────────────                         ─────────────────
+PromotionExpired handler ────────────► query CouponLookupView
+                                        (WHERE PromotionId = X AND Status = Active)
+                                        │
+                                        ├── 🔵 ExpireCoupon(code1) ──► 🟠 CouponExpired
+                                        ├── 🔵 ExpireCoupon(code2) ──► 🟠 CouponExpired
+                                        ├── ⋯ (fan-out via OutgoingMessages)
+                                        └── 🔵 ExpireCoupon(codeN) ──► 🟠 CouponExpired
+```
+
+**Fan-out pattern:** Cascading coupon expiry uses Wolverine `OutgoingMessages` to emit individual `ExpireCoupon` commands. Each processes independently, avoiding a massive single transaction for promotions with thousands of coupons.
+
+### Admin-Initiated Coupon Revocation (independent of promotion lifecycle)
+
+```
+Admin Portal                          Promotions BC
+────────────                          ─────────────
+🔵 RevokeCoupon(code) ─────────────► 🟠 CouponRevoked (Active → Revoked)
+```
+
+---
+---
+
+# Stage 3: Commands, Queries, and Originating Events
+
+> For each event in the timeline, identify the command or query that produces it, who issues it, and the event(s) emitted.
+
+## Commands → Events (Write Side)
+
+### Promotion Aggregate Commands
+
+| # | Command | Issuer | Event(s) Produced | HTTP Endpoint |
+|---|---------|--------|-------------------|---------------|
+| 1 | `CreatePromotion` | Admin Portal | `PromotionCreated` | `POST /api/promotions` |
+| 2 | `ConfigureDiscountRules` | Admin Portal | `DiscountRulesConfigured` | `PUT /api/promotions/{id}/discount-rules` |
+| 3 | `ConfigureScope` | Admin Portal | `PromotionScopeConfigured` | `PUT /api/promotions/{id}/scope` |
+| 4 | `SetEligibilityRules` | Admin Portal | `EligibilityRulesSet` | `PUT /api/promotions/{id}/eligibility` |
+| 5 | `SetRedemptionLimits` | Admin Portal | `RedemptionLimitsSet` | `PUT /api/promotions/{id}/redemption-limits` |
+| 6 | `GenerateCouponBatch` | Admin Portal | `CouponBatchGenerated` + N × `CouponIssued` (fan-out) | `POST /api/promotions/{id}/coupon-batches` |
+| 7 | `SchedulePromotion` | Admin Portal | `PromotionScheduled` + ⏱️ `ActivatePromotion` scheduled | `POST /api/promotions/{id}/schedule` |
+| 8 | `ActivatePromotion` | Admin Portal _or_ Wolverine Scheduler | `PromotionActivated` + 📤 integration + ⏱️ `ExpirePromotion` scheduled | `POST /api/promotions/{id}/activate` |
+| 9 | `PausePromotion` | Admin Portal | `PromotionPaused` + 📤 integration | `POST /api/promotions/{id}/pause` |
+| 10 | `ResumePromotion` | Admin Portal | `PromotionResumed` + 📤 integration | `POST /api/promotions/{id}/resume` |
+| 11 | `CancelPromotion` | Admin Portal | `PromotionCancelled` + 📤 integration + cascading `ExpireCoupon` | `POST /api/promotions/{id}/cancel` |
+| 12 | `ExpirePromotion` | Wolverine Scheduler | `PromotionExpired` + 📤 integration + cascading `ExpireCoupon` | _(internal command, no HTTP)_ |
+| 13 | `RecordRedemption` | RabbitMQ handler (from `OrderPlaced`) | `RedemptionRecorded` [+ `RedemptionCapReached` + `PromotionExpired`] | _(internal command, no HTTP)_ |
+
+### Coupon Aggregate Commands
+
+| # | Command | Issuer | Event(s) Produced | HTTP Endpoint |
+|---|---------|--------|-------------------|---------------|
+| 14 | `IssueCoupon` | Fan-out from `GenerateCouponBatch` handler | `CouponIssued` | _(internal command, no HTTP)_ |
+| 15 | `ValidateCoupon` | Shopping BC (sync HTTP) | `CouponReserved` _(if valid)_ | `POST /api/promotions/coupons/validate` |
+| 16 | `ReleaseCouponReservation` | Cart timeout / coupon removal | `CouponReservationReleased` | _(internal command, no HTTP)_ |
+| 17 | `RedeemCoupon` | Promotions BC handler (from `RecordRedemption`) | `CouponRedeemed` | _(internal command, no HTTP)_ |
+| 18 | `ExpireCoupon` | Fan-out from promotion expiry handler | `CouponExpired` | _(internal command, no HTTP)_ |
+| 19 | `RevokeCoupon` | Admin Portal | `CouponRevoked` | `DELETE /api/promotions/coupons/{code}` |
+
+### Command Records (C# Definitions)
+
+```csharp
+// ─── Promotion Aggregate Commands ───────────────────────────────────
+
+namespace Promotions.Promotions;
+
+public sealed record CreatePromotion(
+    string Name,
+    string Description,
+    Guid CreatedBy);
+
+public sealed record ConfigureDiscountRules(
+    Guid PromotionId,
+    DiscountType DiscountType,
+    decimal DiscountValue,
+    DiscountApplication DiscountApplication,
+    Guid ConfiguredBy);
+
+public sealed record ConfigureScope(
+    Guid PromotionId,
+    PromotionScope Scope,
+    IReadOnlyList<string>? IncludedSkus,
+    IReadOnlyList<string>? ExcludedSkus,
+    IReadOnlyList<string>? IncludedCategories,
+    Guid ConfiguredBy);
+
+public sealed record SetEligibilityRules(
+    Guid PromotionId,
+    decimal? MinimumOrderAmount,
+    bool? NewCustomersOnly,
+    Guid ConfiguredBy);
+
+public sealed record SetRedemptionLimits(
+    Guid PromotionId,
+    int? RedemptionCap,
+    int MaxUsesPerCustomer,
+    bool AllowsStacking,
+    Guid ConfiguredBy);
+
+public sealed record GenerateCouponBatch(
+    Guid PromotionId,
+    int Count,
+    string? Prefix,
+    int MaxUsesPerCoupon,
+    Guid GeneratedBy);
+
+public sealed record SchedulePromotion(
+    Guid PromotionId,
+    DateTimeOffset StartsAt,
+    DateTimeOffset EndsAt,
+    Guid ScheduledBy);
+
+public sealed record ActivatePromotion(
+    Guid PromotionId,
+    Guid ScheduleId,
+    Guid? ActivatedBy);
+
+public sealed record PausePromotion(
+    Guid PromotionId,
+    string Reason,
+    Guid PausedBy);
+
+public sealed record ResumePromotion(
+    Guid PromotionId,
+    Guid ResumedBy);
+
+public sealed record CancelPromotion(
+    Guid PromotionId,
+    string Reason,
+    Guid CancelledBy);
+
+public sealed record ExpirePromotion(
+    Guid PromotionId,
+    Guid ScheduleId);
+
+public sealed record RecordRedemption(
+    Guid PromotionId,
+    Guid OrderId,
+    Guid CustomerId,
+    string? CouponCode,
+    decimal DiscountApplied,
+    DateTimeOffset PlacedAt);
+
+// ─── Coupon Aggregate Commands ──────────────────────────────────────
+
+namespace Promotions.Coupons;
+
+public sealed record IssueCoupon(
+    string CouponCode,
+    Guid PromotionId,
+    Guid BatchId,
+    int MaxUses,
+    int MaxUsesPerCustomer);
+
+public sealed record ValidateCoupon(
+    string CouponCode,
+    Guid CartId,
+    Guid? CustomerId,
+    IReadOnlyList<CartItemRef> CartItems);
+
+public sealed record CartItemRef(
+    string Sku,
+    int Quantity,
+    decimal UnitPrice);
+
+public sealed record ReleaseCouponReservation(
+    string CouponCode,
+    Guid CartId);
+
+public sealed record RedeemCoupon(
+    string CouponCode,
+    Guid OrderId,
+    Guid CustomerId);
+
+public sealed record ExpireCoupon(
+    string CouponCode);
+
+public sealed record RevokeCoupon(
+    string CouponCode,
+    string Reason,
+    Guid RevokedBy);
+```
+
+## Queries (Read Side)
+
+| # | Query | Issuer | Read Model Used | HTTP Endpoint |
+|---|-------|--------|-----------------|---------------|
+| Q1 | `GetActivePromotions` | CE BFF / Shopping BC | `ActivePromotionsView` | `GET /api/promotions/active` |
+| Q2 | `GetPromotionDetails` | Admin Portal | `PromotionSummaryView` | `GET /api/promotions/{id}` |
+| Q3 | `GetApplicablePromotions` | CE BFF / Shopping BC | `ActivePromotionsView` (filtered by SKUs) | `GET /api/promotions/applicable?skus=X,Y,Z` |
+| Q4 | `CalculateDiscount` | Shopping BC / Orders BC | `ActivePromotionsView` + `CouponLookupView` + Pricing HTTP | `POST /api/promotions/calculate-discount` |
+| Q5 | `GetPromotionCalendar` | Admin Portal | `PromotionCalendarView` | `GET /api/promotions/calendar?from=X&to=Y` |
+| Q6 | `GetCouponStatus` | Admin Portal | `CouponLookupView` | `GET /api/promotions/coupons/{code}` |
+| Q7 | `GetPromotionRedemptions` | Admin Portal | `PromotionSummaryView` | `GET /api/promotions/{id}/redemptions` |
+
+### Query Records (C# Definitions)
+
+```csharp
+namespace Promotions.Promotions;
+
+public sealed record GetActivePromotions;
+
+public sealed record GetPromotionDetails(Guid PromotionId);
+
+public sealed record GetApplicablePromotions(IReadOnlyList<string> Skus);
+
+public sealed record CalculateDiscount(
+    Guid? CustomerId,
+    IReadOnlyList<CartItemRef> Items,
+    IReadOnlyList<string>? CouponCodes,
+    decimal ShippingCost);
+
+public sealed record GetPromotionCalendar(
+    DateTimeOffset From,
+    DateTimeOffset To);
+
+namespace Promotions.Coupons;
+
+public sealed record GetCouponStatus(string CouponCode);
+```
+
+---
+---
+
+# Stage 4: Views and Projections
+
+> What read models support each command and query? Specify Marten projection type, lifecycle, key, and which events drive each projection.
+
+## Projection Summary
+
+| # | Projection | Key Type | Key | Lifecycle | Purpose |
+|---|-----------|----------|-----|-----------|---------|
+| P1 | `ActivePromotionsView` | `Guid` | PromotionId | **Inline** | Hot-path: discount calculation, storefront badges |
+| P2 | `CouponLookupView` | `string` | CouponCode (uppercase) | **Inline** | Hot-path: coupon validation at checkout |
+| P3 | `PromotionSummaryView` | `Guid` | PromotionId | **Async** | Admin dashboard: promotion status + metrics |
+| P4 | `CustomerRedemptionView` | `string` | `"{CustomerId}:{PromotionId}"` | **Inline** | Per-customer usage limit enforcement |
+| P5 | `PromotionCalendarView` | `Guid` | PromotionId | **Async** | Admin: visual calendar of promotion schedule |
+
+---
+
+## P1: `ActivePromotionsView` — Inline Projection
+
+**Purpose:** Fast lookup of currently active promotions for discount calculation and storefront display. Zero-lag required because discount calculations happen in the customer's critical path.
+
+**Projection type:** `MultiStreamProjection<ActivePromotionsView, Guid>` — Guid-keyed, maps directly from Promotion event streams.
+
+```csharp
+namespace Promotions.Promotions;
+
+/// <summary>
+/// Read model for currently active promotions.
+/// Inline projection — zero lag, same transaction as command.
+/// Consumed by: CalculateDiscount endpoint, GetActivePromotions query,
+/// GetApplicablePromotions query.
+/// </summary>
+public sealed record ActivePromotionsView
+{
+    public Guid Id { get; init; }  // PromotionId
+    public string Name { get; init; } = null!;
+    public string? Description { get; init; }
+    public PromotionStatus Status { get; init; }
+    public DiscountType DiscountType { get; init; }
+    public decimal DiscountValue { get; init; }
+    public DiscountApplication DiscountApplication { get; init; }
+    public PromotionScope Scope { get; init; }
+    public IReadOnlyList<string> IncludedSkus { get; init; } = [];
+    public IReadOnlyList<string> ExcludedSkus { get; init; } = [];
+    public IReadOnlyList<string> IncludedCategories { get; init; } = [];
+    public bool AllowsStacking { get; init; }
+    public bool RequiresCouponCode { get; init; }
+    public decimal? MinimumOrderAmount { get; init; }
+    public int? RedemptionCap { get; init; }
+    public int CurrentRedemptionCount { get; init; }
+    public DateTimeOffset StartsAt { get; init; }
+    public DateTimeOffset EndsAt { get; init; }
+    public DateTimeOffset LastUpdatedAt { get; init; }
+}
+
+public sealed class ActivePromotionsViewProjection
+    : MultiStreamProjection<ActivePromotionsView, Guid>
+{
+    public ActivePromotionsViewProjection()
+    {
+        Identity<PromotionCreated>(x => x.PromotionId);
+        Identity<DiscountRulesConfigured>(x => x.PromotionId);
+        Identity<PromotionScopeConfigured>(x => x.PromotionId);
+        Identity<EligibilityRulesSet>(x => x.PromotionId);
+        Identity<RedemptionLimitsSet>(x => x.PromotionId);
+        Identity<PromotionScheduled>(x => x.PromotionId);
+        Identity<PromotionActivated>(x => x.PromotionId);
+        Identity<PromotionPaused>(x => x.PromotionId);
+        Identity<PromotionResumed>(x => x.PromotionId);
+        Identity<PromotionExpired>(x => x.PromotionId);
+        Identity<PromotionCancelled>(x => x.PromotionId);
+        Identity<RedemptionRecorded>(x => x.PromotionId);
+        Identity<RedemptionCapReached>(x => x.PromotionId);
+    }
+
+    public ActivePromotionsView Create(PromotionCreated evt) =>
+        new()
+        {
+            Id = evt.PromotionId,
+            Name = evt.Name,
+            Description = evt.Description,
+            Status = PromotionStatus.Draft,
+            LastUpdatedAt = evt.CreatedAt
+        };
+
+    public static ActivePromotionsView Apply(
+        ActivePromotionsView view, DiscountRulesConfigured evt) =>
+        view with
+        {
+            DiscountType = evt.DiscountType,
+            DiscountValue = evt.DiscountValue,
+            DiscountApplication = evt.DiscountApplication,
+            LastUpdatedAt = evt.ConfiguredAt
+        };
+
+    public static ActivePromotionsView Apply(
+        ActivePromotionsView view, PromotionScopeConfigured evt) =>
+        view with
+        {
+            Scope = evt.Scope,
+            IncludedSkus = evt.IncludedSkus ?? [],
+            ExcludedSkus = evt.ExcludedSkus ?? [],
+            IncludedCategories = evt.IncludedCategories ?? [],
+            LastUpdatedAt = evt.ConfiguredAt
+        };
+
+    public static ActivePromotionsView Apply(
+        ActivePromotionsView view, EligibilityRulesSet evt) =>
+        view with
+        {
+            MinimumOrderAmount = evt.MinimumOrderAmount,
+            LastUpdatedAt = evt.SetAt
+        };
+
+    public static ActivePromotionsView Apply(
+        ActivePromotionsView view, RedemptionLimitsSet evt) =>
+        view with
+        {
+            RedemptionCap = evt.RedemptionCap,
+            AllowsStacking = evt.AllowsStacking,
+            LastUpdatedAt = evt.SetAt
+        };
+
+    public static ActivePromotionsView Apply(
+        ActivePromotionsView view, PromotionScheduled evt) =>
+        view with
+        {
+            Status = PromotionStatus.Scheduled,
+            StartsAt = evt.StartsAt,
+            EndsAt = evt.EndsAt,
+            LastUpdatedAt = evt.ScheduledAt
+        };
+
+    public static ActivePromotionsView Apply(
+        ActivePromotionsView view, PromotionActivated evt) =>
+        view with
+        {
+            Status = PromotionStatus.Active,
+            LastUpdatedAt = evt.ActivatedAt
+        };
+
+    public static ActivePromotionsView Apply(
+        ActivePromotionsView view, PromotionPaused evt) =>
+        view with { Status = PromotionStatus.Paused, LastUpdatedAt = evt.PausedAt };
+
+    public static ActivePromotionsView Apply(
+        ActivePromotionsView view, PromotionResumed evt) =>
+        view with { Status = PromotionStatus.Active, LastUpdatedAt = evt.ResumedAt };
+
+    public static ActivePromotionsView Apply(
+        ActivePromotionsView view, RedemptionRecorded evt) =>
+        view with
+        {
+            CurrentRedemptionCount = evt.NewRedemptionCount,
+            LastUpdatedAt = evt.RecordedAt
+        };
+
+    public static ActivePromotionsView Apply(
+        ActivePromotionsView view, PromotionExpired evt) =>
+        view with { Status = PromotionStatus.Expired, LastUpdatedAt = evt.ExpiredAt };
+
+    public static ActivePromotionsView Apply(
+        ActivePromotionsView view, PromotionCancelled evt) =>
+        view with { Status = PromotionStatus.Cancelled, LastUpdatedAt = evt.CancelledAt };
+}
+```
+
+**Query patterns:**
+- `GetActivePromotions`: `session.Query<ActivePromotionsView>().Where(x => x.Status == Active)`
+- `GetApplicablePromotions(skus)`: Filter by `Scope == AllItems` OR `IncludedSkus.Intersect(skus).Any()`
+- `CalculateDiscount`: Load all Active views, evaluate eligibility per cart item
+
+---
+
+## P2: `CouponLookupView` — Inline Projection
+
+**Purpose:** Fast coupon code validation (hot path during checkout). String-keyed by normalized coupon code, following the Pricing BC `CurrentPriceView` pattern (MultiStreamProjection from Guid streams to string-keyed documents).
+
+```csharp
+namespace Promotions.Coupons;
+
+/// <summary>
+/// Read model for fast coupon code validation.
+/// Inline projection — zero lag, same transaction as command.
+/// Key: CouponCode string (normalized uppercase).
+/// Consumed by: ValidateCoupon endpoint, admin GetCouponStatus query.
+/// </summary>
+public sealed record CouponLookupView
+{
+    public string Id { get; init; } = null!;  // CouponCode (uppercase)
+    public string CouponCode { get; init; } = null!;
+    public Guid CouponId { get; init; }       // UUID v5 stream ID
+    public Guid PromotionId { get; init; }
+    public Guid? BatchId { get; init; }
+    public CouponStatus Status { get; init; }
+    public int MaxUses { get; init; }
+    public int MaxUsesPerCustomer { get; init; }
+    public int CurrentUseCount { get; init; }
+    public Guid? ReservedByCartId { get; init; }
+    public DateTimeOffset? ReservedUntil { get; init; }
+    public DateTimeOffset IssuedAt { get; init; }
+    public DateTimeOffset LastUpdatedAt { get; init; }
+}
+
+public sealed class CouponLookupViewProjection
+    : MultiStreamProjection<CouponLookupView, string>
+{
+    public CouponLookupViewProjection()
+    {
+        // Map Guid event streams → string-keyed documents
+        Identity<CouponIssued>(x => x.CouponCode);
+        Identity<CouponReserved>(x => x.CouponCode);
+        Identity<CouponReservationReleased>(x => x.CouponCode);
+        Identity<CouponRedeemed>(x => x.CouponCode);
+        Identity<CouponExpired>(x => x.CouponCode);
+        Identity<CouponRevoked>(x => x.CouponCode);
+    }
+
+    public CouponLookupView Create(CouponIssued evt) =>
+        new()
+        {
+            Id = evt.CouponCode,
+            CouponCode = evt.CouponCode,
+            CouponId = evt.CouponId,
+            PromotionId = evt.PromotionId,
+            BatchId = evt.BatchId,
+            Status = CouponStatus.Active,
+            MaxUses = evt.MaxUses,
+            MaxUsesPerCustomer = evt.MaxUsesPerCustomer,
+            CurrentUseCount = 0,
+            IssuedAt = evt.IssuedAt,
+            LastUpdatedAt = evt.IssuedAt
+        };
+
+    public static CouponLookupView Apply(CouponLookupView view, CouponReserved evt) =>
+        view with
+        {
+            ReservedByCartId = evt.CartId,
+            ReservedUntil = evt.ReservedUntil,
+            LastUpdatedAt = evt.ReservedAt
+        };
+
+    public static CouponLookupView Apply(CouponLookupView view, CouponReservationReleased evt) =>
+        view with
+        {
+            ReservedByCartId = null,
+            ReservedUntil = null,
+            LastUpdatedAt = evt.ReleasedAt
+        };
+
+    public static CouponLookupView Apply(CouponLookupView view, CouponRedeemed evt) =>
+        view with
+        {
+            CurrentUseCount = evt.NewUseCount,
+            Status = evt.NewUseCount >= view.MaxUses ? CouponStatus.Redeemed : view.Status,
+            ReservedByCartId = null,
+            ReservedUntil = null,
+            LastUpdatedAt = evt.RedeemedAt
+        };
+
+    public static CouponLookupView Apply(CouponLookupView view, CouponExpired evt) =>
+        view with { Status = CouponStatus.Expired, LastUpdatedAt = evt.ExpiredAt };
+
+    public static CouponLookupView Apply(CouponLookupView view, CouponRevoked evt) =>
+        view with { Status = CouponStatus.Revoked, LastUpdatedAt = evt.RevokedAt };
+}
+```
+
+---
+
+## P3: `PromotionSummaryView` — Async Projection
+
+**Purpose:** Admin dashboard — campaign performance metrics. Async is acceptable because admin dashboards tolerate seconds-old data.
+
+```csharp
+namespace Promotions.Promotions;
+
+/// <summary>
+/// Read model for admin promotion management dashboard.
+/// Async projection — eventual consistency (seconds of lag acceptable).
+/// Includes aggregated metrics: redemption count, discount totals.
+/// </summary>
+public sealed record PromotionSummaryView
+{
+    public Guid Id { get; init; }  // PromotionId
+    public string Name { get; init; } = null!;
+    public string? Description { get; init; }
+    public PromotionStatus Status { get; init; }
+    public DiscountType DiscountType { get; init; }
+    public decimal DiscountValue { get; init; }
+    public DiscountApplication DiscountApplication { get; init; }
+    public PromotionScope Scope { get; init; }
+    public bool RequiresCouponCode { get; init; }
+    public int? RedemptionCap { get; init; }
+    public int TotalRedemptions { get; init; }
+    public decimal TotalDiscountAmount { get; init; }
+    public int CouponBatchCount { get; init; }
+    public int TotalCouponsIssued { get; init; }
+    public DateTimeOffset StartsAt { get; init; }
+    public DateTimeOffset EndsAt { get; init; }
+    public Guid CreatedBy { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset LastUpdatedAt { get; init; }
+}
+```
+
+---
+
+## P4: `CustomerRedemptionView` — Inline Projection
+
+**Purpose:** Per-customer usage limit enforcement. Needed at validation time to check "has this customer already used this promotion?" Must be inline for accuracy during concurrent redemptions.
+
+```csharp
+namespace Promotions.Coupons;
+
+/// <summary>
+/// Read model tracking per-customer redemptions against a specific promotion.
+/// Inline projection — zero lag, needed for MaxUsesPerCustomer enforcement.
+/// Key: "{CustomerId}:{PromotionId}" composite string.
+/// </summary>
+public sealed record CustomerRedemptionView
+{
+    public string Id { get; init; } = null!;  // "{CustomerId}:{PromotionId}"
+    public Guid CustomerId { get; init; }
+    public Guid PromotionId { get; init; }
+    public int RedemptionCount { get; init; }
+    public IReadOnlyList<RedemptionEntry> Redemptions { get; init; } = [];
+    public DateTimeOffset LastRedeemedAt { get; init; }
+}
+
+public sealed record RedemptionEntry(
+    Guid OrderId,
+    string? CouponCode,
+    decimal DiscountApplied,
+    DateTimeOffset RedeemedAt);
+```
+
+**Note:** This projection is fed by `RedemptionRecorded` events from the Promotion aggregate. It uses a `MultiStreamProjection<CustomerRedemptionView, string>` with a composite key derived from the event's `CustomerId` and `PromotionId` fields.
+
+---
+
+## P5: `PromotionCalendarView` — Async Projection
+
+**Purpose:** Admin visual calendar of all promotions with their time ranges.
+
+```csharp
+namespace Promotions.Promotions;
+
+/// <summary>
+/// Read model for the admin promotion calendar.
+/// Async projection — dashboard tolerates lag.
+/// </summary>
+public sealed record PromotionCalendarView
+{
+    public Guid Id { get; init; }  // PromotionId
+    public string Name { get; init; } = null!;
+    public PromotionStatus Status { get; init; }
+    public DiscountType DiscountType { get; init; }
+    public decimal DiscountValue { get; init; }
+    public DateTimeOffset StartsAt { get; init; }
+    public DateTimeOffset EndsAt { get; init; }
+    public DateTimeOffset LastUpdatedAt { get; init; }
+}
+```
+
+---
+
+## Projection Registration (Program.cs)
+
+```csharp
+builder.Services.AddMarten(opts =>
+{
+    // ... connection, schema config ...
+
+    opts.Events.StreamIdentity = StreamIdentity.AsGuid;
+
+    // Inline projections (zero lag — customer critical path)
+    opts.Projections.Add<ActivePromotionsViewProjection>(ProjectionLifecycle.Inline);
+    opts.Projections.Add<CouponLookupViewProjection>(ProjectionLifecycle.Inline);
+    opts.Projections.Add<CustomerRedemptionViewProjection>(ProjectionLifecycle.Inline);
+
+    // Aggregate snapshots
+    opts.Projections.Snapshot<Promotion>(SnapshotLifecycle.Inline);
+    opts.Projections.Snapshot<Coupon>(SnapshotLifecycle.Inline);
+
+    // Async projections (admin dashboards — lag acceptable)
+    opts.Projections.Add<PromotionSummaryViewProjection>(ProjectionLifecycle.Async);
+    opts.Projections.Add<PromotionCalendarViewProjection>(ProjectionLifecycle.Async);
+})
+.AddAsyncDaemon(DaemonMode.Solo);
+```
+
+---
+---
+
+# Stage 5: Aggregates
+
+> Finalize aggregate boundaries with events each owns, invariants each enforces, state shape, and Polecat migration considerations.
+
+## Aggregate 1: `Promotion`
+
+**Stream ID:** UUID v7 (time-ordered, new)  
+**Identity:** `StreamIdentity.AsGuid`  
+**Pattern:** Marten event-sourced aggregate with `Create()`/`Apply()` (sealed record, immutable)
+
+### State Shape
+
+```csharp
+namespace Promotions.Promotions;
+
+/// <summary>
+/// Event-sourced aggregate representing a marketing promotion.
+/// Owns discount rules, scope, eligibility, redemption tracking, and lifecycle.
+/// Write-only model: contains only state and Apply() methods.
+/// Business logic resides in handlers using the Decider pattern.
+/// </summary>
+public sealed record Promotion(
+    Guid Id,
+    string Name,
+    string? Description,
+    PromotionStatus Status,
+    DiscountType DiscountType,
+    decimal DiscountValue,
+    DiscountApplication DiscountApplication,
+    PromotionScope Scope,
+    IReadOnlyList<string> IncludedSkus,
+    IReadOnlyList<string> ExcludedSkus,
+    IReadOnlyList<string> IncludedCategories,
+    bool AllowsStacking,
+    bool RequiresCouponCode,
+    decimal? MinimumOrderAmount,
+    bool? NewCustomersOnly,
+    int? RedemptionCap,
+    int CurrentRedemptionCount,
+    int MaxUsesPerCustomer,
+    DateTimeOffset StartsAt,
+    DateTimeOffset EndsAt,
+    Guid? PendingActivationScheduleId,
+    Guid? PendingExpirationScheduleId,
+    int CouponBatchCount,
+    Guid CreatedBy,
+    DateTimeOffset CreatedAt)
+{
+    public bool IsTerminal =>
+        Status is PromotionStatus.Expired or PromotionStatus.Cancelled;
+
+    public bool IsActivatable =>
+        Status is PromotionStatus.Draft or PromotionStatus.Scheduled;
+
+    public bool HasReachedCap =>
+        RedemptionCap.HasValue && CurrentRedemptionCount >= RedemptionCap.Value;
+
+    // ─── Factory ────────────────────────────────────────────────────
+
+    public static Promotion Create(PromotionCreated evt) =>
+        new(Id: evt.PromotionId,
+            Name: evt.Name,
+            Description: evt.Description,
+            Status: PromotionStatus.Draft,
+            DiscountType: default,
+            DiscountValue: 0,
+            DiscountApplication: default,
+            Scope: default,
+            IncludedSkus: [],
+            ExcludedSkus: [],
+            IncludedCategories: [],
+            AllowsStacking: false,
+            RequiresCouponCode: false,
+            MinimumOrderAmount: null,
+            NewCustomersOnly: null,
+            RedemptionCap: null,
+            CurrentRedemptionCount: 0,
+            MaxUsesPerCustomer: 1,
+            StartsAt: default,
+            EndsAt: default,
+            PendingActivationScheduleId: null,
+            PendingExpirationScheduleId: null,
+            CouponBatchCount: 0,
+            CreatedBy: evt.CreatedBy,
+            CreatedAt: evt.CreatedAt);
+
+    // ─── Apply Methods ──────────────────────────────────────────────
+
+    public Promotion Apply(DiscountRulesConfigured evt) =>
+        this with
+        {
+            DiscountType = evt.DiscountType,
+            DiscountValue = evt.DiscountValue,
+            DiscountApplication = evt.DiscountApplication
+        };
+
+    public Promotion Apply(PromotionScopeConfigured evt) =>
+        this with
+        {
+            Scope = evt.Scope,
+            IncludedSkus = evt.IncludedSkus ?? [],
+            ExcludedSkus = evt.ExcludedSkus ?? [],
+            IncludedCategories = evt.IncludedCategories ?? []
+        };
+
+    public Promotion Apply(EligibilityRulesSet evt) =>
+        this with
+        {
+            MinimumOrderAmount = evt.MinimumOrderAmount,
+            NewCustomersOnly = evt.NewCustomersOnly
+        };
+
+    public Promotion Apply(RedemptionLimitsSet evt) =>
+        this with
+        {
+            RedemptionCap = evt.RedemptionCap,
+            MaxUsesPerCustomer = evt.MaxUsesPerCustomer,
+            AllowsStacking = evt.AllowsStacking
+        };
+
+    public Promotion Apply(CouponBatchGenerated evt) =>
+        this with { CouponBatchCount = CouponBatchCount + 1 };
+
+    public Promotion Apply(PromotionScheduled evt) =>
+        this with
+        {
+            Status = PromotionStatus.Scheduled,
+            StartsAt = evt.StartsAt,
+            EndsAt = evt.EndsAt,
+            PendingActivationScheduleId = evt.ActivationScheduleId
+        };
+
+    public Promotion Apply(PromotionActivated evt) =>
+        this with
+        {
+            Status = PromotionStatus.Active,
+            PendingActivationScheduleId = null,
+            PendingExpirationScheduleId = evt.ExpirationScheduleId
+        };
+
+    public Promotion Apply(PromotionPaused evt) =>
+        this with { Status = PromotionStatus.Paused };
+
+    public Promotion Apply(PromotionResumed evt) =>
+        this with { Status = PromotionStatus.Active };
+
+    public Promotion Apply(RedemptionRecorded evt) =>
+        this with { CurrentRedemptionCount = evt.NewRedemptionCount };
+
+    public Promotion Apply(RedemptionCapReached evt) =>
+        this with { Status = PromotionStatus.Expired };
+
+    public Promotion Apply(PromotionExpired evt) =>
+        this with
+        {
+            Status = PromotionStatus.Expired,
+            PendingExpirationScheduleId = null
+        };
+
+    public Promotion Apply(PromotionCancelled evt) =>
+        this with
+        {
+            Status = PromotionStatus.Cancelled,
+            PendingActivationScheduleId = null,
+            PendingExpirationScheduleId = null
+        };
+}
+```
+
+### Owned Events
+
+```csharp
+namespace Promotions.Promotions;
+
+public sealed record PromotionCreated(
+    Guid PromotionId,
+    string Name,
+    string? Description,
+    Guid CreatedBy,
+    DateTimeOffset CreatedAt);
+
+public sealed record DiscountRulesConfigured(
+    Guid PromotionId,
+    DiscountType DiscountType,
+    decimal DiscountValue,
+    DiscountApplication DiscountApplication,
+    Guid ConfiguredBy,
+    DateTimeOffset ConfiguredAt);
+
+public sealed record PromotionScopeConfigured(
+    Guid PromotionId,
+    PromotionScope Scope,
+    IReadOnlyList<string>? IncludedSkus,
+    IReadOnlyList<string>? ExcludedSkus,
+    IReadOnlyList<string>? IncludedCategories,
+    Guid ConfiguredBy,
+    DateTimeOffset ConfiguredAt);
+
+public sealed record EligibilityRulesSet(
+    Guid PromotionId,
+    decimal? MinimumOrderAmount,
+    bool? NewCustomersOnly,
+    Guid SetBy,
+    DateTimeOffset SetAt);
+
+public sealed record RedemptionLimitsSet(
+    Guid PromotionId,
+    int? RedemptionCap,
+    int MaxUsesPerCustomer,
+    bool AllowsStacking,
+    Guid SetBy,
+    DateTimeOffset SetAt);
+
+public sealed record CouponBatchGenerated(
+    Guid PromotionId,
+    Guid BatchId,
+    int Count,
+    string? Prefix,
+    int MaxUsesPerCoupon,
+    Guid GeneratedBy,
+    DateTimeOffset GeneratedAt);
+
+public sealed record PromotionScheduled(
+    Guid PromotionId,
+    DateTimeOffset StartsAt,
+    DateTimeOffset EndsAt,
+    Guid ActivationScheduleId,
+    Guid ScheduledBy,
+    DateTimeOffset ScheduledAt);
+
+public sealed record PromotionActivated(
+    Guid PromotionId,
+    Guid ExpirationScheduleId,
+    Guid? ActivatedBy,
+    DateTimeOffset ActivatedAt);
+
+public sealed record PromotionPaused(
+    Guid PromotionId,
+    string Reason,
+    Guid PausedBy,
+    DateTimeOffset PausedAt);
+
+public sealed record PromotionResumed(
+    Guid PromotionId,
+    Guid ResumedBy,
+    DateTimeOffset ResumedAt);
+
+public sealed record RedemptionRecorded(
+    Guid PromotionId,
+    Guid OrderId,
+    Guid CustomerId,
+    string? CouponCode,
+    decimal DiscountApplied,
+    int NewRedemptionCount,
+    DateTimeOffset RecordedAt);
+
+public sealed record RedemptionCapReached(
+    Guid PromotionId,
+    int FinalRedemptionCount,
+    DateTimeOffset ReachedAt);
+
+public sealed record PromotionExpired(
+    Guid PromotionId,
+    DateTimeOffset ExpiredAt);
+
+public sealed record PromotionCancelled(
+    Guid PromotionId,
+    string Reason,
+    Guid CancelledBy,
+    DateTimeOffset CancelledAt);
+```
+
+### Enums
+
+```csharp
+namespace Promotions.Promotions;
+
+/// <summary>
+/// Lifecycle states of a Promotion aggregate.
+/// </summary>
+public enum PromotionStatus
+{
+    /// <summary>Promotion is being configured. Can be modified.</summary>
+    Draft,
+    /// <summary>Promotion has start/end dates set. Waiting for activation time.</summary>
+    Scheduled,
+    /// <summary>Promotion is live. Customers can use it.</summary>
+    Active,
+    /// <summary>Promotion temporarily suspended by admin.</summary>
+    Paused,
+    /// <summary>Promotion reached its end date or redemption cap. Terminal.</summary>
+    Expired,
+    /// <summary>Promotion permanently ended early by admin. Terminal.</summary>
+    Cancelled
+}
+
+/// <summary>
+/// Phase 1 discount types.
+/// </summary>
+public enum DiscountType
+{
+    PercentageOff,
+    FixedAmountOff,
+    FreeShipping
+}
+
+/// <summary>
+/// How the discount is applied to the order.
+/// </summary>
+public enum DiscountApplication
+{
+    /// <summary>Discount applied once to the entire order.</summary>
+    PerOrder,
+    /// <summary>Discount applied to each eligible line item individually.</summary>
+    PerEligibleItem
+}
+
+/// <summary>
+/// What items the promotion targets.
+/// </summary>
+public enum PromotionScope
+{
+    /// <summary>Promotion applies to all items in the order.</summary>
+    AllItems,
+    /// <summary>Promotion applies only to specified categories.</summary>
+    ByCategory,
+    /// <summary>Promotion applies only to specific SKUs.</summary>
+    BySpecificSkus
+}
+```
+
+### Promotion Invariants
+
+| # | Invariant | Enforcement Point | Error Response |
+|---|-----------|-------------------|----------------|
+| 1 | Status transitions must follow valid paths (no Expired→Active, no Cancelled→anything) | `Before()` in each handler | 400 Bad Request |
+| 2 | `StartsAt < EndsAt` | `SchedulePromotionValidator` | 422 Validation Error |
+| 3 | PercentageOff: `0 < DiscountValue ≤ 100` | `ConfigureDiscountRulesValidator` | 422 Validation Error |
+| 4 | FixedAmountOff: `DiscountValue > 0` | `ConfigureDiscountRulesValidator` | 422 Validation Error |
+| 5 | `CurrentRedemptionCount ≤ RedemptionCap` (when cap set) | `RecordRedemptionHandler.Before()` | Marten ConcurrencyException + retry |
+| 6 | Cannot modify Active/Expired/Cancelled promotion (only Pause, Cancel, or record redemption) | `Before()` in config handlers | 400 Bad Request |
+| 7 | Scope must be non-empty (at least one SKU, category, or AllItems) | `ConfigureScopeValidator` | 422 Validation Error |
+| 8 | If `RequiresCouponCode = true`, at least one batch must exist before activation | `ActivatePromotionHandler.Before()` | 400 Bad Request |
+| 9 | Every mutating command carries a non-empty actor Guid (`CreatedBy`, `ActivatedBy`, etc.) | FluentValidation on each command | 422 Validation Error |
+| 10 | Stale scheduled message guard: `ScheduleId` must match `PendingScheduleId` | `ActivatePromotionHandler.Before()`, `ExpirePromotionHandler.Before()` | No-op (discard) |
+
+### Valid State Transitions
+
+```
+Draft       → Scheduled   (via SchedulePromotion)
+Draft       → Active      (via ActivatePromotion, immediate)
+Draft       → Cancelled   (via CancelPromotion)
+Scheduled   → Active      (via ActivatePromotion, scheduled trigger)
+Scheduled   → Cancelled   (via CancelPromotion)
+Active      → Paused      (via PausePromotion)
+Active      → Expired     (via ExpirePromotion or RedemptionCapReached)
+Active      → Cancelled   (via CancelPromotion)
+Paused      → Active      (via ResumePromotion)
+Paused      → Cancelled   (via CancelPromotion)
+Paused      → Expired     (via ExpirePromotion — scheduled message fires while paused)
+Expired     → (terminal, no transitions)
+Cancelled   → (terminal, no transitions)
+```
+
+---
+
+## Aggregate 2: `Coupon`
+
+**Stream ID:** UUID v5 derived from `"promotions:{couponCode.ToUpperInvariant()}"` (deterministic, case-insensitive, follows Pricing BC pattern)  
+**Identity:** `StreamIdentity.AsGuid`  
+**Pattern:** Marten event-sourced aggregate with `Create()`/`Apply()`
+
+### State Shape
+
+```csharp
+namespace Promotions.Coupons;
+
+/// <summary>
+/// Event-sourced aggregate representing a single redeemable coupon code.
+/// Separate from Promotion because:
+/// 1. Independent lifecycle (issued → reserved → redeemed OR expired/revoked)
+/// 2. Own concurrency boundary (high-traffic validation)
+/// 3. Batch generation creates thousands — cannot be part of Promotion stream
+/// </summary>
+public sealed record Coupon(
+    Guid Id,
+    string CouponCode,
+    Guid PromotionId,
+    Guid? BatchId,
+    CouponStatus Status,
+    int MaxUses,
+    int MaxUsesPerCustomer,
+    int CurrentUseCount,
+    IReadOnlyList<CouponRedemption> Redemptions,
+    Guid? ReservedByCartId,
+    DateTimeOffset? ReservedUntil,
+    DateTimeOffset IssuedAt)
+{
+    public bool IsTerminal =>
+        Status is CouponStatus.Redeemed or CouponStatus.Expired or CouponStatus.Revoked;
+
+    public bool IsAvailable =>
+        Status == CouponStatus.Active && CurrentUseCount < MaxUses;
+
+    public bool IsReservedByOther(Guid cartId) =>
+        ReservedByCartId.HasValue
+        && ReservedByCartId.Value != cartId
+        && ReservedUntil.HasValue
+        && ReservedUntil.Value > DateTimeOffset.UtcNow;
+
+    public bool HasCustomerExceededLimit(Guid customerId) =>
+        Redemptions.Count(r => r.CustomerId == customerId) >= MaxUsesPerCustomer;
+
+    /// <summary>
+    /// Deterministic stream ID from coupon code.
+    /// Follows Pricing BC pattern (UUID v5 from natural key).
+    /// </summary>
+    public static Guid StreamIdFromCode(string couponCode) =>
+        GuidV5.Create("promotions", couponCode.Trim().ToUpperInvariant());
+
+    // ─── Factory ────────────────────────────────────────────────────
+
+    public static Coupon Create(CouponIssued evt) =>
+        new(Id: evt.CouponId,
+            CouponCode: evt.CouponCode,
+            PromotionId: evt.PromotionId,
+            BatchId: evt.BatchId,
+            Status: CouponStatus.Active,
+            MaxUses: evt.MaxUses,
+            MaxUsesPerCustomer: evt.MaxUsesPerCustomer,
+            CurrentUseCount: 0,
+            Redemptions: [],
+            ReservedByCartId: null,
+            ReservedUntil: null,
+            IssuedAt: evt.IssuedAt);
+
+    // ─── Apply Methods ──────────────────────────────────────────────
+
+    public Coupon Apply(CouponReserved evt) =>
+        this with
+        {
+            ReservedByCartId = evt.CartId,
+            ReservedUntil = evt.ReservedUntil
+        };
+
+    public Coupon Apply(CouponReservationReleased evt) =>
+        this with
+        {
+            ReservedByCartId = null,
+            ReservedUntil = null
+        };
+
+    public Coupon Apply(CouponRedeemed evt) =>
+        this with
+        {
+            CurrentUseCount = evt.NewUseCount,
+            Status = evt.NewUseCount >= MaxUses ? CouponStatus.Redeemed : Status,
+            Redemptions = [..Redemptions, new CouponRedemption(
+                evt.CustomerId, evt.OrderId, evt.RedeemedAt)],
+            ReservedByCartId = null,
+            ReservedUntil = null
+        };
+
+    public Coupon Apply(CouponExpired evt) =>
+        this with { Status = CouponStatus.Expired };
+
+    public Coupon Apply(CouponRevoked evt) =>
+        this with { Status = CouponStatus.Revoked };
+}
+```
+
+### Embedded Value Objects
+
+```csharp
+namespace Promotions.Coupons;
+
+public sealed record CouponRedemption(
+    Guid CustomerId,
+    Guid OrderId,
+    DateTimeOffset RedeemedAt);
+```
+
+### UUID v5 Generator
+
+```csharp
+namespace Promotions;
+
+/// <summary>
+/// UUID v5 generator (name-based, SHA-1) for deterministic stream IDs.
+/// Same pattern as Pricing BC's deterministic SKU-based IDs.
+/// </summary>
+public static class GuidV5
+{
+    private static readonly Guid PromotionsNamespace =
+        new("a8e1d7c2-4f3b-5e6a-9d0c-1b2e3f4a5b6c");
+
+    public static Guid Create(string prefix, string name)
+    {
+        var combined = $"{prefix}:{name}";
+        var bytes = System.Text.Encoding.UTF8.GetBytes(combined);
+        using var sha1 = System.Security.Cryptography.SHA1.Create();
+        var hash = sha1.ComputeHash(
+            [..PromotionsNamespace.ToByteArray(), ..bytes]);
+        hash[6] = (byte)((hash[6] & 0x0F) | 0x50); // Version 5
+        hash[8] = (byte)((hash[8] & 0x3F) | 0x80); // Variant RFC 4122
+        return new Guid(hash[..16]);
+    }
+}
+```
+
+### Owned Events
+
+```csharp
+namespace Promotions.Coupons;
+
+public sealed record CouponIssued(
+    Guid CouponId,
+    string CouponCode,
+    Guid PromotionId,
+    Guid? BatchId,
+    int MaxUses,
+    int MaxUsesPerCustomer,
+    DateTimeOffset IssuedAt);
+
+public sealed record CouponReserved(
+    string CouponCode,
+    Guid CartId,
+    Guid? CustomerId,
+    DateTimeOffset ReservedAt,
+    DateTimeOffset ReservedUntil);
+
+public sealed record CouponReservationReleased(
+    string CouponCode,
+    Guid CartId,
+    DateTimeOffset ReleasedAt);
+
+public sealed record CouponRedeemed(
+    string CouponCode,
+    Guid OrderId,
+    Guid CustomerId,
+    int NewUseCount,
+    DateTimeOffset RedeemedAt);
+
+public sealed record CouponExpired(
+    string CouponCode,
+    Guid PromotionId,
+    DateTimeOffset ExpiredAt);
+
+public sealed record CouponRevoked(
+    string CouponCode,
+    string Reason,
+    Guid RevokedBy,
+    DateTimeOffset RevokedAt);
+```
+
+### Coupon Status Enum
+
+```csharp
+namespace Promotions.Coupons;
+
+/// <summary>
+/// Lifecycle states of a Coupon aggregate.
+/// </summary>
+public enum CouponStatus
+{
+    /// <summary>Coupon is available for use.</summary>
+    Active,
+    /// <summary>Coupon has reached its max uses. Terminal.</summary>
+    Redeemed,
+    /// <summary>Parent promotion expired. Terminal.</summary>
+    Expired,
+    /// <summary>Admin revoked the coupon. Terminal.</summary>
+    Revoked
+}
+```
+
+### Coupon Invariants
+
+| # | Invariant | Enforcement Point | Error Response |
+|---|-----------|-------------------|----------------|
+| 1 | Cannot redeem beyond `MaxUses` (`CurrentUseCount < MaxUses`) | `RedeemCouponHandler.Before()` | Coupon fully redeemed — order proceeds at full price |
+| 2 | Cannot redeem after parent Promotion expired/cancelled | `ValidateCouponHandler` checks `ActivePromotionsView` | HTTP 200 with `IsValid = false` |
+| 3 | Revoked/Expired/Redeemed coupons are terminal | `Before()` in all mutation handlers | 400 Bad Request |
+| 4 | Code uniqueness enforced by UUID v5 stream ID | Marten stream identity | `ConcurrencyException` if stream exists |
+| 5 | Per-customer limit: `Redemptions.Count(c => c.CustomerId == X) < MaxUsesPerCustomer` | `ValidateCouponHandler` and `RedeemCouponHandler` | Validation error / order at full price |
+| 6 | Reservation: cannot reserve if already reserved by another cart (unless expired) | `ValidateCouponHandler.Before()` | HTTP 200 with `IsValid = false, Reason = "Coupon is currently in use"` |
+
+---
+
+## Non-Aggregate: Discount Calculation Engine (Stateless)
+
+**Not an aggregate.** Pure function with no state, no events, no stream.
+
+```csharp
+namespace Promotions.Discounts;
+
+/// <summary>
+/// Stateless discount calculation engine.
+/// Pure function: (cart items, active promotions, coupons, floor prices) → discount breakdown.
+/// Called at cart display time and checkout finalization.
+/// No events emitted. No state stored.
+/// </summary>
+public static class DiscountCalculator
+{
+    public static DiscountBreakdown Calculate(
+        IReadOnlyList<CartItemRef> items,
+        IReadOnlyList<ActivePromotionsView> activePromotions,
+        IReadOnlyList<CouponLookupView> appliedCoupons,
+        IReadOnlyDictionary<string, decimal?> floorPrices,
+        decimal shippingCost)
+    {
+        // Phase 1: No stacking — highest discount wins per item
+        // 1. Evaluate auto-applied promotions (RequiresCouponCode = false)
+        // 2. Evaluate coupon-linked promotions
+        // 3. For each item, select best discount
+        // 4. Clamp: ensure (UnitPrice - discount) >= FloorPrice
+        // 5. Handle FreeShipping separately (overlay on shipping cost)
+        // 6. Return breakdown
+
+        // Implementation deferred to cycle plan
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Response from discount calculation. Immutable snapshot of computed discounts.
+/// </summary>
+public sealed record DiscountBreakdown(
+    decimal TotalDiscount,
+    decimal DiscountedShippingCost,
+    IReadOnlyList<LineItemDiscount> LineItemDiscounts,
+    IReadOnlyList<AppliedPromotionSummary> AppliedPromotions);
+
+public sealed record LineItemDiscount(
+    string Sku,
+    decimal OriginalUnitPrice,
+    decimal DiscountAmount,
+    decimal EffectiveUnitPrice,
+    Guid PromotionId,
+    string PromotionName);
+
+public sealed record AppliedPromotionSummary(
+    Guid PromotionId,
+    string Name,
+    DiscountType DiscountType,
+    decimal DiscountValue,
+    string? CouponCode,
+    decimal TotalDiscountApplied);
+```
+
+---
+
+## Polecat Migration Considerations
+
+| Concern | Current (Marten) Design | Polecat Migration Path |
+|---------|-------------------------|------------------------|
+| **Aggregates** | Sealed records with `Create()`/`Apply()` via JasperFx.Events interfaces | ✅ Direct port — JasperFx.Events is shared abstraction |
+| **Events** | Plain sealed records, no Marten-specific attributes | ✅ Direct port — no infrastructure coupling |
+| **Inline projections** | `MultiStreamProjection<T, TId>` base class | ✅ Shared JasperFx.Events base class |
+| **Async projections** | Marten async daemon (`DaemonMode.Solo`) | ⚠️ Polecat has own async projection mechanism — requires config change |
+| **Document store** | Marten JSONB documents for read models | ⚠️ Polecat uses SQL Server — EF Core read models instead |
+| **Schema isolation** | `opts.DatabaseSchemaName = "promotions"` | ⚠️ SQL Server schema equivalent needed |
+| **UUID v5 stream ID** | `GuidV5.Create()` in domain code | ✅ Infrastructure-agnostic, pure C# |
+| **`DiscountCalculator`** | Pure function, no infrastructure dependency | ✅ Zero migration effort |
+
+**Key design rule:** No PostgreSQL-specific JSONB queries in handler code. Use Marten's LINQ API (which JasperFx.Events also supports). All business logic in pure functions. Infrastructure at the edges only.
+
+---
+---
+
+# Stage 6: Domain Events vs. Integration Messages
+
+> Distinguish internal domain events from cross-BC integration messages. For each integration message, identify owning BC, direction, and integration strategy.
+
+## Domain Events (Internal to Promotions BC)
+
+These events are **private** to the Promotions event store. They are NOT published to other BCs. They drive aggregate state transitions and Marten projections.
+
+### Promotion Stream Events
+
+| Event | Purpose | Drives Projections |
+|-------|---------|-------------------|
+| `PromotionCreated` | Aggregate creation (Draft) | P1, P3, P5 |
+| `DiscountRulesConfigured` | Discount type/value/application set | P1, P3, P5 |
+| `PromotionScopeConfigured` | Target SKUs/categories set | P1 |
+| `EligibilityRulesSet` | Min order amount, customer rules | P1 |
+| `RedemptionLimitsSet` | Cap, per-customer limit, stacking | P1, P3 |
+| `CouponBatchGenerated` | Batch metadata recorded | P3 |
+| `PromotionScheduled` | Start/end dates + scheduled message ID | P1, P3, P5 |
+| `PromotionActivated` | Transition to Active | P1, P3, P5 |
+| `PromotionPaused` | Transition to Paused | P1, P3, P5 |
+| `PromotionResumed` | Transition to Active (from Paused) | P1, P3, P5 |
+| `RedemptionRecorded` | Increment count + track order | P1, P3, P4 |
+| `RedemptionCapReached` | Cap hit, triggers expiry | P1, P3 |
+| `PromotionExpired` | Terminal state | P1, P3, P5 |
+| `PromotionCancelled` | Terminal state | P1, P3, P5 |
+
+### Coupon Stream Events
+
+| Event | Purpose | Drives Projections |
+|-------|---------|-------------------|
+| `CouponIssued` | Coupon created, ready for use | P2 |
+| `CouponReserved` | Soft-hold during checkout | P2 |
+| `CouponReservationReleased` | Hold released (timeout/removal) | P2 |
+| `CouponRedeemed` | Order confirmed, coupon committed | P2, P4 |
+| `CouponExpired` | Parent promotion expired | P2 |
+| `CouponRevoked` | Admin revocation | P2 |
+
+---
+
+## Integration Messages (Cross-BC, in `Messages.Contracts`)
+
+### Messages Published BY Promotions BC
+
+| # | Message | Target BC(s) | Strategy | Queue | Trigger |
+|---|---------|-------------|----------|-------|---------|
+| I1 | `PromotionActivated` | Shopping, CE BFF | **Async RabbitMQ** | `promotion-lifecycle-events` | Domain event `PromotionActivated` |
+| I2 | `PromotionExpired` | Shopping, CE BFF | **Async RabbitMQ** | `promotion-lifecycle-events` | Domain event `PromotionExpired` |
+| I3 | `PromotionCancelled` | Shopping, CE BFF | **Async RabbitMQ** | `promotion-lifecycle-events` | Domain event `PromotionCancelled` |
+| I4 | `PromotionPaused` | Shopping, CE BFF | **Async RabbitMQ** | `promotion-lifecycle-events` | Domain event `PromotionPaused` |
+| I5 | `PromotionResumed` | Shopping, CE BFF | **Async RabbitMQ** | `promotion-lifecycle-events` | Domain event `PromotionResumed` |
+
+### Messages Consumed BY Promotions BC
+
+| # | Message | Source BC | Strategy | Queue | Handler |
+|---|---------|----------|----------|-------|---------|
+| I6 | `OrderPlaced` (with `AppliedPromotions`) | Orders | **Async RabbitMQ** | `promotions-order-placed` | `OrderPlacedHandler` → `RecordRedemption` + `RedeemCoupon` |
+
+### Synchronous HTTP Contracts (Request/Response, NOT integration messages)
+
+| # | Endpoint | Caller | Callee | Purpose |
+|---|----------|--------|--------|---------|
+| H1 | `POST /api/promotions/coupons/validate` | Shopping BC | Promotions BC | Coupon validation (customer waiting) |
+| H2 | `POST /api/promotions/calculate-discount` | Shopping BC / Orders BC | Promotions BC | Discount calculation for cart/checkout |
+| H3 | `GET /api/pricing/{sku}` | Promotions BC | Pricing BC | Floor price lookup (clamp discounts) |
+| H4 | `GET /api/pricing/bulk?skus=X,Y,Z` | Promotions BC | Pricing BC | Bulk floor price lookup |
+
+---
+
+### Integration Message Records (in `src/Shared/Messages.Contracts/Promotions/`)
+
+```csharp
+namespace Messages.Contracts.Promotions;
+
+/// <summary>
+/// Integration message published by Promotions BC when a promotion goes live.
+/// Consumed by Shopping BC (update cart-level badges, evaluate auto-applied promotions)
+/// and Customer Experience BFF (display sale badges, toast notifications).
+/// </summary>
+public sealed record PromotionActivated(
+    Guid PromotionId,
+    string Name,
+    string DiscountType,
+    decimal DiscountValue,
+    string DiscountApplication,
+    string Scope,
+    IReadOnlyList<string> IncludedSkus,
+    IReadOnlyList<string> IncludedCategories,
+    bool RequiresCouponCode,
+    DateTimeOffset StartsAt,
+    DateTimeOffset EndsAt,
+    DateTimeOffset ActivatedAt);
+
+/// <summary>
+/// Integration message published by Promotions BC when a promotion reaches its end date
+/// or redemption cap. Consumed by Shopping BC (remove auto-applied discounts from active
+/// carts) and Customer Experience BFF (remove sale badges).
+/// </summary>
+public sealed record PromotionExpired(
+    Guid PromotionId,
+    string Name,
+    string Reason,
+    DateTimeOffset ExpiredAt);
+
+/// <summary>
+/// Integration message published by Promotions BC when an admin cancels a promotion.
+/// Same consumers as PromotionExpired. Distinct event for audit trail.
+/// </summary>
+public sealed record PromotionCancelled(
+    Guid PromotionId,
+    string Name,
+    string Reason,
+    Guid CancelledBy,
+    DateTimeOffset CancelledAt);
+
+/// <summary>
+/// Integration message published by Promotions BC when an admin pauses a promotion.
+/// Shopping BC should stop applying this promotion to new carts.
+/// Existing cart applications remain until cart expires or checkout completes.
+/// </summary>
+public sealed record PromotionPaused(
+    Guid PromotionId,
+    string Name,
+    DateTimeOffset PausedAt);
+
+/// <summary>
+/// Integration message published by Promotions BC when an admin resumes a paused promotion.
+/// Shopping BC can resume applying this promotion.
+/// </summary>
+public sealed record PromotionResumed(
+    Guid PromotionId,
+    string Name,
+    DateTimeOffset ResumedAt);
+```
+
+### HTTP Contract Records (Sync Request/Response)
+
+```csharp
+namespace Promotions.Coupons;
+
+/// <summary>
+/// Response from coupon validation endpoint.
+/// NOT an integration message — this is an HTTP response body.
+/// </summary>
+public sealed record CouponValidationResult(
+    string CouponCode,
+    bool IsValid,
+    string? InvalidReason,
+    Guid? PromotionId,
+    string? PromotionName,
+    string? DiscountType,
+    decimal? DiscountValue,
+    string? DiscountApplication,
+    IReadOnlyList<string>? EligibleSkus);
+```
+
+---
+
+## Integration Flow Diagram
+
+```
+                     ┌──────────────┐
+                     │  Admin Portal│
+                     │     (BFF)    │
+                     └──────┬───────┘
+                            │ HTTP commands
+                            ▼
+┌──────────┐  sync HTTP  ┌──────────────┐  async RabbitMQ  ┌──────────┐
+│ Shopping  │◄───────────►│  Promotions  │────────────────►│  CE BFF  │
+│    BC     │  validate   │     BC       │  lifecycle       │          │
+│           │  calculate  │              │  events          │          │
+└──────────┘              └──────┬───────┘                  └──────────┘
+                                │ sync HTTP
+                                ▼
+                         ┌──────────────┐
+                         │  Pricing BC  │
+                         │ (floor price)│
+                         └──────────────┘
+                                ▲
+     ┌──────────┐  async       │
+     │ Orders   │──────────────┘
+     │   BC     │ OrderPlaced
+     └──────────┘ (RabbitMQ → Promotions)
+```
+
+---
+
+## Critical Design Decisions Summary
+
+| # | Decision | Chosen Option | Rationale |
+|---|----------|---------------|-----------|
+| 1 | Promotion stream ID | UUID v7 | Time-ordered, no natural key, follows new-aggregate convention |
+| 2 | Coupon stream ID | UUID v5 from code | Deterministic lookup by code, case-insensitive, follows Pricing BC pattern |
+| 3 | Coupon validation | Sync HTTP | Customer waiting for instant feedback — async unacceptable |
+| 4 | Redemption recording | Async RabbitMQ | Order already placed, no customer waiting |
+| 5 | Coupon reservation | Soft-hold with TTL on Coupon aggregate | Prevents double-validation race; fallback: order at full price |
+| 6 | Floor price enforcement | At calculation time (sync HTTP to Pricing) | Runtime clamp, not design-time constraint |
+| 7 | Stacking (Phase 1) | No stacking — highest discount wins | Simplicity; stacking engine deferred to Phase 2 |
+| 8 | Category scope | Snapshot at creation time (resolved to SKU list) | Avoids cross-BC coupling; known limitation for Phase 1 |
+| 9 | Promotion auto-activation | Wolverine `ScheduleAsync` with stale-message guard | Proven pattern (Returns BC `ExpireReturn`, Pricing BC scheduled price) |
+| 10 | Coupon cascade expiry | Fan-out via `OutgoingMessages` | Avoids massive single transaction for promotions with thousands of coupons |
+| 11 | Polecat | Design infrastructure-agnostic; ADR before adoption | Aggregates use JasperFx.Events interfaces; no PostgreSQL-specific queries in handlers |
+| 12 | Money VO | Copy from Pricing BC (Phase 1) | BC isolation; extract to shared kernel if third BC needs it |
+| 13 | Port allocation | 5249 | Next sequential port per CLAUDE.md convention |
+
+---
+
+## Appendix: Mapping Domain Events → Integration Messages
+
+Not every domain event becomes an integration message. Most events are private to the Promotions event store. Only **lifecycle transitions that other BCs need to react to** cross the boundary.
+
+| Domain Event | Published as Integration Message? | Why / Why Not |
+|---|---|---|
+| `PromotionCreated` | ❌ No | Draft promotions are internal; no external BC cares about drafts |
+| `DiscountRulesConfigured` | ❌ No | Configuration detail; only matters at calculation time |
+| `PromotionScopeConfigured` | ❌ No | Configuration detail |
+| `EligibilityRulesSet` | ❌ No | Configuration detail |
+| `RedemptionLimitsSet` | ❌ No | Configuration detail |
+| `CouponBatchGenerated` | ❌ No | Internal batch tracking |
+| `PromotionScheduled` | ❌ No | Not yet active; Shopping BC doesn't need to know until activation |
+| `PromotionActivated` | ✅ **Yes** | Shopping BC updates badges, CE BFF shows notifications |
+| `PromotionPaused` | ✅ **Yes** | Shopping BC stops applying this promotion |
+| `PromotionResumed` | ✅ **Yes** | Shopping BC resumes applying |
+| `RedemptionRecorded` | ❌ No | Internal bookkeeping |
+| `RedemptionCapReached` | ❌ No | Triggers `PromotionExpired` which IS published |
+| `PromotionExpired` | ✅ **Yes** | Shopping BC removes discounts, CE BFF removes badges |
+| `PromotionCancelled` | ✅ **Yes** | Same as Expired but with admin attribution |
+| `CouponIssued` | ❌ No | Internal coupon lifecycle |
+| `CouponReserved` | ❌ No | Internal reservation tracking |
+| `CouponReservationReleased` | ❌ No | Internal |
+| `CouponRedeemed` | ❌ No | Internal; Orders BC already knows about the discount |
+| `CouponExpired` | ❌ No | Cascading from promotion expiry; Shopping already got `PromotionExpired` |
+| `CouponRevoked` | ❌ No | Internal admin action; no external BC reaction needed |
+
+---
+
+*Stages 2–6 complete. This event model is ready for implementation planning and cycle scoping.*
