@@ -43,7 +43,21 @@
 1. ✅ Created project structure (Promotions domain + Promotions.Api + Promotions.IntegrationTests)
 2. ✅ Added projects to solution files (.sln and .slnx)
 3. ✅ Configured .csproj files with proper package references (Central Package Management)
-4. ⏳ Starting core domain implementation...
+4. ✅ Created Constants.cs and AssemblyAttributes.cs
+5. ✅ Created domain enums (PromotionStatus, CouponStatus, DiscountType)
+6. ✅ Created domain events:
+   - Promotion: PromotionCreated, PromotionActivated, PromotionPaused, PromotionResumed, PromotionCancelled, PromotionExpired
+   - Coupon: CouponIssued, CouponRedeemed, CouponRevoked, CouponExpired
+7. ✅ Created Promotion aggregate with UUID v7 and Apply methods
+8. ✅ Created Coupon aggregate with UUID v5 (deterministic from code) and Apply methods
+9. ✅ Implemented CreatePromotion command, validator, and handler
+10. ✅ Implemented ActivatePromotion command, validator, and handler
+11. ✅ Implemented IssueCoupon command, validator, and handler
+12. ✅ Configured Program.cs with Marten + Wolverine + RabbitMQ
+13. ✅ Configured appsettings.json with connection strings
+14. ✅ Configured launchSettings.json with port 5250
+15. ✅ Domain project builds successfully (0 warnings, 0 errors)
+16. ✅ API project builds successfully (0 warnings, 0 errors)
 
 ### Lessons Learned
 
@@ -87,13 +101,16 @@ None yet.
 
 ### Next Steps
 
-1. Create Constants.cs and AssemblyAttributes.cs
-2. Create domain events (PromotionCreated, PromotionActivated, CouponIssued, etc.)
-3. Create Promotion and Coupon aggregates with Apply methods
-4. Create command handlers (CreatePromotion, ActivatePromotion, IssueCoupon)
-5. Create ValidateCoupon query endpoint
-6. Configure Program.cs with Marten + Wolverine
-7. Write integration tests
+**Completed in this session** — Core domain layer is fully implemented and compiling.
+
+**Remaining for Phase 1 MVP:**
+1. Implement ValidateCoupon query endpoint (read coupon aggregate + parent promotion)
+2. Create CouponLookupView Marten projection (for quick lookups without event replay)
+3. Create PromotionsTestFixture with Alba + TestContainers
+4. Write integration tests for promotion lifecycle
+5. Build entire solution and run all tests
+6. Update CLAUDE.md port allocation table
+7. Update CONTEXTS.md with Promotions BC entry
 
 ---
 
