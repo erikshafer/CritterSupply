@@ -215,11 +215,55 @@ None yet.
    - **Solution:** Read Shopping BC tests which query aggregates directly instead of tracking events
    - **Key Insight:** For aggregate lifecycle tests, verify state via `session.Query<T>()` or `session.Events.AggregateStreamAsync<T>()`, not via event tracking
 
-3. **Marten Snapshot Projection Requirement**
+3. **Marten Snapshot Projection Requirement** ⭐ **Critical Pattern**
    - **Problem:** `session.Query<Promotion>()` returned empty even after successful command execution
    - **Root Cause:** Marten doesn't automatically make aggregates queryable - needs explicit projection configuration
    - **Solution:** Added `opts.Projections.Snapshot<T>(SnapshotLifecycle.Inline)` for both aggregates
    - **Key Insight:** Event-sourced aggregates need snapshot projections to be queryable via LINQ, same as Shopping/Cart pattern
+
+   **🔍 Discoverability Note for Future Reference:**
+
+   This is a **recurring pattern across all event-sourced BCs** and a common pitfall:
+
+   **Symptom:**
+   ```csharp
+   // After successful command execution:
+   await _fixture.ExecuteAndWaitAsync(new CreatePromotion(...));
+
+   // Query returns empty/null:
+   var promotions = await session.Query<Promotion>().ToListAsync();
+   // promotions.Count == 0 ❌
+   ```
+
+   **Diagnosis:**
+   - Events are being stored (verify via `mt_events` table or Wolverine tracking)
+   - Aggregate can be loaded via `session.Events.AggregateStreamAsync<T>()` ✅
+   - BUT `session.Query<T>()` returns nothing ❌
+   - Missing snapshot projection configuration
+
+   **Solution:**
+   ```csharp
+   // In Program.cs Marten configuration:
+   builder.Services.AddMarten(opts =>
+   {
+       opts.Connection(connectionString);
+
+       // Configure snapshots for queryable aggregates
+       opts.Projections.Snapshot<Promotion>(SnapshotLifecycle.Inline);
+       opts.Projections.Snapshot<Coupon>(SnapshotLifecycle.Inline);
+   });
+   ```
+
+   **Why This Works:**
+   - Snapshot projections create `mt_doc_<aggregate>` tables
+   - Inline lifecycle = zero-lag updates in same transaction
+   - Makes aggregates queryable via `session.Query<T>()`
+   - Same pattern used in Shopping (Cart), Orders (Checkout), Returns (Return), Pricing (ProductPrice)
+
+   **Reference:**
+   - Pattern documented in `docs/skills/marten-event-sourcing.md` (Snapshot Strategies section)
+   - Shopping BC reference: `src/Shopping/Shopping.Api/Program.cs:45-46`
+   - This retrospective: Promotions BC implementation (Session 2)
 
 4. **Alba Global Using Directive**
    - **Problem:** Build errors for `IAlbaHost`, `Scenario`, `IScenarioResult` types
