@@ -3,8 +3,8 @@
 **Date:** 2026-03-15
 **Status:** 🟢 Complete (All 10 Stages)
 **Participants:** Principal Software Architect, Product Owner, UX Engineer
-**Related:** [pricing-promotions-domain-spike.md](spikes/pricing-promotions-domain-spike.md), [pricing-event-modeling.md](pricing-event-modeling.md), [CONTEXTS.md](../../CONTEXTS.md#promotions)
-**Prerequisite:** Pricing BC Phase 1 ✅ Complete (Cycle 21-22)
+**Related:** [pricing-promotions-domain-spike.md](spikes/pricing-promotions-domain-spike.md), [pricing-event-modeling.md](pricing-event-modeling.md), [CONTEXTS.md](../../CONTEXTS.md#promotions), [ADR 0031](../../docs/decisions/0031-admin-portal-rbac-model.md)
+**Prerequisite:** Pricing BC Phase 1 ✅ Complete (Cycle 21-22), Admin Identity BC ✅ Complete (Cycle 29 Phase 1)
 
 ---
 
@@ -428,12 +428,17 @@ public sealed record AppliedPromotion(
 - RevokeCoupon
 - ExtendPromotionEndDate (new, not in spike)
 
-**RBAC concern:** Admin Portal needs role-based access control. Who can create promotions? Who can activate them? The cycle plan mentions "RBAC ADR for Admin Portal to be authored during Cycle 29." **This ADR should define promotion-specific roles:**
-- `PromotionManager` — full CRUD on promotions
-- `PromotionViewer` — read-only access to promotion analytics
-- `CouponManager` — generate batches, revoke coupons
+**RBAC model (resolved — ADR 0031, implemented in Cycle 29 Phase 1):** Admin Identity BC now provides JWT-based authentication with 7 defined roles. Promotions management maps to the **`PricingManager`** role, which is authorized via the `PricingManagerOrAbove` composite policy (includes `PricingManager`, `OperationsManager`, `SystemAdmin`).
 
-**Phase 1 simplification:** No RBAC. Any authenticated admin can do anything. RBAC deferred to Admin Portal cycle.
+Per ADR 0031, every Promotions command must include a `Guid AdminUserId` field extracted from the JWT `sub` claim at the Admin Portal gateway. This enables the immutable audit trail in the event stream (e.g., `PromotionCreated.CreatedByAdminUserId`).
+
+**Key integration details:**
+- **Auth issuer:** Admin Identity BC at port `5249`
+- **JWT claim:** `"role": "PricingManager"` (single role per user, Phase 1)
+- **Policy:** `[Authorize(Policy = "PricingManagerOrAbove")]` on Admin Portal endpoints
+- **Audit:** `httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)` → `AdminUserId` on all commands
+
+> **Note:** The Admin Portal BFF is not yet implemented. In Promotions BC Phase 1, admin commands can be invoked directly against the Promotions API (no RBAC enforcement). RBAC is enforced at the Admin Portal gateway layer when it is built. Promotions BC itself trusts the `AdminUserId` it receives.
 
 #### 5i. Promotions BC ← Pricing BC (Price Change Notifications)
 
@@ -895,14 +900,15 @@ Promotions BC gets its own PostgreSQL schema. Isolated from all other BCs. Same 
 
 #### 11d. Port Allocation
 
-CritterSupply uses specific port ranges per BC (see CLAUDE.md port allocation table). Current assignments end at Correspondence (5248). Next available ports:
+CritterSupply uses specific port ranges per BC (see CLAUDE.md port allocation table). Current assignments:
 
 | BC | Port | Status |
 |---|---|---|
 | Correspondence | 5248 | ✅ Assigned (Cycle 28) |
-| **Promotions** | **5249** | 📋 **Proposed** (Cycle 29) |
+| Admin Identity | 5249 | ✅ Assigned (Cycle 29 Phase 1) |
+| **Promotions** | **5250** | 📋 **Proposed** (Cycle 29 Phase 2) |
 
-**Proposed:** Promotions.Api → port **5249** (next sequential port per CLAUDE.md convention — increment by 1 for each new BC)
+> **Updated after Cycle 29 Phase 1 merge (PR #375):** Admin Identity BC was assigned port 5249. Promotions moves to port **5250** (next sequential port per CLAUDE.md convention).
 
 #### 11e. Project Structure
 
@@ -1028,7 +1034,7 @@ These items need input from Product Owner, UX Engineer, and QA before the event 
 | Aggregate in wrong BC requiring migration (Checkout, Cycle 8) | Promotion and Coupon aggregates stay in Promotions BC — discount calculation is a query, not an aggregate |
 | Missing `ChangedBy` actor ID in commands (Order saga gap) | Every command carries `Guid ChangedBy` or `Guid ActivatedBy` — FluentValidation rejects `Guid.Empty` |
 | Deferring integration tests to manual testing (Cycle 18) | Alba integration tests written before any manual testing |
-| Port conflicts in launchSettings.json | Reserve port 5249 before writing any code |
+| Port conflicts in launchSettings.json | Reserve port 5250 before writing any code (5249 taken by Admin Identity) |
 | Forgetting to add projects to `.sln` and `.slnx` files | Add Promotions and Promotions.Api to both solution files immediately |
 | `NullReferenceException` in handlers without null aggregate checks | `Before()` method always checks for null aggregate |
 
@@ -2810,7 +2816,7 @@ public sealed record CouponValidationResult(
 | 10 | Coupon cascade expiry | Fan-out via `OutgoingMessages` | Avoids massive single transaction for promotions with thousands of coupons |
 | 11 | Polecat | Design infrastructure-agnostic; ADR before adoption | Aggregates use JasperFx.Events interfaces; no PostgreSQL-specific queries in handlers |
 | 12 | Money VO | Copy from Pricing BC (Phase 1) | BC isolation; extract to shared kernel if third BC needs it |
-| 13 | Port allocation | 5249 | Next sequential port per CLAUDE.md convention |
+| 13 | Port allocation | 5250 | Next sequential port per CLAUDE.md convention (5249 assigned to Admin Identity BC) |
 
 ---
 
@@ -3522,7 +3528,7 @@ public sealed record AppliedPromotionRef(
 
 ## 10.3 Implementation Phasing
 
-### Phase 1 — Cycle 29: Core Promotions Engine (4-5 weeks)
+### Phase 1 — Cycle 29 Phase 2: Core Promotions Engine (4-5 weeks)
 
 **Objective:** Stand up the Promotions BC with coupon validation, discount calculation, and basic promotion lifecycle — the minimum viable feature set that unblocks Shopping BC cart discounts.
 
@@ -3530,7 +3536,7 @@ public sealed record AppliedPromotionRef(
 
 | # | Deliverable | Aggregates/Components | Priority |
 |---|------------|----------------------|----------|
-| 1 | **Project scaffolding** | Solution structure, `Program.cs`, Marten/Wolverine config, port 5249, Docker Compose, test project | P0 |
+| 1 | **Project scaffolding** | Solution structure, `Program.cs`, Marten/Wolverine config, port 5250, Docker Compose, test project | P0 |
 | 2 | **Promotion aggregate** (core lifecycle) | `CreatePromotion`, `ConfigureDiscountRules`, `ConfigurePromotionScope`, `SetEligibilityRules`, `SetRedemptionLimits` | P0 |
 | 3 | **Promotion scheduling** | `SchedulePromotion`, `ActivatePromotion`, `ExpirePromotion` with scheduled messages | P0 |
 | 4 | **Coupon aggregate** (full lifecycle) | `IssueCoupon`, `ValidateCoupon`, `RedeemCoupon`, `ExpireCoupon`, `CouponReserved`, `CouponReservationReleased` | P0 |
@@ -3554,7 +3560,7 @@ public sealed record AppliedPromotionRef(
 - ✅ All 3 inline projections operational
 - ✅ Integration tests pass with Testcontainers
 
-**Estimated effort:** 4-5 weeks (aligns with Cycle 29 scope)
+**Estimated effort:** 4-5 weeks (aligns with Cycle 29 Phase 2 scope)
 
 ---
 
@@ -3612,9 +3618,10 @@ Phase 1 Prerequisites (must exist before Promotions BC):
   ├── Pricing BC (Cycles 22-23) ✅ — floor price API
   ├── Product Catalog BC (Cycles 21-22) ✅ — SKU data for scope configuration
   ├── Orders BC (Cycles 24-27) ✅ — OrderPlaced message source
-  └── Shopping BC (Cycles 16-18) ✅ — primary consumer of Promotions API
+  ├── Shopping BC (Cycles 16-18) ✅ — primary consumer of Promotions API
+  └── Admin Identity BC (Cycle 29 Phase 1) ✅ — JWT auth for admin commands (ADR 0031)
 
-Phase 1 (Cycle 29): Promotions BC Core
+Phase 1 (Cycle 29 Phase 2): Promotions BC Core
   └── All prerequisites met ✅
 
 Phase 2 (Cycle 30): Shopping + CE BFF Integration
@@ -3630,7 +3637,7 @@ Phase 3 (Cycle 31+): Advanced Features
 
 ---
 
-## 10.5 Phase 1 Cycle 29 Task Breakdown
+## 10.5 Phase 1 Cycle 29 Phase 2 Task Breakdown
 
 Recommended vertical slice ordering for Phase 1:
 
@@ -3657,5 +3664,24 @@ Recommended vertical slice ordering for Phase 1:
 
 ---
 
-*Stages 7–10 complete. The Promotions BC event model is fully specified and ready for Cycle 29 implementation.*
+*Stages 7–10 complete. The Promotions BC event model is fully specified and ready for Cycle 29 Phase 2 implementation.*
+
+---
+
+## Addendum: Impact of Cycle 29 Phase 1 (Admin Identity BC — PR #375)
+
+**Reviewed:** 2026-03-14
+**PR:** [Cycle 29 Admin Identity Phase 1 (#375)](https://github.com/erikshafer/CritterSupply/pull/375)
+
+The following changes were made to this document after reviewing PR #375, which delivered the Admin Identity BC:
+
+| Change | Before | After | Reason |
+|--------|--------|-------|--------|
+| **Port allocation** | Promotions → port 5249 | Promotions → port **5250** | Admin Identity BC claimed port 5249 |
+| **RBAC section (§5h)** | "RBAC ADR to be authored during Cycle 29" | ADR 0031 is now real; `PricingManager` role covers Promotions | ADR 0031 implemented and accepted |
+| **Cycle reference** | "Cycle 29" | "Cycle 29 Phase 2" | Cycle 29 Phase 1 = Admin Identity (done) |
+| **Prerequisites** | 4 prerequisite BCs listed | Admin Identity BC added as 5th prerequisite | JWT auth is now available for admin commands |
+| **Audit trail** | Generic `CreatedBy (Guid)` | Maps to `adminUserId` from JWT `sub` claim per ADR 0031 | Concrete auth infrastructure exists |
+
+**No structural changes were needed.** The event model, aggregates, commands, queries, projections, sagas, integration messages, and naming decisions are all unaffected by Admin Identity BC. The key finding is that Admin Identity BC *strengthens* the Promotions design by providing the concrete JWT authentication infrastructure that the event model assumed would exist.
 
