@@ -1,7 +1,7 @@
 # Cycle 29 Phase 2: Promotions BC Phase 1 — Retrospective Notes
 
 **Date Started:** 2026-03-14
-**Status:** 🚧 In Progress
+**Status:** ✅ Complete — Phase 1 MVP Delivered
 **Branch:** `claude/cycle-29-phase-2-promotions-coupons`
 
 ---
@@ -146,5 +146,141 @@ None yet.
 
 ---
 
-*This document will be continuously updated throughout Cycle 29 Phase 2 implementation.*
-*Final retrospective will be created after Phase 2 completion.*
+## Session 2: Query Layer, Projections & Testing (2026-03-14)
+
+### Decisions Made
+
+1. **Wolverine Handler Return Type Pattern**
+   - **Decision:** Use `IStartStream` return type instead of tuples for new stream handlers
+   - **Pattern:** `MartenOps.StartStream<TAggregate>(streamId, event)`
+   - **Rationale:** Tuples `(Aggregate, Event)` don't integrate with Wolverine tracking. `IStartStream` tells Wolverine to persist events to new streams and makes events trackable.
+   - **Pattern Source:** Discovered by examining `ProductAddedHandler.cs` in Pricing BC
+
+2. **Test Pattern for Event-Sourced Aggregates**
+   - **Decision:** Query aggregates directly via `session.Query<T>()` or `session.Events.AggregateStreamAsync<T>()` instead of tracking events
+   - **Rationale:** When using `IStartStream`, Wolverine applies events immediately but doesn't publish them as trackable messages. Tests should verify aggregate state, not event message tracking.
+   - **Pattern Source:** Shopping BC integration tests (CartLifecycleTests.cs)
+
+3. **Snapshot Projections for Queryability**
+   - **Decision:** Add `opts.Projections.Snapshot<T>(SnapshotLifecycle.Inline)` for Promotion and Coupon aggregates
+   - **Rationale:** Without snapshots, `session.Query<T>()` returns nothing. Snapshots make aggregates queryable via LINQ. Same pattern as Shopping BC uses for Cart aggregate.
+
+### Work Completed
+
+1. ✅ Created CouponLookupView read model (string ID for uppercase normalization)
+2. ✅ Implemented CouponLookupViewProjection using MultiStreamProjection pattern
+3. ✅ Created CouponValidationResult response model (structured validation results)
+4. ✅ Implemented ValidateCoupon query endpoint with business rules:
+   - Coupon exists check
+   - Coupon status check (must be Issued)
+   - Parent promotion exists check
+   - Promotion status check (must be Active)
+   - Date range validation (not expired, not future-dated)
+5. ✅ Configured Marten projections in Program.cs:
+   - CouponLookupView projection (inline)
+   - Promotion snapshot (inline)
+   - Coupon snapshot (inline)
+6. ✅ Fixed CreatePromotionHandler to return `IStartStream` (was tuple)
+7. ✅ Fixed IssueCouponHandler to return `IStartStream` (was tuple)
+8. ✅ Created TestFixture with PostgreSQL TestContainers + Alba
+9. ✅ Created PromotionLifecycleTests (5 tests):
+   - Create promotion in draft status
+   - Activate promotion successfully
+   - Prevent double activation
+   - Issue coupon for active promotion
+   - Reject coupon issuance for inactive promotion
+10. ✅ Created CouponValidationTests (6 tests):
+    - Valid coupon returns success
+    - Non-existent coupon returns invalid
+    - Expired promotion returns invalid
+    - Future-dated promotion returns invalid
+    - Case-insensitive lookup works
+    - Active promotion with draft phase (edge case test)
+11. ✅ All 11 integration tests passing
+12. ✅ Solution builds successfully with 0 errors, 11 warnings (pre-existing, unrelated to Promotions)
+13. ✅ Updated CLAUDE.md port allocation table (Promotions = 5250)
+14. ✅ Updated CONTEXTS.md to move Promotions from "Planned" to "Implemented" with Phase 1 status note
+
+### Lessons Learned
+
+1. **Wolverine IStartStream Pattern Discovery**
+   - **Problem:** Tests failing with "No messages of type PromotionCreated were received" even though events were being stored
+   - **Root Cause:** Handlers returning tuples instead of `IStartStream`
+   - **Solution:** Pattern discovery by reading existing handlers (ProductAddedHandler) showed correct `MartenOps.StartStream` usage
+   - **Key Insight:** Wolverine tracking doesn't capture events from tuple returns - only from explicit `IStartStream` or `OutgoingMessages` patterns
+
+2. **Test Pattern Mismatch**
+   - **Problem:** Wrote tests expecting to track `PromotionCreated` events via `SingleMessage<T>()`
+   - **Root Cause:** Wrong mental model - assumed all events are trackable messages
+   - **Solution:** Read Shopping BC tests which query aggregates directly instead of tracking events
+   - **Key Insight:** For aggregate lifecycle tests, verify state via `session.Query<T>()` or `session.Events.AggregateStreamAsync<T>()`, not via event tracking
+
+3. **Marten Snapshot Projection Requirement**
+   - **Problem:** `session.Query<Promotion>()` returned empty even after successful command execution
+   - **Root Cause:** Marten doesn't automatically make aggregates queryable - needs explicit projection configuration
+   - **Solution:** Added `opts.Projections.Snapshot<T>(SnapshotLifecycle.Inline)` for both aggregates
+   - **Key Insight:** Event-sourced aggregates need snapshot projections to be queryable via LINQ, same as Shopping/Cart pattern
+
+4. **Alba Global Using Directive**
+   - **Problem:** Build errors for `IAlbaHost`, `Scenario`, `IScenarioResult` types
+   - **Solution:** Added `<Using Include="Alba" />` to test project .csproj ItemGroup
+   - **Pattern Source:** Pricing.Api.IntegrationTests.csproj
+
+### Issues / Blockers
+
+None - all blockers resolved during session.
+
+### Key Files Created (Session 2)
+
+- `src/Promotions/Promotions/Coupon/CouponLookupView.cs` (read model)
+- `src/Promotions/Promotions/Coupon/CouponLookupViewProjection.cs` (MultiStreamProjection)
+- `src/Promotions/Promotions/Coupon/CouponValidationResult.cs` (response model)
+- `src/Promotions/Promotions.Api/Queries/ValidateCoupon.cs` (HTTP GET endpoint)
+- `tests/Promotions/Promotions.IntegrationTests/TestFixture.cs` (Alba + TestContainers)
+- `tests/Promotions/Promotions.IntegrationTests/PromotionLifecycleTests.cs` (5 tests)
+- `tests/Promotions/Promotions.IntegrationTests/CouponValidationTests.cs` (6 tests)
+
+### Phase 1 MVP Completion Status
+
+**✅ All Phase 1 Requirements Met:**
+- ✅ Create Promotion (draft status)
+- ✅ Activate Promotion (manual activation)
+- ✅ Issue Coupon (linked to active promotion)
+- ✅ Validate Coupon (business rules: dates, status, promotion link)
+- ✅ Query layer with projection (CouponLookupView for fast lookups)
+- ✅ Comprehensive integration test coverage (11 tests, all passing)
+- ✅ Documentation updated (CLAUDE.md, CONTEXTS.md, retrospective)
+
+---
+
+## Phase 1 Retrospective Summary
+
+**Total Sessions:** 2 (2026-03-14)
+
+**What Went Well:**
+1. Event modeling document (`docs/planning/promotions-event-modeling.md`) proved invaluable as source of truth
+2. Pattern discovery via search agent and examining existing BCs (Shopping, Pricing) accelerated implementation
+3. Clear phase boundaries (Phase 1 = core + validation; Phase 2 = redemption + integration) kept scope manageable
+4. Test-first mindset caught handler pattern issues early
+
+**What Could Be Improved:**
+1. Could have read handler pattern skill file first instead of discovering `IStartStream` pattern reactively
+2. Initial test pattern (tracking events) was incorrect - should have referenced Shopping tests first
+
+**Key Metrics:**
+- **Code:** ~1500 lines (domain models, handlers, projections, tests)
+- **Tests:** 11 integration tests (100% passing)
+- **Build Time:** ~66 seconds (full solution)
+- **Dependencies:** Marten 8.22.2, Wolverine 5.17.0, Alba, TestContainers
+
+**Next Phase Scope (Phase 2):**
+- Redeem Coupon command + handler
+- Revoke Coupon command + handler
+- Expire Coupon (scheduled message)
+- Usage limit enforcement (optimistic concurrency)
+- Shopping BC integration (ApplyCouponToCart)
+- Pricing BC integration (floor price checks)
+
+---
+
+*Phase 1 MVP completed successfully. This document serves as the final retrospective record.*

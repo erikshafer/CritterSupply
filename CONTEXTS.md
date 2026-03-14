@@ -232,18 +232,22 @@ JWT-based authentication and authorization for internal admin users. Provides ac
 
 ---
 
-## Planned
-
 ### Promotions
 
-Coupon codes, percentage discounts, BOGO deals, free shipping thresholds.
+**Folder:** `src/Promotions/`
+
+Owns promotional campaigns and coupon codes — creation, activation, issuance, validation, redemption, and usage tracking.
 
 | Communicates with | Direction | Notes |
 |---|---|---|
-| Shopping | ↔ bidirectional | Validates coupons applied in cart; publishes discount results |
-| Pricing | → queries | Checks MAP floor to prevent below-minimum discounts |
+| Shopping (planned) | ↔ bidirectional | Will validate coupons applied in cart and calculate discounts |
+| Pricing (planned) | → queries | Will check MAP floor to prevent below-minimum discounts |
+
+**Key decisions:** Phase 1 MVP (Cycle 29 Phase 2) includes Promotion creation/activation, Coupon issuance, and ValidateCoupon query with business rule checks (dates, status). Event-sourced aggregates with inline snapshot projections for queryability. Redemption and Shopping integration deferred to future phases.
 
 ---
+
+## Planned
 
 ### Search
 
