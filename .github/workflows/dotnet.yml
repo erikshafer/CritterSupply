@@ -1,14 +1,18 @@
 name: CI
 
 # CI runs on every PR and push to main — but only when code or build config changes.
-# E2E tests have their own workflow (e2e.yml) and do NOT run here (see ADR 0015).
+# E2E tests run in parallel via their own workflow (e2e.yml), also triggered on PRs.
 #
-# Jobs:
+# Jobs (this workflow):
 #   unit-tests        — builds the solution and runs unit tests (no Docker required)
 #   integration-tests — builds the solution and runs API integration tests (Testcontainers)
 #
-# Both jobs run in parallel, giving faster overall feedback and distinct status
-# indicators so failures can be identified at a glance in the GitHub Actions UI.
+# Parallel workflow (e2e.yml):
+#   storefront-e2e    — Playwright browser tests for Storefront (Blazor Server)
+#   vendor-portal-e2e — Playwright browser tests for Vendor Portal (Blazor WASM)
+#
+# All four jobs run in parallel across the two workflows, giving fast overall
+# feedback and distinct status indicators in the GitHub Actions PR checks UI.
 
 on:
   push:
