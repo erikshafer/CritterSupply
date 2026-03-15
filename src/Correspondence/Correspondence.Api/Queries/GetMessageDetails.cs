@@ -7,7 +7,7 @@ namespace Correspondence.Api.Queries;
 
 /// <summary>
 /// HTTP GET endpoint to retrieve details of a specific message.
-/// Used by Admin Portal for customer service tooling (investigating delivery issues).
+/// Used by Backoffice for customer service tooling (investigating delivery issues).
 /// </summary>
 public sealed class GetMessageDetails
 {

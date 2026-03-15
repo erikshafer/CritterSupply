@@ -67,7 +67,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 // Phase 2: replace with a dedicated admin identity provider and finer-grained policies.
 builder.Services.AddAuthorization(opts =>
 {
-    opts.AddPolicy("Admin", policy => policy
+    opts.AddPolicy("VendorAdmin", policy => policy
         .RequireAuthenticatedUser()
         .RequireRole("Admin"));
 });

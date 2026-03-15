@@ -72,7 +72,7 @@ public static class GetVendorAssignmentHandler
     public static Task<Product?> Load(string sku, IDocumentSession session, CancellationToken ct)
         => session.LoadAsync<Product>(sku, ct);
 
-    [Authorize(Policy = "Admin")]
+    [Authorize(Policy = "VendorAdmin")]
     [WolverineGet("/api/admin/products/{sku}/vendor-assignment")]
     public static IResult Handle(string sku, Product? product)
     {
@@ -149,7 +149,7 @@ public static class AssignProductToVendorHandler
     /// </list>
     /// </para>
     /// </summary>
-    [Authorize(Policy = "Admin")]
+    [Authorize(Policy = "VendorAdmin")]
     [WolverinePost("/api/admin/products/{sku}/vendor-assignment")]
     public static async Task<(IResult, OutgoingMessages)> Handle(
         string sku,
@@ -281,7 +281,7 @@ public sealed record BulkAssignmentResult(
 /// </summary>
 public static class BulkAssignProductsToVendorHandler
 {
-    [Authorize(Policy = "Admin")]
+    [Authorize(Policy = "VendorAdmin")]
     [WolverinePost("/api/admin/products/vendor-assignments/bulk")]
     public static async Task<(IResult, OutgoingMessages)> Handle(
         BulkAssignProductsToVendor command,
