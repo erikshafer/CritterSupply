@@ -20,24 +20,24 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M30.0 (Promotions BC Redemption) |
-| **Status** | ✅ COMPLETE (All 29 integration tests passing, documentation updated) |
-| **What Was Delivered** | Complete redemption workflow with RedeemCoupon, RevokeCoupon, RecordPromotionRedemption, GenerateCouponBatch, CalculateDiscount, stub Shopping BC integration |
-| **What Remains** | Retrospective document creation |
+| **Current Milestone** | M30.1 (Shopping BC Coupon Integration) |
+| **Status** | ✅ COMPLETE (All 11 Shopping integration tests + 29 Promotions tests passing) |
+| **What Was Delivered** | ApplyCouponToCart, RemoveCouponFromCart handlers with real Promotions BC HTTP client integration (ValidateCoupon, CalculateDiscount), cart discount display |
+| **What Remains** | Retrospective document creation, plan M31.0 kickoff |
 | **Next Milestone** | M31.0 (Correspondence BC Extended) — Extended integration events & SMS channel |
-| **Completed Milestones** | M25.0, M25.1, M25.2, M28.0, M29.0, M29.1, M30.0 |
+| **Completed Milestones** | M25.0, M25.1, M25.2, M28.0, M29.0, M29.1, M30.0, M30.1 |
 | **Active BCs** | 17 (including Returns, Correspondence, Admin Identity, Promotions) |
 
 ---
 
 ## Current Milestone
 
-**Milestone:** M30.0 — Promotions BC Redemption ✅ *COMPLETE*
-**Status:** ✅ **COMPLETE** — All integration tests passing, CONTEXTS.md updated
-**GitHub Milestone:** M30.0: Promotions BC Redemption
+**Milestone:** M30.1 — Shopping BC Coupon Integration ✅ *COMPLETE*
+**Status:** ✅ **COMPLETE** — All integration tests passing (11 Shopping + 29 Promotions), CONTEXTS.md updated
+**GitHub Milestone:** M30.1: Shopping BC Coupon Integration
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
-**Implementation Status:** [docs/planning/m30-0-implementation-status.md](./m30-0-implementation-status.md)
-**Branch:** `claude/m31-0-establish-current-state`
+**Implementation Status:** [docs/planning/cycles/m30-1-shopping-bc-coupon-retrospective.md](./cycles/m30-1-shopping-bc-coupon-retrospective.md)
+**Branch:** `claude/complete-m30-0-and-m30-1-tasks`
 
 ---
 
@@ -130,13 +130,26 @@
 - **Deferred to Phase 2:** Batch coupon generation, scheduled messages, redemption tracking, Shopping BC integration, Pricing BC floor price integration
 
 **Next milestones (roadmap):**
-- **M30.0:** Promotions BC Redemption — Redemption workflow, Shopping/Pricing BC integration, batch coupon generation
 - **M31.0:** Correspondence BC Extended — Additional integration events (Shipment, Returns, Payments), SMS channel (Twilio)
 - **M32.0+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
 
 ---
 
 ## Recently Completed
+
+- ✅ **M30.1:** Shopping BC Coupon Integration (2026-03-15) — **COMPLETE**
+  - ApplyCouponToCart command + handler — validates coupon via Promotions BC HTTP client
+  - RemoveCouponFromCart command + handler — clears coupon from cart
+  - GetCart enrichment — includes discount information when coupon applied
+  - Real PromotionsClient integration — calls ValidateCoupon and CalculateDiscount HTTP endpoints
+  - Dual handler pattern — separate command handler + HTTP endpoint handler classes (following ClearCart pattern)
+  - Alba test fixture DI replacement — RemoveAll + AddSingleton pattern for stub injection
+  - 11 integration tests covering: valid/invalid coupons, empty/terminal cart validation, discount calculation, remove/reapply flows
+  - **Pattern Discovery:** Wolverine Railway Programming with async external service calls requires separate handler classes
+  - **Design Decision:** Single coupon per cart (stacking deferred to M30.3+)
+  - CONTEXTS.md updated with Shopping ↔ Promotions bidirectional integration
+  - **Skills Refresh:** Propagated M30.1 learnings to wolverine-message-handlers.md (Railway Programming with async validation)
+  - [Retrospective](./cycles/m30-1-shopping-bc-coupon-retrospective.md)
 
 - ✅ **M30.0:** Promotions BC Redemption (2026-03-15) — **COMPLETE**
   - RedeemCoupon, RevokeCoupon, RecordPromotionRedemption command handlers
@@ -299,20 +312,7 @@
 
 ### Next 3-4 Milestones
 
-> **Revised after M29.1 completion (2026-03-15)**
-
-- **M30.0:** Promotions BC Redemption — Redemption Workflow & Integration
-  - RedeemCoupon command + handler (usage limit enforcement via optimistic concurrency)
-  - RevokeCoupon command + handler (admin action)
-  - Expire Coupon scheduled message (Wolverine delayed messaging)
-  - Shopping BC integration: ApplyCouponToCart, RemoveCouponFromCart handlers
-  - Pricing BC integration: Floor price enforcement during discount calculation
-  - GenerateCouponBatch handler (fan-out pattern for bulk coupon creation)
-  - OrderPlacedHandler for coupon redemption recording
-  - ActivePromotionsView projection (for customer-facing promotion listings)
-  - RabbitMQ integration messages: PromotionActivated, PromotionExpired
-  - Docker Compose + Aspire configuration
-  - ADR 0032: Milestone-based planning schema
+> **Revised after M30.1 completion (2026-03-15)**
 
 - **M31.0:** Correspondence BC Extended — Extended Integration & SMS
   - Phase 2a: ShipmentDispatched, ShipmentDelivered, ShipmentDeliveryFailed (Fulfillment BC)
@@ -331,7 +331,6 @@
 ### Future BCs (Priority Roadmap)
 
 **High Priority (Active Development or Near-Term):**
-- 🟢 **Promotions BC Redemption (M30.0)** — Redemption workflow, Shopping/Pricing integration
 - 🟢 **Correspondence BC Extended (M31.0)** — Extended integration events, SMS channel
 - 🟢 **Admin Portal (M32.0+)** — Internal operations portal *(prerequisites: multi-issuer JWT, endpoint gaps closed)*
 
@@ -362,5 +361,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-15 (M30.0 COMPLETE — all 29 integration tests passing, CONTEXTS.md updated, M31.0 planning complete — awaiting M30.0 retrospective before starting M31.0 implementation)*
+*Last Updated: 2026-03-15 (M30.1 COMPLETE — all 11 Shopping + 29 Promotions integration tests passing, CONTEXTS.md updated with Shopping ↔ Promotions integration, M31.0 planning complete)*
 *Update this file at: milestone start, milestone end, and when significant task changes occur*
