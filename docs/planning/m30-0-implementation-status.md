@@ -1,12 +1,34 @@
 # M30.0 Promotions BC Redemption Workflow: Implementation Status
 
 **Date:** 2026-03-15
-**Status:** 🟡 In Progress — Phase 1B Complete (Redemption Workflow Foundation)
+**Status:** 🟡 In Progress — Core Redemption Foundation Complete
 **Branch:** `claude/m30-0-redemption-workflow-integration`
 
 ---
 
-## ✅ Completed: Phase 1A - Coupon Redemption Commands
+## 📌 Terminology Clarification
+
+**Important:** This document tracks **M30.0** (single milestone) implementation progress.
+
+- **M30.0** = Promotions BC Redemption Workflow (this milestone)
+  - Scope: Core redemption commands, discount calculation stub, OrderPlaced handler skeleton
+  - Outcome: Foundation for coupon redemption (awaits Shopping BC integration in M30.1+)
+
+- **M30.1+** = Future milestones (deferred work)
+  - M30.1: Shopping BC integration (ApplyCouponToCart, full OrderPlaced flow)
+  - M30.2: Pricing BC integration (floor price enforcement)
+  - M30.3+: Advanced features (batch generation UI, stacking rules, etc.)
+
+**Notes within M30.0:**
+- "Stub implementation" = Minimal working code to unblock future milestones
+- "Skeleton handler" = Handler exists but doesn't process data yet (Shopping BC integration needed)
+- References to "M30.1+ work" = Explicitly deferred to future milestones
+
+See [ADR 0032: Milestone-Based Planning Schema](../decisions/0032-milestone-based-planning-schema.md) for details.
+
+---
+
+## ✅ Completed: Part 1 - Coupon Redemption Commands
 
 ### What Was Delivered (Commit 1)
 
@@ -38,7 +60,7 @@
 
 ---
 
-## ✅ Completed: Phase 1B - Discount Calculation &amp; OrderPlaced Handler
+## ✅ Completed: Part 2 - Discount Calculation &amp; OrderPlaced Handler
 
 ### What Was Delivered (Commits 2-3)
 
@@ -46,14 +68,14 @@
    - Request: `CalculateDiscountRequest(CartItems, CouponCodes)`
    - Response: `CalculateDiscountResponse(LineItemDiscounts, TotalDiscount, OriginalTotal, DiscountedTotal)`
    - Pure function percentage discount calculator
-   - Phase 1: Stub floor price check (allow full discount)
+   - **M30.0 stub:** Allows full discount (floor price enforcement deferred to M30.2)
    - Returns zero discount for invalid/expired coupons
    - Single coupon constraint enforced by validator
 
 2. **OrderPlacedHandler Infrastructure**
    - Handler: `OrderPlacedHandler` subscribes to `OrderPlaced` integration message
-   - Phase 1: Skeleton implementation (no coupon data in OrderPlaced yet)
-   - Phase 2: Will fan out to `RedeemCoupon` + `RecordPromotionRedemption`
+   - **M30.0 skeleton:** No coupon data in OrderPlaced yet (Shopping BC integration needed)
+   - **M30.1+ work:** Will fan out to `RedeemCoupon` + `RecordPromotionRedemption` when Shopping BC adds coupon support
 
 3. **RecordPromotionRedemption Handler**
    - Command: `RecordPromotionRedemption(PromotionId, OrderId, CustomerId, CouponCode, RedeemedAt)`
@@ -67,31 +89,6 @@
    - ✅ Promotions.Api project builds successfully
    - ✅ All validators use FluentValidation
    - ✅ Follows CritterSupply patterns (IStartStream, optimistic concurrency, fan-out)
-
----
-
-## ✅ Completed: Phase 1A - Coupon Redemption Commands (ORIGINAL SECTION - KEPT FOR HISTORY)
-
-### What Was Delivered
-
-1. **RedeemCoupon Handler**
-   - Command: `RedeemCoupon(CouponCode, OrderId, CustomerId, RedeemedAt)`
-   - Handler uses `[WriteAggregate]` with optimistic concurrency
-   - Enforces single-use constraint (must be Issued status)
-   - Updated `CouponRedeemed` event with full fields
-   - Updated `Coupon` aggregate Apply method + CustomerID property
-
-2. **RevokeCoupon Handler**
-   - Command: `RevokeCoupon(CouponCode, Reason)`
-   - Admin action for fraud prevention/corrections
-   - Can revoke Issued or Redeemed coupons
-   - Cannot revoke already-revoked or expired coupons
-   - Updated `CouponRevoked` event with full fields
-
-3. **Build Status**
-   - ✅ Promotions domain project builds successfully
-   - ✅ All validators use FluentValidation
-   - ✅ Follows CritterSupply patterns (IStartStream from M29.1, optimistic concurrency from Pricing BC)
 
 ---
 
@@ -112,152 +109,162 @@
   - `RedeemCoupon` command (if coupon applied)
   - Record redemption on Promotion aggregate
 - [x] Use `OutgoingMessages` pattern for command fan-out
-- **Note:** Phase 1 skeleton only (Shopping BC integration needed for coupon data)
+- **Note:** M30.0 skeleton only (Shopping BC integration needed for coupon data — deferred to M30.1+)
 
 #### 1.3 Calculate Discount Endpoint ✅
 - [x] Create `CalculateDiscountRequest` model (CartItems, CouponCodes)
 - [x] Create `CalculateDiscountResponse` model (LineItemDiscounts, TotalDiscount)
 - [x] Implement `CalculateDiscount` HTTP POST endpoint
 - [x] Pure function discount calculator logic
-- [x] Phase 1: Stub floor price check (return full discount)
+- [x] Stub floor price check (return full discount — real enforcement deferred to M30.2)
 
-### Priority 2: Shopping BC Integration (Critical Path)
+### Priority 2: Shopping BC Integration ⚠️ DEFERRED TO M30.1+
 
-#### 2.1 Shopping BC Changes
+**Note:** This work is **not** part of M30.0. It is explicitly deferred to milestone M30.1 (or later).
+
+#### 2.1 Shopping BC Changes (M30.1)
 - [ ] Create `ApplyCouponToCart` command in Shopping BC
 - [ ] Create `RemoveCouponFromCart` command in Shopping BC
 - [ ] Update `ShoppingCart` aggregate with `AppliedCoupons` collection
 - [ ] Add cart events: `CouponAppliedToCart`, `CouponRemovedFromCart`
 - [ ] Update `CartView` to include discount information
 
-#### 2.2 Shopping → Promotions HTTP Client
+#### 2.2 Shopping → Promotions HTTP Client (M30.1)
 - [ ] Create `IPromotionsClient` interface in Shopping domain
 - [ ] Implement `PromotionsClient` in Shopping.Api
 - [ ] Wire up HttpClient in Shopping.Api Program.cs
 - [ ] Call `ValidateCoupon` before applying to cart
 - [ ] Call `CalculateDiscount` for cart display
 
-### Priority 3: Pricing BC Integration (Floor Price Enforcement)
+### Priority 3: Pricing BC Integration ⚠️ DEFERRED TO M30.2+
 
-#### 3.1 Pricing Client
+**Note:** This work is **not** part of M30.0. It is explicitly deferred to milestone M30.2 (or later).
+
+#### 3.1 Pricing Client (M30.2)
 - [ ] Create `IPricingClient` interface in Promotions domain
 - [ ] Create `CurrentPriceResponse` model (Price, FloorPrice)
 - [ ] Implement `PricingClient` HTTP client in Promotions.Api
 - [ ] Wire up HttpClient in Promotions.Api Program.cs
 
-#### 3.2 Floor Price Enforcement
+#### 3.2 Floor Price Enforcement (M30.2)
 - [ ] Update `CalculateDiscount` to query Pricing BC for floor prices
 - [ ] Implement clamping logic (never go below floor)
 - [ ] Return clamped discount + original discount (for transparency)
 
-### Priority 4: Batch Coupon Generation
+### Priority 4: Batch Coupon Generation ⚠️ PARTIALLY DEFERRED
 
-#### 4.1 GenerateCouponBatch Command
-- [ ] Create `GenerateCouponBatch(PromotionId, Prefix, Count, MaxUses)`
-- [ ] Create validator
-- [ ] Implement handler using fan-out pattern
-- [ ] Return `OutgoingMessages` with N `IssueCoupon` commands
-- [ ] Add `CouponBatchGenerated` event to Promotion aggregate
+**Note:** Core command/handler exist in M30.0 (Part 1). UI and advanced features deferred to M30.3+.
 
-#### 4.2 Coupon Code Generation
-- [ ] Implement deterministic code generator (e.g., `HOLIDAY2026-A3X9K`)
-- [ ] Ensure uniqueness via UUID v5 collision detection
-- [ ] Support configurable prefix + random suffix
+#### 4.1 GenerateCouponBatch Command ✅ COMPLETE (M30.0)
+- [x] Create `GenerateCouponBatch(PromotionId, Prefix, Count)` command
+- [x] Create validator (max 10,000 coupons per batch)
+- [x] Implement handler using fan-out pattern
+- [x] Return `OutgoingMessages` with N `IssueCoupon` commands
+- [x] Add `CouponBatchGenerated` event to Promotion aggregate
+- [x] Sequential code generation: PREFIX-0001, PREFIX-0002, etc.
 
-### Priority 5: RabbitMQ Integration Messages
+#### 4.2 Coupon Code Generation (M30.3+ - UI & Advanced Features)
+- [ ] Admin UI for batch generation
+- [ ] Random suffix support (e.g., `HOLIDAY2026-A3X9K`)
+- [ ] Batch generation progress tracking
 
-#### 5.1 PromotionActivated Message
+### Priority 5: RabbitMQ Integration Messages ⚠️ DEFERRED TO M30.4+
+
+**Note:** This work is **not** part of M30.0. Integration messages deferred to future milestones.
+
+#### 5.1 PromotionActivated Message (M30.4)
 - [ ] Create integration message in Messages.Contracts
 - [ ] Publish when `ActivatePromotionHandler` succeeds
 - [ ] Shopping BC subscribes → updates active promotions cache
 
-#### 5.2 PromotionExpired Message
+#### 5.2 PromotionExpired Message (M30.4)
 - [ ] Create integration message in Messages.Contracts
 - [ ] Publish when promotion expires (scheduled or manual)
 - [ ] Shopping BC subscribes → removes from active cache
 
-### Priority 6: Projections & Queries
+### Priority 6: Projections & Queries ⚠️ DEFERRED TO M30.5+
 
-#### 6.1 ActivePromotionsView
+**Note:** This work is **not** part of M30.0. Projections deferred to future milestones.
+
+#### 6.1 ActivePromotionsView (M30.5)
 - [ ] MultiStreamProjection listening to PromotionActivated/Expired
 - [ ] Queryable view for customer-facing promotion discovery
 - [ ] Include: Name, Description, DiscountType, DiscountValue, EndDate
 
-#### 6.2 CustomerRedemptionView (Optional - Phase 2)
+#### 6.2 CustomerRedemptionView (M30.6 - Optional)
 - [ ] Tracks which promotions a customer has used
 - [ ] Enforces per-customer redemption limits
 
-### Priority 7: Infrastructure & Configuration
+### Priority 7: Infrastructure & Configuration ⚠️ DEFERRED TO M30.7+
 
-#### 7.1 Docker Compose
+**Note:** This work is **not** part of M30.0. Infrastructure setup deferred to future milestones.
+
+#### 7.1 Docker Compose (M30.7)
 - [ ] Add Promotions.Api service to docker-compose.yml
 - [ ] Create `promotions` profile
 - [ ] Map port 5250
 - [ ] Set Postgres connection string (promotions schema)
 - [ ] Set RabbitMQ connection
 
-#### 7.2 Aspire AppHost
+#### 7.2 Aspire AppHost (M30.7)
 - [ ] Add Promotions.Api to AppHost.cs
 - [ ] Add ProjectReference in CritterSupply.AppHost.csproj
 - [ ] Wire to Postgres + RabbitMQ resources
 
-### Priority 8: Testing & Documentation
+### Priority 8: Testing & Documentation (M30.0 In Progress)
 
-#### 8.1 Integration Tests
+#### 8.1 Integration Tests (M30.0)
 - [ ] Test RedeemCoupon happy path
 - [ ] Test RedeemCoupon double-redemption (optimistic concurrency)
 - [ ] Test RevokeCoupon
-- [ ] Test OrderPlacedHandler → RedeemCoupon flow
-- [ ] Test CalculateDiscount with floor price clamping
+- [ ] Test RecordPromotionRedemption usage limit enforcement
+- [ ] Test CalculateDiscount stub (no floor price yet — M30.2)
 - [ ] Test GenerateCouponBatch fan-out
+- **Note:** Full OrderPlacedHandler → RedeemCoupon flow deferred to M30.1 (needs Shopping BC)
 
-#### 8.2 Documentation
+#### 8.2 Documentation (M30.0)
 - [ ] Update CONTEXTS.md with M30.0 integration contracts
 - [ ] Update CURRENT-CYCLE.md to reflect M30.0 progress
 - [ ] Create M30.0 retrospective document
-- [ ] Update port allocation table (already done for 5250)
+- [x] Clarify terminology (remove "Phase" references)
 
 ---
 
-## 🚧 Deferred to M30.1+ (Not in Scope)
+## 🚧 Deferred to M30.1+ (Out of Scope for M30.0)
 
-The following items from the event modeling document are explicitly deferred:
+The following items from the event modeling document are **explicitly deferred to future milestones**:
 
-- **Scheduled Messages** — `ExpirePromotion` scheduled trigger (manual expiration only for M30.0)
-- **Coupon Reservation** — Soft-hold when applied to cart (accept race condition for M30.0)
-- **Advanced Stacking Rules** — Phase 1: No stacking (one promotion per order)
-- **Category Scope** — Snapshot at creation time (no live Catalog BC subscription)
-- **Money Value Object** — Using `decimal` for M30.0 (percentage discounts only)
-- **Multi-Use Coupons** — Single-use only for M30.0
+- **Shopping BC Integration (M30.1)** — ApplyCouponToCart, RemoveCouponFromCart, full OrderPlaced flow
+- **Pricing BC Integration (M30.2)** — Real floor price enforcement via HTTP client
+- **Batch Generation UI (M30.3)** — Admin interface for coupon batch creation
+- **RabbitMQ Integration Messages (M30.4)** — PromotionActivated/Expired publication
+- **ActivePromotionsView Projection (M30.5)** — Queryable view for customer-facing discovery
+- **Scheduled Messages (M30.6+)** — `ExpirePromotion` scheduled trigger (manual expiration only in M30.0)
+- **Coupon Reservation (M30.6+)** — Soft-hold when applied to cart (accept race condition in M30.0)
+- **Advanced Stacking Rules (M30.7+)** — No stacking in M30.0 (one promotion per order)
+- **Category Scope (M30.8+)** — Snapshot at creation time (no live Catalog BC subscription in M30.0)
+- **Money Value Object (M30.8+)** — Using `decimal` in M30.0 (percentage discounts only)
+- **Multi-Use Coupons (M30.9+)** — Single-use only in M30.0
 
 ---
 
-## 🎯 Recommended Implementation Order
+## 🎯 M30.0 Scope Summary
 
-Based on critical path and dependencies:
+**What's IN M30.0:**
+- ✅ Core redemption commands (RedeemCoupon, RevokeCoupon, RecordPromotionRedemption)
+- ✅ Discount calculation stub (no floor price enforcement yet)
+- ✅ OrderPlacedHandler skeleton (awaits Shopping BC coupon data)
+- ✅ Batch coupon generation (GenerateCouponBatch with sequential codes)
+- 🔄 Integration tests for redemption workflow
+- 🔄 Documentation updates (CONTEXTS.md, CURRENT-CYCLE.md, retrospective)
 
-1. **Week 1: Core Redemption** (Priority 1)
-   - PromotionRedemptionRecorded event
-   - OrderPlacedHandler
-   - CalculateDiscount endpoint (stub floor price)
+**What's DEFERRED (M30.1+):**
+- Shopping BC integration (M30.1) — ApplyCouponToCart, full OrderPlaced flow
+- Pricing BC integration (M30.2) — Real floor price enforcement
+- All remaining priorities (M30.3–M30.9+) — See "Deferred" section above
 
-2. **Week 2: Shopping Integration** (Priority 2)
-   - ApplyCouponToCart / RemoveCouponFromCart
-   - Shopping → Promotions HTTP client
-   - CartView discount display
-
-3. **Week 3: Pricing Integration + Batch Generation** (Priority 3 + 4)
-   - IPricingClient + floor price enforcement
-   - GenerateCouponBatch handler
-
-4. **Week 4: Integration Messages + Projections** (Priority 5 + 6)
-   - PromotionActivated/Expired RabbitMQ
-   - ActivePromotionsView projection
-
-5. **Week 5: Infrastructure + Testing** (Priority 7 + 8)
-   - Docker Compose + Aspire
-   - Integration test suite
-   - Documentation updates
+**Why this scope?**
+M30.0 delivers the **foundation** for coupon redemption. Full end-to-end flow requires Shopping BC changes (M30.1) and Pricing BC integration (M30.2). This milestone establishes contracts and patterns for future milestones to build upon.
 
 ---
 
@@ -267,9 +274,10 @@ Based on critical path and dependencies:
 |----------|-----------|--------|
 | UUID v5 for Coupon stream ID | Deterministic lookup without DB query | promotions-event-modeling.md:72-84 |
 | Decimal for discount values | Simpler for percentage-only discounts | M29.1 retrospective, promotions-event-modeling.md:51 |
-| No coupon reservation (Phase 1) | Accept race condition to reduce complexity | promotions-event-modeling.md:158-161 |
+| No coupon reservation (M30.0) | Accept race condition to reduce complexity | promotions-event-modeling.md:158-161 |
 | Optimistic concurrency for redemption cap | Standard Marten pattern (no sequential queue) | All BCs use this pattern |
 | Fan-out pattern for batch generation | One command → N IssueCoupon messages | promotions-event-modeling.md:1103-1109 |
+| Stub implementations in M30.0 | Unblock future milestones (M30.1+ deliver full features) | ADR 0032 milestone schema |
 
 ---
 
@@ -286,9 +294,9 @@ Based on critical path and dependencies:
 
 ---
 
-**Next Session Checklist:**
-1. Read this status document first
-2. Implement Priority 1 items (PromotionRedemptionRecorded + OrderPlacedHandler)
-3. Build and test after each logical unit
-4. Commit frequently with `(M30.0)` prefix
-5. Update this status document as you progress
+**Next Steps for M30.0 Completion:**
+1. Write integration tests for redemption workflow (Priority 8.1)
+2. Update CONTEXTS.md with M30.0 integration contracts (Priority 8.2)
+3. Update CURRENT-CYCLE.md to show M30.0 progress (Priority 8.2)
+4. Create M30.0 retrospective document (Priority 8.2)
+5. Mark M30.0 complete, begin planning M30.1 (Shopping BC integration)
