@@ -127,26 +127,24 @@ public static class AddItemToCartHandler
         return WolverineContinue.NoProblems;
     }
 
-    // HANDLE: Main business logic
+    // HANDLE: Main business logic (pure function - no validation errors here)
     [WolverinePost("/api/carts/{cartId}/items")]
-    public static async Task<(Events, OutgoingMessages, ProblemDetails)> Handle(
+    public static async Task<(Events, OutgoingMessages)> Handle(
         AddItemToCart command,
         IPricingClient pricingClient,
         [WriteAggregate] Cart cart,
         CancellationToken ct)
     {
         // Fetch server-authoritative price from Pricing BC
+        // Assumes price exists - validation would be in Before/Validate if needed
         var price = await pricingClient.GetPriceAsync(command.Sku, ct);
-        if (price is null)
-            return ([], new OutgoingMessages(), new ProblemDetails
-                { Detail = $"Price not available for SKU: {command.Sku}", Status = 400 });
 
         var @event = new ItemAdded(command.Sku, command.Quantity, price.BasePrice);
         var outgoing = new OutgoingMessages();
         outgoing.Add(new Messages.Contracts.Shopping.ItemAdded(
             cart.Id, cart.CustomerId ?? Guid.Empty, command.Sku, command.Quantity, price.BasePrice));
 
-        return ([@event], outgoing, WolverineContinue.NoProblems);
+        return ([@event], outgoing);
     }
 }
 ```
@@ -912,6 +910,187 @@ public static class ApproveExchangeHandler
 - `Before()` reads like a checklist — "Can we proceed?"
 - `Handle()` reads like a workflow — "What happens next?"
 - Unit tests for `Handle()` assume all preconditions are met (simpler test setup)
+
+### Async Validation with External Services
+
+**⚠️ CRITICAL PATTERN: ValidateAsync() for HTTP Endpoints with External Service Validation**
+
+When you need to validate against external services (e.g., checking coupon validity with Promotions BC), you **MUST use separate handler classes** for command handling vs HTTP endpoint handling:
+
+1. **Command Handler** — For internal use (tests, sagas, etc.) - assumes caller has already validated
+2. **HTTP Endpoint Handler** — Uses `ValidateAsync()` method for async validation
+
+**❌ INCORRECT Pattern (Does NOT Work):**
+
+```csharp
+// DON'T DO THIS - Handle() cannot return ProblemDetails for validation
+public static class ApplyCouponToCartHandler
+{
+    [WolverinePost("/api/carts/{cartId}/apply-coupon")]
+    public static async Task<(Events, OutgoingMessages, ProblemDetails)> Handle(
+        ApplyCouponToCart command,
+        IPromotionsClient promotionsClient,
+        [WriteAggregate] Cart cart,
+        CancellationToken ct)
+    {
+        // ❌ This pattern doesn't work - ProblemDetails in Handle is anti-pattern
+        var validation = await promotionsClient.ValidateCouponAsync(command.CouponCode, ct);
+        if (!validation.IsValid)
+            return ([], new OutgoingMessages(), new ProblemDetails
+                { Detail = validation.Reason, Status = 400 });
+
+        // ... rest of logic
+    }
+}
+```
+
+**✅ CORRECT Pattern (Separate Handler Classes):**
+
+```csharp
+// Command handler for internal use (tests, sagas, etc.)
+public static class ApplyCouponToCartHandler
+{
+    public static ProblemDetails Before(
+        ApplyCouponToCart command,
+        Cart? cart)
+    {
+        if (cart is null)
+            return new ProblemDetails { Detail = "Cart not found", Status = 404 };
+        if (cart.IsTerminal)
+            return new ProblemDetails { Detail = "Cannot modify completed cart", Status = 400 };
+        if (cart.Items.Count == 0)
+            return new ProblemDetails { Detail = "Cannot apply coupon to empty cart", Status = 400 };
+
+        return WolverineContinue.NoProblems;
+    }
+
+    // Command handler - assumes coupon is already validated by caller
+    public static async Task<(Events, OutgoingMessages)> Handle(
+        ApplyCouponToCart command,
+        IPromotionsClient promotionsClient,
+        [WriteAggregate] Cart cart,
+        CancellationToken ct)
+    {
+        // Calculate discount (validation already done by caller)
+        var cartItems = cart.Items.Values
+            .Select(item => new CartItemDto(item.Sku, item.Quantity, item.UnitPrice))
+            .ToList();
+
+        var discount = await promotionsClient.CalculateDiscountAsync(
+            cartItems,
+            [command.CouponCode],
+            ct);
+
+        var @event = new CouponApplied(
+            cart.Id,
+            command.CouponCode,
+            discount.TotalDiscount,
+            DateTimeOffset.UtcNow);
+
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new Messages.Contracts.Shopping.CouponApplied(
+            cart.Id,
+            cart.CustomerId ?? Guid.Empty,
+            command.CouponCode,
+            discount.TotalDiscount,
+            DateTimeOffset.UtcNow));
+
+        return ([@event], outgoing);
+    }
+}
+
+// HTTP endpoint in SEPARATE class to enable ValidateAsync
+public static class ApplyCouponToCartHttpEndpoint
+{
+    public static ProblemDetails Before(
+        Guid cartId,
+        Cart? cart)
+    {
+        if (cart is null)
+            return new ProblemDetails { Detail = "Cart not found", Status = 404 };
+        if (cart.IsTerminal)
+            return new ProblemDetails { Detail = "Cannot modify completed cart", Status = 400 };
+        if (cart.Items.Count == 0)
+            return new ProblemDetails { Detail = "Cannot apply coupon to empty cart", Status = 400 };
+
+        return WolverineContinue.NoProblems;
+    }
+
+    // ✅ ValidateAsync for async external service validation
+    public static async Task<ProblemDetails> ValidateAsync(
+        ApplyCouponToCart command,
+        IPromotionsClient promotionsClient,
+        CancellationToken ct)
+    {
+        var validation = await promotionsClient.ValidateCouponAsync(command.CouponCode, ct);
+
+        if (!validation.IsValid)
+        {
+            return new ProblemDetails
+            {
+                Detail = validation.Reason ?? $"Coupon code '{command.CouponCode}' is invalid",
+                Status = 400
+            };
+        }
+
+        return WolverineContinue.NoProblems;
+    }
+
+    [WolverinePost("/api/carts/{cartId}/apply-coupon")]
+    public static async Task<(Events, OutgoingMessages)> Handle(
+        ApplyCouponToCart command,
+        IPromotionsClient promotionsClient,
+        [WriteAggregate] Cart cart,
+        CancellationToken ct)
+    {
+        // Validation complete - just calculate discount and apply
+        var cartItems = cart.Items.Values
+            .Select(item => new CartItemDto(item.Sku, item.Quantity, item.UnitPrice))
+            .ToList();
+
+        var discount = await promotionsClient.CalculateDiscountAsync(
+            cartItems,
+            [command.CouponCode],
+            ct);
+
+        var @event = new CouponApplied(
+            cart.Id,
+            command.CouponCode,
+            discount.TotalDiscount,
+            DateTimeOffset.UtcNow);
+
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new Messages.Contracts.Shopping.CouponApplied(
+            cart.Id,
+            cart.CustomerId ?? Guid.Empty,
+            command.CouponCode,
+            discount.TotalDiscount,
+            DateTimeOffset.UtcNow));
+
+        return ([@event], outgoing);
+    }
+}
+```
+
+**Key Learnings (M30.1 Shopping BC Coupon Integration):**
+
+1. **Wolverine's Railway Programming pattern requires ProblemDetails in Before/Validate/ValidateAsync, NOT in Handle**
+   - `Handle()` is the "happy path" - it should assume all validation passed
+   - Returning ProblemDetails from `Handle()` breaks Wolverine's pipeline expectations
+
+2. **When you need async validation with external services:**
+   - Split into TWO handler classes (not one)
+   - Command handler: accepts command record, assumes validation done by caller
+   - HTTP endpoint handler: accepts route parameters, uses `ValidateAsync()` for async checks
+
+3. **Why Context7 documentation was essential:**
+   - The incorrect pattern (ProblemDetails in Handle) looked plausible but doesn't work
+   - Official Wolverine docs clarified that Railway Programming stops at Before/Validate level
+   - `ValidateAsync()` is the correct place for async external service validation
+
+**Real-World Example:** `src/Shopping/Shopping/Cart/ApplyCouponToCart.cs`
+
+**Reference:** [M30.1 Shopping BC Coupon Integration Retrospective](../../planning/cycles/m30-1-shopping-bc-coupon-retrospective.md)
 
 ---
 
