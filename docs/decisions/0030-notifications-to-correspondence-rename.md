@@ -76,7 +76,7 @@ Other BCs in CritterSupply use domain-specific names rather than technical abstr
 - **Promotions BC** will own marketing email campaigns (discount codes, seasonal sales)
 - **Correspondence BC** will own transactional emails triggered by business events
 - **Customer Identity BC** already owns notification preferences (which channels the customer has opted into)
-- **Admin Portal BC** (future) may own internal operational alerts
+- **Backoffice BC** (future) may own internal operational alerts
 
 Renaming Notifications → Correspondence establishes clear boundaries before these future BCs are implemented.
 

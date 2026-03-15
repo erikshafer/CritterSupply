@@ -2,6 +2,8 @@
 
 **Status:** ✅ Accepted
 
+> **Note:** "Admin Portal" was renamed to "Backoffice" and "Admin Identity" to "BackofficeIdentity" in [ADR 0033](./0033-admin-portal-to-backoffice-rename.md).
+
 **Date:** 2026-03-08
 
 **Context:** Pricing BC Phase 1 & Phase 2+ — How do we model price constraints with different business semantics?
@@ -329,7 +331,7 @@ When vendor suggests price $X:
 
 ---
 
-### Admin Portal UI (Phase 2+)
+### Backoffice UI (Phase 2+)
 
 **Pricing Dashboard Column:**
 | SKU | Base Price | Floor | MAP | Binding Constraint |
@@ -351,7 +353,7 @@ When vendor suggests price $X:
 
 - **Event Modeling:** `docs/planning/pricing-event-modeling.md` — "Open Decisions Resolved" section (Decision #9)
 - **Vendor Portal Event Modeling:** `docs/planning/vendor-portal-event-modeling.md` — Vendor price suggestions (checks MAP)
-- **Admin Portal Event Modeling:** `docs/planning/admin-portal-event-modeling.md` — Pricing manager workflows
+- **Backoffice Event Modeling:** `docs/planning/admin-portal-event-modeling.md` — Pricing manager workflows
 - **Skill:** `docs/skills/marten-event-sourcing.md` — Immutable aggregate design
 
 ---
@@ -362,7 +364,7 @@ When vendor suggests price $X:
 
 **A (Phase 2 decision):** No. MAP applies to *advertised* prices (storefront, marketing materials). B2B/wholesale prices are negotiated separately and don't violate MAP. This distinction can be modeled via `Channel` enum if multi-channel pricing becomes a requirement.
 
-**Q: Who can set MAP in Admin Portal?**
+**Q: Who can set MAP in Backoffice?**
 
 **A (Phase 2 decision):** Only **Merchandising Managers** (role check). MAP changes require vendor contract reference. Operations Managers can set Floor, but not MAP (different authority).
 

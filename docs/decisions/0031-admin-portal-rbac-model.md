@@ -2,11 +2,13 @@
 
 **Status:** ✅ Accepted
 
+> **Note:** "Admin Portal" was renamed to "Backoffice" and "Admin Identity" to "BackofficeIdentity" in [ADR 0033](./0033-admin-portal-to-backoffice-rename.md).
+
 **Date:** 2026-03-13
 
 **Context:**
 
-The Admin Portal BC is the gateway for internal employees to manage CritterSupply operations — editing product content, setting prices, adjusting inventory, resolving customer issues, and viewing business intelligence dashboards. Unlike Customer Experience (customer-facing) and Vendor Portal (partner-facing), the Admin Portal serves multiple distinct internal personas with varying access needs:
+The Backoffice BC is the gateway for internal employees to manage CritterSupply operations — editing product content, setting prices, adjusting inventory, resolving customer issues, and viewing business intelligence dashboards. Unlike Customer Experience (customer-facing) and Vendor Portal (partner-facing), the Backoffice serves multiple distinct internal personas with varying access needs:
 
 - **CopyWriter** — edits product descriptions and display names
 - **PricingManager** — sets and schedules product prices
@@ -16,7 +18,7 @@ The Admin Portal BC is the gateway for internal employees to manage CritterSuppl
 - **Executive** — views aggregated dashboards, exports reports (no PII access)
 - **SystemAdmin** — manages admin users, system configuration, full access
 
-Each role requires different data access permissions and command authorization. A consistent RBAC (Role-Based Access Control) model is needed across all domain BCs accessed through the Admin Portal to ensure:
+Each role requires different data access permissions and command authorization. A consistent RBAC (Role-Based Access Control) model is needed across all domain BCs accessed through the Backoffice to ensure:
 
 1. **Security** — Users can only perform actions appropriate to their role
 2. **Audit Trail** — Every domain event records which admin user triggered it
@@ -25,20 +27,20 @@ Each role requires different data access permissions and command authorization. 
 
 **Immediate Trigger:**
 
-Cycle 29, Phase 1 includes Promotions BC implementation. Promotions will be managed via the Admin Portal by the `PricingManager` role. Without an established RBAC model, there is no clear pattern for:
+Cycle 29, Phase 1 includes Promotions BC implementation. Promotions will be managed via the Backoffice by the `PricingManager` role. Without an established RBAC model, there is no clear pattern for:
 
 - How to annotate Promotions API endpoints with role requirements
 - How to extract `adminUserId` from JWT claims for audit trails
 - Whether `SystemAdmin` should automatically inherit `PricingManager` permissions
 - What JWT claim structure to use (`role` vs `roles` vs custom claims)
 
-This ADR establishes the RBAC model before any Admin Portal-managed BC (Promotions, Admin Identity, or future BCs) is implemented.
+This ADR establishes the RBAC model before any Backoffice-managed BC (Promotions, BackofficeIdentity, or future BCs) is implemented.
 
 ---
 
 ## Decision
 
-CritterSupply adopts a **policy-based authorization model** for the Admin Portal, using ASP.NET Core's `AuthorizationPolicy` infrastructure.
+CritterSupply adopts a **policy-based authorization model** for the Backoffice, using ASP.NET Core's `AuthorizationPolicy` infrastructure.
 
 ### 1. Role Definitions (Phase 1)
 
@@ -63,7 +65,7 @@ CritterSupply adopts a **policy-based authorization model** for the Admin Portal
 public static async Task<IResult> Handle(...)
 ```
 
-**Policy Registration (AdminPortal.Api/Program.cs):**
+**Policy Registration (Backoffice.Api/Program.cs):**
 ```csharp
 builder.Services.AddAuthorization(opts =>
 {
@@ -103,7 +105,7 @@ This forces every handler to remember to include `SystemAdmin`. Policy-based enc
 
 ### 3. JWT Claims Structure
 
-**Admin Identity BC issues JWTs with these claims:**
+**BackofficeIdentity BC issues JWTs with these claims:**
 
 ```json
 {
@@ -113,12 +115,12 @@ This forces every handler to remember to include `SystemAdmin`. Policy-based enc
   "email": "jane.doe@crittersupply.com",           // Email (for audit logs)
   "exp": 1710345600,                               // Expiry (15 minutes from issue)
   "iat": 1710344700,                               // Issued at
-  "iss": "https://localhost:5249",                 // Admin Identity BC (issuer)
-  "aud": "https://localhost:5249"                  // Phase 1: Admin Identity self-validates its own protected endpoints
+  "iss": "https://localhost:5249",                 // BackofficeIdentity BC (issuer)
+  "aud": "https://localhost:5249"                  // Phase 1: BackofficeIdentity self-validates its own protected endpoints
 }
 ```
 
-> **Phase 1 vs. Phase 2 audience:** In Phase 1, Admin Identity BC is both the token issuer *and* the audience — its own user-management endpoints (`/api/admin-identity/users`) are protected by the JWTs it issues. When Admin Portal API (port 5243) is built in a future cycle, it will configure its own `JwtBearerOptions` to accept tokens with `aud: "https://localhost:5243"`, and Admin Identity will need to issue tokens with that audience. The claim example and validator config below will need updating at that point.
+> **Phase 1 vs. Phase 2 audience:** In Phase 1, BackofficeIdentity BC is both the token issuer *and* the audience — its own user-management endpoints (`/api/admin-identity/users`) are protected by the JWTs it issues. When Backoffice API (port 5243) is built in a future cycle, it will configure its own `JwtBearerOptions` to accept tokens with `aud: "https://localhost:5243"`, and BackofficeIdentity will need to issue tokens with that audience. The claim example and validator config below will need updating at that point.
 
 **Key Decisions:**
 
@@ -130,9 +132,9 @@ This forces every handler to remember to include `SystemAdmin`. Policy-based enc
 - **Access Token:** 15 minutes (short-lived, in Authorization header)
 - **Refresh Token:** 7 days (HttpOnly cookie, server-side revocation list)
 
-### 4. Admin Identity BC Requirements
+### 4. BackofficeIdentity BC Requirements
 
-The Admin Identity BC is a **new bounded context** (not a shared service) that issues and validates JWT tokens for admin users.
+The BackofficeIdentity BC is a **new bounded context** (not a shared service) that issues and validates JWT tokens for admin users.
 
 **Technology Stack:**
 - **Persistence:** EF Core + PostgreSQL (`adminidentity` schema)
@@ -152,21 +154,21 @@ PUT    /api/admin-identity/users/{id}/role         # Change user role (SystemAdm
 DELETE /api/admin-identity/users/{id}              # Deactivate admin user (SystemAdmin only)
 ```
 
-**Integration with Admin Portal (Phase 2+):**
+**Integration with Backoffice (Phase 2+):**
 
-When Admin Portal API (port 5243) is built, it will trust JWTs signed by Admin Identity BC. Its validation is configured via `JwtBearerOptions` using the signing key directly (no OpenID Connect discovery in Phase 1):
+When Backoffice API (port 5243) is built, it will trust JWTs signed by BackofficeIdentity BC. Its validation is configured via `JwtBearerOptions` using the signing key directly (no OpenID Connect discovery in Phase 1):
 
 ```csharp
-// Admin Portal API (future — Phase 2+)
+// Backoffice API (future — Phase 2+)
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opts =>
     {
         opts.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = "https://localhost:5249",   // Admin Identity BC issuer
+            ValidIssuer = "https://localhost:5249",   // BackofficeIdentity BC issuer
             ValidateAudience = true,
-            ValidAudience = "https://localhost:5243", // Admin Portal API audience (Phase 2+)
+            ValidAudience = "https://localhost:5243", // Backoffice API audience (Phase 2+)
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1),
             IssuerSigningKey = new SymmetricSecurityKey(
@@ -175,7 +177,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 ```
 
-> **Phase 1 note:** Admin Identity API validates its own tokens in Phase 1 with `ValidIssuer` and `ValidAudience` both set to its own base URL. Audience alignment between issuer and consumer must be verified before Admin Portal API is wired up.
+> **Phase 1 note:** BackofficeIdentity API validates its own tokens in Phase 1 with `ValidIssuer` and `ValidAudience` both set to its own base URL. Audience alignment between issuer and consumer must be verified before Backoffice API is wired up.
 
 ### 5. Audit Trail Pattern
 
@@ -191,7 +193,7 @@ public sealed record CreatePromotion(
     Guid AdminUserId);  // ← Extracted from JWT at handler
 ```
 
-**Handler Pattern (Admin Portal gateway):**
+**Handler Pattern (Backoffice gateway):**
 ```csharp
 [Authorize(Policy = "PricingManagerOrAbove")]
 [WolverinePost("/api/admin/promotions")]
@@ -230,15 +232,15 @@ public sealed record PromotionCreated(
 
 **Rationale:**
 
-- **Gateway-level extraction** — Admin Portal (BFF) extracts `adminUserId` from JWT, not domain BCs. Domain BCs trust the Admin Portal to provide valid `adminUserId` values.
-- **Service-to-service auth** — Admin Portal → Domain BC calls are trusted (network isolation Phase 1, OAuth 2.0 client credentials Phase 2+).
+- **Gateway-level extraction** — Backoffice (BFF) extracts `adminUserId` from JWT, not domain BCs. Domain BCs trust the Backoffice to provide valid `adminUserId` values.
+- **Service-to-service auth** — Backoffice → Domain BC calls are trusted (network isolation Phase 1, OAuth 2.0 client credentials Phase 2+).
 - **Immutable audit trail** — Event streams contain `adminUserId` in every mutation event. Any admin action can be traced back to a specific user and timestamp.
 
 ### 6. Integration with Domain BCs
 
-**Pattern: Admin Portal as BFF (Backend-for-Frontend)**
+**Pattern: Backoffice as BFF (Backend-for-Frontend)**
 
-Admin Portal does **not** expose domain BC APIs directly. It acts as a gateway that:
+Backoffice does **not** expose domain BC APIs directly. It acts as a gateway that:
 
 1. **Enforces RBAC** — `[Authorize(Policy = "...")]` on every handler
 2. **Extracts audit context** — `adminUserId`, `adminRole` from JWT
@@ -246,14 +248,14 @@ Admin Portal does **not** expose domain BC APIs directly. It acts as a gateway t
 4. **Composes responses** — Fan-out queries across multiple BCs (e.g., dashboard metrics)
 5. **Translates errors** — Domain BC error responses → user-friendly problem details
 
-**Service-to-Service Authentication (Admin Portal → Domain BCs):**
+**Service-to-Service Authentication (Backoffice → Domain BCs):**
 
 | Phase | Approach | Notes |
 |-------|----------|-------|
-| **Phase 1** | Network isolation | Admin Portal + Domain BCs run in private network; external access blocked at load balancer |
+| **Phase 1** | Network isolation | Backoffice + Domain BCs run in private network; external access blocked at load balancer |
 | **Phase 2** | Shared secret / API key | `X-Admin-Portal-Key: {secret}` header; simple but not ideal for production |
-| **Phase 3** | OAuth 2.0 client credentials | Admin Portal authenticates as a service principal; domain BCs validate JWT |
-| **Production** | mTLS (mutual TLS) | Admin Portal presents a client certificate; domain BCs validate it |
+| **Phase 3** | OAuth 2.0 client credentials | Backoffice authenticates as a service principal; domain BCs validate JWT |
+| **Production** | mTLS (mutual TLS) | Backoffice presents a client certificate; domain BCs validate it |
 
 **Recommendation:** Phase 1 uses network isolation (simplest). OAuth 2.0 client credentials planned for Phase 2+.
 
@@ -266,7 +268,7 @@ Admin Portal does **not** expose domain BC APIs directly. It acts as a gateway t
 1. **DRY Principle** — `SystemAdmin` superuser logic is defined once in policy registration, not repeated in every `[Authorize]` attribute.
 2. **Frontend Integration** — Blazor/React components can query policies (`AuthorizeAsync(user, "PricingManager")`) to conditionally render UI without hardcoding role checks.
 3. **Flexibility** — Composite policies (`"PricingManagerOrAbove"`) express intent clearly. Adding a new role to a policy is a one-line change.
-4. **Consistency** — Vendor Portal already uses `[Authorize(Policy = "Admin")]` (see `src/Product Catalog/ProductCatalog.Api/Products/AssignProductToVendor.cs:75,152,284`). Admin Portal follows the same pattern.
+4. **Consistency** — Vendor Portal already uses `[Authorize(Policy = "Admin")]` (see `src/Product Catalog/ProductCatalog.Api/Products/AssignProductToVendor.cs:75,152,284`). Backoffice follows the same pattern.
 
 **Why Single Role Per User (Phase 1):**
 
@@ -277,14 +279,14 @@ Admin Portal does **not** expose domain BC APIs directly. It acts as a gateway t
 **Why JWT Over Session Cookies:**
 
 - **SignalR Compatibility** — SignalR hubs require `[Authorize]` on connection. JWT-based auth works seamlessly with SignalR's `AccessTokenProvider` pattern (see Vendor Portal WASM client).
-- **Stateless** — Admin Portal can scale horizontally without shared session state.
-- **Cross-Origin** — If Admin Portal Web (React/Vue) runs on a different origin than Admin Portal API, JWT in Authorization header avoids CORS cookie issues.
+- **Stateless** — Backoffice can scale horizontally without shared session state.
+- **Cross-Origin** — If Backoffice Web (React/Vue) runs on a different origin than Backoffice API, JWT in Authorization header avoids CORS cookie issues.
 
-**Why Admin Identity BC, Not Shared ASP.NET Core Identity:**
+**Why BackofficeIdentity BC, Not Shared ASP.NET Core Identity:**
 
-- **Bounded Context Clarity** — Admin Identity is a separate domain concern from Customer Identity and Vendor Identity. Mixing them violates bounded context boundaries.
+- **Bounded Context Clarity** — BackofficeIdentity is a separate domain concern from Customer Identity and Vendor Identity. Mixing them violates bounded context boundaries.
 - **Independent Lifecycle** — Admin user lifecycle (onboarding, offboarding, role changes) is different from customer/vendor lifecycle.
-- **SSO Roadmap** — Phase 3 will integrate corporate SSO (Azure AD, Okta). Keeping Admin Identity as a BC allows replacing the local store with an OIDC proxy without changing Admin Portal code.
+- **SSO Roadmap** — Phase 3 will integrate corporate SSO (Azure AD, Okta). Keeping BackofficeIdentity as a BC allows replacing the local store with an OIDC proxy without changing Backoffice code.
 
 ---
 
@@ -292,21 +294,21 @@ Admin Portal does **not** expose domain BC APIs directly. It acts as a gateway t
 
 **Positive:**
 
-- ✅ **Consistent authorization pattern** — All domain BCs managed via Admin Portal use the same policy-based RBAC model
+- ✅ **Consistent authorization pattern** — All domain BCs managed via Backoffice use the same policy-based RBAC model
 - ✅ **Comprehensive audit trail** — Every domain event records which admin user triggered it
 - ✅ **Frontend-backend alignment** — UI can query policies to conditionally render admin tools
 - ✅ **Scalable** — New domain BCs (Correspondence, Analytics, etc.) adopt the same pattern without reinventing auth
-- ✅ **SSO-ready** — Local store (Phase 1) can be replaced with OIDC proxy (Phase 3) without changing Admin Portal
+- ✅ **SSO-ready** — Local store (Phase 1) can be replaced with OIDC proxy (Phase 3) without changing Backoffice
 
 **Negative:**
 
-- ⚠️ **Additional BC to scaffold** — Admin Identity BC adds infrastructure (EF Core, migrations, JWT middleware)
+- ⚠️ **Additional BC to scaffold** — BackofficeIdentity BC adds infrastructure (EF Core, migrations, JWT middleware)
 - ⚠️ **Policy proliferation risk** — Need discipline to avoid creating too many policies (`PricingManagerOrAbove`, `PricingManagerOrOperations`, etc.). Keep policies minimal.
 - ⚠️ **Single role constraint** — Users needing multiple capabilities must be assigned a broader role (`OperationsManager` or `SystemAdmin`). Multi-role support is deferred.
 
 **Mitigation:**
 
-- **Admin Identity BC scaffolding** — Reuse Customer Identity + Vendor Identity patterns exactly (3-file colocation, EF Core, JWT). Expected effort: 0.5 cycles.
+- **BackofficeIdentity BC scaffolding** — Reuse Customer Identity + Vendor Identity patterns exactly (3-file colocation, EF Core, JWT). Expected effort: 0.5 cycles.
 - **Policy proliferation** — Document policy design rules in this ADR: Only create composite policies when ≥ 2 handlers need the same role combination.
 
 ---
@@ -354,7 +356,7 @@ All admin, customer, and vendor users in one `aspnetusers` table.
 
 ## References
 
-- **Admin Portal Event Modeling:** `docs/planning/admin-portal-event-modeling.md` (role permission matrix lines 95-116)
+- **Backoffice Event Modeling:** `docs/planning/admin-portal-event-modeling.md` (role permission matrix lines 95-116)
 - **Vendor Portal RBAC Precedent:** `src/Product Catalog/ProductCatalog.Api/Products/AssignProductToVendor.cs` (policy-based `[Authorize(Policy = "Admin")]`)
 - **Customer Identity ADR:** `docs/decisions/0002-ef-core-for-customer-identity.md` (EF Core + ASP.NET Core Identity pattern)
 - **Vendor Identity ADR:** `docs/decisions/0028-jwt-for-vendor-identity.md` (JWT auth for Blazor WASM)
@@ -364,7 +366,7 @@ All admin, customer, and vendor users in one `aspnetusers` table.
 
 **Implementation Cycles:**
 
-- **Cycle 29, Phase 1:** Admin Identity BC scaffolding + Promotions BC with `PricingManager` RBAC
+- **Cycle 29, Phase 1:** BackofficeIdentity BC scaffolding + Promotions BC with `PricingManager` RBAC
 - **Cycle 30+:** Customer service tooling (`CustomerService` role), warehouse operations (`WarehouseClerk` role), executive dashboards (`Executive` role)
 
 ---
