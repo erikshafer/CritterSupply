@@ -20,10 +20,10 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M32.0+ (Admin Portal Phase 1) |
-| **Status** | 📋 NEXT — Multi-issuer JWT, read-only dashboards, customer service tooling |
-| **What's Next** | Review admin-portal-event-modeling-revised.md, verify prerequisites, begin implementation |
-| **What's Blocking** | Prerequisites: Multi-issuer JWT support, endpoint gaps analysis |
+| **Current Milestone** | M32.0 (Admin Portal Phase 1) |
+| **Status** | 🔄 IN PROGRESS — Prerequisites verification, planning gates, implementation readiness |
+| **What's Next** | Verify prerequisites (multi-issuer JWT, endpoint gaps), assess event modeling gate, begin implementation |
+| **What's Blocking** | Multi-issuer JWT not yet implemented (Phase 0.5 prerequisite) |
 | **Next Milestone** | TBD (Catalog Evolution, Search BC, or Exchange v2) |
 | **Completed Milestones** | M25.0, M25.1, M25.2, M28.0, M29.0, M29.1, M30.0, M30.1, M31.0 |
 | **Active BCs** | 17 (including Returns, Correspondence, Admin Identity, Promotions) |
@@ -32,14 +32,17 @@
 
 ## Current Milestone
 
-**Milestone:** M32.0+ — Admin Portal Phase 1
-**Status:** 📋 **NEXT** — Prerequisites verification, multi-issuer JWT design, read-only dashboards
-**GitHub Milestone:** TBD
+**Milestone:** M32.0 — Admin Portal Phase 1
+**Status:** 🔄 **IN PROGRESS** — Prerequisites verification, planning gates, implementation plan creation
+**GitHub Milestone:** TBD (to be created)
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
-**Implementation Branch:** TBD
+**Implementation Branch:** `claude/implement-admin-portal-phase-1`
 **Planning Documents:**
-- Event Model: [docs/planning/admin-portal-event-modeling-revised.md](./admin-portal-event-modeling-revised.md)
+- Event Model (Revised): [docs/planning/admin-portal-event-modeling-revised.md](./admin-portal-event-modeling-revised.md)
 - Integration Gap Register: [docs/planning/admin-portal-integration-gap-register.md](./admin-portal-integration-gap-register.md)
+- UX Research: [docs/planning/admin-portal-ux-research.md](./admin-portal-ux-research.md)
+- Research & Discovery: [docs/planning/admin-portal-research-discovery.md](./admin-portal-research-discovery.md)
+- RBAC ADR: [docs/decisions/0031-admin-portal-rbac-model.md](../decisions/0031-admin-portal-rbac-model.md)
 - M31.0 Retrospective (Correspondence Extended): [docs/planning/cycles/m31-0-retrospective.md](./cycles/m31-0-retrospective.md)
 
 ---
