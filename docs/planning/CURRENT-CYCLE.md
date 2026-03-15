@@ -20,34 +20,39 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M30.1 (Shopping BC Coupon Integration) |
-| **Status** | ✅ COMPLETE (All 11 Shopping integration tests + 29 Promotions tests passing) |
-| **What Was Delivered** | ApplyCouponToCart, RemoveCouponFromCart handlers with real Promotions BC HTTP client integration (ValidateCoupon, CalculateDiscount), cart discount display |
-| **What Remains** | Retrospective document creation, plan M31.0 kickoff |
-| **Next Milestone** | M31.0 (Correspondence BC Extended) — Extended integration events & SMS channel |
-| **Completed Milestones** | M25.0, M25.1, M25.2, M28.0, M29.0, M29.1, M30.0, M30.1 |
+| **Current Milestone** | M32.0+ (Admin Portal Phase 1) |
+| **Status** | 📋 NEXT — Multi-issuer JWT, read-only dashboards, customer service tooling |
+| **What's Next** | Review admin-portal-event-modeling-revised.md, verify prerequisites, begin implementation |
+| **What's Blocking** | Prerequisites: Multi-issuer JWT support, endpoint gaps analysis |
+| **Next Milestone** | TBD (Catalog Evolution, Search BC, or Exchange v2) |
+| **Completed Milestones** | M25.0, M25.1, M25.2, M28.0, M29.0, M29.1, M30.0, M30.1, M31.0 |
 | **Active BCs** | 17 (including Returns, Correspondence, Admin Identity, Promotions) |
 
 ---
 
 ## Current Milestone
 
-**Milestone:** M30.1 — Shopping BC Coupon Integration ✅ *COMPLETE*
-**Status:** ✅ **COMPLETE** — All integration tests passing (11 Shopping + 29 Promotions), CONTEXTS.md updated
-**GitHub Milestone:** M30.1: Shopping BC Coupon Integration
+**Milestone:** M32.0+ — Admin Portal Phase 1
+**Status:** 📋 **NEXT** — Prerequisites verification, multi-issuer JWT design, read-only dashboards
+**GitHub Milestone:** TBD
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
-**Implementation Status:** [docs/planning/cycles/m30-1-shopping-bc-coupon-retrospective.md](./cycles/m30-1-shopping-bc-coupon-retrospective.md)
-**Branch:** `claude/complete-m30-0-and-m30-1-tasks`
+**Implementation Branch:** TBD
+**Planning Documents:**
+- Event Model: [docs/planning/admin-portal-event-modeling-revised.md](./admin-portal-event-modeling-revised.md)
+- Integration Gap Register: [docs/planning/admin-portal-integration-gap-register.md](./admin-portal-integration-gap-register.md)
+- M31.0 Retrospective (Correspondence Extended): [docs/planning/cycles/m31-0-retrospective.md](./cycles/m31-0-retrospective.md)
 
 ---
 
 ## What's Done
 
-**Milestones M25.0, M25.1, M25.2, M28.0, M29.0, and M29.1 are COMPLETE.**
+**Milestones M25.0, M25.1, M25.2, M28.0, M29.0, M29.1, M30.0, M30.1, and M31.0 are COMPLETE.**
 - Returns BC (M25.0-M25.2)
-- Correspondence BC (M28.0)
+- Correspondence BC (M28.0, M31.0)
 - Admin Identity BC (M29.0)
-- **Promotions BC (M29.1)** ✅ NEW
+- Promotions BC (M29.1, M30.0)
+- Shopping BC Coupon Integration (M30.1)
+- **Correspondence BC Extended (M31.0)** ✅ NEW
 
 > **Note:** Historical milestones used "Cycle N" naming. See [Milestone Mapping](milestone-mapping.md) for translation.
 
@@ -136,6 +141,20 @@
 ---
 
 ## Recently Completed
+
+- ✅ **M31.0:** Correspondence BC Extended (2026-03-15) — **COMPLETE**
+  - 5 new integration handlers: ShipmentDeliveredHandler, ShipmentDeliveryFailedHandler, ReturnDeniedHandler, ReturnExpiredHandler, RefundCompletedHandler
+  - SMS channel infrastructure: ISmsProvider interface, StubSmsProvider with fake Twilio SID generation
+  - RabbitMQ Payments BC queue added (correspondence-payments-events)
+  - All 4 BC integration queues now configured: Orders, Fulfillment, Returns, Payments
+  - Inline HTML templates in handlers (template system deferred to Phase 3+)
+  - TODO placeholders for Customer Identity BC queries (deferred to Phase 3+)
+  - 8 total handlers (4 from M28.0, 3 incremental, 5 from M31.0)
+  - Build: 0 errors, 7 expected warnings (TODO placeholders)
+  - **Pattern Discovery:** Pure choreography pattern scales well (no sagas needed for Correspondence BC)
+  - **Design Decision:** Defer template system and Customer Identity queries to Phase 3+ (reduces complexity)
+  - CONTEXTS.md updated with M31.0 integration matrix
+  - [Retrospective](./cycles/m31-0-retrospective.md)
 
 - ✅ **M30.1:** Shopping BC Coupon Integration (2026-03-15) — **COMPLETE**
   - ApplyCouponToCart command + handler — validates coupon via Promotions BC HTTP client
@@ -361,5 +380,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-15 (M30.1 COMPLETE — all 11 Shopping + 29 Promotions integration tests passing, CONTEXTS.md updated with Shopping ↔ Promotions integration, M31.0 planning complete)*
+*Last Updated: 2026-03-15 (M31.0 COMPLETE — 5 handlers + SMS infrastructure delivered, M32.0+ next)*
 *Update this file at: milestone start, milestone end, and when significant task changes occur*
