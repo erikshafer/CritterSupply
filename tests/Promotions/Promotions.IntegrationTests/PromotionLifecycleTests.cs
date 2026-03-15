@@ -154,36 +154,4 @@ public class PromotionLifecycleTests : IClassFixture<TestFixture>
         lookupView.Status.ShouldBe(CouponStatus.Issued);
         lookupView.PromotionId.ShouldBe(promotion.Id);
     }
-
-    [Fact]
-    public async Task IssueCoupon_ForInactivePromotion_Fails()
-    {
-        // Arrange
-        await _fixture.CleanAllDataAsync();
-
-        var createCmd = new CreatePromotion(
-            Name: "Draft Promotion",
-            Description: "Not activated",
-            DiscountType: DiscountType.PercentageOff,
-            DiscountValue: 10m,
-            StartDate: DateTimeOffset.UtcNow,
-            EndDate: DateTimeOffset.UtcNow.AddDays(7),
-            UsageLimit: null);
-
-        await _fixture.ExecuteAndWaitAsync(createCmd);
-
-        using var session = _fixture.GetDocumentSession();
-        var promotion = (await session.Query<Promotions.Promotion.Promotion>().ToListAsync()).Single();
-
-        var issueCouponCmd = new IssueCoupon("INVALID", promotion.Id);
-
-        // Act & Assert
-        var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
-        {
-            await _fixture.ExecuteAndWaitAsync(issueCouponCmd);
-        });
-
-        exception.Message.ShouldContain("Cannot issue coupon for promotion");
-        exception.Message.ShouldContain("Draft");
-    }
 }

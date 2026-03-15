@@ -9,14 +9,24 @@ public static class GenerateCouponBatchHandler
 {
     /// <summary>
     /// Generates a batch of coupons using fan-out pattern.
-    /// Returns CouponBatchGenerated event + N IssueCoupon commands.
+    /// Appends CouponBatchGenerated event + returns N IssueCoupon commands via OutgoingMessages.
     /// Each IssueCoupon command creates a separate Coupon aggregate stream.
     /// Phase 1: Simple sequential code generation (PREFIX-XXXX format).
     /// </summary>
-    public static (CouponBatchGenerated, OutgoingMessages) Handle(
+    public static async Task<OutgoingMessages> Handle(
         GenerateCouponBatch cmd,
-        [WriteAggregate] Promotion promotion)
+        IDocumentSession session,
+        CancellationToken ct)
     {
+        // Load promotion by ID
+        var promotion = await session.Events.AggregateStreamAsync<Promotion>(cmd.PromotionId, token: ct);
+
+        if (promotion is null)
+        {
+            throw new InvalidOperationException(
+                $"Promotion {cmd.PromotionId} not found");
+        }
+
         // Invariant: Can only generate coupons for Draft or Active promotions
         if (promotion.Status != PromotionStatus.Draft && promotion.Status != PromotionStatus.Active)
         {
@@ -48,15 +58,10 @@ public static class GenerateCouponBatchHandler
             cmd.Count,
             timestamp);
 
-        return (batchEvent, outgoing);
-    }
+        // Manually append event to promotion stream
+        session.Events.Append(cmd.PromotionId, batchEvent);
 
-    /// <summary>
-    /// Load method: Resolves promotion by ID.
-    /// Throws if promotion doesn't exist.
-    /// </summary>
-    public static Task<Promotion?> Load(GenerateCouponBatch cmd, IDocumentSession session)
-    {
-        return session.Events.AggregateStreamAsync<Promotion>(cmd.PromotionId);
+        // Return outgoing messages for fan-out
+        return outgoing;
     }
 }

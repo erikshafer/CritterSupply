@@ -20,21 +20,24 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M29.1 (Promotions BC Core) |
-| **Status** | ✅ COMPLETE (as of 2026-03-15) |
-| **What Was Delivered** | Event-sourced Promotion/Coupon aggregates, command handlers, validation endpoint, 11 integration tests |
-| **Next Milestone** | M30.0 (Promotions BC Redemption) — Redemption workflow & Shopping/Pricing integration |
-| **Completed Milestones** | M25.0, M25.1, M25.2, M28.0, M29.0, M29.1 |
+| **Current Milestone** | M30.0 (Promotions BC Redemption) |
+| **Status** | ✅ COMPLETE (All 29 integration tests passing, documentation updated) |
+| **What Was Delivered** | Complete redemption workflow with RedeemCoupon, RevokeCoupon, RecordPromotionRedemption, GenerateCouponBatch, CalculateDiscount, stub Shopping BC integration |
+| **What Remains** | Retrospective document creation |
+| **Next Milestone** | M31.0 (Correspondence BC Extended) — Extended integration events & SMS channel |
+| **Completed Milestones** | M25.0, M25.1, M25.2, M28.0, M29.0, M29.1, M30.0 |
 | **Active BCs** | 17 (including Returns, Correspondence, Admin Identity, Promotions) |
 
 ---
 
 ## Current Milestone
 
-**Milestone:** M29.1 — Promotions BC Core *(just completed)*
-**Status:** ✅ **COMPLETE** — Core promotion/coupon lifecycle, validation, query layer delivered
-**GitHub Milestone:** M29.1: Promotions BC Core
+**Milestone:** M30.0 — Promotions BC Redemption ✅ *COMPLETE*
+**Status:** ✅ **COMPLETE** — All integration tests passing, CONTEXTS.md updated
+**GitHub Milestone:** M30.0: Promotions BC Redemption
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
+**Implementation Status:** [docs/planning/m30-0-implementation-status.md](./m30-0-implementation-status.md)
+**Branch:** `claude/m31-0-establish-current-state`
 
 ---
 
@@ -134,6 +137,21 @@
 ---
 
 ## Recently Completed
+
+- ✅ **M30.0:** Promotions BC Redemption (2026-03-15) — **COMPLETE**
+  - RedeemCoupon, RevokeCoupon, RecordPromotionRedemption command handlers
+  - GenerateCouponBatch fan-out pattern for batch coupon generation (PREFIX-XXXX format)
+  - CalculateDiscount query with stub CartView for discount calculation (percentage + fixed amount)
+  - RecordPromotionRedemptionHandler choreography integration with Orders BC
+  - ExpireCoupon scheduled message (promotion end date expiry)
+  - 29 integration tests across promotion lifecycle, coupon validation, redemption workflow, discount calculation
+  - **Pattern Discovery:** Handlers manually loading aggregates must use `session.Events.Append()` (not tuple returns)
+  - **Design Decision:** Draft promotions can issue coupons (enables batch generation before activation)
+  - **Banker's Rounding:** `Math.Round(6.825, 2)` rounds to 6.82 (even), not 6.83 — affects discount calculations
+  - CONTEXTS.md updated with M30.0 implementation status
+  - **Skills Refresh:** Propagated M30.0 learnings to wolverine-message-handlers.md (anti-pattern #8), modern-csharp-coding-standards.md (banker's rounding), critterstack-testing-patterns.md (fan-out timing)
+  - **Deferred to M30.1+:** Full Shopping BC integration (real cart workflow), Pricing BC floor price enforcement
+  - [Retrospective](./milestones/m30-0-retrospective.md)
 
 - ✅ **M29.1:** Promotions BC Core — MVP (2026-03-14 to 2026-03-15) — **COMPLETE**
   - Event-sourced Promotion aggregate (UUID v7) with 6 domain events
@@ -344,5 +362,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-15 (M29.1 closed; Promotions BC Core complete — core promotion/coupon lifecycle, validation, query layer, 11 integration tests delivered)*
+*Last Updated: 2026-03-15 (M30.0 COMPLETE — all 29 integration tests passing, CONTEXTS.md updated, M31.0 planning complete — awaiting M30.0 retrospective before starting M31.0 implementation)*
 *Update this file at: milestone start, milestone end, and when significant task changes occur*
