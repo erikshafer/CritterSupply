@@ -8,7 +8,9 @@ public sealed record Cart(
     string? SessionId,
     DateTimeOffset InitializedAt,
     Dictionary<string, CartLineItem> Items,
-    CartStatus Status)
+    CartStatus Status,
+    string? AppliedCouponCode = null,
+    decimal AppliedDiscount = 0m)
 {
     public bool IsTerminal => Status != CartStatus.Active;
 
@@ -71,4 +73,18 @@ public sealed record Cart(
 
     public Cart Apply(CheckoutInitiated @event) =>
         this with { Status = CartStatus.CheckedOut };
+
+    public Cart Apply(CouponApplied @event) =>
+        this with
+        {
+            AppliedCouponCode = @event.CouponCode,
+            AppliedDiscount = @event.DiscountAmount
+        };
+
+    public Cart Apply(CouponRemoved @event) =>
+        this with
+        {
+            AppliedCouponCode = null,
+            AppliedDiscount = 0m
+        };
 }
