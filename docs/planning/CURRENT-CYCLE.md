@@ -1,15 +1,18 @@
-# Current Development Cycle
+# Current Development Milestone
 
-> **Note:** This file is maintained as a lightweight AI-readable summary of the active development cycle.  
-> It is the fallback when GitHub Issues/Projects are not directly accessible.  
+> **Note:** This file is maintained as a lightweight AI-readable summary of the active development milestone.
+> It is the fallback when GitHub Issues/Projects are not directly accessible.
 > **Primary tracking:** GitHub Issues + GitHub Project board (see links below)
 >
 > **For full GitHub-first access on this machine, you need:**
 > 1. **GitHub MCP server** configured in your AI tool's MCP settings
 > 2. **GitHub auth** (personal access token with `repo` + `project` scopes)
 >
-> With both configured, query GitHub directly: `list_issues(milestone="Cycle 28", state="open")`  
+> With both configured, query GitHub directly: `list_issues(milestone="M29.1", state="open")`
 > This works identically on any machine — MacBook, Windows PC, Linux laptop.
+>
+> **⚡ New:** We've migrated from "Cycle N Phase M" to **Milestone-Based Versioning** (M.N format).
+> See [ADR 0032](../decisions/0032-milestone-based-planning-schema.md) and [Milestone Mapping](milestone-mapping.md) for details.
 
 ---
 
@@ -17,33 +20,35 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Cycle** | Cycle 29 Phase 2 (Promotions BC Phase 1) |
+| **Current Milestone** | M29.1 (Promotions BC Core) |
 | **Status** | ✅ COMPLETE (as of 2026-03-15) |
 | **What Was Delivered** | Event-sourced Promotion/Coupon aggregates, command handlers, validation endpoint, 11 integration tests |
-| **Next Cycle** | Cycle 30 (Promotions BC Phase 2) — Redemption workflow & Shopping/Pricing integration |
-| **Completed Cycles** | 25, 26, 27, 28, 29 Phase 1, 29 Phase 2 |
-| **Active BCs** | 17 (including Returns, Correspondence, Admin Identity, Promotions Phase 1) |
+| **Next Milestone** | M30.0 (Promotions BC Redemption) — Redemption workflow & Shopping/Pricing integration |
+| **Completed Milestones** | M25.0, M25.1, M25.2, M28.0, M29.0, M29.1 |
+| **Active BCs** | 17 (including Returns, Correspondence, Admin Identity, Promotions) |
 
 ---
 
-## Current Cycle
+## Current Milestone
 
-**Cycle:** 29 Phase 2 — Promotions BC Phase 1 *(just completed)*
+**Milestone:** M29.1 — Promotions BC Core *(just completed)*
 **Status:** ✅ **COMPLETE** — Core promotion/coupon lifecycle, validation, query layer delivered
-**GitHub Milestone:** Cycle 29 Phase 2
+**GitHub Milestone:** M29.1: Promotions BC Core
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 
 ---
 
 ## What's Done
 
-**Cycles 25, 26, 27, 28, 29 Phase 1, and 29 Phase 2 are COMPLETE.**
-- Returns BC (Phases 1-3)
-- Correspondence BC (Phase 1)
-- Admin Identity BC (Phase 1)
-- **Promotions BC (Phase 1)** ✅ NEW
+**Milestones M25.0, M25.1, M25.2, M28.0, M29.0, and M29.1 are COMPLETE.**
+- Returns BC (M25.0-M25.2)
+- Correspondence BC (M28.0)
+- Admin Identity BC (M29.0)
+- **Promotions BC (M29.1)** ✅ NEW
 
-**What Cycle 25 delivered (Returns BC Phase 1):**
+> **Note:** Historical milestones used "Cycle N" naming. See [Milestone Mapping](milestone-mapping.md) for translation.
+
+**What M25.0 delivered (Returns BC Core):**
 - ✅ Event-sourced Return aggregate (10 lifecycle states, 9 domain events)
 - ✅ 6 command handlers: RequestReturn, ApproveReturn, DenyReturn, ReceiveReturn, SubmitInspection, ExpireReturn
 - ✅ ReturnEligibilityWindow (from Fulfillment.ShipmentDelivered)
@@ -52,7 +57,7 @@
 - ✅ 48 unit tests + 5 integration tests
 - [Phase 1 Retrospective](cycles/cycle-25-returns-bc-phase-1.md)
 
-**What Cycle 26 delivered (Returns BC Phase 2):**
+**What M25.1 delivered (Returns BC Mixed Inspection):**
 - ✅ `ReturnCompleted` expanded with per-item disposition (CustomerId, IReadOnlyList\<ReturnedItem\>)
 - ✅ 5 new integration events: ReturnApproved, ReturnRejected, ReturnExpired, ReturnReceived, ReturnedItem
 - ✅ `ReturnDenied` expanded with CustomerId and customer-facing Message
@@ -66,7 +71,7 @@
 - [Phase 2 Implementation Plan](cycles/cycle-26-returns-bc-phase-2.md)
 - [Phase 2 Retrospective](cycles/cycle-26-returns-bc-phase-2-retrospective.md)
 
-**What Cycle 27 delivered (Returns BC Phase 3):**
+**What M25.2 delivered (Returns BC Exchanges):**
 - ✅ Exchange workflow (UC-11) — `ReturnType` enum, `ExchangeRequest` record, 5 exchange domain events, 3 command handlers (ApproveExchange, DenyExchange, ShipReplacementItem), 6 integration messages
 - ✅ CE SignalR handlers — 7 handlers in `Storefront/Notifications/`, `ReturnStatusChanged` event added to discriminated union
 - ✅ Sequential returns — `IsReturnInProgress` (bool) → `ActiveReturnIds` (IReadOnlyList<Guid>) saga refactor
@@ -78,7 +83,7 @@
 - [Phase 3 Plan](cycles/cycle-27-returns-bc-phase-3.md)
 - [Phase 3 Retrospective](cycles/cycle-27-returns-bc-phase-3-retrospective.md)
 
-**What Cycle 28 delivered (Correspondence BC Phase 1):**
+**What M28.0 delivered (Correspondence BC Core):**
 - ✅ Message aggregate (event-sourced) with 4 domain events: MessageQueued, MessageDelivered, DeliveryFailed, MessageSkipped
 - ✅ Provider interfaces (IEmailProvider, StubEmailProvider)
 - ✅ Integration handler: OrderPlacedHandler (email order confirmations)
@@ -92,7 +97,7 @@
 - ✅ Port 5248 allocated and configured
 - [Phase 1 Retrospective](cycles/cycle-28-correspondence-bc-phase-1-retrospective.md)
 
-**What Cycle 29 Phase 1 delivered (Admin Identity BC):**
+**What M29.0 delivered (Admin Identity BC):**
 - ✅ ADR 0031: RBAC model for Admin Portal (7 roles, policy-based authorization)
 - ✅ EF Core entity model: AdminUser, AdminRole enum, AdminUserStatus enum, AdminIdentityDbContext
 - ✅ Authentication handlers: Login (JWT + refresh token), RefreshToken (rotation pattern), Logout
@@ -104,7 +109,7 @@
 - ✅ CONTEXTS.md + CLAUDE.md + CURRENT-CYCLE.md documentation updates
 - [Phase 1 Retrospective](cycles/cycle-29-admin-identity-phase-1-retrospective.md)
 
-**What Cycle 29 Phase 2 delivered (Promotions BC Phase 1 — MVP):**
+**What M29.1 delivered (Promotions BC Core — MVP):**
 - ✅ Event-sourced Promotion aggregate (UUID v7) — 6 domain events: PromotionCreated, PromotionActivated, PromotionPaused, PromotionResumed, PromotionCancelled, PromotionExpired
 - ✅ Event-sourced Coupon aggregate (UUID v5 from code) — 4 domain events: CouponIssued, CouponRedeemed, CouponRevoked, CouponExpired
 - ✅ Domain enums: PromotionStatus (Draft, Scheduled, Active, Paused, Expired, Cancelled), CouponStatus (Issued, Redeemed, Expired, Revoked), DiscountType (PercentageOff, FixedAmountOff, FreeShipping)
@@ -121,16 +126,16 @@
 - [Phase 2 Retrospective](cycles/cycle-29-phase-2-retrospective-notes.md)
 - **Deferred to Phase 2:** Batch coupon generation, scheduled messages, redemption tracking, Shopping BC integration, Pricing BC floor price integration
 
-**Next cycles (roadmap):**
-- **Cycle 30:** Promotions BC Phase 2 — Redemption workflow, Shopping/Pricing BC integration, batch coupon generation
-- **Cycle 31:** Correspondence BC Phase 2 — Additional integration events (Shipment, Returns, Payments), SMS channel (Twilio)
-- **Cycle 32+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
+**Next milestones (roadmap):**
+- **M30.0:** Promotions BC Redemption — Redemption workflow, Shopping/Pricing BC integration, batch coupon generation
+- **M31.0:** Correspondence BC Extended — Additional integration events (Shipment, Returns, Payments), SMS channel (Twilio)
+- **M32.0+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
 
 ---
 
 ## Recently Completed
 
-- ✅ **Cycle 29 Phase 2:** Promotions BC Phase 1 — MVP (2026-03-14 to 2026-03-15) — **COMPLETE**
+- ✅ **M29.1:** Promotions BC Core — MVP (2026-03-14 to 2026-03-15) — **COMPLETE**
   - Event-sourced Promotion aggregate (UUID v7) with 6 domain events
   - Event-sourced Coupon aggregate (UUID v5 from code) with 4 domain events
   - Command handlers: CreatePromotion, ActivatePromotion, IssueCoupon
@@ -140,10 +145,10 @@
   - 11 integration tests (all passing)
   - Port 5250 allocated
   - **Pattern Discoveries:** IStartStream return type, snapshot projection requirement for queryability
-  - **Deferred to Phase 2:** Redemption tracking, batch generation, Shopping/Pricing integration
+  - **Deferred to M30.0:** Redemption tracking, batch generation, Shopping/Pricing integration
   - [Retrospective](./cycles/cycle-29-phase-2-retrospective-notes.md)
 
-- ✅ **Cycle 29 Phase 1:** Admin Identity BC (2026-03-14) — **COMPLETE**
+- ✅ **M29.0:** Admin Identity BC (2026-03-14) — **COMPLETE**
   - ADR 0031: RBAC model (7 roles, policy-based authorization)
   - EF Core entity model: AdminUser, AdminRole, AdminUserStatus, AdminIdentityDbContext
   - Authentication handlers: Login, RefreshToken, Logout (JWT + refresh token rotation)
@@ -155,7 +160,7 @@
   - CONTEXTS.md + CLAUDE.md + CURRENT-CYCLE.md documentation
   - [Retrospective](./cycles/cycle-29-admin-identity-phase-1-retrospective.md)
 
-- ✅ **Cycle 28:** Correspondence BC Phase 1 (2026-03-13 to 2026-03-14) — **COMPLETE**
+- ✅ **M28.0:** Correspondence BC Core (2026-03-13 to 2026-03-14) — **COMPLETE**
   - Message aggregate (event-sourced) — 4 domain events, retry lifecycle
   - Provider interfaces (IEmailProvider, StubEmailProvider)
   - OrderPlacedHandler — email order confirmations
@@ -167,7 +172,7 @@
   - Sign-offs: PSA ✅, PO ✅ (planning phase)
   - [Retrospective](./cycles/cycle-28-correspondence-bc-phase-1-retrospective.md)
 
-- ✅ **Cycle 27:** Returns BC Phase 3 (2026-03-13) — **COMPLETE**
+- ✅ **M25.2:** Returns BC Exchanges (2026-03-13) — **COMPLETE**
   - Exchange workflow (UC-11) — ReturnType enum, ExchangeRequest, 5 exchange domain events, 3 command handlers
   - 6 integration messages for exchange workflow
   - CE SignalR handlers — 7 handlers, ReturnStatusChanged discriminated union event
@@ -179,7 +184,7 @@
   - Sign-offs: PSA ✅, PO ✅, UXE ✅ (planning phase)
   - [Plan](./cycles/cycle-27-returns-bc-phase-3.md) | [Retrospective](./cycles/cycle-27-returns-bc-phase-3-retrospective.md)
 
-- ✅ **Cycle 26:** Returns BC Phase 2 (2026-03-12 to 2026-03-13) — **COMPLETE**
+- ✅ **M25.1:** Returns BC Mixed Inspection (2026-03-12 to 2026-03-13) — **COMPLETE**
   - ReturnCompleted expanded with per-item disposition (CustomerId, ReturnedItem[])
   - 5 new integration events (ReturnApproved, ReturnRejected, ReturnExpired, ReturnReceived, ReturnedItem)
   - ReturnDenied expanded with CustomerId and Message
@@ -192,7 +197,7 @@
   - Sign-offs: PSA ✅, PO ✅, UXE ✅
   - [Plan](./cycles/cycle-26-returns-bc-phase-2.md) | [Retrospective](./cycles/cycle-26-returns-bc-phase-2-retrospective.md)
 
-- ✅ **Cycle 25:** Returns BC Phase 1 (2026-03-12) — **COMPLETE**
+- ✅ **M25.0:** Returns BC Core (2026-03-12) — **COMPLETE**
   - Event-sourced Return aggregate (10 lifecycle states, 9 domain events)
   - 6 command handlers + 7 API endpoints (port 5245)
   - ReturnEligibilityWindow from Fulfillment.ShipmentDelivered
@@ -274,11 +279,11 @@
 
 ## Upcoming (Planned)
 
-### Next 3-4 Cycles
+### Next 3-4 Milestones
 
-> **Revised after Cycle 29 Phase 2 completion (2026-03-15)**
+> **Revised after M29.1 completion (2026-03-15)**
 
-- **Cycle 30:** Promotions BC Phase 2 — Redemption Workflow & Integration
+- **M30.0:** Promotions BC Redemption — Redemption Workflow & Integration
   - RedeemCoupon command + handler (usage limit enforcement via optimistic concurrency)
   - RevokeCoupon command + handler (admin action)
   - Expire Coupon scheduled message (Wolverine delayed messaging)
@@ -289,16 +294,16 @@
   - ActivePromotionsView projection (for customer-facing promotion listings)
   - RabbitMQ integration messages: PromotionActivated, PromotionExpired
   - Docker Compose + Aspire configuration
-  - ADR 0032: Promotions BC architecture decisions
+  - ADR 0032: Milestone-based planning schema
 
-- **Cycle 31:** Correspondence BC Phase 2 — Extended Integration & SMS
+- **M31.0:** Correspondence BC Extended — Extended Integration & SMS
   - Phase 2a: ShipmentDispatched, ShipmentDelivered, ShipmentDeliveryFailed (Fulfillment BC)
   - Phase 2b: ReturnApproved, ReturnDenied, ReturnCompleted, ReturnExpired (Returns BC)
   - Phase 2c: RefundCompleted (Payments BC)
   - SMS channel implementation (Twilio integration)
   - Template system for email/SMS message formatting
 
-- **Cycle 32+:** Admin Portal Phase 1 — Read-Only Dashboards
+- **M32.0+:** Admin Portal Phase 1 — Read-Only Dashboards
   - Event Modeling: [`docs/planning/admin-portal-event-modeling-revised.md`](admin-portal-event-modeling-revised.md)
   - Integration Gap Register: [`docs/planning/admin-portal-integration-gap-register.md`](admin-portal-integration-gap-register.md)
   - Prerequisites: Multi-issuer JWT support in domain BCs, HTTP endpoint gaps closed
@@ -308,13 +313,13 @@
 ### Future BCs (Priority Roadmap)
 
 **High Priority (Active Development or Near-Term):**
-- 🟢 **Promotions BC Phase 2** — Redemption workflow, Shopping/Pricing integration *(Cycle 30)*
-- 🟢 **Correspondence BC Phase 2** — Extended integration events, SMS channel *(Cycle 31)*
-- 🟢 **Admin Portal** — Internal operations portal *(Cycle 32+, prerequisites: multi-issuer JWT, endpoint gaps closed)*
+- 🟢 **Promotions BC Redemption (M30.0)** — Redemption workflow, Shopping/Pricing integration
+- 🟢 **Correspondence BC Extended (M31.0)** — Extended integration events, SMS channel
+- 🟢 **Admin Portal (M32.0+)** — Internal operations portal *(prerequisites: multi-issuer JWT, endpoint gaps closed)*
 
 **Medium Priority (Customer-Facing Features):**
 - 🟡 **Exchange v2** — Cross-product exchanges, upcharge payment collection
-- 🟡 **Product Catalog Evolution** — Variants, Listings, Marketplaces *(D2–D10 decisions resolved; [cycle plan](catalog-listings-marketplaces-cycle-plan.md) approved — Cycles 33–39 estimated)*
+- 🟡 **Product Catalog Evolution** — Variants, Listings, Marketplaces *(D2–D10 decisions resolved; [milestone plan](catalog-listings-marketplaces-cycle-plan.md) approved — Milestones M33–M39 estimated)*
 - 🟡 **Search BC** — Full-text product search, faceted navigation
 - 🟡 **Recommendations BC** — Personalized product recommendations
 
@@ -339,5 +344,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-15 (Cycle 29 Phase 2 closed; Promotions BC Phase 1 complete — core promotion/coupon lifecycle, validation, query layer, 11 integration tests delivered)*
-*Update this file at: cycle start, cycle end, and when significant task changes occur*
+*Last Updated: 2026-03-15 (M29.1 closed; Promotions BC Core complete — core promotion/coupon lifecycle, validation, query layer, 11 integration tests delivered)*
+*Update this file at: milestone start, milestone end, and when significant task changes occur*
