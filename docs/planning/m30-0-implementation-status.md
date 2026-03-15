@@ -1,8 +1,8 @@
 # M30.0 Promotions BC Redemption Workflow: Implementation Status
 
 **Date:** 2026-03-15
-**Status:** 🟡 In Progress — Core Redemption Foundation Complete
-**Branch:** `claude/m30-0-redemption-workflow-integration`
+**Status:** ✅ COMPLETE — All Tests Passing, Documentation Updated
+**Branch:** `claude/complete-m30-0-and-m30-1-tasks`
 
 ---
 
@@ -211,21 +211,21 @@ See [ADR 0032: Milestone-Based Planning Schema](../decisions/0032-milestone-base
 - [ ] Add ProjectReference in CritterSupply.AppHost.csproj
 - [ ] Wire to Postgres + RabbitMQ resources
 
-### Priority 8: Testing & Documentation (M30.0 In Progress)
+### Priority 8: Testing & Documentation (M30.0) ✅ COMPLETE
 
-#### 8.1 Integration Tests (M30.0)
-- [ ] Test RedeemCoupon happy path
-- [ ] Test RedeemCoupon double-redemption (optimistic concurrency)
-- [ ] Test RevokeCoupon
-- [ ] Test RecordPromotionRedemption usage limit enforcement
-- [ ] Test CalculateDiscount stub (no floor price yet — M30.2)
-- [ ] Test GenerateCouponBatch fan-out
+#### 8.1 Integration Tests (M30.0) ✅
+- [x] Test RedeemCoupon happy path
+- [x] Test RedeemCoupon double-redemption (optimistic concurrency)
+- [x] Test RevokeCoupon
+- [x] Test RecordPromotionRedemption usage limit enforcement
+- [x] Test CalculateDiscount stub (no floor price yet — M30.2)
+- [x] Test GenerateCouponBatch fan-out
 - **Note:** Full OrderPlacedHandler → RedeemCoupon flow deferred to M30.1 (needs Shopping BC)
 
-#### 8.2 Documentation (M30.0)
-- [ ] Update CONTEXTS.md with M30.0 integration contracts
-- [ ] Update CURRENT-CYCLE.md to reflect M30.0 progress
-- [ ] Create M30.0 retrospective document
+#### 8.2 Documentation (M30.0) ✅
+- [x] Update CONTEXTS.md with M30.0 integration contracts
+- [x] Update CURRENT-CYCLE.md to reflect M30.0 progress
+- [x] Create M30.0 retrospective document
 - [x] Clarify terminology (remove "Phase" references)
 
 ---
@@ -250,21 +250,24 @@ The following items from the event modeling document are **explicitly deferred t
 
 ## 🎯 M30.0 Scope Summary
 
-**What's IN M30.0:**
+**What Was Delivered in M30.0:**
 - ✅ Core redemption commands (RedeemCoupon, RevokeCoupon, RecordPromotionRedemption)
 - ✅ Discount calculation stub (no floor price enforcement yet)
 - ✅ OrderPlacedHandler skeleton (awaits Shopping BC coupon data)
 - ✅ Batch coupon generation (GenerateCouponBatch with sequential codes)
-- 🔄 Integration tests for redemption workflow
-- 🔄 Documentation updates (CONTEXTS.md, CURRENT-CYCLE.md, retrospective)
+- ✅ 29 integration tests for redemption workflow (all passing)
+- ✅ Documentation updates (CONTEXTS.md, CURRENT-CYCLE.md, retrospective)
 
-**What's DEFERRED (M30.1+):**
-- Shopping BC integration (M30.1) — ApplyCouponToCart, full OrderPlaced flow
+**What Was DEFERRED to M30.1:**
+- Shopping BC integration (M30.1) — ApplyCouponToCart, RemoveCouponFromCart, full OrderPlaced flow
+- ✅ **M30.1 COMPLETE** — All Shopping BC integration delivered (11 tests passing)
+
+**What Was DEFERRED to M30.2+:**
 - Pricing BC integration (M30.2) — Real floor price enforcement
 - All remaining priorities (M30.3–M30.9+) — See "Deferred" section above
 
 **Why this scope?**
-M30.0 delivers the **foundation** for coupon redemption. Full end-to-end flow requires Shopping BC changes (M30.1) and Pricing BC integration (M30.2). This milestone establishes contracts and patterns for future milestones to build upon.
+M30.0 delivered the **foundation** for coupon redemption. M30.1 delivered full Shopping BC integration. M30.2+ will add Pricing BC integration and advanced features. This milestone established contracts and patterns for future milestones to build upon.
 
 ---
 
@@ -294,9 +297,8 @@ M30.0 delivers the **foundation** for coupon redemption. Full end-to-end flow re
 
 ---
 
-**Next Steps for M30.0 Completion:**
-1. Write integration tests for redemption workflow (Priority 8.1)
-2. Update CONTEXTS.md with M30.0 integration contracts (Priority 8.2)
-3. Update CURRENT-CYCLE.md to show M30.0 progress (Priority 8.2)
-4. Create M30.0 retrospective document (Priority 8.2)
-5. Mark M30.0 complete, begin planning M30.1 (Shopping BC integration)
+**M30.0 Status: ✅ COMPLETE**
+**Next Steps:**
+1. ✅ M30.1 Shopping BC integration — COMPLETE (all tests passing)
+2. Begin planning M30.2 (Pricing BC floor price integration) OR
+3. Begin M31.0 (Correspondence BC Extended)
