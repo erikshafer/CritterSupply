@@ -1,0 +1,1589 @@
+# Critter Stack Event Sourcing Projections
+
+**Purpose:** Building read models (projections) from event-sourced aggregates in the Critter Stack (Marten + Polecat) — transforming append-only event streams into queryable denormalized views.
+
+**When to read this:** Before implementing any projection from event-sourced aggregates, especially when you need queryable read models for hot-path queries, reporting, or cross-stream aggregation.
+
+**Scope:** This document covers projections specifically — the read/view model layer. For event-sourced aggregate design, command handlers, and event modeling, see `marten-event-sourcing.md`.
+
+---
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [When to Use Projections](#when-to-use-projections)
+3. [Projection Types and Lifecycles](#projection-types-and-lifecycles)
+4. [Single-Stream Projections](#single-stream-projections)
+5. [Multi-Stream Projections](#multi-stream-projections)
+6. [Live Aggregation and FetchForWriting](#live-aggregation-and-fetchforwriting)
+7. [Snapshot Projections](#snapshot-projections)
+8. [Projection Registration and Configuration](#projection-registration-and-configuration)
+9. [Event Metadata in Projections](#event-metadata-in-projections)
+10. [Querying Projected Documents](#querying-projected-documents)
+11. [Testing Projection Logic](#testing-projection-logic)
+12. [Polecat Compatibility](#polecat-compatibility)
+13. [Common Pitfalls and Warnings](#common-pitfalls-and-warnings)
+14. [Production Lessons Learned](#production-lessons-learned)
+15. [Decision Matrix: Which Projection Pattern?](#decision-matrix-which-projection-pattern)
+16. [Appendix: How Projections Work Under the Hood](#appendix-how-projections-work-under-the-hood)
+
+---
+
+## Overview
+
+**What are projections?**
+
+Projections are denormalized read models built from event-sourced aggregates. They transform append-only event streams (the write model) into queryable documents or relational tables (the read model). This is the **read side** of CQRS (Command Query Responsibility Segregation).
+
+**Why projections matter:**
+
+- **Performance:** Querying raw event streams is slow (replaying hundreds of events per query). Projections pre-compute views.
+- **Denormalization:** Projections can combine data from multiple event streams into a single queryable document.
+- **Query optimization:** Projections enable indexes, full-text search, and LINQ queries that would be impossible on raw events.
+- **Separation of concerns:** Write model (aggregates) optimized for business logic; read model (projections) optimized for queries.
+
+**The Critter Stack:** This document covers both **Marten** (PostgreSQL) and **Polecat** (SQL Server). Both libraries share the same projection API surface — code is portable with minimal changes.
+
+---
+
+## When to Use Projections
+
+✅ **Use projections when:**
+
+1. **Hot-path queries need <100ms response times** — Projections pre-compute views so queries are simple lookups
+   - Example: Product price lookup in `CurrentPriceView` (Pricing BC) — inline projection ensures zero lag
+   - Example: Coupon code lookup in `CouponLookupView` (Promotions BC) — inline projection for redemption workflow
+
+2. **Querying raw event streams is too slow** — Aggregate snapshots or inline projections avoid event replay overhead
+   - Example: `Checkout` snapshot (Orders BC) — queries load single document instead of replaying 5-10 events
+   - Example: `Promotion` snapshot (Promotions BC) — status checks don't require event replay
+
+3. **You need denormalized views across multiple streams** — Multi-stream projections aggregate events by a non-stream property
+   - Example: Pricing's `CurrentPriceView` — Guid streams → string-keyed documents (SKU as ID)
+   - Example: Returns analytics — aggregate return items by product SKU across many return streams
+
+4. **Business logic requires queryable aggregate state** — Command handlers need to check aggregate state before appending events
+   - Example: `SetPrice` handler (Pricing BC) loads `ProductPrice` snapshot to validate floor/ceiling constraints
+   - Example: Coupon redemption checks `Coupon` snapshot status before appending `CouponRedeemed`
+
+5. **You're building a read-optimized view for a BFF** — Projections create tailored views for UI composition
+   - Example: Storefront BFF queries `CurrentPriceView` to compose `CartView` with live pricing
+
+❌ **Do NOT use projections when:**
+
+1. **The event stream itself is the query model** — If consumers query raw events (e.g., audit logs), no projection needed
+2. **Write-only aggregates** — If you only append events and never query, skip projections (e.g., audit trail aggregates)
+3. **Cross-BC HTTP queries are simpler** — BFFs often compose via HTTP instead of projecting locally
+
+---
+
+## Projection Types and Lifecycles
+
+### The Three Projection Types
+
+| Type | Use Case | Example from CritterSupply |
+|------|----------|----------------------------|
+| **Single-Stream** | Aggregate a single event stream into one document | `Checkout` snapshot (Orders BC) |
+| **Multi-Stream** | Aggregate events across multiple streams by a property | `CurrentPriceView` (Pricing BC) — Guid streams → SKU-keyed documents |
+| **Live Aggregation** | On-demand event replay (no persistent projection) | Command handlers using `FetchForWriting()` (preferred) |
+
+### The Three Projection Lifecycles
+
+| Lifecycle | When Events Are Processed | Latency | Use Case |
+|-----------|---------------------------|---------|----------|
+| **Inline** | Same transaction as command | 0ms | Hot-path queries (price lookups, coupon validation) |
+| **Async** | Background daemon (seconds) | 1-5s | Reporting views, analytics, less-critical reads |
+| **Live** | On-demand query (event replay every time) | 50-500ms | Ad-hoc queries, admin views, rarely-used endpoints |
+
+**Key insight:** Inline projections are **zero-lag** — the projection document is updated in the same transaction that appends the event. This eliminates eventual consistency lag for hot-path queries.
+
+---
+
+## Single-Stream Projections
+
+### Overview
+
+**Single-stream projections** aggregate a single event stream into one document. One stream → One projection document. The document ID typically matches the stream ID.
+
+**When to use:**
+- Snapshot queryable aggregates (avoid event replay on every query)
+- Denormalize aggregate state into a read-optimized shape
+- Enable indexed queries on aggregate properties
+
+### Anatomy: Create() and Apply() Methods
+
+Marten discovers projection methods via **convention-based naming**:
+
+```csharp
+public sealed class MyProjection : SingleStreamProjection<MyDocument>
+{
+    // OPTIONAL: Create() method runs on the first event
+    // If omitted, Marten creates an empty document
+    public MyDocument Create(FirstEvent evt)
+    {
+        return new MyDocument
+        {
+            Id = evt.AggregateId,
+            Property = evt.Value,
+            CreatedAt = evt.Timestamp
+        };
+    }
+
+    // Apply() methods handle subsequent events
+    // MUST be static for inline projections (thread safety)
+    public static MyDocument Apply(MyDocument current, SubsequentEvent evt)
+    {
+        return current with { Property = evt.NewValue, UpdatedAt = evt.Timestamp };
+    }
+
+    // Additional Apply() overloads for each event type
+    public static MyDocument Apply(MyDocument current, AnotherEvent evt)
+    {
+        return current with { AnotherProperty = evt.Data };
+    }
+}
+```
+
+**Key conventions:**
+- `Create()` is optional — if omitted, Marten creates an empty document using the parameterless constructor
+- `Apply()` methods **must** be `static` for inline projections (Marten's thread-safety requirement)
+- Method names are **exact** — `Create` and `Apply`, case-sensitive
+- Return type must match the projection document type
+- Parameter order: `(document, event)` for Apply methods
+
+### Example: Checkout Snapshot (Orders BC)
+
+The `Checkout` aggregate in Orders BC uses a snapshot projection for queryable state:
+
+```csharp
+// In Orders.Api/Program.cs
+opts.Projections.Snapshot<Checkout>(SnapshotLifecycle.Inline);
+```
+
+**Why inline?** Checkout status queries must be zero-lag — cart expiry, checkout completion, and order placement all check `Checkout` state synchronously.
+
+**What this enables:**
+- `GET /api/checkout/{checkoutId}` queries the snapshot document (no event replay)
+- `CompleteCheckout` handler loads snapshot to validate state before appending `CheckoutCompleted`
+- Snapshot is always current (updated in same transaction as events)
+
+**Aggregate as projection document:**
+
+When the aggregate type itself serves as the projection document (common with snapshots), the `Create()` and `Apply()` methods live on the aggregate:
+
+```csharp
+public sealed record Checkout
+{
+    public Guid Id { get; init; }
+    public CheckoutStatus Status { get; init; }
+    public IReadOnlyList<CheckoutLineItem> Items { get; init; } = [];
+    public Address? ShippingAddress { get; init; }
+
+    // Create method for CheckoutInitiated (first event)
+    public static Checkout Create(CheckoutInitiated evt)
+    {
+        return new Checkout
+        {
+            Id = evt.CheckoutId,
+            Status = CheckoutStatus.InProgress,
+            Items = evt.Items,
+        };
+    }
+
+    // Apply methods for subsequent events
+    public static Checkout Apply(Checkout current, ShippingAddressSet evt)
+    {
+        return current with { ShippingAddress = evt.Address };
+    }
+
+    public static Checkout Apply(Checkout current, CheckoutCompleted evt)
+    {
+        return current with { Status = CheckoutStatus.Completed };
+    }
+}
+```
+
+**Key pattern:** Marten discovers `Create()` and `Apply()` methods on the aggregate type when you configure `.Snapshot<Checkout>()`. No separate projection class needed.
+
+---
+
+## Multi-Stream Projections
+
+### Overview
+
+**Multi-stream projections** aggregate events from multiple event streams into a single projection document. The document ID is derived from an event property, not the stream ID.
+
+**Use cases:**
+- **Cross-stream aggregation:** "All returns for a given SKU" (many return streams → one document per SKU)
+- **Different stream ID vs. document ID:** Event streams use Guid IDs, but queries use string keys (e.g., SKU)
+- **Grouping by property:** Multiple event streams contribute to one projection based on a shared property
+
+### Anatomy: Identity<T>() Mapping
+
+Multi-stream projections require explicit identity mapping — you tell Marten which property from each event type becomes the document ID:
+
+```csharp
+public sealed class MyMultiStreamProjection : MultiStreamProjection<MyDocument, string>
+{
+    public MyMultiStreamProjection()
+    {
+        // Map each event type to the document ID property
+        Identity<EventTypeA>(x => x.Sku);  // Use SKU as document ID
+        Identity<EventTypeB>(x => x.Sku);
+        Identity<EventTypeC>(x => x.Sku);
+    }
+
+    // Create() for the first event type that creates the document
+    public MyDocument Create(EventTypeA evt)
+    {
+        return new MyDocument
+        {
+            Id = evt.Sku,  // Document ID matches the Identity mapping
+            // ... other properties
+        };
+    }
+
+    // Apply() methods for subsequent events
+    public static MyDocument Apply(MyDocument current, EventTypeB evt)
+    {
+        return current with { /* updates */ };
+    }
+}
+```
+
+**Key differences from single-stream:**
+- Inherit from `MultiStreamProjection<TDoc, TId>` (TId is the document key type, often `string`)
+- Call `Identity<TEvent>(x => x.Property)` in the constructor for each event type
+- The `Create()` method's event type determines which event *creates* the document
+- All events with matching identity values update the same document
+
+### Example: CurrentPriceView (Pricing BC)
+
+The Pricing BC uses a multi-stream projection to map Guid event streams to string-keyed documents (SKU as ID):
+
+```csharp
+public sealed class CurrentPriceViewProjection : MultiStreamProjection<CurrentPriceView, string>
+{
+    public CurrentPriceViewProjection()
+    {
+        // Tell Marten which property to use as the document ID for each event type
+        // This allows Guid streams to produce string-keyed documents
+        Identity<InitialPriceSet>(x => x.Sku);
+        Identity<PriceChanged>(x => x.Sku);
+        Identity<PriceChangeScheduled>(x => x.Sku);
+        Identity<ScheduledPriceChangeCancelled>(x => x.Sku);
+        Identity<ScheduledPriceActivated>(x => x.Sku);
+        Identity<FloorPriceSet>(x => x.Sku);
+        Identity<CeilingPriceSet>(x => x.Sku);
+        Identity<PriceCorrected>(x => x.Sku);
+        Identity<PriceDiscontinued>(x => x.Sku);
+    }
+
+    // Create method for InitialPriceSet (first event creates the document)
+    public CurrentPriceView Create(InitialPriceSet evt)
+    {
+        return new CurrentPriceView
+        {
+            Id = evt.Sku,  // Document ID is SKU string
+            Sku = evt.Sku,
+            BasePrice = evt.Price.Amount,
+            Currency = evt.Price.Currency,
+            FloorPrice = evt.FloorPrice?.Amount,
+            CeilingPrice = evt.CeilingPrice?.Amount,
+            Status = PriceStatus.Published,
+            HasPendingSchedule = false,
+            LastUpdatedAt = evt.PricedAt
+        };
+    }
+
+    // Apply methods for subsequent events
+    public static CurrentPriceView Apply(CurrentPriceView view, PriceChanged evt)
+    {
+        return view with
+        {
+            BasePrice = evt.NewPrice.Amount,
+            Currency = evt.NewPrice.Currency,
+            PreviousBasePrice = evt.OldPrice.Amount,
+            PreviousPriceSetAt = evt.PreviousPriceSetAt,
+            LastUpdatedAt = evt.ChangedAt
+        };
+    }
+
+    public static CurrentPriceView Apply(CurrentPriceView view, PriceChangeScheduled evt)
+    {
+        return view with
+        {
+            HasPendingSchedule = true,
+            ScheduledChangeAt = evt.ScheduledFor,
+            ScheduledPrice = evt.ScheduledPrice.Amount,
+            LastUpdatedAt = evt.ScheduledAt
+        };
+    }
+
+    // ... other Apply() methods for remaining event types
+}
+```
+
+**Registration:**
+
+```csharp
+// In Pricing.Api/Program.cs
+opts.Projections.Add<CurrentPriceViewProjection>(ProjectionLifecycle.Inline);
+```
+
+**Why this pattern?**
+
+- **ProductPrice** event streams use Guid stream IDs (UUID v5 from SKU via `ProductPrice.StreamId(sku)` — see ADR 0016)
+- **CurrentPriceView** queries use SKU strings as document IDs (`session.LoadAsync<CurrentPriceView>("DOG-FOOD-5LB")`)
+- Multi-stream projection bridges the gap: `Identity<>(x => x.Sku)` maps Guid streams → string-keyed documents
+- Inline lifecycle ensures zero-lag price queries for Shopping BC (hot path)
+
+**Key insight:** Multi-stream projections enable **different identity spaces**. Event streams use one ID type (Guid); projection documents use another (string).
+
+### Example: CouponLookupView (Promotions BC)
+
+Similar pattern for coupon code lookups:
+
+```csharp
+public sealed class CouponLookupViewProjection : MultiStreamProjection<CouponLookupView, string>
+{
+    public CouponLookupViewProjection()
+    {
+        Identity<CouponIssued>(x => x.CouponCode);
+        Identity<CouponRedeemed>(x => x.CouponCode);
+        Identity<CouponRevoked>(x => x.CouponCode);
+        Identity<CouponExpired>(x => x.CouponCode);
+    }
+
+    public CouponLookupView Create(CouponIssued evt)
+    {
+        return new CouponLookupView
+        {
+            Id = evt.CouponCode.ToUpperInvariant(),  // Case-insensitive lookups
+            Code = evt.CouponCode.ToUpperInvariant(),
+            PromotionId = evt.PromotionId,
+            Status = CouponStatus.Issued,
+            IssuedAt = evt.IssuedAt
+        };
+    }
+
+    // ... Apply() methods
+}
+```
+
+**Why inline for coupon lookups?** Coupon redemption is hot-path — the Shopping BC validates coupon codes synchronously during checkout. Inline projection ensures the lookup view is always current.
+
+**Case normalization note:** The `Create()` method normalizes the coupon code to uppercase for case-insensitive queries. This is critical for string-keyed documents in Marten/Polecat.
+
+---
+
+## Live Aggregation and FetchForWriting
+
+### Overview
+
+**Live aggregation** means "replay events on-demand" instead of maintaining a persistent projection. Marten provides `AggregateStreamAsync<T>()` for this pattern.
+
+**However:** As of Marten 7.0+, the **preferred pattern** is `FetchForWriting<T>()`, which is optimized for the command handler workflow.
+
+### Why FetchForWriting() Is Better
+
+**The problem with naive event replay:**
+
+```csharp
+// ❌ ANTI-PATTERN: Manual event replay in command handlers
+public static class MyHandler
+{
+    public static async Task<IEnumerable<object>> Handle(MyCommand cmd, IDocumentSession session)
+    {
+        // Load the aggregate by replaying events (slow)
+        var aggregate = await session.Events.AggregateStreamAsync<MyAggregate>(cmd.AggregateId);
+
+        // Business logic
+        var events = aggregate.Process(cmd);
+
+        // Append events
+        session.Events.Append(cmd.AggregateId, events);
+
+        return events;
+    }
+}
+```
+
+**Problems:**
+1. Event replay happens on every command (performance overhead)
+2. No optimistic concurrency check — concurrent commands can corrupt state
+3. Boilerplate ceremony in every handler
+
+**The solution: FetchForWriting()**
+
+`FetchForWriting<T>()` combines event replay, optimistic concurrency, and aggregate persistence into one API:
+
+```csharp
+// ✅ CORRECT PATTERN: Use FetchForWriting() for command handlers
+public static class MyHandler
+{
+    public static async Task<IEnumerable<object>> Handle(
+        MyCommand cmd,
+        IDocumentSession session)
+    {
+        // Fetch aggregate with optimistic concurrency tracking
+        var aggregate = await session.Events
+            .FetchForWriting<MyAggregate>(cmd.AggregateId);
+
+        // Business logic (pure function)
+        var events = aggregate.Process(cmd);
+
+        // Marten automatically appends events with version check
+        return events;
+    }
+}
+```
+
+**What FetchForWriting() does:**
+
+1. **Replays events** to reconstitute the aggregate
+2. **Tracks the stream version** for optimistic concurrency
+3. **Automatically appends events** returned by the handler
+4. **Throws ConcurrencyException** if another command modified the stream concurrently
+5. **Uses inline snapshot** if available (performance optimization — see below)
+
+**Key insight:** FetchForWriting() is **not** a projection — it's an optimization for command handlers. The aggregate state is ephemeral (exists only during the command). If you need **queryable** aggregate state, use a snapshot projection instead.
+
+### When to Use Each Pattern
+
+| Pattern | Use Case | Performance | Queryable? |
+|---------|----------|-------------|------------|
+| **Inline Snapshot** | Queryable aggregate state (queries + commands) | ⚡ Fastest (no replay) | ✅ Yes |
+| **FetchForWriting()** | Command-only workflows (no queries) | 🟡 Medium (replay + concurrency) | ❌ No |
+| **AggregateStreamAsync()** | Ad-hoc queries, time travel, debugging | 🔴 Slow (full replay) | ❌ No (ephemeral) |
+
+**Recommendation:** Use **inline snapshots** for aggregates that are both queried and modified. Use **FetchForWriting()** for write-only aggregates. Avoid `AggregateStreamAsync()` in production hot paths.
+
+### Example: ProductPrice (Pricing BC)
+
+The Pricing BC uses `FetchForWriting()` for `ProductPrice` commands because the aggregate is **not** directly queried — `CurrentPriceView` projection is the query model:
+
+```csharp
+// Command handler uses FetchForWriting()
+public static class ChangePriceHandler
+{
+    public static async Task<IEnumerable<object>> Handle(
+        ChangePrice cmd,
+        IDocumentSession session)
+    {
+        var streamId = ProductPrice.StreamId(cmd.Sku);
+
+        // Fetch with optimistic concurrency
+        var price = await session.Events.FetchForWriting<ProductPrice>(streamId);
+
+        // Business logic
+        var evt = new PriceChanged(
+            price.Id,
+            cmd.Sku,
+            price.BasePrice,
+            Money.Of(cmd.NewPrice),
+            price.LastChangedAt ?? price.RegisteredAt,
+            cmd.Reason,
+            cmd.ChangedBy,
+            DateTimeOffset.UtcNow,
+            null,
+            null
+        );
+
+        return [evt];
+    }
+}
+```
+
+**Why FetchForWriting() here?**
+- `ProductPrice` aggregate is **write-only** in command handlers
+- `CurrentPriceView` projection handles all queries (inline, zero-lag)
+- No need to persist aggregate state separately — events + inline projection is sufficient
+
+**Contrast with Checkout (Orders BC):**
+
+The `Checkout` aggregate uses an **inline snapshot** because it's both queried and modified:
+
+```csharp
+// Snapshot projection for queryable state
+opts.Projections.Snapshot<Checkout>(SnapshotLifecycle.Inline);
+
+// Command handler loads snapshot (not FetchForWriting)
+public static class SetShippingAddressHandler
+{
+    public static async Task<ShippingAddressSet> Handle(
+        SetShippingAddress cmd,
+        [ReadAggregate] Checkout checkout)  // Wolverine loads snapshot
+    {
+        // Business logic
+        return new ShippingAddressSet(checkout.Id, cmd.Address);
+    }
+}
+```
+
+**Why snapshot instead of FetchForWriting()?**
+- `Checkout` is queried by `GET /api/checkout/{id}` (BFF needs to display cart contents)
+- Snapshot ensures queries don't replay events
+- Command handlers get zero-cost aggregate loading (snapshot is already current)
+
+---
+
+## Snapshot Projections
+
+### Overview
+
+**Snapshot projections** are a special case of single-stream projections where the aggregate type itself serves as the projection document. They're called "snapshots" because they capture the current aggregate state.
+
+**Key differences from regular projections:**
+- The aggregate type **is** the projection document (no separate document class)
+- `Create()` and `Apply()` methods live on the aggregate type
+- Configuration uses `.Snapshot<T>()` instead of `.Add<TProjection>()`
+
+### When to Use Snapshots
+
+✅ **Use snapshot projections when:**
+
+1. **Aggregate is queried and modified** — Commands and queries both need access to current state
+2. **Event replay is too slow** — Aggregates with 100+ events per stream benefit from snapshots
+3. **Hot-path command handlers** — Snapshots eliminate replay latency for high-throughput commands
+
+❌ **Do NOT use snapshots when:**
+
+1. **Write-only aggregates** — If queries don't need aggregate state, use FetchForWriting() instead
+2. **Separate query model** — If you already have a denormalized projection for queries, snapshot is redundant
+
+### Snapshot Lifecycles
+
+| Lifecycle | When Snapshot Updates | Use Case |
+|-----------|----------------------|----------|
+| **Inline** | Same transaction as events | Hot-path queries (zero lag required) |
+| **Async** | Background daemon (seconds) | Reporting, analytics, less-critical reads |
+
+**Inline is almost always correct for snapshots** — if you're using a snapshot, you likely need zero-lag queries.
+
+### Example: Checkout Snapshot (Orders BC)
+
+```csharp
+// In Orders.Api/Program.cs
+opts.Projections.Snapshot<Checkout>(SnapshotLifecycle.Inline);
+```
+
+**Aggregate with snapshot methods:**
+
+```csharp
+public sealed record Checkout
+{
+    public Guid Id { get; init; }
+    public CheckoutStatus Status { get; init; }
+    public IReadOnlyList<CheckoutLineItem> Items { get; init; } = [];
+    public Address? ShippingAddress { get; init; }
+    public PaymentMethod? PaymentMethod { get; init; }
+
+    // Create method for first event
+    public static Checkout Create(CheckoutInitiated evt)
+    {
+        return new Checkout
+        {
+            Id = evt.CheckoutId,
+            Status = CheckoutStatus.InProgress,
+            Items = evt.Items,
+        };
+    }
+
+    // Apply methods for subsequent events
+    public static Checkout Apply(Checkout current, ShippingAddressSet evt)
+    {
+        return current with { ShippingAddress = evt.Address };
+    }
+
+    public static Checkout Apply(Checkout current, PaymentMethodSet evt)
+    {
+        return current with { PaymentMethod = evt.PaymentMethod };
+    }
+
+    public static Checkout Apply(Checkout current, CheckoutCompleted evt)
+    {
+        return current with { Status = CheckoutStatus.Completed };
+    }
+}
+```
+
+**What Marten does:**
+
+1. Discovers `Create()` and `Apply()` methods on `Checkout` type
+2. Creates `mt_doc_checkout` table to store snapshot documents
+3. Updates snapshot in same transaction as event appends (inline lifecycle)
+4. Queries use `session.LoadAsync<Checkout>(checkoutId)` (no event replay)
+
+### Example: Promotion and Coupon Snapshots (Promotions BC)
+
+```csharp
+// In Promotions.Api/Program.cs
+opts.Projections.Snapshot<Promotion>(SnapshotLifecycle.Inline);
+opts.Projections.Snapshot<Coupon>(SnapshotLifecycle.Inline);
+```
+
+**Why snapshots for both?**
+- Promotion status is checked by Shopping BC during cart operations (hot path)
+- Coupon status is checked during redemption (hot path)
+- Both aggregates have 5-10 events per stream — snapshot avoids replay overhead
+
+**Key insight:** Even aggregates with relatively few events benefit from snapshots if queries are frequent. A 5-event replay is ~10ms — acceptable for one query, but a 10% latency tax on every cart operation adds up.
+
+---
+
+## Projection Registration and Configuration
+
+### Registration in Program.cs
+
+All projections are registered in the API's `Program.cs` inside the `AddMarten()` configuration block:
+
+```csharp
+builder.Services.AddMarten(opts =>
+{
+    opts.Connection(connectionString);
+    opts.DatabaseSchemaName = Constants.MyBc.ToLowerInvariant();
+
+    // Inline projections (zero lag)
+    opts.Projections.Add<MyInlineProjection>(ProjectionLifecycle.Inline);
+
+    // Async projections (background daemon)
+    opts.Projections.Add<MyAsyncProjection>(ProjectionLifecycle.Async);
+
+    // Snapshot projections
+    opts.Projections.Snapshot<MyAggregate>(SnapshotLifecycle.Inline);
+    opts.Projections.Snapshot<AnotherAggregate>(SnapshotLifecycle.Async);
+})
+.AddAsyncDaemon(DaemonMode.Solo);  // Required for async projections
+```
+
+**Key configuration points:**
+
+1. **Inline projections** use `ProjectionLifecycle.Inline` — updated in same transaction as events
+2. **Async projections** use `ProjectionLifecycle.Async` — require `.AddAsyncDaemon()`
+3. **Snapshot projections** use `.Snapshot<T>()` with `SnapshotLifecycle.Inline` or `SnapshotLifecycle.Async`
+4. **DaemonMode.Solo** is correct for single-instance deployments; use `DaemonMode.HotCold` for multi-instance
+
+### The Async Daemon
+
+**What is the async daemon?**
+
+The async daemon is a background process that consumes events from `mt_events` and updates async projections. It runs continuously, polling for new events.
+
+**When is it required?**
+- Only for `ProjectionLifecycle.Async` projections
+- Not required for inline projections (they're updated synchronously)
+
+**Configuration:**
+
+```csharp
+.AddAsyncDaemon(DaemonMode.Solo)
+```
+
+**DaemonMode options:**
+
+| Mode | Use Case | Behavior |
+|------|----------|----------|
+| **Solo** | Single API instance | All projections run in this process |
+| **HotCold** | Multiple API instances | Leader election — one instance runs projections |
+| **Disabled** | No async projections | Daemon doesn't start |
+
+**Production note:** If you deploy multiple instances of your API (Kubernetes, Azure App Service scale-out), use `DaemonMode.HotCold` to avoid duplicate projection processing.
+
+### Example: Pricing BC Configuration
+
+```csharp
+builder.Services.AddMarten(opts =>
+{
+    opts.Connection(connectionString);
+    opts.DatabaseSchemaName = Constants.Pricing.ToLowerInvariant();
+
+    // Event-sourced aggregates
+    opts.Events.StreamIdentity = StreamIdentity.AsGuid;
+
+    // Inline projection for hot-path queries (zero lag)
+    opts.Projections.Add<CurrentPriceViewProjection>(ProjectionLifecycle.Inline);
+})
+.AddAsyncDaemon(DaemonMode.Solo)
+.UseLightweightSessions();
+```
+
+**Why no snapshots here?** The `ProductPrice` aggregate is **not** directly queried — `CurrentPriceView` is the query model. Command handlers use `FetchForWriting()` for aggregate loading.
+
+### Example: Promotions BC Configuration
+
+```csharp
+builder.Services.AddMarten(opts =>
+{
+    opts.Connection(connectionString);
+    opts.DatabaseSchemaName = Constants.Promotions.ToLowerInvariant();
+
+    opts.Events.StreamIdentity = StreamIdentity.AsGuid;
+
+    // Snapshot projections for queryable aggregates (inline for zero lag)
+    opts.Projections.Snapshot<Promotion>(SnapshotLifecycle.Inline);
+    opts.Projections.Snapshot<Coupon>(SnapshotLifecycle.Inline);
+
+    // Inline projection for coupon code lookups (hot path)
+    opts.Projections.Add<CouponLookupViewProjection>(ProjectionLifecycle.Inline);
+})
+.AddAsyncDaemon(DaemonMode.Solo)
+.UseLightweightSessions();
+```
+
+**Why both snapshots and projections?**
+- **Snapshots** (`Promotion`, `Coupon`) are for command handlers loading aggregate state
+- **Projections** (`CouponLookupView`) are for queries with different identity (string-keyed by code)
+
+### ⚠️ Critical Warning: Missing Projection Registration
+
+**The silent query failure problem:**
+
+```csharp
+// ❌ ANTI-PATTERN: Projection class exists but is never registered
+public sealed class MyProjection : SingleStreamProjection<MyDocument>
+{
+    // ... Create() and Apply() methods
+}
+
+// Program.cs — MISSING REGISTRATION
+builder.Services.AddMarten(opts =>
+{
+    // No opts.Projections.Add<MyProjection>() call!
+});
+
+// Result: Queries return empty results (no error thrown)
+var doc = await session.LoadAsync<MyDocument>(id);  // Always null!
+```
+
+**What happens:**
+1. Marten creates `mt_doc_mydocument` table (document type is discoverable)
+2. Events are appended successfully (no errors)
+3. Projection logic **never runs** (not registered)
+4. Queries return `null` or empty results (table exists but has no rows)
+5. **No exception thrown** — this is a silent failure
+
+**How to prevent:**
+
+1. **Always register projections immediately after creating them**
+2. **Integration tests must query projected documents** — if the test only checks event persistence, the missing projection won't be caught
+3. **Code review checklist:** Every new projection class → verify `opts.Projections.Add<>()` exists
+
+**Example from CritterSupply:**
+
+The Pricing BC initially had `CurrentPriceViewProjection` implemented but not registered. Integration tests only checked event persistence:
+
+```csharp
+// ❌ BAD TEST: Only checks events, not projection
+[Fact]
+public async Task SetPrice_AppendsInitialPriceSetEvent()
+{
+    var streamId = ProductPrice.StreamId("DOG-FOOD-5LB");
+    await _fixture.PublishAsync(new SetPrice("DOG-FOOD-5LB", 24.99m, Guid.NewGuid()));
+
+    var events = await _fixture.LoadEventsAsync(streamId);
+    events.ShouldContain(e => e is InitialPriceSet);  // ✅ Passes (events work)
+}
+
+// ❌ This query would return null, but test didn't check it!
+// var view = await _fixture.LoadAsync<CurrentPriceView>("DOG-FOOD-5LB");
+```
+
+**Fixed test:**
+
+```csharp
+// ✅ GOOD TEST: Checks both events AND projection
+[Fact]
+public async Task SetPrice_UpdatesCurrentPriceView()
+{
+    var streamId = ProductPrice.StreamId("DOG-FOOD-5LB");
+    await _fixture.PublishAsync(new SetPrice("DOG-FOOD-5LB", 24.99m, Guid.NewGuid()));
+
+    // Check events
+    var events = await _fixture.LoadEventsAsync(streamId);
+    events.ShouldContain(e => e is InitialPriceSet);
+
+    // ✅ Check projection (catches missing registration)
+    var view = await _fixture.LoadAsync<CurrentPriceView>("DOG-FOOD-5LB");
+    view.ShouldNotBeNull();
+    view.BasePrice.ShouldBe(24.99m);
+}
+```
+
+**Key takeaway:** **Every projection must have an integration test that queries the projected document.** Event-only tests are insufficient.
+
+---
+
+## Event Metadata in Projections
+
+### Overview
+
+Event metadata includes version numbers, timestamps, correlation IDs, causation IDs, and custom headers. Projections can access this metadata via `IEvent<T>` wrappers.
+
+**When to use metadata in projections:**
+- Track when events were recorded (`IEvent<T>.Timestamp`)
+- Store version for optimistic concurrency checks (`IEvent<T>.Version`)
+- Correlation/causation IDs for distributed tracing (`IEvent<T>.CausationId`, `IEvent<T>.CorrelationId`)
+
+### Accessing Metadata in Apply() Methods
+
+Use `IEvent<T>` instead of the raw event type:
+
+```csharp
+public static MyDocument Apply(MyDocument current, IEvent<MyEvent> evt)
+{
+    return current with
+    {
+        LastModified = evt.Timestamp,  // Event metadata
+        Version = evt.Version,         // Stream version
+        Data = evt.Data.Value          // Actual event payload
+    };
+}
+```
+
+**Key properties:**
+- `evt.Data` — The actual event payload
+- `evt.Timestamp` — When the event was recorded (UTC)
+- `evt.Version` — Stream version (1, 2, 3, ...)
+- `evt.Id` — Unique event ID (Guid)
+- `evt.CausationId` — ID of the message that caused this event
+- `evt.CorrelationId` — ID of the originating request
+- `evt.Headers` — Custom metadata dictionary
+
+### Example: Tracking Event Timestamps
+
+```csharp
+public sealed class AuditedProjection : SingleStreamProjection<AuditedDocument>
+{
+    public AuditedDocument Create(IEvent<FirstEvent> evt)
+    {
+        return new AuditedDocument
+        {
+            Id = evt.Data.AggregateId,
+            CreatedAt = evt.Timestamp,  // Metadata
+            Version = evt.Version,      // Metadata
+        };
+    }
+
+    public static AuditedDocument Apply(AuditedDocument current, IEvent<UpdatedEvent> evt)
+    {
+        return current with
+        {
+            LastModified = evt.Timestamp,
+            Version = evt.Version,
+        };
+    }
+}
+```
+
+**Why this matters:** Projection documents can include temporal metadata for auditing, cache invalidation, or stale-read detection.
+
+### Example: Correlation IDs for Tracing
+
+```csharp
+public static MyDocument Apply(MyDocument current, IEvent<MyEvent> evt)
+{
+    return current with
+    {
+        Data = evt.Data.Value,
+        CorrelationId = evt.CorrelationId,  // For distributed tracing
+        CausationId = evt.CausationId,      // Parent message ID
+    };
+}
+```
+
+**Use case:** Distributed tracing across BCs — correlation IDs link events back to originating HTTP requests or integration messages.
+
+---
+
+## Querying Projected Documents
+
+### Querying by ID
+
+The most common query pattern — load a single document by its ID:
+
+```csharp
+// Single document load
+var priceView = await session.LoadAsync<CurrentPriceView>("DOG-FOOD-5LB");
+if (priceView == null) { /* handle not found */ }
+```
+
+**Key points:**
+- `LoadAsync<T>(id)` returns `null` if document doesn't exist
+- For inline projections, this is always current (zero lag)
+- For async projections, may be slightly stale (seconds)
+
+### Bulk Lookups with LoadManyAsync
+
+When you need multiple documents by ID, use `LoadManyAsync<T>()`:
+
+```csharp
+// Bulk load (single SQL query with WHERE IN)
+var skus = new[] { "DOG-FOOD-5LB", "CAT-FOOD-3LB", "FISH-TANK-10G" };
+var prices = await session.LoadManyAsync<CurrentPriceView>(skus);
+
+// Returns Dictionary<string, CurrentPriceView>
+foreach (var (sku, priceView) in prices)
+{
+    Console.WriteLine($"{sku}: ${priceView.BasePrice}");
+}
+```
+
+**Performance:** `LoadManyAsync()` issues a single SQL query (`WHERE id = ANY(@ids)`). Much faster than N individual `LoadAsync()` calls.
+
+**Use case:** Product listing pages in BFFs — load prices for 20-50 SKUs in one query.
+
+### LINQ Queries with Query<T>()
+
+For filtering, sorting, or complex queries:
+
+```csharp
+// Query all published prices below $20
+var cheapProducts = await session.Query<CurrentPriceView>()
+    .Where(p => p.Status == PriceStatus.Published && p.BasePrice < 20m)
+    .OrderBy(p => p.BasePrice)
+    .Take(10)
+    .ToListAsync();
+```
+
+**LINQ support:**
+- `.Where()`, `.OrderBy()`, `.Select()`, `.Take()`, `.Skip()`
+- Marten translates to PostgreSQL JSON queries
+- Indexes on projected documents improve query performance
+
+**Index configuration:**
+
+```csharp
+// In AddMarten() configuration
+opts.Schema.For<CurrentPriceView>()
+    .Index(x => x.Status)
+    .Index(x => x.BasePrice);
+```
+
+### Cross-Document Queries
+
+Projections are **documents** — they live in separate tables. Joins require explicit queries:
+
+```csharp
+// ❌ ANTI-PATTERN: Can't join documents in Marten
+var results = await session.Query<CurrentPriceView>()
+    .Join(session.Query<ProductInfo>(), p => p.Sku, pi => pi.Sku, ...)  // Not supported
+
+// ✅ CORRECT: Load separately, join in memory
+var prices = await session.LoadManyAsync<CurrentPriceView>(skus);
+var products = await session.LoadManyAsync<ProductInfo>(skus);
+var joined = skus.Select(sku => new { Price = prices[sku], Product = products[sku] });
+```
+
+**Why?** Marten stores documents in separate tables (`mt_doc_currentpriceview`, `mt_doc_productinfo`). Cross-table joins aren't supported. Use in-memory joins after loading.
+
+**Alternative:** Use `EfCoreMultiStreamProjection` (see `efcore-marten-projections.md`) if you need true relational joins with foreign keys.
+
+---
+
+## Testing Projection Logic
+
+### Unit Testing Apply() Methods
+
+Projection logic is **pure functions** — easy to unit test without infrastructure:
+
+```csharp
+public class CurrentPriceViewProjectionTests
+{
+    [Fact]
+    public void Apply_PriceChanged_UpdatesPriceAndPreviousPrice()
+    {
+        // Arrange
+        var current = new CurrentPriceView
+        {
+            Id = "DOG-FOOD-5LB",
+            BasePrice = 24.99m,
+            LastUpdatedAt = DateTimeOffset.UtcNow.AddDays(-1)
+        };
+        var evt = new PriceChanged(
+            Guid.NewGuid(),
+            "DOG-FOOD-5LB",
+            Money.Of(24.99m),
+            Money.Of(19.99m),
+            current.LastUpdatedAt,
+            "Price drop",
+            Guid.NewGuid(),
+            DateTimeOffset.UtcNow,
+            null,
+            null
+        );
+
+        // Act
+        var result = CurrentPriceViewProjection.Apply(current, evt);
+
+        // Assert
+        result.BasePrice.ShouldBe(19.99m);
+        result.PreviousBasePrice.ShouldBe(24.99m);
+        result.PreviousPriceSetAt.ShouldBe(current.LastUpdatedAt);
+    }
+}
+```
+
+**Why this works:** `Apply()` methods are static pure functions (`(state, event) => newState`). No Marten, no database, no fixtures required.
+
+**What to test:**
+- Each `Apply()` method with each event type
+- Edge cases (null properties, empty collections, boundary values)
+- Immutability (original state is not mutated)
+
+### Integration Testing with Alba
+
+Integration tests verify:
+1. Projection is registered (catches missing `opts.Projections.Add<>()`)
+2. Events trigger projection updates (end-to-end workflow)
+3. Queries return projected documents (not null)
+
+```csharp
+public class PricingProjectionTests : IClassFixture<PricingTestFixture>
+{
+    private readonly PricingTestFixture _fixture;
+
+    public PricingProjectionTests(PricingTestFixture fixture) => _fixture = fixture;
+
+    [Fact]
+    public async Task SetPrice_UpdatesCurrentPriceView()
+    {
+        // Arrange
+        var sku = "TEST-SKU-" + Guid.NewGuid().ToString("N")[..8];
+        var cmd = new SetPrice(sku, 24.99m, Guid.NewGuid());
+
+        // Act
+        var result = await _fixture.Host.PostJson($"/api/pricing/products/{sku}/price", cmd)
+            .Receive<SetPriceResult>();
+
+        // Assert — Check projection
+        var view = await _fixture.LoadAsync<CurrentPriceView>(sku);
+        view.ShouldNotBeNull();  // ⚠️ Catches missing projection registration
+        view.BasePrice.ShouldBe(24.99m);
+        view.Status.ShouldBe(PriceStatus.Published);
+    }
+}
+```
+
+**Key assertion:** `view.ShouldNotBeNull()` — this fails if projection isn't registered. Event-only tests don't catch this bug.
+
+### Test Fixture Pattern
+
+```csharp
+public class PricingTestFixture : IAsyncLifetime
+{
+    public IAlbaHost Host { get; private set; } = null!;
+    private PostgreSqlContainer? _postgresContainer;
+
+    public async Task InitializeAsync()
+    {
+        // Start TestContainer
+        _postgresContainer = new PostgreSqlBuilder().Build();
+        await _postgresContainer.StartAsync();
+
+        // Build Alba host with overridden connection string
+        Host = await AlbaHost.For<Program>(builder =>
+        {
+            builder.UseSetting("ConnectionStrings:postgres", _postgresContainer.GetConnectionString());
+        });
+    }
+
+    public async Task<T?> LoadAsync<T>(object id) where T : class
+    {
+        var store = Host.Services.GetRequiredService<IDocumentStore>();
+        await using var session = store.LightweightSession();
+        return await session.LoadAsync<T>(id);
+    }
+
+    public async Task DisposeAsync()
+    {
+        await Host.DisposeAsync();
+        if (_postgresContainer != null)
+            await _postgresContainer.DisposeAsync();
+    }
+}
+```
+
+**Why TestContainers?** Real PostgreSQL instance ensures projection infrastructure (Weasel schema migration, JSONB queries) works correctly. Mocks can't catch schema issues.
+
+---
+
+## Polecat Compatibility
+
+### Overview
+
+**Polecat** is the SQL Server counterpart to Marten (PostgreSQL). It mirrors Marten's API surface for event sourcing and projections, enabling cross-database portability.
+
+**Key differences:**
+
+| Feature | Marten (PostgreSQL) | Polecat (SQL Server) |
+|---------|---------------------|----------------------|
+| JSON storage | `jsonb` type | `json` type (SQL Server 2025+) |
+| Projection API | Identical | Identical |
+| Configuration | `AddMarten()` | `AddPolecat()` |
+| Connection string | Npgsql format | SQL Server format |
+
+**Code portability:** Projection classes (`SingleStreamProjection<T>`, `MultiStreamProjection<T>`) work identically on both Marten and Polecat. Only configuration changes.
+
+### Example: Migrating a Projection to Polecat
+
+**Before (Marten / PostgreSQL):**
+
+```csharp
+// appsettings.json
+{
+  "ConnectionStrings": {
+    "marten": "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=postgres"
+  }
+}
+
+// Program.cs
+builder.Services.AddMarten(opts =>
+{
+    opts.Connection(builder.Configuration.GetConnectionString("marten"));
+    opts.DatabaseSchemaName = "pricing";
+    opts.Projections.Add<CurrentPriceViewProjection>(ProjectionLifecycle.Inline);
+})
+.AddAsyncDaemon(DaemonMode.Solo);
+```
+
+**After (Polecat / SQL Server):**
+
+```csharp
+// appsettings.json
+{
+  "ConnectionStrings": {
+    "sqlserver": "Server=localhost,1434;Database=pricing;User Id=sa;Password=CritterSupply2025!;TrustServerCertificate=true"
+  }
+}
+
+// Program.cs
+builder.Services.AddPolecat(opts =>
+{
+    opts.Connection(builder.Configuration.GetConnectionString("sqlserver"));
+    opts.DatabaseSchemaName = "pricing";
+    opts.Projections.Add<CurrentPriceViewProjection>(ProjectionLifecycle.Inline);  // Identical!
+})
+.AddAsyncDaemon(DaemonMode.Solo);
+```
+
+**Projection class:** **No changes required.** `CurrentPriceViewProjection` works identically on both.
+
+### Collation Considerations (Polecat)
+
+**SQL Server string collation is case-insensitive by default.** This affects string-keyed projections:
+
+```csharp
+// Marten (case-sensitive)
+await session.LoadAsync<CurrentPriceView>("DOG-FOOD-5LB");   // Different from
+await session.LoadAsync<CurrentPriceView>("dog-food-5lb");   // ← Different document
+
+// Polecat (case-insensitive by default)
+await session.LoadAsync<CurrentPriceView>("DOG-FOOD-5LB");   // Same as
+await session.LoadAsync<CurrentPriceView>("dog-food-5lb");   // ← SAME document!
+```
+
+**Mitigation:** Normalize string keys in projection `Create()` methods:
+
+```csharp
+public CurrentPriceView Create(InitialPriceSet evt)
+{
+    return new CurrentPriceView
+    {
+        Id = evt.Sku.ToUpperInvariant(),  // ✅ Case normalization
+        Sku = evt.Sku.ToUpperInvariant(),
+        // ...
+    };
+}
+```
+
+**See also:** ADR 0026 (Polecat migration) covers collation risks in depth.
+
+---
+
+## Common Pitfalls and Warnings
+
+### ⚠️ Anti-Pattern #1: Missing Projection Registration
+
+**Problem:** Projection class exists but never registered in `Program.cs`:
+
+```csharp
+// ❌ BAD: Projection class defined but not registered
+public sealed class MyProjection : SingleStreamProjection<MyDocument>
+{
+    // ... Create() and Apply() methods
+}
+
+// Program.cs — MISSING opts.Projections.Add<MyProjection>()!
+```
+
+**Result:** Silent query failure. Queries return `null`, no exception thrown.
+
+**Fix:** Always register projections immediately after creating them:
+
+```csharp
+// ✅ GOOD: Register projection
+opts.Projections.Add<MyProjection>(ProjectionLifecycle.Inline);
+```
+
+**Prevention:** Integration tests MUST query projected documents (see Testing section).
+
+---
+
+### ⚠️ Anti-Pattern #2: Forgetting Snapshot Projections for Queryable Aggregates
+
+**Problem:** Aggregate is both queried and modified, but no snapshot projection:
+
+```csharp
+// ❌ BAD: Checkout is queried but has no snapshot
+// Every query replays events (slow)
+var checkout = await session.Events.AggregateStreamAsync<Checkout>(checkoutId);  // Replay!
+```
+
+**Fix:** Add inline snapshot projection:
+
+```csharp
+// ✅ GOOD: Snapshot eliminates replay
+opts.Projections.Snapshot<Checkout>(SnapshotLifecycle.Inline);
+
+// Query loads snapshot (fast)
+var checkout = await session.LoadAsync<Checkout>(checkoutId);
+```
+
+**See also:** `marten-event-sourcing.md` Anti-Pattern #8 covers this in detail.
+
+---
+
+### ⚠️ Anti-Pattern #3: Using Async Lifecycle for Hot-Path Queries
+
+**Problem:** Hot-path queries use async projections (eventual consistency lag):
+
+```csharp
+// ❌ BAD: Price lookup is hot-path but projection is async
+opts.Projections.Add<CurrentPriceView>(ProjectionLifecycle.Async);  // Seconds of lag!
+
+// Shopping BC queries during AddItemToCart
+var price = await session.LoadAsync<CurrentPriceView>(sku);  // May be stale!
+```
+
+**Fix:** Use inline lifecycle for hot-path queries:
+
+```csharp
+// ✅ GOOD: Inline projection ensures zero lag
+opts.Projections.Add<CurrentPriceViewProjection>(ProjectionLifecycle.Inline);
+```
+
+**When async is OK:** Reporting views, analytics, admin dashboards (where seconds of lag is acceptable).
+
+---
+
+### ⚠️ Anti-Pattern #4: Mutable Apply() Methods
+
+**Problem:** `Apply()` methods mutate state instead of returning new state:
+
+```csharp
+// ❌ BAD: Mutable Apply() method
+public void Apply(MyDocument doc, MyEvent evt)
+{
+    doc.Property = evt.Value;  // Mutation!
+}
+```
+
+**Fix:** Use immutable records with `with` expressions:
+
+```csharp
+// ✅ GOOD: Immutable Apply() method
+public static MyDocument Apply(MyDocument doc, MyEvent evt)
+{
+    return doc with { Property = evt.Value };  // Immutable
+}
+```
+
+**Why:** Inline projections run in Marten's async pipeline. Mutable state causes race conditions with concurrent commands.
+
+---
+
+### ⚠️ Anti-Pattern #5: Forgetting AddAsyncDaemon for Async Projections
+
+**Problem:** Async projection registered but daemon not started:
+
+```csharp
+// ❌ BAD: Async projection but no daemon
+opts.Projections.Add<MyProjection>(ProjectionLifecycle.Async);
+
+// Daemon not added — projection never runs!
+// .AddAsyncDaemon() is missing
+```
+
+**Fix:** Always call `.AddAsyncDaemon()` when using async projections:
+
+```csharp
+// ✅ GOOD: Daemon starts background processing
+builder.Services.AddMarten(opts =>
+{
+    opts.Projections.Add<MyProjection>(ProjectionLifecycle.Async);
+})
+.AddAsyncDaemon(DaemonMode.Solo);
+```
+
+---
+
+### ⚠️ Anti-Pattern #6: Case-Sensitive String Keys on Polecat
+
+**Problem:** String-keyed projections on Polecat without case normalization:
+
+```csharp
+// ❌ BAD: No normalization (case mismatch on SQL Server)
+public MyDocument Create(MyEvent evt)
+{
+    return new MyDocument { Id = evt.Sku };  // "DOG-FOOD-5LB" vs "dog-food-5lb"
+}
+```
+
+**Fix:** Normalize keys in `Create()`:
+
+```csharp
+// ✅ GOOD: Case normalization
+public MyDocument Create(MyEvent evt)
+{
+    return new MyDocument { Id = evt.Sku.ToUpperInvariant() };
+}
+```
+
+**See also:** ADR 0026 for Polecat collation considerations.
+
+---
+
+## Production Lessons Learned
+
+### Lesson 1: Always Test Projected Documents, Not Just Events
+
+**From:** Pricing BC (Cycle 29)
+
+**Problem:** `CurrentPriceViewProjection` was implemented but not registered. Integration tests only checked event persistence:
+
+```csharp
+// ❌ BAD TEST: Only checks events
+[Fact]
+public async Task SetPrice_AppendsInitialPriceSetEvent()
+{
+    var streamId = ProductPrice.StreamId("DOG-FOOD-5LB");
+    await _fixture.PublishAsync(new SetPrice("DOG-FOOD-5LB", 24.99m, Guid.NewGuid()));
+
+    var events = await _fixture.LoadEventsAsync(streamId);
+    events.ShouldContain(e => e is InitialPriceSet);  // ✅ Passes
+}
+
+// But queries failed silently:
+// var view = await session.LoadAsync<CurrentPriceView>("DOG-FOOD-5LB");  // null!
+```
+
+**Fix:** Tests now query projected documents:
+
+```csharp
+// ✅ GOOD TEST: Checks projection
+[Fact]
+public async Task SetPrice_UpdatesCurrentPriceView()
+{
+    var streamId = ProductPrice.StreamId("DOG-FOOD-5LB");
+    await _fixture.PublishAsync(new SetPrice("DOG-FOOD-5LB", 24.99m, Guid.NewGuid()));
+
+    // Check projection (catches missing registration)
+    var view = await _fixture.LoadAsync<CurrentPriceView>("DOG-FOOD-5LB");
+    view.ShouldNotBeNull();  // Fails if projection not registered!
+    view.BasePrice.ShouldBe(24.99m);
+}
+```
+
+**Takeaway:** Event-only tests are insufficient. Always query projected documents in integration tests.
+
+---
+
+### Lesson 2: Inline Projections for Hot-Path Queries Are Non-Negotiable
+
+**From:** Pricing BC and Promotions BC (Cycle 29-30)
+
+**Observation:** Both `CurrentPriceView` (Pricing) and `CouponLookupView` (Promotions) use inline projections. Initial designs considered async projections ("eventual consistency is fine, right?").
+
+**Reality:** Hot-path queries cannot tolerate lag:
+- **Pricing:** Shopping BC's `AddItemToCart` validates price existence synchronously — 5 seconds of lag causes "price not found" errors
+- **Promotions:** Coupon redemption checks status synchronously — stale status allows double-redemption
+
+**Decision:** Inline projections for all hot-path queries. Accept the slightly higher write latency (projection update in same transaction) for zero-lag reads.
+
+**Takeaway:** "Eventual consistency is fine" is rarely true for hot-path queries. Default to inline; use async only for reporting/analytics.
+
+---
+
+### Lesson 3: MultiStreamProjection Identity Mapping Is Subtle
+
+**From:** Pricing BC `CurrentPriceView` (Cycle 29)
+
+**Problem:** Initial implementation forgot `Identity<>()` mapping for one event type (`PriceCorrected`). Result:
+
+```csharp
+// ❌ BAD: Missing Identity<PriceCorrected>()
+public CurrentPriceViewProjection()
+{
+    Identity<InitialPriceSet>(x => x.Sku);
+    Identity<PriceChanged>(x => x.Sku);
+    // ... other events
+    // Missing: Identity<PriceCorrected>(x => x.Sku);  ⚠️
+}
+```
+
+**Result:** `PriceCorrected` events didn't update `CurrentPriceView`. No error thrown — silent failure.
+
+**Fix:** Added missing identity mapping:
+
+```csharp
+// ✅ GOOD: All event types mapped
+Identity<PriceCorrected>(x => x.Sku);
+```
+
+**Takeaway:** Every event type that updates a multi-stream projection MUST have `Identity<>()` mapping. Integration tests should append all event types and verify projection updates.
+
+---
+
+### Lesson 4: Snapshot Projections Are Cheaper Than You Think
+
+**From:** Promotions BC (Cycle 29-30)
+
+**Observation:** `Promotion` and `Coupon` aggregates have only 5-10 events per stream. Initial design skipped snapshots ("not worth the overhead for so few events").
+
+**Reality:** A 5-event replay is ~10ms. For a query that runs 1,000 times/hour (cart operations), that's 10 seconds of cumulative latency overhead. Snapshot eliminates all replay — worth it even for small streams.
+
+**Decision:** Inline snapshots for both `Promotion` and `Coupon`.
+
+**Takeaway:** Snapshot overhead (write-time projection update) is negligible. Snapshot benefit (read-time replay elimination) pays off even for small streams on hot paths.
+
+---
+
+### Lesson 5: FetchForWriting() vs. Snapshot — Know the Difference
+
+**From:** Pricing BC `ProductPrice` (Cycle 29)
+
+**Confusion:** "Should I use `FetchForWriting()` or a snapshot for `ProductPrice`?"
+
+**Answer:** It depends on **query patterns**:
+- **Snapshot:** Aggregate is queried directly (`GET /api/products/{sku}/price` → load `ProductPrice` snapshot)
+- **FetchForWriting():** Aggregate is write-only in commands; separate projection handles queries (`CurrentPriceView`)
+
+**Pricing BC decision:** `ProductPrice` is **not** directly queried — `CurrentPriceView` is the query model. Commands use `FetchForWriting()` for aggregate loading.
+
+**Takeaway:** Don't snapshot aggregates that are never queried. Use `FetchForWriting()` for write-only workflows.
+
+---
+
+## Decision Matrix: Which Projection Pattern?
+
+Use this matrix to choose the correct projection pattern for your use case:
+
+| Scenario | Pattern | Lifecycle | Example |
+|----------|---------|-----------|---------|
+| **Aggregate is queried and modified** | Snapshot | Inline | `Checkout` (Orders BC) |
+| **Hot-path denormalized view** | Multi-Stream | Inline | `CurrentPriceView` (Pricing BC) |
+| **Reporting / analytics view** | Single or Multi-Stream | Async | Returns analytics by SKU |
+| **Write-only aggregate (commands only)** | FetchForWriting() | N/A | `ProductPrice` (Pricing BC) |
+| **Admin/audit views (rarely queried)** | Single-Stream | Async | Price history audit log |
+| **Cross-stream aggregation** | Multi-Stream | Inline or Async | Coupon usage by promotion ID |
+| **Ad-hoc queries (debugging)** | Live Aggregation | Live | `AggregateStreamAsync()` in admin tools |
+
+**Key decision points:**
+
+1. **Is the aggregate queried?** → Yes: Snapshot. No: FetchForWriting().
+2. **Is it a hot path?** → Yes: Inline. No: Async.
+3. **Do you need cross-stream aggregation?** → Yes: Multi-Stream. No: Single-Stream.
+4. **Is eventual consistency acceptable?** → Yes: Async. No: Inline.
+
+---
+
+## Appendix: How Projections Work Under the Hood
+
+### Inline Projections: Transaction Flow
+
+```
+1. HTTP Request arrives
+   ↓
+2. Wolverine handler executes
+   ↓
+3. Handler returns event(s)
+   ↓
+4. Marten appends event to mt_events
+   ↓
+5. ⚡ INLINE PROJECTION RUNS (same transaction)
+   - Marten calls Apply() method
+   - Updates mt_doc_{projection} table
+   ↓
+6. Wolverine commits transaction
+   ↓
+7. HTTP Response returns
+```
+
+**Key insight:** Inline projections are **synchronous** — the projection update happens before the HTTP response returns. This eliminates read-after-write consistency issues.
+
+### Async Projections: Daemon Polling
+
+```
+1. Event appended to mt_events (inline projections update)
+   ↓
+2. HTTP Response returns
+   ↓
+   ... (seconds pass) ...
+   ↓
+3. Async Daemon wakes up (polls mt_events)
+   ↓
+4. Daemon reads new events since last checkpoint
+   ↓
+5. For each event:
+   - Calls Apply() on async projections
+   - Updates mt_doc_{projection} table
+   ↓
+6. Daemon updates checkpoint (mt_event_progression)
+   ↓
+7. Daemon sleeps, repeats
+```
+
+**Key insight:** Async projections have **lag** (1-5 seconds by default). Queries may see stale data until daemon catches up.
+
+### Multi-Stream Projections: Identity Resolution
+
+```
+1. Event arrives: InitialPriceSet { ProductPriceId: guid-A, Sku: "DOG-FOOD-5LB" }
+   Stream ID: guid-A (from ProductPrice.StreamId("DOG-FOOD-5LB"))
+   ↓
+2. Marten runs Identity<InitialPriceSet>(x => x.Sku) mapping
+   → Document ID: "DOG-FOOD-5LB" (string)
+   ↓
+3. Marten checks if document exists: SELECT * FROM mt_doc_currentpriceview WHERE id = 'DOG-FOOD-5LB'
+   - Not found → Call Create() method
+   - Found → Call Apply() method
+   ↓
+4. Marten inserts/updates document
+```
+
+**Key insight:** Multi-stream projections decouple stream IDs (Guid) from document IDs (string). Multiple streams can update the same document via shared identity property.
+
+### Snapshot Projections: Aggregate Loading
+
+```
+1. Command handler needs aggregate state
+   ↓
+2. Wolverine loads snapshot: SELECT * FROM mt_doc_checkout WHERE id = ?
+   ↓
+3. If snapshot exists:
+   → Handler gets current aggregate state (no event replay)
+   ↓
+4. If snapshot doesn't exist:
+   → Fall back to event replay (AggregateStreamAsync)
+```
+
+**Key insight:** Snapshots are **read optimizations**. They don't change write behavior (events still appended to `mt_events`).
+
+---
+
+**Next steps:**
+- For aggregate design patterns, read `marten-event-sourcing.md`
+- For EF Core as projection target, read `efcore-marten-projections.md`
+- For Wolverine command handler integration, read `wolverine-message-handlers.md`
+- For testing patterns, read `critterstack-testing-patterns.md`
