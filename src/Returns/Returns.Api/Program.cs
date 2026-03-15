@@ -8,6 +8,8 @@ using JasperFx.Events.Projections;
 using JasperFx.Resources;
 using Marten;
 using Marten.Events.Projections;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using Returns;
 using Returns.Returns;
 using Weasel.Core;
@@ -137,6 +139,73 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddWolverineHttp();
 
+// Configure multi-issuer JWT authentication (ADR 0032)
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer("Admin", options =>
+    {
+        options.Authority = "https://localhost:5249"; // Admin Identity BC
+        options.Audience = "https://localhost:5249";  // Phase 1: self-referential
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            RoleClaimType = "role" // Map JWT "role" claim to ClaimTypes.Role
+        };
+    })
+    .AddJwtBearer("Vendor", options =>
+    {
+        options.Authority = "https://localhost:5240"; // Vendor Identity BC
+        options.Audience = "https://localhost:5240";
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            RoleClaimType = "role"
+        };
+    });
+
+// Configure authorization policies (ADR 0032)
+builder.Services.AddAuthorization(opts =>
+{
+    // Admin policies (accept Admin scheme only)
+    opts.AddPolicy("CustomerService", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Admin");
+        policy.RequireRole("CustomerService", "OperationsManager", "SystemAdmin");
+    });
+
+    opts.AddPolicy("WarehouseClerk", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Admin");
+        policy.RequireRole("WarehouseClerk", "OperationsManager", "SystemAdmin");
+    });
+
+    opts.AddPolicy("OperationsManager", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Admin");
+        policy.RequireRole("OperationsManager", "SystemAdmin");
+    });
+
+    // Vendor policies (accept Vendor scheme only)
+    opts.AddPolicy("VendorAdmin", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Vendor");
+        policy.RequireRole("VendorAdmin");
+    });
+
+    // Cross-issuer policies (accept Admin OR Vendor)
+    opts.AddPolicy("AnyAuthenticated", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Admin");
+        policy.AuthenticationSchemes.Add("Vendor");
+        policy.RequireAuthenticatedUser();
+    });
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -155,6 +224,10 @@ if (app.Environment.IsDevelopment())
 
 // Map Aspire default endpoints (/health, /alive)
 app.MapDefaultEndpoints();
+
+// Add authentication and authorization middleware (ADR 0032)
+app.UseAuthentication();
+app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {
