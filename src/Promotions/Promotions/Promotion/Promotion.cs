@@ -55,9 +55,15 @@ public sealed record Promotion
 
     /// <summary>
     /// Maximum total redemptions allowed (null = unlimited).
-    /// Phase 1: Not enforced. Phase 2: Tracked via counter.
+    /// Enforced via optimistic concurrency when recording redemptions.
     /// </summary>
     public int? UsageLimit { get; init; }
+
+    /// <summary>
+    /// Current number of times this promotion has been redeemed.
+    /// Incremented via PromotionRedemptionRecorded event.
+    /// </summary>
+    public int CurrentRedemptionCount { get; init; }
 
     /// <summary>
     /// When the promotion was created.
@@ -157,4 +163,13 @@ public sealed record Promotion
         {
             Status = PromotionStatus.Expired
         };
+
+    public Promotion Apply(PromotionRedemptionRecorded @event) =>
+        this with
+        {
+            CurrentRedemptionCount = CurrentRedemptionCount + 1
+        };
+
+    public Promotion Apply(CouponBatchGenerated @event) =>
+        this;  // No state change needed - batch metadata is in the event itself
 }
