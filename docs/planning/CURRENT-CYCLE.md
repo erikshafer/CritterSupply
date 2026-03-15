@@ -13,16 +13,35 @@
 
 ---
 
-**Cycle:** 29 — Admin Identity BC Phase 1 *(just completed)*
-**Status:** ✅ **COMPLETE** — JWT authentication, user management, EF Core entities, policy-based authorization delivered
-**GitHub Milestone:** Cycle 29: Admin Identity BC Phase 1
+## Quick Status At A Glance
+
+| Aspect | Status |
+|--------|--------|
+| **Current Cycle** | Cycle 29 Phase 2 (Promotions BC Phase 1) |
+| **Status** | ✅ COMPLETE (as of 2026-03-15) |
+| **What Was Delivered** | Event-sourced Promotion/Coupon aggregates, command handlers, validation endpoint, 11 integration tests |
+| **Next Cycle** | Cycle 30 (Promotions BC Phase 2) — Redemption workflow & Shopping/Pricing integration |
+| **Completed Cycles** | 25, 26, 27, 28, 29 Phase 1, 29 Phase 2 |
+| **Active BCs** | 17 (including Returns, Correspondence, Admin Identity, Promotions Phase 1) |
+
+---
+
+## Current Cycle
+
+**Cycle:** 29 Phase 2 — Promotions BC Phase 1 *(just completed)*
+**Status:** ✅ **COMPLETE** — Core promotion/coupon lifecycle, validation, query layer delivered
+**GitHub Milestone:** Cycle 29 Phase 2
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 
 ---
 
-## Current Status
+## What's Done
 
-**Cycles 25, 26, 27, 28, and 29 Phase 1 are COMPLETE.** Returns BC (Phases 1-3), Correspondence BC (Phase 1), and Admin Identity BC (Phase 1) are delivered.
+**Cycles 25, 26, 27, 28, 29 Phase 1, and 29 Phase 2 are COMPLETE.**
+- Returns BC (Phases 1-3)
+- Correspondence BC (Phase 1)
+- Admin Identity BC (Phase 1)
+- **Promotions BC (Phase 1)** ✅ NEW
 
 **What Cycle 25 delivered (Returns BC Phase 1):**
 - ✅ Event-sourced Return aggregate (10 lifecycle states, 9 domain events)
@@ -85,14 +104,44 @@
 - ✅ CONTEXTS.md + CLAUDE.md + CURRENT-CYCLE.md documentation updates
 - [Phase 1 Retrospective](cycles/cycle-29-admin-identity-phase-1-retrospective.md)
 
+**What Cycle 29 Phase 2 delivered (Promotions BC Phase 1 — MVP):**
+- ✅ Event-sourced Promotion aggregate (UUID v7) — 6 domain events: PromotionCreated, PromotionActivated, PromotionPaused, PromotionResumed, PromotionCancelled, PromotionExpired
+- ✅ Event-sourced Coupon aggregate (UUID v5 from code) — 4 domain events: CouponIssued, CouponRedeemed, CouponRevoked, CouponExpired
+- ✅ Domain enums: PromotionStatus (Draft, Scheduled, Active, Paused, Expired, Cancelled), CouponStatus (Issued, Redeemed, Expired, Revoked), DiscountType (PercentageOff, FixedAmountOff, FreeShipping)
+- ✅ Command handlers: CreatePromotion, ActivatePromotion, IssueCoupon (manual coupon issuance)
+- ✅ CouponLookupView projection (MultiStreamProjection for case-insensitive coupon validation)
+- ✅ ValidateCoupon query endpoint (business rules: dates, status, promotion link, case-insensitive lookup)
+- ✅ Marten snapshot projections for Promotion and Coupon aggregates (inline, zero-lag queryability)
+- ✅ API endpoints: 3 command endpoints + 1 query endpoint (Wolverine HTTP)
+- ✅ Program.cs configuration: Marten + Wolverine + RabbitMQ + OpenTelemetry
+- ✅ Port 5250 allocated and configured
+- ✅ 11 integration tests (PromotionLifecycleTests + CouponValidationTests) — all passing
+- ✅ CLAUDE.md + CONTEXTS.md updated with Promotions BC entry
+- ✅ Pattern discovery: IStartStream return type, snapshot projection requirement
+- [Phase 2 Retrospective](cycles/cycle-29-phase-2-retrospective-notes.md)
+- **Deferred to Phase 2:** Batch coupon generation, scheduled messages, redemption tracking, Shopping BC integration, Pricing BC floor price integration
+
 **Next cycles (roadmap):**
-- **Cycle 29 Phase 2:** Promotions BC Phase 1 — Coupons and discounts (separate PR/branch)
-- **Cycle 30:** Correspondence BC Phase 2 — Additional integration events (Shipment, Returns, Payments), SMS channel (Twilio)
-- **Cycle 31+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
+- **Cycle 30:** Promotions BC Phase 2 — Redemption workflow, Shopping/Pricing BC integration, batch coupon generation
+- **Cycle 31:** Correspondence BC Phase 2 — Additional integration events (Shipment, Returns, Payments), SMS channel (Twilio)
+- **Cycle 32+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
 
 ---
 
 ## Recently Completed
+
+- ✅ **Cycle 29 Phase 2:** Promotions BC Phase 1 — MVP (2026-03-14 to 2026-03-15) — **COMPLETE**
+  - Event-sourced Promotion aggregate (UUID v7) with 6 domain events
+  - Event-sourced Coupon aggregate (UUID v5 from code) with 4 domain events
+  - Command handlers: CreatePromotion, ActivatePromotion, IssueCoupon
+  - CouponLookupView projection (case-insensitive coupon validation)
+  - ValidateCoupon query endpoint with business rules validation
+  - Marten snapshot projections for queryability (Promotion + Coupon)
+  - 11 integration tests (all passing)
+  - Port 5250 allocated
+  - **Pattern Discoveries:** IStartStream return type, snapshot projection requirement for queryability
+  - **Deferred to Phase 2:** Redemption tracking, batch generation, Shopping/Pricing integration
+  - [Retrospective](./cycles/cycle-29-phase-2-retrospective-notes.md)
 
 - ✅ **Cycle 29 Phase 1:** Admin Identity BC (2026-03-14) — **COMPLETE**
   - ADR 0031: RBAC model (7 roles, policy-based authorization)
@@ -225,44 +274,55 @@
 
 ## Upcoming (Planned)
 
-### Next 4 Cycles (Revised after Phase 1 Retrospective)
+### Next 3-4 Cycles
 
-> **See** [`docs/planning/cycles/cycle-28-correspondence-bc-phase-1-retrospective.md`](cycles/cycle-28-correspondence-bc-phase-1-retrospective.md) for Phase 2 priorities agreed in the Cycle 28 retrospective.
+> **Revised after Cycle 29 Phase 2 completion (2026-03-15)**
 
-- **Cycle 29 Phase 2:** Promotions BC Phase 1 — Coupons and discounts (separate PR/branch)
-  - RBAC ADR 0031 completed in Cycle 29 Phase 1
-  - Shopping BC already has `CouponApplied`/`CouponRemoved` placeholder events
+- **Cycle 30:** Promotions BC Phase 2 — Redemption Workflow & Integration
+  - RedeemCoupon command + handler (usage limit enforcement via optimistic concurrency)
+  - RevokeCoupon command + handler (admin action)
+  - Expire Coupon scheduled message (Wolverine delayed messaging)
+  - Shopping BC integration: ApplyCouponToCart, RemoveCouponFromCart handlers
+  - Pricing BC integration: Floor price enforcement during discount calculation
+  - GenerateCouponBatch handler (fan-out pattern for bulk coupon creation)
+  - OrderPlacedHandler for coupon redemption recording
+  - ActivePromotionsView projection (for customer-facing promotion listings)
+  - RabbitMQ integration messages: PromotionActivated, PromotionExpired
+  - Docker Compose + Aspire configuration
+  - ADR 0032: Promotions BC architecture decisions
 
-- **Cycle 30:** Correspondence BC Phase 2 — Additional integration events and SMS channel
+- **Cycle 31:** Correspondence BC Phase 2 — Extended Integration & SMS
   - Phase 2a: ShipmentDispatched, ShipmentDelivered, ShipmentDeliveryFailed (Fulfillment BC)
   - Phase 2b: ReturnApproved, ReturnDenied, ReturnCompleted, ReturnExpired (Returns BC)
   - Phase 2c: RefundCompleted (Payments BC)
-  - SMS channel (Twilio) implementation
+  - SMS channel implementation (Twilio integration)
+  - Template system for email/SMS message formatting
 
-- **Cycle 31+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
-  - Event Modeling: [`docs/planning/admin-portal-event-modeling.md`](admin-portal-event-modeling.md)
-  - UX Research: [`docs/planning/admin-portal-ux-research.md`](admin-portal-ux-research.md)
-  - Gherkin features: [`docs/features/admin-portal/`](../features/admin-portal/)
-  - RBAC ADR must exist before implementation begins
+- **Cycle 32+:** Admin Portal Phase 1 — Read-Only Dashboards
+  - Event Modeling: [`docs/planning/admin-portal-event-modeling-revised.md`](admin-portal-event-modeling-revised.md)
+  - Integration Gap Register: [`docs/planning/admin-portal-integration-gap-register.md`](admin-portal-integration-gap-register.md)
+  - Prerequisites: Multi-issuer JWT support in domain BCs, HTTP endpoint gaps closed
+  - Read-only dashboards: Orders, Returns, Customers, Inventory
+  - Customer Service tooling: Return approval/denial, correspondence history
 
 ### Future BCs (Priority Roadmap)
 
-**High Priority (Customer-Facing Gaps):**
-- 🔴 **Promotions BC** — Discount codes, percentage-off campaigns, BOGO *(Cycle 29)*
-- 🔴 **Correspondence BC Phase 2** — Additional integration events, SMS, push notifications *(Cycle 30)*
-- 🔴 **Exchange v2** — Cross-product exchanges, upcharge payment collection *(future)*
+**High Priority (Active Development or Near-Term):**
+- 🟢 **Promotions BC Phase 2** — Redemption workflow, Shopping/Pricing integration *(Cycle 30)*
+- 🟢 **Correspondence BC Phase 2** — Extended integration events, SMS channel *(Cycle 31)*
+- 🟢 **Admin Portal** — Internal operations portal *(Cycle 32+, prerequisites: multi-issuer JWT, endpoint gaps closed)*
 
-**Medium Priority (Scaling + Internal Tooling):**
-- 🟡 **Admin Portal** — Internal operations portal *(Cycle 30+, after RBAC ADR)*
-- 🟡 **Product Catalog Evolution** — Variants, Listings, Marketplaces *(D2–D10 decisions resolved; [cycle plan](catalog-listings-marketplaces-cycle-plan.md) approved — Cycles 29–35)*
+**Medium Priority (Customer-Facing Features):**
+- 🟡 **Exchange v2** — Cross-product exchanges, upcharge payment collection
+- 🟡 **Product Catalog Evolution** — Variants, Listings, Marketplaces *(D2–D10 decisions resolved; [cycle plan](catalog-listings-marketplaces-cycle-plan.md) approved — Cycles 33–39 estimated)*
 - 🟡 **Search BC** — Full-text product search, faceted navigation
 - 🟡 **Recommendations BC** — Personalized product recommendations
-- 🟡 **Analytics BC** — Business intelligence, reporting, dashboards
 
-**Low Priority (Strategic/Retention):**
-- 🟢 **Store Credit BC** — Gift cards, store credit issuance, balance tracking
-- 🟢 **Loyalty BC** — Rewards program, points accumulation
-- 🟢 **Operations Dashboard** — Developer/SRE event stream visualization (React + SignalR)
+**Lower Priority (Strategic/Retention):**
+- 🔵 **Analytics BC** — Business intelligence, reporting, dashboards
+- 🔵 **Store Credit BC** — Gift cards, store credit issuance, balance tracking
+- 🔵 **Loyalty BC** — Rewards program, points accumulation
+- 🔵 **Operations Dashboard** — Developer/SRE event stream visualization (React + SignalR)
 
 See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specifications.
 
@@ -279,5 +339,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-14 (Cycle 29 Phase 1 closed; Admin Identity BC complete — JWT auth, user management, EF Core entities, policy-based authorization delivered)*
+*Last Updated: 2026-03-15 (Cycle 29 Phase 2 closed; Promotions BC Phase 1 complete — core promotion/coupon lifecycle, validation, query layer, 11 integration tests delivered)*
 *Update this file at: cycle start, cycle end, and when significant task changes occur*
