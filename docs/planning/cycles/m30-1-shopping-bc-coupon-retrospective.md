@@ -87,11 +87,51 @@ public static class RemoveCouponFromCartHttpEndpoint
 
 ## What We're Still Debugging
 
-### 🟡 Session 2: Stub Client DI Replacement Issue
+### 🟢 Session 2-3: Stub Client DI Replacement Pattern Fixed
 
 **Problem:** Tests `ApplyCoupon_InvalidCoupon_Returns400WithErrorMessage` and `ApplyCoupon_NonExistentCoupon_Returns400` return 204 (success) instead of 400 (validation error).
 
-**Expected Flow:**
+**Root Cause (SOLVED):** The `ConfigureServices` callback in `AlbaHost.For<Program>()` runs BEFORE `Program.cs`, not after. So when we tried to remove descriptors, they didn't exist yet. Then we added singletons, but Program.cs ran afterward and added scoped registrations, which took precedence.
+
+**Solution:** Use TWO `ConfigureServices` callbacks with `RemoveAll` from `Microsoft.Extensions.DependencyInjection.Extensions`:
+
+```csharp
+Host = await AlbaHost.For<Program>(builder =>
+{
+    builder.ConfigureServices(services =>
+    {
+        // First callback: Infrastructure setup
+        services.ConfigureMarten(opts => { opts.Connection(_connectionString); });
+        services.DisableAllExternalWolverineTransports();
+    });
+
+    // Second callback: Override Program.cs registrations
+    builder.ConfigureServices(services =>
+    {
+        services.RemoveAll<IPricingClient>();
+        services.RemoveAll<IPromotionsClient>();
+        services.AddSingleton<IPricingClient>(StubPricingClient);
+        services.AddSingleton<IPromotionsClient>(StubPromotionsClient);
+    });
+});
+```
+
+**Key Insight:** Multiple `ConfigureServices` callbacks all run in order BEFORE Program.cs. But using `RemoveAll` in the SECOND callback ensures we clear any previous registrations (from the first callback OR from other configuration sources), then add our singleton. When Program.cs runs and adds scoped registrations, the singleton registration is already there, and ASP.NET Core DI favors the FIRST registration of a service type (our singleton), ignoring subsequent scoped registrations.
+
+**Verification with Diagnostic Tests:**
+Created `DiagnosticTests.cs` with three tests:
+1. ✅ `PromotionsClient_ShouldBeStubImplementation` - Confirms stub type is resolved
+2. ✅ `StubPromotionsClient_InvalidCoupon_ReturnsIsValidFalse` - Confirms stub works when called directly
+3. ✅ `ResolvedPromotionsClient_InvalidCoupon_ReturnsIsValidFalse` - Confirms DI-resolved client is same instance as fixture stub
+
+**Result:** 9 of 11 coupon tests now pass (was 8/11 before fix).
+
+**Remaining Issue:** Two validation tests still fail with 204 instead of 400. However, diagnostic tests prove:
+- ✅ Stub IS being injected correctly
+- ✅ Stub configuration IS working
+- ✅ DI-resolved client IS the same instance as fixture stub
+
+This means the issue is NOT with DI replacement, but with something else in the HTTP request flow or handler logic for those specific test scenarios.
 1. Test calls `_fixture.StubPromotionsClient.SetInvalidCoupon("EXPIRED20", "Coupon has expired")`
 2. Handler calls `await promotionsClient.ValidateCouponAsync(...)`
 3. Stub returns `IsValid = false, Reason = "Coupon has expired"`
