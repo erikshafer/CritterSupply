@@ -48,8 +48,9 @@ builder.Services.AddMarten(opts =>
 
 builder.Services.AddResourceSetupOnStartup();
 
-// Register email provider (stub for Phase 1)
+// Register providers (stubs for Phase 1, real implementations in Phase 2+)
 builder.Services.AddSingleton<IEmailProvider, StubEmailProvider>();
+builder.Services.AddSingleton<ISmsProvider, StubSmsProvider>();
 
 builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(opts =>
 {
@@ -93,6 +94,9 @@ builder.Host.UseWolverine(opts =>
         .ProcessInline();
 
     opts.ListenToRabbitQueue("correspondence-returns-events")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("correspondence-payments-events")
         .ProcessInline();
 
     // Publish integration events for monitoring/analytics
