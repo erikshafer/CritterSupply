@@ -1,13 +1,12 @@
 namespace Promotions.Coupon;
 
 /// <summary>
-/// Domain event: A coupon was redeemed in an order.
+/// Command to redeem a coupon for an order.
+/// This is called when an order is placed with a coupon applied.
 /// Phase 1: Single-use coupons only.
 /// </summary>
-public sealed record CouponRedeemed(
-    Guid CouponId,
+public sealed record RedeemCoupon(
     string CouponCode,
-    Guid PromotionId,
     Guid OrderId,
     Guid CustomerId,
     DateTimeOffset RedeemedAt);

@@ -49,6 +49,11 @@ public sealed record Coupon
     public Guid? OrderId { get; init; }
 
     /// <summary>
+    /// Customer ID who redeemed the coupon (null if not yet redeemed).
+    /// </summary>
+    public Guid? CustomerId { get; init; }
+
+    /// <summary>
     /// Creates a new Coupon aggregate in Issued state.
     /// Called by IssueCouponHandler.
     /// </summary>
@@ -111,7 +116,8 @@ public sealed record Coupon
         {
             Status = CouponStatus.Redeemed,
             RedeemedAt = @event.RedeemedAt,
-            OrderId = @event.OrderId
+            OrderId = @event.OrderId,
+            CustomerId = @event.CustomerId
         };
 
     public Coupon Apply(CouponRevoked @event) =>
