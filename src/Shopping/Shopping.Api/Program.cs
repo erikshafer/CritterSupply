@@ -94,6 +94,10 @@ builder.Host.UseWolverine(opts =>
         .ToRabbitQueue("storefront-notifications");
     opts.PublishMessage<Messages.Contracts.Shopping.ItemQuantityChanged>()
         .ToRabbitQueue("storefront-notifications");
+    opts.PublishMessage<Messages.Contracts.Shopping.CouponApplied>()
+        .ToRabbitQueue("storefront-notifications");
+    opts.PublishMessage<Messages.Contracts.Shopping.CouponRemoved>()
+        .ToRabbitQueue("storefront-notifications");
 
     // Publish CheckoutInitiated to Orders BC
     opts.PublishMessage<Messages.Contracts.Shopping.CheckoutInitiated>()
@@ -121,8 +125,18 @@ builder.Services.AddHttpClient("PricingClient", client =>
     client.Timeout = TimeSpan.FromSeconds(5);
 });
 
+// Configure HttpClient for Promotions BC integration
+builder.Services.AddHttpClient("PromotionsClient", client =>
+{
+    var promotionsBaseUrl = builder.Configuration.GetValue<string>("Promotions:BaseUrl")
+                            ?? "http://localhost:5250";
+    client.BaseAddress = new Uri(promotionsBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(5);
+});
+
 // Register HTTP client implementations
 builder.Services.AddScoped<Shopping.Clients.IPricingClient, Shopping.Api.Clients.PricingClient>();
+builder.Services.AddScoped<Shopping.Clients.IPromotionsClient, Shopping.Api.Clients.PromotionsClient>();
 
 builder.Services.AddWolverineHttp();
 

@@ -42,7 +42,10 @@ public sealed record CartResponse(
     DateTimeOffset InitializedAt,
     IReadOnlyList<CartLineItemResponse> Items,
     string Status,
-    decimal TotalAmount)
+    decimal TotalAmount,
+    string? AppliedCouponCode,
+    decimal AppliedDiscount,
+    decimal DiscountedTotal)
 {
     public static CartResponse From(Shopping.Cart.Cart cart) =>
         new(
@@ -58,7 +61,10 @@ public sealed record CartResponse(
                     item.Quantity * item.UnitPrice))
                 .ToList(),
             cart.Status.ToString(),
-            cart.Items.Values.Sum(item => item.Quantity * item.UnitPrice));
+            cart.Items.Values.Sum(item => item.Quantity * item.UnitPrice),
+            cart.AppliedCouponCode,
+            cart.AppliedDiscount,
+            cart.Items.Values.Sum(item => item.Quantity * item.UnitPrice) - cart.AppliedDiscount);
 }
 
 /// <summary>
