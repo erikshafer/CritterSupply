@@ -20,10 +20,11 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M29.1 (Promotions BC Core) |
-| **Status** | ✅ COMPLETE (as of 2026-03-15) |
-| **What Was Delivered** | Event-sourced Promotion/Coupon aggregates, command handlers, validation endpoint, 11 integration tests |
-| **Next Milestone** | M30.0 (Promotions BC Redemption) — Redemption workflow & Shopping/Pricing integration |
+| **Current Milestone** | M30.0 (Promotions BC Redemption) |
+| **Status** | 🟡 IN PROGRESS (90% complete — awaiting tests & documentation) |
+| **What Was Delivered** | Core redemption commands, discount calculation stub, OrderPlaced skeleton, batch generation |
+| **What Remains** | Integration tests (Priority 8.1), documentation updates (Priority 8.2), retrospective |
+| **Next Milestone** | M31.0 (Correspondence BC Extended) — Extended integration events & SMS channel |
 | **Completed Milestones** | M25.0, M25.1, M25.2, M28.0, M29.0, M29.1 |
 | **Active BCs** | 17 (including Returns, Correspondence, Admin Identity, Promotions) |
 
@@ -31,10 +32,12 @@
 
 ## Current Milestone
 
-**Milestone:** M29.1 — Promotions BC Core *(just completed)*
-**Status:** ✅ **COMPLETE** — Core promotion/coupon lifecycle, validation, query layer delivered
-**GitHub Milestone:** M29.1: Promotions BC Core
+**Milestone:** M30.0 — Promotions BC Redemption *(in progress)*
+**Status:** 🟡 **IN PROGRESS** — Core redemption foundation complete, awaiting tests & documentation
+**GitHub Milestone:** M30.0: Promotions BC Redemption
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
+**Implementation Status:** [docs/planning/m30-0-implementation-status.md](./m30-0-implementation-status.md)
+**Branch:** `claude/m30-0-redemption-workflow-integration`
 
 ---
 
@@ -344,5 +347,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-15 (M29.1 closed; Promotions BC Core complete — core promotion/coupon lifecycle, validation, query layer, 11 integration tests delivered)*
+*Last Updated: 2026-03-15 (M30.0 in progress — core redemption foundation complete, awaiting tests & documentation; M31.0 planning complete — awaiting M30.0 completion before implementation)*
 *Update this file at: milestone start, milestone end, and when significant task changes occur*
