@@ -1,25 +1,64 @@
 ---
 name: adding-new-bounded-context
 description: Step-by-step checklist for adding a new bounded context (BC) to CritterSupply. Covers every infrastructure and configuration step, from domain planning through Docker, Aspire, and integration tests.
+keywords: [bounded-context, docker, postgres, marten, ef-core, wolverine, testcontainers, aspire, integration-tests, event-modeling, domain-design]
+tags: [infrastructure, setup, bounded-context, docker-compose, postgres, database-setup]
 ---
 
 # Adding a New Bounded Context
 
-A comprehensive checklist and reference guide for adding a new bounded context to CritterSupply. Every step is covered — including the infrastructure and configuration steps that are most easily forgotten.
+A comprehensive guide for adding a new bounded context to CritterSupply — from collaborative design through infrastructure setup and testing.
 
 > **Reference ADR:** [ADR 0027: Per-Bounded-Context Postgres Databases](../decisions/0027-per-bc-postgres-databases.md) — explains why each BC has its own database and the init-script pattern used here.
 
 ---
 
+## When to Use This Skill
+
+Use this guide whenever you are:
+- **Adding an entirely new bounded context** (e.g., Returns, Vendor Portal, Shipping)
+- **Spinning up an experimental BC** for a spike or proof-of-concept
+- **Onboarding a contributor** who needs to understand the full BC scaffolding process
+
+For adding features *inside* an existing BC, see [Vertical Slice Organization](./vertical-slice-organization.md) instead.
+
+---
+
+## Prerequisites
+
+Before starting, ensure you have:
+- ✅ Docker Desktop installed and running
+- ✅ .NET 10 SDK installed
+- ✅ CritterSupply repository cloned locally
+- ✅ Understanding of the business domain being modeled
+- ✅ Access to domain experts for Event Modeling workshop (recommended)
+
+---
+
+## Decision Points Summary
+
+Quick reference for key decisions you'll make while adding a BC:
+
+| Decision | Options | Guidance |
+|----------|---------|----------|
+| **Persistence Strategy** | Marten event sourcing / Marten document store / EF Core / None | Event sourcing for rich aggregates; document store for queryable read models; EF Core for complex relational data |
+| **Project Layout** | Domain + API split / Single project | Prefer split for most BCs; single project only for simple BFFs or spikes |
+| **Integration Pattern** | Orchestration (saga) / Choreography (events) / Query-only (BFF) | Orchestration when strict ordering needed; choreography for loose coupling; BFF for read-only composition |
+| **Port Number** | Next available from allocation table | Check `CLAUDE.md` Port Allocation Table — currently 5250+ |
+
+---
+
 ## Quick Checklist
 
-Use this as a skim-first reference before working through each section in detail.
+⚠️ **Use this as a skim-first reference** before working through each section in detail.
 
-**Planning**
+**Planning & Design**
+- [ ] Ran Event Modeling workshop to discover commands, events, and workflows
 - [ ] Defined BC name, domain responsibility, and message contracts in CONTEXTS.md
 - [ ] Decided on persistence strategy (Marten event sourcing / document store / EF Core / none)
 - [ ] Chose single-project vs domain+API split
 - [ ] Reserved a port from the CLAUDE.md allocation table
+- [ ] Wrote Gherkin `.feature` files for key user stories
 
 **Code**
 - [ ] Created .NET project(s) with correct naming convention
@@ -28,7 +67,6 @@ Use this as a skim-first reference before working through each section in detail
 - [ ] `Program.cs` wired up: Wolverine + Marten (or EF Core), reads `GetConnectionString("postgres")`
 - [ ] `appsettings.json` has `"postgres"` key with correct `Database=<bcname>`
 - [ ] `Properties/launchSettings.json` set to the reserved port
-- [ ] Gherkin `.feature` files written before implementation begins
 
 **Database** ⚠️ Most commonly forgotten
 - [ ] Added `CREATE DATABASE <bcname>;` to `docker/postgres/create-databases.sh`
@@ -63,11 +101,42 @@ For adding features *inside* an existing BC, see [Vertical Slice Organization](.
 
 ## Step 1 — Plan & Domain Design
 
-Before touching any code, get clarity on the following.
+⚠️ **Never skip this step.** Code follows from domain understanding, not the other way around.
 
-### 1a. Define the BC's responsibility
+Before touching any code, get clarity on the BC's business capability, boundaries, and integration contracts.
 
-Answer these questions:
+---
+
+### Run an Event Modeling Workshop
+
+**Recommended first step:** Facilitate an Event Modeling session to collaboratively discover:
+- Commands the BC will handle
+- Events the BC will emit
+- Read models (views) the BC will project
+- UI wireframes showing user workflows
+- Vertical slices (independently deliverable features)
+
+Event Modeling produces a visual timeline that serves as a shared blueprint between domain experts, developers, and stakeholders. It works for any information system — not just event-sourced ones — but maps naturally onto CQRS and event sourcing patterns.
+
+**How to run an Event Modeling workshop:**
+See [Event Modeling Workshop](./event-modeling-workshop.md) for the complete facilitation guide, including:
+- The four building blocks (commands, events, views, UI wireframes)
+- Workshop phases (brain dump, storytelling, storyboarding, slicing, scenarios)
+- Multi-persona facilitation patterns (facilitator, domain expert, developer, skeptic)
+- Output artifacts (event model, slice definitions, Given/When/Then scenarios)
+
+**Output artifacts to bring forward:**
+- **Event timeline** — chronological flow of commands → events → views
+- **Slice definitions** — vertical feature cuts for backlog planning
+- **Given/When/Then scenarios** — acceptance criteria for integration tests (use as starting point for Gherkin `.feature` files)
+
+> **Tip:** Even for small BCs, a 1-hour Event Modeling session with a domain expert will surface edge cases and naming conflicts that would otherwise take weeks to discover through code.
+
+---
+
+### Define the BC's Responsibility
+
+Answer these questions (use Event Modeling output if available):
 - What is the single business capability this BC owns?
 - What commands does it accept?
 - What events does it publish?
@@ -76,7 +145,9 @@ Answer these questions:
 
 Document the answers in **CONTEXTS.md** before writing a single line of code. CONTEXTS.md is the architectural source of truth — code follows from it, not the other way around.
 
-### 1b. Choose a persistence strategy
+---
+
+### Choose a Persistence Strategy
 
 | Strategy | Use when |
 |---|---|
@@ -107,9 +178,11 @@ src/<BCFolder>/
 
 See [Vertical Slice Organization](./vertical-slice-organization.md) for the full folder structure inside each project.
 
-### 1d. Reserve a port
+---
 
-Check the **Port Allocation Table** in `CLAUDE.md` and take the next available port (currently starting from **5241**). Record it there immediately to prevent conflicts.
+### Reserve a Port
+
+Check the **Port Allocation Table** in `CLAUDE.md` and take the next available port (currently starting from **5250**). Record it there immediately to prevent conflicts.
 
 | BC | Port | Status |
 |---|---|---|
@@ -124,11 +197,16 @@ Check the **Port Allocation Table** in `CLAUDE.md` and take the next available p
 | Storefront Web | 5238 | ✅ Assigned |
 | Vendor Portal | 5239 | 📋 Reserved |
 | Vendor Identity | 5240 | 📋 Reserved |
-| **Your new BC** | **5241+** | — |
+| Promotions | 5250 | ✅ Assigned |
+| **Your new BC** | **5251+** | — |
 
-### 1e. Write Gherkin feature files first
+---
+
+### Write Gherkin Feature Files First
 
 Write at least 2–3 `.feature` files capturing key user stories **before coding**. Place them in `docs/features/<bcname>/`.
+
+If you ran an Event Modeling workshop, convert your Given/When/Then scenarios directly into Gherkin format. See [Event Modeling Scenarios Reference](./references/scenarios.md) for CritterSupply-specific examples across all BCs.
 
 ```gherkin
 # docs/features/returns/return-request.feature
@@ -916,6 +994,8 @@ docker-compose --profile infrastructure up -d
 
 ## See Also
 
+- [Event Modeling Workshop](./event-modeling-workshop.md) — Collaborative design technique for discovering commands, events, and workflows
+- [Event Modeling Scenarios Reference](./references/scenarios.md) — Given/When/Then patterns for CritterSupply BCs
 - [Vertical Slice Organization](./vertical-slice-organization.md) — File and folder structure inside a BC
 - [Marten Event Sourcing](./marten-event-sourcing.md) — Event-sourced aggregates and projections
 - [Marten Document Store](./marten-document-store.md) — Document store patterns for read models

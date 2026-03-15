@@ -8,6 +8,7 @@ This directory contains implementation patterns and best practices for building 
 
 **Starting from Scratch:**
 - 🏗️ [Adding a New Bounded Context](./adding-new-bounded-context.md) - Complete checklist: projects, Docker, Postgres database, Aspire, CONTEXTS.md, tests
+- 🎨 [Event Modeling Workshop](./event-modeling-workshop.md) - Collaborative design technique: brain dump, storytelling, slicing, scenarios, multi-persona facilitation
 
 **Creating Commands & Handlers:**
 - 🎯 [Wolverine Message Handlers](./wolverine-message-handlers.md) - Command/query handlers, HTTP endpoints, compound handlers, return patterns
@@ -76,9 +77,10 @@ This directory contains implementation patterns and best practices for building 
 
 ### Planning Phase
 1. **New BC?** → Start with [Adding a New Bounded Context](./adding-new-bounded-context.md) for the full checklist
-2. Review [Vertical Slice Organization](./vertical-slice-organization.md) for file structure
-3. Write Gherkin features (see [Reqnroll BDD Testing](./reqnroll-bdd-testing.md))
-4. Choose persistence strategy:
+2. **Design session?** → Use [Event Modeling Workshop](./event-modeling-workshop.md) for collaborative system design
+3. Review [Vertical Slice Organization](./vertical-slice-organization.md) for file structure
+4. Write Gherkin features (see [Reqnroll BDD Testing](./reqnroll-bdd-testing.md) and [Event Modeling Scenarios](./references/scenarios.md))
+5. Choose persistence strategy:
    - Event sourcing? → [Event-Sourced Aggregate Design](./marten-event-sourcing.md)
    - Document store? → [Marten Document Store](./marten-document-store.md)
    - Traditional relational? → [EF Core + Wolverine Integration](./efcore-wolverine-integration.md)
@@ -284,6 +286,8 @@ Each skill document follows this structure:
 
 **Common Questions:**
 
+- *"How do I design a new system or feature?"* → [Event Modeling Workshop](./event-modeling-workshop.md)
+- *"How do I write Given/When/Then scenarios?"* → [Event Modeling Scenarios](./references/scenarios.md)
 - *"How do I build a real-time hub with SignalR and Wolverine?"* → [Wolverine + SignalR](./wolverine-signalr.md)
 - *"How do I create a new command handler?"* → [Wolverine Message Handlers](./wolverine-message-handlers.md)
 - *"How do I test my handler?"* → [CritterStack Testing Patterns](./critterstack-testing-patterns.md)
