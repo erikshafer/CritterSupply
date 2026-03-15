@@ -42,8 +42,8 @@ var storefrontApi = builder.AddProject<Projects.Storefront_Api>("crittersupply-a
     .WithReference(customerIdentityApi)
     .WithReference(productCatalogApi);
 
-// Admin Identity BC - JWT-based authentication for internal admin users (port 5249)
-var adminIdentityApi = builder.AddProject<Projects.AdminIdentity_Api>("crittersupply-aspire-adminidentity-api");
+// Backoffice Identity BC - JWT-based authentication for internal backoffice users (port 5249)
+var backofficeIdentityApi = builder.AddProject<Projects.BackofficeIdentity_Api>("crittersupply-aspire-backofficeidentity-api");
 
 // ===== BLAZOR WEB APP =====
 
