@@ -862,6 +862,23 @@ Covers:
 - Aggregate loading patterns (`[ReadAggregate]`, `[WriteAggregate]`, `Load()`)
 - HTTP endpoint attributes and URL conventions
 
+### When Wiring Integration Messages Between Services
+
+For asynchronous message-based communication between bounded contexts via RabbitMQ:
+
+**Read:** `docs/skills/integration-messaging.md`
+
+Covers:
+- Integration messages vs domain events (foundational distinction)
+- Message contracts in `src/Shared/Messages.Contracts/` (namespace conventions, payload design)
+- Publishing messages (`opts.PublishMessage<T>()`, multi-destination patterns)
+- Subscribing to queues (`opts.ListenToRabbitQueue()`, queue naming conventions)
+- Integration message handlers (choreography vs orchestration patterns)
+- End-to-end message flow walkthrough (contract → publish → subscribe → handle)
+- Adding new integrations (step-by-step checklist)
+- Critical warnings (silent failures, queue name mismatches, contract changes)
+- Lessons learned from Cycles 18–31 (queue wiring, contract expansion, terminal state handlers, tuple return pitfalls)
+
 ### When Working with Event Sourcing
 
 For event-sourced aggregates, domain events, or the decider pattern:
