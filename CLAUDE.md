@@ -912,6 +912,24 @@ Covers:
 - Testing EF Core-backed projections with TestContainers
 - When to use EF Core projections vs. native Marten projections
 
+### When Building Marten Projections
+
+For building read models from event streams using Marten's native projection system:
+
+**Read:** `docs/skills/event-sourcing-projections.md`
+
+Covers:
+- Three projection types: single-stream snapshots, multi-stream aggregations, live aggregation
+- Three projection lifecycles: inline (zero lag), async (eventually consistent), live (session-scoped)
+- `MultiStreamProjection<TDoc, TId>` for string-keyed documents from Guid streams
+- `Identity<T>()` method for mapping events to document IDs
+- `FetchForWriting()` API for command handler workflows
+- Snapshot projections for queryable aggregates
+- Real examples: `CurrentPriceView` (Pricing BC), `CouponLookupView` (Promotions BC), `Checkout` (Orders BC)
+- Common anti-patterns: missing projection registration, mutable projection state, async snapshots
+- Polecat (SQL Server) compatibility considerations
+- Testing patterns with Alba + TestContainers
+
 ### When Integrating External Services
 
 For payment gateways, address verification, shipping providers:
@@ -1635,8 +1653,10 @@ See [DEVPROGRESS.md](./DEVPROGRESS.md) for current development status.
 |-------|---------|
 | `wolverine-message-handlers.md` | Compound handlers, return patterns, aggregate workflows |
 | `marten-event-sourcing.md` | Event-sourced aggregates, domain events, decider pattern |
+| `event-sourcing-projections.md` | Marten projections: snapshots, multi-stream, live aggregation, FetchForWriting() |
 | `marten-document-store.md` | Document database patterns (non-event-sourced) |
 | `efcore-wolverine-integration.md` | Entity Framework Core with Wolverine |
+| `efcore-marten-projections.md` | Projecting Marten events to EF Core tables |
 | `external-service-integration.md` | Strategy pattern, graceful degradation |
 | `bff-realtime-patterns.md` | Backend-for-Frontend, real-time updates (SSE + SignalR) |
 | `wolverine-signalr.md` | Wolverine SignalR transport, hub auth, group routing, WASM client |

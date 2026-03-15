@@ -15,6 +15,7 @@ This directory contains implementation patterns and best practices for building 
 
 **Working with Aggregates:**
 - 📝 [Event-Sourced Aggregate Design](./marten-event-sourcing.md) - Event-sourced aggregates, decider pattern, factory methods
+- 📊 [Event Sourcing Projections](./event-sourcing-projections.md) - Marten projections: snapshots, multi-stream, live aggregation, FetchForWriting()
 - 📦 [Marten Document Store](./marten-document-store.md) - Document models, CRUD patterns, value objects for queryable fields
 
 **Traditional Relational Data:**
@@ -51,6 +52,7 @@ This directory contains implementation patterns and best practices for building 
 
 ### Marten
 - [Event-Sourced Aggregate Design](./marten-event-sourcing.md) - Event-sourced aggregates, projections
+- [Event Sourcing Projections](./event-sourcing-projections.md) - Marten projection types, lifecycles, FetchForWriting()
 - [Marten Document Store](./marten-document-store.md) - Document models, queries, value objects
 - [EF Core Projections with Marten](./efcore-marten-projections.md) - Projecting events to relational tables via EF Core
 
@@ -80,6 +82,7 @@ This directory contains implementation patterns and best practices for building 
    - Event sourcing? → [Event-Sourced Aggregate Design](./marten-event-sourcing.md)
    - Document store? → [Marten Document Store](./marten-document-store.md)
    - Traditional relational? → [EF Core + Wolverine Integration](./efcore-wolverine-integration.md)
+   - Event sourcing with projections? → [Event Sourcing Projections](./event-sourcing-projections.md)
    - Event sourcing with relational projections? → [EF Core Projections with Marten](./efcore-marten-projections.md)
    - Multi-BC orchestration over time? → [Wolverine Sagas](./wolverine-sagas.md)
 
@@ -285,6 +288,7 @@ Each skill document follows this structure:
 - *"How do I create a new command handler?"* → [Wolverine Message Handlers](./wolverine-message-handlers.md)
 - *"How do I test my handler?"* → [CritterStack Testing Patterns](./critterstack-testing-patterns.md)
 - *"Should I use event sourcing or document store?"* → Compare [Event-Sourced Aggregate Design](./marten-event-sourcing.md) vs [Marten Document Store](./marten-document-store.md)
+- *"How do I build read models from events?"* → [Event Sourcing Projections](./event-sourcing-projections.md)
 - *"How do I build a saga that coordinates multiple BCs?"* → [Wolverine Sagas](./wolverine-sagas.md)
 - *"How do I organize my code?"* → [Vertical Slice Organization](./vertical-slice-organization.md)
 - *"When should I use EF Core?"* → [EF Core + Wolverine Integration](./efcore-wolverine-integration.md)
