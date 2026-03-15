@@ -74,7 +74,7 @@ public static async Task<CheckoutView> Handle(
 ## When to Use a BFF
 
 **Use a BFF for:**
-- Customer-facing web/mobile apps querying multiple BCs (e.g., Storefront, Admin Portal)
+- Customer-facing web/mobile apps querying multiple BCs (e.g., Storefront, Backoffice)
 - Real-time notification requirements (cart updates, order status, live analytics)
 - Different client types with different composition needs (web vs. mobile)
 - Complex UI workflows spanning multiple BCs (checkout wizard, vendor dashboards)

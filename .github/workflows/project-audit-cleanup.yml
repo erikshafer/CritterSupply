@@ -402,10 +402,10 @@ jobs:
           **Cycle:** 29 — Promotions BC Phase 1"
 
           create_issue \
-            "[Admin Portal] Write RBAC ADR before implementation begins" \
-            "bc:admin-portal,type:adr,status:backlog" \
+            "[Backoffice] Write RBAC ADR before implementation begins" \
+            "bc:backoffice,type:adr,status:backlog" \
             "Cycle 29:" \
-            "Author the Role-Based Access Control (RBAC) Architectural Decision Record before any Admin Portal implementation begins.
+            "Author the Role-Based Access Control (RBAC) Architectural Decision Record before any Backoffice implementation begins.
 
           **ADR must cover:**
           - Role taxonomy (SuperAdmin, CSAgent, WarehouseOps, etc.)
@@ -414,10 +414,10 @@ jobs:
           - Integration with Vendor Identity BC (shared identity store vs. separate)
           - UI-level RBAC in Blazor (route guards, conditional rendering)
 
-          **Prerequisite for:** Cycle 30+ Admin Portal Phase 1
+          **Prerequisite for:** Cycle 30+ Backoffice Phase 1
 
           **Cycle:** 29 — author during this cycle
-          **See:** \`docs/planning/admin-portal-event-modeling.md\`"
+          **See:** \`docs/planning/backoffice-event-modeling.md\`"
 
       - name: Summary
         run: |

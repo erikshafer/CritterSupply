@@ -553,13 +553,13 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 | Vendor Identity                     | 5240     | ✅ Assigned  | Vendor Identity API                              |
 | **Vendor Portal (Web/Blazor WASM)** | **5241** | ✅ Assigned  | Vendor Blazor WASM frontend (see ADR 0021)       |
 | **Pricing**                         | **5242** | ✅ Assigned  | Pricing API                                      |
-| **Admin Portal (API)**              | **5243** | 📋 Reserved | Admin Portal API (future)                        |
-| **Admin Portal (Web)**              | **5244** | 📋 Reserved | Admin Portal frontend (future; React/Vue/Blazor) |
+| **Backoffice (API)**                | **5243** | 📋 Reserved | Backoffice API (future)                          |
+| **Backoffice (Web)**                | **5244** | 📋 Reserved | Backoffice frontend (future; React/Vue/Blazor)   |
 | **Returns**                         | **5245** | ✅ Assigned  | Returns/                                         |
 | **Listings**                        | **5246** | 📋 Reserved | Listings API (future; Cycle 30+)                 |
 | **Marketplaces**                    | **5247** | 📋 Reserved | Marketplaces API (future; Cycle 32+)             |
 | **Correspondence**                  | **5248** | ✅ Assigned  | Correspondence/ (Cycle 28)                       |
-| **Admin Identity**                  | **5249** | ✅ Assigned  | Admin Identity/ (Cycle 29)                       |
+| **Backoffice Identity**             | **5249** | ✅ Assigned  | Backoffice Identity/ (Cycle 29)                  |
 | **Promotions**                      | **5250** | ✅ Assigned  | Promotions/ (Cycle 29 Phase 2)                   |
 
 **Why this matters:**

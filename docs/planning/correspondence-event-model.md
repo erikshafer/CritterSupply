@@ -183,7 +183,7 @@ Correspondence BC does **not expose HTTP commands** to external callers. All act
 
 2. **GET /api/correspondence/messages/{messageId}** — get details of a specific message
    - Returns: full message content, delivery attempts, error logs
-   - Used by: Admin Portal (customer service tooling for investigating delivery issues)
+   - Used by: Backoffice (customer service tooling for investigating delivery issues)
 
 **Phase 2 (Future):**
 
@@ -444,7 +444,7 @@ public partial record Message
    - Schema: `{ MessageId, CustomerId, Channel, DeliveredAt, AttemptCount }`
 
 3. `CorrespondenceFailed` — published after permanent failure (3 retries exhausted)
-   - Consumed by: Admin Portal (future) for alerting CS agents
+   - Consumed by: Backoffice (future) for alerting CS agents
    - Schema: `{ MessageId, CustomerId, Channel, FailureReason, FailedAt }`
 
 **Naming Convention:** Noun-based events following CONTEXTS.md integration contract pattern (e.g., `OrderPlaced`, `ShipmentDispatched`, `ReturnApproved`).
@@ -626,9 +626,9 @@ Correspondence BC publishes integration events to **2 downstream consumers**:
 |-------------------|---------------|---------|
 | `CorrespondenceQueued` | Operations Dashboard (future) | Real-time monitoring of message queue depth |
 | `CorrespondenceDelivered` | Analytics BC (future) | Delivery success rate metrics, customer engagement tracking |
-| `CorrespondenceFailed` | Admin Portal (future) | Alert CS agents to investigate delivery failures |
+| `CorrespondenceFailed` | Backoffice (future) | Alert CS agents to investigate delivery failures |
 
-**Note:** In Phase 1, these events are published but have no consumers. They are retained in RabbitMQ for 7 days (default TTL) and will be consumed when Operations Dashboard and Admin Portal are implemented.
+**Note:** In Phase 1, these events are published but have no consumers. They are retained in RabbitMQ for 7 days (default TTL) and will be consumed when Operations Dashboard and Backoffice are implemented.
 
 ---
 
@@ -705,7 +705,7 @@ Correspondence BC publishes integration events to **2 downstream consumers**:
 |-------|----------|-------------|----------------------|
 | CorrespondenceQueued | `correspondence-events` | `correspondence.queued` | Operations Dashboard |
 | CorrespondenceDelivered | `correspondence-events` | `correspondence.delivered` | Analytics BC |
-| CorrespondenceFailed | `correspondence-events` | `correspondence.failed` | Admin Portal |
+| CorrespondenceFailed | `correspondence-events` | `correspondence.failed` | Backoffice |
 
 **Total:** 3 events published to 1 exchange
 

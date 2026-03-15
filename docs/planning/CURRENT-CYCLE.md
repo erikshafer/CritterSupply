@@ -20,30 +20,30 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M31.5 (Admin Portal Prerequisites) |
+| **Current Milestone** | M31.5 (Backoffice Prerequisites) |
 | **Status** | 📋 READY TO START — Domain BC endpoint gaps + multi-issuer JWT |
 | **What's Next** | ADR 0032 sign-off, implement 8 endpoint gaps, configure JWT in 5 BCs |
 | **What's Blocking** | ADR 0032 awaiting PSA sign-off |
 | **Next Milestone** | TBD (Catalog Evolution, Search BC, or Exchange v2) |
 | **Completed Milestones** | M25.0, M25.1, M25.2, M28.0, M29.0, M29.1, M30.0, M30.1, M31.0 |
-| **Active BCs** | 17 (including Returns, Correspondence, Admin Identity, Promotions) |
+| **Active BCs** | 17 (including Returns, Correspondence, Backoffice Identity, Promotions) |
 
 ---
 
 ## Current Milestone
 
-**Milestone:** M31.5 — Admin Portal Prerequisites
+**Milestone:** M31.5 — Backoffice Prerequisites
 **Status:** 📋 **READY TO START** — Domain BC endpoint gaps + multi-issuer JWT configuration
 **Duration:** 1 cycle (4-5 sessions, 10-15 hours)
-**GitHub Milestone:** M31.5: Admin Portal Prerequisites
+**GitHub Milestone:** M31.5: Backoffice Prerequisites
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
-**Implementation Branch:** `claude/implement-admin-portal-phase-1`
+**Implementation Branch:** `claude/implement-backoffice-phase-1`
 **Planning Documents:**
-- Milestone Plan: [docs/planning/milestones/m31-5-admin-portal-prerequisites.md](./milestones/m31-5-admin-portal-prerequisites.md)
+- Milestone Plan: [docs/planning/milestones/m31-5-backoffice-prerequisites.md](./milestones/m31-5-backoffice-prerequisites.md)
 - Prerequisite Assessment: [docs/planning/m32-0-prerequisite-assessment.md](./m32-0-prerequisite-assessment.md)
 - Implementation Plan: [docs/planning/phase-0-5-implementation-plan.md](./phase-0-5-implementation-plan.md)
 - ADR 0032: [docs/decisions/0032-multi-issuer-jwt-strategy.md](../decisions/0032-multi-issuer-jwt-strategy.md)
-- Integration Gap Register: [docs/planning/admin-portal-integration-gap-register.md](./admin-portal-integration-gap-register.md)
+- Integration Gap Register: [docs/planning/backoffice-integration-gap-register.md](./backoffice-integration-gap-register.md)
 
 ---
 
@@ -52,7 +52,7 @@
 **Milestones M25.0, M25.1, M25.2, M28.0, M29.0, M29.1, M30.0, M30.1, and M31.0 are COMPLETE.**
 - Returns BC (M25.0-M25.2)
 - Correspondence BC (M28.0, M31.0)
-- Admin Identity BC (M29.0)
+- Backoffice Identity BC (M29.0)
 - Promotions BC (M29.1, M30.0)
 - Shopping BC Coupon Integration (M30.1)
 - **Correspondence BC Extended (M31.0)** ✅ NEW
@@ -108,9 +108,9 @@
 - ✅ Port 5248 allocated and configured
 - [Phase 1 Retrospective](cycles/cycle-28-correspondence-bc-phase-1-retrospective.md)
 
-**What M29.0 delivered (Admin Identity BC):**
-- ✅ ADR 0031: RBAC model for Admin Portal (7 roles, policy-based authorization)
-- ✅ EF Core entity model: AdminUser, AdminRole enum, AdminUserStatus enum, AdminIdentityDbContext
+**What M29.0 delivered (Backoffice Identity BC):**
+- ✅ ADR 0031: RBAC model for Backoffice (7 roles, policy-based authorization)
+- ✅ EF Core entity model: AdminUser, AdminRole enum, AdminUserStatus enum, BackofficeIdentityDbContext
 - ✅ Authentication handlers: Login (JWT + refresh token), RefreshToken (rotation pattern), Logout
 - ✅ User management handlers: CreateAdminUser, GetAdminUsers, ChangeAdminUserRole, DeactivateAdminUser
 - ✅ JWT token generation with 7 authorization policies (leaf + composite)
@@ -139,7 +139,7 @@
 
 **Next milestones (roadmap):**
 - **M31.0:** Correspondence BC Extended — Additional integration events (Shipment, Returns, Payments), SMS channel (Twilio)
-- **M32.0+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
+- **M32.0+:** Backoffice Phase 1 — Read-only dashboards, customer service tooling
 
 ---
 
@@ -201,9 +201,9 @@
   - **Deferred to M30.0:** Redemption tracking, batch generation, Shopping/Pricing integration
   - [Retrospective](./cycles/cycle-29-phase-2-retrospective-notes.md)
 
-- ✅ **M29.0:** Admin Identity BC (2026-03-14) — **COMPLETE**
+- ✅ **M29.0:** Backoffice Identity BC (2026-03-14) — **COMPLETE**
   - ADR 0031: RBAC model (7 roles, policy-based authorization)
-  - EF Core entity model: AdminUser, AdminRole, AdminUserStatus, AdminIdentityDbContext
+  - EF Core entity model: AdminUser, AdminRole, AdminUserStatus, BackofficeIdentityDbContext
   - Authentication handlers: Login, RefreshToken, Logout (JWT + refresh token rotation)
   - User management handlers: CreateAdminUser, GetAdminUsers, ChangeAdminUserRole, DeactivateAdminUser
   - JWT token generation with 7 authorization policies
@@ -343,9 +343,9 @@
   - SMS channel implementation (Twilio integration)
   - Template system for email/SMS message formatting
 
-- **M32.0+:** Admin Portal Phase 1 — Read-Only Dashboards
-  - Event Modeling: [`docs/planning/admin-portal-event-modeling-revised.md`](admin-portal-event-modeling-revised.md)
-  - Integration Gap Register: [`docs/planning/admin-portal-integration-gap-register.md`](admin-portal-integration-gap-register.md)
+- **M32.0+:** Backoffice Phase 1 — Read-Only Dashboards
+  - Event Modeling: [`docs/planning/backoffice-event-modeling-revised.md`](backoffice-event-modeling-revised.md)
+  - Integration Gap Register: [`docs/planning/backoffice-integration-gap-register.md`](backoffice-integration-gap-register.md)
   - Prerequisites: Multi-issuer JWT support in domain BCs, HTTP endpoint gaps closed
   - Read-only dashboards: Orders, Returns, Customers, Inventory
   - Customer Service tooling: Return approval/denial, correspondence history
@@ -354,7 +354,7 @@
 
 **High Priority (Active Development or Near-Term):**
 - 🟢 **Correspondence BC Extended (M31.0)** — Extended integration events, SMS channel
-- 🟢 **Admin Portal (M32.0+)** — Internal operations portal *(prerequisites: multi-issuer JWT, endpoint gaps closed)*
+- 🟢 **Backoffice (M32.0+)** — Internal operations portal *(prerequisites: multi-issuer JWT, endpoint gaps closed)*
 
 **Medium Priority (Customer-Facing Features):**
 - 🟡 **Exchange v2** — Cross-product exchanges, upcharge payment collection

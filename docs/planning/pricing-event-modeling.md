@@ -5,7 +5,7 @@
 **Status:** 🟡 Design Complete — Awaiting Implementation Cycle Assignment
 **Related CONTEXTS.md Sections:** [Pricing](../../CONTEXTS.md#pricing), [Product Catalog](../../CONTEXTS.md#product-catalog), [Shopping](../../CONTEXTS.md#shopping)
 **Related ADRs:** [ADR 0016: UUID v5 for Natural-Key Stream IDs](../decisions/0016-uuid-v5-for-natural-key-stream-ids.md) | See additional ADRs needed below
-**UX Review:** [`docs/planning/pricing-ux-review.md`](pricing-ux-review.md) — DX analysis, event naming recommendations, Admin Portal pricing section UI vision, risks
+**UX Review:** [`docs/planning/pricing-ux-review.md`](pricing-ux-review.md) — DX analysis, event naming recommendations, Backoffice pricing section UI vision, risks
 
 ---
 

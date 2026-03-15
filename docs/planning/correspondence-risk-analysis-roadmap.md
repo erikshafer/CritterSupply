@@ -313,7 +313,7 @@
     - CONTEXTS.md: already updated
 
 14. **Port Allocation**
-    - Reserve port `5248` for Correspondence.Api (next available after Admin Portal reservations)
+    - Reserve port `5248` for Correspondence.Api (next available after Backoffice reservations)
     - Update CLAUDE.md port allocation table
 
 **Dependencies:**
@@ -404,7 +404,7 @@
    - Daily metrics: success rate, average delivery time, error counts
    - Aggregated by channel (Email, SMS, Push)
 
-2. **Admin Portal Integration**
+2. **Backoffice Integration**
    - Consume `CorrespondenceFailed` events → alert CS agents to investigate
    - Display message history for customer (via `GET /api/correspondence/messages/{customerId}`)
 
@@ -420,7 +420,7 @@
 **Estimated Effort:** 2-3 sessions (PSA)
 
 **Success Criteria:**
-- ✅ CS agents can view customer message history in Admin Portal
+- ✅ CS agents can view customer message history in Backoffice
 - ✅ Delivery success rate dashboard shows >95% for email
 - ✅ Push notifications delivered to mobile app (if app exists)
 
@@ -443,7 +443,7 @@ Phase 2 (Cycle 29)
 
 Phase 3 (Cycle 30+)
   └─> Depends on Phase 2 (all email + SMS handlers complete)
-  └─> Admin Portal BC must exist (new — Cycle 30)
+  └─> Backoffice BC must exist (new — Cycle 30)
   └─> Operations Dashboard must exist (new — future)
   └─> Mobile app must exist (new — may not happen)
 ```

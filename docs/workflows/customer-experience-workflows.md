@@ -370,7 +370,7 @@ public static async Task<CartView> GetCartView(
    - Current: Browser-only (SSE)
    - Impact: May need GraphQL subscriptions or WebSocket support
 
-6. **Admin Portal:**
+6. **Backoffice:**
    - Q: Do support agents need real-time visibility into customer carts/orders?
    - Current: Customer-facing only
    - Impact: Separate admin BFF or extend existing (role-based filtering)

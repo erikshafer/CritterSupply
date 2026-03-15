@@ -68,7 +68,7 @@ Tracks stock levels and manages soft reservations (holds) until commitment or re
 | Orders | ↔ bidirectional | Receives reservation requests; publishes confirmation/failure |
 | Fulfillment | ← receives | Shipment dispatch triggers stock adjustment |
 
-**Constraint:** No HTTP layer exists today. Any UI integration (e.g., Admin Portal) requires adding endpoints first.
+**Constraint:** No HTTP layer exists today. Any UI integration (e.g., Backoffice) requires adding endpoints first.
 
 ---
 
@@ -219,15 +219,15 @@ Owns transactional customer communication — email and SMS messages triggered b
 
 ---
 
-### Admin Identity
+### Backoffice Identity
 
-**Folder:** `src/Admin Identity/`
+**Folder:** `src/Backoffice Identity/`
 
-JWT-based authentication and authorization for internal admin users. Provides access tokens consumed by Admin Portal and any BC requiring admin auth.
+JWT-based authentication and authorization for internal admin users. Provides access tokens consumed by Backoffice and any BC requiring admin auth.
 
 | Communicates with | Direction | Notes |
 |---|---|---|
-| Admin Portal (planned) | ← queried by | Auth tokens for admin operations |
+| Backoffice (planned) | ← queried by | Auth tokens for admin operations |
 
 **Key decisions:** EF Core with policy-based RBAC — 7 roles from CopyWriter to SystemAdmin ([ADR 0031](docs/decisions/0031-admin-portal-rbac-model.md)). Single role per user in Phase 1. JWT Bearer authentication (not session-based, unlike Customer Identity).
 
@@ -291,9 +291,9 @@ Business intelligence — dashboards, reports, ML model training. Consumes event
 
 ---
 
-### Admin Portal
+### Backoffice
 
-Internal tooling for operations, customer service, and merchandising. BFF pattern composing data from multiple BCs with RBAC via Admin Identity.
+Internal tooling for operations, customer service, and merchandising. BFF pattern composing data from multiple BCs with RBAC via Backoffice Identity.
 
 ---
 

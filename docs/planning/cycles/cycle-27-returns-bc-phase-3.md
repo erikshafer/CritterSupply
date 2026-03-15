@@ -29,7 +29,7 @@ Deliver the headline Phase 3 feature (exchange workflow) while closing supportin
 - Exchange workflow v2: Upcharge payment collection (replacement costs more)
 - Multi-item exchanges (v1 supports single-item only)
 - Fraud detection active implementation (documentation only)
-- Admin Portal CS agent tooling (deferred to Cycle 30+)
+- Admin Portal (now Backoffice) CS agent tooling (deferred to Cycle 30+)
 
 ---
 

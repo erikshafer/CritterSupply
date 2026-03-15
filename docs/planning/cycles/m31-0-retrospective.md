@@ -107,7 +107,7 @@ public sealed class ShipmentDeliveredHandler
 
 **Future Template System (Phase 3+):**
 - Option 1: Razor templates in code (type-safe, version-controlled)
-- Option 2: Marten document store (admin-editable via Admin Portal)
+- Option 2: Marten document store (admin-editable via Admin Portal (now Backoffice))
 - Option 3: SendGrid Dynamic Templates (external service, marketing self-service)
 
 **Current State:** 8 handlers × inline HTML = sufficient for transactional emails. No customer complaints about formatting in development.
@@ -319,7 +319,7 @@ opts.ListenToRabbitQueue("correspondence-payments-events").ProcessInline();
 Prerequisites:
 - Multi-issuer JWT support in domain BCs
 - HTTP endpoint gaps closed (Inventory BC, etc.)
-- Admin Identity BC complete (✅ M29.0)
+- Admin Identity (now BackofficeIdentity) BC complete (✅ M29.0)
 
 ---
 

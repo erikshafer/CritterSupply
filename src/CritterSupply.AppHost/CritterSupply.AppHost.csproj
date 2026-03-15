@@ -24,7 +24,7 @@
     <ProjectReference Include="../Shopping/Shopping.Api/Shopping.Api.csproj" />
     <ProjectReference Include="../Product Catalog/ProductCatalog.Api/ProductCatalog.Api.csproj" />
     <ProjectReference Include="../Customer Experience/Storefront.Api/Storefront.Api.csproj" />
-    <ProjectReference Include="../Admin Identity/AdminIdentity.Api/AdminIdentity.Api.csproj" />
+    <ProjectReference Include="../Backoffice Identity/BackofficeIdentity.Api/BackofficeIdentity.Api.csproj" />
 
     <!-- Blazor Web App -->
     <ProjectReference Include="../Customer Experience/Storefront.Web/Storefront.Web.csproj" />

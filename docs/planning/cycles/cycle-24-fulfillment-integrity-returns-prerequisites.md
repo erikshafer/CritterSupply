@@ -8,7 +8,7 @@
 
 ## Objectives
 
-Fix critical Fulfillment BC bugs and add Orders saga prerequisites required before the Returns BC can ship in Cycle 25. This cycle was re-scoped from the originally planned Admin Portal Phase 1 based on the cross-functional priority review ([`priority-review-post-cycle-23.md`](../priority-review-post-cycle-23.md)).
+Fix critical Fulfillment BC bugs and add Orders saga prerequisites required before the Returns BC can ship in Cycle 25. This cycle was re-scoped from the originally planned Admin Portal (now Backoffice) Phase 1 based on the cross-functional priority review ([`priority-review-post-cycle-23.md`](../priority-review-post-cycle-23.md)).
 
 ### Why This Cycle Exists
 

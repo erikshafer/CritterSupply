@@ -2,6 +2,8 @@
 
 **Status:** ✅ Accepted
 
+> **Note:** "Admin Portal" was renamed to "Backoffice" and "Admin Identity" to "BackofficeIdentity" in [ADR 0033](./0033-admin-portal-to-backoffice-rename.md).
+
 **Date:** 2026-03-08
 
 **Context:** Pricing BC Phase 2+ — How do we ensure bulk pricing job approvals are auditable?
@@ -109,7 +111,7 @@ Marten event store is already configured for Pricing BC. No new storage mechanis
 **5. Audit Query Simplicity**
 
 ```csharp
-// Admin Portal: "Show me all approvals by Bob in March 2026"
+// Backoffice: "Show me all approvals by Bob in March 2026"
 var events = await session.Events.QueryRawEventDataOnly<BulkJobApproved>()
     .Where(e => e.Data.ApprovedBy == bobId)
     .Where(e => e.Timestamp >= new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero))
@@ -148,7 +150,7 @@ var approval = await session.LoadAsync<BulkApprovalRecord>(jobId);
 **Mitigation (if query performance becomes an issue in Phase 3+):**
 - Create async projection: `BulkJobApprovalLogProjection` → `BulkApprovalRecord` document
 - Projection listens to `BulkJobApproved`, `BulkJobRejected` events
-- Admin Portal queries document (fast) instead of event stream (slower)
+- Backoffice queries document (fast) instead of event stream (slower)
 
 **Phase 2 decision:** Event stream query is sufficient. Defer projection until query performance degrades.
 
@@ -322,7 +324,7 @@ Wolverine:
 
 ---
 
-### Audit Query (Admin Portal)
+### Audit Query (Backoffice)
 
 ```csharp
 public static async Task<BulkJobAuditView> GetBulkJobAudit(
@@ -386,11 +388,11 @@ builder.Services.AddMarten(opts =>
 
 ## Open Questions
 
-**Q: Should Admin Portal query event stream directly, or wait for projection?**
+**Q: Should Backoffice query event stream directly, or wait for projection?**
 
 **A (Phase 2 decision):** Event stream query is sufficient. Bulk job approval audits are infrequent queries (compliance reports, manager investigations). Performance is acceptable. Defer projection to Phase 3+ if query volume increases.
 
-**Q: What if event stream query is too slow for Admin Portal UI?**
+**Q: What if event stream query is too slow for Backoffice UI?**
 
 **A (Phase 3+ mitigation):** Create async projection:
 ```csharp
@@ -400,11 +402,11 @@ public sealed class BulkJobApprovalLogProjection : SingleStreamProjection<BulkAp
     public BulkApprovalRecord Create(BulkJobRejected e) => new(...);
 }
 ```
-Admin Portal queries document (`session.LoadAsync<BulkApprovalRecord>()`) instead of event stream.
+Backoffice queries document (`session.LoadAsync<BulkApprovalRecord>()`) instead of event stream.
 
 **Q: Should approval events be published as integration messages?**
 
-**A (Phase 2 decision):** No. `BulkJobApproved` is internal to Pricing BC. No other BC needs to react to bulk job approvals. If Admin Portal needs real-time notifications (Phase 3+), publish lightweight `BulkJobApprovalNotification` to Admin Portal's SignalR hub (not a global integration event).
+**A (Phase 2 decision):** No. `BulkJobApproved` is internal to Pricing BC. No other BC needs to react to bulk job approvals. If Backoffice needs real-time notifications (Phase 3+), publish lightweight `BulkJobApprovalNotification` to Backoffice's SignalR hub (not a global integration event).
 
 ---
 

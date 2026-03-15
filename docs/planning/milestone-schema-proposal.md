@@ -108,7 +108,7 @@ This requires parsing 3 different hierarchies to answer one question.
 - `M30.1` — Promotions BC batch generation feature
 - `M30.2` — Promotions BC Shopping/Pricing integration
 - `M31.0` — Correspondence BC Phase 2 (new BC capability)
-- `M32.0` — Admin Portal initial release
+- `M32.0` — Backoffice initial release
 
 ### Key Properties
 
@@ -130,15 +130,15 @@ This requires parsing 3 different hierarchies to answer one question.
 | Cycle 26: Returns BC Phase 2 | **M25.1** | Returns BC incremental feature (mixed inspection) |
 | Cycle 27: Returns BC Phase 3 | **M25.2** | Returns BC incremental feature (exchanges) |
 | Cycle 28: Correspondence BC Phase 1 | **M28.0** | Initial Correspondence BC delivery |
-| Cycle 29 Phase 1: Admin Identity BC | **M29.0** | Initial Admin Identity BC delivery |
-| Cycle 29 Phase 2: Promotions BC Phase 1 | **M29.1** | Promotions BC initial delivery (same milestone as Admin Identity) |
+| Cycle 29 Phase 1: Backoffice Identity BC | **M29.0** | Initial Backoffice Identity BC delivery |
+| Cycle 29 Phase 2: Promotions BC Phase 1 | **M29.1** | Promotions BC initial delivery (same milestone as Backoffice Identity) |
 | Cycle 30 (planned): Promotions BC Phase 2 | **M30.0** OR **M29.2** | Decision: Is this significant enough for M30? |
 
 ### Decision Point: When to Increment Major vs. Minor
 
 **Increment MAJOR (M25 → M26) when:**
 - ✅ New bounded context is introduced
-- ✅ Significant cross-BC integration (e.g., Admin Portal requiring multi-issuer JWT)
+- ✅ Significant cross-BC integration (e.g., Backoffice requiring multi-issuer JWT)
 - ✅ Architectural change affecting multiple BCs
 
 **Increment MINOR (M25.0 → M25.1) when:**
@@ -149,8 +149,8 @@ This requires parsing 3 different hierarchies to answer one question.
 **Example Reasoning:**
 - Returns BC Phases 1-3 → **M25.0, M25.1, M25.2** (single BC, incremental features)
 - Correspondence BC Phase 1 → **M28.0** (new BC)
-- Admin Identity BC → **M29.0** (new BC)
-- Promotions BC Phase 1 → **M29.1** (new BC, but delivered in same "milestone window" as Admin Identity)
+- Backoffice Identity BC → **M29.0** (new BC)
+- Promotions BC Phase 1 → **M29.1** (new BC, but delivered in same "milestone window" as Backoffice Identity)
 
 **Alternative:** Treat each new BC as its own MAJOR:
 - Promotions BC Phase 1 → **M30.0** (clearer separation)
@@ -172,12 +172,12 @@ This alternative is **simpler** and avoids the "is this the same milestone?" deb
 | **M25.1** | Returns BC — Mixed inspection |
 | **M25.2** | Returns BC — Exchanges |
 | **M28.0** | Correspondence BC — Email delivery |
-| **M29.0** | Admin Identity BC — JWT auth |
+| **M29.0** | Backoffice Identity BC — JWT auth |
 | **M30.0** | Promotions BC — Core promotion/coupon lifecycle |
 | **M30.1** | Promotions BC — Redemption workflow |
 | **M30.2** | Promotions BC — Batch generation & integrations |
 | **M31.0** | Correspondence BC — Extended integrations & SMS |
-| **M32.0** | Admin Portal — Read-only dashboards |
+| **M32.0** | Backoffice — Read-only dashboards |
 
 ### GitHub Milestone Names
 
@@ -242,7 +242,7 @@ git commit -m "Update CURRENT-CYCLE.md: M29.1 complete (#385)"
 | Cycle 26 | M25.1: Returns Mixed Inspection |
 | Cycle 27 | M25.2: Returns Exchanges |
 | Cycle 28 | M28.0: Correspondence BC |
-| Cycle 29 Phase 1 | M29.0: Admin Identity BC |
+| Cycle 29 Phase 1 | M29.0: Backoffice Identity BC |
 | Cycle 29 Phase 2 | M29.1: Promotions BC Core |
 
 **Future Milestones:**
@@ -314,13 +314,13 @@ A: Distinguishes from semantic versioning (`v2.3`) and makes it clear we're talk
 A: Use `.PATCH` if needed (`M30.1.1`), but this should be rare. Most "fixes" are just follow-up features (`M30.2`).
 
 **Q: Can we have multiple BCs in one milestone?**
-A: Yes, but only if they're tightly coupled. Example: Admin Identity (M29.0) + Promotions BC (M29.1) were delivered in quick succession. Generally, one major BC = one milestone.
+A: Yes, but only if they're tightly coupled. Example: Backoffice Identity (M29.0) + Promotions BC (M29.1) were delivered in quick succession. Generally, one major BC = one milestone.
 
-**Q: How do we handle long-running epics (like Admin Portal)?**
+**Q: How do we handle long-running epics (like Backoffice)?**
 A: Break into multiple milestones:
-- M32.0: Admin Portal — Read dashboards
-- M32.1: Admin Portal — Customer service tools
-- M32.2: Admin Portal — Warehouse operations
+- M32.0: Backoffice — Read dashboards
+- M32.1: Backoffice — Customer service tools
+- M32.2: Backoffice — Warehouse operations
 
 **Q: Do milestone numbers need to be sequential?**
 A: Mostly yes, but gaps are OK if we skip ahead (e.g., M25 → M28 if M26-27 were cancelled). The key is **monotonic ordering** (never go backward).

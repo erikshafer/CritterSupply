@@ -313,7 +313,7 @@ Execute a multi-role planning session for Returns BC Phase 3 with explicit role 
 | 🔴 P0 | **Correspondence BC Phase 1** — Transactional emails for all 7 return lifecycle events | PO | Currently missing. Customers have no email notifications for returns. |
 | 🟡 P1 | **Exchange v2** — Cross-product exchanges, upcharge payment collection | UXE | Remaining 20-30% of exchange use cases. |
 | 🟡 P1 | **Fraud detection active implementation** — Return rate monitoring, risk scoring | PO | Documentation exists (Phase 3). Active detection needed before fraud becomes problem. |
-| 🟢 P2 | **Admin Portal returns dashboard** — CS agent tooling for disputed inspections | PO | Manual override workflow, escalation tracking. |
+| 🟢 P2 | **Admin Portal (now Backoffice) returns dashboard** — CS agent tooling for disputed inspections | PO | Manual override workflow, escalation tracking. |
 | 🟢 P2 | **Exchange UI wireframes** — Detailed mockups for "choose replacement" flow | UXE | Backend flows exist, UI design needed before Storefront.Web implementation. |
 
 ---

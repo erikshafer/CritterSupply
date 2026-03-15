@@ -167,9 +167,9 @@
     <Project Path="src/CritterSupply.ServiceDefaults/CritterSupply.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/src/" />
-  <Folder Name="/src/Admin Identity/">
-    <Project Path="src/Admin Identity/AdminIdentity.Api/AdminIdentity.Api.csproj" />
-    <Project Path="src/Admin Identity/AdminIdentity/AdminIdentity.csproj" />
+  <Folder Name="/src/Backoffice Identity/">
+    <Project Path="src/Backoffice Identity/BackofficeIdentity.Api/BackofficeIdentity.Api.csproj" />
+    <Project Path="src/Backoffice Identity/BackofficeIdentity/BackofficeIdentity.csproj" />
   </Folder>
   <Folder Name="/src/Correspondence/">
     <Project Path="src/Correspondence/Correspondence.Api/Correspondence.Api.csproj" />

@@ -3,7 +3,7 @@
 **Date:** 2026-03-11  
 **Initiated by:** Product Owner  
 **Status:** ✅ Complete — PO draft + UX review + Principal Architect sign-off  
-**Context:** Completed Cycle 23 (Vendor Portal E2E Testing). Cycle 24 (Admin Portal Phase 1) is planned but not started.
+**Context:** Completed Cycle 23 (Vendor Portal E2E Testing). Cycle 24 (Backoffice Phase 1) is planned but not started.
 
 ---
 
@@ -79,11 +79,11 @@ Promotions BC is the "growth" layer of e-commerce. Cart abandonment emails, firs
 
 This matters less urgently than Returns, but it matters for the reference architecture's completeness as a teaching tool.
 
-#### 🟢 Gap 5: Admin Portal
+#### 🟢 Gap 5: Backoffice
 
-The Admin Portal is important. It is how internal teams manage the business: customer service reps handling escalations, pricing managers setting promotions, warehouse clerks acknowledging stock alerts, executives reading dashboards.
+The Backoffice is important. It is how internal teams manage the business: customer service reps handling escalations, pricing managers setting promotions, warehouse clerks acknowledging stock alerts, executives reading dashboards.
 
-**But the problem statement is right to defer this.** The Admin Portal is architecturally complex — it touches every BC, requires sophisticated RBAC, and needs us to have mastered the Blazor WASM + SignalR + JWT patterns that we only finished establishing in Cycles 22 and 23. The event modeling is done. The personas and role matrix are defined. Let it marinate while we shore up the customer-facing foundation.
+**But the problem statement is right to defer this.** The Backoffice is architecturally complex — it touches every BC, requires sophisticated RBAC, and needs us to have mastered the Blazor WASM + SignalR + JWT patterns that we only finished establishing in Cycles 22 and 23. The event modeling is done. The personas and role matrix are defined. Let it marinate while we shore up the customer-facing foundation.
 
 ---
 
@@ -97,18 +97,18 @@ Based on business value, architectural readiness, and the principle of building 
 | 🔴 **P1** | Returns BC (Phase 1: Self-Service Returns) | Most critical customer-facing gap; spec is complete; completes Order saga |
 | 🟡 **P2** | Notifications BC (Phase 1: Transactional) | Returns without notifications is unusable; order confirmation, return approval emails |
 | 🟡 **P3** | Promotions BC (Phase 1: Coupons) | Growth lever; Shopping BC already has `CouponApplied`/`CouponRemoved` placeholder events |
-| 🟢 **P4** | Admin Portal (Phase 1: Read-only dashboards) | High value, but deferred until WASM/SignalR/RBAC patterns are solidified |
+| 🟢 **P4** | Backoffice (Phase 1: Read-only dashboards) | High value, but deferred until WASM/SignalR/RBAC patterns are solidified |
 | 🟢 **P5** | Product Catalog Evolution (Variants, Listings) | Strategic, but not blocking customer journeys |
 
 ---
 
-### On the Admin Portal Specifically
+### On the Backoffice Specifically
 
-I want to be explicit: I am **not** deprioritizing Admin Portal because it is unimportant. I am deprioritizing it because:
+I want to be explicit: I am **not** deprioritizing Backoffice because it is unimportant. I am deprioritizing it because:
 
 1. **The Vendor Portal just taught us a lot.** Cycles 22 and 23 demonstrated the full WASM + SignalR + JWT + RBAC pattern. Let that knowledge settle before we scale it to a much more complex internal portal.
 
-2. **Admin Portal touches everything.** A half-built Admin Portal is worse than no Admin Portal, because it creates the impression of administrative control where none actually exists. Better to build it right after we've fixed the underlying gaps it would expose.
+2. **Backoffice touches everything.** A half-built Backoffice is worse than no Backoffice, because it creates the impression of administrative control where none actually exists. Better to build it right after we've fixed the underlying gaps it would expose.
 
 3. **Customer experience is the foundation.** An internal portal without working customer workflows (returns, notifications) is a façade. Customer service reps would look at it and ask "why can't I process a return?"
 
@@ -174,7 +174,7 @@ The Returns BC spec is well-reasoned from a domain perspective. Here is what the
 
 **Denials need plain language:** Auto-denial for non-returnable items or an expired window must use plain language that explains *why*, not just that the request was rejected. "We're unable to process this return because your 30-day return window closed on March 14" is actionable. "Return request denied" is not.
 
-**The CS agent gap:** FR-03 calls for customer service agents to manually approve returns. Without Admin Portal, there is no UI for this workflow. The Returns API endpoints exist (`POST /api/returns/{id}/approve`), but no one can reach them. Before shipping Returns BC to production, the team must decide: do we expose a minimal internal tool, or do we document that manual approvals are API-only until Admin Portal ships? This is a real operational gap that will surface immediately.
+**The CS agent gap:** FR-03 calls for customer service agents to manually approve returns. Without Backoffice, there is no UI for this workflow. The Returns API endpoints exist (`POST /api/returns/{id}/approve`), but no one can reach them. Before shipping Returns BC to production, the team must decide: do we expose a minimal internal tool, or do we document that manual approvals are API-only until Backoffice ships? This is a real operational gap that will surface immediately.
 
 ---
 
@@ -193,13 +193,13 @@ One integration consideration: the `OrderConfirmation.razor` component already s
 
 ---
 
-### UX Insights on Deferring Admin Portal (P4)
+### UX Insights on Deferring Backoffice (P4)
 
-I agree with the deferral. The strongest argument is not the technical pattern-maturation argument (though that is valid) — it is the workflow completeness argument. Admin Portal Phase 1 as originally scoped is read-only dashboards. A read-only dashboard during a cycle when customers cannot yet submit returns would be a dashboard that surfaces problems with no resolution path. That is a demoralizing tool to hand to customer service staff.
+I agree with the deferral. The strongest argument is not the technical pattern-maturation argument (though that is valid) — it is the workflow completeness argument. Backoffice Phase 1 as originally scoped is read-only dashboards. A read-only dashboard during a cycle when customers cannot yet submit returns would be a dashboard that surfaces problems with no resolution path. That is a demoralizing tool to hand to customer service staff.
 
 Build the workflows first. Build the observability second.
 
-**Risk to flag:** The UX research doc I produced for Admin Portal (`admin-portal-ux-research.md`) includes a CustomerService Workbench with an order lookup and action surface. That research is ready. The risk of deferral is not losing the design work — it is losing the institutional memory of *why* the CS dashboard was designed the way it was. I recommend we explicitly carry the research doc forward as a living artifact and revisit it during Admin Portal planning, not re-derive it from scratch.
+**Risk to flag:** The UX research doc I produced for Backoffice (`backoffice-ux-research.md`) includes a CustomerService Workbench with an order lookup and action surface. That research is ready. The risk of deferral is not losing the design work — it is losing the institutional memory of *why* the CS dashboard was designed the way it was. I recommend we explicitly carry the research doc forward as a living artifact and revisit it during Backoffice planning, not re-derive it from scratch.
 
 ---
 
@@ -347,13 +347,13 @@ All of these depend on Returns BC shipping first. Notifications Phase 1 can begi
 
 ---
 
-### 5. Admin Portal Deferral — Architectural View
+### 5. Backoffice Deferral — Architectural View
 
 I agree with the deferral, and the PO's reasoning is sound. But I want to name a concrete risk the PO and UX did not surface: **the RBAC model.**
 
-Admin Portal requires meaningful role-based access control — customer service reps should not have access to pricing tools; pricing managers should not be able to approve returns on behalf of customers. The longer we defer Admin Portal, the longer the RBAC model remains unspecified. When we do build it, every BC we've shipped in the interim will need to be retrofitted with authorization checks against a model we haven't designed yet.
+Backoffice requires meaningful role-based access control — customer service reps should not have access to pricing tools; pricing managers should not be able to approve returns on behalf of customers. The longer we defer Backoffice, the longer the RBAC model remains unspecified. When we do build it, every BC we've shipped in the interim will need to be retrofitted with authorization checks against a model we haven't designed yet.
 
-**Recommended action during deferral:** Author an ADR that defines the Admin Portal role taxonomy (CustomerService, Merchandising, WarehouseManager, Finance, Admin) and the permission surface per BC. This ADR does not need to be implemented — it just needs to exist so that when we add Admin Portal endpoints to existing BCs, we're fitting them to a pre-agreed model rather than inventing one on the fly.
+**Recommended action during deferral:** Author an ADR that defines the Backoffice role taxonomy (CustomerService, Merchandising, WarehouseManager, Finance, Admin) and the permission surface per BC. This ADR does not need to be implemented — it just needs to exist so that when we add Backoffice endpoints to existing BCs, we're fitting them to a pre-agreed model rather than inventing one on the fly.
 
 The UX research doc is a living artifact and should be maintained as the UX recommends.
 
@@ -402,8 +402,8 @@ I endorse the PO's sequence with these refinements:
 | 🔴 **P1** | Returns BC (Phase 1: Self-Service Returns) + Order History page | Spec is ready; saga prerequisites must be in place first |
 | 🟡 **P2** | Notifications BC (Phase 1: Transactional email — OrderPlaced, ShipmentDispatched; Phase 1b: Returns events after Returns ships) | Pure choreography; depends on Returns for the full contract surface |
 | 🟡 **P3** | Promotions BC (Phase 1: Coupons) | Unblocked; Shopping BC placeholder events exist |
-| 🟠 **P3.5** | RBAC ADR for Admin Portal | Non-implementation; author during Promotions cycle to protect investment |
-| 🟢 **P4** | Admin Portal (Phase 1: read-only dashboards) | Deferred; RBAC model must be authored first; Vendor Portal patterns are solid foundation |
+| 🟠 **P3.5** | RBAC ADR for Backoffice | Non-implementation; author during Promotions cycle to protect investment |
+| 🟢 **P4** | Backoffice (Phase 1: read-only dashboards) | Deferred; RBAC model must be authored first; Vendor Portal patterns are solid foundation |
 | 🟢 **P5** | Product Catalog Evolution (Variants/Listings) | Blocked on Owner/Erik decisions D2–D10; use interim cycles to resolve |
 
 The PO's and UX's instincts are architecturally sound. The priority list they produced is right. What changes with this review is the scope of "P0" — it is larger than a single bug fix, and getting that scope right is the difference between a working system and a working-in-isolation system.
@@ -422,7 +422,7 @@ The PO's and UX's instincts are architecturally sound. The priority list they pr
 
 ### Agreed Priority Sequence
 
-All three perspectives — Product Owner, UX Engineer, and Principal Software Architect — are aligned. The following priority sequence replaces the previously planned Cycle 24 (Admin Portal Phase 1):
+All three perspectives — Product Owner, UX Engineer, and Principal Software Architect — are aligned. The following priority sequence replaces the previously planned Cycle 24 (Backoffice Phase 1):
 
 | Priority | Cycle (Proposed) | Work Item | Lead Concern |
 |---|---|---|---|
@@ -433,8 +433,8 @@ All three perspectives — Product Owner, UX Engineer, and Principal Software Ar
 | 🔴 **P1** | Cycle 25 | Returns BC Phase 1: Self-Service Returns + Order History page | Product (customer trust) |
 | 🟡 **P2** | Cycle 26 | Notifications BC Phase 1: Transactional email (OrderPlaced, ShipmentDispatched; Phase 1b adds Returns events) | Product (closes the silent-workflow gap) |
 | 🟡 **P3** | Cycle 27 | Promotions BC Phase 1: Coupons and discounts | Product (growth lever) |
-| 🟠 **P3.5** | During Cycle 27 | RBAC ADR for Admin Portal — author during Promotions cycle | Architecture (protect Admin Portal investment) |
-| 🟢 **P4** | Cycle 28+ | Admin Portal Phase 1: Read-only dashboards + customer service tooling | Product + UX (internal tooling) |
+| 🟠 **P3.5** | During Cycle 27 | RBAC ADR for Backoffice — author during Promotions cycle | Architecture (protect Backoffice investment) |
+| 🟢 **P4** | Cycle 28+ | Backoffice Phase 1: Read-only dashboards + customer service tooling | Product + UX (internal tooling) |
 | 🟢 **P5** | TBD | Product Catalog Evolution: Variants, Listings, Marketplaces — blocked on Owner/Erik decisions D2–D10 | Product (strategic) |
 
 ---
@@ -442,9 +442,9 @@ All three perspectives — Product Owner, UX Engineer, and Principal Software Ar
 ### Immediate Actions (Pre-Cycle 24)
 
 1. ✅ **OrderConfirmation.razor patched** — UX Engineer removed the false email promise and replaced it with honest copy about in-page tracking. *(Completed in this review cycle.)*
-2. 📋 **Update CURRENT-CYCLE.md** — Revise next-cycle plan from Admin Portal to Fulfillment bug fix sweep.
-3. 📋 **GitHub Milestone** — Update/rename Milestone 17 from "Admin Portal Phase 1" to "Fulfillment Integrity + Returns Prerequisites" (Cycle 24), and create a new Milestone for Admin Portal at the appropriate horizon.
-4. 📋 **Inform stakeholders** — The Admin Portal event modeling is complete and preserved. It will not be discarded — it is deferred to Cycle 28+.
+2. 📋 **Update CURRENT-CYCLE.md** — Revise next-cycle plan from Backoffice to Fulfillment bug fix sweep.
+3. 📋 **GitHub Milestone** — Update/rename Milestone 17 from "Backoffice Phase 1" to "Fulfillment Integrity + Returns Prerequisites" (Cycle 24), and create a new Milestone for Backoffice at the appropriate horizon.
+4. 📋 **Inform stakeholders** — The Backoffice event modeling is complete and preserved. It will not be discarded — it is deferred to Cycle 28+.
 5. 📋 **Owner/Erik decisions D2–D10** — Use the Returns and Notifications cycles to drive resolution of outstanding Product Catalog variant decisions. Hold a focused decision session.
 
 ---

@@ -10,7 +10,7 @@
 ## Session Objectives
 
 ### Primary Goals
-1. **Objective 1:** Add Fulfillment shipment query endpoint for Admin Portal CS workflow
+1. **Objective 1:** Add Fulfillment shipment query endpoint for Admin Portal (now Backoffice) CS workflow
 2. **Objective 2:** Configure multi-issuer JWT authentication in Orders and Returns BCs
 
 ### Success Criteria
@@ -57,10 +57,10 @@ public sealed record ShipmentResponse(
 
 **Why Important:**
 - **CS agent WISMO workflow**: "Where is my order?" tickets require shipment tracking info
-- **Admin Portal dashboard**: OperationsManager needs fulfillment status visibility
-- **Cross-BC composition**: Admin Portal queries Orders BC (order details) + Fulfillment BC (shipment tracking)
+- **Backoffice dashboard**: OperationsManager needs fulfillment status visibility
+- **Cross-BC composition**: Backoffice queries Orders BC (order details) + Fulfillment BC (shipment tracking)
 
-**Commit:** `(M31.5) Add Fulfillment shipment query endpoint for Admin Portal`
+**Commit:** `(M31.5) Add Fulfillment shipment query endpoint for Backoffice`
 
 ### 2. Fulfillment Shipment Query Tests
 
@@ -140,7 +140,7 @@ app.UseAuthorization();   // Added after UseAuthentication
 **Why Identical:**
 - Both BCs need Admin access (CustomerService, OperationsManager workflows)
 - Both BCs need Vendor access (future vendor-initiated return workflows)
-- Consistency across domain BCs simplifies Admin Portal client-side routing
+- Consistency across domain BCs simplifies Backoffice client-side routing
 
 **Commit:** `(M31.5) Configure multi-issuer JWT in Returns.Api - ADR 0032`
 

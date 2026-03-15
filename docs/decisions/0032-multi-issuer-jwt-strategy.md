@@ -2,21 +2,23 @@
 
 **Status:** ✅ Accepted
 
+> **Note:** "Admin Portal" was renamed to "Backoffice" and "Admin Identity" to "BackofficeIdentity" in [ADR 0033](./0033-admin-portal-to-backoffice-rename.md).
+
 **Date:** 2026-03-15
 
 **Context:**
 
 CritterSupply now has two JWT-issuing identity BCs:
 1. **Vendor Identity BC** (port 5240) — issues JWTs for vendor partner users accessing the Vendor Portal
-2. **Admin Identity BC** (port 5249) — issues JWTs for internal employee users accessing the Admin Portal
+2. **BackofficeIdentity BC** (port 5249) — issues JWTs for internal employee users accessing the Backoffice
 
 As of M31.0 completion, domain BCs (Orders, Payments, Inventory, Fulfillment, Returns, Correspondence, Pricing, Product Catalog) do **not** accept admin JWTs. They either:
 - Accept vendor JWTs only (Product Catalog.Api — 3 endpoints protected with `[Authorize(Policy = "Admin")]` which validates vendor tokens)
 - Have no authentication at all (Orders, Payments, Returns, Inventory, Fulfillment, Correspondence, Pricing)
 
-M32.0 (Admin Portal Phase 1) requires domain BCs to accept admin JWTs for customer service tooling and read-only dashboards. Specifically:
+M32.0 (Backoffice Phase 1) requires domain BCs to accept admin JWTs for customer service tooling and read-only dashboards. Specifically:
 
-**Admin Portal Phase 1 Endpoints:**
+**Backoffice Phase 1 Endpoints:**
 - `GET /api/customers?email={email}` (Customer Identity) — CS customer search
 - `GET /api/orders?customerId={id}` (Orders) — CS order lookup
 - `POST /api/orders/{id}/cancel` (Orders) — CS order cancellation
@@ -33,7 +35,7 @@ Without multi-issuer JWT support, domain BCs will reject admin tokens and M32.0 
 
 ## Decision
 
-CritterSupply adopts **named JWT Bearer schemes** for multi-issuer authentication. Each identity BC (Vendor Identity, Admin Identity) has its own named authentication scheme, and domain BC endpoints declare which scheme(s) they accept via policy-based authorization.
+CritterSupply adopts **named JWT Bearer schemes** for multi-issuer authentication. Each identity BC (Vendor Identity, BackofficeIdentity) has its own named authentication scheme, and domain BC endpoints declare which scheme(s) they accept via policy-based authorization.
 
 ### 1. Named Authentication Schemes
 
@@ -42,9 +44,9 @@ Domain BCs configure two named JWT Bearer schemes:
 ```csharp
 // Example: Orders.Api/Program.cs
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer("Admin", options =>
+    .AddJwtBearer("Backoffice", options =>
     {
-        options.Authority = "https://localhost:5249"; // Admin Identity BC
+        options.Authority = "https://localhost:5249"; // BackofficeIdentity BC
         options.Audience = "https://localhost:5249";  // Phase 1: self-referential
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -71,9 +73,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 ```
 
 **Key Design Choices:**
-- **Scheme names:** `"Admin"` and `"Vendor"` (not `"AdminJwt"` or `"AdminBearer"` — concise, matches the identity BC name)
+- **Scheme names:** `"Backoffice"` and `"Vendor"` (not `"BackofficeJwt"` or `"BackofficeBearer"` — concise, matches the identity BC name)
 - **Separate `options.Authority`:** Each scheme validates tokens from a different issuer
-- **Separate `options.Audience`:** Admin tokens have `aud: "https://localhost:5249"`, vendor tokens have `aud: "https://localhost:5240"`
+- **Separate `options.Audience`:** Backoffice tokens have `aud: "https://localhost:5249"`, vendor tokens have `aud: "https://localhost:5240"`
 - **Same `RoleClaimType`:** Both identity BCs use the standard `"role"` claim for consistency
 
 ### 2. Policy-Based Authorization
@@ -84,16 +86,16 @@ Domain BCs define authorization policies that map to authentication schemes and 
 // Example: Orders.Api/Program.cs
 builder.Services.AddAuthorization(opts =>
 {
-    // Admin policies (accept Admin scheme only)
+    // Backoffice policies (accept Backoffice scheme only)
     opts.AddPolicy("CustomerService", policy =>
     {
-        policy.AuthenticationSchemes.Add("Admin");
+        policy.AuthenticationSchemes.Add("Backoffice");
         policy.RequireRole("CustomerService", "OperationsManager", "SystemAdmin");
     });
 
     opts.AddPolicy("WarehouseClerk", policy =>
     {
-        policy.AuthenticationSchemes.Add("Admin");
+        policy.AuthenticationSchemes.Add("Backoffice");
         policy.RequireRole("WarehouseClerk", "OperationsManager", "SystemAdmin");
     });
 
@@ -104,10 +106,10 @@ builder.Services.AddAuthorization(opts =>
         policy.RequireRole("VendorAdmin");
     });
 
-    // Cross-issuer policies (accept Admin OR Vendor)
+    // Cross-issuer policies (accept Backoffice OR Vendor)
     opts.AddPolicy("AnyAuthenticated", policy =>
     {
-        policy.AuthenticationSchemes.Add("Admin", "Vendor");
+        policy.AuthenticationSchemes.Add("Backoffice", "Vendor");
         policy.RequireAuthenticatedUser();
     });
 });
@@ -116,7 +118,7 @@ builder.Services.AddAuthorization(opts =>
 **Key Design Choices:**
 - **Policy names match admin roles:** `"CustomerService"`, `"WarehouseClerk"`, etc. (consistency with ADR 0031)
 - **Policy-to-scheme mapping:** Policies explicitly declare which scheme(s) they accept via `AuthenticationSchemes.Add()`
-- **SystemAdmin superuser:** Admin policies include `"SystemAdmin"` in `RequireRole()` to enforce the superuser pattern from ADR 0031
+- **SystemAdmin superuser:** Backoffice policies include `"SystemAdmin"` in `RequireRole()` to enforce the superuser pattern from ADR 0031
 - **Cross-issuer policies:** `"AnyAuthenticated"` policy accepts both admin and vendor tokens (useful for shared read endpoints)
 
 ### 3. Endpoint Authorization
@@ -128,7 +130,7 @@ Handlers annotate endpoints with policy names:
 public static class GetOrderDetailsQuery
 {
     [WolverineGet("/api/orders/{orderId}")]
-    [Authorize(Policy = "CustomerService")] // Accepts Admin scheme only
+    [Authorize(Policy = "CustomerService")] // Accepts Backoffice scheme only
     public static async Task<OrderView?> Handle(
         Guid orderId,
         IQuerySession session,
@@ -142,7 +144,7 @@ public static class GetOrderDetailsQuery
 public static class CancelOrderHandler
 {
     [WolverinePost("/api/orders/{orderId}/cancel")]
-    [Authorize(Policy = "CustomerService")] // Accepts Admin scheme only
+    [Authorize(Policy = "CustomerService")] // Accepts Backoffice scheme only
     public static async Task<IResult> Handle(
         Guid orderId,
         CancelOrderRequest request,
@@ -183,16 +185,16 @@ builder.Services.AddAuthorization(opts =>
         policy.RequireRole("VendorAdmin");
     });
 
-    // Admin policies (new)
+    // Backoffice policies (new)
     opts.AddPolicy("PricingManager", policy =>
     {
-        policy.AuthenticationSchemes.Add("Admin");
+        policy.AuthenticationSchemes.Add("Backoffice");
         policy.RequireRole("PricingManager", "OperationsManager", "SystemAdmin");
     });
 
     opts.AddPolicy("CopyWriter", policy =>
     {
-        policy.AuthenticationSchemes.Add("Admin");
+        policy.AuthenticationSchemes.Add("Backoffice");
         policy.RequireRole("CopyWriter", "SystemAdmin");
     });
 });
@@ -201,17 +203,17 @@ builder.Services.AddAuthorization(opts =>
 ### 5. Audience Evolution (Phase 1 vs. Phase 2+)
 
 **Phase 1 (Current Decision):**
-- Admin Identity BC issues tokens with `aud: "https://localhost:5249"` (self-referential)
+- BackofficeIdentity BC issues tokens with `aud: "https://localhost:5249"` (self-referential)
 - Domain BCs configure `options.Audience = "https://localhost:5249"`
-- **Rationale:** Admin Portal BFF does not exist yet. Admin Identity's own user management endpoints (`/api/admin-identity/users`) are the only protected endpoints. Domain BCs accept these tokens to enable M32.0 Phase 1 (read-only dashboards + CS tooling).
+- **Rationale:** Backoffice BFF does not exist yet. BackofficeIdentity's own user management endpoints (`/api/admin-identity/users`) are the only protected endpoints. Domain BCs accept these tokens to enable M32.0 Phase 1 (read-only dashboards + CS tooling).
 
 **Phase 2+ (Future Evolution):**
-- Admin Portal API (port 5243) is built
-- Admin Identity BC should issue tokens with `aud: "https://localhost:5243"` (Admin Portal API audience)
+- Backoffice API (port 5243) is built
+- BackofficeIdentity BC should issue tokens with `aud: "https://localhost:5243"` (Backoffice API audience)
 - Domain BCs should configure `options.Audience = "https://localhost:5243"` OR accept multiple audiences
-- **Migration Path:** Coordinated update across Admin Identity BC + 9 domain BCs
+- **Migration Path:** Coordinated update across BackofficeIdentity BC + 9 domain BCs
 
-**Decision:** Defer audience evolution to Phase 2+. Document the limitation in this ADR and plan the migration when Admin Portal API ships.
+**Decision:** Defer audience evolution to Phase 2+. Document the limitation in this ADR and plan the migration when Backoffice API ships.
 
 ---
 
@@ -259,22 +261,22 @@ options.TokenValidationParameters.IssuerValidator = (issuer, securityToken, vali
 
 ### Why `RoleClaimType = "role"` for Both Issuers
 
-Both Admin Identity BC and Vendor Identity BC use the standard `"role"` claim (not custom claims like `"admin_role"` or `"vendor_role"`). This enables:
+Both BackofficeIdentity BC and Vendor Identity BC use the standard `"role"` claim (not custom claims like `"admin_role"` or `"vendor_role"`). This enables:
 - ✅ `policy.RequireRole("CustomerService")` works without custom claim mapping
 - ✅ SignalR hub groups use standard `HttpContext.User.IsInRole()` checks
 - ✅ Frontend `AuthorizeView Roles="CustomerService"` components work without custom logic
 
 ### Why Self-Referential Audience in Phase 1
 
-Admin Identity BC issues tokens with `aud: "https://localhost:5249"` (its own address) because:
-1. Admin Portal API (port 5243) does not exist yet
-2. Admin Identity's user management endpoints need protection
-3. Domain BCs accept these tokens as a transitional pattern until Admin Portal API ships
+BackofficeIdentity BC issues tokens with `aud: "https://localhost:5249"` (its own address) because:
+1. Backoffice API (port 5243) does not exist yet
+2. BackofficeIdentity's user management endpoints need protection
+3. Domain BCs accept these tokens as a transitional pattern until Backoffice API ships
 
-**Trade-off:** Domain BCs validate tokens intended for Admin Identity BC, not for themselves. This is acceptable in Phase 1 because:
-- All admin tokens go through Admin Identity BC (single issuer, single audience)
-- Phase 2 migration path is clear (update audience to Admin Portal API address)
-- No security risk (tokens are still validated against Admin Identity's signing key)
+**Trade-off:** Domain BCs validate tokens intended for BackofficeIdentity BC, not for themselves. This is acceptable in Phase 1 because:
+- All admin tokens go through BackofficeIdentity BC (single issuer, single audience)
+- Phase 2 migration path is clear (update audience to Backoffice API address)
+- No security risk (tokens are still validated against BackofficeIdentity's signing key)
 
 ---
 
@@ -283,7 +285,7 @@ Admin Identity BC issues tokens with `aud: "https://localhost:5249"` (its own ad
 ### Positive
 
 ✅ **Domain BCs accept admin JWTs** — Unblocks M32.0 Phase 1 implementation
-✅ **Per-issuer role validation** — Admin roles and vendor roles are isolated
+✅ **Per-issuer role validation** — Backoffice roles and vendor roles are isolated
 ✅ **Per-endpoint scheme restriction** — Handlers declare which issuer(s) they accept
 ✅ **Consistent with ADR 0031** — Policy names match admin roles (CustomerService, PricingManager, etc.)
 ✅ **Follows ASP.NET Core conventions** — Named schemes are a standard pattern
@@ -308,13 +310,13 @@ Admin Identity BC issues tokens with `aud: "https://localhost:5249"` (its own ad
 
 ### Known Limitations (Phase 1)
 
-⚠️ **Self-referential audience pattern** — Domain BCs validate tokens with `aud: "https://localhost:5249"` (Admin Identity BC), not their own addresses. This is a transitional pattern acceptable for Phase 1 because:
-- Admin Portal API (port 5243) does not exist yet
-- All admin tokens originate from a single issuer (Admin Identity BC)
-- Tokens are still validated against Admin Identity's signing key (secure)
+⚠️ **Self-referential audience pattern** — Domain BCs validate tokens with `aud: "https://localhost:5249"` (BackofficeIdentity BC), not their own addresses. This is a transitional pattern acceptable for Phase 1 because:
+- Backoffice API (port 5243) does not exist yet
+- All admin tokens originate from a single issuer (BackofficeIdentity BC)
+- Tokens are still validated against BackofficeIdentity's signing key (secure)
 
-**Phase 2 Migration Requirement:** When Admin Portal API ships, we must:
-1. Update Admin Identity BC to issue tokens with `aud: "https://localhost:5243"`
+**Phase 2 Migration Requirement:** When Backoffice API ships, we must:
+1. Update BackofficeIdentity BC to issue tokens with `aud: "https://localhost:5243"`
 2. Update all domain BCs to configure `options.Audience = "https://localhost:5243"`
 3. Coordinate deployment to avoid token validation failures during rollout
 4. Consider supporting multiple audiences temporarily (backward compatibility)
@@ -337,11 +339,11 @@ Admin Identity BC issues tokens with `aud: "https://localhost:5249"` (its own ad
    - [x] Mark ADR status as ✅ Accepted
 
 2. **Domain BC JWT Scheme Configuration (5 BCs)**
-   - [ ] Orders.Api — Add `"Admin"` and `"Vendor"` schemes + policies
-   - [ ] Returns.Api — Add `"Admin"` and `"Vendor"` schemes + policies
-   - [ ] Customer Identity.Api — Add `"Admin"` scheme only (customers use cookies)
-   - [ ] Correspondence.Api — Add `"Admin"` scheme only
-   - [ ] Fulfillment.Api — Add `"Admin"` scheme only (verify if WISMO queries exist first)
+   - [ ] Orders.Api — Add `"Backoffice"` and `"Vendor"` schemes + policies
+   - [ ] Returns.Api — Add `"Backoffice"` and `"Vendor"` schemes + policies
+   - [ ] Customer Identity.Api — Add `"Backoffice"` scheme only (customers use cookies)
+   - [ ] Correspondence.Api — Add `"Backoffice"` scheme only
+   - [ ] Fulfillment.Api — Add `"Backoffice"` scheme only (verify if WISMO queries exist first)
 
 3. **Product Catalog.Api Policy Rename**
    - [ ] Rename `"Admin"` policy to `"VendorAdmin"`
@@ -365,7 +367,7 @@ Admin Identity BC issues tokens with `aud: "https://localhost:5249"` (its own ad
 
 - [ADR 0028: JWT Bearer Tokens for Vendor Identity](./0028-jwt-for-vendor-identity.md) — Establishes the JWT pattern for Vendor Identity BC
 - [ADR 0031: Admin Portal Role-Based Access Control Model](./0031-admin-portal-rbac-model.md) — Defines admin roles and policy-based authorization
-- [Admin Portal Integration Gap Register](../planning/admin-portal-integration-gap-register.md) — Documents 8 Phase 0.5 blockers including multi-issuer JWT
+- [Backoffice Integration Gap Register](../planning/admin-portal-integration-gap-register.md) — Documents 8 Phase 0.5 blockers including multi-issuer JWT
 - [M32.0 Prerequisite Assessment](../planning/m32-0-prerequisite-assessment.md) — Assesses M32.0 prerequisites and recommends Phase 0.5 implementation
 
 ---

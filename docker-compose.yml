@@ -377,29 +377,29 @@ services:
       - backend
     profiles: [all]
 
-  adminidentity-api:
-    container_name: crittersupply-adminidentity
+  backofficeidentity-api:
+    container_name: crittersupply-backofficeidentity
     build:
       context: .
-      dockerfile: src/Admin Identity/AdminIdentity.Api/Dockerfile
+      dockerfile: src/Backoffice Identity/BackofficeIdentity.Api/Dockerfile
     ports:
       - "5249:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__postgres: "Host=postgres;Port=5432;Database=adminidentity;Username=postgres;Password=postgres"
+      ConnectionStrings__postgres: "Host=postgres;Port=5432;Database=backofficeidentity;Username=postgres;Password=postgres"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
-      OTEL_SERVICE_NAME: AdminIdentity.Api
-      Jwt__SecretKey: "AdminIdentity-Development-Secret-Key-Minimum-32-Characters-Required"
-      Jwt__Issuer: "http://adminidentity-api:8080"
-      Jwt__Audience: "http://adminidentity-api:8080"
+      OTEL_SERVICE_NAME: BackofficeIdentity.Api
+      Jwt__SecretKey: "BackofficeIdentity-Development-Secret-Key-Minimum-32-Characters-Required"
+      Jwt__Issuer: "http://backofficeidentity-api:8080"
+      Jwt__Audience: "http://backofficeidentity-api:8080"
       Jwt__ExpiryMinutes: "15"
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - backend
-    profiles: [all, adminidentity]
+    profiles: [all, backofficeidentity]
 
 networks:
   backend:

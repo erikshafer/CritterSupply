@@ -141,9 +141,9 @@ builder.Services.AddWolverineHttp();
 
 // Configure multi-issuer JWT authentication (ADR 0032)
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer("Admin", options =>
+    .AddJwtBearer("Backoffice", options =>
     {
-        options.Authority = "https://localhost:5249"; // Admin Identity BC
+        options.Authority = "https://localhost:5249"; // Backoffice Identity BC
         options.Audience = "https://localhost:5249";  // Phase 1: self-referential
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -171,22 +171,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 // Configure authorization policies (ADR 0032)
 builder.Services.AddAuthorization(opts =>
 {
-    // Admin policies (accept Admin scheme only)
+    // Backoffice policies (accept Backoffice scheme only)
     opts.AddPolicy("CustomerService", policy =>
     {
-        policy.AuthenticationSchemes.Add("Admin");
+        policy.AuthenticationSchemes.Add("Backoffice");
         policy.RequireRole("CustomerService", "OperationsManager", "SystemAdmin");
     });
 
     opts.AddPolicy("WarehouseClerk", policy =>
     {
-        policy.AuthenticationSchemes.Add("Admin");
+        policy.AuthenticationSchemes.Add("Backoffice");
         policy.RequireRole("WarehouseClerk", "OperationsManager", "SystemAdmin");
     });
 
     opts.AddPolicy("OperationsManager", policy =>
     {
-        policy.AuthenticationSchemes.Add("Admin");
+        policy.AuthenticationSchemes.Add("Backoffice");
         policy.RequireRole("OperationsManager", "SystemAdmin");
     });
 
@@ -197,10 +197,10 @@ builder.Services.AddAuthorization(opts =>
         policy.RequireRole("VendorAdmin");
     });
 
-    // Cross-issuer policies (accept Admin OR Vendor)
+    // Cross-issuer policies (accept Backoffice OR Vendor)
     opts.AddPolicy("AnyAuthenticated", policy =>
     {
-        policy.AuthenticationSchemes.Add("Admin");
+        policy.AuthenticationSchemes.Add("Backoffice");
         policy.AuthenticationSchemes.Add("Vendor");
         policy.RequireAuthenticatedUser();
     });

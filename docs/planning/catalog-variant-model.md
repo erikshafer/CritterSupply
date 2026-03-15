@@ -857,7 +857,7 @@ The Marketplaces BC needs `FamilyId` to determine whether to create a child ASIN
 | **Storefront BC (Customer Experience)** | Browse by family, add-to-cart by variant SKU | **Primary UI change:** family browse page groups variants under one parent. The `ProductFamilyView` becomes the browse unit; the variant SKU is selected via attribute pickers (Size, Color) before add-to-cart. Storefront BC reacts to `Messages.Contracts.ProductCatalog.ProductVariantAdded` to build the family view. | ✅ **Yes** — family browse page and attribute selector UI |
 | **Fulfillment BC** | Ships variant SKU per order line | No change — fulfillment receives the SKU from the order line. Hazmat routing, carrier selection, and label generation are all per-SKU. | ❌ No changes needed |
 | **Vendor Portal BC** | Vendor manages their products | Vendors will want to see their products grouped by family in the product management UI. The Vendor Portal currently shows products as a flat list by SKU — Phase 3+ will group them by family. Vendor Portal BC may react to `ProductFamilyCreated` and `ProductVariantAdded` to build a family-aware product list. | ⚠️ **UI enhancement** — Phase 3+ scope |
-| **Admin Portal BC** | Catalog manager creates families, adds variants | Gains new UI surface: "Create Product Family" flow and "Add Variant" workflow. This is a Phase 3 implementation deliverable for the Admin Portal. | ✅ **Yes** — new admin UI surfaces |
+| **Backoffice BC** | Catalog manager creates families, adds variants | Gains new UI surface: "Create Product Family" flow and "Add Variant" workflow. This is a Phase 3 implementation deliverable for the Backoffice. | ✅ **Yes** — new admin UI surfaces |
 
 ---
 
@@ -885,7 +885,7 @@ D1 is now resolved. The following items from Phase 3 in the evolution plan can b
 | RabbitMQ routing | New messages on standard `product-catalog` exchange | Low |
 | Integration tests (Alba + Testcontainers) | Create family → add variants → verify projection + messages | High |
 | HTTP endpoints | `POST /families`, `PUT /families/{id}`, `POST /families/{id}/variants`, `DELETE /families/{id}/variants/{sku}` | Medium |
-| Admin Portal UI | "Create Family", "Add Variant to Family", "Manage Family" MudBlazor components | High |
+| Backoffice UI | "Create Family", "Add Variant to Family", "Manage Family" MudBlazor components | High |
 
 ### 6.2 Listings BC — Variant-Aware Updates
 
@@ -1122,7 +1122,7 @@ This last example illustrates an important business point: **a family with one v
 
 ### 9.3 Catalog Manager Workflow
 
-This section describes the end-to-end business workflow for catalog managers when creating and managing product families. These workflows will drive the Admin Portal UX requirements in Phase 3.
+This section describes the end-to-end business workflow for catalog managers when creating and managing product families. These workflows will drive the Backoffice UX requirements in Phase 3.
 
 #### 9.3.1 Creating a New Product Family
 
@@ -1130,7 +1130,7 @@ This section describes the end-to-end business workflow for catalog managers whe
 
 **Step 1 — Create the Product Family**
 
-The catalog manager opens the Admin Portal, navigates to **Product Catalog > Families > Create New Family**, and fills in the family-level details:
+The catalog manager opens the Backoffice, navigates to **Product Catalog > Families > Create New Family**, and fills in the family-level details:
 
 | Field | Example Value | Notes |
 |---|---|---|
@@ -1315,7 +1315,7 @@ The following business rules govern the family/variant model from an operations 
 
 **Business rationale:** Not every product has variants. "CritterSupply XL Premium Dog Kennel" may be a single-SKU product with no size variants. Forcing it into a family creates unnecessary overhead. Standalone SKUs list on Amazon as single products (no parent ASIN). Standalone products are first-class catalog citizens.
 
-**Operational note:** The Admin Portal should make standalone products clearly distinguishable from family members — a visual indicator like "Standalone Product (no family)" prevents catalog managers from thinking a product is "broken" because it has no family link.
+**Operational note:** The Backoffice should make standalone products clearly distinguishable from family members — a visual indicator like "Standalone Product (no family)" prevents catalog managers from thinking a product is "broken" because it has no family link.
 
 #### Rule 2 — Can a Family Have Only One Variant?
 
@@ -1325,7 +1325,7 @@ The following business rules govern the family/variant model from an operations 
 - A product where the catalog manager created the family structure in anticipation of variants that have not yet been sourced (e.g., "we know a green colorway is coming Q3")
 - A product transitioning from standalone to family (the original SKU is the first member; more are expected)
 
-The Admin Portal should display a **soft warning** ("This family has only one variant — is this intentional?") but must not block listing or publishing. A one-variant family is not an error state.
+The Backoffice should display a **soft warning** ("This family has only one variant — is this intentional?") but must not block listing or publishing. A one-variant family is not an error state.
 
 **Hard rule:** A family must have at least one variant to have any listings created against it. An **empty family** (zero variants) cannot have listings. This is enforced by Listings BC at draft creation time: `FamilyId` must resolve to a family with at least one `Active` variant.
 
@@ -1356,7 +1356,7 @@ When every variant in a family reaches `Discontinued` status, the family itself 
 **Constraints:**
 - **Existing listings are not retroactively affected.** If `DOG-BOWL-001` has three active Amazon listings (submitted as a standalone product, no parent ASIN), those listings retain their current state. They are not automatically reorganized under a parent ASIN just because the product joined a family. New listings created *after* the family assignment will use the family grouping.
 - **Catalog manager must review active listings** after a family assignment and decide whether to delist the old standalone listing and re-list as a child under the family's parent ASIN. This is a manual merchandising decision, not an automated cascade.
-- The Admin Portal should surface a **post-assignment notice:** "DOG-BOWL-001 has 3 active listings as a standalone product. Review and update listings to reflect the new family grouping."
+- The Backoffice should surface a **post-assignment notice:** "DOG-BOWL-001 has 3 active listings as a standalone product. Review and update listings to reflect the new family grouping."
 
 #### Rule 6 — Who Can Create, Edit, and Archive Variants?
 
@@ -1378,13 +1378,13 @@ When every variant in a family reaches `Discontinued` status, the family itself 
 
 **No hard system limit at this time.** In practice, e-commerce catalogs rarely exceed 100 variants per family (most fall under 20). A dog collar in 5 sizes × 10 colors = 50 variants, which is realistic. A pet food in 6 bag sizes × 3 protein sources = 18 variants.
 
-**Soft operational guidance:** Families with more than 50 variants should trigger a catalog manager review — this often indicates a family that should be split into sub-families (e.g., "Chicken Recipe" family and "Salmon Recipe" family as separate groupings rather than one giant multi-protein/multi-size family). The Admin Portal may surface this as an advisory: "This family has 52 variants. Consider splitting by primary attribute for clearer customer navigation."
+**Soft operational guidance:** Families with more than 50 variants should trigger a catalog manager review — this often indicates a family that should be split into sub-families (e.g., "Chicken Recipe" family and "Salmon Recipe" family as separate groupings rather than one giant multi-protein/multi-size family). The Backoffice may surface this as an advisory: "This family has 52 variants. Consider splitting by primary attribute for clearer customer navigation."
 
 **Marketplace reality check:** Amazon limits the number of child ASINs under a single parent ASIN to a practical maximum (varies by category, typically 50-200). For families that would exceed marketplace limits, Marketplaces BC must handle the splitting logic — this is a Phase 3+ concern.
 
 #### Rule 8 — What Variant Attributes Are Supported — Free-Form or Constrained?
 
-For **Phase 3 launch**, variant attributes will be **free-form key-value pairs** (`Dictionary<string, string>`) validated at the UI layer rather than enforced by domain schema. The Admin Portal will present a **dropdown of recommended attribute keys** based on the product's category to guide consistent data entry:
+For **Phase 3 launch**, variant attributes will be **free-form key-value pairs** (`Dictionary<string, string>`) validated at the UI layer rather than enforced by domain schema. The Backoffice will present a **dropdown of recommended attribute keys** based on the product's category to guide consistent data entry:
 
 | Category | Suggested Attribute Keys |
 |---|---|
@@ -1493,7 +1493,7 @@ Add:
 
 ### 9.7 Open Questions for the Owner
 
-The following business policy questions require Owner input. D1 is fully resolved; these questions arise from the implications of the D1 model choice and should be answered before Phase 3 Admin Portal UI design begins.
+The following business policy questions require Owner input. D1 is fully resolved; these questions arise from the implications of the D1 model choice and should be answered before Phase 3 Backoffice UI design begins.
 
 ---
 
@@ -1565,7 +1565,7 @@ The following business policy questions require Owner input. D1 is fully resolve
 
 ---
 
-*All five questions above require Owner input before Phase 3 Admin Portal UI and Listings BC validation logic are finalized. None of them block the core variant model implementation (ProductFamily aggregate, Product stream changes) — that engineering work can begin immediately. These questions specifically gate the Admin Portal UX design and the Listings BC validation rule set.*
+*All five questions above require Owner input before Phase 3 Backoffice UI and Listings BC validation logic are finalized. None of them block the core variant model implementation (ProductFamily aggregate, Product stream changes) — that engineering work can begin immediately. These questions specifically gate the Backoffice UX design and the Listings BC validation rule set.*
 
 ---
 

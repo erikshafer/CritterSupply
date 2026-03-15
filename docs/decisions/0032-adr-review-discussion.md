@@ -7,6 +7,8 @@
 **Duration:** 45 minutes
 **Document:** [ADR 0032: Multi-Issuer JWT Authentication Strategy](./0032-multi-issuer-jwt-strategy.md)
 
+> **Note:** "Admin Portal" was renamed to "Backoffice" and "Admin Identity" to "BackofficeIdentity" in [ADR 0033](./0033-admin-portal-to-backoffice-rename.md).
+
 ---
 
 ## Review Process

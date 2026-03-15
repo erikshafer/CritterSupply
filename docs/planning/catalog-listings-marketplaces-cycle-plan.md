@@ -55,7 +55,7 @@ All outstanding Owner decisions from the [Evolution Plan §6](catalog-listings-m
 Cycle 25: Returns BC Phase 1              ← COMPLETE (2026-03-12)
 Cycle 26: Notifications BC Phase 1         ← planned
 Cycle 27: Promotions BC Phase 1            ← planned
-Cycle 28: Admin Portal Phase 1             ← planned
+Cycle 28: Backoffice Phase 1             ← planned
 ────────────────────────────────────────────────────────
 Cycle 29: Product Catalog ES Migration     ← Phase 0 (can overlap w/ Cycle 28)
 Cycle 30: Listings BC Foundation (Part A)  ← Phase 1a
@@ -70,7 +70,7 @@ Cycle 35: Real API Calls + Automation      ← Phase 3b
 
 **Priority level:** Elevated from "Low" to **Medium** (PO decision). Marketplace selling is the #1 revenue growth lever for pet supply retail and demonstrates the real value of bounded contexts + event-driven design in the reference architecture.
 
-**Acceleration option:** Phase 0 (Cycle 29) is a backend-only migration with no UI dependency. It can run as "Cycle 28b" alongside Admin Portal, since it touches `src/Product Catalog/`, `src/Shared/Messages.Contracts/`, and `src/Pricing/` — no overlap with Admin Portal files. This would save one cycle.
+**Acceleration option:** Phase 0 (Cycle 29) is a backend-only migration with no UI dependency. It can run as "Cycle 28b" alongside Backoffice, since it touches `src/Product Catalog/`, `src/Shared/Messages.Contracts/`, and `src/Pricing/` — no overlap with Backoffice files. This would save one cycle.
 
 ---
 
@@ -282,7 +282,7 @@ ANY non-terminal → Ended (via ForcedDown from recall cascade — bypasses norm
 | 1.7 | **HTTP endpoints** — 9 Wolverine HTTP endpoints for full lifecycle management (Create, UpdateContent, SubmitForReview, Approve, Pause, Resume, End, GetListing, ListListings) | 1.5 days |
 | 1.8 | **Integration message contracts** — `Messages.Contracts.Listings` namespace: `ListingCreated`, `ListingActivated`, `ListingPaused`, `ListingEnded`, `ListingForcedDown`, `ListingsCascadeCompleted` | 0.5 day |
 | 1.9 | **Integration tests** — TestContainers PostgreSQL + RabbitMQ; test classes: `CreateListingTests`, `ListingLifecycleTests`, `RecallCascadeTests`, `ProductSummaryViewTests`, `ListingInvariantTests` | 2 days |
-| 1.10 | **AdminPortal.Web scaffold** — Blazor Server app (MudBlazor 9.1.0), `<MudLayout>` shell, no authentication (infrastructure-protected); port 5244 | 0.5 day |
+| 1.10 | **Backoffice.Web scaffold** — Blazor Server app (MudBlazor 9.1.0), `<MudLayout>` shell, no authentication (infrastructure-protected); port 5244 | 0.5 day |
 | 1.11 | **AdminPortal.Api scaffold** — BFF project proxying to ProductCatalog.Api + Listings.Api; port 5243 | 0.5 day |
 | 1.12 | **Listings admin pages** — Dashboard (`/admin/listings`), Detail (`/admin/listings/{id}`), Create (`/admin/listings/create`); `<ListingStatusBadge>` shared component | 1.5 days |
 | 1.13 | **Product Detail enhancements** — Listings Summary widget (P1.2: "2 Live · 1 Paused · 0 Ended"); Product Change History tab (P1.1: `<MudTimeline>` with significance filtering) | 1 day |
@@ -300,7 +300,7 @@ ANY non-terminal → Ended (via ForcedDown from recall cascade — bypasses norm
 ✅ Listing creation rejected for Discontinued/Deleted products and non-existent SKUs  
 ✅ `ProductSummaryView` maintained correctly by reacting to Product Catalog integration messages  
 ✅ Integration tests cover: happy path, recall cascade (3+ listings across 2+ channels), duplicate listing prevention, terminal product rejection  
-✅ AdminPortal.Web scaffold running with Listings Dashboard, Detail, and Create pages  
+✅ Backoffice.Web scaffold running with Listings Dashboard, Detail, and Create pages  
 ✅ Pre-flight discontinuation modal shows accurate affected listing count  
 ✅ ADRs 0032–0034, 0037 written
 
@@ -553,14 +553,14 @@ Four moments in the plan require coordinated changes across multiple bounded con
 - Adapter pattern isolates marketplace specifics — adding a new channel is a new adapter, not a core change  
 **Residual risk:** Medium — even one marketplace (Amazon SP-API) is complex.
 
-### Risk 4: Admin Portal Dependency Bottleneck (Severity: MEDIUM)
+### Risk 4: Backoffice Dependency Bottleneck (Severity: MEDIUM)
 
-**Trigger:** Admin Portal (Cycle 28) is delayed; Listings BC has no management UI.  
+**Trigger:** Backoffice (Cycle 28) is delayed; Listings BC has no management UI.  
 **Impact:** Backend capability with no human-facing surface.  
 **Mitigation:**
 - Listings BC API endpoints are fully self-sufficient (CRUD via HTTP/Swagger)
-- Phase 1 ships a lightweight `AdminPortal.Web` scaffold (Blazor Server, MudBlazor, no auth) — independent of Cycle 28's full Admin Portal scope
-- Every page built in Phases 1–2 survives into the full Admin Portal shell  
+- Phase 1 ships a lightweight `Backoffice.Web` scaffold (Blazor Server, MudBlazor, no auth) — independent of Cycle 28's full Backoffice scope
+- Every page built in Phases 1–2 survives into the full Backoffice shell  
 **Residual risk:** Low — UXE's Option C (standalone scaffold) eliminates the bottleneck.
 
 ### Risk 5: Multi-Cycle Effort Without Intermediate Value (Severity: MEDIUM — PO concern)
@@ -626,7 +626,7 @@ If any phase is cut, previous phases still provide value.
 | Phase | Admin UI | Storefront | New Components |
 |-------|----------|-----------|----------------|
 | **Phase 0** | None (projection design only) | None | 0 |
-| **Phase 1** | AdminPortal.Web scaffold + 5 pages + 1 dialog + 3 components | None | ~9 |
+| **Phase 1** | Backoffice.Web scaffold + 5 pages + 1 dialog + 3 components | None | ~9 |
 | **Phase 2** | 4 pages + 2 components | None | ~6 |
 | **Phase 3** | 3 pages + 1 dialog | PDP variant picker + product card badges + cart variant display | ~7 |
 | **Total** | ~12 admin pages | ~3 Storefront modifications | ~22 components/pages |
@@ -637,8 +637,8 @@ If any phase is cut, previous phases still provide value.
 - `ProductMigrated` excluded from history projections (P0.3 — projection-level filter)
 - `ProductChangeHistoryView` schema designed (significance classification: Major/Minor/System)
 
-**Phase 1 — Admin Portal scaffold ships:**
-- `AdminPortal.Web` (Blazor Server, MudBlazor, port 5244, no auth)
+**Phase 1 — Backoffice scaffold ships:**
+- `Backoffice.Web` (Blazor Server, MudBlazor, port 5244, no auth)
 - `AdminPortal.Api` (BFF, port 5243, proxies to ProductCatalog.Api + Listings.Api)
 - Listings Dashboard (`/admin/listings`) — `<MudDataGrid>` + KPI cards
 - Listing Detail (`/admin/listings/{id}`) — `<MudTabs>` + `<MudStepper>` + actions
@@ -663,18 +663,18 @@ If any phase is cut, previous phases still provide value.
 - **Storefront product cards** — variant count badge
 - **Cart** — variant attributes display
 
-### Admin Portal Migration Path
+### Backoffice Migration Path
 
 ```
-Phase 1 (Cycle 31)          → Phase 2 (Cycle 33)          → Cycle 28+ (Admin Portal)
+Phase 1 (Cycle 31)          → Phase 2 (Cycle 33)          → Cycle 28+ (Backoffice)
 ───────────────────────────────────────────────────────────────────────────────────────
-AdminPortal.Web scaffold      Add Marketplace pages          Wire AdminIdentity BC
+Backoffice.Web scaffold      Add Marketplace pages          Wire BackofficeIdentity BC
 AdminPortal.Api BFF           Add Category Mapping editor    JWT auth + role-based access
 No auth (VPN only)            Still no auth                  Role-filtered navigation
 Catalog + Listings pages      + Marketplace pages            + Dashboards + permissions
 ```
 
-Zero throwaway work. Every page built in Phases 1–2 survives into the full Admin Portal. The shell (`<MudLayout>`, `<MudAppBar>`, `<MudDrawer>`, navigation) becomes the Admin Portal shell. Auth wraps around it — it doesn't replace it.
+Zero throwaway work. Every page built in Phases 1–2 survives into the full Backoffice. The shell (`<MudLayout>`, `<MudAppBar>`, `<MudDrawer>`, navigation) becomes the Backoffice shell. Auth wraps around it — it doesn't replace it.
 
 ---
 
@@ -685,7 +685,7 @@ Zero throwaway work. Every page built in Phases 1–2 survives into the full Adm
 | Listings.Api | 5246 | 📋 Reserved (Phase 1) |
 | Marketplaces.Api | 5247 | 📋 Reserved (Phase 2) |
 | AdminPortal.Api | 5243 | 📋 Reserved (Phase 1) |
-| AdminPortal.Web | 5244 | 📋 Reserved (Phase 1) |
+| Backoffice.Web | 5244 | 📋 Reserved (Phase 1) |
 
 ---
 
