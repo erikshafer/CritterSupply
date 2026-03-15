@@ -140,7 +140,9 @@ Option A (Recommended for pre-production): **Delete existing migrations and rege
 ```bash
 rm -rf "src/Backoffice Identity/BackofficeIdentity/Migrations/"
 cd "src/Backoffice Identity/BackofficeIdentity.Api"
-dotnet ef migrations add InitialCreate --project "../BackofficeIdentity/BackofficeIdentity.csproj"
+dotnet ef migrations add InitialCreate \
+  --project "../BackofficeIdentity/BackofficeIdentity.csproj" \
+  --startup-project "."
 ```
 
 Option B (If preserving migration history): Rename namespaces in all 3 migration files:
@@ -229,8 +231,8 @@ File: `src/CritterSupply.AppHost/AppHost.cs`
 
 ### 1.7 Correspondence BC Reference
 
-File: `src/Correspondence/Correspondence.Api/Queries/GetMessageDetails.cs`
-- Check for any reference to "admin" and update if it's BC-specific (may be a comment or a role reference — verify before changing)
+File: `src/Correspondence/Correspondence.Api/Queries/GetMessageDetails.cs` (line 10)
+- XML doc comment: `/// Used by Admin Portal for customer service tooling` → `/// Used by Backoffice for customer service tooling`
 
 ### Phase 1 Verification
 
@@ -410,9 +412,7 @@ dotnet run --project "src/Backoffice Identity/BackofficeIdentity.Api/BackofficeI
 
 2. **GitHub label rename:** The `bc:admin-portal` label on existing Issues needs manual relabeling to `bc:backoffice`. Should a new `bc:backoffice-identity` label also be created?
 
-3. **Product Catalog `"Admin"` policy:** ADR 0032 already plans to rename this to `"VendorAdmin"`. Should this be done in the same rename session, or is it already complete from M31.5 Session 3?
-
-4. **Aspire note update:** The comment in `AppHost.cs` mentioning intentionally excluded services lists `VendorIdentity.Api` and `VendorPortal.Api`. Should `BackofficeIdentity.Api` also be listed there, or should it remain in the Aspire registration?
+3. **Product Catalog `"Admin"` policy:** Product Catalog.Api still has `opts.AddPolicy("Admin", policy => policy.RequireRole("Admin"))` (line 70 of Program.cs). ADR 0032 planned to rename this to `"VendorAdmin"` but it has NOT been done yet. This should be done in the same rename session to eliminate ALL uses of `"Admin"` as a policy/scheme name. The change is: rename `"Admin"` → `"VendorAdmin"` in Product Catalog.Api/Program.cs and update the 3 endpoint files that reference `[Authorize(Policy = "Admin")]` (in `Products/AssignProductToVendor.cs`).
 
 ---
 

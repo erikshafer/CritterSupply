@@ -112,7 +112,7 @@ All identifiers, configuration, documentation, and infrastructure references wil
 | Project names | `AdminIdentity`, `AdminIdentity.Api` | `BackofficeIdentity`, `BackofficeIdentity.Api` |
 | Namespaces | `AdminIdentity.*` | `BackofficeIdentity.*` |
 | JWT scheme name | `"Admin"` | `"Backoffice"` |
-| JWT issuer | `https://localhost:5249` | `https://localhost:5249` *(unchanged — issuer is the service URL)* |
+| JWT issuer | `https://localhost:5249` | `https://localhost:5249` *(unchanged — issuer is the service URL, configured in appsettings.json)* |
 | JWT secret key prefix | `AdminIdentity-Development-...` | `BackofficeIdentity-Development-...` |
 | Docker service | `adminidentity-api` | `backofficeidentity-api` |
 | Docker container | `crittersupply-adminidentity` | `crittersupply-backofficeidentity` |
