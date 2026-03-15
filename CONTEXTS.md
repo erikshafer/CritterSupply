@@ -205,17 +205,17 @@ Price rules, MAP (Minimum Advertised Price) / floor prices, temporal pricing, an
 
 **Folder:** `src/Correspondence/`
 
-Transactional customer communications — order confirmations, shipping updates, return status. Phase 1 covers email only.
+Owns transactional customer communication — email and SMS messages triggered by business events across all BCs.
 
 | Communicates with | Direction | Notes |
 |---|---|---|
-| Orders | ← receives | Order lifecycle events trigger emails |
-| Fulfillment | ← receives (Phase 2) | Shipment events |
-| Payments | ← receives (Phase 2) | Refund events |
-| Returns | ← receives (Phase 2) | Return status events |
-| Customer Identity | → queries (Phase 2) | Customer contact preferences |
+| Orders | ← receives | OrderPlaced for order confirmations |
+| Fulfillment | ← receives | ShipmentDispatched, ShipmentDelivered, ShipmentDeliveryFailed for tracking and delivery notifications |
+| Returns | ← receives | ReturnApproved, ReturnDenied, ReturnCompleted, ReturnExpired for return workflow updates |
+| Payments | ← receives | RefundCompleted for refund confirmations |
+| Customer Identity | → queries | Customer email, phone, notification preferences (Phase 2+) |
 
-**Key decisions:** Renamed from "Notifications" to avoid ambiguity with real-time UI updates handled by Customer Experience ([ADR 0030](docs/decisions/0030-notifications-to-correspondence-rename.md)). Uses `IEmailProvider` strategy pattern — stub provider in Phase 1.
+**Key decisions:** Renamed from "Notifications" to avoid ambiguity with real-time UI updates handled by Customer Experience ([ADR 0030](docs/decisions/0030-notifications-to-correspondence-rename.md)). Event-sourced Message aggregate with retry lifecycle. M28.0 (Phase 1) implemented OrderPlaced with Stub EmailProvider. M31.0 (Phase 2) added 7 additional integration events and SMS channel infrastructure (StubSmsProvider). Real provider integration (SendGrid, Twilio) deferred to Phase 3+.
 
 ---
 
