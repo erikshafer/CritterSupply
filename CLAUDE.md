@@ -264,9 +264,11 @@ CritterSupply uses a modular documentation structure optimized for AI-assisted d
 
 **⚠️ Migration in Progress (2026-02-23):** CritterSupply is moving from markdown-based planning to **GitHub Projects + Issues**. See [GITHUB-MIGRATION-PLAN.md](./docs/planning/GITHUB-MIGRATION-PLAN.md) and [ADR 0011](./docs/decisions/0011-github-projects-issues-migration.md).
 
-**Active Cycle Tracking (GitHub-First):**
+**⚡ Planning Schema Update (2026-03-15):** CritterSupply has migrated from "Cycle N Phase M" to **Milestone-Based Versioning** (M.N format). See [ADR 0032](./docs/decisions/0032-milestone-based-planning-schema.md) and [Milestone Mapping](./docs/planning/milestone-mapping.md).
+
+**Active Milestone Tracking (GitHub-First):**
 - **GitHub Issues** — One Issue per task; label with `bc:*`, `type:*`, `priority:*`, `status:*`
-- **GitHub Milestones** — One Milestone per cycle (e.g., `Cycle 19: Authentication & Authorization`)
+- **GitHub Milestones** — One Milestone per deliverable (e.g., `M30.1: Promotions Redemption Workflow`)
 - **GitHub Project Board** — Kanban board view with columns: Backlog → In Progress → In Review → Done
 - **[docs/planning/CURRENT-CYCLE.md](./docs/planning/CURRENT-CYCLE.md)** — Lightweight AI-readable summary (fallback when GitHub MCP not available)
 
@@ -279,15 +281,16 @@ Project state lives in GitHub's cloud, not in local files. Any machine with the 
 - See [GITHUB-ACCESS-GUIDE.md](./docs/planning/GITHUB-ACCESS-GUIDE.md) for complete setup instructions (PAT creation, MCP config JSON, domain allowlist, verification checklist)
 
 **Legacy Markdown (Read-Only Archives):**
-- **[docs/planning/CYCLES.md](./docs/planning/CYCLES.md)** — Historical cycle records (Cycles 1–18); **deprecated and outdated** — use CURRENT-CYCLE.md for active cycle tracking
+- **[docs/planning/CYCLES.md](./docs/planning/CYCLES.md)** — Historical cycle records (Cycles 1–18); **deprecated and outdated** — use CURRENT-CYCLE.md for active milestone tracking
 - **[docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md)** — Historical backlog; **deprecated** (items migrated to GitHub Issues)
-- **[docs/planning/cycles/](./docs/planning/cycles/)** — Per-cycle retrospective docs; still created as markdown after each cycle
+- **[docs/planning/cycles/](./docs/planning/cycles/)** — Per-cycle retrospective docs; still created as markdown after each milestone
+- **[docs/planning/milestone-mapping.md](./docs/planning/milestone-mapping.md)** — Maps legacy "Cycle N" identifiers to new milestone IDs
 
 **When to Use What:**
-- Starting a new cycle: Create GitHub Milestone + Issues; write `docs/planning/cycles/cycle-NN-name.md` for detailed plan
+- Starting a new milestone: Create GitHub Milestone + Issues; write `docs/planning/milestones/mNN.M-name.md` for detailed plan
 - Tracking progress: Close GitHub Issues (use `Fixes #XX` in commits); GitHub Project board auto-updates
-- Checking current state: Call `list_issues(milestone="Cycle NN")` OR read `docs/planning/CURRENT-CYCLE.md`
-- Retrospective: Create markdown doc in `cycles/`; update `CURRENT-CYCLE.md`
+- Checking current state: Call `list_issues(milestone="M30.1")` OR read `docs/planning/CURRENT-CYCLE.md`
+- Retrospective: Create markdown doc in `milestones/`; update `CURRENT-CYCLE.md`
 
 ### Architectural Decision Records (ADRs)
 
@@ -345,7 +348,7 @@ Project state lives in GitHub's cloud, not in local files. Any machine with the 
 - **Reference Architecture Value:** Shows BDD practices for developers learning from CritterSupply
 
 **When to Create Feature Files:**
-- Before starting a cycle: Write 2-3 `.feature` files for key user stories
+- Before starting a milestone: Write 2-3 `.feature` files for key user stories
 - During implementation: Reference scenarios as acceptance criteria for integration tests
 - After completion: Feature files serve as living documentation (verified by tests)
 
@@ -387,32 +390,32 @@ docs/features/
 └── [other BCs]/
 ```
 
-### Workflow for New Cycles
+### Workflow for New Milestones
 
-**Before Starting a Cycle (Planning Phase):**
-1. Create GitHub Milestone: `Cycle NN: <Name>` with target due date
-2. Create parent "Cycle Epic" Issue linked to Milestone
+**Before Starting a Milestone (Planning Phase):**
+1. Create GitHub Milestone: `M<N>.<M>: <Short Description>` with target due date (e.g., `M30.1: Promotions Redemption Workflow`)
+2. Create parent "Milestone Epic" Issue linked to Milestone
 3. Create individual task Issues (linked to Milestone) using labels: `bc:*`, `type:feature`, `priority:*`
 4. Write 2-3 Gherkin `.feature` files for key user stories
 5. Create ADR markdown file + companion GitHub Issue for architectural decisions
 6. Review `CONTEXTS.md` for BC ownership and communication directions
-7. Update `docs/planning/CURRENT-CYCLE.md` with new cycle info
+7. Update `docs/planning/CURRENT-CYCLE.md` with new milestone info
 
-**During a Cycle (Implementation Phase):**
+**During a Milestone (Implementation Phase):**
 1. Implement features using `.feature` files as acceptance criteria
 2. Write integration tests verifying Gherkin scenarios
 3. Close Issues via `Fixes #XX` in commit messages (or PR description)
 4. Comment on Issues with implementation notes / blockers
 5. Create ADR markdown file when making architectural decisions
 
-**After Completing a Cycle (Retrospective Phase):**
+**After Completing a Milestone (Retrospective Phase):**
 1. Close GitHub Milestone (records completion date)
 2. Export closed Issues to markdown for fork compatibility:
-   `bash scripts/github-migration/04-export-cycle.sh "Cycle NN: <Name>"`
-   Then commit the exported file (`docs/planning/cycles/cycle-NN-issues-export.md`)
+   `bash scripts/github-migration/04-export-cycle.sh "M30.1: Promotions Redemption Workflow"`
+   Then commit the exported file (`docs/planning/milestones/m30.1-issues-export.md`)
 3. Update `CONTEXTS.md` only if BC ownership or communication directions changed (not for implementation details)
-4. Create retrospective doc: `docs/planning/cycles/cycle-NN-retrospective.md`
-5. Update `docs/planning/CURRENT-CYCLE.md` to next cycle
+4. Create retrospective doc: `docs/planning/milestones/m30.1-retrospective.md`
+5. Update `docs/planning/CURRENT-CYCLE.md` to next milestone
 
 ### Legacy Documentation
 
