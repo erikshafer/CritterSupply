@@ -57,12 +57,16 @@ public class TestFixture : IAsyncLifetime
                 services.DisableAllExternalWolverineTransports();
             });
 
-            // Replace real clients with stubs AFTER Program.cs runs
+            // Multiple ConfigureServices callbacks - the LAST one should win
             builder.ConfigureServices(services =>
             {
-                // Use Replace to ensure stubs override any existing registrations
-                services.Replace(ServiceDescriptor.Singleton<IPricingClient>(StubPricingClient));
-                services.Replace(ServiceDescriptor.Singleton<IPromotionsClient>(StubPromotionsClient));
+                // Remove existing scoped client registrations from Program.cs
+                services.RemoveAll<IPricingClient>();
+                services.RemoveAll<IPromotionsClient>();
+
+                // Replace real HTTP clients with stubs for testing
+                services.AddSingleton<IPricingClient>(StubPricingClient);
+                services.AddSingleton<IPromotionsClient>(StubPromotionsClient);
             });
         });
     }
@@ -150,5 +154,15 @@ public class TestFixture : IAsyncLifetime
         });
 
         return (tracked, result);
+    }
+
+    /// <summary>
+    /// Diagnostic method to verify which client implementation is actually being used.
+    /// </summary>
+    public string GetPromotionsClientType()
+    {
+        using var scope = Host.Services.CreateScope();
+        var client = scope.ServiceProvider.GetRequiredService<IPromotionsClient>();
+        return client.GetType().FullName ?? "Unknown";
     }
 }
