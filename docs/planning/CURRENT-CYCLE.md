@@ -20,11 +20,11 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M30.1 (Shopping BC Coupon Integration) |
-| **Status** | ✅ COMPLETE (All 11 Shopping integration tests + 29 Promotions tests passing) |
-| **What Was Delivered** | ApplyCouponToCart, RemoveCouponFromCart handlers with real Promotions BC HTTP client integration (ValidateCoupon, CalculateDiscount), cart discount display |
-| **What Remains** | Retrospective document creation, plan M31.0 kickoff |
-| **Next Milestone** | M31.0 (Correspondence BC Extended) — Extended integration events & SMS channel |
+| **Current Milestone** | M31.0 (Correspondence BC Extended) |
+| **Status** | 🚧 IN PROGRESS — Extended integration events + SMS channel |
+| **What's Next** | 7 additional integration handlers, SMS channel (Twilio stub), template system |
+| **What's Blocking** | None — Event modeling complete, M30.1 retrospective reviewed |
+| **Next Milestone** | M32.0+ (Admin Portal Phase 1) — Read-only dashboards, customer service tooling |
 | **Completed Milestones** | M25.0, M25.1, M25.2, M28.0, M29.0, M29.1, M30.0, M30.1 |
 | **Active BCs** | 17 (including Returns, Correspondence, Admin Identity, Promotions) |
 
@@ -32,12 +32,15 @@
 
 ## Current Milestone
 
-**Milestone:** M30.1 — Shopping BC Coupon Integration ✅ *COMPLETE*
-**Status:** ✅ **COMPLETE** — All integration tests passing (11 Shopping + 29 Promotions), CONTEXTS.md updated
-**GitHub Milestone:** M30.1: Shopping BC Coupon Integration
+**Milestone:** M31.0 — Correspondence BC Extended
+**Status:** 🚧 **IN PROGRESS** — Extended integration events + SMS channel
+**GitHub Milestone:** M31.0: Correspondence BC Extended
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
-**Implementation Status:** [docs/planning/cycles/m30-1-shopping-bc-coupon-retrospective.md](./cycles/m30-1-shopping-bc-coupon-retrospective.md)
-**Branch:** `claude/complete-m30-0-and-m30-1-tasks`
+**Implementation Branch:** `claude/m31-0-correspondence-extended`
+**Planning Documents:**
+- Event Model: [docs/planning/correspondence-event-model.md](./correspondence-event-model.md)
+- M28.0 Retrospective (Phase 1): [docs/planning/cycles/cycle-28-correspondence-bc-phase-1-retrospective.md](./cycles/cycle-28-correspondence-bc-phase-1-retrospective.md)
+- M30.1 Retrospective: [docs/planning/cycles/m30-1-shopping-bc-coupon-retrospective.md](./cycles/m30-1-shopping-bc-coupon-retrospective.md)
 
 ---
 
@@ -361,5 +364,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Last Updated: 2026-03-15 (M30.1 COMPLETE — all 11 Shopping + 29 Promotions integration tests passing, CONTEXTS.md updated with Shopping ↔ Promotions integration, M31.0 planning complete)*
+*Last Updated: 2026-03-15 (M31.0 IN PROGRESS — Event modeling verified complete, M30.1 retrospective reviewed, preparing implementation)*
 *Update this file at: milestone start, milestone end, and when significant task changes occur*
