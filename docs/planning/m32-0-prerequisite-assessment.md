@@ -1,23 +1,26 @@
 # M32.0: Admin Portal Phase 1 — Prerequisite Assessment
 
 **Date:** 2026-03-15
-**Status:** 🔴 PREREQUISITES NOT MET — Cannot proceed to implementation
+**Status:** ✅ DECISION MADE — Option A (M31.5 separate milestone) approved
 **Milestone:** M32.0 (Admin Portal Phase 1)
 **Assessment Completed By:** AI Agent (Claude Sonnet 4.5)
+**Owner Decision:** Option A (create M31.5) — approved 2026-03-15
 
 ---
 
 ## Executive Summary
 
-**M32.0 cannot proceed to implementation.** The milestone has three explicit prerequisites defined in the problem statement and planning documents. One is complete, but **two critical prerequisites are not met**:
+**M32.0 cannot proceed to implementation until M31.5 is complete.** The milestone had three explicit prerequisites defined in the problem statement and planning documents. One is complete, but **two critical prerequisites were not met** (discovered during Step 4 of the implementation process).
+
+**Owner Decision (2026-03-15):** Owner chose **Option A** — create M31.5 (Admin Portal Prerequisites) as a separate milestone. This separates infrastructure work (JWT configuration, endpoint gaps) from Admin Portal BFF implementation (M32.0).
 
 | Prerequisite | Status | Blocker Severity |
 |--------------|--------|------------------|
 | **1. RBAC ADR** | ✅ **COMPLETE** | Not blocking |
-| **2. Multi-issuer JWT** | ❌ **NOT IMPLEMENTED** | 🔴 **HARD BLOCKER** |
-| **3. Domain BC endpoint gaps** | ⚠️ **8 GAPS IDENTIFIED** | 🔴 **HARD BLOCKER** |
+| **2. Multi-issuer JWT** | ❌ **NOT IMPLEMENTED** | 🔴 **HARD BLOCKER** — resolved in M31.5 |
+| **3. Domain BC endpoint gaps** | ⚠️ **8 GAPS IDENTIFIED** | 🔴 **HARD BLOCKER** — resolved in M31.5 |
 
-**Recommendation:** Implement Phase 0.5 (Domain BC Prerequisites) before starting M32.0 Phase 1 implementation. Estimated effort: **4-5 sessions** to close all Phase 0.5 blockers.
+**Next Steps:** Implement M31.5 (4-5 sessions) to close all blockers, then M32.0 can proceed with all prerequisites met.
 
 ---
 
@@ -331,11 +334,11 @@ builder.Services.AddAuthorization(opts =>
 
 ## Escalation Items for Owner
 
-The following items require owner input before M32.0 can proceed:
+The following items required owner input before M32.0 could proceed:
 
-### 1. Phase 0.5 vs. M32.0 Scope Decision
+### 1. Phase 0.5 vs. M32.0 Scope Decision ✅ RESOLVED
 
-**Question:** Should Phase 0.5 (domain BC prerequisites) be a separate milestone (M31.5 or M32.0) or folded into M32.0 as the first phase?
+**Question:** Should Phase 0.5 (domain BC prerequisites) be a separate milestone (M31.5) or folded into M32.0 as the first phase?
 
 **Context:**
 - Phase 0.5 is **4-5 sessions** of work (multi-issuer JWT ADR + 8 endpoint gaps)
@@ -348,7 +351,11 @@ The following items require owner input before M32.0 can proceed:
 - Duration: 1 cycle (4-5 sessions)
 - Then: M32.0 becomes pure Admin Portal BFF implementation (cleaner scope)
 
-### 2. Multi-issuer JWT ADR Ownership
+**Owner Decision (2026-03-15):** ✅ **Option A approved** — M31.5 created as separate milestone. See:
+- [M31.5 Milestone Plan](milestones/m31-5-admin-portal-prerequisites.md)
+- [Phase 0.5 Implementation Plan](phase-0-5-implementation-plan.md)
+
+### 2. Multi-issuer JWT ADR Ownership ⏳ IN PROGRESS
 
 **Question:** Who writes ADR 0032 "Multi-Issuer JWT Strategy"?
 
@@ -359,7 +366,9 @@ The following items require owner input before M32.0 can proceed:
 
 **Recommendation:** PSA writes ADR 0032 before any multi-issuer JWT implementation begins. AI agent can draft the ADR based on ADR 0028 (Vendor Identity JWT) and ADR 0031 (Admin RBAC) patterns, but PSA must review and sign off.
 
-### 3. Audience Evolution Timeline
+**Status:** ADR 0032 drafted (2026-03-15), awaiting PSA and PO sign-off. See [ADR 0032: Multi-Issuer JWT Strategy](../decisions/0032-multi-issuer-jwt-strategy.md)
+
+### 3. Audience Evolution Timeline ⏳ DEFERRED TO PHASE 2+
 
 **Question:** When should Admin Identity BC start issuing tokens with `aud: "https://localhost:5243"` (Admin Portal API audience)?
 
@@ -371,13 +380,42 @@ The following items require owner input before M32.0 can proceed:
 
 **Recommendation:** Defer audience evolution to Phase 2+. Phase 1 uses self-referential audience to minimize coordination overhead. Document the limitation in ADR 0032 and plan the migration when Admin Portal API ships.
 
+**Decision:** Deferred to Phase 2+ as recommended. Documented in ADR 0032 "Future Evolution" section.
+
 ---
 
-## Recommendation: Implement Phase 0.5 First
+## Owner Decision: Option A (M31.5 Separate Milestone)
 
-**Proposed Path Forward:**
+**Decision Made:** 2026-03-15
+**Decision:** Option A — Create M31.5 (Admin Portal Prerequisites) as separate milestone
 
-### Option A: M31.5 (Admin Portal Prerequisites) — Separate Milestone
+**Rationale:**
+- Cleaner scope separation: Infrastructure work (M31.5) vs BFF implementation (M32.0)
+- Easier progress tracking: M31.5 has clear, objective success criteria (8 endpoint gaps closed, JWT schemes configured)
+- Lower risk: M31.5 can be completed and verified before starting M32.0 BFF work
+- Better milestone sizing: M31.5 (1 cycle) vs M32.0 (2-3 cycles)
+
+**M31.5 Deliverables:**
+1. ADR 0032 "Multi-Issuer JWT Strategy" (accepted)
+2. `GET /api/customers?email={email}` in Customer Identity.Api
+3. Inventory BC HTTP layer (`GET /api/inventory/{sku}`, `GET /api/inventory/low-stock`)
+4. `GET /api/fulfillment/shipments?orderId={id}` verified/added
+5. Multi-issuer JWT schemes in Orders, Returns, Customer Identity, Correspondence, Fulfillment APIs
+6. Product Catalog.Api policy rename (`"Admin"` → `"VendorAdmin"`)
+7. Integration tests verifying admin JWT acceptance
+8. Documentation updates
+
+**M31.5 Success Criteria:** Admin user can authenticate against all domain BCs and call all Phase 1-required endpoints
+
+**After M31.5:** M32.0 can proceed with all prerequisites met
+
+---
+
+## Recommendation: Implement M31.5 First
+
+**Path Forward (Approved):**
+
+### ✅ Option A: M31.5 (Admin Portal Prerequisites) — Separate Milestone (APPROVED)
 1. Create ADR 0032 "Multi-Issuer JWT Strategy" (PSA, PO sign-off)
 2. Add `GET /api/customers?email={email}` to Customer Identity.Api
 3. Add HTTP layer to Inventory.Api (`GET /api/inventory/{sku}`, `GET /api/inventory/low-stock`)
@@ -390,7 +428,11 @@ The following items require owner input before M32.0 can proceed:
 
 **Then:** M32.0 starts with all prerequisites met
 
-### Option B: M32.0 Includes Phase 0.5 — Monolithic Milestone
+**Status:** ✅ **APPROVED** — M31.5 milestone created. See:
+- [M31.5 Milestone Plan](milestones/m31-5-admin-portal-prerequisites.md)
+- [Phase 0.5 Implementation Plan](phase-0-5-implementation-plan.md)
+
+### ❌ Option B: M32.0 Includes Phase 0.5 — Monolithic Milestone (NOT CHOSEN)
 1. Same 7 steps as Option A
 2. Then: Implement Admin Portal BFF (AdminPortal/, AdminPortal.Api/, AdminPortal.Web/)
 3. Then: Implement read-only dashboards + CS tooling
@@ -399,30 +441,30 @@ The following items require owner input before M32.0 can proceed:
 
 **Risk:** Mixing infrastructure work with BFF implementation makes the milestone harder to track
 
-**AI Agent Recommendation:** **Option A (M31.5 as separate milestone)** for cleaner scope separation and easier progress tracking.
+**Status:** ❌ **REJECTED** — Owner chose Option A for cleaner scope separation
 
 ---
 
 ## Next Steps
 
-**If owner approves Option A (M31.5 separate milestone):**
-1. Create GitHub Milestone: "M31.5: Admin Portal Prerequisites"
-2. Create ADR 0032 "Multi-Issuer JWT Strategy" (AI agent drafts, PSA reviews)
-3. Implement 8 endpoint gaps (Customer Identity, Inventory, Fulfillment) + 5 JWT schemes
-4. Close M31.5
-5. Start M32.0 with all prerequisites met
+**✅ Owner approved Option A (M31.5 separate milestone) on 2026-03-15.**
 
-**If owner approves Option B (M32.0 monolithic):**
-1. Create GitHub Milestone: "M32.0: Admin Portal Phase 1"
-2. Create ADR 0032 "Multi-Issuer JWT Strategy" (AI agent drafts, PSA reviews)
-3. Implement Phase 0.5 (domain BC prerequisites)
-4. Conduct targeted event modeling session for Phase 1
-5. Implement Admin Portal BFF
-6. Close M32.0
+**M31.5 Implementation (Current):**
+1. ✅ Create M31.5 milestone plan document
+2. ⏳ PSA and PO review ADR 0032 "Multi-Issuer JWT Strategy"
+3. ⏳ Implement 8 endpoint gaps (Customer Identity, Inventory, Fulfillment) + 5 JWT schemes
+4. ⏳ Close M31.5
+
+**M32.0 Implementation (After M31.5):**
+5. ⏳ Update CURRENT-CYCLE.md to mark M32.0 as "Prerequisites met, ready to start"
+6. ⏳ Conduct targeted event modeling session for M32.0 Phase 1
+7. ⏳ Implement Admin Portal BFF (AdminPortal/, AdminPortal.Api/, AdminPortal.Web/)
+8. ⏳ Close M32.0
 
 ---
 
 **Assessment Completed:** 2026-03-15
 **Assessed By:** AI Agent (Claude Sonnet 4.5)
-**Status:** 🔴 **CANNOT PROCEED** — Prerequisites not met
-**Escalation Required:** Yes (owner must choose Option A or Option B)
+**Status:** ✅ **DECISION MADE** — Option A (M31.5 separate milestone) approved
+**Owner Decision Date:** 2026-03-15
+**Next Milestone:** M31.5 (Admin Portal Prerequisites) — 1 cycle (4-5 sessions)

@@ -1,15 +1,18 @@
 # Phase 0.5: Admin Portal Domain BC Prerequisites — Implementation Plan
 
 **Date:** 2026-03-15
-**Milestone:** Phase 0.5 (prerequisite for M32.0)
+**Milestone:** M31.5 (Admin Portal Prerequisites)
 **Duration:** 1 cycle (4-5 sessions)
 **Status:** 📋 READY TO START (ADR 0032 drafted, gaps documented)
+**Owner Decision:** Option A (separate M31.5 milestone) — approved 2026-03-15
 
 ---
 
 ## Executive Summary
 
-Phase 0.5 closes **8 integration gaps** that block M32.0 (Admin Portal Phase 1). This work is **infrastructure-focused**: adding HTTP endpoints to domain BCs and configuring multi-issuer JWT authentication. No Admin Portal code is written in this phase.
+M31.5 closes **8 integration gaps** that block M32.0 (Admin Portal Phase 1). This work is **infrastructure-focused**: adding HTTP endpoints to domain BCs and configuring multi-issuer JWT authentication. No Admin Portal code is written in this milestone.
+
+**Owner Decision:** This work was originally identified as "Phase 0.5" during M32.0 prerequisite assessment. Owner chose **Option A** (2026-03-15): create M31.5 as a separate milestone rather than folding it into M32.0. See [m32-0-prerequisite-assessment.md](m32-0-prerequisite-assessment.md) for rationale.
 
 **Deliverables:**
 1. ✅ ADR 0032 "Multi-Issuer JWT Strategy" (drafted, needs PSA sign-off)
@@ -24,7 +27,7 @@ Phase 0.5 closes **8 integration gaps** that block M32.0 (Admin Portal Phase 1).
 - Admin JWT is accepted by Orders, Returns, Customer Identity, Correspondence, Fulfillment APIs
 - All Phase 1-required endpoints exist and are callable with admin JWT
 
-**After Phase 0.5:** M32.0 can proceed with all prerequisites met
+**After M31.5:** M32.0 can proceed with all prerequisites met
 
 ---
 
@@ -45,6 +48,8 @@ Phase 0.5 closes **8 integration gaps** that block M32.0 (Admin Portal Phase 1).
 - [ ] Commit ADR to `docs/decisions/0032-multi-issuer-jwt-strategy.md`
 
 **Blocker:** PSA and PO sign-off required before implementation begins
+
+**Note:** This task is the first deliverable of M31.5 milestone
 
 ---
 
@@ -138,7 +143,7 @@ public class CustomerQueryTests : IClassFixture<CustomerIdentityTestFixture>
 - [ ] Run `dotnet build` to verify compilation
 - [ ] Add 2 integration tests to `CustomerIdentity.Api.IntegrationTests/CustomerQueryTests.cs`
 - [ ] Run `dotnet test` to verify tests pass
-- [ ] Commit with message: `(Phase 0.5) Add customer email search endpoint`
+- [ ] Commit with message: `(M31.5) Add customer email search endpoint`
 
 **Estimated Time:** < 1 hour
 
@@ -286,7 +291,7 @@ public class StockQueryTests : IClassFixture<InventoryTestFixture>
 - [ ] Run `dotnet build` to verify compilation
 - [ ] Add 2 integration tests
 - [ ] Run `dotnet test` to verify tests pass
-- [ ] Commit with message: `(Phase 0.5) Add Inventory BC HTTP layer`
+- [ ] Commit with message: `(M31.5) Add Inventory BC HTTP layer`
 
 **Estimated Time:** 2-3 hours
 
@@ -363,7 +368,7 @@ public class ShipmentQueryTests : IClassFixture<FulfillmentTestFixture>
 - [ ] Run `dotnet build` to verify compilation
 - [ ] Add integration test
 - [ ] Run `dotnet test` to verify tests pass
-- [ ] Commit with message: `(Phase 0.5) Add/verify shipment query endpoint`
+- [ ] Commit with message: `(M31.5) Add/verify shipment query endpoint`
 
 **Estimated Time:** < 1 hour
 
@@ -438,7 +443,7 @@ public static async Task<IResult> Handle(...)
 - [ ] Correspondence.Api: Add `"Admin"` scheme + policies + endpoint annotations
 - [ ] Fulfillment.Api: Add `"Admin"` scheme + policies + endpoint annotations
 - [ ] Run `dotnet build` on all 5 projects
-- [ ] Commit with message: `(Phase 0.5) Configure multi-issuer JWT in domain BCs`
+- [ ] Commit with message: `(M31.5) Configure multi-issuer JWT in domain BCs`
 
 **Estimated Time:** 2-3 hours (mostly copy-paste, but must be careful with policy names)
 
@@ -518,7 +523,7 @@ dotnet test tests/Product\ Catalog/ProductCatalog.Api.IntegrationTests/
 - [ ] Update 3 existing endpoints to `[Authorize(Policy = "VendorAdmin")]`
 - [ ] Add new `"PricingManager"` and `"CopyWriter"` policies
 - [ ] Run existing integration tests to ensure vendor JWT auth still works
-- [ ] Commit with message: `(Phase 0.5) Rename Product Catalog Admin policy to VendorAdmin`
+- [ ] Commit with message: `(M31.5) Rename Product Catalog Admin policy to VendorAdmin`
 
 **Estimated Time:** < 1 hour
 
@@ -572,7 +577,7 @@ public class MultiIssuerJwtTests : IClassFixture<AdminIdentityTestFixture>
 - [ ] Test admin JWT accepted by Orders.Api, Returns.Api, Customer Identity.Api, Correspondence.Api, Fulfillment.Api
 - [ ] Test vendor JWT rejected by all 5 domain BCs (wrong scheme)
 - [ ] Run `dotnet test` to verify all tests pass
-- [ ] Commit with message: `(Phase 0.5) Add multi-issuer JWT integration tests`
+- [ ] Commit with message: `(M31.5) Add multi-issuer JWT integration tests`
 
 **Estimated Time:** 2-3 hours
 
@@ -599,11 +604,11 @@ public class MultiIssuerJwtTests : IClassFixture<AdminIdentityTestFixture>
    - Update M32.0 status to "Prerequisites met, ready to start"
 
 **Checklist:**
-- [ ] Update integration gap register
-- [ ] Update prerequisite assessment
-- [ ] Update CLAUDE.md
-- [ ] Update CURRENT-CYCLE.md
-- [ ] Commit with message: `(Phase 0.5) Update documentation after gap closure`
+- [ ] Update integration gap register (mark 8 gaps as ✅ Closed)
+- [ ] Update prerequisite assessment (document owner's Option A decision)
+- [ ] Update CLAUDE.md (add multi-issuer JWT pattern)
+- [ ] Update CURRENT-CYCLE.md (mark M31.5 complete)
+- [ ] Commit with message: `(M31.5) Update documentation after gap closure`
 
 **Estimated Time:** < 1 hour
 
@@ -615,41 +620,41 @@ public class MultiIssuerJwtTests : IClassFixture<AdminIdentityTestFixture>
 - **Duration:** 1-2 hours
 - **Deliverables:** ADR 0032 accepted, email search endpoint added, tests passing
 - **Commits:**
-  1. `(Phase 0.5) ADR 0032 Multi-Issuer JWT Strategy - Accepted`
-  2. `(Phase 0.5) Add customer email search endpoint`
+  1. `(M31.5) ADR 0032 Multi-Issuer JWT Strategy - Accepted`
+  2. `(M31.5) Add customer email search endpoint`
 
 ### Session 2: Inventory BC HTTP Layer
 - **Duration:** 2-3 hours
 - **Deliverables:** Inventory.Api project, snapshot projection, 2 query endpoints, tests
 - **Commits:**
-  1. `(Phase 0.5) Add Inventory BC HTTP layer with query endpoints`
+  1. `(M31.5) Add Inventory BC HTTP layer with query endpoints`
 
 ### Session 3: Fulfillment Query + Multi-Issuer JWT Config (Part 1)
 - **Duration:** 2-3 hours
 - **Deliverables:** Shipment query endpoint verified/added, JWT config in Orders.Api + Returns.Api
 - **Commits:**
-  1. `(Phase 0.5) Add/verify Fulfillment shipment query endpoint`
-  2. `(Phase 0.5) Configure multi-issuer JWT in Orders and Returns APIs`
+  1. `(M31.5) Add/verify Fulfillment shipment query endpoint`
+  2. `(M31.5) Configure multi-issuer JWT in Orders and Returns APIs`
 
 ### Session 4: Multi-Issuer JWT Config (Part 2) + Product Catalog Rename
 - **Duration:** 2-3 hours
 - **Deliverables:** JWT config in Customer Identity, Correspondence, Fulfillment; Product Catalog policy rename
 - **Commits:**
-  1. `(Phase 0.5) Configure multi-issuer JWT in Customer Identity, Correspondence, Fulfillment`
-  2. `(Phase 0.5) Rename Product Catalog Admin policy to VendorAdmin`
+  1. `(M31.5) Configure multi-issuer JWT in Customer Identity, Correspondence, Fulfillment`
+  2. `(M31.5) Rename Product Catalog Admin policy to VendorAdmin`
 
 ### Session 5: Integration Tests + Documentation
 - **Duration:** 2-3 hours
 - **Deliverables:** Multi-issuer JWT tests, documentation updates
 - **Commits:**
-  1. `(Phase 0.5) Add multi-issuer JWT integration tests`
-  2. `(Phase 0.5) Update documentation after gap closure`
+  1. `(M31.5) Add multi-issuer JWT integration tests`
+  2. `(M31.5) Update documentation after gap closure`
 
 ---
 
 ## Success Criteria
 
-**Phase 0.5 is complete when:**
+**M31.5 is complete when:**
 
 1. ✅ ADR 0032 is marked as ✅ Accepted
 2. ✅ `GET /api/customers?email={email}` exists in Customer Identity.Api
@@ -664,12 +669,21 @@ public class MultiIssuerJwtTests : IClassFixture<AdminIdentityTestFixture>
 
 ---
 
-## Next Steps After Phase 0.5
+## Next Steps After M31.5
 
-**When Phase 0.5 is complete:**
+**When M31.5 is complete:**
 1. Update CURRENT-CYCLE.md to mark M32.0 as "Prerequisites met, ready to start"
 2. Conduct targeted event modeling session for M32.0 Phase 1 (Admin Portal BFF)
 3. Start M32.0 Phase 1 implementation (Admin Portal domain project, API project, Blazor WASM frontend)
+
+---
+
+## Related Documents
+
+- [M31.5 Milestone Plan](milestones/m31-5-admin-portal-prerequisites.md) — Official milestone document
+- [M32.0 Prerequisite Assessment](m32-0-prerequisite-assessment.md) — Analysis leading to M31.5 creation
+- [ADR 0032: Multi-Issuer JWT Strategy](../decisions/0032-multi-issuer-jwt-strategy.md) — First deliverable of M31.5
+- [Admin Portal Integration Gap Register](admin-portal-integration-gap-register.md) — 8 gaps closed by M31.5
 
 ---
 
@@ -677,3 +691,5 @@ public class MultiIssuerJwtTests : IClassFixture<AdminIdentityTestFixture>
 **Created By:** AI Agent (Claude Sonnet 4.5)
 **Estimated Duration:** 1 cycle (4-5 sessions, 10-15 hours total)
 **Status:** 📋 READY TO START (ADR 0032 drafted, waiting for sign-off)
+**Milestone:** M31.5 (Admin Portal Prerequisites)
+**Owner Decision:** Option A (separate milestone) — approved 2026-03-15

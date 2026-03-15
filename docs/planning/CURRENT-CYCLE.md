@@ -20,10 +20,10 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M32.0 (Admin Portal Phase 1) |
-| **Status** | 🔄 IN PROGRESS — Prerequisites verification, planning gates, implementation readiness |
-| **What's Next** | Verify prerequisites (multi-issuer JWT, endpoint gaps), assess event modeling gate, begin implementation |
-| **What's Blocking** | Multi-issuer JWT not yet implemented (Phase 0.5 prerequisite) |
+| **Current Milestone** | M31.5 (Admin Portal Prerequisites) |
+| **Status** | 📋 READY TO START — Domain BC endpoint gaps + multi-issuer JWT |
+| **What's Next** | ADR 0032 sign-off, implement 8 endpoint gaps, configure JWT in 5 BCs |
+| **What's Blocking** | ADR 0032 awaiting PSA sign-off |
 | **Next Milestone** | TBD (Catalog Evolution, Search BC, or Exchange v2) |
 | **Completed Milestones** | M25.0, M25.1, M25.2, M28.0, M29.0, M29.1, M30.0, M30.1, M31.0 |
 | **Active BCs** | 17 (including Returns, Correspondence, Admin Identity, Promotions) |
@@ -32,18 +32,18 @@
 
 ## Current Milestone
 
-**Milestone:** M32.0 — Admin Portal Phase 1
-**Status:** 🔄 **IN PROGRESS** — Prerequisites verification, planning gates, implementation plan creation
-**GitHub Milestone:** TBD (to be created)
+**Milestone:** M31.5 — Admin Portal Prerequisites
+**Status:** 📋 **READY TO START** — Domain BC endpoint gaps + multi-issuer JWT configuration
+**Duration:** 1 cycle (4-5 sessions, 10-15 hours)
+**GitHub Milestone:** M31.5: Admin Portal Prerequisites
 **GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 **Implementation Branch:** `claude/implement-admin-portal-phase-1`
 **Planning Documents:**
-- Event Model (Revised): [docs/planning/admin-portal-event-modeling-revised.md](./admin-portal-event-modeling-revised.md)
+- Milestone Plan: [docs/planning/milestones/m31-5-admin-portal-prerequisites.md](./milestones/m31-5-admin-portal-prerequisites.md)
+- Prerequisite Assessment: [docs/planning/m32-0-prerequisite-assessment.md](./m32-0-prerequisite-assessment.md)
+- Implementation Plan: [docs/planning/phase-0-5-implementation-plan.md](./phase-0-5-implementation-plan.md)
+- ADR 0032: [docs/decisions/0032-multi-issuer-jwt-strategy.md](../decisions/0032-multi-issuer-jwt-strategy.md)
 - Integration Gap Register: [docs/planning/admin-portal-integration-gap-register.md](./admin-portal-integration-gap-register.md)
-- UX Research: [docs/planning/admin-portal-ux-research.md](./admin-portal-ux-research.md)
-- Research & Discovery: [docs/planning/admin-portal-research-discovery.md](./admin-portal-research-discovery.md)
-- RBAC ADR: [docs/decisions/0031-admin-portal-rbac-model.md](../decisions/0031-admin-portal-rbac-model.md)
-- M31.0 Retrospective (Correspondence Extended): [docs/planning/cycles/m31-0-retrospective.md](./cycles/m31-0-retrospective.md)
 
 ---
 
