@@ -11,10 +11,21 @@ public static class RevokeCouponHandler
     /// Can revoke coupons in Issued or Redeemed status.
     /// Cannot revoke already-revoked or expired coupons.
     /// </summary>
-    public static CouponRevoked Handle(
+    public static async Task<(Coupon, CouponRevoked)> Handle(
         RevokeCoupon cmd,
-        [WriteAggregate] Coupon coupon)
+        IDocumentSession session,
+        CancellationToken ct)
     {
+        // Load coupon by deterministic UUID v5 from code
+        var streamId = Coupon.StreamId(cmd.CouponCode);
+        var coupon = await session.Events.AggregateStreamAsync<Coupon>(streamId, token: ct);
+
+        if (coupon is null)
+        {
+            throw new InvalidOperationException(
+                $"Coupon with code '{cmd.CouponCode}' not found");
+        }
+
         // Invariant: Cannot revoke an already-revoked or expired coupon
         if (coupon.Status == CouponStatus.Revoked)
         {
@@ -28,22 +39,15 @@ public static class RevokeCouponHandler
                 $"Cannot revoke coupon {coupon.Code} — it is already expired.");
         }
 
-        // Return domain event — Wolverine + Marten handle persistence
-        return new CouponRevoked(
+        // Create domain event
+        var evt = new CouponRevoked(
             coupon.Id,
             coupon.Code,
             coupon.PromotionId,
             cmd.Reason,
             DateTimeOffset.UtcNow);
-    }
 
-    /// <summary>
-    /// Load method: Resolves coupon by deterministic UUID v5 from code.
-    /// Throws if coupon doesn't exist.
-    /// </summary>
-    public static Task<Coupon?> Load(RevokeCoupon cmd, IDocumentSession session)
-    {
-        var streamId = Coupon.StreamId(cmd.CouponCode);
-        return session.Events.AggregateStreamAsync<Coupon>(streamId);
+        // Return tuple: updated aggregate + event
+        return (coupon.Apply(evt), evt);
     }
 }

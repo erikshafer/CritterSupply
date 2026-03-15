@@ -10,7 +10,7 @@ namespace Promotions.Promotion;
 /// Phase 2 (M30.1): OrderPlacedHandler will fan out to this command.
 ///
 /// Concurrency Strategy:
-/// Uses Marten's optimistic concurrency via [WriteAggregate] attribute.
+/// Uses Marten's optimistic concurrency via tuple return pattern.
 /// If two redemptions arrive simultaneously and UsageLimit is reached,
 /// Marten will throw ConcurrencyException on second commit.
 /// Wolverine's retry policy handles the exception:
@@ -20,10 +20,20 @@ namespace Promotions.Promotion;
 /// </summary>
 public static class RecordPromotionRedemptionHandler
 {
-    public static PromotionRedemptionRecorded Handle(
+    public static async Task<(Promotion, PromotionRedemptionRecorded)> Handle(
         RecordPromotionRedemption cmd,
-        [WriteAggregate] Promotion promotion)
+        IDocumentSession session,
+        CancellationToken ct)
     {
+        // Load promotion by ID
+        var promotion = await session.Events.AggregateStreamAsync<Promotion>(cmd.PromotionId, token: ct);
+
+        if (promotion is null)
+        {
+            throw new InvalidOperationException(
+                $"Promotion {cmd.PromotionId} not found");
+        }
+
         // Invariant: Cannot record redemption on non-active promotion
         if (promotion.Status != PromotionStatus.Active)
         {
@@ -43,20 +53,13 @@ public static class RecordPromotionRedemptionHandler
         }
 
         // Record redemption (increment handled by Apply method)
-        return new PromotionRedemptionRecorded(
+        var evt = new PromotionRedemptionRecorded(
             promotion.Id,
             cmd.OrderId,
             cmd.CustomerId,
             cmd.CouponCode,
             cmd.RedeemedAt);
-    }
 
-    /// <summary>
-    /// Load method: Resolves promotion by ID.
-    /// Throws if promotion doesn't exist.
-    /// </summary>
-    public static Task<Promotion?> Load(RecordPromotionRedemption cmd, IDocumentSession session)
-    {
-        return session.Events.AggregateStreamAsync<Promotion>(cmd.PromotionId);
+        return (promotion.Apply(evt), evt);
     }
 }

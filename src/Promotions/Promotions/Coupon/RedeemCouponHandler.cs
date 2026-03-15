@@ -11,10 +11,21 @@ public static class RedeemCouponHandler
     /// Enforces single-use constraint: coupon must be in Issued status.
     /// Uses optimistic concurrency (Marten) to prevent double-redemption.
     /// </summary>
-    public static CouponRedeemed Handle(
+    public static async Task<(Coupon, CouponRedeemed)> Handle(
         RedeemCoupon cmd,
-        [WriteAggregate] Coupon coupon)
+        IDocumentSession session,
+        CancellationToken ct)
     {
+        // Load coupon by deterministic UUID v5 from code
+        var streamId = Coupon.StreamId(cmd.CouponCode);
+        var coupon = await session.Events.AggregateStreamAsync<Coupon>(streamId, token: ct);
+
+        if (coupon is null)
+        {
+            throw new InvalidOperationException(
+                $"Coupon with code '{cmd.CouponCode}' not found");
+        }
+
         // Invariant: Coupon must be in Issued status to redeem
         if (coupon.Status != CouponStatus.Issued)
         {
@@ -23,23 +34,16 @@ public static class RedeemCouponHandler
                 "Only coupons in Issued status can be redeemed.");
         }
 
-        // Return domain event — Wolverine + Marten handle persistence
-        return new CouponRedeemed(
+        // Create domain event
+        var evt = new CouponRedeemed(
             coupon.Id,
             coupon.Code,
             coupon.PromotionId,
             cmd.OrderId,
             cmd.CustomerId,
             cmd.RedeemedAt);
-    }
 
-    /// <summary>
-    /// Load method: Resolves coupon by deterministic UUID v5 from code.
-    /// Throws if coupon doesn't exist.
-    /// </summary>
-    public static Task<Coupon?> Load(RedeemCoupon cmd, IDocumentSession session)
-    {
-        var streamId = Coupon.StreamId(cmd.CouponCode);
-        return session.Events.AggregateStreamAsync<Coupon>(streamId);
+        // Return tuple: updated aggregate + event
+        return (coupon.Apply(evt), evt);
     }
 }
