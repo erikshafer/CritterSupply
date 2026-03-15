@@ -25,6 +25,7 @@ public class TestFixture : IAsyncLifetime
 
     public IAlbaHost Host { get; private set; } = null!;
     public StubPricingClient StubPricingClient { get; private set; } = null!;
+    public StubPromotionsClient StubPromotionsClient { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
@@ -37,8 +38,9 @@ public class TestFixture : IAsyncLifetime
         // does not (seem) to have any negative or unintended side effects.
         JasperFxEnvironment.AutoStartHost = true;
 
-        // Initialize stub Pricing client
+        // Initialize stub clients
         StubPricingClient = new StubPricingClient();
+        StubPromotionsClient = new StubPromotionsClient();
 
         Host = await AlbaHost.For<Program>(builder =>
         {
@@ -50,8 +52,9 @@ public class TestFixture : IAsyncLifetime
                     opts.Connection(_connectionString);
                 });
 
-                // Replace real Pricing client with stub
+                // Replace real clients with stubs
                 services.AddSingleton<IPricingClient>(StubPricingClient);
+                services.AddSingleton<IPromotionsClient>(StubPromotionsClient);
 
                 // Disable external Wolverine transports for testing
                 services.DisableAllExternalWolverineTransports();

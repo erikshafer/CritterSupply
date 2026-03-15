@@ -20,7 +20,7 @@ public sealed record RemoveCouponFromCart(Guid CartId)
 public static class RemoveCouponFromCartHandler
 {
     public static ProblemDetails Before(
-        RemoveCouponFromCart command,
+        Guid cartId,
         Cart? cart)
     {
         if (cart is null)
@@ -45,7 +45,7 @@ public static class RemoveCouponFromCartHandler
 
     [WolverineDelete("/api/carts/{cartId}/apply-coupon")]
     public static (Events, OutgoingMessages) Handle(
-        RemoveCouponFromCart command,
+        Guid cartId,
         [WriteAggregate] Cart cart)
     {
         var @event = new CouponRemoved(
