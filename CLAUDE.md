@@ -538,29 +538,29 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 
 **Port Allocation Table** (increment by 1 for each new BC):
 
-| BC                            | Port     | Status      | Folder Name                    |
-|-------------------------------|----------|-------------|--------------------------------|
-| Orders                        | 5231     | ✅ Assigned  | Orders/                        |
-| Payments                      | 5232     | ✅ Assigned  | Payments/                      |
-| Inventory                     | 5233     | ✅ Assigned  | Inventory/                     |
-| Fulfillment                   | 5234     | ✅ Assigned  | Fulfillment/                   |
-| Customer Identity             | 5235     | ✅ Assigned  | Customer Identity/             |
-| Shopping                      | 5236     | ✅ Assigned  | Shopping/                      |
-| Product Catalog               | 5133     | ✅ Assigned  | Product Catalog/               |
-| **Customer Experience (BFF)** | **5237** | ✅ Assigned  | Customer Experience/Storefront.Api/ |
-| **Customer Experience (Web)** | **5238** | ✅ Assigned  | Customer Experience/Storefront.Web/ |
-| Vendor Portal                 | 5239     | ✅ Assigned  | Vendor Portal API              |
-| Vendor Identity               | 5240     | ✅ Assigned  | Vendor Identity API            |
-| **Vendor Portal (Web/Blazor WASM)**| **5241** | ✅ Assigned | Vendor Blazor WASM frontend (see ADR 0021)|
-| **Pricing**                   | **5242** | ✅ Assigned | Pricing API                    |
-| **Admin Portal (API)**        | **5243** | 📋 Reserved | Admin Portal API (future)      |
-| **Admin Portal (Web)**        | **5244** | 📋 Reserved | Admin Portal frontend (future; React/Vue/Blazor) |
-| **Returns**                   | **5245** | ✅ Assigned  | Returns/                       |
-| **Listings**                  | **5246** | 📋 Reserved | Listings API (future; Cycle 30+)|
-| **Marketplaces**              | **5247** | 📋 Reserved | Marketplaces API (future; Cycle 32+)|
-| **Correspondence**            | **5248** | ✅ Assigned | Correspondence/ (Cycle 28)     |
-| **Admin Identity**            | **5249** | ✅ Assigned | Admin Identity/ (Cycle 29)     |
-| **Promotions**                | **5250** | ✅ Assigned | Promotions/ (Cycle 29 Phase 2) |
+| BC                                  | Port     | Status      | Folder Name                                      |
+|-------------------------------------|----------|-------------|--------------------------------------------------|
+| Orders                              | 5231     | ✅ Assigned  | Orders/                                          |
+| Payments                            | 5232     | ✅ Assigned  | Payments/                                        |
+| Inventory                           | 5233     | ✅ Assigned  | Inventory/                                       |
+| Fulfillment                         | 5234     | ✅ Assigned  | Fulfillment/                                     |
+| Customer Identity                   | 5235     | ✅ Assigned  | Customer Identity/                               |
+| Shopping                            | 5236     | ✅ Assigned  | Shopping/                                        |
+| Product Catalog                     | 5133     | ✅ Assigned  | Product Catalog/                                 |
+| **Customer Experience (BFF)**       | **5237** | ✅ Assigned  | Customer Experience/Storefront.Api/              |
+| **Customer Experience (Web)**       | **5238** | ✅ Assigned  | Customer Experience/Storefront.Web/              |
+| Vendor Portal                       | 5239     | ✅ Assigned  | Vendor Portal API                                |
+| Vendor Identity                     | 5240     | ✅ Assigned  | Vendor Identity API                              |
+| **Vendor Portal (Web/Blazor WASM)** | **5241** | ✅ Assigned  | Vendor Blazor WASM frontend (see ADR 0021)       |
+| **Pricing**                         | **5242** | ✅ Assigned  | Pricing API                                      |
+| **Admin Portal (API)**              | **5243** | 📋 Reserved | Admin Portal API (future)                        |
+| **Admin Portal (Web)**              | **5244** | 📋 Reserved | Admin Portal frontend (future; React/Vue/Blazor) |
+| **Returns**                         | **5245** | ✅ Assigned  | Returns/                                         |
+| **Listings**                        | **5246** | 📋 Reserved | Listings API (future; Cycle 30+)                 |
+| **Marketplaces**                    | **5247** | 📋 Reserved | Marketplaces API (future; Cycle 32+)             |
+| **Correspondence**                  | **5248** | ✅ Assigned  | Correspondence/ (Cycle 28)                       |
+| **Admin Identity**                  | **5249** | ✅ Assigned  | Admin Identity/ (Cycle 29)                       |
+| **Promotions**                      | **5250** | ✅ Assigned  | Promotions/ (Cycle 29 Phase 2)                   |
 
 **Why this matters:**
 - Allows running multiple APIs simultaneously during development
@@ -583,11 +583,11 @@ src/<BC Name>/
 │   │   └── I*Client.cs
 │   ├── Composition/                    # View models for UI
 │   │   └── *View.cs
-│   └── Notifications/                  # Integration message handlers
-│       ├── IEventBroadcaster.cs        # SSE pub/sub interface
-│       ├── EventBroadcaster.cs         # Channel-based implementation
-│       ├── *Event.cs                   # Discriminated union for SSE
-│       └── *Handler.cs                 # Integration message handlers
+│   ├── Notifications/                  # Integration message handlers
+│   │   └── *Handler.cs                 # Wolverine handlers for RabbitMQ messages
+│   └── RealTime/                       # SignalR transport types
+│       ├── IStorefrontWebSocketMessage.cs  # Marker interface for SignalR routing
+│       └── StorefrontEvent.cs          # Discriminated union for real-time events
 │
 └── <ProjectName>.Api/                  # API project (Web SDK)
     ├── <ProjectName>.Api.csproj        # References: <ProjectName>, Messages.Contracts
@@ -598,7 +598,7 @@ src/<BC Name>/
     │   └── Get*View.cs                 # namespace: <ProjectName>.Api.Queries
     ├── Clients/                        # HTTP client implementations
     │   └── *Client.cs                  # namespace: <ProjectName>.Api.Clients
-    └── *Hub.cs                         # SSE endpoint (namespace: <ProjectName>.Api)
+    └── *Hub.cs                         # SignalR hub (namespace: <ProjectName>.Api)
 ```
 
 **Example: Customer Experience BFF (Storefront)**
@@ -608,13 +608,14 @@ src/Customer Experience/
 ├── Storefront/                         # Domain project
 │   ├── Clients/                        # Interfaces for Shopping, Orders, Catalog, etc.
 │   ├── Composition/                    # CartView, CheckoutView, ProductListingView
-│   └── Notifications/                  # ItemAddedHandler, OrderPlacedHandler, EventBroadcaster
+│   ├── Notifications/                  # ItemAddedHandler, OrderPlacedHandler, ShipmentDispatchedHandler, etc.
+│   └── RealTime/                       # IStorefrontWebSocketMessage, StorefrontEvent
 │
 └── Storefront.Api/                     # API project
     ├── Program.cs                      # Wolverine handler discovery for both assemblies
     ├── Queries/                        # GetCartView, GetCheckoutView, GetProductListing
     ├── Clients/                        # ShoppingClient, OrdersClient, CatalogClient
-    └── StorefrontHub.cs                # SSE endpoint at /sse/storefront
+    └── StorefrontHub.cs                # SignalR hub at /hub/storefront
 ```
 
 **Key Configuration (Program.cs):**
@@ -627,7 +628,7 @@ builder.Host.UseWolverine(opts =>
     opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
 
     // Domain assembly (Integration message handlers)
-    opts.Discovery.IncludeAssembly(typeof(Storefront.Notifications.IEventBroadcaster).Assembly);
+    opts.Discovery.IncludeAssembly(typeof(Storefront.RealTime.IStorefrontWebSocketMessage).Assembly);
 });
 ```
 
@@ -731,19 +732,19 @@ docker-compose --profile infrastructure --profile orders --profile payments --pr
 
 ### Docker Compose Profiles
 
-| Profile | Services Started | Use Case |
-|---------|------------------|----------|
-| `infrastructure` | Postgres + RabbitMQ | Native development (default) |
-| `all` | All infrastructure + 8 APIs + Blazor web | Full system demo, onboarding |
-| `orders` | Orders.Api | Selective service testing |
-| `payments` | Payments.Api | Selective service testing |
-| `inventory` | Inventory.Api | Selective service testing |
-| `fulfillment` | Fulfillment.Api | Selective service testing |
-| `customeridentity` | CustomerIdentity.Api | Selective service testing |
-| `shopping` | Shopping.Api | Selective service testing |
-| `catalog` | ProductCatalog.Api | Selective service testing |
-| `storefront` | Storefront.Api | Selective service testing |
-| `ci` | Infrastructure only | CI/CD pipelines |
+| Profile            | Services Started                         | Use Case                     |
+|--------------------|------------------------------------------|------------------------------|
+| `infrastructure`   | Postgres + RabbitMQ                      | Native development (default) |
+| `all`              | All infrastructure + 8 APIs + Blazor web | Full system demo, onboarding |
+| `orders`           | Orders.Api                               | Selective service testing    |
+| `payments`         | Payments.Api                             | Selective service testing    |
+| `inventory`        | Inventory.Api                            | Selective service testing    |
+| `fulfillment`      | Fulfillment.Api                          | Selective service testing    |
+| `customeridentity` | CustomerIdentity.Api                     | Selective service testing    |
+| `shopping`         | Shopping.Api                             | Selective service testing    |
+| `catalog`          | ProductCatalog.Api                       | Selective service testing    |
+| `storefront`       | Storefront.Api                           | Selective service testing    |
+| `ci`               | Infrastructure only                      | CI/CD pipelines              |
 
 **Combine profiles:**
 ```bash
@@ -1658,7 +1659,7 @@ See [DEVPROGRESS.md](./DEVPROGRESS.md) for current development status.
 | `efcore-wolverine-integration.md` | Entity Framework Core with Wolverine |
 | `efcore-marten-projections.md` | Projecting Marten events to EF Core tables |
 | `external-service-integration.md` | Strategy pattern, graceful degradation |
-| `bff-realtime-patterns.md` | Backend-for-Frontend, real-time updates (SSE + SignalR) |
+| `bff-realtime-patterns.md` | Backend-for-Frontend, real-time updates (SignalR) |
 | `wolverine-signalr.md` | Wolverine SignalR transport, hub auth, group routing, WASM client |
 | `blazor-wasm-jwt.md` | Blazor WASM + JWT: named HTTP clients, in-memory tokens, SignalR AccessTokenProvider, RBAC |
 | `vertical-slice-organization.md` | File structure, naming conventions, colocation patterns, anti-pattern warnings |
