@@ -1,6 +1,7 @@
 using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Shopping.Api.IntegrationTests.Stubs;
 using Shopping.Clients;
 using Testcontainers.PostgreSql;
@@ -52,12 +53,16 @@ public class TestFixture : IAsyncLifetime
                     opts.Connection(_connectionString);
                 });
 
-                // Replace real clients with stubs
-                services.AddSingleton<IPricingClient>(StubPricingClient);
-                services.AddSingleton<IPromotionsClient>(StubPromotionsClient);
-
                 // Disable external Wolverine transports for testing
                 services.DisableAllExternalWolverineTransports();
+            });
+
+            // Replace real clients with stubs AFTER Program.cs runs
+            builder.ConfigureServices(services =>
+            {
+                // Use Replace to ensure stubs override any existing registrations
+                services.Replace(ServiceDescriptor.Singleton<IPricingClient>(StubPricingClient));
+                services.Replace(ServiceDescriptor.Singleton<IPromotionsClient>(StubPromotionsClient));
             });
         });
     }
