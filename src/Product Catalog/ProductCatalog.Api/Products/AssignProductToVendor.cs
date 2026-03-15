@@ -38,7 +38,7 @@ public sealed record VendorAssignmentResponse(
 /// <summary>
 /// Command to assign a single product SKU to a vendor.
 /// SKU is bound from the route; VendorTenantId comes from the request body.
-/// AssociatedBy is resolved at handler time (admin identity — Phase 2 will wire real auth).
+/// AssociatedBy is resolved at handler time (backoffice identity — Phase 2 will wire real auth).
 /// <para>
 /// <b>Phase 2 note:</b> <see cref="VendorTenantId"/> is accepted as-is without cross-BC validation.
 /// A non-existent vendor GUID will create an orphaned assignment. Vendor existence validation

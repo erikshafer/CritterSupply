@@ -63,8 +63,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// Authorization policy: "Admin" requires a JWT with Role == "Admin".
-// Phase 2: replace with a dedicated admin identity provider and finer-grained policies.
+// Authorization policy: "VendorAdmin" requires a JWT with Role == "Admin".
+// Phase 2: replace with a dedicated backoffice identity provider and finer-grained policies.
 builder.Services.AddAuthorization(opts =>
 {
     opts.AddPolicy("VendorAdmin", policy => policy
