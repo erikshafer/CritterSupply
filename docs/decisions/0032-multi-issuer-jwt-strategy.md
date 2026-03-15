@@ -1,6 +1,6 @@
 # ADR 0032: Multi-Issuer JWT Authentication Strategy
 
-**Status:** ⚠️ Proposed
+**Status:** ✅ Accepted
 
 **Date:** 2026-03-15
 
@@ -293,9 +293,31 @@ Admin Identity BC issues tokens with `aud: "https://localhost:5249"` (its own ad
 ### Negative
 
 ⚠️ **Configuration duplication** — Each domain BC must configure both schemes (8 BCs × 2 schemes = 16 configurations)
-⚠️ **Product Catalog policy rename** — Breaking change for existing `"Admin"` policy (must rename to `"VendorAdmin"` and update 3 endpoints)
+
+⚠️ **Product Catalog policy rename** — Existing `"Admin"` policy (validates vendor tokens) must be renamed to `"VendorAdmin"` and 3 endpoints must be updated to `[Authorize(Policy = "VendorAdmin")]`.
+
+**Migration Risk:** Breaking change for vendor-facing endpoints if tests don't cover all scenarios.
+
+**Mitigation:**
+1. Run existing vendor JWT integration tests before rename (establish baseline)
+2. Perform rename in a single atomic commit
+3. Run tests again after rename to verify no regressions
+4. If tests fail, investigate and fix before proceeding with M31.5 Session 4
+
 ⚠️ **Audience evolution complexity** — Phase 2 migration requires coordinated update across 9 BCs
-⚠️ **Self-referential audience limitation** — Phase 1 tokens are issued for Admin Identity BC, not for domain BCs (transitional pattern only)
+
+### Known Limitations (Phase 1)
+
+⚠️ **Self-referential audience pattern** — Domain BCs validate tokens with `aud: "https://localhost:5249"` (Admin Identity BC), not their own addresses. This is a transitional pattern acceptable for Phase 1 because:
+- Admin Portal API (port 5243) does not exist yet
+- All admin tokens originate from a single issuer (Admin Identity BC)
+- Tokens are still validated against Admin Identity's signing key (secure)
+
+**Phase 2 Migration Requirement:** When Admin Portal API ships, we must:
+1. Update Admin Identity BC to issue tokens with `aud: "https://localhost:5243"`
+2. Update all domain BCs to configure `options.Audience = "https://localhost:5243"`
+3. Coordinate deployment to avoid token validation failures during rollout
+4. Consider supporting multiple audiences temporarily (backward compatibility)
 
 ### Neutral
 
@@ -307,12 +329,12 @@ Admin Identity BC issues tokens with `aud: "https://localhost:5249"` (its own ad
 
 ## Implementation Checklist
 
-**Phase 0.5: Multi-Issuer JWT Setup (4-5 sessions)**
+**M31.5: Multi-Issuer JWT Setup (4-5 sessions)**
 
 1. **ADR Sign-Off**
-   - [ ] PSA reviews and approves this ADR
-   - [ ] PO reviews and confirms alignment with M32.0 scope
-   - [ ] Mark ADR status as ✅ Accepted
+   - [x] PSA reviews and approves this ADR
+   - [x] PO reviews and confirms alignment with M32.0 scope
+   - [x] Mark ADR status as ✅ Accepted
 
 2. **Domain BC JWT Scheme Configuration (5 BCs)**
    - [ ] Orders.Api — Add `"Admin"` and `"Vendor"` schemes + policies
