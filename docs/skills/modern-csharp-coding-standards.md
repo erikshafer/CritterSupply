@@ -452,6 +452,82 @@ public DateTimeOffset? ProcessedAt { get; init; }
 var now = DateTimeOffset.UtcNow;
 ```
 
+## Decimal and Financial Calculations
+
+### Banker's Rounding ⚠️ **CRITICAL for Financial Operations**
+
+**Problem:** `Math.Round()` uses banker's rounding (round-to-even) by default, NOT round-away-from-zero.
+
+```csharp
+// Examples of banker's rounding behavior:
+Math.Round(6.825m, 2)  // → 6.82 (rounds DOWN to even)
+Math.Round(6.835m, 2)  // → 6.84 (rounds UP to even)
+Math.Round(4.5m, 0)    // → 4 (rounds DOWN to even)
+Math.Round(5.5m, 0)    // → 6 (rounds UP to even)
+```
+
+**Why this matters:**
+- Default .NET rounding mode: `MidpointRounding.ToEven`
+- Affects discount calculations, tax calculations, currency conversions
+- Can cause test failures when expecting traditional "round away from zero" behavior
+- Small differences accumulate in bulk calculations
+
+**When discovered:** M30.0 discount calculation tests expected `28.66m` but got `28.64m` due to banker's rounding of `6.825m → 6.82m`.
+
+**Example from Promotions BC (M30.0):**
+
+```csharp
+// Calculating percentage discount
+private static LineItemDiscount CalculatePercentageDiscount(
+    CartLineItem item,
+    decimal discountPercentage,
+    string couponCode)
+{
+    var originalPrice = item.UnitPrice;
+
+    // Math.Round uses banker's rounding by default!
+    // 15% of 45.50 = 6.825 → rounds to 6.82 (not 6.83)
+    var discountAmount = Math.Round(originalPrice * (discountPercentage / 100m), 2);
+    var discountedPrice = originalPrice - discountAmount;
+
+    return new LineItemDiscount(
+        Sku: item.Sku,
+        OriginalPrice: originalPrice,
+        DiscountedPrice: Math.Max(discountedPrice, 0),
+        DiscountAmount: discountAmount * item.Quantity,
+        AppliedCouponCode: couponCode);
+}
+```
+
+**Test expectations must account for banker's rounding:**
+
+```csharp
+// Calculate expected discount: 15% of each item's unit price * quantity
+// SKU-001: 15% of 29.99 = 4.4985, rounded to 4.50 * 3 = 13.50
+// SKU-002: 15% of 10.01 = 1.5015, rounded to 1.50 * 1 = 1.50
+// SKU-003: 15% of 45.50 = 6.825, banker's rounding to 6.82 * 2 = 13.64
+// Total discount: 28.64 (not 28.66 due to banker's rounding)
+response.TotalDiscount.ShouldBe(28.64m);
+```
+
+**If you need traditional "round away from zero":**
+
+```csharp
+// Explicitly specify rounding mode
+var rounded = Math.Round(6.825m, 2, MidpointRounding.AwayFromZero); // → 6.83
+```
+
+**Best practices:**
+
+1. **Document rounding behavior** in financial calculation methods
+2. **Test with midpoint values** (X.X25, X.X75, etc.) to catch rounding assumptions
+3. **Be consistent** — use same rounding mode throughout a calculation pipeline
+4. **Consider regulatory requirements** — some jurisdictions mandate specific rounding rules
+
+**Reference:** [M30.0 Retrospective - D3: Banker's Rounding in Discount Calculations](../../planning/milestones/m30-0-retrospective.md#d3-bankers-rounding-in-discount-calculations)
+
+---
+
 ## Naming Conventions
 
 | Type | Convention | Example |

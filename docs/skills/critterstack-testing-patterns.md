@@ -1041,6 +1041,152 @@ tests/
         PaymentAggregateTests.cs
 ```
 
+## Testing Async Patterns and Fan-Out Commands
+
+### Fan-Out Pattern Timing ⚠️ **Important for Reliable Tests**
+
+**Problem:** When testing fan-out patterns (one command creates N child commands via `OutgoingMessages`), tests need sufficient delays for async processing and projection updates.
+
+**Pattern:** Fan-out via OutgoingMessages
+
+```csharp
+// Handler that creates multiple child commands
+public static async Task<OutgoingMessages> Handle(
+    GenerateCouponBatch cmd,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    var promotion = await session.Events.AggregateStreamAsync<Promotion>(cmd.PromotionId, token: ct);
+    var outgoing = new OutgoingMessages();
+
+    // Fan-out: Generate N IssueCoupon commands
+    for (int i = 1; i <= cmd.Count; i++)
+    {
+        var couponCode = $"{cmd.Prefix.ToUpperInvariant()}-{i:D4}";
+        outgoing.Add(new IssueCoupon(couponCode, promotion.Id));
+    }
+
+    return outgoing;
+}
+```
+
+**Testing challenge:** Each child command handler creates an aggregate + updates projections asynchronously.
+
+**Wrong (Insufficient delay):**
+
+```csharp
+[Fact]
+public async Task GenerateCouponBatch_Creates100Coupons()
+{
+    // Arrange
+    var promotionId = await CreatePromotion();
+    var batchCmd = new GenerateCouponBatch(promotionId, "SAVE20", 100);
+
+    // Act
+    await _fixture.ExecuteAndWaitAsync(batchCmd);
+
+    // ❌ Wait 300ms — insufficient for 100 commands + projections
+    await Task.Delay(300);
+
+    // Assert
+    await using var session = _fixture.GetDocumentSession();
+    for (int i = 1; i <= 100; i++)
+    {
+        var code = $"SAVE20-{i:D4}";
+        var coupon = await session.LoadAsync<CouponLookupView>(code);
+        coupon.ShouldNotBeNull();  // ❌ Fails intermittently
+    }
+}
+```
+
+**Correct (Generous delay):**
+
+```csharp
+[Fact]
+public async Task GenerateCouponBatch_Creates100Coupons()
+{
+    // Arrange
+    var promotionId = await CreatePromotion();
+    var batchCmd = new GenerateCouponBatch(promotionId, "SAVE20", 100);
+
+    // Act
+    await _fixture.ExecuteAndWaitAsync(batchCmd);
+
+    // ✅ Wait 1000ms for async processing
+    // GenerateCouponBatch creates N IssueCoupon commands via OutgoingMessages
+    // Each IssueCoupon handler:
+    //   1. Creates a Coupon aggregate (UUID v5 stream)
+    //   2. Triggers CouponLookupView projection update (inline)
+    // 1000ms ensures all N commands + projections complete
+    await Task.Delay(1000);
+
+    // Assert
+    await using var session = _fixture.GetDocumentSession();
+    for (int i = 1; i <= 100; i++)
+    {
+        var code = $"SAVE20-{i:D4}";
+        var coupon = await session.LoadAsync<CouponLookupView>(code);
+        coupon.ShouldNotBeNull();  // ✅ Reliable
+    }
+}
+```
+
+**Why 1000ms?**
+- Each child command goes through Wolverine's handler pipeline
+- Each aggregate creation persists events to Marten
+- Inline projections update synchronously but still require DB writes
+- 300ms was insufficient in M30.0 tests (intermittent failures)
+- 1000ms provides reliable execution with safety margin
+
+**Real example from CritterSupply:**
+
+```csharp
+// From Promotions.IntegrationTests/CouponRedemptionTests.cs (M30.0)
+[Fact]
+public async Task GenerateCouponBatch_ForDraftPromotion_CreatesSuccessfully()
+{
+    // ... setup ...
+
+    var batch = new GenerateCouponBatch(promotionId, "TEST", batchSize);
+    await _fixture.ExecuteAndWaitAsync(batch);
+
+    // Wait for fan-out IssueCoupon commands to be processed asynchronously
+    await Task.Delay(1000); // Increased from 300ms after test failures
+
+    // Verify all coupons created
+    await using var session = _fixture.GetDocumentSession();
+    for (int i = 1; i <= batchSize; i++)
+    {
+        var code = $"TEST-{i:D4}";
+        var coupon = await session.LoadAsync<CouponLookupView>(code);
+        coupon.ShouldNotBeNull();
+        coupon.Status.ShouldBe(CouponStatus.Issued);
+    }
+}
+```
+
+**Guidelines:**
+
+| Pattern | Recommended Delay | Why |
+|---------|------------------|-----|
+| Single command execution | 0ms (use `ExecuteAndWaitAsync`) | Wolverine waits for handler completion |
+| Fan-out (N < 10 commands) | 500ms | Small batch, projections update quickly |
+| Fan-out (N ≥ 10 commands) | 1000ms | Larger batch, multiple DB operations |
+| Saga with scheduled messages | Test-specific (use Wolverine test helpers) | See wolverine-sagas.md testing section |
+
+**Best practices:**
+
+1. **Document why you're delaying** — Add comments explaining the async workflow
+2. **Start generous, optimize later** — 1000ms is safe; reduce only if tests are slow
+3. **Use ExecuteAndWaitAsync first** — Only add Task.Delay for fan-out/projection cases
+4. **Test with different batch sizes** — Ensure timing works for 1, 10, 100 items
+
+**When discovered:** M30.0 batch generation tests failed intermittently with 300ms delay. Increasing to 1000ms achieved 100% reliability.
+
+**Reference:** [M30.0 Retrospective - D4: Fan-Out Timing in Integration Tests](../../planning/milestones/m30-0-retrospective.md#d4-fan-out-timing-in-integration-tests)
+
+---
+
 ## Key Principles
 
 1. **Standardized TestFixture across all BCs** — Use the same helper methods for consistency

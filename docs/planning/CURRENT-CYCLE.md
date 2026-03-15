@@ -149,8 +149,9 @@
   - **Design Decision:** Draft promotions can issue coupons (enables batch generation before activation)
   - **Banker's Rounding:** `Math.Round(6.825, 2)` rounds to 6.82 (even), not 6.83 — affects discount calculations
   - CONTEXTS.md updated with M30.0 implementation status
+  - **Skills Refresh:** Propagated M30.0 learnings to wolverine-message-handlers.md (anti-pattern #8), modern-csharp-coding-standards.md (banker's rounding), critterstack-testing-patterns.md (fan-out timing)
   - **Deferred to M30.1+:** Full Shopping BC integration (real cart workflow), Pricing BC floor price enforcement
-  - [Retrospective](./milestones/m30-0-retrospective.md) *(pending)*
+  - [Retrospective](./milestones/m30-0-retrospective.md)
 
 - ✅ **M29.1:** Promotions BC Core — MVP (2026-03-14 to 2026-03-15) — **COMPLETE**
   - Event-sourced Promotion aggregate (UUID v7) with 6 domain events

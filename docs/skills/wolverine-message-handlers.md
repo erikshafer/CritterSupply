@@ -1805,6 +1805,102 @@ public static class PlaceOrderHandler
 }
 ```
 
+### 8. ❌ Returning Tuples When Manually Loading Aggregates ⚠️ **CRITICAL**
+
+**Problem:** When you manually load aggregates using `session.Events.AggregateStreamAsync<T>()` instead of using `[WriteAggregate]`, returning event tuples doesn't tell Wolverine to persist the events.
+
+**Wrong:**
+
+```csharp
+public static async Task<(Coupon, CouponRedeemed)> Handle(
+    RedeemCoupon cmd,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    // ❌ Manually loading aggregate
+    var streamId = Coupon.StreamId(cmd.CouponCode);
+    var coupon = await session.Events.AggregateStreamAsync<Coupon>(streamId, token: ct);
+
+    if (coupon is null)
+        throw new InvalidOperationException("Coupon not found");
+    if (coupon.Status != CouponStatus.Issued)
+        throw new InvalidOperationException("Coupon already redeemed");
+
+    var evt = new CouponRedeemed(cmd.CouponCode, cmd.OrderId, cmd.CustomerId, DateTimeOffset.UtcNow);
+
+    // ❌ Returning tuple - event will NOT be persisted!
+    return (coupon, evt);
+}
+```
+
+**Why wrong:** The tuple return pattern `(Aggregate, Event)` only works with `[WriteAggregate]`. When you manually load aggregates, Wolverine doesn't know to persist the returned event. The event gets discarded silently.
+
+**Correct:**
+
+```csharp
+public static async Task Handle(
+    RedeemCoupon cmd,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    // 1. Manually load aggregate
+    var streamId = Coupon.StreamId(cmd.CouponCode);
+    var coupon = await session.Events.AggregateStreamAsync<Coupon>(streamId, token: ct);
+
+    // 2. Validate
+    if (coupon is null)
+        throw new InvalidOperationException("Coupon not found");
+    if (coupon.Status != CouponStatus.Issued)
+        throw new InvalidOperationException("Coupon already redeemed");
+
+    // 3. Create event
+    var evt = new CouponRedeemed(cmd.CouponCode, cmd.OrderId, cmd.CustomerId, DateTimeOffset.UtcNow);
+
+    // 4. ✅ Manually append to stream (Wolverine persists via transactional outbox)
+    session.Events.Append(streamId, evt);
+}
+```
+
+**When to manually load aggregates:**
+- Loading by deterministic ID (UUID v5 from code/string)
+- Need full control over stream ID generation
+- Cannot use `[WriteAggregate]` for some reason
+
+**Pattern comparison:**
+
+| Pattern | When to Use | Event Persistence |
+|---------|-------------|-------------------|
+| `[WriteAggregate]` + tuple return | Standard aggregate handlers | ✅ Automatic - Wolverine appends events |
+| Manual loading + tuple return | ❌ **Never use this combination** | ❌ Events discarded silently |
+| Manual loading + `session.Events.Append()` | Deterministic IDs, custom loading logic | ✅ Explicit - you control appending |
+
+**Real examples from CritterSupply:**
+
+```csharp
+// ✅ Promotions BC: RedeemCouponHandler.cs (M30.0)
+public static async Task Handle(
+    RedeemCoupon cmd,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    var streamId = Coupon.StreamId(cmd.CouponCode); // UUID v5
+    var coupon = await session.Events.AggregateStreamAsync<Coupon>(streamId, token: ct);
+
+    // Validation...
+
+    var evt = new CouponRedeemed(/* ... */);
+    session.Events.Append(streamId, evt); // ✅ Manual append
+}
+
+// ✅ Returns BC: RequestReturnHandler.cs, ExpireReturnHandler.cs
+// ✅ Inventory BC: Multiple handlers
+// ✅ Correspondence BC: Message handlers
+```
+
+**Key lesson from M30.0:** This anti-pattern caused ~30 minutes of debugging when events weren't persisting. The tuple return looked correct but silently failed. Always use `session.Events.Append()` when manually loading aggregates.
+
+**Reference:** [M30.0 Retrospective - D1: Manual Event Appending Pattern](../../planning/milestones/m30-0-retrospective.md#d1-manual-event-appending-pattern--critical-discovery)
+
 ---
 
 ## File Organization and Naming
