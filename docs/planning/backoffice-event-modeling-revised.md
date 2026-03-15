@@ -1,16 +1,16 @@
-# Admin Portal: Revised Event Model & Design
+# Backoffice: Revised Event Model & Design
 
 **Date:** 2026-03-14 (Re-modeling session)
 **Last Updated:** 2026-03-14 (Post-Cycle 29 Phase 1 reconciliation)
-**Original Document:** [admin-portal-event-modeling.md](admin-portal-event-modeling.md) (2026-03-07)
+**Original Document:** [backoffice-event-modeling.md](backoffice-event-modeling.md) (2026-03-07)
 **Participants:** Principal Software Architect, Product Owner, UX Engineer
 **Status:** 🟡 Revised Model — Awaiting Owner Sign-Off on Open Questions (Phase 0 complete)
-**Input Documents:** Original event model, [Research & Discovery](admin-portal-research-discovery.md), [UX Research](admin-portal-ux-research.md), Cycle 21-28 retrospectives, codebase audit, [Cycle 29 Phase 1 Retrospective](cycles/cycle-29-admin-identity-phase-1-retrospective.md)
-**Companion Documents:** [Integration Gap Register](admin-portal-integration-gap-register.md), [Decision Log](admin-portal-revised-decision-log.md), [Open Questions](admin-portal-open-questions.md)
+**Input Documents:** Original event model, [Research & Discovery](backoffice-research-discovery.md), [UX Research](backoffice-ux-research.md), Cycle 21-28 retrospectives, codebase audit, [Cycle 29 Phase 1 Retrospective](cycles/cycle-29-admin-identity-phase-1-retrospective.md)
+**Companion Documents:** [Integration Gap Register](backoffice-integration-gap-register.md), [Decision Log](backoffice-revised-decision-log.md), [Open Questions](backoffice-open-questions.md)
 
-> **Revision Note:** This document replaces the original `admin-portal-event-modeling.md` as the current-state event model. The original is preserved as-is for historical reference. All changes are marked with `[REVISED]` tags and rationale. The companion [Decision Log](admin-portal-revised-decision-log.md) records what was kept, changed, or removed from the original.
+> **Revision Note:** This document replaces the original `backoffice-event-modeling.md` as the current-state event model. The original is preserved as-is for historical reference. All changes are marked with `[REVISED]` tags and rationale. The companion [Decision Log](backoffice-revised-decision-log.md) records what was kept, changed, or removed from the original.
 >
-> **Post-PR #375 Update:** Admin Identity BC (Phase 0) was implemented in Cycle 29 Phase 1 and merged to main. This document has been updated to reflect Phase 0 as complete, reconcile assumptions against the actual implementation (password hashing, user provisioning, JWT claims), and update remaining phase blockers.
+> **Post-PR #375 Update:** Backoffice Identity BC (Phase 0) was implemented in Cycle 29 Phase 1 and merged to main. This document has been updated to reflect Phase 0 as complete, reconcile assumptions against the actual implementation (password hashing, user provisioning, JWT claims), and update remaining phase blockers.
 
 ---
 
@@ -20,7 +20,7 @@
 2. [What Changed Since the Original Model](#what-changed-since-the-original-model)
 3. [Internal User Personas & Roles](#internal-user-personas--roles)
 4. [Technology Decisions](#technology-decisions)
-5. [Admin Identity: Authentication Prerequisite](#admin-identity-authentication-prerequisite)
+5. [Backoffice Identity: Authentication Prerequisite](#admin-identity-authentication-prerequisite)
 6. [Revised Phased Roadmap](#revised-phased-roadmap)
 7. [Event Modeling: Key Flows (Revised)](#event-modeling-key-flows-revised)
 8. [Commands & Queries — Reconciled Against Codebase](#commands--queries--reconciled-against-codebase)
@@ -37,15 +37,15 @@
 
 ## Core Architecture Decision
 
-**Unchanged from original:** Admin Portal is a **BFF (Backend-for-Frontend)**, not a pure API gateway. It follows the same pattern as Customer Experience (for customers) and Vendor Portal (for vendor partners).
+**Unchanged from original:** Backoffice is a **BFF (Backend-for-Frontend)**, not a pure API gateway. It follows the same pattern as Customer Experience (for customers) and Vendor Portal (for vendor partners).
 
 ```
 Customer Experience BC → Storefront.Api (BFF for customers)
 Vendor Portal BC       → VendorPortal.Api (BFF for vendor partners)
-Admin Portal BC        → AdminPortal.Api (BFF for internal employees)  ← this document
+Backoffice BC        → AdminPortal.Api (BFF for internal employees)  ← this document
 ```
 
-The Admin Portal BFF:
+The Backoffice BFF:
 - **DOES:** Authenticate, authorize (RBAC), compose multi-BC queries, transform responses, subscribe to events via RabbitMQ, push via SignalR, validate input, translate errors
 - **DOES NOT:** Execute business logic, store transactional data, proxy raw requests
 
@@ -57,13 +57,13 @@ The Admin Portal BFF:
 
 ### BCs Now Implemented (Since 2026-03-07)
 
-| BC | Cycles | Key Impact on Admin Portal |
+| BC | Cycles | Key Impact on Backoffice |
 |----|--------|---------------------------|
-| **Admin Identity** | 29 (Phase 1) | ✅ **Phase 0 prerequisite COMPLETE.** EF Core + JWT auth + 7 admin roles + 7 API endpoints (login, refresh, logout, CRUD). Port 5249. ADR 0031 accepted. Policy-based authorization with SystemAdmin superuser pattern. PBKDF2-SHA256 password hashing. Direct user creation (not invitation flow). |
+| **Backoffice Identity** | 29 (Phase 1) | ✅ **Phase 0 prerequisite COMPLETE.** EF Core + JWT auth + 7 admin roles + 7 API endpoints (login, refresh, logout, CRUD). Port 5249. ADR 0031 accepted. Policy-based authorization with SystemAdmin superuser pattern. PBKDF2-SHA256 password hashing. Direct user creation (not invitation flow). |
 | **Returns** | 25-27 | 14 integration messages, 10 endpoints, 10 lifecycle states. CS return management is now feasible — endpoints exist for approve, deny, receive, inspect, exchange. **Original model had Returns as Phase 2 read-only; revised to Phase 1 read+write.** |
 | **Correspondence** | 28 | Renamed from "Notifications" (ADR 0030). Email delivery tracking. 2 query endpoints exist. **Not in original model; added to Phase 1 CS view.** |
 | **Pricing** | 21 | PriceRule event-sourced aggregate, BulkPricingJob saga, CurrentPriceView projection. Only 2 GET endpoints exist today — **no admin write endpoints yet**. |
-| **Vendor Portal** | 22-23 | Blazor WASM + JWT + SignalR pattern fully proven. 143 tests, 100% pass rate. Provides the template for Admin Portal frontend. |
+| **Vendor Portal** | 22-23 | Blazor WASM + JWT + SignalR pattern fully proven. 143 tests, 100% pass rate. Provides the template for Backoffice frontend. |
 
 ### BCs Still Missing (Impact on Original Model)
 
@@ -78,8 +78,8 @@ The Admin Portal BFF:
 
 | Collision | Original | Fixed |
 |-----------|----------|-------|
-| **Port 5245** | AdminIdentity.Api | **5249** — Returns.Api owns 5245 |
-| **ADR 0026-0029** | Reserved for Admin Portal | **0031-0034** — 0026-0030 taken by other decisions |
+| **Port 5245** | BackofficeIdentity.Api | **5249** — Returns.Api owns 5245 |
+| **ADR 0026-0029** | Reserved for Backoffice | **0031-0034** — 0026-0030 taken by other decisions |
 | **Frontend recommendation** | React/Next.js (event model) vs Blazor WASM (research doc) | **Blazor WASM** — research doc override is authoritative; consistent with Vendor Portal |
 | **"Notifications BC"** | Referenced in original | **Correspondence BC** — renamed per ADR 0030 |
 
@@ -127,32 +127,32 @@ The Admin Portal BFF:
 | Aspect | Decision | Change from Original? |
 |---|---|---|
 | Backend persistence | Marten (BFF-owned projections for dashboard metrics) | **[REVISED]** No Analytics BC dependency |
-| Auth mechanism | JWT Bearer (AdminIdentity BC, issuer `https://localhost:5249`) | **[UPDATED]** Phase 1: self-referential audience; Phase 2+ needs Admin Portal API audience |
+| Auth mechanism | JWT Bearer (BackofficeIdentity BC, issuer `https://localhost:5249`) | **[UPDATED]** Phase 1: self-referential audience; Phase 2+ needs Backoffice API audience |
 | Real-time | SignalR via `opts.UseSignalR()` | Unchanged |
 | **Frontend** | **Blazor WASM** | **[REVISED]** Changed from React/Next.js. Research doc override (consistency with Vendor Portal pattern). |
 | SignalR client | `Microsoft.AspNetCore.SignalR.Client` (native .NET) | **[REVISED]** Follows from Blazor WASM decision |
 | Hub groups | Role-scoped: `role:{roleName}` + `admin-user:{userId}` | Unchanged |
-| Admin Portal.Api port | **5243** | Unchanged |
-| Admin Portal.Web port | **5244** | Unchanged |
-| **Admin Identity.Api port** | **5249** | **[REVISED]** Was 5245 — collision with Returns.Api |
+| Backoffice.Api port | **5243** | Unchanged |
+| Backoffice.Web port | **5244** | Unchanged |
+| **Backoffice Identity.Api port** | **5249** | **[REVISED]** Was 5245 — collision with Returns.Api |
 | Schema | `adminportal` | Unchanged |
 
-> **Counter-proposal (from research doc):** If the team wants a React reference, the **Operations Dashboard BC** (developer-facing tool with heavy chart/visualization needs) is a better candidate than the Admin Portal.
+> **Counter-proposal (from research doc):** If the team wants a React reference, the **Operations Dashboard BC** (developer-facing tool with heavy chart/visualization needs) is a better candidate than the Backoffice.
 
 ---
 
-## Admin Identity: Authentication Prerequisite
+## Backoffice Identity: Authentication Prerequisite
 
-> **Status: ✅ IMPLEMENTED** — Delivered in Cycle 29 Phase 1 (PR #375). See [Cycle 29 Phase 1 Retrospective](cycles/cycle-29-admin-identity-phase-1-retrospective.md) and [ADR 0031](../decisions/0031-admin-portal-rbac-model.md).
+> **Status: ✅ IMPLEMENTED** — Delivered in Cycle 29 Phase 1 (PR #375). See [Cycle 29 Phase 1 Retrospective](cycles/cycle-29-admin-identity-phase-1-retrospective.md) and [ADR 0031](../decisions/0031-backoffice-rbac-model.md).
 
-- EF Core + Postgres (`adminidentity` schema) — **implemented**
+- EF Core + Postgres (`backofficeidentity` schema) — **implemented**
 - Single-organization (no tenant concept, mirrors VendorIdentity) — **implemented**
-- JWT: issuer `https://localhost:5249`, audience `https://localhost:5249` (self-referential in Phase 1; Phase 2+ will add Admin Portal API audience), 15-min access + 7-day refresh — **implemented**
+- JWT: issuer `https://localhost:5249`, audience `https://localhost:5249` (self-referential in Phase 1; Phase 2+ will add Backoffice API audience), 15-min access + 7-day refresh — **implemented**
 - Password hashing: PBKDF2-SHA256 via ASP.NET Core Identity `PasswordHasher<T>` (100,000 iterations) — **implemented** (original research doc assumed Argon2id; ADR 0031 documents the decision to use PBKDF2 with Argon2id deferred to Phase 2+ if needed)
 - User provisioning: Direct creation by SystemAdmin via `POST /api/admin-identity/users` — **implemented** (no invitation flow; resolves the discrepancy in the original research doc Appendix B)
 - No seed data in migration — users are created via the CreateAdminUser endpoint at runtime
 - **Port: 5249** — **implemented**
-- **ADR: 0031** (Admin Portal RBAC Model) — **accepted**
+- **ADR: 0031** (Backoffice RBAC Model) — **accepted**
 
 **Implemented endpoints:**
 ```
@@ -174,29 +174,29 @@ DELETE /api/admin-identity/users/{id}       # Deactivate admin user (SystemAdmin
 
 ## Revised Phased Roadmap
 
-### Phase 0: AdminIdentity BC (Prerequisite) — ✅ COMPLETE (Cycle 29 Phase 1)
+### Phase 0: BackofficeIdentity BC (Prerequisite) — ✅ COMPLETE (Cycle 29 Phase 1)
 
 > **Delivered:** PR #375, merged 2026-03-14. All deliverables shipped.
 
 | Deliverable | Status |
 |------------|--------|
-| AdminIdentity project (EF Core, schema `adminidentity`) | ✅ Implemented |
-| AdminIdentity.Api (JWT issuer, login/logout/refresh, port 5249) | ✅ Implemented |
+| BackofficeIdentity project (EF Core, schema `backofficeidentity`) | ✅ Implemented |
+| BackofficeIdentity.Api (JWT issuer, login/logout/refresh, port 5249) | ✅ Implemented |
 | AdminRole enum (CopyWriter=1 through SystemAdmin=7) | ✅ Implemented |
-| ADR 0031: Admin Portal RBAC Model | ✅ Accepted |
+| ADR 0031: Backoffice RBAC Model | ✅ Accepted |
 | Authorization policies (7 leaf + 3 composite) | ✅ Implemented |
 | User management CRUD (SystemAdmin only) | ✅ Implemented |
 
 **Deliverable gate:** ✅ `POST /api/admin-identity/auth/login` returns a valid JWT with `sub` (AdminUserId), `role` (AdminRole), `email`, and `name` claims.
 
 **Not yet delivered (deferred):**
-- Integration messages in Messages.Contracts (`AdminUserCreated`, `AdminUserDeactivated`, `AdminUserRoleChanged`) — not yet needed; to be added when Admin Portal BFF subscribes to these events
+- Integration messages in Messages.Contracts (`AdminUserCreated`, `AdminUserDeactivated`, `AdminUserRoleChanged`) — not yet needed; to be added when Backoffice BFF subscribes to these events
 - Integration tests (Alba + TestContainers) — no test project created yet
 - Seed data script — users created via CreateAdminUser endpoint
 
 ### Phase 0.5: Domain BC Endpoint Gaps (Prerequisite) — 1 cycle
 
-> **[NEW PHASE]** Codebase audit revealed critical endpoint gaps in domain BCs that block Phase 1. These must ship before Admin Portal Phase 1 begins. This is the lesson from Cycle 26 (Fulfillment queue wiring bug discovered mid-cycle).
+> **[NEW PHASE]** Codebase audit revealed critical endpoint gaps in domain BCs that block Phase 1. These must ship before Backoffice Phase 1 begins. This is the lesson from Cycle 26 (Fulfillment queue wiring bug discovered mid-cycle).
 
 | Gap | Owning BC | Why It Blocks Phase 1 | Estimated Effort |
 |-----|----------|----------------------|-----------------|
@@ -227,7 +227,7 @@ DELETE /api/admin-identity/users/{id}       # Deactivate admin user (SystemAdmin
 | **Return lookup by order** | CS, Ops | Returns | ✅ `GET /api/returns` (supports orderId filter) | P0 |
 | **Return detail view** | CS, Ops | Returns | ✅ `GET /api/returns/{returnId}` | P0 |
 | **Return approval/denial** | CS, Ops | Returns | ✅ `POST /api/returns/{id}/approve` + `/deny` | P0 |
-| **Order notes/internal comments** | CS | Admin Portal (new aggregate) | N/A (creating) | P0 |
+| **Order notes/internal comments** | CS | Backoffice (new aggregate) | N/A (creating) | P0 |
 | **Correspondence history** | CS | Correspondence | ✅ `GET /api/correspondence/messages/customer/{id}` | P1 |
 | Executive KPIs (7 metrics via BFF projections) | Exec, Ops | BFF ← RabbitMQ events | N/A (creating) | P1 |
 | Operations alert feed (SignalR) | Ops, WH | BFF ← RabbitMQ events | N/A (creating) | P1 |
@@ -236,8 +236,8 @@ DELETE /api/admin-identity/users/{id}       # Deactivate admin user (SystemAdmin
 | Ops read access to product content | Ops | Product Catalog | ✅ `GET /api/products/{sku}` | P1 |
 | PII access logging (GDPR) | Compliance | Self | N/A (creating) | P0 |
 | ADR 0032: Multi-Issuer JWT Strategy | — | — | — | P0 |
-| ADR 0033: Blazor WASM for Admin Portal | — | — | — | P0 |
-| ADR 0034: Admin Portal SignalR Hub Design | — | — | — | P0 |
+| ADR 0033: Blazor WASM for Backoffice | — | — | — | P0 |
+| ADR 0034: Backoffice SignalR Hub Design | — | — | — | P0 |
 
 **Executive Dashboard KPIs (Phase 1):**
 
@@ -260,13 +260,13 @@ DELETE /api/admin-identity/users/{id}       # Deactivate admin user (SystemAdmin
 | Product content editing | CopyWriter | Product Catalog | ⚠️ **GAP** — needs admin write endpoints | P1 |
 | Price set + schedule + cancel | PricingMgr | Pricing | ⚠️ **GAP** — only 2 GET endpoints exist | P1 |
 | Inventory adjust + receive stock | WH | Inventory | ⚠️ **GAP** — message-driven only, no HTTP | P1 |
-| Receiving discrepancy notes | WH | Admin Portal | N/A (creating) | P1 |
+| Receiving discrepancy notes | WH | Backoffice | N/A (creating) | P1 |
 | **Return receipt** | WH | Returns | ✅ `POST /api/returns/{id}/receive` | P1 |
 | **Submit inspection** | WH | Returns | ✅ `POST /api/returns/{id}/inspection` | P1 |
 | **Exchange approval/denial** | CS, Ops | Returns | ✅ `POST /api/returns/{id}/approve-exchange` + `/deny-exchange` | P1 |
 | **Ship replacement item** | WH | Returns | ✅ `POST /api/returns/{id}/ship-replacement` | P1 |
 | Floor price visibility | PricingMgr | Pricing | ⚠️ Needs FloorPriceSet data exposed | P1 |
-| Escalation workflow (CS → Ops) | CS, Ops | Admin Portal (new) | N/A (creating) | P1 |
+| Escalation workflow (CS → Ops) | CS, Ops | Backoffice (new) | N/A (creating) | P1 |
 | Correspondence delivery monitoring | Ops | Correspondence | ✅ Existing endpoints + new projection | P2 |
 | Promotions read-only view | PricingMgr, Ops | Promotions | TBD (Cycle 29 output) | P2 |
 | Auth headers in Inventory.Api, Payments.Api | Infra | Multiple | N/A | P0 |
@@ -277,14 +277,14 @@ DELETE /api/admin-identity/users/{id}       # Deactivate admin user (SystemAdmin
 | Capability | Role | BC | Priority |
 |-----------|------|-----|----------|
 | Promotions management (create/deactivate) | PricingMgr | Promotions | P1 |
-| SystemAdmin user management CRUD | SysAdmin | AdminIdentity | P1 |
+| SystemAdmin user management CRUD | SysAdmin | BackofficeIdentity | P1 |
 | CSV/Excel report exports | Exec, Ops | BFF projections | P1 |
 | Returns analytics dashboard | Ops, Exec | Returns + BFF projections | P2 |
 | Audit log viewer | SysAdmin | BFF projection ← domain events | P2 |
 | Bulk operations pattern | All write roles | All write BCs | P2 |
-| Tab visibility API (ADR 0025 must-fix) | All | Admin Portal.Web | P1 |
-| Session expiry modal (ADR 0025 must-fix) | All | Admin Portal.Web | P1 |
-| Alert notification preferences | All | Admin Portal | P2 |
+| Tab visibility API (ADR 0025 must-fix) | All | Backoffice.Web | P1 |
+| Session expiry modal (ADR 0025 must-fix) | All | Backoffice.Web | P1 |
+| Alert notification preferences | All | Backoffice | P2 |
 
 ### Phase 4+: Future Work (Blocked or Low Priority)
 
@@ -339,14 +339,14 @@ Orders BC: OrderPlaced published to RabbitMQ
               to hub groups: role:executive, role:operations
 ```
 
-No Analytics BC dependency. The Admin Portal BFF subscribes directly to domain BC events via RabbitMQ and maintains its own lightweight projections.
+No Analytics BC dependency. The Backoffice BFF subscribes directly to domain BC events via RabbitMQ and maintains its own lightweight projections.
 
 ### Flow 5: CS Agent Handles Return Request [NEW]
 
 ```
 Trigger: Customer calls about a return
 
-[Admin Portal Frontend — CustomerService role]
+[Backoffice Frontend — CustomerService role]
 CS agent searches customer by email
   └─> GET /api/admin/customers?email={email} (AdminPortal.Api)
       └─> Customer Identity BC: GET /api/customers?email={email} [Phase 0.5 gap]
@@ -376,7 +376,7 @@ CS agent approves pending return
               ├─> Orders BC: saga tracks active return
               ├─> Fulfillment BC: expects return shipment
               ├─> Correspondence BC: sends return approval email
-              └─> Admin Portal SignalR: alert to role:operations
+              └─> Backoffice SignalR: alert to role:operations
 ```
 
 ### Flow 6: CS Agent Views Correspondence History [NEW]
@@ -384,7 +384,7 @@ CS agent approves pending return
 ```
 Trigger: Customer asks "I never got my order confirmation"
 
-[Admin Portal Frontend — CustomerService role]
+[Backoffice Frontend — CustomerService role]
 CS agent is already viewing customer detail (from Flow 5)
 CS agent clicks "Messages" tab
   └─> GET /api/admin/customers/{customerId}/messages (AdminPortal.Api)
@@ -397,14 +397,14 @@ CS agent sees order confirmation with status "DeliveryFailed"
           └─> Return: full message detail with retry history and error messages
 
 CS agent: "I see the email failed. Let me verify your email address..."
-  └─> (Manual resolution — no automated retry from Admin Portal in Phase 1)
+  └─> (Manual resolution — no automated retry from Backoffice in Phase 1)
 ```
 
 ---
 
 ## Commands & Queries — Reconciled Against Codebase
 
-### Commands the Admin Portal Will Issue (Verified Against Actual BC Endpoints)
+### Commands the Backoffice Will Issue (Verified Against Actual BC Endpoints)
 
 | Command | Target BC | Endpoint | Exists Today? | Phase |
 |---------|-----------|----------|--------------|-------|
@@ -458,7 +458,7 @@ CS agent: "I see the email failed. Let me verify your email address..."
 
 ### Projections Available in Domain BCs (Already Built)
 
-| Projection | Owning BC | Endpoint | Used By Admin Portal |
+| Projection | Owning BC | Endpoint | Used By Backoffice |
 |-----------|-----------|----------|---------------------|
 | `CurrentPriceView` | Pricing | `GET /api/pricing/products/{sku}` | Yes — PricingManager dashboard |
 | `MessageListView` | Correspondence | `GET /api/correspondence/messages/customer/{id}` | Yes — CS correspondence tab |
@@ -477,24 +477,24 @@ CS agent: "I see the email failed. Let me verify your email address..."
 
 ## Aggregates & Boundaries
 
-### Admin Portal's Own Aggregates
+### Backoffice's Own Aggregates
 
 | Aggregate | Storage | Purpose | Phase |
 |-----------|---------|---------|-------|
-| **OrderNote** (new) | Marten document store | CS internal comments on orders. Keyed by `{orderId}:{noteId}`. Not part of the Orders BC — the Admin Portal owns this context. | 1 |
+| **OrderNote** (new) | Marten document store | CS internal comments on orders. Keyed by `{orderId}:{noteId}`. Not part of the Orders BC — the Backoffice owns this context. | 1 |
 | **AdminDailyMetrics** | Marten document | BFF-owned projection for dashboard KPIs | 1 |
 | **AlertAcknowledgment** | Marten document | Tracks which alerts have been acknowledged by which admin user | 1 |
 | **EscalationTicket** (new) | Marten document | CS escalation to Ops. Status: Open → Acknowledged → Resolved. | 2 |
 
-> **Boundary stress-test:** OrderNote intentionally lives in Admin Portal, NOT in Orders BC. Rationale: internal CS notes are operational tooling metadata, not part of the order's business lifecycle. Orders BC events should not be polluted with `OrderNoteAdded` — that's an Admin Portal concern. If a future "Notes" aggregate is needed in Orders BC for customer-visible notes, that's a separate aggregate with different semantics.
+> **Boundary stress-test:** OrderNote intentionally lives in Backoffice, NOT in Orders BC. Rationale: internal CS notes are operational tooling metadata, not part of the order's business lifecycle. Orders BC events should not be polluted with `OrderNoteAdded` — that's an Backoffice concern. If a future "Notes" aggregate is needed in Orders BC for customer-visible notes, that's a separate aggregate with different semantics.
 
-### Aggregates in Domain BCs Used by Admin Portal (Verified)
+### Aggregates in Domain BCs Used by Backoffice (Verified)
 
-| Aggregate | BC | Type | Admin Portal Interaction |
+| Aggregate | BC | Type | Backoffice Interaction |
 |-----------|-----|------|------------------------|
 | Order (saga) | Orders | Event-sourced saga | Read state, cancel command |
-| Checkout | Orders | Event-sourced | Not directly — Admin Portal sees completed orders |
-| Cart | Shopping | Event-sourced | Not directly — Admin Portal doesn't manage carts |
+| Checkout | Orders | Event-sourced | Not directly — Backoffice sees completed orders |
+| Cart | Shopping | Event-sourced | Not directly — Backoffice doesn't manage carts |
 | Return | Returns | Event-sourced | Read state, approve/deny/receive/inspect commands |
 | ProductInventory | Inventory | Event-sourced | Read stock levels (Phase 0.5), adjust/receive (Phase 2) |
 | Payment | Payments | Event-sourced saga | Read payment status |
@@ -511,7 +511,7 @@ CS agent: "I see the email failed. Let me verify your email address..."
 
 | BC | Strategy | Phase 1 | Phase 2 | Status |
 |----|----------|---------|---------|--------|
-| **Admin Identity** | JWT issuer + user management | Login, token refresh, user CRUD | — | ✅ **COMPLETE** (Cycle 29 Phase 1) |
+| **Backoffice Identity** | JWT issuer + user management | Login, token refresh, user CRUD | — | ✅ **COMPLETE** (Cycle 29 Phase 1) |
 | **Customer Identity** | HTTP queries (typed client) | Customer lookup, address display | — | ⚠️ Missing email search endpoint |
 | **Orders** | HTTP queries + commands | Order list, detail, cancel, returnable items | — | ✅ Fully defined |
 | **Returns** | HTTP queries + commands | Return list, detail, approve, deny | Receive, inspect, exchange approve/deny, ship replacement | ✅ Fully defined |
@@ -525,11 +525,11 @@ CS agent: "I see the email failed. Let me verify your email address..."
 | **Analytics** | None | — | — | ❌ **REMOVED** — BFF projections replace |
 | **Store Credit** | None | — | — | ❌ **REMOVED** — does not exist |
 
-### RabbitMQ Event Subscriptions (Admin Portal BFF)
+### RabbitMQ Event Subscriptions (Backoffice BFF)
 
-The Admin Portal BFF subscribes to these integration events for real-time dashboards and alert feeds:
+The Backoffice BFF subscribes to these integration events for real-time dashboards and alert feeds:
 
-| Event | Source BC | Admin Portal Handler | Purpose |
+| Event | Source BC | Backoffice Handler | Purpose |
 |-------|----------|---------------------|---------|
 | `OrderPlaced` | Orders | `OrderPlacedAdminHandler` | Revenue/order count KPI |
 | `OrderCancelled` | Orders | `OrderCancelledAdminHandler` | KPI adjustment, CS alert |
@@ -554,16 +554,16 @@ The Admin Portal BFF subscribes to these integration events for real-time dashbo
 
 ### Original Saga Candidates
 
-The original event model did not identify explicit Admin Portal sagas. Reassessment:
+The original event model did not identify explicit Backoffice sagas. Reassessment:
 
 | Candidate | Assessment | Decision |
 |-----------|-----------|----------|
-| **Admin user provisioning** | AdminIdentity implements user creation as a simple command handler (`CreateAdminUser`). Delivered in Cycle 29 Phase 1. | **Not a saga.** Simple command handler (confirmed by implementation). |
+| **Admin user provisioning** | BackofficeIdentity implements user creation as a simple command handler (`CreateAdminUser`). Delivered in Cycle 29 Phase 1. | **Not a saga.** Simple command handler (confirmed by implementation). |
 | **Escalation workflow** (Phase 2) | CS creates escalation → Ops acknowledges → Ops resolves. Three-state lifecycle. | **Not a saga.** Simple Marten document with state transitions. No cross-BC orchestration. |
-| **Bulk pricing job** | Already a saga in Pricing BC (`BulkPricingJob`). Admin Portal triggers via HTTP, does not own the saga. | **Delegated.** Admin Portal is a client, not the orchestrator. |
-| **Order cancellation** | Already orchestrated by Order saga in Orders BC. Admin Portal calls `POST /cancel`, saga handles compensation. | **Delegated.** Admin Portal issues the command; Orders saga orchestrates the rollback. |
+| **Bulk pricing job** | Already a saga in Pricing BC (`BulkPricingJob`). Backoffice triggers via HTTP, does not own the saga. | **Delegated.** Backoffice is a client, not the orchestrator. |
+| **Order cancellation** | Already orchestrated by Order saga in Orders BC. Backoffice calls `POST /cancel`, saga handles compensation. | **Delegated.** Backoffice issues the command; Orders saga orchestrates the rollback. |
 
-**Conclusion:** Admin Portal does NOT need its own sagas in any phase. It delegates orchestration to domain BCs and owns only simple document-based state (OrderNote, AlertAcknowledgment, EscalationTicket).
+**Conclusion:** Backoffice does NOT need its own sagas in any phase. It delegates orchestration to domain BCs and owns only simple document-based state (OrderNote, AlertAcknowledgment, EscalationTicket).
 
 ---
 
@@ -584,8 +584,8 @@ All names verified against the codebase ubiquitous language established in Cycle
 | `ProductDescriptionUpdated` (event model Flow 1) | Not an existing event — Product Catalog uses document updates, not events | ⚠️ | **[NOTE]** When Product Catalog evolves to event sourcing, this event name should be adopted |
 | `PriceChangeScheduled` (event model Flow 2) | `PriceChangeScheduled` exists in Pricing domain events | ✅ | No change |
 | `ScheduledPriceActivated` | `ScheduledPriceActivated` exists in Pricing domain events | ✅ | No change |
-| `AdminRole` enum values | ✅ Implemented in `AdminIdentity.Identity.AdminRole` (Cycle 29 Phase 1) | ✅ | CopyWriter=1, PricingManager=2, WarehouseClerk=3, CustomerService=4, OperationsManager=5, Executive=6, SystemAdmin=7 |
-| `IAdminRoleMessage` / `IAdminUserMessage` | Not yet in codebase — to be created when Admin Portal BFF needs SignalR routing | — | Naming consistent with Vendor Portal pattern |
+| `AdminRole` enum values | ✅ Implemented in `BackofficeIdentity.Identity.AdminRole` (Cycle 29 Phase 1) | ✅ | CopyWriter=1, PricingManager=2, WarehouseClerk=3, CustomerService=4, OperationsManager=5, Executive=6, SystemAdmin=7 |
+| `IAdminRoleMessage` / `IAdminUserMessage` | Not yet in codebase — to be created when Backoffice BFF needs SignalR routing | — | Naming consistent with Vendor Portal pattern |
 
 ---
 
@@ -604,15 +604,15 @@ All names verified against the codebase ubiquitous language established in Cycle
 
 | Risk | Likelihood | Impact | Change from Original |
 |------|-----------|--------|---------------------|
-| Admin Portal becomes "God Gateway" | Medium | High | Unchanged |
+| Backoffice becomes "God Gateway" | Medium | High | Unchanged |
 | **[REVISED]** Frontend technology choice | Low | Low | **Risk reduced** — Blazor WASM decision eliminates React migration debt |
 | Audit notes on mutations | Medium | Low | Unchanged |
 | SignalR connection overhead | Low | Low | Unchanged |
 | Domain BCs add admin endpoints without security | Medium | High | Unchanged |
 | **[REMOVED]** Phase 1 Blazor → React migration | — | — | **Eliminated** — Blazor WASM is the final choice |
-| **[NEW]** Phase 0.5 endpoint gaps delay Phase 1 | Medium | High | If domain BC teams are slow to add required endpoints, Admin Portal Phase 1 is blocked |
-| **[NEW]** Inventory BC has zero HTTP endpoints | High | Medium | Most endpoint-sparse BC. Needs significant work before Admin Portal can integrate. |
-| **[NEW]** Product Catalog evolution (document → event sourcing) during Admin Portal lifecycle | Low | Medium | Interface-based HTTP clients insulate Admin Portal from API surface changes |
+| **[NEW]** Phase 0.5 endpoint gaps delay Phase 1 | Medium | High | If domain BC teams are slow to add required endpoints, Backoffice Phase 1 is blocked |
+| **[NEW]** Inventory BC has zero HTTP endpoints | High | Medium | Most endpoint-sparse BC. Needs significant work before Backoffice can integrate. |
+| **[NEW]** Product Catalog evolution (document → event sourcing) during Backoffice lifecycle | Low | Medium | Interface-based HTTP clients insulate Backoffice from API surface changes |
 
 ---
 
@@ -620,7 +620,7 @@ All names verified against the codebase ubiquitous language established in Cycle
 
 | BC | Dependency Type | Phase | Status |
 |----|----------------|-------|--------|
-| **Admin Identity** | JWT issuer (prerequisite) | 0 | ✅ **COMPLETE** (Cycle 29 Phase 1) |
+| **Backoffice Identity** | JWT issuer (prerequisite) | 0 | ✅ **COMPLETE** (Cycle 29 Phase 1) |
 | **Customer Identity** | HTTP read (customer lookup, address) | 0.5 + 1 | ⚠️ Missing email search |
 | **Orders** | HTTP read (orders, returnable items) + HTTP write (cancel) | 1 | ✅ All endpoints exist |
 | **Returns** | HTTP read (returns) + HTTP write (approve, deny) | 1 | ✅ All endpoints exist |
@@ -636,6 +636,6 @@ All names verified against the codebase ubiquitous language established in Cycle
 
 ---
 
-*See [Integration Gap Register](admin-portal-integration-gap-register.md) for the full audit of every integration point with current status.*
-*See [Decision Log](admin-portal-revised-decision-log.md) for what was kept, changed, and removed from the original model.*
-*See [Open Questions](admin-portal-open-questions.md) for unresolved items requiring owner decision.*
+*See [Integration Gap Register](backoffice-integration-gap-register.md) for the full audit of every integration point with current status.*
+*See [Decision Log](backoffice-revised-decision-log.md) for what was kept, changed, and removed from the original model.*
+*See [Open Questions](backoffice-open-questions.md) for unresolved items requiring owner decision.*

@@ -1,7 +1,7 @@
-# Admin Portal — Revised Decision Log
+# Backoffice — Revised Decision Log
 
 **Date:** 2026-03-14 (Re-modeling session)
-**Status:** Companion to [Revised Event Model](admin-portal-event-modeling-revised.md)
+**Status:** Companion to [Revised Event Model](backoffice-event-modeling-revised.md)
 **Participants:** Principal Software Architect (PSA), Product Owner (PO), UX Engineer (UXE)
 
 > This document records every original modeling decision that was revisited during the re-modeling session. For each, we state what was kept, changed, or removed — and the rationale.
@@ -26,26 +26,26 @@
 
 ## Architecture Decisions
 
-### D-1: BFF Pattern for Admin Portal
-- **Original:** Admin Portal is a BFF that composes views from multiple BCs
+### D-1: BFF Pattern for Backoffice
+- **Original:** Backoffice is a BFF that composes views from multiple BCs
 - **Status:** **KEPT** ✅ 3/3
 - **Rationale:** Pattern validated by both Customer Experience BFF (Storefront) and Vendor Portal BFF. Consistent architecture.
 
-### D-2: Admin Portal Does Not Own Business Logic
+### D-2: Backoffice Does Not Own Business Logic
 - **Original:** BFF delegates to domain BCs; does not execute business logic
 - **Status:** **KEPT** ✅ 3/3
-- **Rationale:** Confirmed by codebase audit — all business logic lives in domain BCs. Admin Portal composes and orchestrates.
+- **Rationale:** Confirmed by codebase audit — all business logic lives in domain BCs. Backoffice composes and orchestrates.
 
 ### D-3: Single SignalR Hub with Role-Based Groups
 - **Original (research doc):** Single hub at `/hub/admin`, role-based groups with supervisory inheritance
 - **Status:** **KEPT** ✅ 3/3
 - **Rationale:** Vendor Portal's single-hub pattern (`/hub/vendor-portal`) works well. Supervisory group inheritance (OperationsManager joins WH + CS groups) is elegant.
 
-### D-4: JWT Authentication via AdminIdentity BC
-- **Original:** Separate AdminIdentity BC with JWT tokens
+### D-4: JWT Authentication via BackofficeIdentity BC
+- **Original:** Separate BackofficeIdentity BC with JWT tokens
 - **Status:** **KEPT** ✅ 3/3 — **Now implemented** (Cycle 29 Phase 1)
 - **Rationale:** Mirrors VendorIdentity pattern. No tenant concept needed for internal employees. 7-role AdminRole enum confirmed.
-- **Implementation note:** JWT claims: `sub` (userId GUID), `role` (single role string), `email`, `name`. Issuer: `https://localhost:5249`. Audience: self-referential in Phase 1 (to be updated for Admin Portal API in Phase 2+). See [ADR 0031](../decisions/0031-admin-portal-rbac-model.md).
+- **Implementation note:** JWT claims: `sub` (userId GUID), `role` (single role string), `email`, `name`. Issuer: `https://localhost:5249`. Audience: self-referential in Phase 1 (to be updated for Backoffice API in Phase 2+). See [ADR 0031](../decisions/0031-backoffice-rbac-model.md).
 
 ### D-5: Single Role Per Admin User
 - **Original (research doc §11):** Single role per user; OperationsManager as "Swiss Army knife" for small teams
@@ -66,12 +66,12 @@
   - Vendor Portal WASM pattern is fully proven (143 tests, 100% pass rate)
   - Code reuse: AuthState, AuthStateProvider, HttpClient patterns, MudBlazor components, SignalR client all transfer directly
   - Counter-proposal accepted: Operations Dashboard BC (developer-facing) is a better React candidate
-  - **UXE sign-off:** UX research document (admin-portal-ux-research.md) already uses MudBlazor component names throughout — no rework needed
+  - **UXE sign-off:** UX research document (backoffice-ux-research.md) already uses MudBlazor component names throughout — no rework needed
 
 ### D-7: SSR Concern (Original React Justification)
 - **Original:** React's SSR advantage for first paint
 - **Status:** **REMOVED** ✅ 3/3
-- **Rationale:** Admin Portal is an internal tool on managed desktops (Chrome/Edge). WASM payload is cached after first load. SSR advantage is minimal for this use case. Research doc §4 explicitly addresses this.
+- **Rationale:** Backoffice is an internal tool on managed desktops (Chrome/Edge). WASM payload is cached after first load. SSR advantage is minimal for this use case. Research doc §4 explicitly addresses this.
 
 ---
 
@@ -132,7 +132,7 @@
 - **Status:** **NEW** ✅ 3/3
 - **Revised:** Phase 2 (read-only), Phase 3 (write)
 - **Rationale:**
-  - Promotions BC shipping Cycle 29 — will exist before Admin Portal Phase 2
+  - Promotions BC shipping Cycle 29 — will exist before Backoffice Phase 2
   - PricingManager owns promotions (no separate role until 50+ users)
   - Read-only view in Phase 2: "See active coupons while setting prices"
   - Write operations in Phase 3: create/deactivate promotions
@@ -141,21 +141,21 @@
 
 ## Port & Numbering Decisions
 
-### D-14: AdminIdentity.Api Port
+### D-14: BackofficeIdentity.Api Port
 - **Original (research doc):** Port 5245
 - **Status:** **CHANGED** ✅ 3/3 — **Confirmed by implementation** (launchSettings.json: `http://localhost:5249`)
 - **Revised:** Port **5249**
-- **Rationale:** Returns.Api launched on port 5245 (Cycle 25). Collision. Next available port: 5249 (5243=Admin Portal.Api, 5244=Admin Portal.Web, 5245=Returns, 5246-5248 reserved/used).
+- **Rationale:** Returns.Api launched on port 5245 (Cycle 25). Collision. Next available port: 5249 (5243=Backoffice.Api, 5244=Backoffice.Web, 5245=Returns, 5246-5248 reserved/used).
 
-### D-15: ADR Numbers for Admin Portal
+### D-15: ADR Numbers for Backoffice
 - **Original (research doc):** ADRs 0026-0029
-- **Status:** **CHANGED** ✅ 3/3 — **ADR 0031 now exists** (`docs/decisions/0031-admin-portal-rbac-model.md`)
+- **Status:** **CHANGED** ✅ 3/3 — **ADR 0031 now exists** (`docs/decisions/0031-backoffice-rbac-model.md`)
 - **Revised:** ADRs **0031-0034**
 - **Rationale:** ADRs 0026-0030 were taken by: Polecat SQL Server (0026), Per-BC Postgres DBs (0027), JWT for Vendor Identity (0028), Order Saga Design (0029), Notifications→Correspondence rename (0030). Next available: 0031.
-  - ADR 0031: Admin Portal RBAC Model — ✅ **Accepted** (Cycle 29 Phase 1)
+  - ADR 0031: Backoffice RBAC Model — ✅ **Accepted** (Cycle 29 Phase 1)
   - ADR 0032: Multi-Issuer JWT Strategy — 📋 Reserved
-  - ADR 0033: Blazor WASM for Admin Portal — 📋 Reserved
-  - ADR 0034: Admin Portal SignalR Hub Design — 📋 Reserved
+  - ADR 0033: Blazor WASM for Backoffice — 📋 Reserved
+  - ADR 0034: Backoffice SignalR Hub Design — 📋 Reserved
 
 ---
 
@@ -209,7 +209,7 @@
 
 ### D-21: AdminRole Enum Values
 - **Original (event model):** CopyWriter, PricingManager, WarehouseClerk, CustomerService, OperationsManager, Executive, SystemAdmin
-- **Status:** **KEPT** ✅ 3/3 — **Confirmed by implementation** (`AdminIdentity.Identity.AdminRole` enum)
+- **Status:** **KEPT** ✅ 3/3 — **Confirmed by implementation** (`BackofficeIdentity.Identity.AdminRole` enum)
 - **Rationale:** All 7 roles confirmed across research doc, UX research, feature files, AND now codebase. Enum values: CopyWriter=1, PricingManager=2, WarehouseClerk=3, CustomerService=4, OperationsManager=5, Executive=6, SystemAdmin=7.
 - **UXE sign-off:** Role names used in UX wireframes match. CopyWriter (not "ContentEditor"), CustomerService (not "CSRep"), WarehouseClerk (not "Warehouse").
 
@@ -220,13 +220,13 @@
 ### D-22: OrderNote Aggregate Ownership
 - **Original:** Not in original model
 - **Status:** **NEW** ✅ 3/3
-- **Revised:** OrderNote lives in Admin Portal BC, NOT Orders BC
+- **Revised:** OrderNote lives in Backoffice BC, NOT Orders BC
 - **Rationale:** Internal CS notes are operational tooling metadata, not part of the order's business lifecycle. Orders BC events should not be polluted with `OrderNoteAdded`. If customer-visible notes are needed later, that's a separate aggregate in Orders BC with different semantics.
 
-### D-23: Admin Portal Has No Sagas
+### D-23: Backoffice Has No Sagas
 - **Original:** No sagas identified
 - **Status:** **KEPT** ✅ 3/3
-- **Rationale:** Reassessment confirms: Admin Portal delegates orchestration to domain BCs (Order saga, BulkPricingJob saga). Admin Portal owns only simple Marten documents (OrderNote, AlertAcknowledgment, EscalationTicket) with straightforward state transitions.
+- **Rationale:** Reassessment confirms: Backoffice delegates orchestration to domain BCs (Order saga, BulkPricingJob saga). Backoffice owns only simple Marten documents (OrderNote, AlertAcknowledgment, EscalationTicket) with straightforward state transitions.
 
 ---
 
@@ -265,6 +265,6 @@
 
 All original 26 decisions reached **3/3 consensus**. 2 additional decisions (D-18a: password hashing, D-18b: user provisioning) were resolved by the Cycle 29 Phase 1 implementation — these are counted in the "Changed" column under Roles/Permissions.
 
-> **Post-implementation update (2026-03-14):** Decisions D-4, D-5, D-14, D-15, and D-21 have been confirmed by the Admin Identity BC implementation (PR #375). D-18a and D-18b are new decisions that emerged from comparing the original research doc assumptions against the actual implementation.
+> **Post-implementation update (2026-03-14):** Decisions D-4, D-5, D-14, D-15, and D-21 have been confirmed by the Backoffice Identity BC implementation (PR #375). D-18a and D-18b are new decisions that emerged from comparing the original research doc assumptions against the actual implementation.
 
-See [Open Questions](admin-portal-open-questions.md) for items that require additional information or owner sign-off.
+See [Open Questions](backoffice-open-questions.md) for items that require additional information or owner sign-off.

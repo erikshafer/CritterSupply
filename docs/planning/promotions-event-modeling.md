@@ -3,8 +3,8 @@
 **Date:** 2026-03-15
 **Status:** 🟢 Complete (All 10 Stages)
 **Participants:** Principal Software Architect, Product Owner, UX Engineer
-**Related:** [pricing-promotions-domain-spike.md](spikes/pricing-promotions-domain-spike.md), [pricing-event-modeling.md](pricing-event-modeling.md), [CONTEXTS.md](../../CONTEXTS.md#promotions), [ADR 0031](../../docs/decisions/0031-admin-portal-rbac-model.md)
-**Prerequisite:** Pricing BC Phase 1 ✅ Complete (Cycle 21-22), Admin Identity BC ✅ Complete (Cycle 29 Phase 1)
+**Related:** [pricing-promotions-domain-spike.md](spikes/pricing-promotions-domain-spike.md), [pricing-event-modeling.md](pricing-event-modeling.md), [CONTEXTS.md](../../CONTEXTS.md#promotions), [ADR 0031](../../docs/decisions/0031-backoffice-rbac-model.md)
+**Prerequisite:** Pricing BC Phase 1 ✅ Complete (Cycle 21-22), Backoffice Identity BC ✅ Complete (Cycle 29 Phase 1)
 
 ---
 
@@ -415,10 +415,10 @@ public sealed record AppliedPromotion(
 
 **This follows the existing CE pattern** — CE has `Storefront/Notifications/` handlers that receive RabbitMQ messages and push to SignalR. Same pattern as `OrderPlaced`, `ShipmentDispatched`, etc.
 
-#### 5h. Admin Portal → Promotions BC (Command Interface)
+#### 5h. Backoffice → Promotions BC (Command Interface)
 
-**Direction:** Admin Portal sends commands → Promotions BC
-**Pattern:** HTTP (Admin Portal is a BFF that routes commands)
+**Direction:** Backoffice sends commands → Promotions BC
+**Pattern:** HTTP (Backoffice is a BFF that routes commands)
 **Commands:**
 - CreatePromotion
 - ActivatePromotion / SchedulePromotion
@@ -428,17 +428,17 @@ public sealed record AppliedPromotion(
 - RevokeCoupon
 - ExtendPromotionEndDate (new, not in spike)
 
-**RBAC model (resolved — ADR 0031, implemented in Cycle 29 Phase 1):** Admin Identity BC now provides JWT-based authentication with 7 defined roles. Promotions management maps to the **`PricingManager`** role, which is authorized via the `PricingManagerOrAbove` composite policy (includes `PricingManager`, `OperationsManager`, `SystemAdmin`).
+**RBAC model (resolved — ADR 0031, implemented in Cycle 29 Phase 1):** Backoffice Identity BC now provides JWT-based authentication with 7 defined roles. Promotions management maps to the **`PricingManager`** role, which is authorized via the `PricingManagerOrAbove` composite policy (includes `PricingManager`, `OperationsManager`, `SystemAdmin`).
 
-Per ADR 0031, every Promotions command must include a `Guid AdminUserId` field extracted from the JWT `sub` claim at the Admin Portal gateway. This enables the immutable audit trail in the event stream (e.g., `PromotionCreated.CreatedByAdminUserId`).
+Per ADR 0031, every Promotions command must include a `Guid AdminUserId` field extracted from the JWT `sub` claim at the Backoffice gateway. This enables the immutable audit trail in the event stream (e.g., `PromotionCreated.CreatedByAdminUserId`).
 
 **Key integration details:**
-- **Auth issuer:** Admin Identity BC at port `5249`
+- **Auth issuer:** Backoffice Identity BC at port `5249`
 - **JWT claim:** `"role": "PricingManager"` (single role per user, Phase 1)
-- **Policy:** `[Authorize(Policy = "PricingManagerOrAbove")]` on Admin Portal endpoints
+- **Policy:** `[Authorize(Policy = "PricingManagerOrAbove")]` on Backoffice endpoints
 - **Audit:** `httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)` → `AdminUserId` on all commands
 
-> **Note:** The Admin Portal BFF is not yet implemented. In Promotions BC Phase 1, admin commands can be invoked directly against the Promotions API (no RBAC enforcement). RBAC is enforced at the Admin Portal gateway layer when it is built. Promotions BC itself trusts the `AdminUserId` it receives.
+> **Note:** The Backoffice BFF is not yet implemented. In Promotions BC Phase 1, admin commands can be invoked directly against the Promotions API (no RBAC enforcement). RBAC is enforced at the Backoffice gateway layer when it is built. Promotions BC itself trusts the `AdminUserId` it receives.
 
 #### 5i. Promotions BC ← Pricing BC (Price Change Notifications)
 
@@ -607,7 +607,7 @@ Each `ExpireCoupon` is an individual command that updates one Coupon aggregate. 
 
 #### 7e. `PromotionCalendarView` (Async Projection)
 
-**Purpose:** Admin Portal — visual calendar of scheduled/active/expired promotions
+**Purpose:** Backoffice — visual calendar of scheduled/active/expired promotions
 **Key:** Date range index
 **Fields:**
 - PromotionId, Name, Status, StartsAt, EndsAt, DiscountType, DiscountValue
@@ -905,10 +905,10 @@ CritterSupply uses specific port ranges per BC (see CLAUDE.md port allocation ta
 | BC | Port | Status |
 |---|---|---|
 | Correspondence | 5248 | ✅ Assigned (Cycle 28) |
-| Admin Identity | 5249 | ✅ Assigned (Cycle 29 Phase 1) |
+| Backoffice Identity | 5249 | ✅ Assigned (Cycle 29 Phase 1) |
 | **Promotions** | **5250** | 📋 **Proposed** (Cycle 29 Phase 2) |
 
-> **Updated after Cycle 29 Phase 1 merge (PR #375):** Admin Identity BC was assigned port 5249. Promotions moves to port **5250** (next sequential port per CLAUDE.md convention).
+> **Updated after Cycle 29 Phase 1 merge (PR #375):** Backoffice Identity BC was assigned port 5249. Promotions moves to port **5250** (next sequential port per CLAUDE.md convention).
 
 #### 11e. Project Structure
 
@@ -1034,7 +1034,7 @@ These items need input from Product Owner, UX Engineer, and QA before the event 
 | Aggregate in wrong BC requiring migration (Checkout, Cycle 8) | Promotion and Coupon aggregates stay in Promotions BC — discount calculation is a query, not an aggregate |
 | Missing `ChangedBy` actor ID in commands (Order saga gap) | Every command carries `Guid ChangedBy` or `Guid ActivatedBy` — FluentValidation rejects `Guid.Empty` |
 | Deferring integration tests to manual testing (Cycle 18) | Alba integration tests written before any manual testing |
-| Port conflicts in launchSettings.json | Reserve port 5250 before writing any code (5249 taken by Admin Identity) |
+| Port conflicts in launchSettings.json | Reserve port 5250 before writing any code (5249 taken by Backoffice Identity) |
 | Forgetting to add projects to `.sln` and `.slnx` files | Add Promotions and Promotions.Api to both solution files immediately |
 | `NullReferenceException` in handlers without null aggregate checks | `Before()` method always checks for null aggregate |
 
@@ -1075,7 +1075,7 @@ Each swimlane below represents a **temporal phase** of the promotion lifecycle. 
 ```
 Time ─────────────────────────────────────────────────────────────────►
 
-Admin Portal                          Promotions BC
+Backoffice                          Promotions BC
 ────────────                          ─────────────
 🔵 CreatePromotion ──────────────────► 🟠 PromotionCreated (Draft)
                                         │
@@ -1098,7 +1098,7 @@ Admin Portal                          Promotions BC
 ```
 Time ─────────────────────────────────────────────────────────────────►
 
-Admin Portal                          Promotions BC              Coupon Aggregates
+Backoffice                          Promotions BC              Coupon Aggregates
 ────────────                          ─────────────              ─────────────────
 🔵 GenerateCouponBatch ─────────────► 🟠 CouponBatchGenerated   ─► 🟠 CouponIssued (×N)
                                         (on Promotion stream)       (one per coupon stream)
@@ -1117,7 +1117,7 @@ Admin Portal                          Promotions BC              Coupon Aggregat
 ```
 Time ─────────────────────────────────────────────────────────────────►
 
-Admin Portal                          Promotions BC                    Outbound
+Backoffice                          Promotions BC                    Outbound
 ────────────                          ─────────────                    ────────
 🔵 ActivatePromotion ───────────────► 🟠 PromotionActivated           ─► 📤 PromotionActivated
                                         (Draft → Active)                  (integration msg → Shopping, CE BFF)
@@ -1130,7 +1130,7 @@ Admin Portal                          Promotions BC                    Outbound
 ```
 Time ─────────────────────────────────────────────────────────────────►
 
-Admin Portal                          Promotions BC
+Backoffice                          Promotions BC
 ────────────                          ─────────────
 🔵 SchedulePromotion ───────────────► 🟠 PromotionScheduled (Draft → Scheduled)
                                         │
@@ -1300,7 +1300,7 @@ Wolverine Scheduler                   Promotions BC                    Outbound
 ### Path B: Admin Cancellation
 
 ```
-Admin Portal                          Promotions BC                    Outbound
+Backoffice                          Promotions BC                    Outbound
 ────────────                          ─────────────                    ────────
 🔵 CancelPromotion ────────────────► 🟠 PromotionCancelled            📤 PromotionCancelled
                                         (any non-terminal → Cancelled)    (→ Shopping, CE BFF)
@@ -1309,7 +1309,7 @@ Admin Portal                          Promotions BC                    Outbound
 ### Path C: Admin Pause / Resume
 
 ```
-Admin Portal                          Promotions BC                    Outbound
+Backoffice                          Promotions BC                    Outbound
 ────────────                          ─────────────                    ────────
 🔵 PausePromotion ─────────────────► 🟠 PromotionPaused              📤 PromotionPaused
                                         (Active → Paused)                (→ Shopping, CE BFF)
@@ -1341,7 +1341,7 @@ PromotionExpired handler ────────────► query CouponLoo
 ### Admin-Initiated Coupon Revocation (independent of promotion lifecycle)
 
 ```
-Admin Portal                          Promotions BC
+Backoffice                          Promotions BC
 ────────────                          ─────────────
 🔵 RevokeCoupon(code) ─────────────► 🟠 CouponRevoked (Active → Revoked)
 ```
@@ -1359,17 +1359,17 @@ Admin Portal                          Promotions BC
 
 | # | Command | Issuer | Event(s) Produced | HTTP Endpoint |
 |---|---------|--------|-------------------|---------------|
-| 1 | `CreatePromotion` | Admin Portal | `PromotionCreated` | `POST /api/promotions` |
-| 2 | `ConfigureDiscountRules` | Admin Portal | `DiscountRulesConfigured` | `PUT /api/promotions/{id}/discount-rules` |
-| 3 | `ConfigureScope` | Admin Portal | `PromotionScopeConfigured` | `PUT /api/promotions/{id}/scope` |
-| 4 | `SetEligibilityRules` | Admin Portal | `EligibilityRulesSet` | `PUT /api/promotions/{id}/eligibility` |
-| 5 | `SetRedemptionLimits` | Admin Portal | `RedemptionLimitsSet` | `PUT /api/promotions/{id}/redemption-limits` |
-| 6 | `GenerateCouponBatch` | Admin Portal | `CouponBatchGenerated` + N × `CouponIssued` (fan-out) | `POST /api/promotions/{id}/coupon-batches` |
-| 7 | `SchedulePromotion` | Admin Portal | `PromotionScheduled` + ⏱️ `ActivatePromotion` scheduled | `POST /api/promotions/{id}/schedule` |
-| 8 | `ActivatePromotion` | Admin Portal _or_ Wolverine Scheduler | `PromotionActivated` + 📤 integration + ⏱️ `ExpirePromotion` scheduled | `POST /api/promotions/{id}/activate` |
-| 9 | `PausePromotion` | Admin Portal | `PromotionPaused` + 📤 integration | `POST /api/promotions/{id}/pause` |
-| 10 | `ResumePromotion` | Admin Portal | `PromotionResumed` + 📤 integration | `POST /api/promotions/{id}/resume` |
-| 11 | `CancelPromotion` | Admin Portal | `PromotionCancelled` + 📤 integration + cascading `ExpireCoupon` | `POST /api/promotions/{id}/cancel` |
+| 1 | `CreatePromotion` | Backoffice | `PromotionCreated` | `POST /api/promotions` |
+| 2 | `ConfigureDiscountRules` | Backoffice | `DiscountRulesConfigured` | `PUT /api/promotions/{id}/discount-rules` |
+| 3 | `ConfigureScope` | Backoffice | `PromotionScopeConfigured` | `PUT /api/promotions/{id}/scope` |
+| 4 | `SetEligibilityRules` | Backoffice | `EligibilityRulesSet` | `PUT /api/promotions/{id}/eligibility` |
+| 5 | `SetRedemptionLimits` | Backoffice | `RedemptionLimitsSet` | `PUT /api/promotions/{id}/redemption-limits` |
+| 6 | `GenerateCouponBatch` | Backoffice | `CouponBatchGenerated` + N × `CouponIssued` (fan-out) | `POST /api/promotions/{id}/coupon-batches` |
+| 7 | `SchedulePromotion` | Backoffice | `PromotionScheduled` + ⏱️ `ActivatePromotion` scheduled | `POST /api/promotions/{id}/schedule` |
+| 8 | `ActivatePromotion` | Backoffice _or_ Wolverine Scheduler | `PromotionActivated` + 📤 integration + ⏱️ `ExpirePromotion` scheduled | `POST /api/promotions/{id}/activate` |
+| 9 | `PausePromotion` | Backoffice | `PromotionPaused` + 📤 integration | `POST /api/promotions/{id}/pause` |
+| 10 | `ResumePromotion` | Backoffice | `PromotionResumed` + 📤 integration | `POST /api/promotions/{id}/resume` |
+| 11 | `CancelPromotion` | Backoffice | `PromotionCancelled` + 📤 integration + cascading `ExpireCoupon` | `POST /api/promotions/{id}/cancel` |
 | 12 | `ExpirePromotion` | Wolverine Scheduler | `PromotionExpired` + 📤 integration + cascading `ExpireCoupon` | _(internal command, no HTTP)_ |
 | 13 | `RecordRedemption` | RabbitMQ handler (from `OrderPlaced`) | `RedemptionRecorded` [+ `RedemptionCapReached` + `PromotionExpired`] | _(internal command, no HTTP)_ |
 
@@ -1382,7 +1382,7 @@ Admin Portal                          Promotions BC
 | 16 | `ReleaseCouponReservation` | Cart timeout / coupon removal | `CouponReservationReleased` | _(internal command, no HTTP)_ |
 | 17 | `RedeemCoupon` | Promotions BC handler (from `RecordRedemption`) | `CouponRedeemed` | _(internal command, no HTTP)_ |
 | 18 | `ExpireCoupon` | Fan-out from promotion expiry handler | `CouponExpired` | _(internal command, no HTTP)_ |
-| 19 | `RevokeCoupon` | Admin Portal | `CouponRevoked` | `DELETE /api/promotions/coupons/{code}` |
+| 19 | `RevokeCoupon` | Backoffice | `CouponRevoked` | `DELETE /api/promotions/coupons/{code}` |
 
 ### Command Records (C# Definitions)
 
@@ -1513,12 +1513,12 @@ public sealed record RevokeCoupon(
 | # | Query | Issuer | Read Model Used | HTTP Endpoint |
 |---|-------|--------|-----------------|---------------|
 | Q1 | `GetActivePromotions` | CE BFF / Shopping BC | `ActivePromotionsView` | `GET /api/promotions/active` |
-| Q2 | `GetPromotionDetails` | Admin Portal | `PromotionSummaryView` | `GET /api/promotions/{id}` |
+| Q2 | `GetPromotionDetails` | Backoffice | `PromotionSummaryView` | `GET /api/promotions/{id}` |
 | Q3 | `GetApplicablePromotions` | CE BFF / Shopping BC | `ActivePromotionsView` (filtered by SKUs) | `GET /api/promotions/applicable?skus=X,Y,Z` |
 | Q4 | `CalculateDiscount` | Shopping BC / Orders BC | `ActivePromotionsView` + `CouponLookupView` + Pricing HTTP | `POST /api/promotions/calculate-discount` |
-| Q5 | `GetPromotionCalendar` | Admin Portal | `PromotionCalendarView` | `GET /api/promotions/calendar?from=X&to=Y` |
-| Q6 | `GetCouponStatus` | Admin Portal | `CouponLookupView` | `GET /api/promotions/coupons/{code}` |
-| Q7 | `GetPromotionRedemptions` | Admin Portal | `PromotionSummaryView` | `GET /api/promotions/{id}/redemptions` |
+| Q5 | `GetPromotionCalendar` | Backoffice | `PromotionCalendarView` | `GET /api/promotions/calendar?from=X&to=Y` |
+| Q6 | `GetCouponStatus` | Backoffice | `CouponLookupView` | `GET /api/promotions/coupons/{code}` |
+| Q7 | `GetPromotionRedemptions` | Backoffice | `PromotionSummaryView` | `GET /api/promotions/{id}/redemptions` |
 
 ### Query Records (C# Definitions)
 
@@ -2775,7 +2775,7 @@ public sealed record CouponValidationResult(
 
 ```
                      ┌──────────────┐
-                     │  Admin Portal│
+                     │  Backoffice│
                      │     (BFF)    │
                      └──────┬───────┘
                             │ HTTP commands
@@ -2816,7 +2816,7 @@ public sealed record CouponValidationResult(
 | 10 | Coupon cascade expiry | Fan-out via `OutgoingMessages` | Avoids massive single transaction for promotions with thousands of coupons |
 | 11 | Polecat | Design infrastructure-agnostic; ADR before adoption | Aggregates use JasperFx.Events interfaces; no PostgreSQL-specific queries in handlers |
 | 12 | Money VO | Copy from Pricing BC (Phase 1) | BC isolation; extract to shared kernel if third BC needs it |
-| 13 | Port allocation | 5250 | Next sequential port per CLAUDE.md convention (5249 assigned to Admin Identity BC) |
+| 13 | Port allocation | 5250 | Next sequential port per CLAUDE.md convention (5249 assigned to Backoffice Identity BC) |
 
 ---
 
@@ -3104,15 +3104,15 @@ public static async Task Handle(
 
 ---
 
-### 8.1.4 Admin Portal BFF → Subscribes to Promotion Lifecycle Events (Future)
+### 8.1.4 Backoffice BFF → Subscribes to Promotion Lifecycle Events (Future)
 
-| Integration Message | Admin Portal Reaction | Transport | Phase |
+| Integration Message | Backoffice Reaction | Transport | Phase |
 |---|---|---|---|
 | `PromotionActivated` | Update promotion dashboard; show "now live" status | RabbitMQ → SignalR | Phase 2+ |
 | `PromotionExpired` | Update dashboard; show redemption summary | RabbitMQ → SignalR | Phase 2+ |
 | `PromotionCancelled` | Update dashboard; alert ops team | RabbitMQ → SignalR | Phase 2+ |
 
-**⚠️ Undefined Integration:** Admin Portal is a future BC (🟢 Low Priority in CONTEXTS.md). No implementation needed for Phase 1 — admin operations go directly to Promotions API endpoints.
+**⚠️ Undefined Integration:** Backoffice is a future BC (🟢 Low Priority in CONTEXTS.md). No implementation needed for Phase 1 — admin operations go directly to Promotions API endpoints.
 
 ---
 
@@ -3203,7 +3203,7 @@ public sealed record AppliedPromotionRef(
 | R4 | `PromotionExpired` | Shopping, CE BFF | RabbitMQ | Phase 1 |
 | R5 | `PromotionCancelled` | Shopping, CE BFF | RabbitMQ | Phase 1 |
 | R6 | `PromotionActivated` | Correspondence | RabbitMQ | Phase 2+ |
-| R7 | `PromotionActivated` | Admin Portal BFF | RabbitMQ | Phase 2+ |
+| R7 | `PromotionActivated` | Backoffice BFF | RabbitMQ | Phase 2+ |
 
 ### Inbound (Other BCs → Promotions)
 
@@ -3218,7 +3218,7 @@ public sealed record AppliedPromotionRef(
 | R9 | `POST /api/promotions/coupons/validate` | Shopping | Coupon validation + reservation | Phase 1 |
 | R10 | `POST /api/promotions/calculate-discount` | Shopping / Orders | Discount calculation | Phase 1 |
 | R11 | `GET /api/promotions/applicable?skus=X,Y,Z` | CE BFF | Product page badges | Phase 1 |
-| R12 | `GET /api/promotions/active` | CE BFF / Admin Portal | List all active promotions | Phase 1 |
+| R12 | `GET /api/promotions/active` | CE BFF / Backoffice | List all active promotions | Phase 1 |
 
 ### Sync HTTP (Promotions calls other BCs)
 
@@ -3234,7 +3234,7 @@ public sealed record AppliedPromotionRef(
 | # | Integration | Status | Action Required |
 |---|-------------|--------|----------------|
 | F1 | Promotions → Correspondence (marketing emails) | ❌ Not in CONTEXTS.md | Add to Phase 2 integration table |
-| F2 | Promotions → Admin Portal BFF (dashboard updates) | ❌ Not in CONTEXTS.md | Add when Admin Portal BC is scoped |
+| F2 | Promotions → Backoffice BFF (dashboard updates) | ❌ Not in CONTEXTS.md | Add when Backoffice BC is scoped |
 | F3 | Promotions → Vendor Portal BFF (vendor visibility) | ❌ Not in CONTEXTS.md | Backlog item — Phase 3+ |
 | F4 | `OrderPlaced` contract extension with `AppliedPromotions` | ⚠️ Needs contract update | Extend existing `OrderPlaced` contract in Messages.Contracts |
 | F5 | Shopping BC `CouponApplied` domain event | ⚠️ Listed as future in CONTEXTS.md | Confirm this is Shopping-internal, not an integration event |
@@ -3602,7 +3602,7 @@ public sealed record AppliedPromotionRef(
 | 1 | **Advanced stacking engine** | Configurable stacking rules, mutual exclusion groups, priority ordering |
 | 2 | **Dynamic scope (optional)** | Subscribe to Product Catalog events for auto-updating category-based scopes |
 | 3 | **Correspondence integration** | Marketing emails on promotion activation |
-| 4 | **Admin Portal promotion management** | CRUD UI for promotions (when Admin Portal BC is scoped) |
+| 4 | **Backoffice promotion management** | CRUD UI for promotions (when Backoffice BC is scoped) |
 | 5 | **Promotion analytics dashboard** | Redemption rates, revenue impact, coupon usage metrics via `PromotionSummaryView` |
 | 6 | **Floor price cache** | Short-lived cache for Pricing BC floor prices (reduce sync HTTP calls) |
 | 7 | **Load testing** | Verify redemption concurrency under realistic flash sale load |
@@ -3619,7 +3619,7 @@ Phase 1 Prerequisites (must exist before Promotions BC):
   ├── Product Catalog BC (Cycles 21-22) ✅ — SKU data for scope configuration
   ├── Orders BC (Cycles 24-27) ✅ — OrderPlaced message source
   ├── Shopping BC (Cycles 16-18) ✅ — primary consumer of Promotions API
-  └── Admin Identity BC (Cycle 29 Phase 1) ✅ — JWT auth for admin commands (ADR 0031)
+  └── Backoffice Identity BC (Cycle 29 Phase 1) ✅ — JWT auth for admin commands (ADR 0031)
 
 Phase 1 (Cycle 29 Phase 2): Promotions BC Core
   └── All prerequisites met ✅
@@ -3631,7 +3631,7 @@ Phase 2 (Cycle 30): Shopping + CE BFF Integration
 
 Phase 3 (Cycle 31+): Advanced Features
   ├── Depends on: Phase 2 complete
-  ├── Optional: Admin Portal BC (not yet scoped)
+  ├── Optional: Backoffice BC (not yet scoped)
   └── Optional: Correspondence BC Phase 2
 ```
 
@@ -3668,20 +3668,20 @@ Recommended vertical slice ordering for Phase 1:
 
 ---
 
-## Addendum: Impact of Cycle 29 Phase 1 (Admin Identity BC — PR #375)
+## Addendum: Impact of Cycle 29 Phase 1 (Backoffice Identity BC — PR #375)
 
 **Reviewed:** 2026-03-14
-**PR:** [Cycle 29 Admin Identity Phase 1 (#375)](https://github.com/erikshafer/CritterSupply/pull/375)
+**PR:** [Cycle 29 Backoffice Identity Phase 1 (#375)](https://github.com/erikshafer/CritterSupply/pull/375)
 
-The following changes were made to this document after reviewing PR #375, which delivered the Admin Identity BC:
+The following changes were made to this document after reviewing PR #375, which delivered the Backoffice Identity BC:
 
 | Change | Before | After | Reason |
 |--------|--------|-------|--------|
-| **Port allocation** | Promotions → port 5249 | Promotions → port **5250** | Admin Identity BC claimed port 5249 |
+| **Port allocation** | Promotions → port 5249 | Promotions → port **5250** | Backoffice Identity BC claimed port 5249 |
 | **RBAC section (§5h)** | "RBAC ADR to be authored during Cycle 29" | ADR 0031 is now real; `PricingManager` role covers Promotions | ADR 0031 implemented and accepted |
-| **Cycle reference** | "Cycle 29" | "Cycle 29 Phase 2" | Cycle 29 Phase 1 = Admin Identity (done) |
-| **Prerequisites** | 4 prerequisite BCs listed | Admin Identity BC added as 5th prerequisite | JWT auth is now available for admin commands |
+| **Cycle reference** | "Cycle 29" | "Cycle 29 Phase 2" | Cycle 29 Phase 1 = Backoffice Identity (done) |
+| **Prerequisites** | 4 prerequisite BCs listed | Backoffice Identity BC added as 5th prerequisite | JWT auth is now available for admin commands |
 | **Audit trail** | Generic `CreatedBy (Guid)` | Maps to `adminUserId` from JWT `sub` claim per ADR 0031 | Concrete auth infrastructure exists |
 
-**No structural changes were needed.** The event model, aggregates, commands, queries, projections, sagas, integration messages, and naming decisions are all unaffected by Admin Identity BC. The key finding is that Admin Identity BC *strengthens* the Promotions design by providing the concrete JWT authentication infrastructure that the event model assumed would exist.
+**No structural changes were needed.** The event model, aggregates, commands, queries, projections, sagas, integration messages, and naming decisions are all unaffected by Backoffice Identity BC. The key finding is that Backoffice Identity BC *strengthens* the Promotions design by providing the concrete JWT authentication infrastructure that the event model assumed would exist.
 

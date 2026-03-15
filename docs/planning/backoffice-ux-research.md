@@ -1,4 +1,4 @@
-# Admin Portal — UX Research & Discovery
+# Backoffice — UX Research & Discovery
 
 > **Date:** 2025-07-16
 > **Author:** UX Engineering (Research & Discovery)
@@ -360,7 +360,7 @@ Create a reusable `AdminKpiCard` component:
 
 ### 3.1 Universal Table Pattern
 
-Every data table in the Admin Portal should follow this standard contract:
+Every data table in the Backoffice should follow this standard contract:
 
 ```razor
 <MudTable @ref="_table"
@@ -757,7 +757,7 @@ Examples already shown in Section 3.4 (Status Indicators in Tables).
 
 ### 7.1 Architecture Context
 
-The Admin Portal follows the VendorPortal.Web JWT pattern:
+The Backoffice follows the VendorPortal.Web JWT pattern:
 
 - **Access token:** 15-minute expiry, stored in memory (not localStorage — XSS risk)
 - **Refresh token:** 7-day expiry, secure random string
@@ -977,7 +977,7 @@ Desktop (1280px+)                    Tablet (768px-1024px)
 
 4. **Executive data freshness:** Are Executives okay with hourly-aggregated KPIs, or do they expect real-time revenue numbers? This determines whether we need live SignalR updates or periodic polling for that dashboard.
 
-5. **SystemAdmin user management scope:** Does the SystemAdmin create admin users directly (Admin Portal owns the identity), or do they provision from an external IdP (Azure AD, Okta)? This fundamentally changes the User Management screen design.
+5. **SystemAdmin user management scope:** Does the SystemAdmin create admin users directly (Backoffice owns the identity), or do they provision from an external IdP (Azure AD, Okta)? This fundamentally changes the User Management screen design.
 
 6. **Offline/degraded mode for warehouse:** If the warehouse tablet loses Wi-Fi momentarily, should we queue stock receipt actions locally and sync when connectivity returns? Or is "you must be online" acceptable?
 

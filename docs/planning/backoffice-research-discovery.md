@@ -1,18 +1,18 @@
-# Admin Portal — Research & Discovery
+# Backoffice — Research & Discovery
 
 > **Date:** 2026-03-10
 > **Status:** 📋 Research Complete — Ready for ADR Drafting
 > **Authors:** Principal Software Architect, Product Owner, UX Engineer
-> **Scope:** Technical recommendations, business validation, and UX design for the Admin Portal bounded context — spanning AdminIdentity BC, AdminPortal BFF, multi-issuer JWT, frontend technology, SignalR hub design, API extension strategy, audit trail pattern, role-based navigation, and phased implementation
-> **Prerequisite Reading:** [CONTEXTS.md — Admin Portal §](../../CONTEXTS.md), [Admin Portal Event Modeling](admin-portal-event-modeling.md), [Admin Portal UX Research](admin-portal-ux-research.md)
-> **Companion Documents:** [Admin Portal Feature Files](../features/admin-portal/), [ADR 0028 (JWT)](../decisions/0028-jwt-for-vendor-identity.md), [ADR 0025 (Blazor WASM Learnings)](../decisions/0025-blazor-wasm-jwt-poc-learnings.md)
+> **Scope:** Technical recommendations, business validation, and UX design for the Backoffice bounded context — spanning BackofficeIdentity BC, AdminPortal BFF, multi-issuer JWT, frontend technology, SignalR hub design, API extension strategy, audit trail pattern, role-based navigation, and phased implementation
+> **Prerequisite Reading:** [CONTEXTS.md — Backoffice §](../../CONTEXTS.md), [Backoffice Event Modeling](backoffice-event-modeling.md), [Backoffice UX Research](backoffice-ux-research.md)
+> **Companion Documents:** [Backoffice Feature Files](../features/backoffice/), [ADR 0028 (JWT)](../decisions/0028-jwt-for-vendor-identity.md), [ADR 0025 (Blazor WASM Learnings)](../decisions/0025-blazor-wasm-jwt-poc-learnings.md)
 
 ---
 
 ## Table of Contents
 
 1. [Executive Summary](#1-executive-summary)
-2. [AdminIdentity BC Design](#2-adminidentity-bc-design)
+2. [BackofficeIdentity BC Design](#2-backofficeidentity-bc-design)
 3. [Multi-Issuer JWT Validation](#3-multi-issuer-jwt-validation)
 4. [Frontend Technology](#4-frontend-technology)
 5. [SignalR Hub Design](#5-signalr-hub-design)
@@ -27,27 +27,27 @@
 
 ## 1. Executive Summary
 
-The Admin Portal bounded context requires 7 interconnected design decisions before implementation begins. This document provides technically grounded recommendations for each, drawing from proven patterns in the Vendor Portal (Blazor WASM + JWT + SignalR), Storefront BFF (SSE + Marten projections), and the existing CONTEXTS.md specification.
+The Backoffice bounded context requires 7 interconnected design decisions before implementation begins. This document provides technically grounded recommendations for each, drawing from proven patterns in the Vendor Portal (Blazor WASM + JWT + SignalR), Storefront BFF (SSE + Marten projections), and the existing CONTEXTS.md specification.
 
 **Key recommendations:**
 
 | # | Decision | Recommendation |
 |---|----------|---------------|
-| 1 | AdminIdentity BC | Separate BC, EF Core, mirrors VendorIdentity structure |
+| 1 | BackofficeIdentity BC | Separate BC, EF Core, mirrors VendorIdentity structure |
 | 2 | Multi-issuer JWT | Named JWT Bearer schemes in domain BCs |
 | 3 | Frontend | Blazor WASM (consistency over ecosystem breadth) |
 | 4 | SignalR hub | Single hub, role-based groups, multi-group membership |
-| 5 | API extension | Admin endpoints live in domain BCs; Admin Portal is a composing BFF |
+| 5 | API extension | Admin endpoints live in domain BCs; Backoffice is a composing BFF |
 | 6 | Audit trail | `adminUserId` from JWT claim, forwarded in command payloads |
 | 7 | BC evolution | Typed HTTP clients with interface abstraction; no API versioning yet |
 
 ---
 
-## 2. AdminIdentity BC Design
+## 2. BackofficeIdentity BC Design
 
 ### Recommendation: Separate BC — Mirrors VendorIdentity Pattern
 
-AdminIdentity should be a **separate bounded context** with its own EF Core DbContext, PostgreSQL schema (`adminidentity`), and JWT token issuer. This mirrors the VendorIdentity pattern exactly.
+BackofficeIdentity should be a **separate bounded context** with its own EF Core DbContext, PostgreSQL schema (`backofficeidentity`), and JWT token issuer. This mirrors the VendorIdentity pattern exactly.
 
 ### Why NOT Reuse VendorIdentity?
 
@@ -57,17 +57,17 @@ AdminIdentity should be a **separate bounded context** with its own EF Core DbCo
 | **Different role models** | VendorRole has 3 values (`Admin`, `CatalogManager`, `ReadOnly`). AdminRole has 7 values with fundamentally different permission semantics. |
 | **Different lifecycle** | Vendor users are invited by tenant admins with 72-hour expiry tokens. Admin users are provisioned by system administrators with different onboarding flows. |
 | **Different audit requirements** | Admin actions on customer data (PII lookups) require GDPR-compliant access logging. Vendor actions do not. |
-| **CONTEXTS.md directive** | Line 3726: *"Admin user identity and authentication (Admin Identity BC — separate, analogous to Customer Identity and Vendor Identity)"* |
+| **CONTEXTS.md directive** | Line 3726: *"Admin user identity and authentication (Backoffice Identity BC — separate, analogous to Customer Identity and Vendor Identity)"* |
 
 ### AdminRole Enum
 
 ```csharp
-// src/Shared/Messages.Contracts/AdminIdentity/AdminRole.cs
-namespace Messages.Contracts.AdminIdentity;
+// src/Shared/Messages.Contracts/BackofficeIdentity/AdminRole.cs
+namespace Messages.Contracts.BackofficeIdentity;
 
 /// <summary>
-/// Roles for internal admin users defining their permissions within the Admin Portal.
-/// Each role maps to a real job function at CritterSupply — see CONTEXTS.md Admin Portal § for permission matrix.
+/// Roles for internal admin users defining their permissions within the Backoffice.
+/// Each role maps to a real job function at CritterSupply — see CONTEXTS.md Backoffice § for permission matrix.
 /// </summary>
 public enum AdminRole
 {
@@ -96,7 +96,7 @@ public enum AdminRole
 
 ### JWT Claims
 
-AdminIdentity issues JWT tokens with these claims — paralleling the VendorIdentity pattern but with admin-specific claim names to prevent cross-context token misuse:
+BackofficeIdentity issues JWT tokens with these claims — paralleling the VendorIdentity pattern but with admin-specific claim names to prevent cross-context token misuse:
 
 | Claim | Type | Example | Purpose |
 |-------|------|---------|---------|
@@ -109,7 +109,7 @@ AdminIdentity issues JWT tokens with these claims — paralleling the VendorIden
 **Why `AdminUserId` instead of `sub`?** Consistency with the established Vendor Portal pattern (`VendorUserId`, `VendorTenantId`). Custom claim names prevent a VendorIdentity JWT from accidentally satisfying an AdminPortal authorization check — the claim names are namespace-disjoint by convention.
 
 ```csharp
-// Reference pattern — AdminIdentity JwtTokenService.CreateAccessToken
+// Reference pattern — BackofficeIdentity JwtTokenService.CreateAccessToken
 var claims = new[]
 {
     new Claim("AdminUserId", user.Id.ToString()),
@@ -120,7 +120,7 @@ var claims = new[]
 
 var token = new JwtSecurityToken(
     issuer: "admin-identity",     // Different from "vendor-identity"
-    audience: "admin-portal",     // Different from "vendor-portal"
+    audience: "backoffice",     // Different from "vendor-portal"
     claims: claims,
     expires: DateTime.UtcNow.AddMinutes(15),
     signingCredentials: credentials);
@@ -143,11 +143,11 @@ Same pattern as VendorIdentity (ADR 0028):
 
 ```
 src/
-  Admin Identity/
-    AdminIdentity/                    # Domain library (regular SDK)
-      AdminIdentity.csproj            # References: Messages.Contracts, EF Core
+  Backoffice Identity/
+    BackofficeIdentity/                    # Domain library (regular SDK)
+      BackofficeIdentity.csproj            # References: Messages.Contracts, EF Core
       Identity/
-        AdminIdentityDbContext.cs      # Schema: "adminidentity"
+        BackofficeIdentityDbContext.cs      # Schema: "backofficeidentity"
       UserManagement/
         AdminUser.cs                  # Entity: Id, Email, PasswordHash, Role, Status, etc.
         AdminUserStatus.cs            # Enum: Active, Deactivated
@@ -155,29 +155,29 @@ src/
         CreateAdminUserHandler.cs     # Handler
         CreateAdminUserValidator.cs   # FluentValidation
 
-    AdminIdentity.Api/                # API project (Web SDK)
-      AdminIdentity.Api.csproj
+    BackofficeIdentity.Api/                # API project (Web SDK)
+      BackofficeIdentity.Api.csproj
       Program.cs                      # EF Core + Wolverine + JWT issuer
       Auth/
-        JwtTokenService.cs            # Issuer: "admin-identity", Audience: "admin-portal"
+        JwtTokenService.cs            # Issuer: "admin-identity", Audience: "backoffice"
         JwtSettings.cs                # Config DTO
         AdminLogin.cs                 # POST /api/admin-identity/auth/login
         AdminLogout.cs                # POST /api/admin-identity/auth/logout
         AdminRefreshToken.cs          # POST /api/admin-identity/auth/refresh
-        AdminIdentitySeedData.cs      # Seed: dev users per role
+        BackofficeIdentitySeedData.cs      # Seed: dev users per role
       Properties/
         launchSettings.json           # Port: 5245
       appsettings.json
 ```
 
-**Port allocation:** `5245` for AdminIdentity.Api (next available after Pricing.Api at 5242; AdminPortal.Api is planned for 5243 and AdminPortal.Web for 5244 — see [Appendix A](#appendix-a-port-allocation-updated) for the full table).
+**Port allocation:** `5245` for BackofficeIdentity.Api (next available after Pricing.Api at 5242; AdminPortal.Api is planned for 5243 and AdminPortal.Web for 5244 — see [Appendix A](#appendix-a-port-allocation-updated) for the full table).
 
 ### Seed Data
 
 Seven dev users, one per role — enables immediate manual testing of RBAC:
 
 ```csharp
-// AdminIdentitySeedData.cs — development only
+// BackofficeIdentitySeedData.cs — development only
 private static readonly (string Email, string First, string Last, AdminRole Role)[] SeedUsers =
 [
     ("copy@admin.local", "Carol", "Writer", AdminRole.CopyWriter),
@@ -186,26 +186,26 @@ private static readonly (string Email, string First, string Last, AdminRole Role
     ("cs@admin.local", "Clara", "Service", AdminRole.CustomerService),
     ("ops@admin.local", "Oscar", "Manager", AdminRole.OperationsManager),
     ("exec@admin.local", "Eva", "Executive", AdminRole.Executive),
-    ("admin@admin.local", "Sylvia", "Admin", AdminRole.SystemAdmin),
+    ("admin@admin.local", "Sylvia", "Backoffice", AdminRole.SystemAdmin),
 ];
 ```
 
 ### Integration Messages
 
-AdminIdentity publishes lifecycle events to RabbitMQ (same pattern as VendorIdentity):
+BackofficeIdentity publishes lifecycle events to RabbitMQ (same pattern as VendorIdentity):
 
 ```csharp
-// src/Shared/Messages.Contracts/AdminIdentity/AdminUserCreated.cs
+// src/Shared/Messages.Contracts/BackofficeIdentity/AdminUserCreated.cs
 public sealed record AdminUserCreated(Guid AdminUserId, string Email, AdminRole Role, DateTimeOffset CreatedAt);
 
-// src/Shared/Messages.Contracts/AdminIdentity/AdminUserDeactivated.cs
+// src/Shared/Messages.Contracts/BackofficeIdentity/AdminUserDeactivated.cs
 public sealed record AdminUserDeactivated(Guid AdminUserId, string Reason, DateTimeOffset DeactivatedAt);
 
-// src/Shared/Messages.Contracts/AdminIdentity/AdminUserRoleChanged.cs
+// src/Shared/Messages.Contracts/BackofficeIdentity/AdminUserRoleChanged.cs
 public sealed record AdminUserRoleChanged(Guid AdminUserId, AdminRole OldRole, AdminRole NewRole, DateTimeOffset ChangedAt);
 ```
 
-> **No tenant concept.** Unlike VendorIdentity, admin users do not belong to tenants. CritterSupply is a single-organization admin team. This removes the entire TenantManagement vertical slice from the AdminIdentity BC.
+> **No tenant concept.** Unlike VendorIdentity, admin users do not belong to tenants. CritterSupply is a single-organization admin team. This removes the entire TenantManagement vertical slice from the BackofficeIdentity BC.
 
 ---
 
@@ -213,9 +213,9 @@ public sealed record AdminUserRoleChanged(Guid AdminUserId, AdminRole OldRole, A
 
 ### The Problem
 
-ProductCatalog.Api currently validates JWT tokens from VendorIdentity (issuer: `vendor-identity`, audience: `vendor-portal`). The existing `[Authorize(Policy = "Admin")]` endpoints use VendorRole.Admin.
+ProductCatalog.Api currently validates JWT tokens from VendorIdentity (issuer: `vendor-identity`, audience: `vendor-portal`). The existing `[Authorize(Policy = "Backoffice")]` endpoints use VendorRole.Admin.
 
-Admin Portal users need to call ProductCatalog for content editing and vendor assignment. But Admin Portal uses a DIFFERENT JWT issuer (`admin-identity`, audience: `admin-portal`).
+Backoffice users need to call ProductCatalog for content editing and vendor assignment. But Backoffice uses a DIFFERENT JWT issuer (`admin-identity`, audience: `backoffice`).
 
 **This is a cross-cutting infrastructure concern that affects every domain BC with admin-facing endpoints.**
 
@@ -224,8 +224,8 @@ Admin Portal users need to call ProductCatalog for content editing and vendor as
 | Option | Description | Pros | Cons |
 |--------|-------------|------|------|
 | **A: Named JWT Bearer Schemes** | Domain BCs register multiple `AddJwtBearer("vendor", ...)` / `AddJwtBearer("admin", ...)` schemes; policies select which scheme(s) to accept | Clean separation; each scheme validates independently; ASP.NET Core native | Each domain BC must know about every issuer; config grows as new portals are added |
-| **B: Service-to-Service Tokens** | Admin Portal.Api obtains a machine-to-machine token (client credentials) to call domain BCs on behalf of admin users | Domain BCs only validate one issuer per caller type; clean trust boundary | Loses `adminUserId` from the JWT claim (must be in request body); extra token exchange hop; more complex |
-| **C: True BFF Gateway (Proxy)** | Admin Portal.Api proxies ALL calls — domain BCs never see external JWT tokens; Admin Portal authenticates the admin user and calls domain BCs with internal service credentials | Domain BCs stay simpler; only trust internal network | Admin Portal becomes a bottleneck; every new domain BC endpoint requires a corresponding proxy endpoint; high coupling |
+| **B: Service-to-Service Tokens** | Backoffice.Api obtains a machine-to-machine token (client credentials) to call domain BCs on behalf of admin users | Domain BCs only validate one issuer per caller type; clean trust boundary | Loses `adminUserId` from the JWT claim (must be in request body); extra token exchange hop; more complex |
+| **C: True BFF Gateway (Proxy)** | Backoffice.Api proxies ALL calls — domain BCs never see external JWT tokens; Backoffice authenticates the admin user and calls domain BCs with internal service credentials | Domain BCs stay simpler; only trust internal network | Backoffice becomes a bottleneck; every new domain BC endpoint requires a corresponding proxy endpoint; high coupling |
 | **D: Shared Signing Key, Different Audiences** | All identity BCs use the same HMAC signing key; domain BCs validate signature but accept multiple audiences | Simple key management | Single key compromise affects all contexts; violates defense-in-depth; audiences provide weak isolation |
 
 ### Recommendation: Option A — Named JWT Bearer Schemes
@@ -262,15 +262,15 @@ builder.Services.AddAuthentication()
             ClockSkew = TimeSpan.FromSeconds(30),
         };
     })
-    // Admin Portal JWT scheme
-    .AddJwtBearer("Admin", options =>
+    // Backoffice JWT scheme
+    .AddJwtBearer("Backoffice", options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuer = "admin-identity",
             ValidateAudience = true,
-            ValidAudience = "admin-portal",
+            ValidAudience = "backoffice",
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(adminJwtKey)),
             ValidateLifetime = true,
@@ -284,37 +284,37 @@ builder.Services.AddAuthorization(opts =>
     opts.AddPolicy("VendorAdmin", policy => policy
         .AddAuthenticationSchemes("Vendor")
         .RequireAuthenticatedUser()
-        .RequireRole("Admin"));
+        .RequireRole("Backoffice"));
 
-    // Admin Portal: new policies per admin role
+    // Backoffice: new policies per admin role
     opts.AddPolicy("AdminCopyWriter", policy => policy
-        .AddAuthenticationSchemes("Admin")
+        .AddAuthenticationSchemes("Backoffice")
         .RequireAuthenticatedUser()
         .RequireRole("CopyWriter", "SystemAdmin"));
 
     opts.AddPolicy("AdminPricingManager", policy => policy
-        .AddAuthenticationSchemes("Admin")
+        .AddAuthenticationSchemes("Backoffice")
         .RequireAuthenticatedUser()
         .RequireRole("PricingManager", "SystemAdmin"));
 
     // SystemAdmin always included — they can do everything
     opts.AddPolicy("AdminSystemAdmin", policy => policy
-        .AddAuthenticationSchemes("Admin")
+        .AddAuthenticationSchemes("Backoffice")
         .RequireAuthenticatedUser()
         .RequireRole("SystemAdmin"));
 });
 ```
 
-### Migration Path for Existing ProductCatalog.Api `[Authorize(Policy = "Admin")]`
+### Migration Path for Existing ProductCatalog.Api `[Authorize(Policy = "Backoffice")]`
 
-The current `[Authorize(Policy = "Admin")]` on `AssignProductToVendor.cs` uses the default scheme. When named schemes are introduced:
+The current `[Authorize(Policy = "Backoffice")]` on `AssignProductToVendor.cs` uses the default scheme. When named schemes are introduced:
 
-1. **Rename** the existing policy from `"Admin"` to `"VendorAdmin"` to make the trust boundary explicit.
+1. **Rename** the existing policy from `"Backoffice"` to `"VendorAdmin"` to make the trust boundary explicit.
 2. **Add** the `"Vendor"` scheme to the renamed policy.
 3. **Add** new `"AdminCopyWriter"` and `"AdminSystemAdmin"` policies for the new admin content endpoints.
-4. **Update** the three existing `[Authorize(Policy = "Admin")]` attributes to `[Authorize(Policy = "VendorAdmin")]`.
+4. **Update** the three existing `[Authorize(Policy = "Backoffice")]` attributes to `[Authorize(Policy = "VendorAdmin")]`.
 
-This is a **non-breaking change** — VendorPortal.Web tokens continue to work because they're validated by the `"Vendor"` scheme, and the renamed policy still requires `Role == "Admin"`.
+This is a **non-breaking change** — VendorPortal.Web tokens continue to work because they're validated by the `"Vendor"` scheme, and the renamed policy still requires `Role == "Backoffice"`.
 
 ### Configuration Pattern (appsettings.json)
 
@@ -326,10 +326,10 @@ This is a **non-breaking change** — VendorPortal.Web tokens continue to work b
       "Issuer": "vendor-identity",
       "Audience": "vendor-portal"
     },
-    "Admin": {
+    "Backoffice": {
       "SigningKey": "dev-only-admin-signing-key-change-in-production-must-be-at-least-32-chars",
       "Issuer": "admin-identity",
-      "Audience": "admin-portal"
+      "Audience": "backoffice"
     }
   }
 }
@@ -354,7 +354,7 @@ This is a **non-breaking change** — VendorPortal.Web tokens continue to work b
 
 ### Recommendation: Blazor WASM
 
-**Commit to Blazor WASM for Admin Portal**, diverging from the original event modeling doc's React/Next.js recommendation. Here's why:
+**Commit to Blazor WASM for Backoffice**, diverging from the original event modeling doc's React/Next.js recommendation. Here's why:
 
 ### Decision Matrix
 
@@ -376,17 +376,17 @@ The event modeling doc (2026-03-07) recommended React/Next.js because:
 
 > *"This context is also an opportunity to explore non-Blazor frontend technology"*
 
-This is a valid learning goal, but it conflicts with the primary goal of **delivering operational value**. The Admin Portal's role-scoped dashboards, real-time SignalR alerts, and RBAC-gated mutations are complex enough without simultaneously learning a new frontend framework.
+This is a valid learning goal, but it conflicts with the primary goal of **delivering operational value**. The Backoffice's role-scoped dashboards, real-time SignalR alerts, and RBAC-gated mutations are complex enough without simultaneously learning a new frontend framework.
 
 **Counter-proposal:** If the team wants a React reference, the **Operations Dashboard BC** (CONTEXTS.md line 3904) is a better candidate. It's a developer-facing tool with heavy chart/visualization needs (d3.js, event stream rendering) where React's ecosystem genuinely shines, and it has no RBAC complexity.
 
 ### What Blazor WASM Reuses from Vendor Portal
 
-| Component | Vendor Portal Source | Admin Portal Target | Changes |
+| Component | Vendor Portal Source | Backoffice Target | Changes |
 |-----------|---------------------|---------------------|---------|
 | `VendorAuthState.cs` | In-memory JWT storage | `AdminAuthState.cs` | Replace VendorTenantId with AdminRole-based properties; remove tenant concept |
 | `VendorAuthStateProvider.cs` | Custom AuthenticationStateProvider | `AdminAuthStateProvider.cs` | Identical pattern; swap claim names |
-| `VendorAuthService.cs` | Login/logout/refresh HTTP calls | `AdminAuthService.cs` | Point to AdminIdentity.Api endpoints |
+| `VendorAuthService.cs` | Login/logout/refresh HTTP calls | `AdminAuthService.cs` | Point to BackofficeIdentity.Api endpoints |
 | `TokenRefreshService.cs` | Background timer-based refresh | Same class, reused | Identical logic (15-min access token pattern) |
 | `VendorHubService.cs` | SignalR connection management | `AdminHubService.cs` | Point to `/hub/admin`; role-based group messages |
 | `Program.cs` WASM setup | Named HttpClients, MudBlazor, auth | Same pattern | Different API URLs, different auth state type |
@@ -415,7 +415,7 @@ MudBlazor (v9.1.0, already in `Directory.Packages.props`) provides:
 
 ```csharp
 // AdminPortal.Api/Hubs/AdminPortalHub.cs
-[Authorize(AuthenticationSchemes = "Admin")]
+[Authorize(AuthenticationSchemes = "Backoffice")]
 public sealed class AdminPortalHub : Hub
 {
     private readonly ILogger<AdminPortalHub> _logger;
@@ -510,7 +510,7 @@ This means when a `LowStockAlertRaised` message is sent to `role:warehouseclerk`
 
 ### SignalR Message Interfaces
 
-Following the Vendor Portal pattern (`IVendorTenantMessage`, `IVendorUserMessage`), define marker interfaces for the Admin Portal:
+Following the Vendor Portal pattern (`IVendorTenantMessage`, `IVendorUserMessage`), define marker interfaces for the Backoffice:
 
 ```csharp
 // AdminPortal/RealTime/IAdminRoleMessage.cs
@@ -613,18 +613,18 @@ Admin-facing endpoints should live **inside the domain BC APIs**, not in AdminPo
 
 ### Why Endpoints in Domain BCs?
 
-| Factor | Endpoints in Domain BC | Endpoints in Admin Portal BFF |
+| Factor | Endpoints in Domain BC | Endpoints in Backoffice BFF |
 |--------|----------------------|------------------------------|
 | **Proximity to business logic** | ✅ Handler is next to the aggregate/projection it operates on | ❌ BFF must serialize command, send HTTP, domain BC deserializes again |
 | **Wolverine integration** | ✅ Direct access to Marten sessions, aggregate handlers, `[WriteAggregate]` | ❌ BFF cannot use Wolverine aggregate workflows for remote BCs |
-| **Existing pattern** | ✅ ProductCatalog.Api already has `[Authorize(Policy = "Admin")]` endpoints | — |
+| **Existing pattern** | ✅ ProductCatalog.Api already has `[Authorize(Policy = "Backoffice")]` endpoints | — |
 | **Team scaling** | ✅ Domain team owns their admin endpoints alongside their core API | ❌ All admin endpoints funneled through one team/project |
 | **Testing** | ✅ Alba integration tests in domain BC test project | ❌ BFF tests require mocking or running full domain BC |
 
-### What Admin Portal BFF Does (and Doesn't Do)
+### What Backoffice BFF Does (and Doesn't Do)
 
 **AdminPortal.Api DOES:**
-- Authenticate the admin user (JWT Bearer from AdminIdentity)
+- Authenticate the admin user (JWT Bearer from BackofficeIdentity)
 - Authorize based on admin role (RBAC policies)
 - Compose multi-BC queries (e.g., customer lookup fans out to CustomerIdentity + Orders)
 - Transform responses into admin-specific view models
@@ -646,19 +646,19 @@ Orders, Inventory, Payments, and Fulfillment APIs currently have **no authentica
 ```csharp
 // Inventory.Api Program.cs — Phase 2 (when admin endpoints are added)
 
-// Add JWT validation for Admin Portal only
+// Add JWT validation for Backoffice only
 var adminJwtKey = builder.Configuration["Jwt:Admin:SigningKey"]
     ?? "dev-only-admin-signing-key-change-in-production-must-be-at-least-32-chars";
 
 builder.Services.AddAuthentication()
-    .AddJwtBearer("Admin", options =>
+    .AddJwtBearer("Backoffice", options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuer = "admin-identity",
             ValidateAudience = true,
-            ValidAudience = "admin-portal",
+            ValidAudience = "backoffice",
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(adminJwtKey)),
             ValidateLifetime = true,
@@ -669,7 +669,7 @@ builder.Services.AddAuthentication()
 builder.Services.AddAuthorization(opts =>
 {
     opts.AddPolicy("AdminWarehouseClerk", policy => policy
-        .AddAuthenticationSchemes("Admin")
+        .AddAuthenticationSchemes("Backoffice")
         .RequireAuthenticatedUser()
         .RequireRole("WarehouseClerk", "OperationsManager", "SystemAdmin"));
 });
@@ -696,7 +696,7 @@ builder.Services.AddAuthorization(opts =>
 | **Orders** | `POST /api/orders/{orderId}/cancel` (admin variant) | AdminCustomerService |
 | **Customer Identity** | `GET /api/identity/customers?email={email}` (admin search) | AdminCustomerService |
 
-### Admin Portal BFF Composition Examples
+### Backoffice BFF Composition Examples
 
 ```csharp
 // AdminPortal.Api/Queries/GetCustomerServiceView.cs
@@ -762,7 +762,7 @@ Marten Event Store:
 
 ### Why Not Propagate the JWT to Domain BCs Directly?
 
-The Admin Portal BFF **does** propagate the JWT to domain BCs (via the `Authorization: Bearer` header on HTTP client calls). Domain BCs validate the JWT and can extract `AdminUserId` from it. However, **the command body should ALSO include `adminUserId`** because:
+The Backoffice BFF **does** propagate the JWT to domain BCs (via the `Authorization: Bearer` header on HTTP client calls). Domain BCs validate the JWT and can extract `AdminUserId` from it. However, **the command body should ALSO include `adminUserId`** because:
 
 1. **Explicit over implicit:** The domain event needs `adminUserId` in its data. Extracting it from `HttpContext.User` in every handler is repetitive. Including it in the command body makes the audit attribution part of the business contract.
 2. **Wolverine handler purity:** If the command includes `adminUserId`, the handler is a pure function of its inputs. If the handler must reach into `HttpContext.User`, it has a hidden dependency.
@@ -795,7 +795,7 @@ public interface IAdminCommand
 
 ### PII Access Logging (Customer Service Endpoints)
 
-CONTEXTS.md line 3718: *"PII accessed via Admin Portal (customer emails, addresses) must be logged per access for GDPR compliance audit."*
+CONTEXTS.md line 3718: *"PII accessed via Backoffice (customer emails, addresses) must be logged per access for GDPR compliance audit."*
 
 For customer service read endpoints (not mutations), there's no domain event to carry the audit trail. Instead, use structured logging in the BFF:
 
@@ -831,9 +831,9 @@ public static async Task<IResult> Handle(
 
 CONTEXTS.md documents that Product Catalog is planned to evolve from Marten document store to event sourcing. This means the API surface will change — products will be managed via event-sourced aggregates instead of CRUD document operations.
 
-### Recommendation: Interface-Based HTTP Clients in Admin Portal
+### Recommendation: Interface-Based HTTP Clients in Backoffice
 
-Admin Portal should access domain BCs through **typed HTTP client interfaces** (the same pattern already defined in CONTEXTS.md line 3809). This provides a stable seam:
+Backoffice should access domain BCs through **typed HTTP client interfaces** (the same pattern already defined in CONTEXTS.md line 3809). This provides a stable seam:
 
 ```csharp
 // AdminPortal/Clients/IProductCatalogAdminClient.cs
@@ -868,7 +868,7 @@ When Product Catalog evolves its API surface, only `ProductCatalogAdminClient` n
 
 **Don't introduce API versioning at this stage.** Here's why:
 
-1. **Internal consumers only.** Admin Portal BFF is the only consumer of admin endpoints. There are no third-party API consumers to break.
+1. **Internal consumers only.** Backoffice BFF is the only consumer of admin endpoints. There are no third-party API consumers to break.
 2. **Co-deployed.** In CritterSupply's architecture, all BCs are deployed together from the same repo. A breaking API change in ProductCatalog can be accompanied by a corresponding client update in AdminPortal in the same PR.
 3. **Complexity cost.** URL-based versioning (`/api/v1/...` → `/api/v2/...`) adds routing complexity and doubles the endpoint surface during migration periods.
 4. **When to add it.** Introduce versioning if/when CritterSupply has external API consumers (public API for third-party integrations) or when domain BCs are deployed independently with different release cadences.
@@ -877,18 +877,18 @@ When Product Catalog evolves its API surface, only `ProductCatalogAdminClient` n
 
 ## 9. Implementation Phasing
 
-### Phase 0: AdminIdentity BC (Prerequisite)
+### Phase 0: BackofficeIdentity BC (Prerequisite)
 
 **Scope:** Identity only — no portal, no frontend
 
 | Task | Effort | Dependency |
 |------|--------|------------|
-| Create `AdminIdentity` project (EF Core, DbContext, schema `adminidentity`) | 1 session | None |
-| Create `AdminIdentity.Api` (JWT issuer, login/logout/refresh, seed data) | 1-2 sessions | AdminIdentity project |
+| Create `BackofficeIdentity` project (EF Core, DbContext, schema `backofficeidentity`) | 1 session | None |
+| Create `BackofficeIdentity.Api` (JWT issuer, login/logout/refresh, seed data) | 1-2 sessions | BackofficeIdentity project |
 | Add `AdminRole` enum to `Messages.Contracts` | < 1 hour | None |
 | Add `AdminUserCreated`, `AdminUserDeactivated`, `AdminUserRoleChanged` to `Messages.Contracts` | < 1 hour | AdminRole enum |
-| Write ADR 0026: AdminIdentity (documents decisions from this research) | 1 session | This document |
-| Integration tests (Alba + TestContainers) | 1 session | AdminIdentity.Api |
+| Write ADR 0026: BackofficeIdentity (documents decisions from this research) | 1 session | This document |
+| Integration tests (Alba + TestContainers) | 1 session | BackofficeIdentity.Api |
 
 **Deliverable:** `POST /api/admin-identity/auth/login` returns a valid JWT with AdminUserId and AdminRole claims.
 
@@ -907,7 +907,7 @@ When Product Catalog evolves its API surface, only `ProductCatalogAdminClient` n
 | Customer service: order detail with saga state | 1 session | Orders BC endpoints |
 | Multi-issuer JWT in ProductCatalog.Api (rename existing policy) | < 1 session | Phase 0 |
 | Write ADR 0027: Multi-Issuer JWT Strategy | 1 session | This document |
-| Write ADR 0028: Blazor WASM for Admin Portal | 1 session | This document |
+| Write ADR 0028: Blazor WASM for Backoffice | 1 session | This document |
 
 **Deliverable:** Admin users can log in, see role-filtered dashboards, and look up customer orders.
 
@@ -937,7 +937,7 @@ When Product Catalog evolves its API surface, only `ProductCatalogAdminClient` n
 | Tab visibility API for token refresh (ADR 0025 must-fix) | < 1 session | AdminPortal.Web |
 | Session expiry modal (ADR 0025 must-fix) | < 1 session | AdminPortal.Web |
 | Warehouse: barcode scanning integration | 2 sessions | AdminPortal.Web |
-| SystemAdmin: user management CRUD | 2 sessions | AdminIdentity.Api |
+| SystemAdmin: user management CRUD | 2 sessions | BackofficeIdentity.Api |
 
 ---
 
@@ -947,10 +947,10 @@ Based on this research, the following ADRs should be drafted before implementati
 
 | ADR # | Title | Key Decision |
 |-------|-------|-------------|
-| 0026 | AdminIdentity BC: Separate Identity Store | Separate BC, EF Core, mirrors VendorIdentity; no tenant concept; 7-role AdminRole enum |
-| 0027 | Multi-Issuer JWT Strategy for Domain BCs | Named JWT Bearer schemes (`"Vendor"`, `"Admin"`); rename existing `"Admin"` policy to `"VendorAdmin"` |
-| 0028 | Blazor WASM for Admin Portal Frontend | Blazor WASM over React/Next.js for consistency; reserve React for Operations Dashboard BC |
-| 0029 | Admin Portal SignalR Hub Design | Single hub, role-based groups, multi-group membership for supervisory roles |
+| 0026 | BackofficeIdentity BC: Separate Identity Store | Separate BC, EF Core, mirrors VendorIdentity; no tenant concept; 7-role AdminRole enum |
+| 0027 | Multi-Issuer JWT Strategy for Domain BCs | Named JWT Bearer schemes (`"Vendor"`, `"Backoffice"`); rename existing `"Backoffice"` policy to `"VendorAdmin"` |
+| 0028 | Blazor WASM for Backoffice Frontend | Blazor WASM over React/Next.js for consistency; reserve React for Operations Dashboard BC |
+| 0029 | Backoffice SignalR Hub Design | Single hub, role-based groups, multi-group membership for supervisory roles |
 
 ---
 
@@ -968,7 +968,7 @@ The following questions were raised during research and resolved with Product Ow
 
 3. **Admin user lifecycle: invitation vs direct creation?**
    - **PO Decision:** Use invitation flow (72-hour token, email link, self-service password setup). SystemAdmin is the only role that can invite. Seed one SystemAdmin for dev environments. On departure: immediate deactivation, force session termination via SignalR, soft-deactivate (never delete — audit trail must survive). Support reactivation (`AdminUserReactivated`) for contractors and seasonal staff.
-   - **Architect alignment:** ✅ Invitation flow matches AdminIdentity design. Add `deactivatedAt` check against JWT `iat` for immediate session invalidation.
+   - **Architect alignment:** ✅ Invitation flow matches BackofficeIdentity design. Add `deactivatedAt` check against JWT `iat` for immediate session invalidation.
 
 4. **Concurrent admin edits?**
    - **PO Decision:** Last-write-wins for Phase 1. When Product Catalog evolves to event sourcing, use optimistic concurrency. Defer conflict resolution UI to Phase 3.
@@ -980,7 +980,7 @@ The following questions were raised during research and resolved with Product Ow
 
 ## 12. Product Owner — Additional Requirements
 
-The following requirements emerged from the PO business review and should be integrated into the Admin Portal plan:
+The following requirements emerged from the PO business review and should be integrated into the Backoffice plan:
 
 ### Phase 1 Additions (Critical)
 
@@ -1003,10 +1003,10 @@ The following requirements emerged from the PO business review and should be int
 
 | # | Requirement | Priority | Phase |
 |---|------------|----------|-------|
-| 8 | **returns-management.feature** | Add Gherkin feature file now (even if `@future` tagged). Returns BC + Admin Portal returns dashboard is the biggest missing feature area. | Planning |
-| 9 | **Promotions BC** as a future bounded context | Coupon codes, automatic discounts, bundle pricing. Separate from Pricing BC. Admin Portal will need promotion management tooling. | Phase 4+ |
+| 8 | **returns-management.feature** | Add Gherkin feature file now (even if `@future` tagged). Returns BC + Backoffice returns dashboard is the biggest missing feature area. | Planning |
+| 9 | **Promotions BC** as a future bounded context | Coupon codes, automatic discounts, bundle pricing. Separate from Pricing BC. Backoffice will need promotion management tooling. | Phase 4+ |
 | 10 | **Bulk operations** pattern for all write roles | First request from every role will be "can I do this in bulk?" Build single-item ops first, but ensure data model supports batch commands. | Phase 3 |
-| 11 | **Audit log viewer** for SystemAdmin | Query audit trail: "Show me everything Jane Smith did in the last 30 days." Read projection in Admin Portal subscribing to domain events. | Phase 3 |
+| 11 | **Audit log viewer** for SystemAdmin | Query audit trail: "Show me everything Jane Smith did in the last 30 days." Read projection in Backoffice subscribing to domain events. | Phase 3 |
 | 12 | **ChannelManager role** for Listings BC | New role when Listings/Marketplaces BC launches. Owns channel strategy: which products listed where, at what price, with what content. | Phase 4+ |
 
 ### Executive Dashboard KPIs (PO-Validated)
@@ -1037,7 +1037,7 @@ The 7 KPIs that matter for the daily executive dashboard:
 
 ## 13. UX Engineer Review
 
-A comprehensive UX research document has been created at **[Admin Portal UX Research](admin-portal-ux-research.md)**, covering:
+A comprehensive UX research document has been created at **[Backoffice UX Research](backoffice-ux-research.md)**, covering:
 
 - **Navigation architecture**: Role-filtered sidebar hiding inaccessible items, grouped by domain area
 - **Dashboard layout**: Per-role dedicated dashboard pages with reusable KPI card components
@@ -1067,25 +1067,25 @@ A comprehensive UX research document has been created at **[Admin Portal UX Rese
 | Vendor Identity.Api | 5240 | ✅ Live |
 | Vendor Portal.Web | 5241 | ✅ Live |
 | Pricing.Api | 5242 | ✅ Live |
-| **Admin Portal.Api** | **5243** | 🟡 Planned |
-| **Admin Portal.Web** | **5244** | 🟡 Planned |
-| **Admin Identity.Api** | **5245** | 🟡 Planned |
+| **Backoffice.Api** | **5243** | 🟡 Planned |
+| **Backoffice.Web** | **5244** | 🟡 Planned |
+| **Backoffice Identity.Api** | **5245** | 🟡 Planned |
 
-## Appendix B: Comparison — VendorIdentity vs AdminIdentity
+## Appendix B: Comparison — VendorIdentity vs BackofficeIdentity
 
-| Aspect | VendorIdentity | AdminIdentity |
+| Aspect | VendorIdentity | BackofficeIdentity |
 |--------|---------------|---------------|
 | Users | External vendor partners | Internal employees |
 | Roles | 3 (Admin, CatalogManager, ReadOnly) | 7 (CopyWriter → SystemAdmin) |
 | Tenant concept | ✅ Multi-tenant (VendorTenantId) | ❌ Single-organization |
 | JWT issuer | `vendor-identity` | `admin-identity` |
-| JWT audience | `vendor-portal` | `admin-portal` |
+| JWT audience | `vendor-portal` | `backoffice` |
 | Signing key | Vendor-specific key | Admin-specific key (separate) |
 | Custom claims | VendorUserId, VendorTenantId, VendorTenantStatus | AdminUserId |
 | Password hashing | Argon2id | Argon2id |
 | Token lifecycle | 15-min access + 7-day refresh | 15-min access + 7-day refresh |
 | Seed data | Per-tenant (Demo Vendor org) | Per-role (7 users, one per role) |
-| EF Core schema | `vendoridentity` | `adminidentity` |
+| EF Core schema | `vendoridentity` | `backofficeidentity` |
 | Integration events | VendorTenantCreated, VendorUserActivated, etc. | AdminUserCreated, AdminUserDeactivated, AdminUserRoleChanged |
 | Invitation flow | 72-hour invitation tokens (SHA-256 hashed) | Direct creation by SystemAdmin (no invitation) |
 

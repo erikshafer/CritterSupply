@@ -23,7 +23,7 @@
    - ❌ Deferred: CouponReserved soft reservation logic
 
 2. **Port Allocation**
-   - Promotions.Api assigned port **5250** (next after Admin Identity's 5249)
+   - Promotions.Api assigned port **5250** (next after Admin Identity (now BackofficeIdentity)'s 5249)
 
 3. **Money Value Object Strategy**
    - **Decision:** Use `decimal` for Phase 1 (simpler, USD-only)

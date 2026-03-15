@@ -1,8 +1,8 @@
-# M32.0: Admin Portal Phase 1 — Prerequisite Assessment
+# M32.0: Backoffice Phase 1 — Prerequisite Assessment
 
 **Date:** 2026-03-15
 **Status:** ✅ DECISION MADE — Option A (M31.5 separate milestone) approved
-**Milestone:** M32.0 (Admin Portal Phase 1)
+**Milestone:** M32.0 (Backoffice Phase 1)
 **Assessment Completed By:** AI Agent (Claude Sonnet 4.5)
 **Owner Decision:** Option A (create M31.5) — approved 2026-03-15
 
@@ -12,7 +12,7 @@
 
 **M32.0 cannot proceed to implementation until M31.5 is complete.** The milestone had three explicit prerequisites defined in the problem statement and planning documents. One is complete, but **two critical prerequisites were not met** (discovered during Step 4 of the implementation process).
 
-**Owner Decision (2026-03-15):** Owner chose **Option A** — create M31.5 (Admin Portal Prerequisites) as a separate milestone. This separates infrastructure work (JWT configuration, endpoint gaps) from Admin Portal BFF implementation (M32.0).
+**Owner Decision (2026-03-15):** Owner chose **Option A** — create M31.5 (Backoffice Prerequisites) as a separate milestone. This separates infrastructure work (JWT configuration, endpoint gaps) from Backoffice BFF implementation (M32.0).
 
 | Prerequisite | Status | Blocker Severity |
 |--------------|--------|------------------|
@@ -28,7 +28,7 @@
 
 ### Prerequisite 1: RBAC ADR ✅ COMPLETE
 
-**Status:** ADR 0031 "Admin Portal Role-Based Access Control Model" is **ACCEPTED** (2026-03-13) and covers M32.0 scope completely.
+**Status:** ADR 0031 "Backoffice Role-Based Access Control Model" is **ACCEPTED** (2026-03-13) and covers M32.0 scope completely.
 
 **What ADR 0031 Delivers:**
 - ✅ 7 admin roles defined (CopyWriter, PricingManager, WarehouseClerk, CustomerService, OperationsManager, Executive, SystemAdmin)
@@ -36,11 +36,11 @@
 - ✅ SystemAdmin as superuser (automatically included in all policies)
 - ✅ JWT claims structure documented (`sub`, `role`, `name`, `email`, `iss`, `aud`)
 - ✅ Single role per user (Phase 1 constraint)
-- ✅ Admin Identity BC requirements documented (EF Core, PBKDF2-SHA256, port 5249)
+- ✅ Backoffice Identity BC requirements documented (EF Core, PBKDF2-SHA256, port 5249)
 
 **What's Already Implemented:**
-- ✅ Admin Identity BC (M29.0, PR #375) — login, refresh, logout, user CRUD, port 5249
-- ✅ 7 authorization policies in AdminIdentity.Api/Program.cs
+- ✅ Backoffice Identity BC (M29.0, PR #375) — login, refresh, logout, user CRUD, port 5249
+- ✅ 7 authorization policies in BackofficeIdentity.Api/Program.cs
 - ✅ JWT token generation with `role` claim
 
 **Coverage for M32.0:**
@@ -57,14 +57,14 @@
 **Status:** ❌ **DOES NOT EXIST** — This is a Phase 0.5 hard blocker.
 
 **Current State:**
-- Admin Identity BC (port 5249) issues JWTs with `iss: "https://localhost:5249"` and `aud: "https://localhost:5249"` (self-referential)
-- These tokens work for Admin Identity's own protected endpoints (`/api/admin-identity/users`)
+- Backoffice Identity BC (port 5249) issues JWTs with `iss: "https://localhost:5249"` and `aud: "https://localhost:5249"` (self-referential)
+- These tokens work for Backoffice Identity's own protected endpoints (`/api/admin-identity/users`)
 - **Problem:** Domain BCs (Orders, Returns, Customer Identity, Payments, Inventory, Fulfillment, Correspondence, Pricing, Product Catalog) do NOT have JWT Bearer authentication configured
-- **Impact:** Admin Portal BFF will issue commands/queries to domain BCs, but domain BCs will reject the requests because they don't validate admin JWTs
+- **Impact:** Backoffice BFF will issue commands/queries to domain BCs, but domain BCs will reject the requests because they don't validate admin JWTs
 
 **What Multi-issuer JWT Means:**
 Domain BCs need to accept JWTs from **multiple issuers**:
-1. **Admin Identity BC** (`https://localhost:5249`) — for admin users accessing Admin Portal
+1. **Backoffice Identity BC** (`https://localhost:5249`) — for admin users accessing Backoffice
 2. **Vendor Identity BC** (`https://localhost:5240`) — already configured in Product Catalog.Api for vendor partner access
 3. **Customer Identity BC** (session-based) — customers use cookies, not JWTs
 
@@ -129,7 +129,7 @@ builder.Services.AddAuthorization(opts =>
 **ADR Required:** ADR 0032 "Multi-Issuer JWT Strategy" must be created before implementation begins. This ADR should cover:
 - Token validation pattern (named schemes: `"Admin"`, `"Vendor"`)
 - Policy-based authorization mapping (which policies use which schemes)
-- Audience evolution (Phase 1: self-referential `https://localhost:5249`; Phase 2+: Admin Portal API audience `https://localhost:5243`)
+- Audience evolution (Phase 1: self-referential `https://localhost:5249`; Phase 2+: Backoffice API audience `https://localhost:5243`)
 - Signing key management (shared secret or asymmetric keys)
 - Cross-BC consistency (all domain BCs follow same pattern)
 
@@ -139,7 +139,7 @@ builder.Services.AddAuthorization(opts =>
 
 ### Prerequisite 3: Domain BC Endpoint Gaps ⚠️ 8 GAPS IDENTIFIED
 
-**Status:** ⚠️ **8 Phase 0.5 blockers** documented in `admin-portal-integration-gap-register.md`
+**Status:** ⚠️ **8 Phase 0.5 blockers** documented in `backoffice-integration-gap-register.md`
 
 **Gap Summary:**
 
@@ -271,7 +271,7 @@ public static class GetShipmentsForOrderQuery
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer("Admin", options =>
     {
-        options.Authority = "https://localhost:5249"; // Admin Identity BC
+        options.Authority = "https://localhost:5249"; // Backoffice Identity BC
         options.Audience = "https://localhost:5249";  // Phase 1: self-referential
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -316,13 +316,13 @@ builder.Services.AddAuthorization(opts =>
 
 **What's Missing for M32.0:**
 1. **Multi-issuer JWT authentication flow** — How admin user logs in, JWT validation at domain BCs, token refresh
-2. **Commands issued through Admin Portal BFF** — Admin Portal BFF → domain BC command routing (HTTP client pattern)
+2. **Commands issued through Backoffice BFF** — Backoffice BFF → domain BC command routing (HTTP client pattern)
 3. **Queries powering read-only dashboards** — AdminDailyMetrics projection design, SignalR group routing for live updates
 4. **Customer service tooling commands** — Order cancellation with admin audit trail, return approval with CS reason
 
 **Recommendation:**
 - If implementing Phase 0.5 only (domain BC prerequisites), **no additional event modeling needed** — these are infrastructure changes (JWT config, HTTP endpoints wrapping existing handlers)
-- If implementing M32.0 Phase 1 (Admin Portal BFF), **conduct targeted event modeling session** covering:
+- If implementing M32.0 Phase 1 (Backoffice BFF), **conduct targeted event modeling session** covering:
   - Auth flows (login, JWT validation, refresh)
   - BFF composition patterns (how BFF queries multiple BCs and composes views)
   - Real-time dashboard updates (RabbitMQ → Wolverine handler → SignalR push)
@@ -342,17 +342,17 @@ The following items required owner input before M32.0 could proceed:
 
 **Context:**
 - Phase 0.5 is **4-5 sessions** of work (multi-issuer JWT ADR + 8 endpoint gaps)
-- M32.0 Phase 1 (Admin Portal BFF implementation) is **2-3 cycles** of work
+- M32.0 Phase 1 (Backoffice BFF implementation) is **2-3 cycles** of work
 - Mixing infrastructure work (Phase 0.5) with BFF implementation (Phase 1) in a single milestone risks confusion
 
-**Recommendation:** Create **M31.5: Admin Portal Prerequisites** as a separate milestone:
+**Recommendation:** Create **M31.5: Backoffice Prerequisites** as a separate milestone:
 - Deliverables: ADR 0032 (Multi-issuer JWT), 8 endpoint gaps closed, JWT schemes configured in 5 domain BCs
-- Success Criteria: Admin Portal can authenticate against domain BCs and call all Phase 1-required endpoints
+- Success Criteria: Backoffice can authenticate against domain BCs and call all Phase 1-required endpoints
 - Duration: 1 cycle (4-5 sessions)
-- Then: M32.0 becomes pure Admin Portal BFF implementation (cleaner scope)
+- Then: M32.0 becomes pure Backoffice BFF implementation (cleaner scope)
 
 **Owner Decision (2026-03-15):** ✅ **Option A approved** — M31.5 created as separate milestone. See:
-- [M31.5 Milestone Plan](milestones/m31-5-admin-portal-prerequisites.md)
+- [M31.5 Milestone Plan](milestones/m31-5-backoffice-prerequisites.md)
 - [Phase 0.5 Implementation Plan](phase-0-5-implementation-plan.md)
 
 ### 2. Multi-issuer JWT ADR Ownership ⏳ IN PROGRESS
@@ -360,7 +360,7 @@ The following items required owner input before M32.0 could proceed:
 **Question:** Who writes ADR 0032 "Multi-Issuer JWT Strategy"?
 
 **Context:**
-- ADR 0031 (RBAC) was created during Admin Identity BC implementation (M29.0)
+- ADR 0031 (RBAC) was created during Backoffice Identity BC implementation (M29.0)
 - ADR 0032 is a cross-cutting architectural decision affecting 9+ domain BCs
 - Principal Software Architect typically owns cross-BC infrastructure decisions
 
@@ -370,15 +370,15 @@ The following items required owner input before M32.0 could proceed:
 
 ### 3. Audience Evolution Timeline ⏳ DEFERRED TO PHASE 2+
 
-**Question:** When should Admin Identity BC start issuing tokens with `aud: "https://localhost:5243"` (Admin Portal API audience)?
+**Question:** When should Backoffice Identity BC start issuing tokens with `aud: "https://localhost:5243"` (Backoffice API audience)?
 
 **Context:**
-- Phase 1: Admin Identity issues tokens with `aud: "https://localhost:5249"` (self-referential)
+- Phase 1: Backoffice Identity issues tokens with `aud: "https://localhost:5249"` (self-referential)
 - Domain BCs configure `options.Audience = "https://localhost:5249"` to accept admin tokens
-- Phase 2+: Admin Portal API (port 5243) is built; should have its own audience
-- Changing audience requires coordinated update across Admin Identity BC + all domain BCs
+- Phase 2+: Backoffice API (port 5243) is built; should have its own audience
+- Changing audience requires coordinated update across Backoffice Identity BC + all domain BCs
 
-**Recommendation:** Defer audience evolution to Phase 2+. Phase 1 uses self-referential audience to minimize coordination overhead. Document the limitation in ADR 0032 and plan the migration when Admin Portal API ships.
+**Recommendation:** Defer audience evolution to Phase 2+. Phase 1 uses self-referential audience to minimize coordination overhead. Document the limitation in ADR 0032 and plan the migration when Backoffice API ships.
 
 **Decision:** Deferred to Phase 2+ as recommended. Documented in ADR 0032 "Future Evolution" section.
 
@@ -387,7 +387,7 @@ The following items required owner input before M32.0 could proceed:
 ## Owner Decision: Option A (M31.5 Separate Milestone)
 
 **Decision Made:** 2026-03-15
-**Decision:** Option A — Create M31.5 (Admin Portal Prerequisites) as separate milestone
+**Decision:** Option A — Create M31.5 (Backoffice Prerequisites) as separate milestone
 
 **Rationale:**
 - Cleaner scope separation: Infrastructure work (M31.5) vs BFF implementation (M32.0)
@@ -415,26 +415,26 @@ The following items required owner input before M32.0 could proceed:
 
 **Path Forward (Approved):**
 
-### ✅ Option A: M31.5 (Admin Portal Prerequisites) — Separate Milestone (APPROVED)
+### ✅ Option A: M31.5 (Backoffice Prerequisites) — Separate Milestone (APPROVED)
 1. Create ADR 0032 "Multi-Issuer JWT Strategy" (PSA, PO sign-off)
 2. Add `GET /api/customers?email={email}` to Customer Identity.Api
 3. Add HTTP layer to Inventory.Api (`GET /api/inventory/{sku}`, `GET /api/inventory/low-stock`)
 4. Verify or add `GET /api/fulfillment/shipments?orderId={id}` to Fulfillment.Api
 5. Configure admin JWT schemes in Orders.Api, Returns.Api, Customer Identity.Api, Correspondence.Api, Fulfillment.Api
 6. Integration test: Admin user logs in → JWT accepted by all 5 domain BCs
-7. **Success Criteria:** Admin Portal (when built) can authenticate and call all Phase 1 endpoints
+7. **Success Criteria:** Backoffice (when built) can authenticate and call all Phase 1 endpoints
 
 **Duration:** 1 cycle (4-5 sessions)
 
 **Then:** M32.0 starts with all prerequisites met
 
 **Status:** ✅ **APPROVED** — M31.5 milestone created. See:
-- [M31.5 Milestone Plan](milestones/m31-5-admin-portal-prerequisites.md)
+- [M31.5 Milestone Plan](milestones/m31-5-backoffice-prerequisites.md)
 - [Phase 0.5 Implementation Plan](phase-0-5-implementation-plan.md)
 
 ### ❌ Option B: M32.0 Includes Phase 0.5 — Monolithic Milestone (NOT CHOSEN)
 1. Same 7 steps as Option A
-2. Then: Implement Admin Portal BFF (AdminPortal/, AdminPortal.Api/, AdminPortal.Web/)
+2. Then: Implement Backoffice BFF (AdminPortal/, AdminPortal.Api/, AdminPortal.Web/)
 3. Then: Implement read-only dashboards + CS tooling
 
 **Duration:** 3-4 cycles (Phase 0.5 = 1 cycle, Phase 1 = 2-3 cycles)
@@ -458,7 +458,7 @@ The following items required owner input before M32.0 could proceed:
 **M32.0 Implementation (After M31.5):**
 5. ⏳ Update CURRENT-CYCLE.md to mark M32.0 as "Prerequisites met, ready to start"
 6. ⏳ Conduct targeted event modeling session for M32.0 Phase 1
-7. ⏳ Implement Admin Portal BFF (AdminPortal/, AdminPortal.Api/, AdminPortal.Web/)
+7. ⏳ Implement Backoffice BFF (AdminPortal/, AdminPortal.Api/, AdminPortal.Web/)
 8. ⏳ Close M32.0
 
 ---
@@ -467,4 +467,4 @@ The following items required owner input before M32.0 could proceed:
 **Assessed By:** AI Agent (Claude Sonnet 4.5)
 **Status:** ✅ **DECISION MADE** — Option A (M31.5 separate milestone) approved
 **Owner Decision Date:** 2026-03-15
-**Next Milestone:** M31.5 (Admin Portal Prerequisites) — 1 cycle (4-5 sessions)
+**Next Milestone:** M31.5 (Backoffice Prerequisites) — 1 cycle (4-5 sessions)

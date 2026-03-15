@@ -220,7 +220,7 @@
 
 **Why:** Security fix (server-authoritative pricing) is the only blocker for production. Everything else is operational enhancement.
 
-**Trade-off:** Vendor Portal cannot launch until Phase 2 (vendor price suggestions). Admin Portal pricing features deferred.
+**Trade-off:** Vendor Portal cannot launch until Phase 2 (vendor price suggestions). Admin Portal (now Backoffice) pricing features deferred.
 
 ---
 

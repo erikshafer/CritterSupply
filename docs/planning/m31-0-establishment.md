@@ -145,7 +145,7 @@ A separate retrospective (`docs/planning/cycles/m30-1-shopping-bc-coupon-retrosp
      - Test pattern mismatch (tracking events vs querying aggregates)
    - **Deferred to M30.0:** Redemption tracking, batch generation, Shopping/Pricing integration
 
-3. **M29.0 Admin Identity BC Retrospective** (2026-03-14)
+3. **M29.0 Backoffice Identity BC Retrospective** (2026-03-14)
    - File: `docs/planning/cycles/cycle-29-admin-identity-phase-1-retrospective.md`
    - Status: ✅ Complete
    - Delivered: RBAC model, JWT auth, user management, 7 endpoints

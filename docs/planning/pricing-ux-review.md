@@ -1,6 +1,6 @@
 # Pricing BC: UX Engineer Review — Event Modeling, DX Analysis, and `Pricing.Web` UI Vision
 
-> **⚠️ Architecture Update (2026-03-07):** After a joint review by the Principal Architect, Product Owner, and UX Engineer, `Pricing.Web` as a standalone frontend is **eliminated**. The UI functionality documented here (MudDataGrid products grid, side-sheet editing, MudTimeline, SignalR real-time updates) will be delivered as the **Pricing section of the Admin Portal** (`AdminPortal.Web`). All UX artifacts in this document remain valid reference material for the Admin Portal implementation team — component patterns, risk register, and build ordering translate directly. Port 5243 is now assigned to AdminPortal.Api (not Pricing.Web).
+> **⚠️ Architecture Update (2026-03-07):** After a joint review by the Principal Architect, Product Owner, and UX Engineer, `Pricing.Web` as a standalone frontend is **eliminated**. The UI functionality documented here (MudDataGrid products grid, side-sheet editing, MudTimeline, SignalR real-time updates) will be delivered as the **Pricing section of the Backoffice** (`AdminPortal.Web`). All UX artifacts in this document remain valid reference material for the Backoffice implementation team — component patterns, risk register, and build ordering translate directly. Port 5243 is now assigned to AdminPortal.Api (not Pricing.Web).
 
 **Date:** 2026-03-07
 **Reviewer:** UX Engineer
@@ -231,7 +231,7 @@ Lock this down **before** building `Pricing.Web`. The anomaly confirmation flow 
 src/Pricing/
 ├── Pricing/                  # Domain library
 ├── Pricing.Api/              # Wolverine HTTP + message handlers (port 5242)
-# Note: Pricing.Web eliminated — pricing UI delivered via Admin Portal (AdminPortal.Web, port 5244)
+# Note: Pricing.Web eliminated — pricing UI delivered via Backoffice (AdminPortal.Web, port 5244)
     ├── Components/
     │   ├── Pages/
     │   │   ├── Dashboard.razor
@@ -729,7 +729,7 @@ Every list endpoint must return a consistent pagination envelope before the firs
 | 🟡 Before first sprint | Define `GET /api/pricing/products/{sku}/history` response shape | Architect |
 | 🟡 Phase 0 sprint | Implement SKU normalization middleware | Developer |
 | 🟡 Phase 0 sprint | Add `ExpiresAt` to `FloorPriceSet` / `CeilingPriceSet` | Developer |
-| 🟢 Phase 1 | Implement Pricing section in Admin Portal — products grid, side-sheet edit, price history | Developer + UX |
+| 🟢 Phase 1 | Implement Pricing section in Backoffice — products grid, side-sheet edit, price history | Developer + UX |
 | 🟢 Phase 1 | Build read-only `ProductsGrid.razor` + `MudDataGrid` | Developer + UX |
 
 ---

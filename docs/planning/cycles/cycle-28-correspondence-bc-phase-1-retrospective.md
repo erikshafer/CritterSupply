@@ -78,7 +78,7 @@ This retrospective documents the complete implementation of Correspondence BC Ph
 **RBAC ADR Requirement — RESOLVED:**
 - ✅ Confirmed that Correspondence BC **does NOT require an RBAC ADR** for Phase 1
 - Rationale: No user-facing authorization endpoints. All messages triggered by integration events from other BCs via RabbitMQ.
-- HTTP query endpoints will use existing authorization patterns (JWT Bearer for Admin Portal, claims-based for Customer Experience) when those consuming BCs call them.
+- HTTP query endpoints will use existing authorization patterns (JWT Bearer for Admin Portal (now Backoffice), claims-based for Customer Experience) when those consuming BCs call them.
 - RBAC ADR requirement documented in CURRENT-CYCLE.md is for **Cycle 29 (Admin Portal)**, not Cycle 28 (Correspondence).
 
 **Domain Model Verification — VERIFIED:**

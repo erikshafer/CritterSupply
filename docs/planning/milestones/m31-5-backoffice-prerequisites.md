@@ -1,20 +1,20 @@
-# M31.5: Admin Portal Prerequisites
+# M31.5: Backoffice Prerequisites
 
 **Date Started:** 2026-03-15
 **Date Completed:** TBD
 **Status:** 📋 READY TO START
 **Duration Estimate:** 1 cycle (4-5 sessions)
-**GitHub Milestone:** M31.5: Admin Portal Prerequisites
-**Implementation Branch:** `claude/implement-admin-portal-phase-1`
+**GitHub Milestone:** M31.5: Backoffice Prerequisites
+**Implementation Branch:** `claude/implement-backoffice-phase-1`
 
 ---
 
 ## Executive Summary
 
-M31.5 is a prerequisite milestone that closes **8 integration gaps** blocking M32.0 (Admin Portal Phase 1). This work is infrastructure-focused: adding HTTP endpoints to domain BCs and configuring multi-issuer JWT authentication.
+M31.5 is a prerequisite milestone that closes **8 integration gaps** blocking M32.0 (Backoffice Phase 1). This work is infrastructure-focused: adding HTTP endpoints to domain BCs and configuring multi-issuer JWT authentication.
 
 **Why M31.5 Exists:**
-During M32.0 prerequisite assessment (2026-03-15), we discovered that domain BCs cannot accept admin JWTs and are missing critical query endpoints. Rather than mixing this infrastructure work with Admin Portal BFF implementation, we've created M31.5 as a separate, focused milestone.
+During M32.0 prerequisite assessment (2026-03-15), we discovered that domain BCs cannot accept admin JWTs and are missing critical query endpoints. Rather than mixing this infrastructure work with Backoffice BFF implementation, we've created M31.5 as a separate, focused milestone.
 
 **After M31.5:** M32.0 can proceed with all prerequisites met.
 
@@ -27,7 +27,7 @@ During M32.0 prerequisite assessment (2026-03-15), we discovered that domain BCs
 **Status:** ⚠️ Drafted (2026-03-15), awaiting PSA and PO review
 
 **What It Covers:**
-- Named JWT Bearer schemes (`"Admin"` from port 5249, `"Vendor"` from port 5240)
+- Named JWT Bearer schemes (`"Backoffice"` from port 5249, `"Vendor"` from port 5240)
 - Policy-based authorization mapping
 - Phase 1 self-referential audience pattern
 - Product Catalog.Api policy rename
@@ -106,7 +106,7 @@ During M32.0 prerequisite assessment (2026-03-15), we discovered that domain BCs
 ```csharp
 // Add named JWT Bearer schemes
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer("Admin", options =>
+    .AddJwtBearer("Backoffice", options =>
     {
         options.Authority = "https://localhost:5249";
         options.Audience = "https://localhost:5249";
@@ -125,7 +125,7 @@ builder.Services.AddAuthorization(opts =>
 {
     opts.AddPolicy("CustomerService", policy =>
     {
-        policy.AuthenticationSchemes.Add("Admin");
+        policy.AuthenticationSchemes.Add("Backoffice");
         policy.RequireRole("CustomerService", "OperationsManager", "SystemAdmin");
     });
 });
@@ -146,10 +146,10 @@ app.UseAuthorization();
 
 ### 6. Product Catalog.Api — Policy Rename
 
-**Gap:** Existing `"Admin"` policy validates vendor tokens (naming collision)
+**Gap:** Existing `"Backoffice"` policy validates vendor tokens (naming collision)
 
 **Implementation:**
-1. Rename `"Admin"` policy to `"VendorAdmin"` in Program.cs
+1. Rename `"Backoffice"` policy to `"VendorAdmin"` in Program.cs
 2. Update 3 existing endpoints to `[Authorize(Policy = "VendorAdmin")]`
 3. Add new admin policies (`"PricingManager"`, `"CopyWriter"`)
 4. Verify existing vendor JWT tests still pass
@@ -167,7 +167,7 @@ app.UseAuthorization();
 - Vendor JWT rejected by all 5 domain BCs (wrong scheme)
 - Cross-issuer `"AnyAuthenticated"` policy accepts both
 
-**Location:** `tests/Admin Identity/AdminIdentity.Api.IntegrationTests/MultiIssuerJwtTests.cs`
+**Location:** `tests/Backoffice Identity/BackofficeIdentity.Api.IntegrationTests/MultiIssuerJwtTests.cs`
 
 **Estimated Effort:** 1 session
 
@@ -176,7 +176,7 @@ app.UseAuthorization();
 ### 8. Documentation Updates
 
 **Files to Update:**
-1. `admin-portal-integration-gap-register.md` — Mark 8 gaps as ✅ Closed
+1. `backoffice-integration-gap-register.md` — Mark 8 gaps as ✅ Closed
 2. `m32-0-prerequisite-assessment.md` — Document owner decision (Option A)
 3. `CLAUDE.md` — Add multi-issuer JWT pattern to API Project Configuration
 4. `CURRENT-CYCLE.md` — Mark M31.5 as active, M32.0 as blocked
@@ -234,7 +234,7 @@ M31.5 is complete when all of the following are true:
 4. ✅ `GET /api/inventory/low-stock` exists and tested
 5. ✅ `GET /api/fulfillment/shipments?orderId={id}` exists and tested
 6. ✅ Admin JWT schemes configured in 5 domain BCs (Orders, Returns, Customer Identity, Correspondence, Fulfillment)
-7. ✅ Product Catalog `"Admin"` policy renamed to `"VendorAdmin"`
+7. ✅ Product Catalog `"Backoffice"` policy renamed to `"VendorAdmin"`
 8. ✅ Integration tests verify admin JWT acceptance
 9. ✅ All documentation updated
 10. ✅ Solution builds with 0 errors
@@ -244,7 +244,7 @@ M31.5 is complete when all of the following are true:
 
 ## Dependencies
 
-**Blocks:** M32.0 (Admin Portal Phase 1)
+**Blocks:** M32.0 (Backoffice Phase 1)
 
 **Blocked By:** None (all prerequisites met)
 
@@ -266,7 +266,7 @@ M31.5 is complete when all of the following are true:
 - [M32.0 Prerequisite Assessment](../m32-0-prerequisite-assessment.md) — Comprehensive analysis leading to M31.5 creation
 - [ADR 0032: Multi-Issuer JWT Strategy](../../decisions/0032-multi-issuer-jwt-strategy.md) — Technical implementation pattern
 - [Phase 0.5 Implementation Plan](../phase-0-5-implementation-plan.md) — Detailed session-by-session guide
-- [Admin Portal Integration Gap Register](../admin-portal-integration-gap-register.md) — Complete gap inventory
+- [Backoffice Integration Gap Register](../backoffice-integration-gap-register.md) — Complete gap inventory
 
 ---
 

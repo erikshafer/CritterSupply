@@ -1,7 +1,7 @@
-# Phase 0.5: Admin Portal Domain BC Prerequisites — Implementation Plan
+# Phase 0.5: Backoffice Domain BC Prerequisites — Implementation Plan
 
 **Date:** 2026-03-15
-**Milestone:** M31.5 (Admin Portal Prerequisites)
+**Milestone:** M31.5 (Backoffice Prerequisites)
 **Duration:** 1 cycle (4-5 sessions)
 **Status:** 📋 READY TO START (ADR 0032 drafted, gaps documented)
 **Owner Decision:** Option A (separate M31.5 milestone) — approved 2026-03-15
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-M31.5 closes **8 integration gaps** that block M32.0 (Admin Portal Phase 1). This work is **infrastructure-focused**: adding HTTP endpoints to domain BCs and configuring multi-issuer JWT authentication. No Admin Portal code is written in this milestone.
+M31.5 closes **8 integration gaps** that block M32.0 (Backoffice Phase 1). This work is **infrastructure-focused**: adding HTTP endpoints to domain BCs and configuring multi-issuer JWT authentication. No Backoffice code is written in this milestone.
 
 **Owner Decision:** This work was originally identified as "Phase 0.5" during M32.0 prerequisite assessment. Owner chose **Option A** (2026-03-15): create M31.5 as a separate milestone rather than folding it into M32.0. See [m32-0-prerequisite-assessment.md](m32-0-prerequisite-assessment.md) for rationale.
 
@@ -23,7 +23,7 @@ M31.5 closes **8 integration gaps** that block M32.0 (Admin Portal Phase 1). Thi
 6. ⏳ Integration tests verifying admin JWT acceptance
 
 **Success Criteria:**
-- Admin user logs into Admin Identity BC → receives JWT with `role: "CustomerService"`
+- Admin user logs into Backoffice Identity BC → receives JWT with `role: "CustomerService"`
 - Admin JWT is accepted by Orders, Returns, Customer Identity, Correspondence, Fulfillment APIs
 - All Phase 1-required endpoints exist and are callable with admin JWT
 
@@ -394,7 +394,7 @@ public class ShipmentQueryTests : IClassFixture<FulfillmentTestFixture>
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer("Admin", options =>
     {
-        options.Authority = "https://localhost:5249"; // Admin Identity BC
+        options.Authority = "https://localhost:5249"; // Backoffice Identity BC
         options.Audience = "https://localhost:5249";  // Phase 1: self-referential
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -536,8 +536,8 @@ dotnet test tests/Product\ Catalog/ProductCatalog.Api.IntegrationTests/
 **Test Pattern:**
 
 ```csharp
-// File: tests/Admin Identity/AdminIdentity.Api.IntegrationTests/MultiIssuerJwtTests.cs
-public class MultiIssuerJwtTests : IClassFixture<AdminIdentityTestFixture>
+// File: tests/Backoffice Identity/BackofficeIdentity.Api.IntegrationTests/MultiIssuerJwtTests.cs
+public class MultiIssuerJwtTests : IClassFixture<BackofficeIdentityTestFixture>
 {
     [Fact]
     public async Task AdminJwt_OrdersApi_Accepted()
@@ -573,7 +573,7 @@ public class MultiIssuerJwtTests : IClassFixture<AdminIdentityTestFixture>
 ```
 
 **Checklist:**
-- [ ] Add `MultiIssuerJwtTests.cs` to `AdminIdentity.Api.IntegrationTests/`
+- [ ] Add `MultiIssuerJwtTests.cs` to `BackofficeIdentity.Api.IntegrationTests/`
 - [ ] Test admin JWT accepted by Orders.Api, Returns.Api, Customer Identity.Api, Correspondence.Api, Fulfillment.Api
 - [ ] Test vendor JWT rejected by all 5 domain BCs (wrong scheme)
 - [ ] Run `dotnet test` to verify all tests pass
@@ -587,7 +587,7 @@ public class MultiIssuerJwtTests : IClassFixture<AdminIdentityTestFixture>
 
 **Files to Update:**
 
-1. **admin-portal-integration-gap-register.md:**
+1. **backoffice-integration-gap-register.md:**
    - Mark 8 gaps as ✅ Closed
    - Add "Closed Date: 2026-03-XX" column
 
@@ -673,17 +673,17 @@ public class MultiIssuerJwtTests : IClassFixture<AdminIdentityTestFixture>
 
 **When M31.5 is complete:**
 1. Update CURRENT-CYCLE.md to mark M32.0 as "Prerequisites met, ready to start"
-2. Conduct targeted event modeling session for M32.0 Phase 1 (Admin Portal BFF)
-3. Start M32.0 Phase 1 implementation (Admin Portal domain project, API project, Blazor WASM frontend)
+2. Conduct targeted event modeling session for M32.0 Phase 1 (Backoffice BFF)
+3. Start M32.0 Phase 1 implementation (Backoffice domain project, API project, Blazor WASM frontend)
 
 ---
 
 ## Related Documents
 
-- [M31.5 Milestone Plan](milestones/m31-5-admin-portal-prerequisites.md) — Official milestone document
+- [M31.5 Milestone Plan](milestones/m31-5-backoffice-prerequisites.md) — Official milestone document
 - [M32.0 Prerequisite Assessment](m32-0-prerequisite-assessment.md) — Analysis leading to M31.5 creation
 - [ADR 0032: Multi-Issuer JWT Strategy](../decisions/0032-multi-issuer-jwt-strategy.md) — First deliverable of M31.5
-- [Admin Portal Integration Gap Register](admin-portal-integration-gap-register.md) — 8 gaps closed by M31.5
+- [Backoffice Integration Gap Register](backoffice-integration-gap-register.md) — 8 gaps closed by M31.5
 
 ---
 
@@ -691,5 +691,5 @@ public class MultiIssuerJwtTests : IClassFixture<AdminIdentityTestFixture>
 **Created By:** AI Agent (Claude Sonnet 4.5)
 **Estimated Duration:** 1 cycle (4-5 sessions, 10-15 hours total)
 **Status:** 📋 READY TO START (ADR 0032 drafted, waiting for sign-off)
-**Milestone:** M31.5 (Admin Portal Prerequisites)
+**Milestone:** M31.5 (Backoffice Prerequisites)
 **Owner Decision:** Option A (separate milestone) — approved 2026-03-15

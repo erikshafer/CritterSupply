@@ -10,7 +10,7 @@
 ## Session Objectives
 
 ### Primary Goal
-Add HTTP query endpoints to Inventory BC for warehouse stock queries, enabling Admin Portal integration for WarehouseClerk and OperationsManager roles.
+Add HTTP query endpoints to Inventory BC for warehouse stock queries, enabling Admin Portal (now Backoffice) integration for WarehouseClerk and OperationsManager roles.
 
 ### Success Criteria
 - [x] `GET /api/inventory/{sku}` endpoint created and tested
@@ -269,7 +269,7 @@ public sealed record LowStockItem(
 **Mitigation:** Session 3-5 will add JWT authentication before M32.0 Phase 1 begins
 
 ### Risk 2: Single Warehouse Constraint (Phase 1)
-**Impact:** Low (Admin Portal Phase 1 only supports single warehouse)
+**Impact:** Low (Backoffice Phase 1 only supports single warehouse)
 **Likelihood:** Planned limitation
 **Mitigation:** Query parameter `warehouseId` already exists for Phase 2+ multi-warehouse support
 
@@ -354,7 +354,7 @@ public sealed record LowStockItem(
    - Write multi-issuer JWT acceptance tests
    - Verify admin JWTs accepted by all 5 domain BCs
    - Verify vendor JWTs rejected by all 5 domain BCs (wrong scheme)
-   - Update documentation (admin-portal-integration-gap-register.md, CLAUDE.md)
+   - Update documentation (backoffice-integration-gap-register.md, CLAUDE.md)
 
 ---
 

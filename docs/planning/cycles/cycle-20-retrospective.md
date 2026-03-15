@@ -267,7 +267,7 @@ The Playwright + Reqnroll + Page Object Model combination proved to be an excell
 
 **Key Takeaway:** Real Kestrel servers are non-negotiable for SignalR testing. TestServer cannot properly test SignalR connections. This pattern is now established for all future E2E test suites in CritterSupply.
 
-**Ready for next cycle:** With E2E testing infrastructure in place, we can confidently add new features (Vendor Portal, Pricing BC, Admin Portal) knowing that regressions will be caught automatically.
+**Ready for next cycle:** With E2E testing infrastructure in place, we can confidently add new features (Vendor Portal, Pricing BC, Admin Portal (now Backoffice)) knowing that regressions will be caught automatically.
 
 ---
 

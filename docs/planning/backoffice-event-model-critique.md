@@ -1,8 +1,8 @@
-# Admin Portal Event Model — PSA Critique & Re-Modeling Findings
+# Backoffice Event Model — PSA Critique & Re-Modeling Findings
 
 **Date:** 2026-03-28
 **Reviewer:** Principal Software Architect
-**Scope:** Structured critique of `admin-portal-event-modeling.md` (2026-03-07) and `admin-portal-research-discovery.md` (2026-03-10) against the codebase as of Cycle 28 completion.
+**Scope:** Structured critique of `backoffice-event-modeling.md` (2026-03-07) and `backoffice-research-discovery.md` (2026-03-10) against the codebase as of Cycle 28 completion.
 **Purpose:** Foundation for the revised event model. Every finding must be resolved before implementation begins.
 
 ---
@@ -31,9 +31,9 @@ Severity: 🔴 Blocks implementation, 🟡 Should fix before implementation, �
 
 **Reality:** Analytics BC is listed as 🟢 Low Priority in CONTEXTS.md (line 733). No `src/Analytics/` directory exists. No code, no API, no projections.
 
-**Impact:** The event model's Phase 1 assumes a BC that does not exist and is not planned for near-term delivery. The executive dashboard KPIs (revenue, order count, AOV, conversion rate, payment failure rate, fulfillment pipeline, low-stock count — research doc §12 lines 1013-1026) must be sourced **directly from domain BCs** via the Admin Portal BFF's own Marten projections, not from Analytics BC.
+**Impact:** The event model's Phase 1 assumes a BC that does not exist and is not planned for near-term delivery. The executive dashboard KPIs (revenue, order count, AOV, conversion rate, payment failure rate, fulfillment pipeline, low-stock count — research doc §12 lines 1013-1026) must be sourced **directly from domain BCs** via the Backoffice BFF's own Marten projections, not from Analytics BC.
 
-**Resolution:** Remove Analytics BC from the dependency table entirely. Admin Portal BFF subscribes to `OrderPlaced`, `PaymentCaptured`, `PaymentFailed`, `ShipmentDispatched`, `InventoryLow` via RabbitMQ and maintains its own lightweight Marten document projections (`AdminDailyMetrics`, `FulfillmentPipelineView`, `LowStockSummaryView`). This is actually hinted at in the event model's Flow 4 (line 336: "Update AdminMetrics Marten document") but contradicts the dependency table that says "Analytics BC."
+**Resolution:** Remove Analytics BC from the dependency table entirely. Backoffice BFF subscribes to `OrderPlaced`, `PaymentCaptured`, `PaymentFailed`, `ShipmentDispatched`, `InventoryLow` via RabbitMQ and maintains its own lightweight Marten document projections (`AdminDailyMetrics`, `FulfillmentPipelineView`, `LowStockSummaryView`). This is actually hinted at in the event model's Flow 4 (line 336: "Update AdminMetrics Marten document") but contradicts the dependency table that says "Analytics BC."
 
 ---
 
@@ -78,14 +78,14 @@ These are all admin-facing operations that should be in the model's Phases 1-2, 
 
 **Impact:** The "requires Pricing BC to be live" guard is satisfied. Pricing integration can move to Phase 1 (read) / Phase 2 (write) without blockers.
 
-**BUT:** The Pricing BC currently has **NO admin-facing HTTP write endpoints**. Only 2 GET endpoints exist (`GET /api/pricing/products/{sku}` and `GET /api/pricing/products?skus=...`). All price write operations (`SetInitialPrice`, `ChangePrice`, `PriceChangeScheduled`) are internal domain command handlers, not HTTP endpoints. Admin Portal cannot call them via HTTP yet.
+**BUT:** The Pricing BC currently has **NO admin-facing HTTP write endpoints**. Only 2 GET endpoints exist (`GET /api/pricing/products/{sku}` and `GET /api/pricing/products?skus=...`). All price write operations (`SetInitialPrice`, `ChangePrice`, `PriceChangeScheduled`) are internal domain command handlers, not HTTP endpoints. Backoffice cannot call them via HTTP yet.
 
 **Resolution:** Pricing BC must add admin-facing write endpoints before Phase 2. The research doc (§6, line 690-692) correctly identifies these endpoints:
 - `PUT /api/pricing/products/{sku}/price` → AdminPricingManager
 - `POST /api/pricing/products/{sku}/price/schedule` → AdminPricingManager
 - `DELETE /api/pricing/products/{sku}/price/schedule/{scheduleId}` → AdminPricingManager
 
-These are prerequisites for Admin Portal Phase 2, and should be tracked as such.
+These are prerequisites for Backoffice Phase 2, and should be tracked as such.
 
 ---
 
@@ -93,7 +93,7 @@ These are prerequisites for Admin Portal Phase 2, and should be tracked as such.
 
 **Event model (line 205):** Phase 3 includes "Notification preferences per admin user (opt out of alert types)"
 
-**Reality:** ADR 0030 renamed "Notifications BC" to "Correspondence BC" to disambiguate transactional customer communications (Correspondence BC) from real-time UI push notifications (SignalR in Customer Experience / Admin Portal BFFs).
+**Reality:** ADR 0030 renamed "Notifications BC" to "Correspondence BC" to disambiguate transactional customer communications (Correspondence BC) from real-time UI push notifications (SignalR in Customer Experience / Backoffice BFFs).
 
 **Impact:** The event model's Phase 3 "notification preferences" item is actually about **SignalR push alert preferences** for admin users, NOT about the Correspondence BC. However, the naming ambiguity that motivated ADR 0030 affects how readers interpret this item. It should be renamed to "alert preferences" or "push notification preferences."
 
@@ -105,7 +105,7 @@ These are prerequisites for Admin Portal Phase 2, and should be tracked as such.
 
 ### M-1. 🔴 Returns BC Admin Integration Surface Is Absent
 
-The original model has **zero detail** about how Admin Portal interacts with the Returns BC beyond "HTTP read (return history)." Given Returns BC is now fully implemented with extensive admin-facing needs, this is the largest gap.
+The original model has **zero detail** about how Backoffice interacts with the Returns BC beyond "HTTP read (return history)." Given Returns BC is now fully implemented with extensive admin-facing needs, this is the largest gap.
 
 **What's missing — CS Agent (CustomerService role):**
 
@@ -173,7 +173,7 @@ The Correspondence BC (Cycle 28) exists but the event model has no integration w
 
 ### M-3. 🟡 Promotions BC Admin Tooling Is Absent
 
-Promotions BC is 🔴 High Priority (next, Cycle 29). It explicitly requires admin tooling (CONTEXTS.md line 657: "Commands (Admin Portal)"). Yet the event model has zero mention of promotions management.
+Promotions BC is 🔴 High Priority (next, Cycle 29). It explicitly requires admin tooling (CONTEXTS.md line 657: "Commands (Backoffice)"). Yet the event model has zero mention of promotions management.
 
 **What will be needed:**
 
@@ -221,7 +221,7 @@ Promotions BC is 🔴 High Priority (next, Cycle 29). It explicitly requires adm
 
 ### M-6. 🟡 CS Agent Runbook Integration Is Not Mentioned
 
-Returns BC has a CS agent runbook (documented in Cycle 27 retrospective). The Admin Portal should surface runbook steps contextually — e.g., when a CS agent views a return in "Inspecting" state, the UI should show the relevant runbook section for "waiting for inspection."
+Returns BC has a CS agent runbook (documented in Cycle 27 retrospective). The Backoffice should surface runbook steps contextually — e.g., when a CS agent views a return in "Inspecting" state, the UI should show the relevant runbook section for "waiting for inspection."
 
 **Resolution:** Add a requirement for contextual help / runbook links in the CS agent returns view. This is a UX concern, but the event model should flag it as a Phase 2 UX requirement.
 
@@ -237,7 +237,7 @@ Fulfillment BC (Cycles 7, 24) is fully implemented. The event model doesn't refe
 
 ---
 
-### M-8. 🟢 Missing `SystemAdmin` Role from CONTEXTS.md Admin Portal Section
+### M-8. 🟢 Missing `SystemAdmin` Role from CONTEXTS.md Backoffice Section
 
 **CONTEXTS.md (line 759):** "**Roles:** `Executive`, `OperationsManager`, `CustomerService`, `CopyWriter`, `PricingManager`, `WarehouseClerk`"
 
@@ -249,9 +249,9 @@ Lists 6 roles. The event model (line 93) and research doc (line 64) define **7 r
 
 ## 3. COLLISION — Naming, Port, or ADR Conflicts
 
-### C-1. 🔴 Port 5245 Collision: AdminIdentity.Api vs Returns.Api
+### C-1. 🔴 Port 5245 Collision: BackofficeIdentity.Api vs Returns.Api
 
-**Research doc (line 169, line 1072):** AdminIdentity.Api → port `5245`
+**Research doc (line 169, line 1072):** BackofficeIdentity.Api → port `5245`
 
 **Reality:** Returns.Api is live on port `5245` (confirmed in `src/Returns/Returns.Api/Properties/launchSettings.json`).
 
@@ -259,29 +259,29 @@ Lists 6 roles. The event model (line 93) and research doc (line 64) define **7 r
 
 **Impact:** Cannot deploy both services. Port collision is a hard blocker.
 
-**Resolution:** Assign AdminIdentity.Api the next available port. Current allocations through 5248 (Correspondence). Next available: **5249** for AdminIdentity.Api.
+**Resolution:** Assign BackofficeIdentity.Api the next available port. Current allocations through 5248 (Correspondence). Next available: **5249** for BackofficeIdentity.Api.
 
 Updated port table amendment:
 
 | Service | Port | Status |
 |---------|------|--------|
-| Admin Portal.Api | 5243 | 📋 Reserved (unchanged) |
-| Admin Portal.Web | 5244 | 📋 Reserved (unchanged) |
+| Backoffice.Api | 5243 | 📋 Reserved (unchanged) |
+| Backoffice.Web | 5244 | 📋 Reserved (unchanged) |
 | Returns.Api | 5245 | ✅ Live (KEEPS this port) |
 | Listings.Api | 5246 | 📋 Reserved |
 | Marketplaces.Api | 5247 | 📋 Reserved |
 | Correspondence.Api | 5248 | ✅ Live |
-| **AdminIdentity.Api** | **5249** | 📋 Reserved (NEW) |
+| **BackofficeIdentity.Api** | **5249** | 📋 Reserved (NEW) |
 
 ---
 
 ### C-2. 🔴 ADR Numbers 0026-0029 Are All Taken
 
 **Research doc (lines 948-953):** Proposes:
-- ADR 0026: AdminIdentity BC: Separate Identity Store
+- ADR 0026: BackofficeIdentity BC: Separate Identity Store
 - ADR 0027: Multi-Issuer JWT Strategy for Domain BCs
-- ADR 0028: Blazor WASM for Admin Portal Frontend
-- ADR 0029: Admin Portal SignalR Hub Design
+- ADR 0028: Blazor WASM for Backoffice Frontend
+- ADR 0029: Backoffice SignalR Hub Design
 
 **Reality:** All four numbers are taken:
 - ADR 0026: Polecat SQL Server Migration
@@ -290,10 +290,10 @@ Updated port table amendment:
 - ADR 0029: Order Saga Design Decisions
 
 **Resolution:** Re-number to next available (0031+):
-- **ADR 0031:** AdminIdentity BC: Separate Identity Store
+- **ADR 0031:** BackofficeIdentity BC: Separate Identity Store
 - **ADR 0032:** Multi-Issuer JWT Strategy for Domain BCs
-- **ADR 0033:** Blazor WASM for Admin Portal Frontend
-- **ADR 0034:** Admin Portal SignalR Hub Design
+- **ADR 0033:** Blazor WASM for Backoffice Frontend
+- **ADR 0034:** Backoffice SignalR Hub Design
 
 ---
 
@@ -307,7 +307,7 @@ Three documents give three different answers:
 | Research doc (line 357) | 2026-03-10 | Blazor WASM (overrides event model) |
 | CONTEXTS.md (line 761) | Current | "Next.js SSR (recommended)" |
 
-**Analysis:** The research doc explicitly overrides the event model (lines 373-379): "Commit to Blazor WASM for Admin Portal, diverging from the original event modeling doc's React/Next.js recommendation." The rationale is sound — team velocity, code reuse from Vendor Portal, single-language toolchain.
+**Analysis:** The research doc explicitly overrides the event model (lines 373-379): "Commit to Blazor WASM for Backoffice, diverging from the original event modeling doc's React/Next.js recommendation." The rationale is sound — team velocity, code reuse from Vendor Portal, single-language toolchain.
 
 **Impact:** CONTEXTS.md still says "Next.js SSR" which contradicts the research doc's explicit override. Anyone reading CONTEXTS.md will get the wrong answer.
 
@@ -324,9 +324,9 @@ Three documents give three different answers:
 
 **Research doc Appendix B (line 1090):** "Direct creation by SystemAdmin (no invitation)"
 
-These are mutually exclusive. The PO decision in §11 is the authoritative answer (it's the actual recorded decision). Appendix B's comparison table has an error in the AdminIdentity column.
+These are mutually exclusive. The PO decision in §11 is the authoritative answer (it's the actual recorded decision). Appendix B's comparison table has an error in the BackofficeIdentity column.
 
-**Resolution:** Fix Appendix B to say "72-hour invitation tokens (SHA-256 hashed)" in the AdminIdentity column, matching the §11 PO decision. Add a note that the invitation flow mirrors VendorIdentity's pattern.
+**Resolution:** Fix Appendix B to say "72-hour invitation tokens (SHA-256 hashed)" in the BackofficeIdentity column, matching the §11 PO decision. Add a note that the invitation flow mirrors VendorIdentity's pattern.
 
 ---
 
@@ -384,7 +384,7 @@ These are mutually exclusive. The PO decision in §11 is the authoritative answe
 
 **Impact on event model:** The research doc (§6, line 692) proposes a `DELETE /api/pricing/products/{sku}/price/schedule/{scheduleId}` endpoint. The event model's admin portal would need to interact with bulk pricing operations. If the saga doesn't exist, the admin portal can't manage bulk jobs.
 
-**Resolution:** Note in the revised event model that BulkPricingJob saga is NOT yet implemented. Admin Portal pricing management should target individual price operations first; bulk operations are blocked until the saga ships.
+**Resolution:** Note in the revised event model that BulkPricingJob saga is NOT yet implemented. Backoffice pricing management should target individual price operations first; bulk operations are blocked until the saga ships.
 
 ---
 
@@ -406,7 +406,7 @@ These are mutually exclusive. The PO decision in §11 is the authoritative answe
 
 **Reality:** Pricing.Api has only 2 GET endpoints. No write endpoints exist.
 
-**Impact:** This is expected — admin endpoints were planned for addition when Admin Portal begins implementation. But the revised event model should explicitly call out that these endpoints must be created as **prerequisites** in the Pricing BC, not assumed to exist.
+**Impact:** This is expected — admin endpoints were planned for addition when Backoffice begins implementation. But the revised event model should explicitly call out that these endpoints must be created as **prerequisites** in the Pricing BC, not assumed to exist.
 
 **Resolution:** Add "Pricing BC: add admin write endpoints" as a prerequisite task in Phase 2.
 
@@ -442,11 +442,11 @@ The event model doesn't define what WarehouseClerk sees regarding returns. Two p
 ### Q-3. 🟡 How Should the Executive Dashboard Source Data Without Analytics BC?
 
 The original model assumed Analytics BC projections. Without it:
-- **Option A:** Admin Portal BFF subscribes to domain events and builds its own Marten projections (research doc §12 KPIs 1-7 are all derivable from existing domain events)
+- **Option A:** Backoffice BFF subscribes to domain events and builds its own Marten projections (research doc §12 KPIs 1-7 are all derivable from existing domain events)
 - **Option B:** Domain BCs expose aggregate query endpoints (e.g., Orders BC: `GET /api/orders/metrics/today`)
 - **Option C:** Defer executive dashboard until Analytics BC is built
 
-**Recommendation:** Option A — Admin Portal BFF as a projection owner is consistent with the BFF pattern. The BFF already subscribes to RabbitMQ events for SignalR; adding projection updates to those handlers is minimal incremental work. This also avoids polluting domain BC APIs with dashboard-specific query endpoints.
+**Recommendation:** Option A — Backoffice BFF as a projection owner is consistent with the BFF pattern. The BFF already subscribes to RabbitMQ events for SignalR; adding projection updates to those handlers is minimal incremental work. This also avoids polluting domain BC APIs with dashboard-specific query endpoints.
 
 ---
 
@@ -461,7 +461,7 @@ Promotions BC is next (Cycle 29). The event model has no promotions management. 
 
 ---
 
-### Q-5. 🟡 What Is the Correct AdminIdentity User Provisioning Flow?
+### Q-5. 🟡 What Is the Correct BackofficeIdentity User Provisioning Flow?
 
 Research doc has an internal contradiction (see **C-4**). Two possibilities:
 - **Invitation flow** (72-hour token, email link, self-service password setup) — per §11 PO Decision
@@ -479,9 +479,9 @@ When a CS agent looks up a customer, should the view include recent corresponden
 
 ---
 
-### Q-7. 🟢 Should the Revised Model Add a Phase 0 (AdminIdentity Only)?
+### Q-7. 🟢 Should the Revised Model Add a Phase 0 (BackofficeIdentity Only)?
 
-The research doc (§9, line 880) already proposes a Phase 0 for AdminIdentity BC. The original event model starts at Phase 1. Should the revised event model adopt the 4-phase structure (0, 1, 2, 3)?
+The research doc (§9, line 880) already proposes a Phase 0 for BackofficeIdentity BC. The original event model starts at Phase 1. Should the revised event model adopt the 4-phase structure (0, 1, 2, 3)?
 
 **Recommendation:** Yes. Phase 0 is clean scope — identity BC only, no portal, no frontend. This is a proven pattern (VendorIdentity shipped in a cycle before Vendor Portal). The revised model should use Phases 0-3 (matching the research doc).
 
@@ -494,7 +494,7 @@ The research doc (§9, line 880) already proposes a Phase 0 for AdminIdentity BC
 | # | Finding | Action | Owner |
 |---|---------|--------|-------|
 | I-1 | Analytics BC doesn't exist | Remove from dependencies; design BFF-owned projections | Architect |
-| C-1 | Port 5245 collision | Assign AdminIdentity.Api → port 5249 | Architect |
+| C-1 | Port 5245 collision | Assign BackofficeIdentity.Api → port 5249 | Architect |
 | C-2 | ADR 0026-0029 taken | Re-number to ADR 0031-0034 | Architect |
 | M-1 | Returns BC integration absent | Design full Returns admin surface (6+ endpoints) | Architect + PO |
 | Q-1 | Return approval role ownership | PO decision needed | PO |
@@ -537,11 +537,11 @@ The research doc (§9, line 880) already proposes a Phase 0 for AdminIdentity BC
 
 Based on findings above, here is the proposed phase structure for the revised event model:
 
-### Phase 0: AdminIdentity BC (Prerequisite — 1 cycle)
-- AdminIdentity project (EF Core, DbContext, `adminidentity` schema)
-- AdminIdentity.Api (JWT issuer, login/logout/refresh, seed data) — **port 5249**
+### Phase 0: BackofficeIdentity BC (Prerequisite — 1 cycle)
+- BackofficeIdentity project (EF Core, DbContext, `backofficeidentity` schema)
+- BackofficeIdentity.Api (JWT issuer, login/logout/refresh, seed data) — **port 5249**
 - AdminRole enum + integration messages in Messages.Contracts
-- **ADR 0031:** AdminIdentity BC: Separate Identity Store
+- **ADR 0031:** BackofficeIdentity BC: Separate Identity Store
 - Integration tests (Alba + TestContainers)
 
 ### Phase 1: Read-Only Dashboards + CS + Returns Read (1-2 cycles)
@@ -555,8 +555,8 @@ Based on findings above, here is the proposed phase structure for the revised ev
 - SignalR: `OrderPlaced`, `PaymentFailed`, `InventoryLow`, `ReturnRequested`, `ReturnExpired`
 - Multi-issuer JWT in ProductCatalog.Api, Orders.Api, Returns.Api
 - **ADR 0032:** Multi-Issuer JWT Strategy
-- **ADR 0033:** Blazor WASM for Admin Portal Frontend
-- **ADR 0034:** Admin Portal SignalR Hub Design
+- **ADR 0033:** Blazor WASM for Backoffice Frontend
+- **ADR 0034:** Backoffice SignalR Hub Design
 
 ### Phase 2: Write Operations + Warehouse + Pricing (1-2 cycles)
 - CopyWriter: product description update → Product Catalog BC
@@ -569,7 +569,7 @@ Based on findings above, here is the proposed phase structure for the revised ev
 - Add auth to Inventory.Api, Payments.Api (admin scheme)
 
 ### Phase 3: Polish + Advanced Features (1 cycle)
-- SystemAdmin: user management CRUD → AdminIdentity BC
+- SystemAdmin: user management CRUD → BackofficeIdentity BC
 - Executive: CSV/Excel report exports (from BFF projections, NOT Analytics BC)
 - Escalation workflow (CS → Ops: `OrderEscalated` event → SignalR)
 - Audit log viewer (SystemAdmin: "show me everything Jane Smith did in 30 days")

@@ -111,7 +111,7 @@
    - `Cycle 26` → `M25.1: Returns Mixed Inspection`
    - `Cycle 27` → `M25.2: Returns Exchanges`
    - `Cycle 28` → `M28.0: Correspondence BC`
-   - `Cycle 29 Phase 1` → `M29.0: Admin Identity BC`
+   - `Cycle 29 Phase 1` → `M29.0: Backoffice Identity BC`
    - `Cycle 29 Phase 2` → `M29.1: Promotions BC Core`
 
 2. **Use new convention for future milestones**:

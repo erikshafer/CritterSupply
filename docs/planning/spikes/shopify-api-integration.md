@@ -593,7 +593,7 @@ The Marketplaces BC Shopify adapter needs subscriptions to these topics:
 | `products/update` | Product updated in Shopify admin directly | Log warning (Shopify is NOT our source of truth — this is an audit signal, not a sync trigger) |
 | `fulfillments/update` | Fulfillment status changes | Update order tracking in CritterSupply |
 | `inventory_levels/update` | Inventory changed in Shopify | Reconciliation signal (should match our push) |
-| `app/uninstalled` | App removed from store | Deactivate `Marketplace` document for `SHOPIFY_US`, suspend all sync handlers, alert ops team (Admin Portal notification + structured log alert). Pending in-flight fulfillments should still attempt push-back before suspension. Recovery requires manual re-installation and re-enabling the Marketplace document. |
+| `app/uninstalled` | App removed from store | Deactivate `Marketplace` document for `SHOPIFY_US`, suspend all sync handlers, alert ops team (Backoffice notification + structured log alert). Pending in-flight fulfillments should still attempt push-back before suspension. Recovery requires manual re-installation and re-enabling the Marketplace document. |
 | `customers/data_request` | GDPR: customer data request | **Mandatory** — must be subscribed. Note: we DO store customer PII (email, shipping address on Order records). Handler must query Orders BC for orders tied to this Shopify customer ID and return the data per GDPR Article 15. See [GDPR note](#gdpr-clarification) below. |
 | `customers/redact` | GDPR: delete customer data | **Mandatory** — must be subscribed. Trigger data deletion workflow in Orders BC. |
 | `shop/redact` | GDPR: delete shop data | **Mandatory** — must be subscribed |
@@ -1076,12 +1076,12 @@ This section is the explicit scope boundary for the Cycle 35 implementation of t
 | **Reverse cancel propagation** | CritterSupply cancel → Shopify `orderCancel` mutation. Decision on this (build now vs. CS SOP) must be made at Cycle 35 planning. If deferred, document CS SOP explicitly. |
 | **Chargeback handling** | `orders/updated` for `financialStatus: CHARGED_BACK`. Requires CS Operations input and possible Returns BC involvement. Cycle 36 minimum. |
 | **Multi-location inventory** | CritterSupply has a single warehouse at launch. Multi-location inventory sync deferred until Inventory BC supports multiple locations. |
-| **Customer data lookup** | Shopify order ID ↔ CritterSupply order ID lookup in Admin Portal. Basic correlation stored on Order aggregate; Admin Portal search feature deferred to Admin Portal Phase 2. |
+| **Customer data lookup** | Shopify order ID ↔ CritterSupply order ID lookup in Backoffice. Basic correlation stored on Order aggregate; Backoffice search feature deferred to Backoffice Phase 2. |
 | **Subscription products** | Selling Plans API integration. Requires marketing/business decision on subscription model. |
 | **Programmatic collection management** | Smart Collections (recommended in Section 9.3) handle this without API calls. Programmatic collection assignment can be added if Smart Collections are insufficient. |
 | **Price sync** | Separate `PriceChanged` event handler (in addition to full `productSet` sync). Can be achieved with incremental `productSet` in Cycle 35; dedicated price sync endpoint deferred. |
-| **Shopify analytics read** | Reading order analytics from Shopify. Admin Portal dashboard for Shopify channel activity. Deferred to Admin Portal Phase 2. |
-| **Circuit-breaker** | Auto-suspend adapter after repeated failures. Basic retry/backoff in Cycle 35; circuit-breaker (with `ShopifyAdapterCircuitOpen` event + Admin Portal alert) in Cycle 36. |
+| **Shopify analytics read** | Reading order analytics from Shopify. Backoffice dashboard for Shopify channel activity. Deferred to Backoffice Phase 2. |
+| **Circuit-breaker** | Auto-suspend adapter after repeated failures. Basic retry/backoff in Cycle 35; circuit-breaker (with `ShopifyAdapterCircuitOpen` event + Backoffice alert) in Cycle 36. |
 
 ### 11.3 Pre-Cycle 35 Requirements (Must Be Resolved Before Planning Closes)
 
@@ -1144,7 +1144,7 @@ These items are not implementation tasks — they are decisions, configurations,
 The spike originally mentioned that "Shopify does its own reservation" but didn't trace the race condition. The inventory sync section now explicitly documents the dual-decrement sequence and requires that Wolverine handler ordering enforce: inventory reservation COMMITTED → then inventory push to Shopify. Engineering must see this before writing handler code.
 
 **Gap 2: `app/uninstalled` Webhook Had No Business Response**
-"Alert + disable adapter" was insufficient. Section 5.1 now specifies: deactivate `Marketplace` document for `SHOPIFY_US`, suspend sync handlers, alert ops team via Admin Portal notification + structured log, allow in-flight fulfillments to complete before suspension, and require manual re-installation + document re-enablement for recovery.
+"Alert + disable adapter" was insufficient. Section 5.1 now specifies: deactivate `Marketplace` document for `SHOPIFY_US`, suspend sync handlers, alert ops team via Backoffice notification + structured log, allow in-flight fulfillments to complete before suspension, and require manual re-installation + document re-enablement for recovery.
 
 **Gap 3: Draft Orders Were Missing**
 When CS reps create Shopify draft orders (phone-in, goodwill orders), completion fires `orders/create`. Section 1.4 now notes this and confirms the payload is structurally identical — ingest the same way. Additional fields (zero shipping, manual discounts, notes) are stored for CS context.

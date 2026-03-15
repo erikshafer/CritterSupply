@@ -24,11 +24,11 @@
 | Cycle 26 | M25.1 | Returns BC — Mixed inspection | ✅ Complete |
 | Cycle 27 | M25.2 | Returns BC — Exchanges | ✅ Complete |
 | Cycle 28 | M28.0 | Correspondence BC — Email delivery | ✅ Complete |
-| Cycle 29 Phase 1 | M29.0 | Admin Identity BC — JWT auth | ✅ Complete |
+| Cycle 29 Phase 1 | M29.0 | Backoffice Identity BC — JWT auth | ✅ Complete |
 | Cycle 29 Phase 2 | M29.1 | Promotions BC — Core lifecycle | ✅ Complete |
 | Cycle 30 (planned) | M30.0 | Promotions BC — Redemption workflow | 📋 Planned |
 | Cycle 31 (planned) | M31.0 | Correspondence BC — Extended integrations & SMS | 📋 Planned |
-| Cycle 32+ (planned) | M32.0 | Admin Portal — Read-only dashboards | 📋 Planned |
+| Cycle 32+ (planned) | M32.0 | Backoffice — Read-only dashboards | 📋 Planned |
 
 ---
 
@@ -241,9 +241,9 @@
 
 ---
 
-### M29.0: Admin Identity BC — JWT Auth (Cycle 29 Phase 1)
+### M29.0: Backoffice Identity BC — JWT Auth (Cycle 29 Phase 1)
 **Date:** 2026-03-14
-**BC:** Admin Identity
+**BC:** Backoffice Identity
 **Port:** 5249
 **Deliverables:**
 - ADR 0031: RBAC model (7 roles, policy-based authorization)
@@ -256,7 +256,7 @@
 
 **Files:**
 - Retrospective: `docs/planning/cycles/cycle-29-admin-identity-phase-1-retrospective.md`
-- ADR: `docs/decisions/0031-admin-portal-rbac-model.md`
+- ADR: `docs/decisions/0031-backoffice-rbac-model.md`
 
 ---
 
@@ -310,9 +310,9 @@
 
 ---
 
-### M32.0: Admin Portal — Read-Only Dashboards (Planned)
+### M32.0: Backoffice — Read-Only Dashboards (Planned)
 **Status:** 📋 Planned
-**BC:** Admin Portal
+**BC:** Backoffice
 **Prerequisites:**
 - Multi-issuer JWT support in domain BCs
 - HTTP endpoint gaps closed (Customer Identity email search, Inventory HTTP layer, etc.)
@@ -320,8 +320,8 @@
 **Planned Deliverables:**
 - Read-only dashboards: Orders, Returns, Customers, Inventory
 - Customer Service tooling: Return approval/denial, correspondence history
-- Event Modeling: `docs/planning/admin-portal-event-modeling-revised.md`
-- Integration Gap Register: `docs/planning/admin-portal-integration-gap-register.md`
+- Event Modeling: `docs/planning/backoffice-event-modeling-revised.md`
+- Integration Gap Register: `docs/planning/backoffice-integration-gap-register.md`
 
 ---
 
@@ -363,9 +363,9 @@ These are **incremental features** within the **same bounded context**, so they 
 
 ### Why M29.0 and M29.1 (not M29 and M30)?
 
-Admin Identity (M29.0) and Promotions BC Core (M29.1) were delivered in the same "milestone window" (March 14-15, 2026). While they're separate BCs, they're both **foundational** for the Admin Portal epic, so they share a MAJOR number (29).
+Backoffice Identity (M29.0) and Promotions BC Core (M29.1) were delivered in the same "milestone window" (March 14-15, 2026). While they're separate BCs, they're both **foundational** for the Backoffice epic, so they share a MAJOR number (29).
 
-**Alternative rationale:** Could treat each BC as MAJOR (M29.0 = Admin Identity, M30.0 = Promotions BC Core). The team chose to keep them together as M29.x to reflect the tight delivery cadence.
+**Alternative rationale:** Could treat each BC as MAJOR (M29.0 = Backoffice Identity, M30.0 = Promotions BC Core). The team chose to keep them together as M29.x to reflect the tight delivery cadence.
 
 ### Why M30.0 for "Promotions BC Phase 2"?
 

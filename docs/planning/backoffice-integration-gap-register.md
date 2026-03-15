@@ -1,12 +1,12 @@
-# Admin Portal — Integration Gap Register
+# Backoffice — Integration Gap Register
 
 **Date:** 2026-03-14 (Re-modeling session)
-**Status:** Companion to [Revised Event Model](admin-portal-event-modeling-revised.md)
+**Status:** Companion to [Revised Event Model](backoffice-event-modeling-revised.md)
 **Source of Truth:** Codebase audit of `src/` directory, verified against `src/Shared/Messages.Contracts/`
 
 > **Important:** CONTEXTS.md is reliable for descriptions and architectural intent but NOT for exact events, commands, queries, or integration messages. All endpoint claims in this document have been verified against the actual codebase as of Cycle 28 completion.
 >
-> **Update (2026-03-14):** Admin Identity BC is now implemented (Cycle 29 Phase 1, PR #375). It issues JWTs with issuer `https://localhost:5249` and standard `role` claim. Domain BCs that need to accept admin tokens must add `JwtBearerOptions` trusting this issuer. See [ADR 0031](../decisions/0031-admin-portal-rbac-model.md) §4 for the token validation pattern.
+> **Update (2026-03-14):** Backoffice Identity BC is now implemented (Cycle 29 Phase 1, PR #375). It issues JWTs with issuer `https://localhost:5249` and standard `role` claim. Domain BCs that need to accept admin tokens must add `JwtBearerOptions` trusting this issuer. See [ADR 0031](../decisions/0031-backoffice-rbac-model.md) §4 for the token validation pattern.
 
 ---
 
@@ -14,24 +14,24 @@
 
 | Status | Meaning |
 |--------|---------|
-| ✅ Fully Defined | Endpoint exists in the domain BC, tested, and ready for Admin Portal to call |
+| ✅ Fully Defined | Endpoint exists in the domain BC, tested, and ready for Backoffice to call |
 | ⚠️ Partially Defined | BC exists but the specific endpoint is not yet implemented |
 | ❌ Not Yet Possible | BC doesn't exist or is deferred |
 | 🟡 TBD | BC is in progress (Cycle 29+); integration surface not yet known |
 
 | Phase Blocking | Meaning |
 |---------------|---------|
-| **Phase 0.5 Blocker** | Must be created before Admin Portal Phase 1 can begin |
+| **Phase 0.5 Blocker** | Must be created before Backoffice Phase 1 can begin |
 | **Phase 2 Blocker** | Must be created before Phase 2 write operations |
 | **Known Deferral** | Acknowledged gap with a planned resolution timeline |
 | **Newly Discovered** | Gap found during this re-modeling session, not previously documented |
 
 ---
 
-## 0. Admin Identity BC — ✅ COMPLETE
+## 0. Backoffice Identity BC — ✅ COMPLETE
 
-**Folder:** `src/Admin Identity/`
-**Technology:** EF Core + PostgreSQL (`adminidentity` schema)
+**Folder:** `src/Backoffice Identity/`
+**Technology:** EF Core + PostgreSQL (`backofficeidentity` schema)
 **Auth Status:** JWT Bearer auth on all user management endpoints (`[Authorize(Policy = "SystemAdmin")]`)
 **Status:** ✅ Fully implemented in Cycle 29 Phase 1 (PR #375)
 
@@ -45,12 +45,12 @@
 | Change user role | Command | `PUT /api/admin-identity/users/{id}/role` | ✅ Fully Defined | — | SystemAdmin only |
 | Deactivate user | Command | `DELETE /api/admin-identity/users/{id}` | ✅ Fully Defined | — | SystemAdmin only; soft delete with reason |
 
-**All 7 endpoints implemented. No gaps.** Admin Portal BFF will consume these endpoints via typed HTTP client for authentication and user management flows.
+**All 7 endpoints implemented. No gaps.** Backoffice BFF will consume these endpoints via typed HTTP client for authentication and user management flows.
 
 **Deferred items (not blocking):**
 - Integration messages in `Messages.Contracts` (`AdminUserCreated`, `AdminUserDeactivated`, `AdminUserRoleChanged`) — to be added when other BCs need to react to admin user lifecycle events
 - Integration tests (Alba + TestContainers) — no test project created yet
-- Multi-audience JWT (Admin Portal API audience) — Phase 1 uses self-referential audience (`https://localhost:5249`); must be updated when Admin Portal API (port 5243) is built
+- Multi-audience JWT (Backoffice API audience) — Phase 1 uses self-referential audience (`https://localhost:5249`); must be updated when Backoffice API (port 5243) is built
 
 ---
 
@@ -65,8 +65,8 @@
 | Get customer by ID | Query | `GET /api/customers/{id}` | ✅ Fully Defined | — | |
 | **Search customer by email** | Query | `GET /api/customers?email={email}` | ⚠️ **GAP** | **Phase 0.5 Blocker** | Only ID-based lookup exists. CS workflow is dead on arrival without email search. **Newly Discovered.** |
 | Get customer addresses | Query | `GET /api/customers/{id}/addresses` | ✅ Fully Defined | — | |
-| Get address snapshot | Query | `GET /api/addresses/{id}/snapshot` | ✅ Fully Defined | — | Used by Orders BC at checkout; Admin Portal can use for display |
-| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Admin"`) | ⚠️ **GAP** | **Phase 0.5 Blocker** | No multi-issuer JWT configured. Admin tokens will be rejected. |
+| Get address snapshot | Query | `GET /api/addresses/{id}/snapshot` | ✅ Fully Defined | — | Used by Orders BC at checkout; Backoffice can use for display |
+| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ⚠️ **GAP** | **Phase 0.5 Blocker** | No multi-issuer JWT configured. Admin tokens will be rejected. |
 
 **Estimated Effort:** < 1 session for email search; < 1 session for admin JWT scheme.
 
@@ -84,7 +84,7 @@
 | Get order detail | Query | `GET /api/orders/{orderId}` | ✅ Fully Defined | — | Returns saga state, line items, amounts |
 | Cancel order | Command | `POST /api/orders/{orderId}/cancel` | ✅ Fully Defined | — | Saga handles compensation (inventory release + refund) |
 | Get returnable items | Query | `GET /api/orders/{orderId}/returnable-items` | ✅ Fully Defined | — | Returns items with delivery date and return eligibility |
-| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Admin"`) | ⚠️ **GAP** | **Phase 0.5 Blocker** | No authentication on any endpoint today |
+| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ⚠️ **GAP** | **Phase 0.5 Blocker** | No authentication on any endpoint today |
 
 **Estimated Effort:** < 1 session for admin JWT scheme.
 
@@ -109,9 +109,9 @@
 | Approve exchange | Command | `POST /api/returns/{id}/approve-exchange` | ✅ Fully Defined | — | CS workflow, Phase 2 |
 | Deny exchange | Command | `POST /api/returns/{id}/deny-exchange` | ✅ Fully Defined | — | CS workflow, Phase 2 |
 | Ship replacement | Command | `POST /api/returns/{id}/ship-replacement` | ✅ Fully Defined | — | Warehouse workflow, Phase 2 |
-| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Admin"`) | ⚠️ **GAP** | **Phase 0.5 Blocker** | No authentication on any endpoint today |
+| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ⚠️ **GAP** | **Phase 0.5 Blocker** | No authentication on any endpoint today |
 
-**Returns BC is the most complete integration surface for Admin Portal.** All 9 endpoints needed for Phases 1 and 2 already exist. Only auth setup is missing.
+**Returns BC is the most complete integration surface for Backoffice.** All 9 endpoints needed for Phases 1 and 2 already exist. Only auth setup is missing.
 
 **Estimated Effort:** < 1 session for admin JWT scheme.
 
@@ -127,7 +127,7 @@
 |------------------|------|----------|--------|---------------|-------|
 | Get payment detail | Query | `GET /api/payments/{paymentId}` | ✅ Fully Defined | — | Returns payment saga state, amounts, transaction IDs |
 | List payments for order | Query | `GET /api/payments?orderId={id}` | ⚠️ **GAP** | **Known Deferral (P2)** | CS needs to see payment history for an order. Only single-payment lookup exists today. Not a Phase 1 blocker (CS can find paymentId from order detail). |
-| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Admin"`) | ⚠️ **GAP** | **Phase 2 Blocker** | Only needed when CS accesses payment data directly |
+| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ⚠️ **GAP** | **Phase 2 Blocker** | Only needed when CS accesses payment data directly |
 
 **Estimated Effort:** < 1 session for order-based payment query; < 1 session for admin JWT scheme.
 
@@ -145,10 +145,10 @@
 | **Get low-stock alerts** | Query | `GET /api/inventory/low-stock` | ❌ **Does not exist** | **Phase 0.5 Blocker** | WH alert feed needs a query endpoint for initial load (before SignalR streams). **Newly Discovered.** |
 | **Adjust inventory** | Command | `POST /api/inventory/{sku}/adjust` | ❌ **Does not exist** | **Phase 2 Blocker** | `ReceiveStock` and `InitializeInventory` handlers exist as Wolverine message handlers but are NOT exposed as HTTP endpoints. |
 | **Receive stock** | Command | `POST /api/inventory/{sku}/receive` | ❌ **Does not exist** | **Phase 2 Blocker** | Same as above — handler exists, HTTP endpoint does not. |
-| **Acknowledge low-stock alert** | Command | `POST /api/inventory/alerts/{id}/acknowledge` | ❌ **Does not exist** | **Phase 2 Blocker** | No concept of alert acknowledgment in Inventory BC today. Admin Portal may own this (AlertAcknowledgment aggregate). |
+| **Acknowledge low-stock alert** | Command | `POST /api/inventory/alerts/{id}/acknowledge` | ❌ **Does not exist** | **Phase 2 Blocker** | No concept of alert acknowledgment in Inventory BC today. Backoffice may own this (AlertAcknowledgment aggregate). |
 | Admin JWT acceptance | Auth | Named JWT Bearer scheme | ❌ **Does not exist** | **Phase 0.5 Blocker** | No HTTP layer at all |
 
-**Inventory BC is the most significant gap.** All 6 integration points (5 endpoints + auth scheme) require new work — the BC has no HTTP layer at all today. This is the highest-effort prerequisite BC for Admin Portal.
+**Inventory BC is the most significant gap.** All 6 integration points (5 endpoints + auth scheme) require new work — the BC has no HTTP layer at all today. This is the highest-effort prerequisite BC for Backoffice.
 
 **Estimated Effort:** 2-3 sessions to add HTTP layer with query + command endpoints + admin JWT.
 
@@ -163,7 +163,7 @@
 | Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
 |------------------|------|----------|--------|---------------|-------|
 | **Get shipment for order** | Query | `GET /api/fulfillment/shipments?orderId={id}` | ⚠️ **GAP** | **Phase 0.5 Blocker** | CS agents answering "Where is my order?" (35-40% of tickets) need shipment tracking data. Fulfillment BC dispatches shipments but may not expose a read endpoint. **Needs codebase verification for existing endpoints.** |
-| Admin JWT acceptance | Auth | Named JWT Bearer scheme | ⚠️ **GAP** | **Phase 2 Blocker** | Only needed if Admin Portal sends commands to Fulfillment |
+| Admin JWT acceptance | Auth | Named JWT Bearer scheme | ⚠️ **GAP** | **Phase 2 Blocker** | Only needed if Backoffice sends commands to Fulfillment |
 
 **Estimated Effort:** < 1 session for shipment query endpoint; < 1 session for admin JWT if needed.
 
@@ -173,7 +173,7 @@
 
 **Folder:** `src/Product Catalog/`
 **Technology:** Marten document store (non-event-sourced)
-**Auth Status:** 3 endpoints protected with `[Authorize(Policy = "Admin")]` (Vendor JWT)
+**Auth Status:** 3 endpoints protected with `[Authorize(Policy = "Backoffice")]` (Vendor JWT)
 
 | Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
 |------------------|------|----------|--------|---------------|-------|
@@ -181,8 +181,8 @@
 | Get product detail | Query | `GET /api/products/{sku}` | ✅ Fully Defined | — | |
 | **Update product description** | Command | `PUT /api/products/{sku}/description` | ⚠️ **GAP** | **Phase 2 Blocker** | `PUT /api/products/{sku}` exists but updates the entire product, not just description. CopyWriter needs a scoped description-only endpoint. |
 | Change product status | Command | `PATCH /api/products/{sku}/status` | ✅ Fully Defined | — | Exists but unprotected. Needs admin auth policy. |
-| Vendor assignment | Command | `POST /api/admin/products/{sku}/vendor-assignment` | ✅ Fully Defined | — | Already protected with `[Authorize(Policy = "Admin")]` — Vendor JWT. **Needs policy rename from `"Admin"` to `"VendorAdmin"` when multi-issuer JWT is introduced.** |
-| **Multi-issuer JWT** | Auth | Named schemes (`"Vendor"`, `"Admin"`) | ⚠️ **GAP** | **Phase 2 Blocker** | Currently only Vendor JWT scheme. Needs admin scheme added per research doc §3. Existing `"Admin"` policy must be renamed to `"VendorAdmin"`. |
+| Vendor assignment | Command | `POST /api/admin/products/{sku}/vendor-assignment` | ✅ Fully Defined | — | Already protected with `[Authorize(Policy = "Backoffice")]` — Vendor JWT. **Needs policy rename from `"Backoffice"` to `"VendorAdmin"` when multi-issuer JWT is introduced.** |
+| **Multi-issuer JWT** | Auth | Named schemes (`"Vendor"`, `"Backoffice"`) | ⚠️ **GAP** | **Phase 2 Blocker** | Currently only Vendor JWT scheme. Needs admin scheme added per research doc §3. Existing `"Backoffice"` policy must be renamed to `"VendorAdmin"`. |
 
 **Estimated Effort:** < 1 session for description-only endpoint; 1 session for multi-issuer JWT refactor.
 
@@ -234,7 +234,7 @@
 
 | Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
 |------------------|------|----------|--------|---------------|-------|
-| List active promotions | Query | TBD | 🟡 TBD | **Known Deferral** | Phase 2 dependency — Promotions BC will ship Cycle 29, before Admin Portal Phase 2 |
+| List active promotions | Query | TBD | 🟡 TBD | **Known Deferral** | Phase 2 dependency — Promotions BC will ship Cycle 29, before Backoffice Phase 2 |
 | Create promotion | Command | TBD | 🟡 TBD | **Known Deferral** | Phase 3 dependency |
 | Deactivate promotion | Command | TBD | 🟡 TBD | **Known Deferral** | Phase 3 dependency |
 
@@ -260,13 +260,13 @@
 
 ## Summary
 
-> **Update (2026-03-14):** Admin Identity BC (Phase 0) is now complete. The counts below reflect the original gap analysis plus 7 newly resolved endpoints from AdminIdentity.
+> **Update (2026-03-14):** Backoffice Identity BC (Phase 0) is now complete. The counts below reflect the original gap analysis plus 7 newly resolved endpoints from BackofficeIdentity.
 
 ### Gap Count by Severity
 
 | Status | Count | Blocking Phase |
 |--------|-------|---------------|
-| ✅ Fully Defined | **25** (18 original + 7 AdminIdentity) | Ready to integrate |
+| ✅ Fully Defined | **25** (18 original + 7 BackofficeIdentity) | Ready to integrate |
 | Phase 0.5 Blockers | **8** | Must resolve before Phase 1 |
 | Phase 2 Blockers | **9** | Must resolve before Phase 2 |
 | Known Deferrals | **3** | Acknowledged, resolution planned |

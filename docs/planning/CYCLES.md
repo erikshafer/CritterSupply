@@ -231,8 +231,8 @@ This document tracks active and recent development cycles. For complete historic
 **Cycle 27:** Promotions BC Phase 1 — Coupons and discounts
 - Shopping BC already has `CouponApplied`/`CouponRemoved` placeholder events
 
-**Cycle 28+:** Admin Portal Phase 1 — Read-only dashboards, customer service tooling
-- Event Modeling: `docs/planning/admin-portal-event-modeling.md`
+**Cycle 28+:** Backoffice Phase 1 — Read-only dashboards, customer service tooling
+- Event Modeling: `docs/planning/backoffice-event-modeling.md`
 - RBAC ADR must exist before implementation begins
 
 ---

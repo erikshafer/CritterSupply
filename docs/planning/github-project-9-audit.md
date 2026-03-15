@@ -107,7 +107,7 @@ Issues needed:
 2. `[Promotions BC] Implement coupon/discount domain model` (bc:promotions, type:feature)
 3. `[Promotions BC] Shopping BC integration: apply coupon to cart` (bc:shopping, type:feature)
 4. `[Promotions BC] Write integration tests` (bc:promotions, type:feature)
-5. `[Admin Portal] Write RBAC ADR before implementation begins` (bc:admin-portal, type:documentation)
+5. `[Backoffice] Write RBAC ADR before implementation begins` (bc:backoffice, type:documentation)
 
 ---
 
@@ -139,7 +139,7 @@ Issues needed:
 ## Notes for Owner
 
 1. **Label Drift workflow:** The automated "Label Drift Detected" issues suggest a GitHub Actions workflow fires when labels diverge from `scripts/github-migration/01-labels.sh`. Consider:
-   - Updating `01-labels.sh` to include all canonical labels (`bc:admin-portal`, `bc:notifications`, `bc:pricing`, `bc:promotions`, `bc:vendor-identity`)
+   - Updating `01-labels.sh` to include all canonical labels (`bc:backoffice`, `bc:notifications`, `bc:pricing`, `bc:promotions`, `bc:vendor-identity`)
    - OR disabling the label-drift check if it's producing noise without action
 
 2. **Migration debt:** Issues 256-305 were created as part of the GitHub migration effort but were never used for day-to-day tracking. The actual implementation tracked via commit messages and retrospective docs. This is the root cause of the drift.

@@ -1,16 +1,16 @@
-# Admin Portal: Event Modeling & Design Session
+# Backoffice: Event Modeling & Design Session
 
 **Date:** 2026-03-07
 **Participants:** Product Owner, Principal Architect, Engineering Lead
 **Status:** 🟡 Planning Complete — Awaiting Implementation Cycle Assignment
-**Related CONTEXTS.md Section:** [Admin Portal](../../CONTEXTS.md#admin-portal)
+**Related CONTEXTS.md Section:** [Backoffice](../../CONTEXTS.md#backoffice)
 **Port Assignments:** AdminPortal.Api → 5243, AdminPortal.Web → 5244
 
 ---
 
 ## Purpose
 
-This document captures the collaborative event modeling and design session for the Admin Portal Bounded Context. It is the pre-implementation blueprint that expands the initial sketch in CONTEXTS.md with detailed decisions, trade-off analysis, phased roadmap, and risk register.
+This document captures the collaborative event modeling and design session for the Backoffice Bounded Context. It is the pre-implementation blueprint that expands the initial sketch in CONTEXTS.md with detailed decisions, trade-off analysis, phased roadmap, and risk register.
 
 **This is NOT a one-shot implementation request.** It is planning output that feeds into phased implementation cycle planning.
 
@@ -20,17 +20,17 @@ This document captures the collaborative event modeling and design session for t
 
 ### The Key Question
 
-> Is the Admin Portal its own BC? Does it need a "gateway API" to access other BCs?
+> Is the Backoffice its own BC? Does it need a "gateway API" to access other BCs?
 
 **Yes — it is its own BC, and its API *is* the internal gateway.**
 
-Admin Portal follows the **BFF (Backend-for-Frontend) pattern**, the same pattern used by Customer Experience (for customers) and Vendor Portal (for partner vendors). The difference is the audience: internal employees.
+Backoffice follows the **BFF (Backend-for-Frontend) pattern**, the same pattern used by Customer Experience (for customers) and Vendor Portal (for partner vendors). The difference is the audience: internal employees.
 
 ### Why BFF, Not a Pure API Gateway
 
-A generic API gateway (Kong, NGINX, Azure API Management) forwards requests transparently. An Admin Portal BFF does more:
+A generic API gateway (Kong, NGINX, Azure API Management) forwards requests transparently. An Backoffice BFF does more:
 
-| Concern | Generic Gateway | Admin Portal BFF |
+| Concern | Generic Gateway | Backoffice BFF |
 |---|---|---|
 | Authentication | Validates token | Validates token + role claims |
 | Authorization | Route-level allow/deny | Fine-grained: CopyWriter can't touch inventory |
@@ -54,7 +54,7 @@ Vendor Portal BC
       └─> Aggregates: Product Catalog, Inventory, Orders (vendor slice)
       └─> Frontend: TBD (Blazor)
 
-Admin Portal BC  ← this document
+Backoffice BC  ← this document
   └─> AdminPortal.Api (BFF for internal employees)
       └─> Aggregates: ALL domain BCs (role-gated)
       └─> Frontend: React (Next.js SSR) recommended (or Blazor / Vue)
@@ -64,7 +64,7 @@ Admin Portal BC  ← this document
 
 ## Lessons Learned (Do Not Repeat)
 
-| What Went Wrong in Existing BCs | What Admin Portal Should Do Instead |
+| What Went Wrong in Existing BCs | What Backoffice Should Do Instead |
 |---|---|
 | Customer Experience started with SSE, migrated to SignalR (1 full cycle of rework) | SignalR from day one — `opts.UseSignalR()` |
 | `customerId` from query string in StorefrontHub (security concern) | `adminUserId` and `adminRole` from JWT claims ONLY |
@@ -120,8 +120,8 @@ CritterSupply has six distinct internal user personas with different daily tasks
 
 | Aspect | Decision | Rationale |
 |---|---|---|
-| Backend persistence | Marten (lightweight — cached projections only) | Domain BCs are source of truth; Admin Portal only needs to cache dashboard metrics |
-| Auth mechanism | JWT Bearer (AdminIdentity BC) | SignalR requires JWT for hub authentication; role claims drive RBAC |
+| Backend persistence | Marten (lightweight — cached projections only) | Domain BCs are source of truth; Backoffice only needs to cache dashboard metrics |
+| Auth mechanism | JWT Bearer (BackofficeIdentity BC) | SignalR requires JWT for hub authentication; role claims drive RBAC |
 | Real-time | SignalR via `opts.UseSignalR()` | Bidirectional: push alerts to connected clients; lesson learned from SSE→SignalR migration |
 | Frontend (recommended) | React (Next.js with SSR) | Richer data visualization ecosystem; SSR for dashboard load performance |
 | Frontend (alternative A) | Vue.js (Nuxt.js with SSR) | Similar SSR benefits; smaller bundle, simpler state management |
@@ -134,20 +134,20 @@ CritterSupply has six distinct internal user personas with different daily tasks
 
 ---
 
-## Admin Identity: Authentication Prerequisite
+## Backoffice Identity: Authentication Prerequisite
 
-Admin Portal requires its own internal user identity system. This is a lightweight additional BC with three viable approaches:
+Backoffice requires its own internal user identity system. This is a lightweight additional BC with three viable approaches:
 
-### Option 1: Local Admin Identity Store (Recommended for Phase 1)
+### Option 1: Local Backoffice Identity Store (Recommended for Phase 1)
 
 **Same pattern as Customer Identity and Vendor Identity:**
-- ASP.NET Core Identity + EF Core + Postgres (`adminidentity` schema)
+- ASP.NET Core Identity + EF Core + Postgres (`backofficeidentity` schema)
 - Roles stored in `AspNetUserRoles` table
 - JWT issued on login (15-min access + 7-day refresh in HttpOnly cookie)
 - Password hashing: Argon2id (same as Vendor Identity — no plaintext shortcuts)
 
 **Pro:** Zero external dependencies; works in local dev without corporate SSO.
-**Con:** Requires separate user management UI (a `SystemAdmin` role within Admin Portal itself).
+**Con:** Requires separate user management UI (a `SystemAdmin` role within Backoffice itself).
 
 ### Option 2: Corporate SSO / IdP Integration
 
@@ -158,7 +158,7 @@ Microsoft Entra ID (Azure AD), Okta, or Auth0. Admin users log in with corporate
 
 ### Option 3: Hybrid (Phase 1 Local → Phase 2 SSO)
 
-Start with local store. Add OIDC/SAML SSO integration in a later cycle without changing the rest of Admin Portal.
+Start with local store. Add OIDC/SAML SSO integration in a later cycle without changing the rest of Backoffice.
 
 **Recommendation:** Option 1 for Phase 1 (reference architecture clarity); Option 3 roadmap (practical enterprise path).
 
@@ -171,7 +171,7 @@ Start with local store. Add OIDC/SAML SSO integration in a later cycle without c
 **Goal:** Immediate operational value without full RBAC complexity.
 
 **Included:**
-- Admin Identity: user store, JWT auth, `Executive`, `OperationsManager`, `CustomerService`, `SystemAdmin` roles
+- Backoffice Identity: user store, JWT auth, `Executive`, `OperationsManager`, `CustomerService`, `SystemAdmin` roles
 - AdminPortal.Api: gateway skeleton, health endpoint, SignalR hub
 - SignalR integration: `OrderPlaced`, `PaymentFailed`, `InventoryLow` → alert push to connected clients
 - Customer service endpoints: customer search, order detail, cancel order
@@ -211,11 +211,11 @@ Start with local store. Add OIDC/SAML SSO integration in a later cycle without c
 | # | Question | Status | Recommendation |
 |---|---|---|---|
 | 1 | Which frontend framework? | 🟡 Open | React (Next.js SSR) for Phase 3; Blazor acceptable for Phase 1/2 |
-| 2 | Admin Identity: local vs. SSO? | 🟡 Open | Local store (Phase 1); plan SSO path for Phase 3 |
+| 2 | Backoffice Identity: local vs. SSO? | 🟡 Open | Local store (Phase 1); plan SSO path for Phase 3 |
 | 3 | Can OperationsManager cancel orders? | ✅ Resolved | Yes — same as CustomerService; both roles need this capability |
 | 4 | Report format: CSV, Excel, PDF? | 🟡 Open | CSV first (simplest); Excel (via ClosedXML) in Phase 3; PDF deferred |
 | 5 | Should Executive see customer count (PII-adjacent)? | ✅ Resolved | Aggregates only (counts, not emails/names); no PII in Executive dashboard |
-| 6 | Multi-tenancy for admin users? | ✅ Resolved | No tenancy — all internal users share a single Admin Portal (unlike Vendor Portal which is per-vendor) |
+| 6 | Multi-tenancy for admin users? | ✅ Resolved | No tenancy — all internal users share a single Backoffice (unlike Vendor Portal which is per-vendor) |
 | 7 | Hub group granularity: role vs. department vs. individual? | ✅ Resolved | Role-scoped groups (`role:executive` etc.) — sufficient for broadcast alerts; per-user groups not needed |
 | 8 | Should CopyWriter see inventory counts on the product list? | 🟡 Open | Lean toward No — information minimization; they only need description/name fields |
 
@@ -228,7 +228,7 @@ Start with local store. Add OIDC/SAML SSO integration in a later cycle without c
 ```
 Trigger: Content writer receives editorial brief, opens admin portal
 
-[Admin Portal Frontend]
+[Backoffice Frontend]
 Writer navigates to /admin/products
   └─> GET /api/admin/products?status=published (AdminPortal.Api)
       └─> AdminPortal.Api: IProductCatalogAdminClient.GetProductsAsync()
@@ -262,7 +262,7 @@ AdminPortal.Api:
 ```
 Trigger: Black Friday sale planning, 4 weeks ahead
 
-[Admin Portal Frontend]
+[Backoffice Frontend]
 PricingManager navigates to /admin/pricing
   └─> GET /api/admin/pricing?sku={optional filter} (AdminPortal.Api)
       └─> Pricing BC: GET /api/pricing/products (current prices + scheduled changes)
@@ -295,7 +295,7 @@ AdminPortal.Api:
 ```
 Trigger: Delivery truck arrives with purchase order PO-2026-0042
 
-[Admin Portal Frontend — ideally a mobile-friendly warehouse view]
+[Backoffice Frontend — ideally a mobile-friendly warehouse view]
 WarehouseClerk scans barcode → pre-fills SKU field
   └─> GET /api/admin/inventory/{sku} (AdminPortal.Api)
       └─> Inventory BC: GET /api/inventory/{sku}?warehouseId={id}
@@ -315,7 +315,7 @@ AdminPortal.Api:
               └─> StockReplenished event
                   ├─> Available: 3 + 50 = 53
                   ├─> Threshold check: 53 > 10 → deactivate any active LowStockAlert
-                  ├─> LowStockAlertDeactivated → Admin Portal: push alert dismissed to SignalR
+                  ├─> LowStockAlertDeactivated → Backoffice: push alert dismissed to SignalR
                   └─> Vendor Portal: InventorySnapshot projection updated (if SKU has vendor)
 
 [SignalR push to connected WarehouseClerks and OperationsManagers]
@@ -332,7 +332,7 @@ LowStockAlertDeactivated
 
 Orders BC: CheckoutCompleted → Order saga → OrderPlaced published to RabbitMQ
 
-[Admin Portal domain assembly — Wolverine handler]
+[Backoffice domain assembly — Wolverine handler]
 OrderPlaced (from RabbitMQ)
   └─> OrderPlacedAdminHandler
       ├─> Update AdminMetrics Marten document:
@@ -359,17 +359,17 @@ OrderPlaced (from RabbitMQ)
 | Forged `adminUserId` in command body | `adminUserId` extracted from JWT claims at gateway — body field ignored if present |
 | PII leak via SignalR messages | Policy: no PII in `IAdminPortalMessage` implementations; only IDs and counts |
 | Replay attack on management endpoints | JWT expiry (15 min); each command includes `adminUserId` and timestamp for idempotency check |
-| Privilege escalation via domain BC endpoints | Domain BCs should validate that admin endpoints require a trusted internal caller header; Admin Portal passes a service-to-service API key or uses mTLS |
+| Privilege escalation via domain BC endpoints | Domain BCs should validate that admin endpoints require a trusted internal caller header; Backoffice passes a service-to-service API key or uses mTLS |
 | GDPR: PII accessed without justification | Access logs for customer-lookup endpoints; consider requiring reason field for CS lookups |
 
-### Service-to-Service Authentication (Admin Portal → Domain BCs)
+### Service-to-Service Authentication (Backoffice → Domain BCs)
 
-Domain BCs currently don't distinguish internal calls from external calls. For Admin Portal, consider one of:
+Domain BCs currently don't distinguish internal calls from external calls. For Backoffice, consider one of:
 
 1. **Shared secret / API key header** — `X-Admin-Portal-Key: {secret}` — simple, not ideal for production
 2. **mTLS (mutual TLS)** — AdminPortal.Api presents a client certificate; domain BCs validate it
 3. **OAuth 2.0 client credentials** — AdminPortal.Api authenticates as a service principal to a token server; domain BCs validate JWT
-4. **Network-level isolation** — Admin Portal and domain BCs run in a private network segment; external access blocked at the load balancer (acceptable for MVP)
+4. **Network-level isolation** — Backoffice and domain BCs run in a private network segment; external access blocked at the load balancer (acceptable for MVP)
 
 **Recommendation:** Network isolation for Phase 1 (simplest); OAuth 2.0 client credentials for Phase 2+.
 
@@ -379,7 +379,7 @@ Domain BCs currently don't distinguish internal calls from external calls. For A
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Admin Portal becomes a "God Gateway" that leaks domain logic | Medium | High | Strict invariant: gateway only routes and composes; all validation in domain BCs |
+| Backoffice becomes a "God Gateway" that leaks domain logic | Medium | High | Strict invariant: gateway only routes and composes; all validation in domain BCs |
 | Frontend technology choice creates long-term maintenance burden | Low | Medium | Backend API is framework-agnostic; frontend can be replaced independently |
 | Admin users forget to include reason/audit notes on mutations | Medium | Low | Make `reason` field required in API validation; not optional |
 | Real-time dashboard creates high SignalR connection overhead | Low | Low | Role-scoped hub groups limit connection count; executive users typically < 10 concurrent |
@@ -404,5 +404,5 @@ Domain BCs currently don't distinguish internal calls from external calls. For A
 
 ---
 
-*See [CONTEXTS.md — Admin Portal](../../CONTEXTS.md#admin-portal) for the architectural specification.*
-*See [docs/features/admin-portal/](../features/admin-portal/) for Gherkin feature specifications.*
+*See [CONTEXTS.md — Backoffice](../../CONTEXTS.md#backoffice) for the architectural specification.*
+*See [docs/features/backoffice/](../features/backoffice/) for Gherkin feature specifications.*
