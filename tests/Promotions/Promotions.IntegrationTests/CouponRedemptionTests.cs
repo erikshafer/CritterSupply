@@ -405,8 +405,10 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
         // Act
         await _fixture.ExecuteAndWaitAsync(batchCmd);
 
-        // Wait for fan-out commands to process
-        await Task.Delay(500);
+        // Wait for fan-out IssueCoupon commands to be processed asynchronously
+        // GenerateCouponBatch creates N IssueCoupon commands via OutgoingMessages
+        // Each IssueCoupon handler creates a coupon aggregate + updates CouponLookupView projection
+        await Task.Delay(1000); // Increased to handle async projection updates
 
         // Assert - Verify all 5 coupons were created
         var expectedCodes = new[] { "BATCH-0001", "BATCH-0002", "BATCH-0003", "BATCH-0004", "BATCH-0005" };
@@ -456,7 +458,11 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
 
         // Act
         await _fixture.ExecuteAndWaitAsync(batchCmd);
-        await Task.Delay(300);
+
+        // Wait for fan-out IssueCoupon commands to be processed asynchronously
+        // GenerateCouponBatch creates N IssueCoupon commands via OutgoingMessages
+        // Each IssueCoupon handler creates a coupon aggregate + updates CouponLookupView projection
+        await Task.Delay(1000); // Increased from 300ms to handle async projection updates
 
         // Assert - Verify all 3 coupons were created
         var codes = new[] { "DRAFT-0001", "DRAFT-0002", "DRAFT-0003" };

@@ -11,7 +11,7 @@ public static class RedeemCouponHandler
     /// Enforces single-use constraint: coupon must be in Issued status.
     /// Uses optimistic concurrency (Marten) to prevent double-redemption.
     /// </summary>
-    public static async Task<(Coupon, CouponRedeemed)> Handle(
+    public static async Task Handle(
         RedeemCoupon cmd,
         IDocumentSession session,
         CancellationToken ct)
@@ -43,7 +43,7 @@ public static class RedeemCouponHandler
             cmd.CustomerId,
             cmd.RedeemedAt);
 
-        // Return tuple: updated aggregate + event
-        return (coupon.Apply(evt), evt);
+        // Manually append event to stream (optimistic concurrency via Marten)
+        session.Events.Append(streamId, evt);
     }
 }

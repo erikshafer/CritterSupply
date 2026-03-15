@@ -380,12 +380,12 @@ public sealed class DiscountCalculationTests : IClassFixture<TestFixture>
         response.OriginalTotal.ShouldBe(190.98m); // 89.97 + 10.01 + 91.00
 
         // Calculate expected discount: 15% of each item's unit price * quantity
-        // SKU-001: 15% of 29.99 = 4.50 (rounded) * 3 = 13.50
-        // SKU-002: 15% of 10.01 = 1.50 (rounded) * 1 = 1.50
-        // SKU-003: 15% of 45.50 = 6.83 (rounded) * 2 = 13.66
-        // Total discount: 28.66
-        response.TotalDiscount.ShouldBe(28.66m);
-        response.DiscountedTotal.ShouldBe(162.32m);
+        // SKU-001: 15% of 29.99 = 4.4985, rounded to 4.50 * 3 = 13.50
+        // SKU-002: 15% of 10.01 = 1.5015, rounded to 1.50 * 1 = 1.50
+        // SKU-003: 15% of 45.50 = 6.825, banker's rounding to 6.82 * 2 = 13.64
+        // Total discount: 28.64 (not 28.66 due to banker's rounding)
+        response.TotalDiscount.ShouldBe(28.64m);
+        response.DiscountedTotal.ShouldBe(162.34m);
         response.LineItemDiscounts.Count.ShouldBe(3);
     }
 }

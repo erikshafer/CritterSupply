@@ -11,7 +11,7 @@ public static class RevokeCouponHandler
     /// Can revoke coupons in Issued or Redeemed status.
     /// Cannot revoke already-revoked or expired coupons.
     /// </summary>
-    public static async Task<(Coupon, CouponRevoked)> Handle(
+    public static async Task Handle(
         RevokeCoupon cmd,
         IDocumentSession session,
         CancellationToken ct)
@@ -47,7 +47,7 @@ public static class RevokeCouponHandler
             cmd.Reason,
             DateTimeOffset.UtcNow);
 
-        // Return tuple: updated aggregate + event
-        return (coupon.Apply(evt), evt);
+        // Manually append event to stream (optimistic concurrency via Marten)
+        session.Events.Append(streamId, evt);
     }
 }

@@ -9,11 +9,11 @@ public static class GenerateCouponBatchHandler
 {
     /// <summary>
     /// Generates a batch of coupons using fan-out pattern.
-    /// Returns CouponBatchGenerated event + N IssueCoupon commands.
+    /// Appends CouponBatchGenerated event + returns N IssueCoupon commands via OutgoingMessages.
     /// Each IssueCoupon command creates a separate Coupon aggregate stream.
     /// Phase 1: Simple sequential code generation (PREFIX-XXXX format).
     /// </summary>
-    public static async Task<(Promotion, CouponBatchGenerated, OutgoingMessages)> Handle(
+    public static async Task<OutgoingMessages> Handle(
         GenerateCouponBatch cmd,
         IDocumentSession session,
         CancellationToken ct)
@@ -58,6 +58,10 @@ public static class GenerateCouponBatchHandler
             cmd.Count,
             timestamp);
 
-        return (promotion.Apply(batchEvent), batchEvent, outgoing);
+        // Manually append event to promotion stream
+        session.Events.Append(cmd.PromotionId, batchEvent);
+
+        // Return outgoing messages for fan-out
+        return outgoing;
     }
 }

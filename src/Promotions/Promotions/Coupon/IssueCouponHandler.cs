@@ -11,7 +11,7 @@ public static class IssueCouponHandler
         IDocumentSession session,
         CancellationToken ct)
     {
-        // Verify the parent promotion exists and is active
+        // Verify the parent promotion exists
         var promotion = await session.Events.AggregateStreamAsync<Promotions.Promotion.Promotion>(
             command.PromotionId,
             token: ct);
@@ -22,11 +22,13 @@ public static class IssueCouponHandler
                 $"Promotion {command.PromotionId} not found");
         }
 
-        if (promotion.Status != PromotionStatus.Active)
+        // M30.0: Allow coupon issuance for both Draft and Active promotions
+        // This enables batch generation during draft phase before activation
+        if (promotion.Status != PromotionStatus.Draft && promotion.Status != PromotionStatus.Active)
         {
             throw new InvalidOperationException(
                 $"Cannot issue coupon for promotion in {promotion.Status} status. " +
-                $"Promotion must be Active.");
+                $"Promotion must be Draft or Active.");
         }
 
         // Check if coupon code already exists (idempotency)

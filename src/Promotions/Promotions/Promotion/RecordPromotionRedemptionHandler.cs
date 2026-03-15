@@ -20,7 +20,7 @@ namespace Promotions.Promotion;
 /// </summary>
 public static class RecordPromotionRedemptionHandler
 {
-    public static async Task<(Promotion, PromotionRedemptionRecorded)> Handle(
+    public static async Task Handle(
         RecordPromotionRedemption cmd,
         IDocumentSession session,
         CancellationToken ct)
@@ -60,6 +60,7 @@ public static class RecordPromotionRedemptionHandler
             cmd.CouponCode,
             cmd.RedeemedAt);
 
-        return (promotion.Apply(evt), evt);
+        // Manually append event to stream (optimistic concurrency via Marten)
+        session.Events.Append(cmd.PromotionId, evt);
     }
 }
