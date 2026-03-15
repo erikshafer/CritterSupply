@@ -236,14 +236,14 @@ JWT-based authentication and authorization for internal admin users. Provides ac
 
 **Folder:** `src/Promotions/`
 
-Owns promotional campaigns and coupon codes — creation, activation, issuance, validation, redemption, and usage tracking.
+Owns promotional campaigns and coupon codes — creation, activation, issuance, validation, redemption, revocation, and usage tracking. Supports batch coupon generation and discount calculation.
 
 | Communicates with | Direction | Notes |
 |---|---|---|
-| Shopping (planned) | ↔ bidirectional | Will validate coupons applied in cart and calculate discounts |
+| Shopping (stub) | ← queries | CalculateDiscount query accepts stub CartView — full Shopping integration deferred to M30.1+ |
 | Pricing (planned) | → queries | Will check MAP floor to prevent below-minimum discounts |
 
-**Key decisions:** Phase 1 MVP (Cycle 29 Phase 2) includes Promotion creation/activation, Coupon issuance, and ValidateCoupon query with business rule checks (dates, status). Event-sourced aggregates with inline snapshot projections for queryability. Redemption and Shopping integration deferred to future phases.
+**Key decisions:** M30.0 implements complete redemption workflow with stub integration points. Event-sourced aggregates (Promotion, Coupon) with inline projections (`CouponLookupView` for O(1) validation). Coupons use deterministic UUID v5 stream IDs from code strings. Batch generation uses fan-out pattern via `OutgoingMessages`. Handlers manually append events via `session.Events.Append()` (not tuple returns). Shopping BC integration and real checkout flow deferred to M30.1+.
 
 ---
 
