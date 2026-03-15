@@ -13,6 +13,7 @@ This directory contains implementation patterns and best practices for building 
 **Creating Commands & Handlers:**
 - 🎯 [Wolverine Message Handlers](./wolverine-message-handlers.md) - Command/query handlers, HTTP endpoints, compound handlers, return patterns
 - 🔄 [Wolverine Sagas](./wolverine-sagas.md) - Stateful orchestration sagas, multi-BC coordination, compensation chains, idempotency
+- 📨 [Integration Messaging](./integration-messaging.md) - Asynchronous inter-service messaging: contracts, publishing, subscribing, RabbitMQ configuration
 
 **Working with Aggregates:**
 - 📝 [Event-Sourced Aggregate Design](./marten-event-sourcing.md) - Event-sourced aggregates, decider pattern, factory methods
@@ -50,6 +51,7 @@ This directory contains implementation patterns and best practices for building 
 ### Wolverine
 - [Wolverine Message Handlers](./wolverine-message-handlers.md) - Command/query handling, HTTP endpoints
 - [Wolverine Sagas](./wolverine-sagas.md) - Stateful orchestration, multi-BC coordination, compensation chains
+- [Integration Messaging](./integration-messaging.md) - Inter-service messaging: RabbitMQ, contracts, queue configuration
 
 ### Marten
 - [Event-Sourced Aggregate Design](./marten-event-sourcing.md) - Event-sourced aggregates, projections
@@ -90,10 +92,11 @@ This directory contains implementation patterns and best practices for building 
 
 ### Implementation Phase
 1. Write handlers → [Wolverine Message Handlers](./wolverine-message-handlers.md)
-2. Follow coding standards → [Modern C# Coding Standards](./modern-csharp-coding-standards.md)
-3. Integrate external services? → [External Service Integration](./external-service-integration.md)
-4. Building BFF? → [BFF Real-time Patterns](./bff-realtime-patterns.md)
-5. Adding SignalR real-time? → [Wolverine + SignalR](./wolverine-signalr.md)
+2. Need inter-service messaging? → [Integration Messaging](./integration-messaging.md)
+3. Follow coding standards → [Modern C# Coding Standards](./modern-csharp-coding-standards.md)
+4. Integrate external services? → [External Service Integration](./external-service-integration.md)
+5. Building BFF? → [BFF Real-time Patterns](./bff-realtime-patterns.md)
+6. Adding SignalR real-time? → [Wolverine + SignalR](./wolverine-signalr.md)
 
 ### Testing Phase
 1. Write integration tests → [CritterStack Testing Patterns](./critterstack-testing-patterns.md)
@@ -294,10 +297,11 @@ Each skill document follows this structure:
 - *"Should I use event sourcing or document store?"* → Compare [Event-Sourced Aggregate Design](./marten-event-sourcing.md) vs [Marten Document Store](./marten-document-store.md)
 - *"How do I build read models from events?"* → [Event Sourcing Projections](./event-sourcing-projections.md)
 - *"How do I build a saga that coordinates multiple BCs?"* → [Wolverine Sagas](./wolverine-sagas.md)
+- *"How do I publish messages to other services?"* → [Integration Messaging](./integration-messaging.md)
 - *"How do I organize my code?"* → [Vertical Slice Organization](./vertical-slice-organization.md)
 - *"When should I use EF Core?"* → [EF Core + Wolverine Integration](./efcore-wolverine-integration.md)
 - *"How do I add a new bounded context?"* → [Adding a New Bounded Context](./adding-new-bounded-context.md)
 
 ---
 
-**Last Updated:** 2026-03-09
+**Last Updated:** 2026-03-15
