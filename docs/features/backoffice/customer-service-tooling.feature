@@ -4,7 +4,7 @@ Feature: Customer Service Tooling
   So that I can resolve customer issues quickly without needing direct database access or engineering support
 
   Background:
-    Given I am logged in to the Admin Portal as a "CustomerService" representative
+    Given I am logged in to the Backoffice as a "CustomerService" representative
     And a customer "Alice" exists with email "alice@example.com" and customer ID "cust-alice-001"
     And Alice has placed order "order-alice-100" which is currently in "PendingFulfillment" state
 
@@ -36,11 +36,11 @@ Feature: Customer Service Tooling
     And I click "Cancel Order"
     And I select reason "CustomerRequested" and add note "Customer changed their mind"
     And I confirm cancellation
-    Then the Admin Portal sends a cancel command to the Orders BC attributed to my admin user ID
+    Then the Backoffice sends a cancel command to the Orders BC attributed to my admin user ID
     And the Orders BC saga transitions the order to "Cancelled" state
     And a "OrderCancelled" event is recorded with my admin user ID and the reason
     And the customer receives an automated cancellation notification (via Notifications BC, when live)
-    And the Admin Portal shows the updated order state as "Cancelled"
+    And the Backoffice shows the updated order state as "Cancelled"
 
   Scenario: Cannot cancel an order that has already shipped
     Given order "order-alice-200" is in "InTransit" state (already shipped)
@@ -62,15 +62,15 @@ Feature: Customer Service Tooling
     And the credit appears in Alice's wallet on her next checkout
 
   Scenario: Customer service rep cannot access pricing or inventory management
-    When I navigate to the Admin Portal home
+    When I navigate to the Backoffice home
     Then I do not see a "Pricing" link in the navigation
     And I do not see an "Inventory" link in the navigation
     And I do not see a "Product Content" link in the navigation
 
   Scenario: Non-CustomerService role cannot cancel orders
-    Given I am logged in to the Admin Portal as a "PricingManager"
-    When I attempt to cancel order "order-alice-100" via the Admin Portal API
-    Then the Admin Portal API returns 403 Forbidden
+    Given I am logged in to the Backoffice as a "PricingManager"
+    When I attempt to cancel order "order-alice-100" via the Backoffice API
+    Then the Backoffice API returns 403 Forbidden
     And no cancel command is sent to the Orders BC
 
   Scenario: Customer service rep views a customer's return history

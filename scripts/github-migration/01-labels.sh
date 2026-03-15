@@ -49,7 +49,7 @@ label "bc:vendor-identity"   "008080"  "Vendor Identity bounded context"
 label "bc:pricing"           "ffcc00"  "Pricing bounded context"
 label "bc:notifications"     "b794f4"  "Notifications bounded context"
 label "bc:promotions"        "ff69b4"  "Promotions bounded context"
-label "bc:admin-portal"      "7057ff"  "Admin Portal bounded context"
+label "bc:backoffice"          "7057ff"  "Backoffice bounded context"
 label "bc:cross-cutting"     "d4c5f9"  "Affects multiple bounded contexts (e.g. tracing, Wolverine upgrades)"
 label "bc:infrastructure"    "cccccc"  "Infrastructure / DevOps / CI-CD"
 

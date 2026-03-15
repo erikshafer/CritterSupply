@@ -176,7 +176,7 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 | 📊 **Vendor Portal**       | Vendor analytics, insights, change requests    | ✅ Complete |
 | 🔄 **Returns**             | Return authorization and processing            | 🔜 Planned |
 | 💰 **Pricing**             | Server-authoritative pricing, scheduled price changes | 🔜 Planned |
-| 🖥️ **Admin Portal**        | Internal operations portal (gateway BFF)       | 🔜 Planned |
+| 🖥️ **Backoffice**          | Internal operations portal (gateway BFF)       | 🔜 Planned |
 | 🔔 **Notifications**       | Customer email/SMS notifications               | 🔜 Planned |
 | 🏷️ **Promotions**          | Coupon codes, discount rules                   | 🔜 Planned |
 | 📈 **Analytics**           | Business intelligence projections              | 🔜 Planned |
