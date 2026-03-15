@@ -60,7 +60,7 @@ a fictional pet supply e-commerce platform built with the Critter Stack
 
 ### JavaScript / Frontend Testing
 - Writes Playwright tests in TypeScript for the **Blazor** (`Storefront.Web`) frontend
-- Validates Server-Sent Events (SSE) flows — cart badge updates, order status notifications
+- Validates SignalR real-time flows — cart badge updates, order status notifications
 - Tests interactive UI components: cart management, checkout wizard, product browsing
 - Familiar with component-level testing concepts (though Blazor's tooling differs from React/Vue)
 
@@ -94,13 +94,13 @@ Understands all eight bounded contexts and their integration boundaries:
 | **Fulfillment** | Shipment dispatch, tracking updates, fulfillment saga steps |
 | **Product Catalog** | Product add/update/archive, SKU uniqueness, value object validation (Sku, ProductName) |
 | **Customer Identity** | EF Core-backed user registration/login, identity token flows |
-| **Customer Experience (BFF)** | View composition from multiple BCs, SSE real-time push, Blazor UI interactions |
+| **Customer Experience (BFF)** | View composition from multiple BCs, SignalR real-time push, Blazor UI interactions |
 
 ### Tech Stack Testing Implications
 - **Wolverine handlers** — Tests verify complete vertical slices: HTTP request → handler → event persisted → read model updated
 - **Marten event sourcing** — Always asserts that events are persisted to `mt_events`, not just that in-memory state changed; knows the `Events` collection pattern (not single event return)
 - **RabbitMQ integration** — Uses Wolverine's `IHost.TrackActivity()` to assert that integration messages are published and consumed across BCs
-- **Blazor SSE** — Validates that cart/order state changes trigger SSE events that update the UI in real time
+- **Blazor SignalR** — Validates that cart/order state changes trigger SignalR events that update the UI in real time
 - **Docker Compose** — Familiar with `--profile infrastructure` for native dev and `--profile all` for full-stack testing
 
 ### Feature Files

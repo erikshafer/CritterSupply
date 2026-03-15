@@ -1075,6 +1075,21 @@ Covers:
 - Async data loading with `WaitForAssertion`
 - CI-safe currency and locale-independent assertions
 
+### When Running an Event Modeling Workshop
+
+For collaborative design sessions, brain dumps, timeline construction, slice definition, scenario writing, or multi-persona facilitation:
+
+**Read:** `docs/skills/event-modeling-workshop.md`
+
+Covers:
+- The four building blocks (Events, Commands, Views, UI) and timeline layout
+- Five workshop phases with explicit input/output per phase
+- Structured slice output format (table template)
+- Multi-persona facilitation using CritterSupply's custom agents (Product Owner, Principal Architect, UX Engineer, QA Engineer)
+- How workshop outputs connect to CritterSupply artifacts (GitHub Issues, Gherkin features, CONTEXTS.md, ADRs, Messages.Contracts)
+- CritterSupply mini example (Returns BC)
+- Reference: `docs/skills/references/scenarios.md` for Given/When/Then patterns
+
 ---
 
 ## Testing Strategy
@@ -1653,6 +1668,7 @@ See [DEVPROGRESS.md](./DEVPROGRESS.md) for current development status.
 | Skill | Purpose |
 |-------|---------|
 | `wolverine-message-handlers.md` | Compound handlers, return patterns, aggregate workflows |
+| `wolverine-sagas.md` | Stateful orchestration sagas, multi-BC coordination, compensation chains, idempotency |
 | `marten-event-sourcing.md` | Event-sourced aggregates, domain events, decider pattern |
 | `event-sourcing-projections.md` | Marten projections: snapshots, multi-stream, live aggregation, FetchForWriting() |
 | `marten-document-store.md` | Document database patterns (non-event-sourced) |
@@ -1664,6 +1680,10 @@ See [DEVPROGRESS.md](./DEVPROGRESS.md) for current development status.
 | `blazor-wasm-jwt.md` | Blazor WASM + JWT: named HTTP clients, in-memory tokens, SignalR AccessTokenProvider, RBAC |
 | `vertical-slice-organization.md` | File structure, naming conventions, colocation patterns, anti-pattern warnings |
 | `modern-csharp-coding-standards.md` | C# language features, immutability |
+| `adding-new-bounded-context.md` | Complete checklist: projects, Docker, Postgres, Aspire, CONTEXTS.md, tests |
+| `event-modeling-workshop.md` | Collaborative design: brain dumps, slicing, scenarios, multi-persona facilitation |
 | `critterstack-testing-patterns.md` | Unit and integration testing |
 | `testcontainers-integration-tests.md` | TestContainers setup, patterns for Marten and EF Core |
 | `reqnroll-bdd-testing.md` | BDD testing with Gherkin and Reqnroll |
+| `e2e-playwright-testing.md` | Browser E2E tests with Playwright, real Kestrel, Page Object Model |
+| `bunit-component-testing.md` | Blazor component unit testing with bUnit, MudBlazor setup, auth emulation |

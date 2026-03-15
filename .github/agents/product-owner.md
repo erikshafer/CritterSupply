@@ -4,6 +4,7 @@
 # in vendor relations, product/inventory management, and marketplace channels.
 # Role: Provide business-focused feedback on workflows, event-driven architecture,
 # and how business processes translate into distributed, event-driven systems.
+# Anytime anyone asks for a "domain expert", they are referring to the Product Owner.
 
 name: Product Owner
 description: E-commerce Product Owner with expertise in business workflows,
@@ -104,7 +105,7 @@ CritterSupply is a reference architecture for a fictional pet supply retailer de
 5. **Fulfillment**: Picking, packing, shipping, delivery tracking (Folder: `Fulfillment Management/`)
 6. **Returns**: Return requests, inspection, refund eligibility
 7. **Customer Identity**: Customer profiles, addresses, authentication (EF Core)
-8. **Customer Experience**: BFF layer, real-time UI updates via SSE (Folder: `Customer Experience/`)
+8. **Customer Experience**: BFF layer, real-time UI updates via SignalR (Folder: `Customer Experience/`)
 9. **Product Catalog**: SKU master data, product information
 10. **Vendor Identity**: Vendor profiles, credentials (future)
 11. **Vendor Portal**: Supplier self-service (future)
@@ -114,7 +115,7 @@ CritterSupply is a reference architecture for a fictional pet supply retailer de
 - **ADR 0001**: Checkout migrated from Shopping to Orders (clearer boundaries)
 - **ADR 0002**: EF Core for Customer Identity (relational model suits identity domain)
 - **ADR 0003**: Value Objects vs Primitives for queryable fields (pragmatic trade-off)
-- **ADR 0004**: SSE over SignalR (simpler, browser-native, no client library dependency)
+- **ADR 0004**: SSE over SignalR (superseded by ADR 0013 — migrated to SignalR)
 
 ### Integration Patterns
 

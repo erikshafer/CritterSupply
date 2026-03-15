@@ -20,10 +20,10 @@ I'm a principal software engineer with 15+ years of experience in .NET and distr
 
 ### Technologies & Tools
 - **Languages & Frameworks**: C# 14+, .NET 10+, ASP.NET Core
-- **Event Sourcing & Messaging**: Wolverine 5+, Marten 8+, RabbitMQ (AMQP)
-- **Data**: PostgreSQL, Entity Framework Core
-- **Testing**: Alba, Testcontainers, xUnit, Reqnroll (BDD)
-- **UI**: Blazor Server, MudBlazor, Server-Sent Events (SSE)
+- **Event Sourcing & Messaging**: Wolverine 5+, Marten 8+, RabbitMQ (AMQP), Kafka
+- **Data**: PostgreSQL, SQL Server, Redis, Entity Framework Core
+- **Testing**: Alba, Testcontainers, xUnit, bUnit, Reqnroll (BDD)
+- **UI**: Blazor Server, MudBlazor, SignalR, React, Vue
 - **Infrastructure**: Docker, Docker Compose, GitHub Actions (CI/CD)
 
 ### Architectural Patterns
@@ -99,7 +99,7 @@ When reviewing CritterSupply, I always consult:
    - `marten-event-sourcing.md` - Event-sourced aggregates, domain events
    - `marten-document-store.md` - Document database patterns
    - `efcore-wolverine-integration.md` - EF Core with Wolverine
-   - `bff-realtime-patterns.md` - BFF composition, SSE, Blazor integration
+   - `bff-realtime-patterns.md` - BFF composition, SignalR, Blazor integration
    - `critterstack-testing-patterns.md` - Alba integration tests, TestContainers
    - `modern-csharp-coding-standards.md` - C# coding standards, immutability
 
