@@ -110,6 +110,11 @@ jobs:
             "$E2E_BIN/.playwright/package/cli.js" \
             install chromium --with-deps
 
+      # Pre-pull the PostgreSQL image used by TestContainers E2E fixtures.
+      # This avoids flaky timeouts on slow Docker Hub responses.
+      - name: Pre-pull TestContainers PostgreSQL image
+        run: docker pull postgres:18-alpine
+
       - name: Run Storefront E2E Tests
         run: |
           dotnet test "tests/Customer Experience/Storefront.E2ETests/Storefront.E2ETests.csproj" \
@@ -196,6 +201,11 @@ jobs:
           "$E2E_BIN/.playwright/node/linux-x64/node" \
             "$E2E_BIN/.playwright/package/cli.js" \
             install chromium --with-deps
+
+      # Pre-pull the PostgreSQL image used by TestContainers E2E fixtures.
+      # This avoids flaky timeouts on slow Docker Hub responses.
+      - name: Pre-pull TestContainers PostgreSQL image
+        run: docker pull postgres:18-alpine
 
       - name: Run Vendor Portal E2E Tests
         run: |
