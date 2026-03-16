@@ -1,7 +1,8 @@
+using Marten;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Wolverine;
 using Wolverine.Http;
-using Wolverine.Marten;
 
 namespace Backoffice.Api.Commands;
 
@@ -14,7 +15,7 @@ public static class AddOrderNoteEndpoint
     /// <summary>
     /// Validate that the order exists before creating note.
     /// </summary>
-    public static async Task<ProblemDetails?> ValidateAsync(
+    public static async Task<ProblemDetails?> BeforeAsync(
         Backoffice.OrderNote.AddOrderNote command,
         Backoffice.Clients.IOrdersClient ordersClient,
         CancellationToken ct)
@@ -37,18 +38,19 @@ public static class AddOrderNoteEndpoint
             return validationResult;
         }
 
-        return null; // No problems
+        return WolverineContinue.NoProblems;
     }
 
     /// <summary>
     /// Create OrderNote event stream.
-    /// Pure function: Command → (Response, Event Stream)
+    /// Wolverine automatically calls SaveChangesAsync() after handler completes.
     /// </summary>
     [WolverinePost("/api/backoffice/orders/{orderId}/notes")]
     [Microsoft.AspNetCore.Authorization.Authorize(Policy = "CustomerService")]
-    public static (CreationResponse<Guid>, IStartStream) Handle(
+    public static CreationResponse<Guid> Handle(
         Backoffice.OrderNote.AddOrderNote command,
-        HttpContext httpContext)
+        HttpContext httpContext,
+        IDocumentSession session)
     {
         var noteId = Guid.CreateVersion7();
 
@@ -65,10 +67,9 @@ public static class AddOrderNoteEndpoint
             command.Text,
             DateTimeOffset.UtcNow);
 
-        var stream = MartenOps.StartStream<Backoffice.OrderNote.OrderNote>(noteId, @event);
+        // Start event stream - Wolverine will call SaveChangesAsync()
+        session.Events.StartStream<Backoffice.OrderNote.OrderNote>(noteId, @event);
 
-        var response = new CreationResponse<Guid>($"/api/backoffice/orders/{command.OrderId}/notes/{noteId}", noteId);
-
-        return (response, stream);
+        return new CreationResponse<Guid>($"/api/backoffice/orders/{command.OrderId}/notes/{noteId}", noteId);
     }
 }

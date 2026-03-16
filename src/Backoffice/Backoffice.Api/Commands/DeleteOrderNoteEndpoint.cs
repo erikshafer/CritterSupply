@@ -73,7 +73,7 @@ public static class DeleteOrderNoteEndpoint
             };
         }
 
-        return null; // No problems
+        return WolverineContinue.NoProblems;
     }
 
     /// <summary>
