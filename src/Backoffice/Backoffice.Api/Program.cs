@@ -92,6 +92,58 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Add HTTP clients for downstream BC queries
+builder.Services.AddHttpClient("CustomerIdentityClient", client =>
+{
+    var url = builder.Configuration["ApiClients:CustomerIdentityApiUrl"] ?? "http://localhost:5235";
+    client.BaseAddress = new Uri(url);
+});
+
+builder.Services.AddHttpClient("OrdersClient", client =>
+{
+    var url = builder.Configuration["ApiClients:OrdersApiUrl"] ?? "http://localhost:5231";
+    client.BaseAddress = new Uri(url);
+});
+
+builder.Services.AddHttpClient("ReturnsClient", client =>
+{
+    var url = builder.Configuration["ApiClients:ReturnsApiUrl"] ?? "http://localhost:5245";
+    client.BaseAddress = new Uri(url);
+});
+
+builder.Services.AddHttpClient("CorrespondenceClient", client =>
+{
+    var url = builder.Configuration["ApiClients:CorrespondenceApiUrl"] ?? "http://localhost:5248";
+    client.BaseAddress = new Uri(url);
+});
+
+builder.Services.AddHttpClient("InventoryClient", client =>
+{
+    var url = builder.Configuration["ApiClients:InventoryApiUrl"] ?? "http://localhost:5233";
+    client.BaseAddress = new Uri(url);
+});
+
+builder.Services.AddHttpClient("FulfillmentClient", client =>
+{
+    var url = builder.Configuration["ApiClients:FulfillmentApiUrl"] ?? "http://localhost:5234";
+    client.BaseAddress = new Uri(url);
+});
+
+builder.Services.AddHttpClient("CatalogClient", client =>
+{
+    var url = builder.Configuration["ApiClients:CatalogApiUrl"] ?? "http://localhost:5133";
+    client.BaseAddress = new Uri(url);
+});
+
+// Register HTTP client implementations
+builder.Services.AddScoped<Backoffice.Clients.ICustomerIdentityClient, Backoffice.Api.Clients.CustomerIdentityClient>();
+builder.Services.AddScoped<Backoffice.Clients.IOrdersClient, Backoffice.Api.Clients.OrdersClient>();
+builder.Services.AddScoped<Backoffice.Clients.IReturnsClient, Backoffice.Api.Clients.ReturnsClient>();
+builder.Services.AddScoped<Backoffice.Clients.ICorrespondenceClient, Backoffice.Api.Clients.CorrespondenceClient>();
+builder.Services.AddScoped<Backoffice.Clients.IInventoryClient, Backoffice.Api.Clients.InventoryClient>();
+builder.Services.AddScoped<Backoffice.Clients.IFulfillmentClient, Backoffice.Api.Clients.FulfillmentClient>();
+builder.Services.AddScoped<Backoffice.Clients.ICatalogClient, Backoffice.Api.Clients.CatalogClient>();
+
 // SignalR
 builder.Services.AddSignalR();
 
@@ -99,20 +151,19 @@ builder.Host.UseWolverine(opts =>
 {
     // Include the API assembly (HTTP endpoints, dashboard queries)
     opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
+
     // Include the domain assembly (integration message handlers, composition models)
-    // Note: Will be added once we create marker types in Backoffice project
-    // opts.Discovery.IncludeAssembly(typeof(Backoffice.RealTime.IBackofficeWebSocketMessage).Assembly);
+    opts.Discovery.IncludeAssembly(typeof(Backoffice.RealTime.IBackofficeWebSocketMessage).Assembly);
 
     // Configure SignalR transport for server→client push
     opts.UseSignalR();
 
     // Publish rules: route all Backoffice WebSocket messages via SignalR transport
-    // Note: Will be configured once we create IBackofficeWebSocketMessage marker interface
-    // opts.Publish(x =>
-    // {
-    //     x.MessagesImplementing<IBackofficeWebSocketMessage>();
-    //     x.ToSignalR();
-    // });
+    opts.Publish(x =>
+    {
+        x.MessagesImplementing<Backoffice.RealTime.IBackofficeWebSocketMessage>();
+        x.ToSignalR();
+    });
 
     // Configure RabbitMQ for integration messages
     var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");
