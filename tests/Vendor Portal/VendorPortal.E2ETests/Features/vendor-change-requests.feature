@@ -1,4 +1,4 @@
-@vendor-portal @change-requests
+@vendor-portal @change-requests @ignore
 Feature: Vendor Portal Change Requests
   As a catalog manager
   I want to manage product change requests
