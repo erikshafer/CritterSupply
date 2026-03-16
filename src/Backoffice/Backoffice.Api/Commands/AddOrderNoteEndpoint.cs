@@ -1,8 +1,8 @@
-using Marten;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
+using Wolverine.Marten;
 
 namespace Backoffice.Api.Commands;
 
@@ -43,14 +43,13 @@ public static class AddOrderNoteEndpoint
 
     /// <summary>
     /// Create OrderNote event stream.
-    /// Wolverine automatically calls SaveChangesAsync() after handler completes.
+    /// Returns IStartStream - Wolverine automatically calls SaveChangesAsync() after handler completes.
     /// </summary>
     [WolverinePost("/api/backoffice/orders/{orderId}/notes")]
     [Microsoft.AspNetCore.Authorization.Authorize(Policy = "CustomerService")]
-    public static CreationResponse<Guid> Handle(
+    public static (CreationResponse<Guid>, IStartStream) Handle(
         Backoffice.OrderNote.AddOrderNote command,
-        HttpContext httpContext,
-        IDocumentSession session)
+        HttpContext httpContext)
     {
         var noteId = Guid.CreateVersion7();
 
@@ -67,9 +66,11 @@ public static class AddOrderNoteEndpoint
             command.Text,
             DateTimeOffset.UtcNow);
 
-        // Start event stream - Wolverine will call SaveChangesAsync()
-        session.Events.StartStream<Backoffice.OrderNote.OrderNote>(noteId, @event);
+        // CRITICAL: Use MartenOps.StartStream() and return IStartStream for Wolverine to persist
+        // CreationResponse MUST come first in tuple (HTTP response, then side effect)
+        var stream = MartenOps.StartStream<Backoffice.OrderNote.OrderNote>(noteId, @event);
+        var response = new CreationResponse<Guid>($"/api/backoffice/orders/{command.OrderId}/notes/{noteId}", noteId);
 
-        return new CreationResponse<Guid>($"/api/backoffice/orders/{command.OrderId}/notes/{noteId}", noteId);
+        return (response, stream);
     }
 }

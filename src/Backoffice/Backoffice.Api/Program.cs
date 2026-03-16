@@ -80,6 +80,7 @@ builder.Services.AddMarten(opts =>
     // Snapshot projection for OrderNote (zero-lag queries, excludes deleted notes in projections)
     opts.Projections.Snapshot<Backoffice.OrderNote.OrderNote>(Marten.Events.Projections.SnapshotLifecycle.Inline);
 })
+.AddAsyncDaemon(JasperFx.Events.Daemon.DaemonMode.Solo)
 .UseLightweightSessions()
 .IntegrateWithWolverine();
 
@@ -152,6 +153,9 @@ builder.Services.AddSignalR();
 
 builder.Host.UseWolverine(opts =>
 {
+    // CRITICAL: Auto-apply transactional middleware to handlers that use persistence
+    opts.Policies.AutoApplyTransactions();
+
     // Include the API assembly (HTTP endpoints, dashboard queries)
     opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
 
