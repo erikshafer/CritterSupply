@@ -81,9 +81,12 @@ builder.Services.AddMarten(opts =>
     // Snapshot projection for OrderNote (zero-lag queries, excludes deleted notes in projections)
     opts.Projections.Snapshot<Backoffice.OrderNote.OrderNote>(Marten.Events.Projections.SnapshotLifecycle.Inline);
 
-    // BFF-owned projection for AdminDailyMetrics (dashboard KPIs)
-    // Inline lifecycle: zero lag, updated in same transaction as integration message handling
+    // BFF-owned projections (inline lifecycle: zero lag)
+    // AdminDailyMetrics: Executive dashboard KPIs (Session 6)
     opts.Projections.Add<Backoffice.Projections.AdminDailyMetricsProjection>(ProjectionLifecycle.Inline);
+
+    // AlertFeedView: Operations alert feed (Session 7)
+    opts.Projections.Add<Backoffice.Projections.AlertFeedViewProjection>(ProjectionLifecycle.Inline);
 })
 .AddAsyncDaemon(JasperFx.Events.Daemon.DaemonMode.Solo)
 .UseLightweightSessions()
@@ -198,18 +201,20 @@ builder.Host.UseWolverine(opts =>
     opts.ListenToRabbitQueue("backoffice-payment-captured").ProcessInline();
     opts.ListenToRabbitQueue("backoffice-payment-failed").ProcessInline();
 
-    // Future subscriptions (Sessions 7-9):
-    // Subscribe to Fulfillment BC events
-    // opts.ListenToRabbitQueue("backoffice-shipment-dispatched").ProcessInline();
-    // opts.ListenToRabbitQueue("backoffice-shipment-delivery-failed").ProcessInline();
-
+    // RabbitMQ subscriptions for AlertFeedView projection (Session 7)
     // Subscribe to Inventory BC events for alerts
-    // opts.ListenToRabbitQueue("backoffice-low-stock-detected").ProcessInline();
-    // opts.ListenToRabbitQueue("backoffice-stock-replenished").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-low-stock-detected").ProcessInline();
 
-    // Subscribe to Returns BC events
+    // Subscribe to Fulfillment BC events for alerts
+    opts.ListenToRabbitQueue("backoffice-shipment-delivery-failed").ProcessInline();
+
+    // Subscribe to Returns BC events for alerts
+    opts.ListenToRabbitQueue("backoffice-return-expired").ProcessInline();
+
+    // Future subscriptions (Sessions 8-9):
+    // opts.ListenToRabbitQueue("backoffice-shipment-dispatched").ProcessInline();
+    // opts.ListenToRabbitQueue("backoffice-stock-replenished").ProcessInline();
     // opts.ListenToRabbitQueue("backoffice-return-requested").ProcessInline();
-    // opts.ListenToRabbitQueue("backoffice-return-expired").ProcessInline();
 
     // Subscribe to Correspondence BC events
     // opts.ListenToRabbitQueue("backoffice-correspondence-failed").ProcessInline();
