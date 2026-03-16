@@ -8,7 +8,7 @@
 > 1. **GitHub MCP server** configured in your AI tool's MCP settings
 > 2. **GitHub auth** (personal access token with `repo` + `project` scopes)
 >
-> With both configured, query GitHub directly: `list_issues(milestone="M29.1", state="open")`
+> With both configured, query GitHub directly: `list_issues(milestone="M31.5", state="open")`
 > This works identically on any machine — MacBook, Windows PC, Linux laptop.
 >
 > **⚡ New:** We've migrated from "Cycle N Phase M" to **Milestone-Based Versioning** (M.N format).
@@ -16,372 +16,419 @@
 
 ---
 
-## Quick Status At A Glance
+## 🤖 LLM Navigation Guide
+
+**Choose your section based on your task:**
+
+| **Your Task** | **Go To Section** | **Purpose** |
+|---------------|-------------------|-------------|
+| 📊 **Quick status check** | [Quick Status](#quick-status) | One-table snapshot of current state |
+| 🚀 **Starting new work** | [Active Milestone](#active-milestone) | Detailed info on current milestone only |
+| ✅ **Recording completion** | [Recent Completions](#recent-completions) | Add to top of list (keep last 3 milestones) |
+| 📦 **Looking up old milestone** | [Milestone Archive](#milestone-archive) | Full historical record (M29.1 and earlier) |
+| 🗺️ **Planning next work** | [Roadmap](#roadmap) | Next 3-4 milestones + future BCs |
+| 🔗 **Finding references** | [Quick Links](#quick-links) | GitHub, docs, ADRs |
+
+**Update Instructions:**
+- **Milestone starts:** Update [Active Milestone](#active-milestone) section + Quick Status table
+- **Milestone completes:** Move Active → [Recent Completions](#recent-completions), update Quick Status, add retrospective link
+- **Archiving old milestones:** After 3 milestones in Recent Completions, move oldest to [Milestone Archive](#milestone-archive)
+- **Roadmap changes:** Update [Roadmap](#roadmap) with new priorities (keep focused on next 3-4 only)
+
+---
+
+## Quick Status
 
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M31.5 (Backoffice Prerequisites) |
-| **Status** | 📋 READY TO START — Domain BC endpoint gaps + multi-issuer JWT |
-| **What's Next** | ADR 0032 sign-off, implement 8 endpoint gaps, configure JWT in 5 BCs |
-| **What's Blocking** | ADR 0032 awaiting PSA sign-off |
+| **Status** | 📋 READY TO START |
+| **Deliverables** | Domain BC endpoint gaps (8 gaps) + multi-issuer JWT (5 BCs) |
+| **Blocking** | ADR 0032 awaiting PSA sign-off |
 | **Next Milestone** | TBD (Catalog Evolution, Search BC, or Exchange v2) |
-| **Completed Milestones** | M25.0, M25.1, M25.2, M28.0, M29.0, M29.1, M30.0, M30.1, M31.0 |
-| **Active BCs** | 17 (including Returns, Correspondence, Backoffice Identity, Promotions) |
+| **Active BCs** | 17 total |
+
+*Last Updated: 2026-03-15*
 
 ---
 
-## Current Milestone
+## Active Milestone
 
-**Milestone:** M31.5 — Backoffice Prerequisites
+**M31.5 — Backoffice Prerequisites**
+
 **Status:** 📋 **READY TO START** — Domain BC endpoint gaps + multi-issuer JWT configuration
 **Duration:** 1 cycle (4-5 sessions, 10-15 hours)
-**GitHub Milestone:** M31.5: Backoffice Prerequisites
-**GitHub Project:** [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
 **Implementation Branch:** `claude/implement-backoffice-phase-1`
+
+**GitHub Links:**
+- Milestone: [M31.5: Backoffice Prerequisites](https://github.com/erikshafer/CritterSupply/milestone/TBD)
+- Project Board: [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
+
 **Planning Documents:**
-- Milestone Plan: [docs/planning/milestones/m31-5-backoffice-prerequisites.md](./milestones/m31-5-backoffice-prerequisites.md)
-- Prerequisite Assessment: [docs/planning/m32-0-prerequisite-assessment.md](./m32-0-prerequisite-assessment.md)
-- Implementation Plan: [docs/planning/phase-0-5-implementation-plan.md](./phase-0-5-implementation-plan.md)
-- ADR 0032: [docs/decisions/0032-multi-issuer-jwt-strategy.md](../decisions/0032-multi-issuer-jwt-strategy.md)
-- Integration Gap Register: [docs/planning/backoffice-integration-gap-register.md](./backoffice-integration-gap-register.md)
+- [Milestone Plan](./milestones/m31-5-backoffice-prerequisites.md)
+- [Prerequisite Assessment](./m32-0-prerequisite-assessment.md)
+- [Implementation Plan](./phase-0-5-implementation-plan.md)
+- [ADR 0032: Multi-Issuer JWT Strategy](../decisions/0032-multi-issuer-jwt-strategy.md)
+- [Integration Gap Register](./backoffice-integration-gap-register.md)
+
+**Deliverables:**
+1. Multi-issuer JWT configuration in 5 domain BCs (Orders, Inventory, Payments, Fulfillment, ProductCatalog)
+2. 8 HTTP endpoint gaps closed across domain BCs
+3. ADR 0032 sign-off from PSA
+4. Integration testing with Admin Identity tokens
+
+**Blockers:**
+- ADR 0032 awaiting PSA sign-off
+
+*Last Updated: 2026-03-15*
 
 ---
 
-## What's Done
+## Recent Completions
 
-**Milestones M25.0, M25.1, M25.2, M28.0, M29.0, M29.1, M30.0, M30.1, and M31.0 are COMPLETE.**
-- Returns BC (M25.0-M25.2)
-- Correspondence BC (M28.0, M31.0)
-- Backoffice Identity BC (M29.0)
-- Promotions BC (M29.1, M30.0)
-- Shopping BC Coupon Integration (M30.1)
-- **Correspondence BC Extended (M31.0)** ✅ NEW
+> **Contains:** Last 3 completed milestones for quick reference.
+> **Archive Policy:** After 3 milestones accumulate, move oldest to [Milestone Archive](#milestone-archive).
 
-> **Note:** Historical milestones used "Cycle N" naming. See [Milestone Mapping](milestone-mapping.md) for translation.
+### ✅ M31.0: Correspondence BC Extended (2026-03-15)
 
-**What M25.0 delivered (Returns BC Core):**
-- ✅ Event-sourced Return aggregate (10 lifecycle states, 9 domain events)
-- ✅ 6 command handlers: RequestReturn, ApproveReturn, DenyReturn, ReceiveReturn, SubmitInspection, ExpireReturn
-- ✅ ReturnEligibilityWindow (from Fulfillment.ShipmentDelivered)
-- ✅ Auto-approval logic + restocking fee calculation
-- ✅ 7 API endpoints (port 5245, schema `returns`)
-- ✅ 48 unit tests + 5 integration tests
-- [Phase 1 Retrospective](cycles/cycle-25-returns-bc-phase-1.md)
+**What shipped:**
+- 5 new integration handlers: ShipmentDeliveredHandler, ShipmentDeliveryFailedHandler, ReturnDeniedHandler, ReturnExpiredHandler, RefundCompletedHandler
+- SMS channel infrastructure: ISmsProvider interface, StubSmsProvider with fake Twilio SID generation
+- RabbitMQ Payments BC queue added (correspondence-payments-events)
+- All 4 BC integration queues configured: Orders, Fulfillment, Returns, Payments
+- 8 total handlers (4 from M28.0 + 4 new from M31.0)
 
-**What M25.1 delivered (Returns BC Mixed Inspection):**
-- ✅ `ReturnCompleted` expanded with per-item disposition (CustomerId, IReadOnlyList\<ReturnedItem\>)
-- ✅ 5 new integration events: ReturnApproved, ReturnRejected, ReturnExpired, ReturnReceived, ReturnedItem
-- ✅ `ReturnDenied` expanded with CustomerId and customer-facing Message
-- ✅ Mixed inspection three-way logic (all-pass/all-fail/mixed → partial refund)
-- ✅ `GetReturnsForOrder` query implemented (Marten inline snapshots)
-- ✅ RabbitMQ dual-queue routing (orders-returns-events + storefront-returns-events)
-- ✅ Fulfillment → Returns queue wiring fix (production bug)
-- ✅ Orders saga: DeliveredAt persistence + ReturnRejected/ReturnExpired handlers
-- ✅ CS agent runbook
-- ✅ 53 Returns unit tests + 34 integration tests + 12 Orders return saga tests = ~99 total
-- [Phase 2 Implementation Plan](cycles/cycle-26-returns-bc-phase-2.md)
-- [Phase 2 Retrospective](cycles/cycle-26-returns-bc-phase-2-retrospective.md)
+**Key Decisions:**
+- Pure choreography pattern scales well (no sagas needed)
+- Defer template system and Customer Identity queries to Phase 3+
+- Inline HTML templates in handlers for now
 
-**What M25.2 delivered (Returns BC Exchanges):**
-- ✅ Exchange workflow (UC-11) — `ReturnType` enum, `ExchangeRequest` record, 5 exchange domain events, 3 command handlers (ApproveExchange, DenyExchange, ShipReplacementItem), 6 integration messages
-- ✅ CE SignalR handlers — 7 handlers in `Storefront/Notifications/`, `ReturnStatusChanged` event added to discriminated union
-- ✅ Sequential returns — `IsReturnInProgress` (bool) → `ActiveReturnIds` (IReadOnlyList<Guid>) saga refactor
-- ✅ Anticorruption layer — `EnumTranslations` static class for customer-facing enum text
-- ✅ `GetReturnableItems` DeliveredAt endpoint fix
-- ✅ $0 refund guard in Orders saga `ReturnCompleted` handler
-- ✅ Cross-BC smoke tests — 3-host Alba fixture (Returns + Orders + Fulfillment)
-- ✅ Fraud detection patterns documentation
-- [Phase 3 Plan](cycles/cycle-27-returns-bc-phase-3.md)
-- [Phase 3 Retrospective](cycles/cycle-27-returns-bc-phase-3-retrospective.md)
+**Build Status:** 0 errors, 7 expected warnings (TODO placeholders)
 
-**What M28.0 delivered (Correspondence BC Core):**
-- ✅ Message aggregate (event-sourced) with 4 domain events: MessageQueued, MessageDelivered, DeliveryFailed, MessageSkipped
-- ✅ Provider interfaces (IEmailProvider, StubEmailProvider)
-- ✅ Integration handler: OrderPlacedHandler (email order confirmations)
-- ✅ SendMessage handler with exponential backoff retry (3 attempts: 5min, 30min, 2hr)
-- ✅ Program.cs configuration (Marten + Wolverine + RabbitMQ)
-- ✅ MessageListView projection (inline) for customer message history
-- ✅ HTTP query endpoints (GetMessagesForCustomer, GetMessageDetails)
-- ✅ 12 unit tests (MessageAggregateTests) — all passing
-- ✅ 5 integration tests (OrderPlacedHandlerTests) — all passing
-- ✅ CONTEXTS.md updated with Phase 1 integration contracts
-- ✅ Port 5248 allocated and configured
-- [Phase 1 Retrospective](cycles/cycle-28-correspondence-bc-phase-1-retrospective.md)
+**References:**
+- [Retrospective](./cycles/m31-0-retrospective.md)
+- CONTEXTS.md updated with M31.0 integration matrix
 
-**What M29.0 delivered (Backoffice Identity BC):**
-- ✅ ADR 0031: RBAC model for Backoffice (7 roles, policy-based authorization)
-- ✅ EF Core entity model: AdminUser, AdminRole enum, AdminUserStatus enum, BackofficeIdentityDbContext
-- ✅ Authentication handlers: Login (JWT + refresh token), RefreshToken (rotation pattern), Logout
-- ✅ User management handlers: CreateAdminUser, GetAdminUsers, ChangeAdminUserRole, DeactivateAdminUser
-- ✅ JWT token generation with 7 authorization policies (leaf + composite)
-- ✅ API endpoints: 3 auth + 4 user management (all using Wolverine HTTP)
-- ✅ Program.cs configuration: JWT Bearer auth, EF Core, Wolverine, OpenTelemetry
-- ✅ Infrastructure: Docker Compose, Aspire, database creation script, port 5249
-- ✅ CONTEXTS.md + CLAUDE.md + CURRENT-CYCLE.md documentation updates
-- [Phase 1 Retrospective](cycles/cycle-29-admin-identity-phase-1-retrospective.md)
-
-**What M29.1 delivered (Promotions BC Core — MVP):**
-- ✅ Event-sourced Promotion aggregate (UUID v7) — 6 domain events: PromotionCreated, PromotionActivated, PromotionPaused, PromotionResumed, PromotionCancelled, PromotionExpired
-- ✅ Event-sourced Coupon aggregate (UUID v5 from code) — 4 domain events: CouponIssued, CouponRedeemed, CouponRevoked, CouponExpired
-- ✅ Domain enums: PromotionStatus (Draft, Scheduled, Active, Paused, Expired, Cancelled), CouponStatus (Issued, Redeemed, Expired, Revoked), DiscountType (PercentageOff, FixedAmountOff, FreeShipping)
-- ✅ Command handlers: CreatePromotion, ActivatePromotion, IssueCoupon (manual coupon issuance)
-- ✅ CouponLookupView projection (MultiStreamProjection for case-insensitive coupon validation)
-- ✅ ValidateCoupon query endpoint (business rules: dates, status, promotion link, case-insensitive lookup)
-- ✅ Marten snapshot projections for Promotion and Coupon aggregates (inline, zero-lag queryability)
-- ✅ API endpoints: 3 command endpoints + 1 query endpoint (Wolverine HTTP)
-- ✅ Program.cs configuration: Marten + Wolverine + RabbitMQ + OpenTelemetry
-- ✅ Port 5250 allocated and configured
-- ✅ 11 integration tests (PromotionLifecycleTests + CouponValidationTests) — all passing
-- ✅ CLAUDE.md + CONTEXTS.md updated with Promotions BC entry
-- ✅ Pattern discovery: IStartStream return type, snapshot projection requirement
-- [Phase 2 Retrospective](cycles/cycle-29-phase-2-retrospective-notes.md)
-- **Deferred to Phase 2:** Batch coupon generation, scheduled messages, redemption tracking, Shopping BC integration, Pricing BC floor price integration
-
-**Next milestones (roadmap):**
-- **M31.0:** Correspondence BC Extended — Additional integration events (Shipment, Returns, Payments), SMS channel (Twilio)
-- **M32.0+:** Backoffice Phase 1 — Read-only dashboards, customer service tooling
+*Completed: 2026-03-15*
 
 ---
 
-## Recently Completed
+### ✅ M30.1: Shopping BC Coupon Integration (2026-03-15)
 
-- ✅ **M31.0:** Correspondence BC Extended (2026-03-15) — **COMPLETE**
-  - 5 new integration handlers: ShipmentDeliveredHandler, ShipmentDeliveryFailedHandler, ReturnDeniedHandler, ReturnExpiredHandler, RefundCompletedHandler
-  - SMS channel infrastructure: ISmsProvider interface, StubSmsProvider with fake Twilio SID generation
-  - RabbitMQ Payments BC queue added (correspondence-payments-events)
-  - All 4 BC integration queues now configured: Orders, Fulfillment, Returns, Payments
-  - Inline HTML templates in handlers (template system deferred to Phase 3+)
-  - TODO placeholders for Customer Identity BC queries (deferred to Phase 3+)
-  - 8 total handlers (4 from M28.0, 3 incremental, 5 from M31.0)
-  - Build: 0 errors, 7 expected warnings (TODO placeholders)
-  - **Pattern Discovery:** Pure choreography pattern scales well (no sagas needed for Correspondence BC)
-  - **Design Decision:** Defer template system and Customer Identity queries to Phase 3+ (reduces complexity)
-  - CONTEXTS.md updated with M31.0 integration matrix
-  - [Retrospective](./cycles/m31-0-retrospective.md)
+**What shipped:**
+- ApplyCouponToCart + RemoveCouponFromCart command handlers
+- Real PromotionsClient integration (ValidateCoupon + CalculateDiscount HTTP calls)
+- GetCart enrichment with discount information
+- Dual handler pattern (command handler + HTTP endpoint handler classes)
+- 11 integration tests covering valid/invalid coupons, empty/terminal carts, discount calculations
 
-- ✅ **M30.1:** Shopping BC Coupon Integration (2026-03-15) — **COMPLETE**
-  - ApplyCouponToCart command + handler — validates coupon via Promotions BC HTTP client
-  - RemoveCouponFromCart command + handler — clears coupon from cart
-  - GetCart enrichment — includes discount information when coupon applied
-  - Real PromotionsClient integration — calls ValidateCoupon and CalculateDiscount HTTP endpoints
-  - Dual handler pattern — separate command handler + HTTP endpoint handler classes (following ClearCart pattern)
-  - Alba test fixture DI replacement — RemoveAll + AddSingleton pattern for stub injection
-  - 11 integration tests covering: valid/invalid coupons, empty/terminal cart validation, discount calculation, remove/reapply flows
-  - **Pattern Discovery:** Wolverine Railway Programming with async external service calls requires separate handler classes
-  - **Design Decision:** Single coupon per cart (stacking deferred to M30.3+)
-  - CONTEXTS.md updated with Shopping ↔ Promotions bidirectional integration
-  - **Skills Refresh:** Propagated M30.1 learnings to wolverine-message-handlers.md (Railway Programming with async validation)
-  - [Retrospective](./cycles/m30-1-shopping-bc-coupon-retrospective.md)
+**Key Patterns:**
+- Wolverine Railway Programming with async external service calls requires separate handler classes
+- Alba test fixture DI replacement: RemoveAll + AddSingleton pattern for stub injection
+- Single coupon per cart (stacking deferred to M30.3+)
 
-- ✅ **M30.0:** Promotions BC Redemption (2026-03-15) — **COMPLETE**
-  - RedeemCoupon, RevokeCoupon, RecordPromotionRedemption command handlers
-  - GenerateCouponBatch fan-out pattern for batch coupon generation (PREFIX-XXXX format)
-  - CalculateDiscount query with stub CartView for discount calculation (percentage + fixed amount)
-  - RecordPromotionRedemptionHandler choreography integration with Orders BC
-  - ExpireCoupon scheduled message (promotion end date expiry)
-  - 29 integration tests across promotion lifecycle, coupon validation, redemption workflow, discount calculation
-  - **Pattern Discovery:** Handlers manually loading aggregates must use `session.Events.Append()` (not tuple returns)
-  - **Design Decision:** Draft promotions can issue coupons (enables batch generation before activation)
-  - **Banker's Rounding:** `Math.Round(6.825, 2)` rounds to 6.82 (even), not 6.83 — affects discount calculations
-  - CONTEXTS.md updated with M30.0 implementation status
-  - **Skills Refresh:** Propagated M30.0 learnings to wolverine-message-handlers.md (anti-pattern #8), modern-csharp-coding-standards.md (banker's rounding), critterstack-testing-patterns.md (fan-out timing)
-  - **Deferred to M30.1+:** Full Shopping BC integration (real cart workflow), Pricing BC floor price enforcement
-  - [Retrospective](./milestones/m30-0-retrospective.md)
+**Skills Refresh:**
+- Propagated M30.1 learnings to `wolverine-message-handlers.md` (Railway Programming with async validation)
 
-- ✅ **M29.1:** Promotions BC Core — MVP (2026-03-14 to 2026-03-15) — **COMPLETE**
-  - Event-sourced Promotion aggregate (UUID v7) with 6 domain events
-  - Event-sourced Coupon aggregate (UUID v5 from code) with 4 domain events
-  - Command handlers: CreatePromotion, ActivatePromotion, IssueCoupon
-  - CouponLookupView projection (case-insensitive coupon validation)
-  - ValidateCoupon query endpoint with business rules validation
-  - Marten snapshot projections for queryability (Promotion + Coupon)
-  - 11 integration tests (all passing)
-  - Port 5250 allocated
-  - **Pattern Discoveries:** IStartStream return type, snapshot projection requirement for queryability
-  - **Deferred to M30.0:** Redemption tracking, batch generation, Shopping/Pricing integration
-  - [Retrospective](./cycles/cycle-29-phase-2-retrospective-notes.md)
+**References:**
+- [Retrospective](./cycles/m30-1-shopping-bc-coupon-retrospective.md)
+- CONTEXTS.md updated with Shopping ↔ Promotions bidirectional integration
 
-- ✅ **M29.0:** Backoffice Identity BC (2026-03-14) — **COMPLETE**
-  - ADR 0031: RBAC model (7 roles, policy-based authorization)
-  - EF Core entity model: AdminUser, AdminRole, AdminUserStatus, BackofficeIdentityDbContext
-  - Authentication handlers: Login, RefreshToken, Logout (JWT + refresh token rotation)
-  - User management handlers: CreateAdminUser, GetAdminUsers, ChangeAdminUserRole, DeactivateAdminUser
-  - JWT token generation with 7 authorization policies
-  - API endpoints: 3 auth + 4 user management (Wolverine HTTP)
-  - Program.cs configuration: JWT Bearer auth, EF Core, Wolverine, OpenTelemetry
-  - Infrastructure: Docker Compose, Aspire, database, port 5249
-  - CONTEXTS.md + CLAUDE.md + CURRENT-CYCLE.md documentation
-  - [Retrospective](./cycles/cycle-29-admin-identity-phase-1-retrospective.md)
-
-- ✅ **M28.0:** Correspondence BC Core (2026-03-13 to 2026-03-14) — **COMPLETE**
-  - Message aggregate (event-sourced) — 4 domain events, retry lifecycle
-  - Provider interfaces (IEmailProvider, StubEmailProvider)
-  - OrderPlacedHandler — email order confirmations
-  - SendMessage handler — exponential backoff retry (5min, 30min, 2hr)
-  - MessageListView projection (inline)
-  - HTTP query endpoints (GetMessagesForCustomer, GetMessageDetails)
-  - 12 unit tests + 5 integration tests (all passing)
-  - CONTEXTS.md integration
-  - Sign-offs: PSA ✅, PO ✅ (planning phase)
-  - [Retrospective](./cycles/cycle-28-correspondence-bc-phase-1-retrospective.md)
-
-- ✅ **M25.2:** Returns BC Exchanges (2026-03-13) — **COMPLETE**
-  - Exchange workflow (UC-11) — ReturnType enum, ExchangeRequest, 5 exchange domain events, 3 command handlers
-  - 6 integration messages for exchange workflow
-  - CE SignalR handlers — 7 handlers, ReturnStatusChanged discriminated union event
-  - Sequential returns — IsReturnInProgress → ActiveReturnIds (IReadOnlyList<Guid>) saga refactor
-  - Anticorruption layer — EnumTranslations static class for customer-facing text
-  - GetReturnableItems DeliveredAt fix + $0 refund guard
-  - Cross-BC smoke tests (3-host Alba fixture: Returns + Orders + Fulfillment)
-  - Fraud detection patterns documentation
-  - Sign-offs: PSA ✅, PO ✅, UXE ✅ (planning phase)
-  - [Plan](./cycles/cycle-27-returns-bc-phase-3.md) | [Retrospective](./cycles/cycle-27-returns-bc-phase-3-retrospective.md)
-
-- ✅ **M25.1:** Returns BC Mixed Inspection (2026-03-12 to 2026-03-13) — **COMPLETE**
-  - ReturnCompleted expanded with per-item disposition (CustomerId, ReturnedItem[])
-  - 5 new integration events (ReturnApproved, ReturnRejected, ReturnExpired, ReturnReceived, ReturnedItem)
-  - ReturnDenied expanded with CustomerId and Message
-  - Mixed inspection three-way logic (all-pass/all-fail/mixed → partial refund)
-  - GetReturnsForOrder query implemented (Marten inline snapshots)
-  - RabbitMQ dual-queue routing + Fulfillment queue wiring fix
-  - Orders saga: DeliveredAt + ReturnRejected/ReturnExpired handlers
-  - CS agent runbook
-  - ~99 total return-related tests (53 unit + 34 integration + 12 saga)
-  - Sign-offs: PSA ✅, PO ✅, UXE ✅
-  - [Plan](./cycles/cycle-26-returns-bc-phase-2.md) | [Retrospective](./cycles/cycle-26-returns-bc-phase-2-retrospective.md)
-
-- ✅ **M25.0:** Returns BC Core (2026-03-12) — **COMPLETE**
-  - Event-sourced Return aggregate (10 lifecycle states, 9 domain events)
-  - 6 command handlers + 7 API endpoints (port 5245)
-  - ReturnEligibilityWindow from Fulfillment.ShipmentDelivered
-  - Auto-approval logic + restocking fee calculation
-  - 48 unit tests + 5 integration tests
-  - Sign-offs: PO ✅, UXE ✅, QA ✅, PSA ✅
-  - [Plan & Retrospective](./cycles/cycle-25-returns-bc-phase-1.md)
-
-- ✅ **Cycle 24:** Fulfillment Integrity + Returns Prerequisites (2026-03-12) — **COMPLETE**
-  - RabbitMQ transport wired in Fulfillment.Api
-  - `RecordDeliveryFailure` endpoint + ShipmentDeliveryFailed cascade
-  - `shipment-delivery-failed` SSE case in OrderConfirmation.razor
-  - UUID v5 idempotent shipment creation + clean ShipmentStatus enum
-  - SharedShippingAddress with dual JSON annotations (Phase A)
-  - Orders saga return handlers + IsReturnInProgress guard
-  - `GET /api/orders/{orderId}/returnable-items` endpoint
-  - Event modeling exercise conducted with PO + UXE
-  - Sign-offs: PO ✅, UXE ✅, PSA ✅
-  - [Plan](./cycles/cycle-24-fulfillment-integrity-returns-prerequisites.md)
-
-- ✅ **Cycle 23:** Vendor Portal E2E Testing (2026-03-11) — **COMPLETE**
-  - 3-server E2E fixture (VendorIdentity.Api + VendorPortal.Api + WASM static host)
-  - 12 BDD scenarios (P0 + P1a) across 3 feature files
-  - Page Object Models for Login, Dashboard, Change Requests, Submit, Settings
-  - SignalR hub message injection testing via IHubContext
-  - Collaborative design: PA + QA + PO
-  - [Plan](./cycles/cycle-23-vendor-portal-e2e-testing.md) | [Skills Update](../skills/e2e-playwright-testing.md)
-
-- ✅ **Cycle 22:** Vendor Portal + Vendor Identity Phase 1 (2026-03-08 to 2026-03-10) — **ALL 6 PHASES COMPLETE**
-  - Phase 1: JWT Auth (VendorIdentity.Api, EF Core, token lifecycle)
-  - Phase 2: Vendor Portal API (analytics, alerts, dashboard, multi-tenant)
-  - Phase 3: Blazor WASM Frontend (SignalR hub, in-memory JWT, live updates)
-  - Phase 4: Change Request Workflow (7-state machine, Catalog BC integration)
-  - Phase 5: Saved Views + VendorAccount (notification preferences, saved dashboard views)
-  - Phase 6: Full Identity Lifecycle + Admin Tools (8 admin endpoints, compensation handler, last-admin protection)
-  - 143 integration tests across Vendor Portal + Identity (100% pass rate)
-  - [Event Modeling](vendor-portal-event-modeling.md) | [Retrospective](./cycles/cycle-22-retrospective.md) | [Milestone](https://github.com/erikshafer/CritterSupply/milestone/16)
-
-- ✅ **Cycle 21:** Pricing BC Phase 1 (2026-03-07 to 2026-03-08) — **MILESTONE CLOSED**
-  - ProductPrice event-sourced aggregate (UUID v5 deterministic stream ID)
-  - Money value object (140 unit tests)
-  - CurrentPriceView inline projection (zero-lag queries)
-  - Shopping BC security fix (server-authoritative pricing)
-  - 5 ADRs written (UUID v5, price freeze, Money VO, bulk jobs, MAP vs Floor)
-  - 151 Pricing tests + 56 Shopping tests (all passing)
-  - Docker Compose integration
-  - 11 issues closed (all deliverables complete)
-  - [Plan](pricing-event-modeling.md) | [Retrospective](./cycles/cycle-21-retrospective.md) | [Milestone](https://github.com/erikshafer/CritterSupply/milestone/15) (closed)
-
-- ✅ **Cycle 20:** Automated Browser Testing (2026-03-04 to 2026-03-07)
-  - Playwright + Reqnroll E2E testing infrastructure
-  - Real Kestrel servers (not TestServer) for SignalR testing
-  - Page Object Model with data-testid selectors
-  - MudBlazor component interaction patterns (MudSelect)
-  - Stub coordination via TestIdProvider (deterministic IDs)
-  - Playwright tracing for CI failure diagnosis
-  - Full coverage: product browsing, cart, checkout wizard, order history, SignalR real-time updates
-  - [Plan](./cycles/cycle-20-automated-browser-testing.md) | [Retrospective](./cycles/cycle-20-retrospective.md) | [Issues Export](./cycles/cycle-20-issues-export.md) | [Milestone](https://github.com/erikshafer/CritterSupply/milestone/2)
-
-- ✅ **Cycle 19.5:** Complete Checkout Workflow (2026-03-04)
-  - Wired checkout stepper to backend APIs
-  - Checkout initialization + CheckoutId persistence
-  - Error handling with MudSnackbar toasts
-  - End-to-end manual testing
-  - [Milestone](https://github.com/erikshafer/CritterSupply/milestone/13)
-
-- ✅ **Cycle 19:** Authentication & Authorization (2026-02-25 to 2026-02-26)
-  - Cookie-based authentication (ASP.NET Core Authentication middleware)
-  - Login/Logout pages with MudBlazor
-  - Protected routes (Cart, Checkout)
-  - AppBar authentication UI (Sign In / My Account dropdown)
-  - Replaced all stub customerIds with authenticated session values
-  - Cart persistence via browser localStorage
-  - Swagger UI + seed data for ProductCatalog.Api
-  - Npgsql logging noise reduction
-  - [Plan](./cycles/cycle-19-authentication-authorization.md) | [Retrospective](./cycles/cycle-19-retrospective.md) | [Issues Export](./cycles/cycle-19-issues-export.md)
+*Completed: 2026-03-15*
 
 ---
 
-## Upcoming (Planned)
+### ✅ M30.0: Promotions BC Redemption (2026-03-15)
+
+**What shipped:**
+- RedeemCoupon, RevokeCoupon, RecordPromotionRedemption command handlers
+- GenerateCouponBatch fan-out pattern (PREFIX-XXXX format)
+- CalculateDiscount query with stub CartView
+- RecordPromotionRedemptionHandler choreography integration with Orders BC
+- ExpireCoupon scheduled message (promotion end date expiry)
+- 29 integration tests across lifecycle, validation, redemption, discount calculation
+
+**Key Patterns:**
+- Handlers manually loading aggregates must use `session.Events.Append()` (not tuple returns)
+- Draft promotions can issue coupons (enables batch generation before activation)
+- **Banker's Rounding:** `Math.Round(6.825, 2)` → 6.82 (even), not 6.83 — affects discount calculations
+
+**Skills Refresh:**
+- Updated `wolverine-message-handlers.md` (anti-pattern #8)
+- Updated `modern-csharp-coding-standards.md` (banker's rounding)
+- Updated `critterstack-testing-patterns.md` (fan-out timing)
+
+**Deferred:**
+- Full Shopping BC integration (completed in M30.1)
+- Pricing BC floor price enforcement (future)
+
+**References:**
+- [Retrospective](./milestones/m30-0-retrospective.md)
+- CONTEXTS.md updated with M30.0 implementation status
+
+*Completed: 2026-03-15*
+
+---
+
+## Milestone Archive
+
+> **Contains:** Completed milestones older than the last 3 (M29.1 and earlier).
+> **Purpose:** Historical reference without cluttering recent work context.
+
+<details>
+<summary><strong>M29.1: Promotions BC Core — MVP (2026-03-14 to 2026-03-15)</strong></summary>
+
+**What shipped:**
+- Event-sourced Promotion aggregate (UUID v7) with 6 domain events
+- Event-sourced Coupon aggregate (UUID v5 from code) with 4 domain events
+- Command handlers: CreatePromotion, ActivatePromotion, IssueCoupon
+- CouponLookupView projection (case-insensitive coupon validation)
+- ValidateCoupon query endpoint with business rules
+- Marten snapshot projections (Promotion + Coupon)
+- 11 integration tests (all passing)
+- Port 5250 allocated
+
+**Pattern Discoveries:**
+- IStartStream return type for event stream creation
+- Snapshot projection requirement for queryability
+
+**Deferred to M30.0:** Redemption tracking, batch generation, Shopping/Pricing integration
+
+[Retrospective](./cycles/cycle-29-phase-2-retrospective-notes.md)
+
+</details>
+
+<details>
+<summary><strong>M29.0: Backoffice Identity BC (2026-03-14)</strong></summary>
+
+**What shipped:**
+- ADR 0031: RBAC model (7 roles, policy-based authorization)
+- EF Core entity model: AdminUser, AdminRole, AdminUserStatus, BackofficeIdentityDbContext
+- Authentication handlers: Login, RefreshToken, Logout (JWT + refresh token rotation)
+- User management handlers: CreateAdminUser, GetAdminUsers, ChangeAdminUserRole, DeactivateAdminUser
+- JWT token generation with 7 authorization policies
+- API endpoints: 3 auth + 4 user management (Wolverine HTTP)
+- Infrastructure: Docker Compose, Aspire, database, port 5249
+
+[Retrospective](./cycles/cycle-29-admin-identity-phase-1-retrospective.md)
+
+</details>
+
+<details>
+<summary><strong>M28.0: Correspondence BC Core (2026-03-13 to 2026-03-14)</strong></summary>
+
+**What shipped:**
+- Message aggregate (event-sourced) — 4 domain events, retry lifecycle
+- Provider interfaces (IEmailProvider, StubEmailProvider)
+- OrderPlacedHandler — email order confirmations
+- SendMessage handler — exponential backoff retry (5min, 30min, 2hr)
+- MessageListView projection (inline)
+- HTTP query endpoints (GetMessagesForCustomer, GetMessageDetails)
+- 12 unit tests + 5 integration tests
+
+[Retrospective](./cycles/cycle-28-correspondence-bc-phase-1-retrospective.md)
+
+</details>
+
+<details>
+<summary><strong>M25.2: Returns BC Exchanges (2026-03-13)</strong></summary>
+
+**What shipped:**
+- Exchange workflow (UC-11) — ReturnType enum, ExchangeRequest, 5 exchange domain events, 3 command handlers
+- 6 integration messages for exchange workflow
+- CE SignalR handlers — 7 handlers, ReturnStatusChanged discriminated union event
+- Sequential returns — IsReturnInProgress → ActiveReturnIds saga refactor
+- Anticorruption layer — EnumTranslations static class
+- Cross-BC smoke tests (3-host Alba fixture)
+
+[Plan](./cycles/cycle-27-returns-bc-phase-3.md) | [Retrospective](./cycles/cycle-27-returns-bc-phase-3-retrospective.md)
+
+</details>
+
+<details>
+<summary><strong>M25.1: Returns BC Mixed Inspection (2026-03-12 to 2026-03-13)</strong></summary>
+
+**What shipped:**
+- ReturnCompleted expanded with per-item disposition
+- 5 new integration events (ReturnApproved, ReturnRejected, ReturnExpired, ReturnReceived, ReturnedItem)
+- Mixed inspection three-way logic
+- GetReturnsForOrder query (Marten inline snapshots)
+- RabbitMQ dual-queue routing + Fulfillment queue wiring fix
+- ~99 total return-related tests
+
+[Plan](./cycles/cycle-26-returns-bc-phase-2.md) | [Retrospective](./cycles/cycle-26-returns-bc-phase-2-retrospective.md)
+
+</details>
+
+<details>
+<summary><strong>M25.0: Returns BC Core (2026-03-12)</strong></summary>
+
+**What shipped:**
+- Event-sourced Return aggregate (10 lifecycle states, 9 domain events)
+- 6 command handlers + 7 API endpoints (port 5245)
+- ReturnEligibilityWindow from Fulfillment.ShipmentDelivered
+- Auto-approval logic + restocking fee calculation
+- 48 unit tests + 5 integration tests
+
+[Plan & Retrospective](./cycles/cycle-25-returns-bc-phase-1.md)
+
+</details>
+
+<details>
+<summary><strong>Cycle 24: Fulfillment Integrity + Returns Prerequisites (2026-03-12)</strong></summary>
+
+**What shipped:**
+- RabbitMQ transport wired in Fulfillment.Api
+- RecordDeliveryFailure endpoint + ShipmentDeliveryFailed cascade
+- UUID v5 idempotent shipment creation
+- SharedShippingAddress with dual JSON annotations
+- Orders saga return handlers + IsReturnInProgress guard
+- GET /api/orders/{orderId}/returnable-items endpoint
+
+[Plan](./cycles/cycle-24-fulfillment-integrity-returns-prerequisites.md)
+
+</details>
+
+<details>
+<summary><strong>Cycle 23: Vendor Portal E2E Testing (2026-03-11)</strong></summary>
+
+**What shipped:**
+- 3-server E2E fixture (VendorIdentity.Api + VendorPortal.Api + WASM static host)
+- 12 BDD scenarios (P0 + P1a) across 3 feature files
+- Page Object Models for Login, Dashboard, Change Requests, Submit, Settings
+- SignalR hub message injection testing
+
+[Plan](./cycles/cycle-23-vendor-portal-e2e-testing.md) | [Skills Update](../skills/e2e-playwright-testing.md)
+
+</details>
+
+<details>
+<summary><strong>Cycle 22: Vendor Portal + Vendor Identity Phase 1 (2026-03-08 to 2026-03-10)</strong></summary>
+
+**What shipped (6 phases):**
+- Phase 1: JWT Auth (VendorIdentity.Api, EF Core, token lifecycle)
+- Phase 2: Vendor Portal API (analytics, alerts, dashboard, multi-tenant)
+- Phase 3: Blazor WASM Frontend (SignalR hub, in-memory JWT, live updates)
+- Phase 4: Change Request Workflow (7-state machine, Catalog BC integration)
+- Phase 5: Saved Views + VendorAccount (notification preferences, saved dashboard views)
+- Phase 6: Full Identity Lifecycle + Admin Tools (8 admin endpoints, compensation handler)
+- 143 integration tests (100% pass rate)
+
+[Event Modeling](vendor-portal-event-modeling.md) | [Retrospective](./cycles/cycle-22-retrospective.md) | [Milestone](https://github.com/erikshafer/CritterSupply/milestone/16)
+
+</details>
+
+<details>
+<summary><strong>Cycle 21: Pricing BC Phase 1 (2026-03-07 to 2026-03-08)</strong></summary>
+
+**What shipped:**
+- ProductPrice event-sourced aggregate (UUID v5 deterministic stream ID)
+- Money value object (140 unit tests)
+- CurrentPriceView inline projection (zero-lag queries)
+- Shopping BC security fix (server-authoritative pricing)
+- 5 ADRs written
+- 151 Pricing tests + 56 Shopping tests
+
+[Plan](pricing-event-modeling.md) | [Retrospective](./cycles/cycle-21-retrospective.md) | [Milestone](https://github.com/erikshafer/CritterSupply/milestone/15) (closed)
+
+</details>
+
+<details>
+<summary><strong>Cycle 20: Automated Browser Testing (2026-03-04 to 2026-03-07)</strong></summary>
+
+**What shipped:**
+- Playwright + Reqnroll E2E testing infrastructure
+- Real Kestrel servers (not TestServer) for SignalR testing
+- Page Object Model with data-testid selectors
+- MudBlazor component interaction patterns
+- Playwright tracing for CI failure diagnosis
+
+[Plan](./cycles/cycle-20-automated-browser-testing.md) | [Retrospective](./cycles/cycle-20-retrospective.md) | [Milestone](https://github.com/erikshafer/CritterSupply/milestone/2)
+
+</details>
+
+<details>
+<summary><strong>Cycle 19.5: Complete Checkout Workflow (2026-03-04)</strong></summary>
+
+**What shipped:**
+- Wired checkout stepper to backend APIs
+- Checkout initialization + CheckoutId persistence
+- Error handling with MudSnackbar toasts
+- End-to-end manual testing
+
+[Milestone](https://github.com/erikshafer/CritterSupply/milestone/13)
+
+</details>
+
+<details>
+<summary><strong>Cycle 19: Authentication & Authorization (2026-02-25 to 2026-02-26)</strong></summary>
+
+**What shipped:**
+- Cookie-based authentication (ASP.NET Core middleware)
+- Login/Logout pages with MudBlazor
+- Protected routes (Cart, Checkout)
+- AppBar authentication UI
+- Cart persistence via browser localStorage
+- Swagger UI + seed data for ProductCatalog.Api
+
+[Plan](./cycles/cycle-19-authentication-authorization.md) | [Retrospective](./cycles/cycle-19-retrospective.md)
+
+</details>
+
+*Archive Last Updated: 2026-03-15*
+
+---
+
+## Roadmap
+
+> **Contains:** Next 3-4 milestones + future BCs (high-level only).
+> **Purpose:** Forward-looking planning without excessive detail.
 
 ### Next 3-4 Milestones
 
-> **Revised after M30.1 completion (2026-03-15)**
-
-- **M31.0:** Correspondence BC Extended — Extended Integration & SMS
-  - Phase 2a: ShipmentDispatched, ShipmentDelivered, ShipmentDeliveryFailed (Fulfillment BC)
-  - Phase 2b: ReturnApproved, ReturnDenied, ReturnCompleted, ReturnExpired (Returns BC)
-  - Phase 2c: RefundCompleted (Payments BC)
-  - SMS channel implementation (Twilio integration)
-  - Template system for email/SMS message formatting
-
 - **M32.0+:** Backoffice Phase 1 — Read-Only Dashboards
-  - Event Modeling: [`docs/planning/backoffice-event-modeling-revised.md`](backoffice-event-modeling-revised.md)
-  - Integration Gap Register: [`docs/planning/backoffice-integration-gap-register.md`](backoffice-integration-gap-register.md)
-  - Prerequisites: Multi-issuer JWT support in domain BCs, HTTP endpoint gaps closed
+  - Prerequisites: Multi-issuer JWT (M31.5), endpoint gaps closed (M31.5)
   - Read-only dashboards: Orders, Returns, Customers, Inventory
   - Customer Service tooling: Return approval/denial, correspondence history
+  - Event Modeling: [backoffice-event-modeling-revised.md](backoffice-event-modeling-revised.md)
+  - Integration Gap Register: [backoffice-integration-gap-register.md](backoffice-integration-gap-register.md)
 
 ### Future BCs (Priority Roadmap)
 
 **High Priority (Active Development or Near-Term):**
-- 🟢 **Correspondence BC Extended (M31.0)** — Extended integration events, SMS channel
-- 🟢 **Backoffice (M32.0+)** — Internal operations portal *(prerequisites: multi-issuer JWT, endpoint gaps closed)*
+- 🟢 **Backoffice (M32.0+)** — Internal operations portal
 
 **Medium Priority (Customer-Facing Features):**
 - 🟡 **Exchange v2** — Cross-product exchanges, upcharge payment collection
-- 🟡 **Product Catalog Evolution** — Variants, Listings, Marketplaces *(D2–D10 decisions resolved; [milestone plan](catalog-listings-marketplaces-cycle-plan.md) approved — Milestones M33–M39 estimated)*
+- 🟡 **Product Catalog Evolution** — Variants, Listings, Marketplaces ([plan](catalog-listings-marketplaces-cycle-plan.md) approved — M33–M39 estimated)
 - 🟡 **Search BC** — Full-text product search, faceted navigation
 - 🟡 **Recommendations BC** — Personalized product recommendations
 
 **Lower Priority (Strategic/Retention):**
 - 🔵 **Analytics BC** — Business intelligence, reporting, dashboards
-- 🔵 **Store Credit BC** — Gift cards, store credit issuance, balance tracking
+- 🔵 **Store Credit BC** — Gift cards, store credit issuance
 - 🔵 **Loyalty BC** — Rewards program, points accumulation
 - 🔵 **Operations Dashboard** — Developer/SRE event stream visualization (React + SignalR)
 
 See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specifications.
+
+*Roadmap Last Updated: 2026-03-15*
 
 ---
 
 ## Quick Links
 
 - [CONTEXTS.md](../../CONTEXTS.md) — Architectural source of truth *(always read first)*
-- [Full Backlog on GitHub](https://github.com/erikshafer/CritterSupply/issues?q=label%3Astatus%3Abacklog) *(after migration)*
-- [GitHub Project Board](https://github.com/users/erikshafer/projects) *(after setup)*
-- [Historical cycles](./cycles/) — Markdown retrospectives
+- [GitHub Issues](https://github.com/erikshafer/CritterSupply/issues) — Issue tracking
+- [GitHub Project Board](https://github.com/users/erikshafer/projects/9) — Kanban board
+- [Historical Cycles](./cycles/) — Markdown retrospectives
+- [Milestone Mapping](./milestone-mapping.md) — Legacy "Cycle N" → "M.N" translation
 - [Migration Plan](./GITHUB-MIGRATION-PLAN.md) — How we got here
 - [ADR 0011](../decisions/0011-github-projects-issues-migration.md) — Why we made this change
+- [ADR 0032](../decisions/0032-milestone-based-planning-schema.md) — Milestone-based planning schema
 
 ---
 
-*Last Updated: 2026-03-15 (M31.0 COMPLETE — 5 handlers + SMS infrastructure delivered, M32.0+ next)*
-*Update this file at: milestone start, milestone end, and when significant task changes occur*
+*Document Last Updated: 2026-03-15*
+*Active Milestone: M31.5 (Backoffice Prerequisites) — READY TO START*
+*Update Policy: At milestone start, milestone end, and significant task changes*
