@@ -59,11 +59,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 // Marten document store — owns the VendorProductCatalog lookup and future Vendor Portal projections
-var connectionString = builder.Configuration.GetConnectionString("postgres")
-    ?? "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=postgres";
-
 builder.Services.AddMarten(opts =>
 {
+    var connectionString = builder.Configuration.GetConnectionString("postgres")
+        ?? "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=postgres";
     opts.Connection(connectionString);
     opts.DatabaseSchemaName = "vendorportal";
 })

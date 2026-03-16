@@ -69,8 +69,12 @@ public sealed class DataHooks
     [AfterTestRun(Order = 100)]
     public static async Task StopInfrastructure()
     {
-        await _browser.DisposeAsync();
-        _playwright.Dispose();
-        await _fixture.DisposeAsync();
+        if (_browser is not null)
+            await _browser.DisposeAsync();
+
+        _playwright?.Dispose();
+
+        if (_fixture is not null)
+            await _fixture.DisposeAsync();
     }
 }
