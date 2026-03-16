@@ -1,4 +1,5 @@
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Wolverine.Http;
 
@@ -30,6 +31,7 @@ public sealed record LowStockResponse(
 public sealed class GetLowStock
 {
     [WolverineGet("/api/inventory/low-stock")]
+    [Authorize(Policy = "WarehouseClerk")]
     public static async Task<Ok<LowStockResponse>> Handle(
         int? threshold,
         IDocumentSession session,

@@ -2,7 +2,10 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using CustomerIdentity.AddressBook;
 using JasperFx;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -51,8 +54,8 @@ builder.Services.AddSwaggerGen();
 // Register address verification service (stub for development)
 builder.Services.AddSingleton<IAddressVerificationService, StubAddressVerificationService>();
 
-// Configure authentication (cookie-based sessions for dev mode)
-builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme)
+// Configure authentication with Cookie (for customer login) + JWT (for Backoffice access)
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
         options.Cookie.Name = "CritterSupply.Auth";
@@ -65,9 +68,40 @@ builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.Cookies.C
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             return Task.CompletedTask;
         };
+    })
+    .AddJwtBearer("Backoffice", options =>
+    {
+        options.Authority = "https://localhost:5249";
+        options.Audience = "https://localhost:5249";
+        if (builder.Environment.IsDevelopment())
+        {
+            options.RequireHttpsMetadata = false;
+        }
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            RoleClaimType = "role"
+        };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(opts =>
+{
+    // Backoffice policies for customer service access
+    opts.AddPolicy("CustomerService", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Backoffice");
+        policy.RequireRole("CustomerService", "OperationsManager", "SystemAdmin");
+    });
+
+    opts.AddPolicy("OperationsManager", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Backoffice");
+        policy.RequireRole("OperationsManager", "SystemAdmin");
+    });
+});
 
 builder.Services.AddWolverineHttp();
 

@@ -1,4 +1,5 @@
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Orders.Placement;
 using Wolverine.Http;
 
@@ -17,6 +18,7 @@ public static class ListOrdersEndpoint
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with list of OrderSummaryResponse (may be empty).</returns>
     [WolverineGet("/api/orders")]
+    [Authorize(Policy = "CustomerService")]
     public static async Task<IResult> List(
         Guid? customerId,
         IQuerySession session,

@@ -1,5 +1,6 @@
 using FluentValidation;
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProductCatalog.Products;
 using Wolverine;
@@ -69,6 +70,7 @@ public static class UpdateProductHandler
     }
 
     [WolverinePut("/api/products/{sku}")]
+    [Authorize(Policy = "VendorAdmin")]
     public static async Task Handle(
         UpdateProduct command,
         Product product,

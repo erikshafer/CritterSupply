@@ -6,8 +6,10 @@ using JasperFx.Events.Daemon;
 using JasperFx.Resources;
 using Marten;
 using Marten.Events.Projections;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -79,6 +81,49 @@ builder.Host.UseWolverine(opts =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Configure JWT authentication with Backoffice issuer only
+// Note: Payments BC does not need Vendor access in Phase 1
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer("Backoffice", options =>
+    {
+        options.Authority = "https://localhost:5249";
+        options.Audience = "https://localhost:5249";
+        if (builder.Environment.IsDevelopment())
+        {
+            options.RequireHttpsMetadata = false;
+        }
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            RoleClaimType = "role"
+        };
+    });
+
+// Configure authorization policies
+builder.Services.AddAuthorization(opts =>
+{
+    opts.AddPolicy("CustomerService", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Backoffice");
+        policy.RequireRole("CustomerService", "OperationsManager", "SystemAdmin");
+    });
+
+    opts.AddPolicy("FinanceClerk", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Backoffice");
+        policy.RequireRole("FinanceClerk", "OperationsManager", "SystemAdmin");
+    });
+
+    opts.AddPolicy("OperationsManager", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Backoffice");
+        policy.RequireRole("OperationsManager", "SystemAdmin");
+    });
+});
+
 // Register IPaymentGateway - StubPaymentGateway for development, real gateway for production
 builder.Services.AddSingleton<IPaymentGateway, StubPaymentGateway>();
 
@@ -102,6 +147,10 @@ if (app.Environment.IsDevelopment())
 
 // Map Aspire default endpoints (/health, /alive)
 app.MapDefaultEndpoints();
+
+// Add authentication and authorization middleware
+app.UseAuthentication();
+app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {

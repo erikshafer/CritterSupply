@@ -1,5 +1,6 @@
 using Correspondence.Messages;
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Wolverine.Http;
 
@@ -12,6 +13,7 @@ namespace Correspondence.Api.Queries;
 public sealed class GetMessageDetails
 {
     [WolverineGet("/api/correspondence/messages/{messageId}")]
+    [Authorize(Policy = "CustomerService")]
     public static async Task<Results<Ok<Message>, NotFound>> Handle(
         Guid messageId,
         IDocumentSession session)

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Wolverine.Http;
@@ -17,6 +18,7 @@ public sealed record GetCustomerByEmail(string Email);
 public static class GetCustomerByEmailHandler
 {
     [WolverineGet("/api/customers")]
+    [Authorize(Policy = "CustomerService")]
     public static async Task<IResult> Handle(
         string email,
         CustomerIdentityDbContext dbContext,

@@ -1,5 +1,6 @@
 using Fulfillment.Shipments;
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Wolverine.Http;
 
@@ -28,6 +29,7 @@ public sealed record ShipmentResponse(
 public sealed class GetShipmentsForOrder
 {
     [WolverineGet("/api/fulfillment/shipments")]
+    [Authorize(Policy = "CustomerService")]
     public static async Task<Ok<IReadOnlyList<ShipmentResponse>>> Handle(
         Guid orderId,
         IDocumentSession session,

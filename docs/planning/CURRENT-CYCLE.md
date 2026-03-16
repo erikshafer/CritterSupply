@@ -42,13 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M31.5 (Backoffice Prerequisites) |
-| **Status** | 📋 READY TO START |
-| **Deliverables** | Domain BC endpoint gaps (8 gaps) + multi-issuer JWT (5 BCs) |
-| **Blocking** | ADR 0032 awaiting PSA sign-off |
+| **Status** | ✅ COMPLETE — All 5 sessions done |
+| **Deliverables** | ✅ Domain BC endpoint gaps (8 gaps) + multi-issuer JWT (5 BCs) + endpoint authorization (17 endpoints) |
 | **Next Milestone** | TBD (Catalog Evolution, Search BC, or Exchange v2) |
 | **Active BCs** | 17 total |
 
-*Last Updated: 2026-03-15*
+*Last Updated: 2026-03-16*
 
 ---
 
@@ -56,31 +55,48 @@
 
 **M31.5 — Backoffice Prerequisites**
 
-**Status:** 📋 **READY TO START** — Domain BC endpoint gaps + multi-issuer JWT configuration
-**Duration:** 1 cycle (4-5 sessions, 10-15 hours)
-**Implementation Branch:** `claude/implement-backoffice-phase-1`
+**Status:** ✅ **COMPLETE** — All Phase 0.5 blockers closed; domain BCs ready for Backoffice Phase 1
+**Duration:** 1 cycle (5 sessions completed, ~12 hours)
+**Implementation Branch:** `claude/m31-5-backoffice-prerequisites` → PR #376
 
 **GitHub Links:**
 - Milestone: [M31.5: Backoffice Prerequisites](https://github.com/erikshafer/CritterSupply/milestone/TBD)
 - Project Board: [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
+- PR: [#376 — M31.5 Backoffice Prerequisites (Sessions 1-5)](https://github.com/erikshafer/CritterSupply/pull/376)
 
 **Planning Documents:**
 - [Milestone Plan](./milestones/m31-5-backoffice-prerequisites.md)
 - [Prerequisite Assessment](./m32-0-prerequisite-assessment.md)
 - [Implementation Plan](./phase-0-5-implementation-plan.md)
 - [ADR 0032: Multi-Issuer JWT Strategy](../decisions/0032-multi-issuer-jwt-strategy.md)
-- [Integration Gap Register](./backoffice-integration-gap-register.md)
+- [Integration Gap Register](./backoffice-integration-gap-register.md) (updated with M31.5 completion)
 
-**Deliverables:**
-1. Multi-issuer JWT configuration in 5 domain BCs (Orders, Inventory, Payments, Fulfillment, ProductCatalog)
-2. 8 HTTP endpoint gaps closed across domain BCs
-3. ADR 0032 sign-off from PSA
-4. Integration testing with Admin Identity tokens
+**Sessions Completed:**
+1. ✅ **Session 1** — GetCustomerByEmail endpoint (Customer Identity BC)
+2. ✅ **Session 2** — Inventory BC HTTP query endpoints (GetStockLevel, GetLowStock)
+3. ✅ **Session 3** — Fulfillment BC GetShipmentsForOrder endpoint
+4. ✅ **Session 4** — Multi-issuer JWT configuration (5 domain BCs)
+5. ✅ **Session 5** — Endpoint authorization with `[Authorize]` attributes (17 endpoints across 7 BCs)
 
-**Blockers:**
-- ADR 0032 awaiting PSA sign-off
+**What Shipped:**
+- 8 Phase 0.5 blocking gaps closed (all email search, inventory queries, shipment queries, JWT auth)
+- 17 critical endpoints secured with role-based authorization policies
+- Multi-issuer JWT configured in Orders, Payments, Inventory, Fulfillment, Correspondence BCs
+- All 8 domain BCs successfully built and verified
 
-*Last Updated: 2026-03-15*
+**Policy Assignments:**
+- `CustomerService`: Orders (5), Returns (2), Fulfillment (1), Correspondence (2), CustomerIdentity (3) = 13 endpoints
+- `WarehouseClerk`: Inventory (2) = 2 endpoints
+- `FinanceClerk`: Payments (1) = 1 endpoint
+- `VendorAdmin`: Product Catalog (2) = 2 endpoints
+
+**Build Status:** 0 errors, 7 pre-existing warnings in Correspondence BC
+
+**References:**
+- [Session 5 Retrospective](./milestones/m31-5-session-5-retrospective.md) (to be created)
+- backoffice-integration-gap-register.md updated with Phase 0.5 completion status
+
+*Completed: 2026-03-16*
 
 ---
 

@@ -58,17 +58,17 @@
 
 **Folder:** `src/Customer Identity/`
 **Technology:** EF Core + PostgreSQL
-**Auth Status:** Only `GET /api/auth/me` is protected with `[Authorize]`
+**Auth Status:** ✅ Multi-issuer JWT configured (Session 4); Critical endpoints protected with `[Authorize(Policy = "CustomerService")]` (Session 5)
 
 | Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
 |------------------|------|----------|--------|---------------|-------|
-| Get customer by ID | Query | `GET /api/customers/{id}` | ✅ Fully Defined | — | |
-| **Search customer by email** | Query | `GET /api/customers?email={email}` | ⚠️ **GAP** | **Phase 0.5 Blocker** | Only ID-based lookup exists. CS workflow is dead on arrival without email search. **Newly Discovered.** |
-| Get customer addresses | Query | `GET /api/customers/{id}/addresses` | ✅ Fully Defined | — | |
-| Get address snapshot | Query | `GET /api/addresses/{id}/snapshot` | ✅ Fully Defined | — | Used by Orders BC at checkout; Backoffice can use for display |
-| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ⚠️ **GAP** | **Phase 0.5 Blocker** | No multi-issuer JWT configured. Admin tokens will be rejected. |
+| Get customer by ID | Query | `GET /api/customers/{id}` | ✅ Fully Defined | — | Protected with `CustomerService` policy (M31.5 Session 5) |
+| Search customer by email | Query | `GET /api/customers?email={email}` | ✅ Fully Defined | — | Protected with `CustomerService` policy (M31.5 Session 5) |
+| Get customer addresses | Query | `GET /api/customers/{id}/addresses` | ✅ Fully Defined | — | Protected with `CustomerService` policy (M31.5 Session 5) |
+| Get address snapshot | Query | `GET /api/addresses/{id}/snapshot` | ✅ Fully Defined | — | NOT protected (used by Shopping BC at checkout); Backoffice can use for display |
+| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ✅ Fully Defined | — | Configured in M31.5 Session 4 |
 
-**Estimated Effort:** < 1 session for email search; < 1 session for admin JWT scheme.
+**All Phase 0.5 gaps closed in M31.5 Sessions 4-5 (PR #376).**
 
 ---
 
@@ -76,17 +76,18 @@
 
 **Folder:** `src/Orders/`
 **Technology:** Marten event sourcing + Wolverine saga
-**Auth Status:** No authentication on any endpoint
+**Auth Status:** ✅ Multi-issuer JWT configured (Session 4); Critical endpoints protected with `[Authorize(Policy = "CustomerService")]` (Session 5)
 
 | Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
 |------------------|------|----------|--------|---------------|-------|
-| List orders for customer | Query | `GET /api/orders?customerId={id}` | ✅ Fully Defined | — | Supports pagination |
-| Get order detail | Query | `GET /api/orders/{orderId}` | ✅ Fully Defined | — | Returns saga state, line items, amounts |
-| Cancel order | Command | `POST /api/orders/{orderId}/cancel` | ✅ Fully Defined | — | Saga handles compensation (inventory release + refund) |
-| Get returnable items | Query | `GET /api/orders/{orderId}/returnable-items` | ✅ Fully Defined | — | Returns items with delivery date and return eligibility |
-| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ⚠️ **GAP** | **Phase 0.5 Blocker** | No authentication on any endpoint today |
+| List orders for customer | Query | `GET /api/orders?customerId={id}` | ✅ Fully Defined | — | Protected with `CustomerService` policy (M31.5 Session 5); Supports pagination |
+| Get order detail | Query | `GET /api/orders/{orderId}` | ✅ Fully Defined | — | Protected with `CustomerService` policy (M31.5 Session 5); Returns saga state, line items, amounts |
+| Cancel order | Command | `POST /api/orders/{orderId}/cancel` | ✅ Fully Defined | — | Protected with `CustomerService` policy (M31.5 Session 5); Saga handles compensation (inventory release + refund) |
+| Get returnable items | Query | `GET /api/orders/{orderId}/returnable-items` | ✅ Fully Defined | — | Protected with `CustomerService` policy (M31.5 Session 5); Returns items with delivery date and return eligibility |
+| Get checkout | Query | `GET /api/checkouts/{checkoutId}` | ✅ Fully Defined | — | Protected with `CustomerService` policy (M31.5 Session 5); Returns checkout aggregate state |
+| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ✅ Fully Defined | — | Configured in M31.5 Session 4 |
 
-**Estimated Effort:** < 1 session for admin JWT scheme.
+**All Phase 0.5 gaps closed in M31.5 Sessions 4-5 (PR #376).**
 
 **Note:** Order cancellation will need an admin-specific variant that includes `adminUserId` and `reason` in the request body for audit trail. The existing endpoint accepts cancellation but may not carry admin attribution.
 
@@ -96,12 +97,12 @@
 
 **Folder:** `src/Returns/`
 **Technology:** Marten event sourcing
-**Auth Status:** No authentication on any endpoint
+**Auth Status:** ✅ Multi-issuer JWT configured (Session 4); Critical endpoints protected with `[Authorize(Policy = "CustomerService")]` (Session 5)
 
 | Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
 |------------------|------|----------|--------|---------------|-------|
-| List returns | Query | `GET /api/returns` (supports orderId filter) | ✅ Fully Defined | — | |
-| Get return detail | Query | `GET /api/returns/{returnId}` | ✅ Fully Defined | — | Full lifecycle state, items, inspection results |
+| List returns | Query | `GET /api/returns` (supports orderId filter) | ✅ Fully Defined | — | Protected with `CustomerService` policy (M31.5 Session 5) |
+| Get return detail | Query | `GET /api/returns/{returnId}` | ✅ Fully Defined | — | Protected with `CustomerService` policy (M31.5 Session 5); Full lifecycle state, items, inspection results |
 | Approve return | Command | `POST /api/returns/{id}/approve` | ✅ Fully Defined | — | CS workflow, Phase 1 |
 | Deny return | Command | `POST /api/returns/{id}/deny` | ✅ Fully Defined | — | CS workflow, Phase 1 |
 | Receive return | Command | `POST /api/returns/{id}/receive` | ✅ Fully Defined | — | Warehouse workflow, Phase 2 |
@@ -109,11 +110,9 @@
 | Approve exchange | Command | `POST /api/returns/{id}/approve-exchange` | ✅ Fully Defined | — | CS workflow, Phase 2 |
 | Deny exchange | Command | `POST /api/returns/{id}/deny-exchange` | ✅ Fully Defined | — | CS workflow, Phase 2 |
 | Ship replacement | Command | `POST /api/returns/{id}/ship-replacement` | ✅ Fully Defined | — | Warehouse workflow, Phase 2 |
-| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ⚠️ **GAP** | **Phase 0.5 Blocker** | No authentication on any endpoint today |
+| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ✅ Fully Defined | — | Configured in M31.5 Session 4 |
 
-**Returns BC is the most complete integration surface for Backoffice.** All 9 endpoints needed for Phases 1 and 2 already exist. Only auth setup is missing.
-
-**Estimated Effort:** < 1 session for admin JWT scheme.
+**Returns BC is the most complete integration surface for Backoffice.** All 9 endpoints needed for Phases 1 and 2 already exist. All Phase 0.5 gaps closed in M31.5 Sessions 4-5 (PR #376).
 
 ---
 
@@ -121,36 +120,34 @@
 
 **Folder:** `src/Payments/`
 **Technology:** Marten event sourcing + Wolverine saga
-**Auth Status:** No authentication
+**Auth Status:** ✅ Multi-issuer JWT configured (Session 4); Critical endpoints protected with `[Authorize(Policy = "FinanceClerk")]` (Session 5)
 
 | Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
 |------------------|------|----------|--------|---------------|-------|
-| Get payment detail | Query | `GET /api/payments/{paymentId}` | ✅ Fully Defined | — | Returns payment saga state, amounts, transaction IDs |
+| Get payment detail | Query | `GET /api/payments/{paymentId}` | ✅ Fully Defined | — | Protected with `FinanceClerk` policy (M31.5 Session 5); Returns payment saga state, amounts, transaction IDs |
 | List payments for order | Query | `GET /api/payments?orderId={id}` | ⚠️ **GAP** | **Known Deferral (P2)** | CS needs to see payment history for an order. Only single-payment lookup exists today. Not a Phase 1 blocker (CS can find paymentId from order detail). |
-| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ⚠️ **GAP** | **Phase 2 Blocker** | Only needed when CS accesses payment data directly |
+| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ✅ Fully Defined | — | Configured in M31.5 Session 4 |
 
-**Estimated Effort:** < 1 session for order-based payment query; < 1 session for admin JWT scheme.
+**Phase 0.5 gaps closed in M31.5 Sessions 4-5 (PR #376).** List payments for order query remains a Phase 2 deferral.
 
 ---
 
 ## 5. Inventory BC
 
 **Folder:** `src/Inventory/`
-**Technology:** Marten event sourcing (message-driven only)
-**Auth Status:** No authentication (no HTTP endpoints exist)
+**Technology:** Marten event sourcing (message-driven + HTTP endpoints)
+**Auth Status:** ✅ Multi-issuer JWT configured (Session 4); Query endpoints protected with `[Authorize(Policy = "WarehouseClerk")]` (Session 5)
 
 | Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
 |------------------|------|----------|--------|---------------|-------|
-| **Get stock level for SKU** | Query | `GET /api/inventory/{sku}` | ❌ **Does not exist** | **Phase 0.5 Blocker** | Inventory BC has zero HTTP endpoints. Entirely message-driven. WH dashboard and low-stock KPI require this. **Newly Discovered.** |
-| **Get low-stock alerts** | Query | `GET /api/inventory/low-stock` | ❌ **Does not exist** | **Phase 0.5 Blocker** | WH alert feed needs a query endpoint for initial load (before SignalR streams). **Newly Discovered.** |
+| Get stock level for SKU | Query | `GET /api/inventory/{sku}` | ✅ Fully Defined | — | Protected with `WarehouseClerk` policy (M31.5 Session 5); Implemented in M31.5 Session 2 |
+| Get low-stock alerts | Query | `GET /api/inventory/low-stock` | ✅ Fully Defined | — | Protected with `WarehouseClerk` policy (M31.5 Session 5); Implemented in M31.5 Session 2 |
 | **Adjust inventory** | Command | `POST /api/inventory/{sku}/adjust` | ❌ **Does not exist** | **Phase 2 Blocker** | `ReceiveStock` and `InitializeInventory` handlers exist as Wolverine message handlers but are NOT exposed as HTTP endpoints. |
 | **Receive stock** | Command | `POST /api/inventory/{sku}/receive` | ❌ **Does not exist** | **Phase 2 Blocker** | Same as above — handler exists, HTTP endpoint does not. |
 | **Acknowledge low-stock alert** | Command | `POST /api/inventory/alerts/{id}/acknowledge` | ❌ **Does not exist** | **Phase 2 Blocker** | No concept of alert acknowledgment in Inventory BC today. Backoffice may own this (AlertAcknowledgment aggregate). |
-| Admin JWT acceptance | Auth | Named JWT Bearer scheme | ❌ **Does not exist** | **Phase 0.5 Blocker** | No HTTP layer at all |
+| Admin JWT acceptance | Auth | Named JWT Bearer scheme | ✅ Fully Defined | — | Configured in M31.5 Session 4 |
 
-**Inventory BC is the most significant gap.** All 6 integration points (5 endpoints + auth scheme) require new work — the BC has no HTTP layer at all today. This is the highest-effort prerequisite BC for Backoffice.
-
-**Estimated Effort:** 2-3 sessions to add HTTP layer with query + command endpoints + admin JWT.
+**Phase 0.5 gaps closed in M31.5 Sessions 2, 4, and 5 (PR #376).** Phase 2 write endpoints remain as blockers for warehouse operations.
 
 ---
 
@@ -158,14 +155,14 @@
 
 **Folder:** `src/Fulfillment/`
 **Technology:** Marten event sourcing
-**Auth Status:** No authentication
+**Auth Status:** ✅ Multi-issuer JWT configured (Session 4); Shipment query endpoint protected with `[Authorize(Policy = "CustomerService")]` (Session 5)
 
 | Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
 |------------------|------|----------|--------|---------------|-------|
-| **Get shipment for order** | Query | `GET /api/fulfillment/shipments?orderId={id}` | ⚠️ **GAP** | **Phase 0.5 Blocker** | CS agents answering "Where is my order?" (35-40% of tickets) need shipment tracking data. Fulfillment BC dispatches shipments but may not expose a read endpoint. **Needs codebase verification for existing endpoints.** |
-| Admin JWT acceptance | Auth | Named JWT Bearer scheme | ⚠️ **GAP** | **Phase 2 Blocker** | Only needed if Backoffice sends commands to Fulfillment |
+| Get shipment for order | Query | `GET /api/fulfillment/shipments?orderId={id}` | ✅ Fully Defined | — | Protected with `CustomerService` policy (M31.5 Session 5); Implemented in M31.5 Session 3; CS agents answering "Where is my order?" (35-40% of tickets) |
+| Admin JWT acceptance | Auth | Named JWT Bearer scheme | ✅ Fully Defined | — | Configured in M31.5 Session 4 |
 
-**Estimated Effort:** < 1 session for shipment query endpoint; < 1 session for admin JWT if needed.
+**All Phase 0.5 gaps closed in M31.5 Sessions 3-5 (PR #376).**
 
 ---
 
@@ -173,18 +170,20 @@
 
 **Folder:** `src/Product Catalog/`
 **Technology:** Marten document store (non-event-sourced)
-**Auth Status:** 3 endpoints protected with `[Authorize(Policy = "Backoffice")]` (Vendor JWT)
+**Auth Status:** ✅ Vendor JWT scheme configured; 3 endpoints protected with `[Authorize(Policy = "VendorAdmin")]` (M31.5 Session 5)
 
 | Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
 |------------------|------|----------|--------|---------------|-------|
 | List products | Query | `GET /api/products` | ✅ Fully Defined | — | Supports search, pagination |
 | Get product detail | Query | `GET /api/products/{sku}` | ✅ Fully Defined | — | |
+| Add product | Command | `POST /api/products` | ✅ Fully Defined | — | Protected with `VendorAdmin` policy (M31.5 Session 5) |
+| Update product | Command | `PUT /api/products/{sku}` | ✅ Fully Defined | — | Protected with `VendorAdmin` policy (M31.5 Session 5); Updates entire product |
 | **Update product description** | Command | `PUT /api/products/{sku}/description` | ⚠️ **GAP** | **Phase 2 Blocker** | `PUT /api/products/{sku}` exists but updates the entire product, not just description. CopyWriter needs a scoped description-only endpoint. |
 | Change product status | Command | `PATCH /api/products/{sku}/status` | ✅ Fully Defined | — | Exists but unprotected. Needs admin auth policy. |
-| Vendor assignment | Command | `POST /api/admin/products/{sku}/vendor-assignment` | ✅ Fully Defined | — | Already protected with `[Authorize(Policy = "Backoffice")]` — Vendor JWT. **Needs policy rename from `"Backoffice"` to `"VendorAdmin"` when multi-issuer JWT is introduced.** |
-| **Multi-issuer JWT** | Auth | Named schemes (`"Vendor"`, `"Backoffice"`) | ⚠️ **GAP** | **Phase 2 Blocker** | Currently only Vendor JWT scheme. Needs admin scheme added per research doc §3. Existing `"Backoffice"` policy must be renamed to `"VendorAdmin"`. |
+| Vendor assignment | Command | `POST /api/admin/products/{sku}/vendor-assignment` | ✅ Fully Defined | — | Protected with `VendorAdmin` policy |
+| **Multi-issuer JWT** | Auth | Named schemes (`"Vendor"`, `"Backoffice"`) | ⚠️ **GAP** | **Phase 2 Blocker** | Currently only Vendor JWT scheme. Needs admin scheme added when multi-issuer JWT is introduced to Product Catalog. |
 
-**Estimated Effort:** < 1 session for description-only endpoint; 1 session for multi-issuer JWT refactor.
+**Session 5 Note:** The policy name "VendorAdmin" was already correct in the codebase. No rename was needed. AddProduct and UpdateProduct endpoints now protected.
 
 ---
 
@@ -212,17 +211,15 @@
 
 **Folder:** `src/Correspondence/`
 **Technology:** Marten event sourcing (Message aggregate)
-**Auth Status:** No authentication
+**Auth Status:** ✅ Multi-issuer JWT configured (Session 4); Query endpoints protected with `[Authorize(Policy = "CustomerService")]` (Session 5)
 
 | Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
 |------------------|------|----------|--------|---------------|-------|
-| Get messages for customer | Query | `GET /api/correspondence/messages/customer/{id}` | ✅ Fully Defined | — | Returns MessageListView with status, timestamps |
-| Get message detail | Query | `GET /api/correspondence/messages/{id}` | ✅ Fully Defined | — | Full delivery history with retry attempts |
-| Admin JWT acceptance | Auth | Named JWT Bearer scheme | ⚠️ **GAP** | **Phase 1 Blocker** | Needed for CS access to correspondence data |
+| Get messages for customer | Query | `GET /api/correspondence/messages/customer/{id}` | ✅ Fully Defined | — | Protected with `CustomerService` policy (M31.5 Session 5); Returns MessageListView with status, timestamps |
+| Get message detail | Query | `GET /api/correspondence/messages/{id}` | ✅ Fully Defined | — | Protected with `CustomerService` policy (M31.5 Session 5); Full delivery history with retry attempts |
+| Admin JWT acceptance | Auth | Named JWT Bearer scheme | ✅ Fully Defined | — | Configured in M31.5 Session 4 |
 
-**Correspondence BC is Phase 1-ready** — both query endpoints exist. Only auth is missing.
-
-**Estimated Effort:** < 1 session for admin JWT scheme.
+**Correspondence BC is Phase 1-ready.** All Phase 0.5 gaps closed in M31.5 Sessions 4-5 (PR #376).
 
 ---
 
@@ -260,34 +257,48 @@
 
 ## Summary
 
-> **Update (2026-03-14):** Backoffice Identity BC (Phase 0) is now complete. The counts below reflect the original gap analysis plus 7 newly resolved endpoints from BackofficeIdentity.
+> **Update (2026-03-16):** M31.5 Session 5 completed — all 8 Phase 0.5 blockers closed. Domain BCs now accept Backoffice JWTs and critical endpoints are protected with role-based authorization policies.
 
 ### Gap Count by Severity
 
 | Status | Count | Blocking Phase |
 |--------|-------|---------------|
-| ✅ Fully Defined | **25** (18 original + 7 BackofficeIdentity) | Ready to integrate |
-| Phase 0.5 Blockers | **8** | Must resolve before Phase 1 |
+| ✅ Fully Defined | **38** (18 original + 7 BackofficeIdentity + 13 M31.5) | Ready to integrate |
+| Phase 0.5 Blockers | **0** (all closed in M31.5) | ✅ **Ready for Phase 1** |
 | Phase 2 Blockers | **9** | Must resolve before Phase 2 |
 | Known Deferrals | **3** | Acknowledged, resolution planned |
-| Newly Discovered | **4** | Found during re-modeling session (all Phase 0.5) |
+
+### M31.5 Session 5 Summary
+
+**What Changed:**
+- Added `[Authorize(Policy = "...")]` attributes to 17 critical endpoints across 7 domain BCs
+- Verified Product Catalog policy already named "VendorAdmin" (no rename needed)
+- Built all 8 domain BCs successfully (0 errors, 7 pre-existing warnings in Correspondence)
+
+**Policy Assignments:**
+- `CustomerService`: Orders (5), Returns (2), Fulfillment (1), Correspondence (2), CustomerIdentity (3) = 13 endpoints
+- `WarehouseClerk`: Inventory (2) = 2 endpoints
+- `FinanceClerk`: Payments (1) = 1 endpoint
+- `VendorAdmin`: Product Catalog (2) = 2 endpoints
+
+**Phase 0.5 Status:** ✅ **COMPLETE**. All domain BCs now ready for Backoffice Phase 1 integration.
 
 ### Effort Estimate for Gap Closure
 
 | Phase | Gaps to Close | Estimated Sessions |
 |-------|--------------|-------------------|
-| Phase 0.5 | 8 gaps across 6 BCs (email search, stock query, shipment query, admin JWT in 5 BCs) | 4-5 sessions |
+| Phase 0.5 | ✅ **Closed** (M31.5 Sessions 1-5) | Complete |
 | Phase 2 prep | 9 gaps across 4 BCs (Pricing write endpoints, Inventory write endpoints, Product Catalog admin write, Payments order query) | 4-5 sessions |
 
-### Phase 0.5 Recommended Work Order
+### Phase 0.5 Work Order (COMPLETED)
 
-| Priority | Task | BC | Effort |
-|----------|------|-----|--------|
-| 1 | Add `GET /api/customers?email={email}` | Customer Identity | < 1 session |
-| 2 | Add admin JWT scheme to Orders.Api, Returns.Api | Orders, Returns | < 1 session |
-| 3 | Add `GET /api/inventory/{sku}` and `GET /api/inventory/low-stock` | Inventory | 1 session |
-| 4 | Add `GET /api/fulfillment/shipments?orderId={id}` | Fulfillment | < 1 session |
-| 5 | Add admin JWT scheme to Customer Identity, Correspondence, Inventory | Multiple | < 1 session |
+| Priority | Task | BC | Effort | Status |
+|----------|------|-----|--------|--------|
+| 1 | Add `GET /api/customers?email={email}` | Customer Identity | < 1 session | ✅ M31.5 Session 1 |
+| 2 | Add admin JWT scheme to 5 domain BCs | Multiple | 1 session | ✅ M31.5 Session 4 |
+| 3 | Add `GET /api/inventory/{sku}` and `GET /api/inventory/low-stock` | Inventory | 1 session | ✅ M31.5 Session 2 |
+| 4 | Add `GET /api/fulfillment/shipments?orderId={id}` | Fulfillment | < 1 session | ✅ M31.5 Session 3 |
+| 5 | Add `[Authorize]` to critical endpoints | 7 BCs | < 1 session | ✅ M31.5 Session 5 |
 
 ---
 

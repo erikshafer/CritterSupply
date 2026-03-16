@@ -1,6 +1,11 @@
+using System.Security.Claims;
+using System.Text.Encodings.Web;
 using JasperFx.CommandLine;
 using Marten;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.Tracking;
@@ -46,6 +51,25 @@ public class TestFixture : IAsyncLifetime
 
                 // Disable external Wolverine transports for testing
                 services.DisableAllExternalWolverineTransports();
+
+                // Replace authentication services with test authentication that bypasses JWT validation
+                // Remove existing authentication services
+                var authServices = services.Where(s =>
+                    s.ServiceType.Namespace == "Microsoft.AspNetCore.Authentication" ||
+                    s.ServiceType.FullName?.Contains("Authentication") == true)
+                    .ToList();
+                foreach (var service in authServices)
+                {
+                    services.Remove(service);
+                }
+
+                // Add test authentication scheme using "Backoffice" scheme name to satisfy policy requirements
+                services.AddAuthentication("Backoffice")
+                    .AddScheme<AuthenticationSchemeOptions, CustomerServiceAuthHandler>(
+                        "Backoffice", _ => { });
+
+                // Add authorization with policies (must be after authentication)
+                services.AddAuthorization();
             });
         });
     }
@@ -133,5 +157,34 @@ public class TestFixture : IAsyncLifetime
         });
 
         return (tracked, result);
+    }
+}
+
+/// <summary>
+/// Fake authentication handler used in integration tests.
+/// Automatically authenticates every request as a CustomerService user, satisfying the "CustomerService"
+/// authorization policy without requiring a real JWT. This keeps test code clean while
+/// still exercising the full authorization middleware pipeline.
+/// Registered as "Backoffice" scheme to match the policy configuration in Program.cs.
+/// </summary>
+internal sealed class CustomerServiceAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+{
+    public CustomerServiceAuthHandler(
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder)
+        : base(options, logger, encoder) { }
+
+    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.Name, "test-cs-agent"),
+            new Claim(ClaimTypes.Role, "CustomerService"),
+        };
+        var identity = new ClaimsIdentity(claims, "Backoffice");
+        var principal = new ClaimsPrincipal(identity);
+        var ticket = new AuthenticationTicket(principal, "Backoffice");
+        return Task.FromResult(AuthenticateResult.Success(ticket));
     }
 }

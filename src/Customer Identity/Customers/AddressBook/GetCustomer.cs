@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Wolverine.Http;
@@ -26,6 +27,7 @@ public sealed record CustomerResponse(
 public static class GetCustomerHandler
 {
     [WolverineGet("/api/customers/{customerId}")]
+    [Authorize(Policy = "CustomerService")]
     public static async Task<IResult> Handle(
         Guid customerId,
         CustomerIdentityDbContext dbContext,

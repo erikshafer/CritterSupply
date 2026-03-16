@@ -1,4 +1,5 @@
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Orders.Checkout;
 using Wolverine.Http;
 using ShoppingContracts = Messages.Contracts.Shopping;
@@ -18,6 +19,7 @@ public static class GetCheckoutEndpoint
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with CheckoutResponse if found, 404 if not found.</returns>
     [WolverineGet("/api/checkouts/{checkoutId}")]
+    [Authorize(Policy = "CustomerService")]
     public static async Task<IResult> Get(
         Guid checkoutId,
         IQuerySession session,

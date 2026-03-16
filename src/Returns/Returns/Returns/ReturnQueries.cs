@@ -1,4 +1,5 @@
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Wolverine.Http;
 
@@ -26,6 +27,7 @@ public sealed record ReturnSummaryResponse(
 public static class GetReturnHandler
 {
     [WolverineGet("/api/returns/{returnId}")]
+    [Authorize(Policy = "CustomerService")]
     public static async Task<IResult> Handle(
         Guid returnId,
         IDocumentSession session,
@@ -62,6 +64,7 @@ public static class GetReturnHandler
 public static class GetReturnsForOrderHandler
 {
     [WolverineGet("/api/returns")]
+    [Authorize(Policy = "CustomerService")]
     public static async Task<IReadOnlyList<ReturnSummaryResponse>> Handle(
         Guid orderId,
         IQuerySession session,
