@@ -55,7 +55,7 @@
 
 **M32.0 — Backoffice Phase 1: Read-Only Dashboards & CS Tooling**
 
-**Status:** 🚀 **ACTIVE** — Session 3 complete (3/11 sessions, 27% progress)
+**Status:** 🚀 **ACTIVE** — Session 4 complete (4/11 sessions, 36% progress)
 **Duration:** 2-3 cycles (10-15 sessions estimated, ~24-32 hours)
 **Implementation Branch:** `claude/m32-customer-service-workflows-part-1`
 
@@ -89,7 +89,7 @@
 1. ✅ **Session 1** — Project scaffolding & infrastructure ([retrospective](./milestones/m32-0-session-1-retrospective.md))
 2. ✅ **Session 2** — HTTP client abstractions ([retrospective](./milestones/m32-0-session-2-retrospective.md))
 3. ✅ **Session 3** — CS workflows Part 1: Search & Orders ([retrospective](./milestones/m32-0-session-3-retrospective.md))
-4. ⏳ **Session 4** — CS workflows Part 2: Returns & Correspondence (2-3 hours)
+4. ✅ **Session 4** — CS workflows Part 2: Returns & Correspondence ([retrospective](./milestones/m32-0-session-4-retrospective.md))
 5. ⏳ **Session 5** — OrderNote aggregate (1-2 hours)
 6. ⏳ **Session 6** — BFF projections: AdminDailyMetrics (2-3 hours)
 7. ⏳ **Session 7** — BFF projections: AlertFeedView (2-3 hours)

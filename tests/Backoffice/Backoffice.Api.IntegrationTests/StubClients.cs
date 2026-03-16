@@ -95,34 +95,96 @@ public class StubOrdersClient : IOrdersClient
 }
 
 // Minimal stubs for other clients (not used in Session 3 tests)
+/// <summary>
+/// Stub implementation of IReturnsClient for testing.
+/// </summary>
 public class StubReturnsClient : IReturnsClient
 {
+    private readonly List<ReturnDetailDto> _returns = new();
+    private readonly HashSet<Guid> _approvedReturns = new();
+    private readonly Dictionary<Guid, string> _deniedReturns = new();
+
     public Task<IReadOnlyList<ReturnSummaryDto>> GetReturnsAsync(
         Guid? orderId = null,
         int? limit = null,
         CancellationToken ct = default)
-        => Task.FromResult<IReadOnlyList<ReturnSummaryDto>>(Array.Empty<ReturnSummaryDto>());
+    {
+        var returns = _returns
+            .Where(r => orderId == null || r.OrderId == orderId)
+            .Select(r => new ReturnSummaryDto(r.Id, r.OrderId, r.RequestedAt, r.Status, r.ReturnType))
+            .Take(limit ?? int.MaxValue)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<ReturnSummaryDto>>(returns);
+    }
 
     public Task<ReturnDetailDto?> GetReturnAsync(Guid returnId, CancellationToken ct = default)
-        => Task.FromResult<ReturnDetailDto?>(null);
+    {
+        var returnDto = _returns.FirstOrDefault(r => r.Id == returnId);
+        return Task.FromResult(returnDto);
+    }
 
     public Task ApproveReturnAsync(Guid returnId, CancellationToken ct = default)
-        => Task.CompletedTask;
+    {
+        _approvedReturns.Add(returnId);
+        return Task.CompletedTask;
+    }
 
     public Task DenyReturnAsync(Guid returnId, string reason, CancellationToken ct = default)
-        => Task.CompletedTask;
+    {
+        _deniedReturns[returnId] = reason;
+        return Task.CompletedTask;
+    }
+
+    public void AddReturn(ReturnDetailDto returnDto) => _returns.Add(returnDto);
+    public bool WasApproved(Guid returnId) => _approvedReturns.Contains(returnId);
+    public bool WasDenied(Guid returnId) => _deniedReturns.ContainsKey(returnId);
+    public string? GetDenialReason(Guid returnId) => _deniedReturns.GetValueOrDefault(returnId);
+    public void Clear()
+    {
+        _returns.Clear();
+        _approvedReturns.Clear();
+        _deniedReturns.Clear();
+    }
 }
 
+/// <summary>
+/// Stub implementation of ICorrespondenceClient for testing.
+/// </summary>
 public class StubCorrespondenceClient : ICorrespondenceClient
 {
+    private readonly List<CorrespondenceMessageDto> _messages = new();
+
     public Task<IReadOnlyList<CorrespondenceMessageDto>> GetMessagesForCustomerAsync(
         Guid customerId,
         int? limit = null,
         CancellationToken ct = default)
-        => Task.FromResult<IReadOnlyList<CorrespondenceMessageDto>>(Array.Empty<CorrespondenceMessageDto>());
+    {
+        var messages = _messages
+            .Where(m => m.CustomerId == customerId)
+            .Take(limit ?? int.MaxValue)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<CorrespondenceMessageDto>>(messages);
+    }
 
     public Task<CorrespondenceDetailDto?> GetMessageDetailAsync(Guid messageId, CancellationToken ct = default)
-        => Task.FromResult<CorrespondenceDetailDto?>(null);
+    {
+        var message = _messages.FirstOrDefault(m => m.Id == messageId);
+        if (message == null) return Task.FromResult<CorrespondenceDetailDto?>(null);
+
+        var detail = new CorrespondenceDetailDto(
+            message.Id,
+            message.CustomerId,
+            message.SentAt,
+            message.MessageType,
+            message.Subject,
+            "Email body content",
+            message.DeliveryStatus,
+            null);
+        return Task.FromResult<CorrespondenceDetailDto?>(detail);
+    }
+
+    public void AddMessage(CorrespondenceMessageDto message) => _messages.Add(message);
+    public void Clear() => _messages.Clear();
 }
 
 public class StubInventoryClient : IInventoryClient
