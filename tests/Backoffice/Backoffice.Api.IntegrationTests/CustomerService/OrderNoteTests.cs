@@ -291,4 +291,256 @@ public class OrderNoteTests
         notes.ShouldNotBeNull();
         notes.Count.ShouldBe(0);
     }
+
+    #region Validation Edge Cases
+
+    [Fact]
+    public async Task AddOrderNote_WithEmptyText_Returns400BadRequest()
+    {
+        // Arrange
+        var orderId = Guid.NewGuid();
+        _fixture.OrdersClient.AddOrderDetail(new Backoffice.Clients.OrderDetailDto(
+            orderId,
+            CustomerId: Guid.NewGuid(),
+            PlacedAt: DateTime.UtcNow,
+            Status: "Confirmed",
+            TotalAmount: 100.00m,
+            Items: new List<Backoffice.Clients.OrderLineItemDto>(),
+            CancellationReason: null));
+
+        var command = new { OrderId = orderId, Text = "" };
+
+        // Act & Assert
+        await _fixture.Host.Scenario(_ =>
+        {
+            _.Post.Json(command).ToUrl($"/api/backoffice/orders/{orderId}/notes");
+            _.StatusCodeShouldBe(400);
+        });
+    }
+
+    [Fact]
+    public async Task AddOrderNote_WithTextExactly2000Characters_Returns201Created()
+    {
+        // Arrange
+        var orderId = Guid.NewGuid();
+        _fixture.OrdersClient.AddOrderDetail(new Backoffice.Clients.OrderDetailDto(
+            orderId,
+            CustomerId: Guid.NewGuid(),
+            PlacedAt: DateTime.UtcNow,
+            Status: "Confirmed",
+            TotalAmount: 100.00m,
+            Items: new List<Backoffice.Clients.OrderLineItemDto>(),
+            CancellationReason: null));
+
+        var text = new string('a', 2000); // Exactly at boundary
+        var command = new { OrderId = orderId, Text = text };
+
+        // Act
+        var result = await _fixture.Host.Scenario(_ =>
+        {
+            _.Post.Json(command).ToUrl($"/api/backoffice/orders/{orderId}/notes");
+            _.StatusCodeShouldBe(201);
+            _.Header("Location").ShouldHaveValues();
+        });
+
+        // Assert - verify note was created with full text
+        var location = result.Context.Response.Headers["Location"].ToString();
+        var noteId = Guid.Parse(location.Split('/').Last());
+        var notes = await _fixture.Host.GetAsJson<IReadOnlyList<OrderNoteDto>>(
+            $"/api/backoffice/orders/{orderId}/notes");
+
+        notes.Count.ShouldBe(1);
+        notes[0].Text.Length.ShouldBe(2000);
+    }
+
+    [Fact]
+    public async Task AddOrderNote_WithTextExceeding2000Characters_Returns400BadRequest()
+    {
+        // Arrange
+        var orderId = Guid.NewGuid();
+        _fixture.OrdersClient.AddOrderDetail(new Backoffice.Clients.OrderDetailDto(
+            orderId,
+            CustomerId: Guid.NewGuid(),
+            PlacedAt: DateTime.UtcNow,
+            Status: "Confirmed",
+            TotalAmount: 100.00m,
+            Items: new List<Backoffice.Clients.OrderLineItemDto>(),
+            CancellationReason: null));
+
+        var text = new string('a', 2001); // One character over boundary
+        var command = new { OrderId = orderId, Text = text };
+
+        // Act & Assert
+        await _fixture.Host.Scenario(_ =>
+        {
+            _.Post.Json(command).ToUrl($"/api/backoffice/orders/{orderId}/notes");
+            _.StatusCodeShouldBe(400);
+        });
+    }
+
+    [Fact]
+    public async Task EditOrderNote_WithEmptyText_Returns400BadRequest()
+    {
+        // Arrange
+        var orderId = Guid.NewGuid();
+        _fixture.OrdersClient.AddOrderDetail(new Backoffice.Clients.OrderDetailDto(
+            orderId,
+            CustomerId: Guid.NewGuid(),
+            PlacedAt: DateTime.UtcNow,
+            Status: "Confirmed",
+            TotalAmount: 100.00m,
+            Items: new List<Backoffice.Clients.OrderLineItemDto>(),
+            CancellationReason: null));
+
+        // Create note first
+        var createCommand = new { OrderId = orderId, Text = "Original" };
+        var createResult = await _fixture.Host.Scenario(_ =>
+        {
+            _.Post.Json(createCommand).ToUrl($"/api/backoffice/orders/{orderId}/notes");
+            _.StatusCodeShouldBe(201);
+        });
+
+        var location = createResult.Context.Response.Headers["Location"].ToString();
+        var noteId = Guid.Parse(location.Split('/').Last());
+
+        // Act & Assert - try to edit with empty text
+        var editCommand = new { NoteId = noteId, NewText = "" };
+        await _fixture.Host.Scenario(_ =>
+        {
+            _.Put.Json(editCommand).ToUrl($"/api/backoffice/orders/{orderId}/notes/{noteId}");
+            _.StatusCodeShouldBe(400);
+        });
+    }
+
+    [Fact]
+    public async Task EditOrderNote_WithTextExactly2000Characters_Returns204NoContent()
+    {
+        // Arrange
+        var orderId = Guid.NewGuid();
+        _fixture.OrdersClient.AddOrderDetail(new Backoffice.Clients.OrderDetailDto(
+            orderId,
+            CustomerId: Guid.NewGuid(),
+            PlacedAt: DateTime.UtcNow,
+            Status: "Confirmed",
+            TotalAmount: 100.00m,
+            Items: new List<Backoffice.Clients.OrderLineItemDto>(),
+            CancellationReason: null));
+
+        // Create note first
+        var createCommand = new { OrderId = orderId, Text = "Original" };
+        var createResult = await _fixture.Host.Scenario(_ =>
+        {
+            _.Post.Json(createCommand).ToUrl($"/api/backoffice/orders/{orderId}/notes");
+            _.StatusCodeShouldBe(201);
+        });
+
+        var location = createResult.Context.Response.Headers["Location"].ToString();
+        var noteId = Guid.Parse(location.Split('/').Last());
+
+        // Act - edit with text exactly at boundary
+        var text = new string('b', 2000);
+        var editCommand = new { NoteId = noteId, NewText = text };
+        await _fixture.Host.Scenario(_ =>
+        {
+            _.Put.Json(editCommand).ToUrl($"/api/backoffice/orders/{orderId}/notes/{noteId}");
+            _.StatusCodeShouldBe(204);
+        });
+
+        // Assert - verify text was updated
+        var notes = await _fixture.Host.GetAsJson<IReadOnlyList<OrderNoteDto>>(
+            $"/api/backoffice/orders/{orderId}/notes");
+
+        notes.Count.ShouldBe(1);
+        notes[0].Text.Length.ShouldBe(2000);
+        notes[0].EditedAt.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task EditOrderNote_WithTextExceeding2000Characters_Returns400BadRequest()
+    {
+        // Arrange
+        var orderId = Guid.NewGuid();
+        _fixture.OrdersClient.AddOrderDetail(new Backoffice.Clients.OrderDetailDto(
+            orderId,
+            CustomerId: Guid.NewGuid(),
+            PlacedAt: DateTime.UtcNow,
+            Status: "Confirmed",
+            TotalAmount: 100.00m,
+            Items: new List<Backoffice.Clients.OrderLineItemDto>(),
+            CancellationReason: null));
+
+        // Create note first
+        var createCommand = new { OrderId = orderId, Text = "Original" };
+        var createResult = await _fixture.Host.Scenario(_ =>
+        {
+            _.Post.Json(createCommand).ToUrl($"/api/backoffice/orders/{orderId}/notes");
+            _.StatusCodeShouldBe(201);
+        });
+
+        var location = createResult.Context.Response.Headers["Location"].ToString();
+        var noteId = Guid.Parse(location.Split('/').Last());
+
+        // Act & Assert - try to edit with text over boundary
+        var text = new string('b', 2001);
+        var editCommand = new { NoteId = noteId, NewText = text };
+        await _fixture.Host.Scenario(_ =>
+        {
+            _.Put.Json(editCommand).ToUrl($"/api/backoffice/orders/{orderId}/notes/{noteId}");
+            _.StatusCodeShouldBe(400);
+        });
+    }
+
+    [Fact]
+    public async Task EditOrderNote_MultipleTimes_UpdatesEditedAtTimestamp()
+    {
+        // Arrange
+        var orderId = Guid.NewGuid();
+        _fixture.OrdersClient.AddOrderDetail(new Backoffice.Clients.OrderDetailDto(
+            orderId,
+            CustomerId: Guid.NewGuid(),
+            PlacedAt: DateTime.UtcNow,
+            Status: "Confirmed",
+            TotalAmount: 100.00m,
+            Items: new List<Backoffice.Clients.OrderLineItemDto>(),
+            CancellationReason: null));
+
+        // Create note
+        var createCommand = new { OrderId = orderId, Text = "Version 1" };
+        var createResult = await _fixture.Host.Scenario(_ =>
+        {
+            _.Post.Json(createCommand).ToUrl($"/api/backoffice/orders/{orderId}/notes");
+            _.StatusCodeShouldBe(201);
+        });
+
+        var location = createResult.Context.Response.Headers["Location"].ToString();
+        var noteId = Guid.Parse(location.Split('/').Last());
+
+        // Act - edit multiple times
+        await _fixture.Host.Scenario(_ =>
+        {
+            _.Put.Json(new { NoteId = noteId, NewText = "Version 2" })
+                .ToUrl($"/api/backoffice/orders/{orderId}/notes/{noteId}");
+            _.StatusCodeShouldBe(204);
+        });
+
+        await Task.Delay(50); // Ensure different timestamp
+
+        await _fixture.Host.Scenario(_ =>
+        {
+            _.Put.Json(new { NoteId = noteId, NewText = "Version 3" })
+                .ToUrl($"/api/backoffice/orders/{orderId}/notes/{noteId}");
+            _.StatusCodeShouldBe(204);
+        });
+
+        // Assert - verify final version and EditedAt is set
+        var notes = await _fixture.Host.GetAsJson<IReadOnlyList<OrderNoteDto>>(
+            $"/api/backoffice/orders/{orderId}/notes");
+
+        notes.Count.ShouldBe(1);
+        notes[0].Text.ShouldBe("Version 3");
+        notes[0].EditedAt.ShouldNotBeNull();
+        notes[0].EditedAt.Value.ShouldBeGreaterThan(notes[0].CreatedAt);
+    }
+
+    #endregion
 }
