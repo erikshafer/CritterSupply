@@ -1,5 +1,6 @@
 using System.Text;
 using JasperFx;
+using JasperFx.Events.Projections;
 using Marten;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -79,6 +80,10 @@ builder.Services.AddMarten(opts =>
 
     // Snapshot projection for OrderNote (zero-lag queries, excludes deleted notes in projections)
     opts.Projections.Snapshot<Backoffice.OrderNote.OrderNote>(Marten.Events.Projections.SnapshotLifecycle.Inline);
+
+    // BFF-owned projection for AdminDailyMetrics (dashboard KPIs)
+    // Inline lifecycle: zero lag, updated in same transaction as integration message handling
+    opts.Projections.Add<Backoffice.Projections.AdminDailyMetricsProjection>(ProjectionLifecycle.Inline);
 })
 .AddAsyncDaemon(JasperFx.Events.Daemon.DaemonMode.Solo)
 .UseLightweightSessions()
@@ -184,15 +189,16 @@ builder.Host.UseWolverine(opts =>
     })
     .AutoProvision();
 
-    // RabbitMQ subscriptions (will be added in Sessions 6-7)
+    // RabbitMQ subscriptions for AdminDailyMetrics projection (Session 6)
     // Subscribe to Orders BC events for dashboard metrics
-    // opts.ListenToRabbitQueue("backoffice-order-placed").ProcessInline();
-    // opts.ListenToRabbitQueue("backoffice-order-cancelled").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-order-placed").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-order-cancelled").ProcessInline();
 
-    // Subscribe to Payments BC events
-    // opts.ListenToRabbitQueue("backoffice-payment-captured").ProcessInline();
-    // opts.ListenToRabbitQueue("backoffice-payment-failed").ProcessInline();
+    // Subscribe to Payments BC events for dashboard metrics
+    opts.ListenToRabbitQueue("backoffice-payment-captured").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-payment-failed").ProcessInline();
 
+    // Future subscriptions (Sessions 7-9):
     // Subscribe to Fulfillment BC events
     // opts.ListenToRabbitQueue("backoffice-shipment-dispatched").ProcessInline();
     // opts.ListenToRabbitQueue("backoffice-shipment-delivery-failed").ProcessInline();
