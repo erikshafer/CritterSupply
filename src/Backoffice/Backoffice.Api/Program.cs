@@ -1,5 +1,6 @@
 using System.Text;
 using JasperFx;
+using JasperFx.Events.Projections;
 using Marten;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -79,6 +80,13 @@ builder.Services.AddMarten(opts =>
 
     // Snapshot projection for OrderNote (zero-lag queries, excludes deleted notes in projections)
     opts.Projections.Snapshot<Backoffice.OrderNote.OrderNote>(Marten.Events.Projections.SnapshotLifecycle.Inline);
+
+    // BFF-owned projections (inline lifecycle: zero lag)
+    // AdminDailyMetrics: Executive dashboard KPIs (Session 6)
+    opts.Projections.Add<Backoffice.Projections.AdminDailyMetricsProjection>(ProjectionLifecycle.Inline);
+
+    // AlertFeedView: Operations alert feed (Session 7)
+    opts.Projections.Add<Backoffice.Projections.AlertFeedViewProjection>(ProjectionLifecycle.Inline);
 })
 .AddAsyncDaemon(JasperFx.Events.Daemon.DaemonMode.Solo)
 .UseLightweightSessions()
@@ -184,26 +192,29 @@ builder.Host.UseWolverine(opts =>
     })
     .AutoProvision();
 
-    // RabbitMQ subscriptions (will be added in Sessions 6-7)
+    // RabbitMQ subscriptions for AdminDailyMetrics projection (Session 6)
     // Subscribe to Orders BC events for dashboard metrics
-    // opts.ListenToRabbitQueue("backoffice-order-placed").ProcessInline();
-    // opts.ListenToRabbitQueue("backoffice-order-cancelled").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-order-placed").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-order-cancelled").ProcessInline();
 
-    // Subscribe to Payments BC events
-    // opts.ListenToRabbitQueue("backoffice-payment-captured").ProcessInline();
-    // opts.ListenToRabbitQueue("backoffice-payment-failed").ProcessInline();
+    // Subscribe to Payments BC events for dashboard metrics
+    opts.ListenToRabbitQueue("backoffice-payment-captured").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-payment-failed").ProcessInline();
 
-    // Subscribe to Fulfillment BC events
-    // opts.ListenToRabbitQueue("backoffice-shipment-dispatched").ProcessInline();
-    // opts.ListenToRabbitQueue("backoffice-shipment-delivery-failed").ProcessInline();
-
+    // RabbitMQ subscriptions for AlertFeedView projection (Session 7)
     // Subscribe to Inventory BC events for alerts
-    // opts.ListenToRabbitQueue("backoffice-low-stock-detected").ProcessInline();
-    // opts.ListenToRabbitQueue("backoffice-stock-replenished").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-low-stock-detected").ProcessInline();
 
-    // Subscribe to Returns BC events
+    // Subscribe to Fulfillment BC events for alerts
+    opts.ListenToRabbitQueue("backoffice-shipment-delivery-failed").ProcessInline();
+
+    // Subscribe to Returns BC events for alerts
+    opts.ListenToRabbitQueue("backoffice-return-expired").ProcessInline();
+
+    // Future subscriptions (Sessions 8-9):
+    // opts.ListenToRabbitQueue("backoffice-shipment-dispatched").ProcessInline();
+    // opts.ListenToRabbitQueue("backoffice-stock-replenished").ProcessInline();
     // opts.ListenToRabbitQueue("backoffice-return-requested").ProcessInline();
-    // opts.ListenToRabbitQueue("backoffice-return-expired").ProcessInline();
 
     // Subscribe to Correspondence BC events
     // opts.ListenToRabbitQueue("backoffice-correspondence-failed").ProcessInline();
@@ -237,9 +248,12 @@ app.MapWolverineEndpoints(opts =>
     opts.UseFluentValidationProblemDetailMiddleware();
 });
 
-// SignalR hub (will be created in Session 8)
-// app.MapHub<Backoffice.Api.BackofficeHub>("/hub/backoffice")
-//     .DisableAntiforgery();
+// SignalR hub for real-time notifications
+// DisableAntiforgery: ASP.NET Core 10+ enables antiforgery protection on SignalR hubs by default.
+// WebSocket connections are CSRF-safe by design (browsers enforce same-origin on WS upgrades),
+// so antiforgery tokens do not add security here and blocking the negotiation handshake breaks E2E tests.
+app.MapHub<Backoffice.Api.BackofficeHub>("/hub/backoffice")
+    .DisableAntiforgery();
 
 app.MapGet("/", (HttpResponse response) =>
 {
