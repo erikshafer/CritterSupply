@@ -202,8 +202,12 @@ internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSche
         {
             new Claim(ClaimTypes.NameIdentifier, adminUserId),
             new Claim("sub", adminUserId),
-            new Claim(ClaimTypes.Name, "test-cs-agent"),
+            new Claim(ClaimTypes.Name, "test-admin"),
             new Claim(ClaimTypes.Role, "cs-agent"),
+            new Claim(ClaimTypes.Role, "warehouse-clerk"),
+            new Claim(ClaimTypes.Role, "operations-manager"),
+            new Claim(ClaimTypes.Role, "executive"),
+            new Claim(ClaimTypes.Role, "system-admin"),
         };
         var identity = new ClaimsIdentity(claims, "Test");
         var principal = new ClaimsPrincipal(identity);

@@ -190,10 +190,27 @@ public class StubCorrespondenceClient : ICorrespondenceClient
 public class StubInventoryClient : IInventoryClient
 {
     public Task<StockLevelDto?> GetStockLevelAsync(string sku, CancellationToken ct = default)
-        => Task.FromResult<StockLevelDto?>(null);
+    {
+        // Return mock stock level data for testing
+        var stockLevel = new StockLevelDto(
+            Sku: sku,
+            AvailableQuantity: 50,
+            ReservedQuantity: 10,
+            TotalQuantity: 60,
+            WarehouseId: "warehouse-central");
+        return Task.FromResult<StockLevelDto?>(stockLevel);
+    }
 
     public Task<IReadOnlyList<LowStockDto>> GetLowStockAsync(int? threshold = null, CancellationToken ct = default)
-        => Task.FromResult<IReadOnlyList<LowStockDto>>(Array.Empty<LowStockDto>());
+    {
+        // Return mock low stock data for testing
+        var lowStockItems = new List<LowStockDto>
+        {
+            new LowStockDto("SKU-LOW-001", "Test Product 1", 5, 20),
+            new LowStockDto("SKU-LOW-002", "Test Product 2", 3, 15)
+        };
+        return Task.FromResult<IReadOnlyList<LowStockDto>>(lowStockItems);
+    }
 }
 
 public class StubFulfillmentClient : IFulfillmentClient
