@@ -1,4 +1,5 @@
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Payments.Processing;
 using Wolverine.Http;
 
@@ -17,6 +18,7 @@ public static class GetPaymentEndpoint
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with PaymentResponse if found, 404 if not found.</returns>
     [WolverineGet("/api/payments/{paymentId}")]
+    [Authorize(Policy = "FinanceClerk")]
     public static async Task<IResult> Get(
         Guid paymentId,
         IQuerySession session,

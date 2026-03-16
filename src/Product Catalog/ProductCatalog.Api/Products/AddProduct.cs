@@ -1,5 +1,6 @@
 using FluentValidation;
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using ProductCatalog.Products;
 using Wolverine.Http;
 
@@ -59,6 +60,7 @@ public sealed record ProductDimensionsDto(decimal Length, decimal Width, decimal
 public static class AddProductHandler
 {
     [WolverinePost("/api/products")]
+    [Authorize(Policy = "VendorAdmin")]
     public static async Task<IResult> Handle(
         AddProduct command,
         IDocumentSession session,

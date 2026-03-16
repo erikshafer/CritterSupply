@@ -1,4 +1,5 @@
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orders.Placement;
 using Wolverine.Http;
@@ -19,6 +20,7 @@ public sealed record ReturnableItem(
 public static class GetReturnableItemsEndpoint
 {
     [WolverineGet("/api/orders/{orderId}/returnable-items")]
+    [Authorize(Policy = "CustomerService")]
     public static async Task<IResult> Handle(
         Guid orderId,
         IDocumentSession session,

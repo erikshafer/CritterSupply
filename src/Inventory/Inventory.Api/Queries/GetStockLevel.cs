@@ -1,4 +1,5 @@
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Wolverine.Http;
@@ -23,6 +24,7 @@ public sealed record StockLevelResponse(
 public sealed class GetStockLevel
 {
     [WolverineGet("/api/inventory/{sku}")]
+    [Authorize(Policy = "WarehouseClerk")]
     public static async Task<Results<Ok<StockLevelResponse>, NotFound>> Handle(
         string sku,
         string? warehouseId,
