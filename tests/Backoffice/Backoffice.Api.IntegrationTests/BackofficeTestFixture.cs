@@ -32,6 +32,8 @@ public class BackofficeTestFixture : IAsyncLifetime
     // Stub clients for testing
     public StubCustomerIdentityClient CustomerIdentityClient { get; private set; } = null!;
     public StubOrdersClient OrdersClient { get; private set; } = null!;
+    public StubReturnsClient ReturnsClient { get; private set; } = null!;
+    public StubCorrespondenceClient CorrespondenceClient { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
@@ -42,6 +44,8 @@ public class BackofficeTestFixture : IAsyncLifetime
         // Initialize stub clients
         CustomerIdentityClient = new StubCustomerIdentityClient();
         OrdersClient = new StubOrdersClient();
+        ReturnsClient = new StubReturnsClient();
+        CorrespondenceClient = new StubCorrespondenceClient();
 
         // Necessary for WebApplicationFactory usage with Alba for integration testing
         JasperFxEnvironment.AutoStartHost = true;
@@ -81,8 +85,8 @@ public class BackofficeTestFixture : IAsyncLifetime
                 // Register stub clients
                 services.AddScoped<ICustomerIdentityClient>(_ => CustomerIdentityClient);
                 services.AddScoped<IOrdersClient>(_ => OrdersClient);
-                services.AddScoped<IReturnsClient>(_ => new StubReturnsClient());
-                services.AddScoped<ICorrespondenceClient>(_ => new StubCorrespondenceClient());
+                services.AddScoped<IReturnsClient>(_ => ReturnsClient);
+                services.AddScoped<ICorrespondenceClient>(_ => CorrespondenceClient);
                 services.AddScoped<IInventoryClient>(_ => new StubInventoryClient());
                 services.AddScoped<IFulfillmentClient>(_ => new StubFulfillmentClient());
                 services.AddScoped<ICatalogClient>(_ => new StubCatalogClient());
