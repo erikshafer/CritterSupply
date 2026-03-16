@@ -146,7 +146,11 @@ public sealed class MyProjection : SingleStreamProjection<MyDocument>
 
 **Key conventions:**
 - `Create()` is optional — if omitted, Marten creates an empty document using the parameterless constructor
-- `Apply()` methods **must** be `static` for inline projections (Marten's thread-safety requirement)
+- `Apply()` methods can be either instance or static (both work correctly with Marten inline projections)
+  - **CritterSupply convention:** Use instance methods for consistency across the codebase
+  - Instance pattern: `public MyDocument Apply(MyDocument current, SubsequentEvent evt)`
+  - Static pattern: `public static MyDocument Apply(MyDocument current, SubsequentEvent evt)`
+  - All 9 production aggregates in CritterSupply (Cart, Checkout, Return, Promotion, Coupon, ProductInventory, Payment, Shipment, OrderNote) use instance methods successfully
 - Method names are **exact** — `Create` and `Apply`, case-sensitive
 - Return type must match the projection document type
 - Parameter order: `(document, event)` for Apply methods

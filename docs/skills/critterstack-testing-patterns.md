@@ -174,6 +174,179 @@ public class TestFixture : IAsyncLifetime
 }
 ```
 
+### Test Authentication with Stable User IDs
+
+**⚠️ CRITICAL for Multi-Request Authorization Tests:**
+
+When testing authorization scenarios that involve **multiple HTTP requests** against the same resource (create → edit/delete), the test authentication handler MUST provide **stable user IDs** across requests.
+
+**The Problem: Random User IDs Break Multi-Request Tests**
+
+```csharp
+// ❌ ANTI-PATTERN: Random Guid for `sub` claim on EVERY request
+public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+{
+    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()), // ❌ NEW GUID EVERY REQUEST!
+            new Claim(ClaimTypes.Name, "Test Admin"),
+            new Claim(ClaimTypes.Role, "Admin")
+        };
+
+        // Result: Request 1 has UserId = "abc...", Request 2 has UserId = "xyz..."
+        // Resource created by "abc..." cannot be edited by "xyz..." → 403 Forbidden
+    }
+}
+```
+
+**Why This Breaks Multi-Request Tests:**
+
+1. **Create request** → `UserId = Guid-A` → Resource created with `CreatedBy = Guid-A`
+2. **Edit/Delete request** → `UserId = Guid-B` (NEW RANDOM GUID!) → Authorization check fails: `Guid-B != Guid-A` → 403 Forbidden
+3. Test fails with unexpected 403 instead of 200
+
+**The Solution: Stable User IDs via ITestAuthContext**
+
+Use a constant user ID stored in a test context interface:
+
+```csharp
+/// <summary>
+/// Provides stable authentication context for integration tests.
+/// CRITICAL: User IDs must remain stable across multiple HTTP requests in the same test
+/// to allow authorization checks to pass (e.g., create → edit/delete same resource).
+/// </summary>
+public interface ITestAuthContext
+{
+    Guid UserId { get; }
+}
+
+/// <summary>
+/// Default implementation with a stable admin user ID.
+/// </summary>
+public class TestAuthContext : ITestAuthContext
+{
+    /// <summary>
+    /// Stable admin user ID for all test requests.
+    /// DO NOT use Guid.NewGuid() here — breaks multi-request authorization tests.
+    /// </summary>
+    public static readonly Guid TestAdminUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    public Guid UserId => TestAdminUserId;
+}
+
+/// <summary>
+/// Test authentication handler with stable user ID from ITestAuthContext.
+/// </summary>
+public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+{
+    private readonly ITestAuthContext _authContext;
+
+    public TestAuthHandler(
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder,
+        ITestAuthContext authContext)
+        : base(options, logger, encoder)
+    {
+        _authContext = authContext;
+    }
+
+    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    {
+        var claims = new[]
+        {
+            // ✅ STABLE: Same user ID for all requests in a test
+            new Claim(ClaimTypes.NameIdentifier, _authContext.UserId.ToString()),
+            new Claim(ClaimTypes.Name, "Test Admin"),
+            new Claim(ClaimTypes.Role, "Admin")
+        };
+
+        var identity = new ClaimsIdentity(claims, "Test");
+        var principal = new ClaimsPrincipal(identity);
+        var ticket = new AuthenticationTicket(principal, "Test");
+
+        return Task.FromResult(AuthenticateResult.Success(ticket));
+    }
+}
+```
+
+**TestFixture Registration:**
+
+```csharp
+public async Task InitializeAsync()
+{
+    await _postgres.StartAsync();
+    _connectionString = _postgres.GetConnectionString();
+
+    JasperFxEnvironment.AutoStartHost = true;
+
+    Host = await AlbaHost.For<Program>(builder =>
+    {
+        builder.ConfigureServices(services =>
+        {
+            services.ConfigureMarten(opts => opts.Connection(_connectionString));
+            services.DisableAllExternalWolverineTransports();
+
+            // ✅ Register test auth context with stable user ID
+            services.AddSingleton<ITestAuthContext, TestAuthContext>();
+
+            // Configure authentication with TestAuthHandler
+            services.AddAuthentication("Test")
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
+        });
+    });
+}
+```
+
+**Example: Multi-Request Authorization Test**
+
+```csharp
+[Fact]
+public async Task CreateOrderNote_ThenUpdateAsCreator_Returns200()
+{
+    var orderId = Guid.CreateVersion7();
+    var customerId = Guid.CreateVersion7();
+
+    // Request 1: Create note (UserId = TestAdminUserId)
+    var createCmd = new CreateOrderNote(orderId, customerId, "Original note");
+    var createResult = await _fixture.Host.PostJson("/api/order-notes", createCmd)
+        .Receive<CreateOrderNoteResult>();
+
+    var noteId = createResult.NoteId;
+
+    // Request 2: Edit note (UserId = SAME TestAdminUserId)
+    var editCmd = new EditOrderNote(noteId, "Updated note");
+    await _fixture.Host.Scenario(s =>
+    {
+        s.Put.Json(editCmd).ToUrl($"/api/order-notes/{noteId}");
+        s.StatusCodeShouldBe(200); // ✅ Passes — same UserId across requests
+    });
+}
+```
+
+**Without Stable IDs (Anti-Pattern):**
+```csharp
+// ❌ Request 1: UserId = "abc..." → Note created with CreatedBy = "abc..."
+// ❌ Request 2: UserId = "xyz..." → Authorization fails: "xyz..." != "abc..." → 403 Forbidden
+```
+
+**With Stable IDs (Correct Pattern):**
+```csharp
+// ✅ Request 1: UserId = TestAdminUserId → Note created with CreatedBy = TestAdminUserId
+// ✅ Request 2: UserId = TestAdminUserId → Authorization passes: TestAdminUserId == TestAdminUserId → 200 OK
+```
+
+**Key Takeaways:**
+1. **Never use `Guid.NewGuid()` in test auth handlers** — breaks multi-request tests
+2. **Use a constant user ID** stored in `ITestAuthContext`
+3. **Register `ITestAuthContext` as singleton** in TestFixture
+4. **Inject `ITestAuthContext` into `TestAuthHandler`** for stable user ID
+5. **Document why stability matters** — prevents confusing 403 failures in authorization tests
+
+
+
 ### EF Core TestFixture Pattern
 
 For BCs using Entity Framework Core (like Customer Identity):

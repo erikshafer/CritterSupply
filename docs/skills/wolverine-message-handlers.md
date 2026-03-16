@@ -604,19 +604,47 @@ public static (Events, OutgoingMessages) Handle(
 
 ### Pattern 4: Start New Stream (Message Handler)
 
+**⚠️ CRITICAL:** Handlers that create new event streams **MUST return `IStartStream`** from `MartenOps.StartStream()`. Direct `session.Events.StartStream()` usage does **NOT** enroll in Wolverine's transactional middleware and events will **NOT** be persisted.
+
+**✅ CORRECT — Return IStartStream:**
+
 ```csharp
-public static IStartStream Handle(StartPayment cmd, IDocumentSession session)
+public static IStartStream Handle(StartPayment cmd)
 {
     var paymentId = Guid.CreateVersion7();
     var initiated = new PaymentInitiated(paymentId, cmd.OrderId, cmd.Amount);
 
+    // ✅ CORRECT: Return IStartStream from MartenOps.StartStream()
     return MartenOps.StartStream<Payment>(paymentId, initiated);
 }
 ```
 
+**❌ ANTI-PATTERN — Direct session usage (does NOT persist):**
+
+```csharp
+public static void Handle(StartPayment cmd, IDocumentSession session)
+{
+    var paymentId = Guid.CreateVersion7();
+    var initiated = new PaymentInitiated(paymentId, cmd.OrderId, cmd.Amount);
+
+    // ❌ WRONG: Direct session usage does NOT enroll in transactional middleware
+    session.Events.StartStream<Payment>(paymentId, initiated);
+
+    // Events are NOT persisted — no transaction enrolled!
+}
+```
+
+**Why this matters:**
+- `MartenOps.StartStream()` returns `IStartStream` which Wolverine recognizes as a side effect to persist
+- Direct `session.Events.StartStream()` bypasses Wolverine's transactional middleware entirely
+- Without `IStartStream` return, events appear to succeed but are silently discarded
+- This pattern is **REQUIRED**, not optional — see `docs/skills/marten-event-sourcing.md` for full explanation
+
 **Wolverine creates a new `Payment` stream with the `PaymentInitiated` event.**
 
 ### Pattern 5: Start New Stream (HTTP Endpoint)
+
+**⚠️ CRITICAL:** HTTP endpoints that create new streams **MUST return `IStartStream`** in the tuple. The tuple order is critical: `(CreationResponse, IStartStream)` — HTTP response MUST be first.
 
 ```csharp
 [WolverinePost("/api/carts")]
@@ -624,6 +652,8 @@ public static (CreationResponse<Guid>, IStartStream) Handle(InitializeCart cmd)
 {
     var cartId = Guid.CreateVersion7();
     var @event = new CartInitialized(cmd.CustomerId, cmd.SessionId);
+
+    // ✅ CORRECT: Return IStartStream from MartenOps.StartStream()
     var stream = MartenOps.StartStream<Cart>(cartId, @event);
 
     // CRITICAL: CreationResponse MUST be first in tuple!
@@ -647,6 +677,8 @@ In Wolverine HTTP handlers, **the FIRST item in a return tuple is ALWAYS the HTT
 
 **Why this happens:**
 Wolverine serializes the first tuple element as the response body. All other elements are treated as side effects (events to append, messages to publish, etc.).
+
+**See also:** `docs/skills/marten-event-sourcing.md` for detailed explanation of IStartStream requirements and AutoApplyTransactions() policy.
 
 **Example response:**
 
@@ -1283,8 +1315,22 @@ builder.Host.UseWolverine(opts =>
 
     // Discover handlers in domain project (commands, sagas, integration handlers)
     opts.Discovery.IncludeAssembly(typeof(Orders.Order).Assembly);
+
+    // ⚠️ CRITICAL: AutoApplyTransactions() is REQUIRED for Marten integration
+    opts.Policies.AutoApplyTransactions();
 });
 ```
+
+**⚠️ CRITICAL: AutoApplyTransactions() Policy**
+
+The `AutoApplyTransactions()` policy is **REQUIRED** for Marten integration, not optional:
+
+- Without this policy, Wolverine does NOT wrap handlers in transactional middleware
+- Marten changes (events, documents) are NOT automatically committed
+- Handlers complete successfully but no data is persisted to the database
+- This causes **silent failures** — no exceptions thrown, but database remains unchanged
+
+**See also:** `docs/skills/marten-event-sourcing.md` (lines 1417-1476) for complete explanation of this critical requirement.
 
 **Testing handler discovery:**
 
@@ -1900,6 +1946,55 @@ public static async Task Handle(
 **Key lesson from M30.0:** This anti-pattern caused ~30 minutes of debugging when events weren't persisting. The tuple return looked correct but silently failed. Always use `session.Events.Append()` when manually loading aggregates.
 
 **Reference:** [M30.0 Retrospective - D1: Manual Event Appending Pattern](../../planning/milestones/m30-0-retrospective.md#d1-manual-event-appending-pattern--critical-discovery)
+
+### 9. ❌ Using Direct `session.Events.StartStream()` Without Returning `IStartStream` ⚠️ **CRITICAL**
+
+**Problem:** Creating new event streams with direct `session.Events.StartStream()` calls bypasses Wolverine's transactional middleware. Events appear to succeed but are **silently discarded** — no exceptions thrown, handler completes successfully, but database remains unchanged.
+
+**❌ ANTI-PATTERN — Events Not Persisted:**
+
+```csharp
+[WolverinePost("/api/carts")]
+public static CreationResponse Handle(InitializeCart cmd, IDocumentSession session)
+{
+    var cartId = Guid.CreateVersion7();
+    var @event = new CartInitialized(cmd.CustomerId, cmd.SessionId);
+
+    // ❌ WRONG: Direct session usage does NOT enroll in transactional middleware
+    session.Events.StartStream<Cart>(cartId, @event);
+
+    // Handler completes successfully but events are NOT persisted!
+    return new CreationResponse($"/api/carts/{cartId}");
+}
+```
+
+**✅ CORRECT — Return IStartStream:**
+
+```csharp
+[WolverinePost("/api/carts")]
+public static (CreationResponse, IStartStream) Handle(InitializeCart cmd)
+{
+    var cartId = Guid.CreateVersion7();
+    var @event = new CartInitialized(cmd.CustomerId, cmd.SessionId);
+
+    // ✅ CORRECT: Return IStartStream from MartenOps.StartStream()
+    var stream = MartenOps.StartStream<Cart>(cartId, @event);
+
+    var response = new CreationResponse($"/api/carts/{cartId}");
+    return (response, stream);  // Response first, IStartStream second
+}
+```
+
+**Why this matters:**
+- `IStartStream` is a special return type Wolverine recognizes as a persistence side effect
+- Wolverine's `AutoApplyTransactions()` policy only wraps handlers that return recognized types
+- Direct `session.Events.StartStream()` calls don't produce return values Wolverine can intercept
+- This is a **silent failure** pattern — no errors, but data never reaches the database
+- **CRITICAL:** This pattern was discovered in M32.0 retrospectives after 30+ minutes of debugging
+
+**See also:** `docs/skills/marten-event-sourcing.md` (lines 1029-1084) for detailed explanation and `AutoApplyTransactions()` requirements.
+
+**Reference:** [M32.0 Session 5 Retrospective - Investigation Findings](../../retrospectives/m32.0-session5-retrospective.md)
 
 ---
 
