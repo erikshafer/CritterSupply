@@ -230,7 +230,7 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 
 | Context                       | Responsibility                                                        | Status      |
 |-------------------------------|-----------------------------------------------------------------------|-------------|
-| 📨 **Orders**                 | Commercial commitment: checkout intake and post-purchase order orchestration | ✅ Complete |
+| 📨 **Orders**                 | Checkout intake and post-purchase order orchestration | ✅ Complete |
 | 💳 **Payments**               | Authorization, capture, refunds                                       | ✅ Complete |
 | 🛒 **Shopping**               | Cart management                                                       | ✅ Complete |
 | 📊 **Inventory**              | Stock levels and reservations                                         | ✅ Complete |
