@@ -35,6 +35,12 @@ public class BackofficeTestFixture : IAsyncLifetime
     public StubReturnsClient ReturnsClient { get; private set; } = null!;
     public StubCorrespondenceClient CorrespondenceClient { get; private set; } = null!;
 
+    /// <summary>
+    /// Stable admin user ID for test authentication.
+    /// Used consistently across all requests in a test run to allow edit/delete authorization checks.
+    /// </summary>
+    public static readonly Guid TestAdminUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
@@ -101,7 +107,10 @@ public class BackofficeTestFixture : IAsyncLifetime
                     services.Remove(service);
                 }
 
-                // Add test authentication scheme
+                // Register test auth context as singleton (must be before authentication setup)
+                services.AddSingleton<ITestAuthContext>(new TestAuthContext(TestAdminUserId));
+
+                // Add test authentication scheme with stable admin user ID
                 services.AddAuthentication("Test")
                     .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", _ => { });
 
@@ -147,23 +156,52 @@ public class BackofficeTestFixture : IAsyncLifetime
 }
 
 /// <summary>
+/// Context for test authentication providing stable user identity.
+/// </summary>
+internal interface ITestAuthContext
+{
+    Guid AdminUserId { get; }
+}
+
+/// <summary>
+/// Implementation of test authentication context.
+/// </summary>
+internal sealed class TestAuthContext : ITestAuthContext
+{
+    public Guid AdminUserId { get; }
+
+    public TestAuthContext(Guid adminUserId)
+    {
+        AdminUserId = adminUserId;
+    }
+}
+
+/// <summary>
 /// Fake authentication handler for integration tests.
 /// Automatically authenticates as CustomerService user with cs-agent role.
+/// Uses stable admin user ID from ITestAuthContext to allow authorization checks across requests.
 /// </summary>
 internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
+    private readonly ITestAuthContext _authContext;
+
     public TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
-        UrlEncoder encoder)
-        : base(options, logger, encoder) { }
+        UrlEncoder encoder,
+        ITestAuthContext authContext)
+        : base(options, logger, encoder)
+    {
+        _authContext = authContext;
+    }
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        var adminUserId = _authContext.AdminUserId.ToString();
         var claims = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-            new Claim("sub", Guid.NewGuid().ToString()),
+            new Claim(ClaimTypes.NameIdentifier, adminUserId),
+            new Claim("sub", adminUserId),
             new Claim(ClaimTypes.Name, "test-cs-agent"),
             new Claim(ClaimTypes.Role, "cs-agent"),
         };
