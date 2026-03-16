@@ -248,9 +248,12 @@ app.MapWolverineEndpoints(opts =>
     opts.UseFluentValidationProblemDetailMiddleware();
 });
 
-// SignalR hub (will be created in Session 8)
-// app.MapHub<Backoffice.Api.BackofficeHub>("/hub/backoffice")
-//     .DisableAntiforgery();
+// SignalR hub for real-time notifications
+// DisableAntiforgery: ASP.NET Core 10+ enables antiforgery protection on SignalR hubs by default.
+// WebSocket connections are CSRF-safe by design (browsers enforce same-origin on WS upgrades),
+// so antiforgery tokens do not add security here and blocking the negotiation handshake breaks E2E tests.
+app.MapHub<Backoffice.Api.BackofficeHub>("/hub/backoffice")
+    .DisableAntiforgery();
 
 app.MapGet("/", (HttpResponse response) =>
 {
