@@ -8,8 +8,10 @@ using JasperFx.Events.Daemon;
 using JasperFx.Resources;
 using Marten;
 using Marten.Events.Projections;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -114,6 +116,81 @@ builder.Host.UseWolverine(opts =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Configure JWT authentication with Backoffice and Vendor issuers
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer("Backoffice", options =>
+    {
+        options.Authority = "https://localhost:5249";
+        options.Audience = "https://localhost:5249";
+        if (builder.Environment.IsDevelopment())
+        {
+            options.RequireHttpsMetadata = false;
+        }
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            RoleClaimType = "role"
+        };
+    })
+    .AddJwtBearer("Vendor", options =>
+    {
+        options.Authority = "https://localhost:5240";
+        options.Audience = "https://localhost:5240";
+        if (builder.Environment.IsDevelopment())
+        {
+            options.RequireHttpsMetadata = false;
+        }
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            RoleClaimType = "role"
+        };
+    });
+
+// Configure authorization policies
+builder.Services.AddAuthorization(opts =>
+{
+    // Backoffice policies
+    opts.AddPolicy("CustomerService", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Backoffice");
+        policy.RequireRole("CustomerService", "OperationsManager", "SystemAdmin");
+    });
+
+    opts.AddPolicy("WarehouseClerk", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Backoffice");
+        policy.RequireRole("WarehouseClerk", "OperationsManager", "SystemAdmin");
+    });
+
+    opts.AddPolicy("OperationsManager", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Backoffice");
+        policy.RequireRole("OperationsManager", "SystemAdmin");
+    });
+
+    // Vendor policies
+    opts.AddPolicy("VendorAdmin", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Vendor");
+        policy.RequireRole("VendorAdmin");
+    });
+
+    // Cross-issuer policy: accept tokens from either Backoffice or Vendor
+    opts.AddPolicy("AnyAuthenticated", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Backoffice");
+        policy.AuthenticationSchemes.Add("Vendor");
+        policy.RequireAuthenticatedUser();
+    });
+});
+
 builder.Services.AddWolverineHttp();
 
 var app = builder.Build();
@@ -134,6 +211,10 @@ if (app.Environment.IsDevelopment())
 
 // Map Aspire default endpoints (/health, /alive)
 app.MapDefaultEndpoints();
+
+// Add authentication and authorization middleware
+app.UseAuthentication();
+app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {
