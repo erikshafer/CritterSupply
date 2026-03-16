@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Marten" />
+    <PackageReference Include="WolverineFx.SignalR" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Shared/Messages.Contracts/Messages.Contracts.csproj" />
+  </ItemGroup>
+</Project>
