@@ -41,11 +41,11 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M31.5 (Backoffice Prerequisites) |
-| **Status** | ✅ COMPLETE — All 5 sessions done |
-| **Deliverables** | ✅ Domain BC endpoint gaps (8 gaps) + multi-issuer JWT (5 BCs) + endpoint authorization (17 endpoints) |
-| **Next Milestone** | TBD (Catalog Evolution, Search BC, or Exchange v2) |
-| **Active BCs** | 17 total |
+| **Current Milestone** | M32.0 (Backoffice Phase 1 — Read-Only Dashboards) |
+| **Status** | 🚀 ACTIVE — Planning complete, Session 1 ready |
+| **Deliverables** | BFF infrastructure + CS tooling + dashboard KPIs + ops alerts + warehouse dashboard |
+| **Next Milestone** | M32.1 (Backoffice Phase 2 — Write Operations) |
+| **Active BCs** | 17 total (18 after M32.0 — Backoffice BFF) |
 
 *Last Updated: 2026-03-16*
 
@@ -53,50 +53,73 @@
 
 ## Active Milestone
 
-**M31.5 — Backoffice Prerequisites**
+**M32.0 — Backoffice Phase 1: Read-Only Dashboards & CS Tooling**
 
-**Status:** ✅ **COMPLETE** — All Phase 0.5 blockers closed; domain BCs ready for Backoffice Phase 1
-**Duration:** 1 cycle (5 sessions completed, ~12 hours)
-**Implementation Branch:** `claude/m31-5-backoffice-prerequisites` → PR #376
+**Status:** 🚀 **ACTIVE** — Planning complete; Session 1 ready to begin
+**Duration:** 2-3 cycles (10-15 sessions estimated, ~24-32 hours)
+**Implementation Branch:** `claude/m32-0-backoffice-phase-1-read-only-dashboards`
 
 **GitHub Links:**
-- Milestone: [M31.5: Backoffice Prerequisites](https://github.com/erikshafer/CritterSupply/milestone/TBD)
+- Milestone: [M32.0: Backoffice Phase 1](https://github.com/erikshafer/CritterSupply/milestone/TBD)
 - Project Board: [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
-- PR: [#376 — M31.5 Backoffice Prerequisites (Sessions 1-5)](https://github.com/erikshafer/CritterSupply/pull/376)
 
 **Planning Documents:**
-- [Milestone Plan](./milestones/m31-5-backoffice-prerequisites.md)
-- [Prerequisite Assessment](./m32-0-prerequisite-assessment.md)
-- [Implementation Plan](./phase-0-5-implementation-plan.md)
+- [Milestone Plan](./milestones/m32-0-backoffice-phase-1-plan.md) (comprehensive 11-session plan)
+- [Session 1: Preparation & Discovery](./milestones/m32-0-session-1-preparation.md)
+- [Backoffice Event Modeling (Revised)](./backoffice-event-modeling-revised.md)
+- [Backoffice Integration Gap Register](./backoffice-integration-gap-register.md)
+- [ADR 0031: Backoffice RBAC Model](../decisions/0031-admin-portal-rbac-model.md)
 - [ADR 0032: Multi-Issuer JWT Strategy](../decisions/0032-multi-issuer-jwt-strategy.md)
-- [Integration Gap Register](./backoffice-integration-gap-register.md) (updated with M31.5 completion)
+- [ADR 0033: Backoffice Rename](../decisions/0033-admin-portal-to-backoffice-rename.md)
 
-**Sessions Completed:**
-1. ✅ **Session 1** — GetCustomerByEmail endpoint (Customer Identity BC)
-2. ✅ **Session 2** — Inventory BC HTTP query endpoints (GetStockLevel, GetLowStock)
-3. ✅ **Session 3** — Fulfillment BC GetShipmentsForOrder endpoint
-4. ✅ **Session 4** — Multi-issuer JWT configuration (5 domain BCs)
-5. ✅ **Session 5** — Endpoint authorization with `[Authorize]` attributes (17 endpoints across 7 BCs)
+**ADRs to Write:**
+- ADR 0034: Backoffice BFF Architecture (Session 1)
+- ADR 0035: Backoffice SignalR Hub Design (Session 8)
+- ADR 0036: BFF-Owned Projections Strategy (Session 6)
+- ADR 0037: OrderNote Aggregate Ownership (Session 5)
 
-**What Shipped:**
-- 8 Phase 0.5 blocking gaps closed (all email search, inventory queries, shipment queries, JWT auth)
-- 17 critical endpoints secured with role-based authorization policies
-- Multi-issuer JWT configured in Orders, Payments, Inventory, Fulfillment, Correspondence BCs
-- All 8 domain BCs successfully built and verified
+**Phase 1 Scope (P0 Features):**
+1. **BFF Infrastructure** — Projects, Marten, Wolverine, JWT, SignalR hub
+2. **Customer Service Workflows** — Search, orders, returns, correspondence, order notes
+3. **Executive Dashboard KPIs** — 5 metrics with real-time updates
+4. **Operations Alert Feed** — 4 alert types with SignalR push
+5. **Warehouse Clerk Dashboard** — Stock visibility, alert acknowledgment
 
-**Policy Assignments:**
-- `CustomerService`: Orders (5), Returns (2), Fulfillment (1), Correspondence (2), CustomerIdentity (3) = 13 endpoints
-- `WarehouseClerk`: Inventory (2) = 2 endpoints
-- `FinanceClerk`: Payments (1) = 1 endpoint
-- `VendorAdmin`: Product Catalog (2) = 2 endpoints
+**Implementation Sessions:**
+1. ⏳ **Session 1** — Project scaffolding & infrastructure (2-3 hours)
+2. ⏳ **Session 2** — HTTP client abstractions (2-3 hours)
+3. ⏳ **Session 3** — CS workflows Part 1: Search & Orders (2-3 hours)
+4. ⏳ **Session 4** — CS workflows Part 2: Returns & Correspondence (2-3 hours)
+5. ⏳ **Session 5** — OrderNote aggregate (1-2 hours)
+6. ⏳ **Session 6** — BFF projections: AdminDailyMetrics (2-3 hours)
+7. ⏳ **Session 7** — BFF projections: AlertFeedView (2-3 hours)
+8. ⏳ **Session 8** — SignalR hub (2-3 hours)
+9. ⏳ **Session 9** — Warehouse clerk dashboard (2-3 hours)
+10. ⏳ **Session 10** — Integration testing & CI (3-4 hours)
+11. ⏳ **Session 11** — Documentation & retrospective (2-3 hours)
 
-**Build Status:** 0 errors, 7 pre-existing warnings in Correspondence BC
+**Prerequisites Status:** ✅ All complete (M31.5 — Multi-issuer JWT + endpoint gaps)
+
+**What Will Ship:**
+- Backoffice BFF (Backend-for-Frontend) for internal employees
+- CS agent workflows: customer search, order lookup, return management, correspondence history, order notes
+- Executive dashboard with 5 KPIs and real-time updates
+- Operations alert feed with SignalR push
+- Warehouse clerk stock visibility and alert acknowledgment
+- BFF-owned Marten projections (AdminDailyMetrics, AlertFeedView)
+- Integration tests with Alba + TestContainers
+- 14+ RabbitMQ event subscriptions from 7 domain BCs
+
+**Technology Stack:**
+- Backoffice.Api (port 5243), Marten (`backoffice` schema), Wolverine, SignalR, JWT Bearer (BackofficeIdentity)
+
+**Build Status:** Not yet started
 
 **References:**
-- [Session 5 Retrospective](./milestones/m31-5-session-5-retrospective.md) (to be created)
-- backoffice-integration-gap-register.md updated with Phase 0.5 completion status
+- [M31.5 Session 5 Retrospective](./milestones/m31-5-session-5-retrospective.md)
+- [Backoffice Integration Gap Register](./backoffice-integration-gap-register.md) (38 fully defined endpoints)
 
-*Completed: 2026-03-16*
+*Started: 2026-03-16*
 
 ---
 
@@ -104,6 +127,35 @@
 
 > **Contains:** Last 3 completed milestones for quick reference.
 > **Archive Policy:** After 3 milestones accumulate, move oldest to [Milestone Archive](#milestone-archive).
+
+### ✅ M31.5: Backoffice Prerequisites (2026-03-16)
+
+**What shipped:**
+- 8 Phase 0.5 blocking gaps closed across 5 sessions
+- GetCustomerByEmail endpoint (Customer Identity BC)
+- Inventory BC HTTP query endpoints (GetStockLevel, GetLowStock)
+- Fulfillment BC GetShipmentsForOrder endpoint
+- Multi-issuer JWT configuration (5 domain BCs: Orders, Payments, Inventory, Fulfillment, Correspondence)
+- Endpoint authorization with `[Authorize]` attributes (17 endpoints across 7 BCs)
+- 38 fully defined endpoints ready for Backoffice Phase 1
+
+**Key Decisions:**
+- Multi-issuer JWT uses named schemes (`"Backoffice"`, `"Vendor"`)
+- Policy-based authorization aligned with ADR 0031 roles
+- Product Catalog policy already named "VendorAdmin" (no rename needed)
+- GetAddressSnapshot deliberately left unprotected (BC-to-BC integration)
+
+**Build Status:** 0 errors, 7 pre-existing warnings (Correspondence BC unused variables)
+
+**References:**
+- [Milestone Plan](./milestones/m31-5-backoffice-prerequisites.md)
+- [Session 5 Retrospective](./milestones/m31-5-session-5-retrospective.md)
+- [Integration Gap Register](./backoffice-integration-gap-register.md) (updated)
+- [ADR 0032: Multi-Issuer JWT Strategy](../decisions/0032-multi-issuer-jwt-strategy.md)
+
+*Completed: 2026-03-16*
+
+---
 
 ### ✅ M31.0: Correspondence BC Extended (2026-03-15)
 
