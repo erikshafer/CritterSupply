@@ -1026,8 +1026,11 @@ public static UpdatedAggregate<XAccount> Handle(
 }
 ```
 
-#### 5. `IStartStream` (New Aggregate)
+#### 5. `IStartStream` (New Aggregate) — ⚠️ **CRITICAL: Required for Stream Creation**
 
+**IMPORTANT:** Handlers that create new event streams MUST return `IStartStream` from `MartenOps.StartStream()`. Direct `session.Events.StartStream()` usage DOES NOT enroll in Wolverine's transactional middleware and events will not be persisted.
+
+**✅ CORRECT — Return IStartStream:**
 ```csharp
 [WolverinePost("/api/carts")]
 public static (IStartStream, CreationResponse) Handle(InitializeCart command)
@@ -1039,8 +1042,44 @@ public static (IStartStream, CreationResponse) Handle(InitializeCart command)
         command.SessionId,
         DateTimeOffset.UtcNow);
 
+    // ✅ CORRECT: Return IStartStream from MartenOps.StartStream()
     var stream = MartenOps.StartStream<Cart>(cartId, @event);
     return (stream, new CreationResponse($"/api/carts/{cartId}"));
+}
+```
+
+**❌ ANTI-PATTERN — Direct session usage (does NOT persist):**
+```csharp
+[WolverinePost("/api/carts")]
+public static CreationResponse Handle(InitializeCart command, IDocumentSession session)
+{
+    var cartId = Guid.CreateVersion7();
+    var @event = new CartInitialized(/* ... */);
+
+    // ❌ WRONG: Direct session usage does NOT enroll in transactional middleware
+    session.Events.StartStream<Cart>(cartId, @event);
+
+    // Events are NOT persisted — no transaction enrolled!
+    return new CreationResponse($"/api/carts/{cartId}");
+}
+```
+
+**Tuple return order matters:**
+- First element: Response object (e.g., `CreationResponse`, `SetPriceResult`)
+- Second element: `IStartStream` (Wolverine uses this to enroll transaction)
+
+**Example with multiple return values:**
+```csharp
+public static (SetPriceResult, IStartStream) Handle(SetPrice cmd)
+{
+    var streamId = ProductPrice.StreamId(cmd.Sku);
+    var @event = new InitialPriceSet(/* ... */);
+
+    var stream = MartenOps.StartStream<ProductPrice>(streamId, @event);
+    var result = new SetPriceResult(streamId);
+
+    // Response first, IStartStream second
+    return (result, stream);
 }
 ```
 
@@ -1413,6 +1452,67 @@ builder.Services.AddMarten(opts =>
 | `DaemonMode.Solo` | Single daemon instance | Development + small APIs |
 | `DaemonMode.HotCold` | Leader election for multi-instance | Production (future) |
 | `UseLightweightSessions` | No identity map tracking | Default (better performance) |
+
+### ⚠️ CRITICAL: AutoApplyTransactions() Policy is REQUIRED
+
+**IMPORTANT:** The `AutoApplyTransactions()` Wolverine policy is **REQUIRED** for Marten integration, not optional.
+
+**Why this matters:**
+- Without `AutoApplyTransactions()`, Wolverine does NOT wrap handlers in transactional middleware
+- Marten changes (events, documents) are NOT automatically committed
+- Handlers complete successfully but no data is persisted to the database
+- **Silent failure** — no exceptions thrown, handler returns success, but database remains unchanged
+
+**✅ CORRECT — AutoApplyTransactions() configured:**
+```csharp
+builder.Host.UseWolverine(opts =>
+{
+    // ✅ REQUIRED: Enroll Marten handlers in transactional middleware
+    opts.Policies.AutoApplyTransactions();
+
+    // Also configure durable messaging
+    opts.Policies.UseDurableLocalQueues();
+    opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
+});
+```
+
+**❌ ANTI-PATTERN — Missing AutoApplyTransactions() (silent failure):**
+```csharp
+builder.Host.UseWolverine(opts =>
+{
+    // ❌ WRONG: Missing AutoApplyTransactions()
+    // Handlers will NOT automatically commit Marten changes
+    opts.Policies.UseDurableLocalQueues();
+    opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
+});
+
+// Result: Handler executes, returns success, but no database changes persist!
+```
+
+**Where to find this in your codebase:**
+Every BC's `Program.cs` file MUST include `opts.Policies.AutoApplyTransactions()` in the Wolverine configuration.
+
+**Example: Orders BC Program.cs:**
+```csharp
+builder.Host.UseWolverine(opts =>
+{
+    opts.Policies.AutoApplyTransactions();  // ✅ Present in all working BCs
+    opts.Policies.UseDurableLocalQueues();
+    opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
+
+    opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
+    opts.Discovery.IncludeAssembly(typeof(Orders.Order.Order).Assembly);
+});
+```
+
+**How to diagnose missing policy:**
+1. Handler returns success but data not in database
+2. No exceptions thrown in handler or middleware
+3. Events not persisted to `mt_events` table
+4. Projections not updated (queries return stale/empty results)
+5. Check Program.cs for `opts.Policies.AutoApplyTransactions()` — if missing, add it
+
+**Reference:** All working BCs in CritterSupply (Orders, Shopping, Returns, Pricing, Inventory, Fulfillment, Payments, Promotions, Correspondence, Backoffice, Vendor Identity) include this policy.
 
 ### Session Types
 
