@@ -7,11 +7,11 @@
 
 ## 🤔 What Is This Repository? <a id='1.0'></a>
 
-This repository demonstrates how to build robust, production-ready, event-driven systems using a realistic e-commerce domain.
+This repository demonstrates how to build production-grade, event-driven systems using a realistic e-commerce domain.
 
 It also serves as a reference architecture for idiomatically leveraging the "Critter Stack"—[Wolverine](https://github.com/JasperFx/wolverine) and [Marten](https://github.com/JasperFx/marten)—to supercharge your .NET development. These tools just get out of your way so you can focus on the actual business problems at hand.
 
-**Best suited for:** .NET developers learning event sourcing and CQRS, architects evaluating the Critter Stack for production use, and teams transitioning from monolithic to event-driven architectures.
+**Best suited for:** .NET developers learning event sourcing and CQRS, architects evaluating the Critter Stack for production use, teams transitioning from monolithic to event-driven architectures, and engineers looking for cross-BC integration reference patterns.
 
 ### 🛒 Ecommerce <a id='1.1'></a>
 
@@ -21,7 +21,7 @@ E-commerce was chosen as the domain partly from the maintainer's industry experi
 
 ### ️🔎️ Patterns in Practice <a id='1.2'></a>
 
-Beyond accessibility, e-commerce naturally demands the patterns this repository aims to demonstrate: event sourcing for capturing the full history of orders and inventory movements, stateful Sagas for coordinating multi-step processes like payment authorization and fulfillment, and reservation-based workflows where inventory is held pending confirmation rather than immediately decremented.
+E-commerce is a natural fit for the patterns this repository aims to demonstrate: event sourcing for capturing the full history of orders and inventory movements, stateful Sagas for coordinating multi-step processes like payment authorization and fulfillment, and reservation-based workflows where inventory is held pending confirmation rather than immediately decremented.
 
 This isn't a reference architecture padded with unnecessary layers, abstractions, or onion architecture to appear "enterprise-ready." The patterns here are inspired by real production systems built with the Critter Stack—code that's actually running and handling real business problems, ranging from startups to large enterprises.
 
@@ -37,13 +37,17 @@ A non-exhaustive list of the patterns, paradigms, and principles demonstrated in
 - Reservation-based Workflows (Inventory management)
 - Choreography vs Orchestration (BC integration patterns)
 - Snapshot Pattern (temporal consistency — e.g., address captured at order placement)
-- Backend-for-Frontend (BFF) Pattern (Customer Experience)
+- Backend-for-Frontend (BFF) Pattern (Customer Experience — Blazor Server; Vendor Portal — Blazor WASM)
 - Vertical Slice Architecture (VSA)
-- Behavior-Driven Development (BDD) with Reqnroll (Product Catalog BC — reference implementation)
 - Domain-Driven Design (DDD)
-- Traditional DDD with EF Core (Customer Identity)
+- Traditional DDD with EF Core (Customer Identity, Vendor Identity, Backoffice Identity)
 - A-Frame Architecture (pure business logic)
 - Railway-Oriented Programming (Wolverine middleware)
+- Behavior-Driven Development (BDD) with Reqnroll (reference implementation in Product Catalog; applied across multiple BCs)
+- E2E Testing with Playwright (Storefront + Vendor Portal)
+- Component Testing with bUnit (Storefront.Web)
+- Multi-issuer JWT Strategy (Vendor Identity + Backoffice Identity co-existing auth systems)
+- UUID v5 for Natural-Key Stream IDs (Promotions BC)
 
 ## 🤖 AI-assisted Development <a id='1.3'></a>
 
@@ -67,7 +71,7 @@ CritterSupply includes specialized GitHub Copilot agents with domain expertise t
 
 - **🧪 QA Engineer** ([`.github/agents/qa-engineer.md`](./.github/agents/qa-engineer.md)) - Seasoned quality assurance professional with expertise in manual and automated testing, BDD, and full-stack quality strategy. Expert in building test coverage for event-driven, distributed .NET systems using the Critter Stack (Wolverine + Marten) and verifying system integrity across bounded contexts.
 
-- **🎨 UX Engineer** ([`.github/agents/ux-engineer.md`](./.github/agents/ux-engineer.md)) - User experience specialist focused on frontend design, accessibility, and UI patterns for Blazor applications. Provides feedback on component design, user flows, and ensuring the storefront delivers a cohesive, intuitive experience.
+- **🎨 UX Engineer** ([`.github/agents/ux-engineer.md`](./.github/agents/ux-engineer.md)) - Senior UX Engineer specializing in e-commerce experiences and Blazor frontends. Reviews components for accessibility (WCAG 2.1/2.2), responsive design, and interaction quality. Participates in domain modeling (Event Storming, Event Modeling) with a user-perspective lens, designs read models and dashboards from the consumer's information needs outward, and applies DDD and Team Topologies thinking to surface UX friction before it reaches implementation.
 
 **How to use:** Tag the agent (`@principal-architect`, `@product-owner`, `@devops-engineer`, `@qa-engineer`, or `@ux-engineer`) in pull request or issue comments to get specialized feedback.
 
@@ -94,7 +98,7 @@ CritterSupply includes specialized GitHub Copilot agents with domain expertise t
 
 - **Core:** C# 14+ (.NET 10), [Wolverine](https://wolverine.netlify.app/), [Marten](https://martendb.io/), [EF Core](https://learn.microsoft.com/en-us/ef/core/)
 - **Infrastructure:** PostgreSQL, RabbitMQ, Docker, [.NET Aspire](https://learn.microsoft.com/en-us/dotnet/aspire/)
-- **Testing:** [Alba](https://jasperfx.github.io/alba/), [Testcontainers](https://dotnet.testcontainers.org/), xUnit, [Reqnroll](https://reqnroll.net/), [Playwright](https://playwright.dev/dotnet/) (E2E)
+- **Testing:** [Alba](https://jasperfx.github.io/alba/), [Testcontainers](https://dotnet.testcontainers.org/), xUnit, [Reqnroll](https://reqnroll.net/), [Playwright](https://playwright.dev/dotnet/) (E2E), [bUnit](https://bunit.dev/) (components)
 - **UI:** [Blazor Server](https://learn.microsoft.com/en-us/aspnet/core/blazor/) + [Blazor WASM](https://learn.microsoft.com/en-us/aspnet/core/blazor/hosting-models#blazor-webassembly), [MudBlazor](https://mudblazor.com/), SignalR
 - **Observability:** OpenTelemetry, Jaeger (distributed tracing)
 
@@ -106,81 +110,135 @@ CritterSupply is organized into bounded contexts. As described in Domain-Driven 
 
 ### Architecture Overview
 
+The system spans two primary flows: the customer-facing storefront and the vendor/operations side. Each is shown separately below for clarity.
+
+#### Customer-Facing Flow
+
 ```mermaid
 graph TB
-    %% Customer-Facing Layer
-    CE[🎁 Customer Experience<br/>Storefront BFF + Blazor]
-    
-    %% Core Business Contexts
+    CE[🎁 Customer Experience<br/>Storefront BFF · Blazor Server + SignalR]
     Shopping[🛒 Shopping<br/>Cart Management]
-    Orders[📨 Orders<br/>Order Orchestration]
+    Orders[📨 Orders<br/>Order Orchestration Saga]
     Payments[💳 Payments<br/>Authorization & Capture]
     Inventory[📊 Inventory<br/>Stock & Reservations]
-    Fulfillment[🚚 Fulfillment<br/>Shipping & Delivery]
-    
-    %% Supporting Contexts
-    CustomerID[👤 Customer Identity<br/>Addresses & Profiles]
+    Fulfillment[🚚 Fulfillment<br/>Picking · Packing · Shipping]
+    Returns[🔄 Returns<br/>Return Auth & Exchanges]
+    CustomerID[👤 Customer Identity<br/>Auth · Addresses · Profiles]
     Catalog[📦 Product Catalog<br/>Products & Catalog Data]
-    
-    %% Customer Experience interactions
-    CE -->|Get Cart| Shopping
-    CE -->|Place Order| Orders
+    Pricing[💰 Pricing<br/>MAP · Floor · Temporal Prices]
+    Promotions[🏷️ Promotions<br/>Coupons & Discount Rules]
+    Correspondence[📬 Correspondence<br/>Transactional Email & SMS]
+
     CE -->|Browse Products| Catalog
+    CE -->|Get Cart| Shopping
+    CE -->|View Orders| Orders
     CE -->|Get Customer Data| CustomerID
-    
-    %% Order Orchestration (Saga)
+    Shopping -->|Checkout Handoff| Orders
     Orders -->|Authorize Payment| Payments
     Orders -->|Reserve Stock| Inventory
     Orders -->|Create Shipment| Fulfillment
-    
-    %% Data enrichment
-    Shopping -.->|Product Details| Catalog
+    Returns -->|Refund Request| Payments
+    Returns <-->|Return Coordination| Fulfillment
+    Returns <-->|Return Notification| Orders
+    Shopping -.->|Validate Coupon| Promotions
+    Shopping -.->|Resolve Price| Pricing
     Orders -.->|Customer Snapshot| CustomerID
-    
-    %% Real-time notifications
-    Shopping -.->|Cart Updated| CE
-    Orders -.->|Order Placed| CE
-    Fulfillment -.->|Order Fulfilled| CE
-    
+    Pricing -.->|Price Updates| Shopping
+    Shopping -.->|CartUpdated| CE
+    Orders -.->|OrderPlaced| CE
+    Fulfillment -.->|Shipped| CE
+    Payments -.->|PaymentResult| CE
+    Orders -.->|OrderConfirmed| Correspondence
+    Fulfillment -.->|ShipmentDispatched| Correspondence
+    Returns -.->|ReturnApproved| Correspondence
+    Payments -.->|RefundIssued| Correspondence
+    Correspondence -.->|Customer Lookup| CustomerID
+
     classDef bff fill:#e1f5ff,stroke:#01579b,stroke-width:2px
     classDef core fill:#fff3e0,stroke:#e65100,stroke-width:2px
     classDef support fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    
     class CE bff
-    class Shopping,Orders,Payments,Inventory,Fulfillment core
-    class CustomerID,Catalog support
+    class Shopping,Orders,Payments,Inventory,Fulfillment,Returns core
+    class CustomerID,Catalog,Pricing,Promotions,Correspondence support
 ```
 
-**Legend:**
-- **Solid arrows (→)**: Synchronous HTTP calls (composition, orchestration)
+#### Vendor & Operations Flow
+
+```mermaid
+graph TB
+    VP[🏪 Vendor Portal<br/>Vendor BFF · Blazor WASM]
+    VendorID[🔐 Vendor Identity<br/>Vendor Auth & Tenancy · JWT]
+    BO[🖥️ Backoffice<br/>Internal Ops Portal · Planned]
+    BackofficeID[🛡️ Backoffice Identity<br/>Admin Auth · RBAC · JWT]
+    Orders[📨 Orders<br/>Order Orchestration]
+    Payments[💳 Payments<br/>Authorization & Capture]
+    Fulfillment[🚚 Fulfillment<br/>Picking · Packing · Shipping]
+    Catalog[📦 Product Catalog<br/>Products & Catalog Data]
+    Pricing[💰 Pricing<br/>MAP · Floor · Temporal Prices]
+    Inventory[📊 Inventory<br/>Stock & Reservations]
+
+    VP -->|Authenticate| VendorID
+    VP -->|View Orders| Orders
+    VP -->|View Fulfillment| Fulfillment
+    VP -->|View Payments| Payments
+    VP -->|Manage Pricing| Pricing
+    Catalog -.->|ProductPublished| Pricing
+    VP -.->|PriceChangeRequest| Pricing
+    BO -->|Authenticate| BackofficeID
+    BO -.->|Admin Access| Orders
+    BO -.->|Admin Access| Inventory
+    BO -.->|Admin Access| Catalog
+
+    classDef bff fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef identity fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef core fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef planned fill:#f5f5f5,stroke:#9e9e9e,stroke-width:2px,stroke-dasharray:5 5
+    class VP bff
+    class VendorID,BackofficeID identity
+    class Orders,Payments,Fulfillment,Catalog,Pricing,Inventory core
+    class BO planned
+```
+
+**Legend (both diagrams):**
+- **Solid arrows (→)**: Synchronous calls (HTTP composition or direct orchestration)
 - **Dotted arrows (⋯→)**: Asynchronous integration messages (RabbitMQ)
-- **Blue**: Customer-facing layer (BFF)
+- **Blue**: BFF layer (customer-facing or vendor-facing)
+- **Green**: Identity contexts (JWT-issuing authentication services)
 - **Orange**: Core business contexts (event-sourced)
 - **Purple**: Supporting contexts
+- **Grey dashed border**: Planned — not yet implemented
 
 ### Bounded Context Status
 
-Below is a table of each contexts' focused responsibilities, along with their current implementation status.
+Below is a table of each context's focused responsibilities, along with its current implementation status.
 
-| Context                    | Responsibility                                 | Status     |
-|----------------------------|------------------------------------------------|------------|
-| 📨 **Orders** | Order lifecycle and checkout orchestration     | ✅ Complete |
-| 💳 **Payments** | Authorization, capture, refunds                | ✅ Complete |
-| 🛒 **Shopping** | Cart management                                | ✅ Complete |
-| 📊 **Inventory** | Stock levels and reservations                  | ✅ Complete |
-| 🚚 **Fulfillment** | Picking, packing, shipping                     | ✅ Complete |
-| 👤 **Customer Identity**   | Addresses and saved payment methods            | ✅ Complete |
-| 📦 **Product Catalog**     | Product definitions and pricing                | ✅ Complete |
-| 🎁 **Customer Experience** | Storefront BFF (Blazor + SignalR)              | ✅ Complete |
-| 🏢 **Vendor Identity**     | Vendor user authentication & tenant management | ✅ Complete |
-| 📊 **Vendor Portal**       | Vendor analytics, insights, change requests    | ✅ Complete |
-| 🔄 **Returns**             | Return authorization and processing            | 🔜 Planned |
-| 💰 **Pricing**             | Server-authoritative pricing, scheduled price changes | 🔜 Planned |
-| 🖥️ **Backoffice**          | Internal operations portal (gateway BFF)       | 🔜 Planned |
-| 🔔 **Notifications**       | Customer email/SMS notifications               | 🔜 Planned |
-| 🏷️ **Promotions**          | Coupon codes, discount rules                   | 🔜 Planned |
-| 📈 **Analytics**           | Business intelligence projections              | 🔜 Planned |
-| 🔧 **Operations Dashboard** | Engineering/SRE observability tooling         | 🔜 Planned |
+| Context                       | Responsibility                                                              | Status      |
+|-------------------------------|-----------------------------------------------------------------------------|-------------|
+| 📨 **Orders**                 | Commercial commitment: checkout intake and post-purchase order orchestration | ✅ Complete |
+| 💳 **Payments**               | Authorization, capture, refunds                                             | ✅ Complete |
+| 🛒 **Shopping**               | Cart management                                                             | ✅ Complete |
+| 📊 **Inventory**              | Stock levels and reservations                                               | ✅ Complete |
+| 🚚 **Fulfillment**            | Picking, packing, shipping                                                  | ✅ Complete |
+| 👤 **Customer Identity**      | Customer authentication, addresses, and profiles                            | ✅ Complete |
+| 📦 **Product Catalog**        | Product definitions and catalog data                                        | ✅ Complete |
+| 🎁 **Customer Experience**    | Storefront BFF (Blazor Server + SignalR)                                    | ✅ Complete |
+| 🔐 **Vendor Identity**        | Vendor authentication and tenant management (JWT)                           | ✅ Complete |
+| 🏪 **Vendor Portal**          | Vendor analytics, insights, and change requests (BFF)                       | ✅ Complete |
+| 🔄 **Returns**                | Return authorization, exchanges, and refund coordination                    | ✅ Complete |
+| 💰 **Pricing**                | MAP/floor prices, temporal pricing, vendor price management                 | ✅ Complete |
+| 🏷️ **Promotions**             | Coupon codes and discount rules                                             | ✅ Complete |
+| 📬 **Correspondence**         | Transactional email and SMS notifications                                   | ✅ Complete |
+| 🛡️ **Backoffice Identity**    | Admin JWT authentication with RBAC (7 roles)                               | ✅ Complete |
+| 🖥️ **Backoffice**             | Internal operations portal (gateway BFF)                                    | 🔜 Planned  |
+| 🔍 **Search**                 | Full-text and faceted product search                                        | 🔜 Planned  |
+| ⭐ **Recommendations**        | Personalized product recommendations                                        | 🔜 Planned  |
+| 🎫 **Store Credit**           | Store credit issuance and redemption                                        | 🔜 Planned  |
+| 📈 **Analytics**              | Business intelligence projections                                           | 🔜 Planned  |
+| 🔧 **Operations Dashboard**   | Engineering/SRE observability tooling                                       | 🔜 Planned  |
+
+### Vendor-Side Contexts
+
+The vendor side of CritterSupply mirrors how a real pet supply retailer operates: suppliers authenticate through **Vendor Identity** (a dedicated JWT-issuing service with per-tenant isolation), then interact with the system through the **Vendor Portal** BFF—a Blazor WASM application where vendors manage pricing proposals, view order and fulfillment status for their products, and track payment settlements. **Backoffice Identity** issues admin tokens with role-based access control across seven defined roles, laying the groundwork for the planned **Backoffice** internal operations portal.
 
 For detailed responsibilities, interactions, and event flows between contexts, see [CONTEXTS.md](./CONTEXTS.md).
 
@@ -218,7 +276,7 @@ dotnet run --project "src/Customer Experience/Storefront.Web/Storefront.Web.cspr
 # Navigate to http://localhost:5238
 ```
 
-**See [QUICKSTART.md](./QUICKSTART.md) for a full step-by-step guide.**
+**See [docs/QUICK-START.md](./docs/QUICK-START.md) for a full step-by-step guide.**
 
 ---
 
