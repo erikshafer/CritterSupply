@@ -42,7 +42,7 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.0 (Backoffice Phase 1 — Read-Only Dashboards) |
-| **Status** | 🚀 ACTIVE — Session 6 complete (6/11 sessions, 55% progress) |
+| **Status** | 🚀 ACTIVE — Session 9 complete (9/11 sessions, 82% progress) |
 | **Deliverables** | BFF infrastructure + CS tooling + dashboard KPIs + ops alerts + warehouse dashboard |
 | **Next Milestone** | M32.1 (Backoffice Phase 2 — Write Operations) |
 | **Active BCs** | 17 total (18 after M32.0 — Backoffice BFF) |
@@ -55,7 +55,7 @@
 
 **M32.0 — Backoffice Phase 1: Read-Only Dashboards & CS Tooling**
 
-**Status:** 🚀 **ACTIVE** — Session 6 complete (6/11 sessions, 55% progress)
+**Status:** 🚀 **ACTIVE** — Session 9 complete (9/11 sessions, 82% progress)
 **Duration:** 2-3 cycles (10-15 sessions estimated, ~24-32 hours)
 **Implementation Branch:** `claude/m32-customer-service-workflows-part-1`
 
@@ -92,9 +92,9 @@
 4. ✅ **Session 4** — CS workflows Part 2: Returns & Correspondence ([retrospective](./milestones/m32-0-session-4-retrospective.md))
 5. ✅ **Session 5** — OrderNote aggregate ([retrospective](./milestones/m32-0-session-5-retrospective.md))
 6. ✅ **Session 6** — BFF projections: AdminDailyMetrics ([retrospective](./milestones/m32-0-session-6-retrospective.md))
-7. ⏳ **Session 7** — BFF projections: AlertFeedView (2-3 hours)
-8. ⏳ **Session 8** — SignalR hub (2-3 hours)
-9. ⏳ **Session 9** — Warehouse clerk dashboard (2-3 hours)
+7. ✅ **Session 7** — BFF projections: AlertFeedView ([retrospective](./milestones/m32-0-session-7-retrospective.md))
+8. ✅ **Session 8** — SignalR hub ([retrospective](./milestones/m32-0-session-8-retrospective.md))
+9. ✅ **Session 9** — Warehouse clerk dashboard ([retrospective](./milestones/m32-0-session-9-retrospective.md))
 10. ⏳ **Session 10** — Integration testing & CI (3-4 hours)
 11. ⏳ **Session 11** — Documentation & retrospective (2-3 hours)
 
