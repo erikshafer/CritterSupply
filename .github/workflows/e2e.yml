@@ -115,6 +115,12 @@ jobs:
       - name: Pre-pull TestContainers PostgreSQL image
         run: docker pull postgres:18-alpine
 
+      # Verify Docker service is healthy before running tests
+      - name: Verify Docker service
+        run: |
+          docker ps
+          docker info
+
       - name: Run Storefront E2E Tests
         run: |
           dotnet test "tests/Customer Experience/Storefront.E2ETests/Storefront.E2ETests.csproj" \
@@ -206,6 +212,12 @@ jobs:
       # This avoids flaky timeouts on slow Docker Hub responses.
       - name: Pre-pull TestContainers PostgreSQL image
         run: docker pull postgres:18-alpine
+
+      # Verify Docker service is healthy before running tests
+      - name: Verify Docker service
+        run: |
+          docker ps
+          docker info
 
       - name: Run Vendor Portal E2E Tests
         run: |
