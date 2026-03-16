@@ -42,7 +42,7 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.0 (Backoffice Phase 1 — Read-Only Dashboards) |
-| **Status** | 🚀 ACTIVE — Planning complete, Session 1 ready |
+| **Status** | 🚀 ACTIVE — Session 3 complete (3/11 sessions, 27% progress) |
 | **Deliverables** | BFF infrastructure + CS tooling + dashboard KPIs + ops alerts + warehouse dashboard |
 | **Next Milestone** | M32.1 (Backoffice Phase 2 — Write Operations) |
 | **Active BCs** | 17 total (18 after M32.0 — Backoffice BFF) |
@@ -55,9 +55,9 @@
 
 **M32.0 — Backoffice Phase 1: Read-Only Dashboards & CS Tooling**
 
-**Status:** 🚀 **ACTIVE** — Planning complete; Session 1 ready to begin
+**Status:** 🚀 **ACTIVE** — Session 3 complete (3/11 sessions, 27% progress)
 **Duration:** 2-3 cycles (10-15 sessions estimated, ~24-32 hours)
-**Implementation Branch:** `claude/m32-0-backoffice-phase-1-read-only-dashboards`
+**Implementation Branch:** `claude/m32-customer-service-workflows-part-1`
 
 **GitHub Links:**
 - Milestone: [M32.0: Backoffice Phase 1](https://github.com/erikshafer/CritterSupply/milestone/TBD)
@@ -86,9 +86,9 @@
 5. **Warehouse Clerk Dashboard** — Stock visibility, alert acknowledgment
 
 **Implementation Sessions:**
-1. ⏳ **Session 1** — Project scaffolding & infrastructure (2-3 hours)
-2. ⏳ **Session 2** — HTTP client abstractions (2-3 hours)
-3. ⏳ **Session 3** — CS workflows Part 1: Search & Orders (2-3 hours)
+1. ✅ **Session 1** — Project scaffolding & infrastructure ([retrospective](./milestones/m32-0-session-1-retrospective.md))
+2. ✅ **Session 2** — HTTP client abstractions ([retrospective](./milestones/m32-0-session-2-retrospective.md))
+3. ✅ **Session 3** — CS workflows Part 1: Search & Orders ([retrospective](./milestones/m32-0-session-3-retrospective.md))
 4. ⏳ **Session 4** — CS workflows Part 2: Returns & Correspondence (2-3 hours)
 5. ⏳ **Session 5** — OrderNote aggregate (1-2 hours)
 6. ⏳ **Session 6** — BFF projections: AdminDailyMetrics (2-3 hours)
