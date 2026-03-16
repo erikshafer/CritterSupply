@@ -3,7 +3,7 @@
   <PropertyGroup>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
-    <AssemblyName>Storefront.Web.Tests</AssemblyName>
+    <AssemblyName>Storefront.Web.UnitTests</AssemblyName>
     <RootNamespace>Storefront.Web.Tests</RootNamespace>
   </PropertyGroup>
 

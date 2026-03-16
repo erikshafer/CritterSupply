@@ -1,14 +1,21 @@
 name: CI
 
 # CI runs on every PR and push to main — but only when code or build config changes.
-# E2E tests have their own workflow (e2e.yml) and do NOT run here (see ADR 0015).
+# E2E tests run in parallel via their own workflow (e2e.yml), also triggered on PRs.
 #
-# Jobs:
-#   unit-tests        — builds the solution and runs unit tests (no Docker required)
-#   integration-tests — builds the solution and runs API integration tests (Testcontainers)
+# Jobs (this workflow):
+#   build             — restores + builds the solution once, uploads build output
+#   unit-tests        — downloads build output and runs all *.UnitTests projects
+#   integration-tests — downloads build output and runs API integration tests (Testcontainers)
 #
-# Both jobs run in parallel, giving faster overall feedback and distinct status
-# indicators so failures can be identified at a glance in the GitHub Actions UI.
+# Parallel workflow (e2e.yml):
+#   storefront-e2e    — Playwright browser tests for Storefront (Blazor Server)
+#   vendor-portal-e2e — Playwright browser tests for Vendor Portal (Blazor WASM)
+#
+# The build job runs first; unit-tests and integration-tests fan out in parallel
+# after it completes.  This eliminates a redundant full solution build and saves
+# runner minutes.  E2E jobs (separate workflow) still build independently because
+# cross-workflow artifact sharing adds too much complexity for the benefit.
 
 on:
   push:
@@ -37,11 +44,12 @@ concurrency:
 
 jobs:
 
-  # ─── Unit Tests ─────────────────────────────────────────────────────────────
-  # Fast feedback: builds the solution and runs all *.UnitTests projects.
-  # No Docker infrastructure required — pure in-process xUnit tests.
-  unit-tests:
-    name: Unit Tests
+  # ─── Build ──────────────────────────────────────────────────────────────────
+  # Restores NuGet packages and builds the entire solution once in Release mode.
+  # The compiled output (bin/Release) is uploaded as an artifact so downstream
+  # test jobs can skip the build step entirely.
+  build:
+    name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -69,6 +77,44 @@ jobs:
 
       - name: Build
         run: dotnet build --no-restore --configuration Release
+        env:
+          # Prevent Playwright browser download during build (E2E projects).
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output-${{ github.run_number }}
+          path: |
+            **/bin/Release/
+          retention-days: 1
+          compression-level: 6
+
+  # ─── Unit Tests ─────────────────────────────────────────────────────────────
+  # Fast feedback: downloads the shared build output and runs all *.UnitTests
+  # projects (including bUnit component tests).
+  # No Docker infrastructure required — pure in-process xUnit tests.
+  unit-tests:
+    name: Unit Tests
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output-${{ github.run_number }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
 
       - name: Run Unit Tests
         run: |
@@ -93,12 +139,13 @@ jobs:
           retention-days: 30
 
   # ─── Integration Tests ───────────────────────────────────────────────────────
-  # Runs all *.Api.IntegrationTests projects.
+  # Downloads the shared build output and runs all *.IntegrationTests projects.
   # Each test fixture spins up its own isolated PostgreSQL container via
   # Testcontainers (no shared docker-compose infrastructure needed).
   # External Wolverine transports (RabbitMQ) are disabled in every fixture.
   integration-tests:
     name: Integration Tests
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -108,24 +155,21 @@ jobs:
       - name: Check Out Repo
         uses: actions/checkout@v4
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
+      - name: Download build output
+        uses: actions/download-artifact@v4
         with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
+          name: build-output-${{ github.run_number }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore dependencies
-        run: dotnet restore
-
-      - name: Build
-        run: dotnet build --no-restore --configuration Release
+      # Pre-pull the PostgreSQL image used by all TestContainers test fixtures.
+      # This avoids each test fixture pulling independently and reduces flaky
+      # timeouts on slow Docker Hub responses.
+      - name: Pre-pull TestContainers PostgreSQL image
+        run: docker pull postgres:18-alpine
 
       - name: Run Integration Tests
         run: |

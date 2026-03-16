@@ -1,11 +1,14 @@
 name: E2E Tests
 
-# E2E tests run on main push and nightly — NOT on every PR.
-# Rationale (ADR 0015):
-#   - E2E tests require real browser (Chromium), real Kestrel servers, and TestContainers Postgres
-#   - Runtime: 10–15 minutes (vs 2–3 min for integration tests)
-#   - Flake risk is higher for browser tests than deterministic API integration tests
-#   - PR feedback loop must remain fast — keep integration tests (dotnet.yml) for every PR
+# E2E tests run on every PR, main push, and nightly.
+#
+# Each E2E test suite (Storefront, Vendor Portal) runs in its own parallel job so
+# they execute concurrently with each other — and concurrently with the unit-test
+# and integration-test jobs in dotnet.yml.  This keeps PR feedback fast even as the
+# E2E suite grows (e.g. Backoffice BC).
+#
+# Playwright requires a real Chromium browser, real Kestrel servers, and
+# TestContainers Postgres — heavier than integration tests but isolated per job.
 #
 # To run E2E tests manually against a specific branch:
 #   1. Navigate to Actions → "E2E Tests" → "Run workflow"
@@ -19,6 +22,15 @@ on:
       - "CLAUDE.md"
       - "CONTEXTS.md"
       - "docs/**"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/e2e.yml'
+      - '*.props'
+      - '*.slnx'
+      - 'docker-compose.yml'
   schedule:
     # Nightly at 06:00 UTC (10:00 PM Pacific) — catches regressions not caught in PR cycle
     - cron: '0 6 * * *'
@@ -33,9 +45,19 @@ on:
           - 'true'
           - 'false'
 
+# Cancel in-progress runs for the same branch/PR to avoid wasted runner time.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  e2e:
-    name: Playwright E2E Tests
+
+  # ─── Storefront E2E Tests ──────────────────────────────────────────────────
+  # Blazor Server: Checkout wizard, SignalR real-time updates, protected routes.
+  # Uses real Kestrel (Storefront.Web + Storefront.Api) with stub downstream clients
+  # and TestContainers PostgreSQL for Marten event sourcing.
+  storefront-e2e:
+    name: Storefront E2E
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -49,7 +71,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-e2e-${{ hashFiles('**/*.csproj') }}
+          key: ${{ runner.os }}-nuget-e2e-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
           restore-keys: |
             ${{ runner.os }}-nuget-e2e-
             ${{ runner.os }}-nuget-
@@ -73,13 +95,10 @@ jobs:
         id: playwright-cache
         uses: actions/cache@v4
         with:
-          # cache Playwright browser binaries for Linux/macOS and Windows runners
-          path: |
-            ~/.cache/ms-playwright
-            $HOME/.cache/ms-playwright
-            %USERPROFILE%\\.cache\\ms-playwright
-          key: ${{ runner.os }}-ms-playwright-${{ hashFiles('**/tests/**/*E2ETests.csproj') }}
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-storefront-${{ hashFiles('tests/Customer Experience/Storefront.E2ETests/Storefront.E2ETests.csproj') }}
           restore-keys: |
+            ${{ runner.os }}-ms-playwright-storefront-
             ${{ runner.os }}-ms-playwright-
 
       - name: Install Playwright browsers
@@ -91,12 +110,16 @@ jobs:
             "$E2E_BIN/.playwright/package/cli.js" \
             install chromium --with-deps
 
-      - name: Cache status
-        if: always()
+      # Pre-pull the PostgreSQL image used by TestContainers E2E fixtures.
+      # This avoids flaky timeouts on slow Docker Hub responses.
+      - name: Pre-pull TestContainers PostgreSQL image
+        run: docker pull postgres:18-alpine
+
+      # Verify Docker service is healthy before running tests
+      - name: Verify Docker service
         run: |
-          echo "## Playwright cache status" >> $GITHUB_STEP_SUMMARY || true
-          echo "Playwright cache hit: ${{ steps.playwright-cache.outputs.cache-hit }}" >> $GITHUB_STEP_SUMMARY || true
-          echo "Playwright cache hit: ${{ steps.playwright-cache.outputs.cache-hit }}"
+          docker ps
+          docker info
 
       - name: Run Storefront E2E Tests
         run: |
@@ -111,6 +134,91 @@ jobs:
           DOCKER_HOST: unix:///var/run/docker.sock
           TESTCONTAINERS_RYUK_DISABLED: false
 
+      - name: Upload Storefront test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storefront-e2e-results-${{ github.run_number }}
+          path: '**/TestResults/**/*.trx'
+          retention-days: 14
+
+      - name: Upload Playwright traces (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storefront-playwright-traces-${{ github.run_number }}
+          path: '**/playwright-traces/**/*.zip'
+          retention-days: 7
+
+  # ─── Vendor Portal E2E Tests ───────────────────────────────────────────────
+  # Blazor WASM: Authentication, vendor dashboard, change request management, RBAC.
+  # Uses real Kestrel (VendorPortal.Web + VendorPortal.Api + VendorIdentity.Api)
+  # with TestContainers PostgreSQL.
+  vendor-portal-e2e:
+    name: Vendor Portal E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-e2e-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-e2e-
+            ${{ runner.os }}-nuget-
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --no-restore --configuration Release
+        # Prevent project-level Playwright install Exec from running in CI.
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      # Cache Playwright browser binaries between runs to speed up CI
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-vendor-${{ hashFiles('tests/Vendor Portal/VendorPortal.E2ETests/VendorPortal.E2ETests.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-ms-playwright-vendor-
+            ${{ runner.os }}-ms-playwright-
+
+      - name: Install Playwright browsers
+        run: |
+          # Use the Node.js CLI bundled inside the Microsoft.Playwright NuGet package
+          # so we don't need pwsh or the outdated Microsoft.Playwright.CLI dotnet tool.
+          E2E_BIN="tests/Vendor Portal/VendorPortal.E2ETests/bin/Release/net10.0"
+          "$E2E_BIN/.playwright/node/linux-x64/node" \
+            "$E2E_BIN/.playwright/package/cli.js" \
+            install chromium --with-deps
+
+      # Pre-pull the PostgreSQL image used by TestContainers E2E fixtures.
+      # This avoids flaky timeouts on slow Docker Hub responses.
+      - name: Pre-pull TestContainers PostgreSQL image
+        run: docker pull postgres:18-alpine
+
+      # Verify Docker service is healthy before running tests
+      - name: Verify Docker service
+        run: |
+          docker ps
+          docker info
+
       - name: Run Vendor Portal E2E Tests
         run: |
           dotnet test "tests/Vendor Portal/VendorPortal.E2ETests/VendorPortal.E2ETests.csproj" \
@@ -124,36 +232,18 @@ jobs:
           DOCKER_HOST: unix:///var/run/docker.sock
           TESTCONTAINERS_RYUK_DISABLED: false
 
-      - name: Upload test results
+      - name: Upload Vendor Portal test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-test-results
-          path: |
-            **/*.trx
+          name: vendor-portal-e2e-results-${{ github.run_number }}
+          path: '**/TestResults/**/*.trx'
           retention-days: 14
 
       - name: Upload Playwright traces (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-traces
-          path: |
-            **/playwright-traces/**/*.zip
+          name: vendor-portal-playwright-traces-${{ github.run_number }}
+          path: '**/playwright-traces/**/*.zip'
           retention-days: 7
-
-      - name: Summary
-        if: always()
-        run: |
-          echo "## E2E Test Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Test Suites" >> $GITHUB_STEP_SUMMARY
-          echo "- **Storefront E2E** (Blazor Server): Checkout, SignalR, Protected Routes" >> $GITHUB_STEP_SUMMARY
-          echo "- **Vendor Portal E2E** (Blazor WASM): Auth, Dashboard, Change Requests, RBAC" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "If this run failed, download the **playwright-traces** artifact and open it with:" >> $GITHUB_STEP_SUMMARY
-          echo "\`playwright show-trace <trace-file.zip>\`" >> $GITHUB_STEP_SUMMARY
