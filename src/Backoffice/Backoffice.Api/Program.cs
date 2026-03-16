@@ -76,6 +76,9 @@ builder.Services.AddMarten(opts =>
         ?? "Host=localhost;Port=5433;Database=postgres;Username=postgres;Password=postgres";
     opts.Connection(connectionString);
     opts.DatabaseSchemaName = "backoffice";
+
+    // Snapshot projection for OrderNote (zero-lag queries, excludes deleted notes in projections)
+    opts.Projections.Snapshot<Backoffice.OrderNote.OrderNote>(Marten.Events.Projections.SnapshotLifecycle.Inline);
 })
 .UseLightweightSessions()
 .IntegrateWithWolverine();
