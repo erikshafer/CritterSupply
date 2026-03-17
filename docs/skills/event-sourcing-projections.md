@@ -68,6 +68,12 @@ Projections are denormalized read models built from event-sourced aggregates. Th
 
 5. **You're building a read-optimized view for a BFF** — Projections create tailored views for UI composition
    - Example: Storefront BFF queries `CurrentPriceView` to compose `CartView` with live pricing
+   - Example: Backoffice BFF owns `AdminDailyMetrics` and `AlertFeedView` projections aggregating events from 7 domain BCs
+
+6. **BFF-owned projections for cross-BC aggregation** — BFF projections aggregate events from multiple domain BCs into unified views
+   - Example: `AdminDailyMetrics` (Backoffice BC) — sources events from Orders, Payments, Inventory, Fulfillment
+   - Example: `AlertFeedView` (Backoffice BC) — sources events from Payments, Inventory, Fulfillment, Returns
+   - Pattern: BFF subscribes to integration messages from domain BCs, appends to BFF's event store, inline projections aggregate into queryable views
 
 ❌ **Do NOT use projections when:**
 
@@ -343,6 +349,109 @@ opts.Projections.Add<CurrentPriceViewProjection>(ProjectionLifecycle.Inline);
 - Inline lifecycle ensures zero-lag price queries for Shopping BC (hot path)
 
 **Key insight:** Multi-stream projections enable **different identity spaces**. Event streams use one ID type (Guid); projection documents use another (string).
+
+### Discriminated Unions for Projection Views (JSON Polymorphism)
+
+**From:** Backoffice BC (M32.0 Session 8)
+
+For projections that produce different event types for SignalR or real-time updates, use C# discriminated unions via JSON polymorphism:
+
+**Pattern:**
+
+```csharp
+using System.Text.Json.Serialization;
+
+/// <summary>
+/// Base class for all real-time events from a projection.
+/// Uses discriminated union pattern with JSON polymorphism for type-safe deserialization.
+/// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "eventType")]
+[JsonDerivedType(typeof(LiveMetricUpdated), typeDiscriminator: "live-metric-updated")]
+[JsonDerivedType(typeof(AlertCreated), typeDiscriminator: "alert-created")]
+public abstract record BackofficeEvent(DateTimeOffset OccurredAt);
+
+/// <summary>
+/// Real-time metric update for executive dashboard.
+/// </summary>
+public sealed record LiveMetricUpdated(
+    int OrderCount,
+    decimal Revenue,
+    decimal PaymentFailureRate,
+    DateTimeOffset OccurredAt) : BackofficeEvent(OccurredAt);
+
+/// <summary>
+/// Alert notification for operations team.
+/// </summary>
+public sealed record AlertCreated(
+    string AlertType,
+    string Severity,
+    string Message,
+    DateTimeOffset OccurredAt) : BackofficeEvent(OccurredAt);
+```
+
+**Why this pattern?**
+
+1. **Type safety:** Clients can deserialize the base type and switch on derived types
+2. **JSON serialization:** `[JsonPolymorphic]` adds `eventType` discriminator field automatically
+3. **Extensibility:** Add new event types by adding new `[JsonDerivedType]` attributes
+4. **SignalR compatibility:** Works seamlessly with Wolverine SignalR transport
+
+**Example JSON output:**
+
+```json
+{
+  "eventType": "live-metric-updated",
+  "orderCount": 42,
+  "revenue": 1234.56,
+  "paymentFailureRate": 0.02,
+  "occurredAt": "2026-03-16T12:00:00Z"
+}
+
+{
+  "eventType": "alert-created",
+  "alertType": "PaymentFailed",
+  "severity": "Critical",
+  "message": "Payment failed for order #12345",
+  "occurredAt": "2026-03-16T12:01:00Z"
+}
+```
+
+**Client-side deserialization (C#):**
+
+```csharp
+var baseEvent = JsonSerializer.Deserialize<BackofficeEvent>(json);
+switch (baseEvent)
+{
+    case LiveMetricUpdated metric:
+        // Handle metric update
+        break;
+    case AlertCreated alert:
+        // Handle alert
+        break;
+}
+```
+
+**When to use discriminated unions in projections:**
+
+✅ **Use when:**
+- Projection produces multiple event types for real-time updates
+- Events share common properties (e.g., `OccurredAt`, `TenantId`)
+- Clients need type-safe deserialization
+- SignalR or WebSocket transport is involved
+
+❌ **Don't use when:**
+- Projection produces a single document type
+- Events are completely unrelated (no shared properties)
+- Simple DTO mapping is sufficient
+
+**Related patterns:**
+- See `wolverine-signalr.md` for SignalR hub integration
+- See `bff-realtime-patterns.md` for BFF-owned projection patterns
+- See M32.0 retrospective (Session 8) for Backoffice example
+
+**Key insight:** Discriminated unions via `[JsonPolymorphic]` provide type-safe, extensible event modeling for projection outputs without hand-rolling type discriminators.
+
+---
 
 ### Example: CouponLookupView (Promotions BC)
 
@@ -1360,6 +1469,79 @@ public MyDocument Create(MyEvent evt)
 
 ## Production Lessons Learned
 
+### Lesson 0: Inline Projections Require Explicit SaveChanges Before Querying
+
+**From:** Backoffice BC (M32.0 Session 8)
+
+**Problem:** Handler queried inline projection immediately after `Events.Append()` without calling `SaveChangesAsync()`:
+
+```csharp
+// ❌ BAD: Query returns null because projection hasn't updated yet
+public static async Task<LiveMetricUpdated> Handle(
+    OrderPlaced message,
+    IDocumentSession session)
+{
+    session.Events.Append(Guid.NewGuid(), message);
+
+    // Projection hasn't updated yet!
+    var metrics = await session.LoadAsync<AdminDailyMetrics>(today);
+    // metrics is null or stale!
+
+    return new LiveMetricUpdated(...);
+}
+```
+
+**Root Cause:** Marten inline projections update **during** `SaveChangesAsync()`, not during `Events.Append()`. The projection document won't exist until the transaction commits.
+
+**Fix:** Call `await session.SaveChangesAsync()` before querying the projection:
+
+```csharp
+// ✅ GOOD: Explicit SaveChanges before projection query
+public static async Task<LiveMetricUpdated> Handle(
+    OrderPlaced message,
+    IDocumentSession session)
+{
+    // 1. Append event
+    session.Events.Append(Guid.NewGuid(), message);
+
+    // 2. Commit transaction (inline projection updates here)
+    await session.SaveChangesAsync();
+
+    // 3. Now query the updated projection
+    var metrics = await session.LoadAsync<AdminDailyMetrics>(today);
+    // metrics is current!
+
+    return new LiveMetricUpdated(
+        metrics.OrderCount,
+        metrics.Revenue,
+        metrics.PaymentFailureRate,
+        DateTimeOffset.UtcNow
+    );
+}
+```
+
+**When this pattern is needed:**
+- Integration message handlers that append events **and** query inline projections
+- Handlers returning SignalR events with projection data
+- Any workflow where the handler needs the updated projection state immediately
+
+**When this pattern is NOT needed:**
+- Handlers that only append events (Wolverine auto-commits via `AutoApplyTransactions()` policy)
+- Handlers that don't query projections
+- Async projections (daemon updates them later)
+
+**Impact:** Handler becomes `async Task<T>` instead of synchronous `T` return. This is acceptable because the projection query requires async anyway.
+
+**Discovered in:** M32.0 Session 8 (SignalR hub integration). OrderPlacedHandler needed to return `LiveMetricUpdated` with fresh metrics from `AdminDailyMetrics` projection.
+
+**Takeaway:** When handlers need projection data immediately after appending events, always:
+1. Append events
+2. Call `SaveChangesAsync()` explicitly
+3. Query projection
+4. Return result
+
+---
+
 ### Lesson 1: Always Test Projected Documents, Not Just Events
 
 **From:** Pricing BC (Cycle 29)
@@ -1476,6 +1658,74 @@ Identity<PriceCorrected>(x => x.Sku);
 **Pricing BC decision:** `ProductPrice` is **not** directly queried — `CurrentPriceView` is the query model. Commands use `FetchForWriting()` for aggregate loading.
 
 **Takeaway:** Don't snapshot aggregates that are never queried. Use `FetchForWriting()` for write-only workflows.
+
+---
+
+### Lesson 6: BFF-Owned Projections Avoid Need for Separate Analytics BC
+
+**From:** Backoffice BC (M32.0 Sessions 6-7)
+
+**Observation:** Backoffice BFF owns two Marten projections aggregating events from 7 domain BCs:
+- **AdminDailyMetrics** — sourced from Orders, Payments, Inventory, Fulfillment
+- **AlertFeedView** — sourced from Payments, Inventory, Fulfillment, Returns
+
+**Alternative considered:** Create separate Analytics BC to own these projections.
+
+**Decision:** BFF-owned projections are sufficient for Phase 1-2 operational dashboards. Defer Analytics BC until business analytics requirements mature (Phase 3+).
+
+**Pattern:**
+
+```csharp
+// BFF integration message handler (appends event to BFF's event store)
+public static class OrderPlacedHandler
+{
+    public static async Task<LiveMetricUpdated> Handle(
+        Orders.OrderPlaced message,
+        IDocumentSession session)
+    {
+        // 1. Append integration message to BFF event store
+        session.Events.Append(Guid.NewGuid(), message);
+
+        // 2. Commit (inline projection updates AdminDailyMetrics)
+        await session.SaveChangesAsync();
+
+        // 3. Query updated projection
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var metrics = await session.LoadAsync<AdminDailyMetrics>(today);
+
+        // 4. Return SignalR event with fresh metrics
+        return new LiveMetricUpdated(
+            metrics.OrderCount,
+            metrics.Revenue,
+            metrics.PaymentFailureRate,
+            DateTimeOffset.UtcNow
+        );
+    }
+}
+```
+
+**Why BFF-owned projections?**
+
+1. **Lower infrastructure cost:** No separate Analytics BC API/database
+2. **Faster delivery:** Projections added in 2 sessions vs. 5+ sessions for new BC
+3. **Sufficient for Phase 1:** Operational dashboards don't need complex analytics (BI tools, machine learning, etc.)
+4. **Easy migration path:** If Analytics BC becomes necessary, projections can be moved without changing domain BCs
+
+**When to use BFF-owned projections:**
+- ✅ Operational dashboards (real-time KPIs, alert feeds, executive summary)
+- ✅ Cross-BC aggregation for UI composition
+- ✅ Inline lifecycle required (zero-lag updates)
+- ✅ Queries are simple (load by ID, basic filtering)
+
+**When to create separate Analytics BC:**
+- ❌ Complex analytics (time-series analysis, forecasting, ML models)
+- ❌ Long-term data warehousing (years of historical data)
+- ❌ Heavy BI tooling integration (Tableau, Power BI, etc.)
+- ❌ Async/batch processing (nightly aggregations, reports)
+
+**Takeaway:** BFF-owned projections are a pragmatic alternative to creating a separate Analytics BC. Start with BFF projections; migrate to Analytics BC when requirements demand it.
+
+**ADR Reference:** ADR 0036 (BFF-Owned Projections Strategy) — rationale for deferring Analytics BC investment.
 
 ---
 
