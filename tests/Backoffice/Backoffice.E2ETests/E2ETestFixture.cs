@@ -410,7 +410,37 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
 
         _app.UseCors();
 
+        // Add comprehensive request/response logging middleware BEFORE any other middleware
+        _app.Use(async (context, next) =>
+        {
+            Console.WriteLine($"[WasmStaticFileHost] → Request: {context.Request.Method} {context.Request.Path}{context.Request.QueryString}");
+            Console.WriteLine($"[WasmStaticFileHost]   Host: {context.Request.Host}");
+
+            await next();
+
+            Console.WriteLine($"[WasmStaticFileHost] ← Response: {context.Response.StatusCode} for {context.Request.Method} {context.Request.Path}");
+
+            if (context.Response.StatusCode == 404)
+            {
+                Console.WriteLine($"❌ [WasmStaticFileHost] 404 NOT FOUND: {context.Request.Method} {context.Request.Path}");
+            }
+        });
+
+        // CRITICAL: Serve static WASM files FIRST (before any route handlers)
+        // This ensures _framework/*.dll, *.wasm, blazor.webassembly.js are served correctly
+        _app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wasmRoot),
+            ServeUnknownFileTypes = true, // Required for .wasm, .dll, .dat files
+            OnPrepareResponse = ctx =>
+            {
+                // Log static file responses for debugging
+                Console.WriteLine($"[WasmStaticFileHost] Serving static file: {ctx.File.Name} ({ctx.File.Length} bytes)");
+            }
+        });
+
         // Intercept appsettings.json requests to inject test API URLs
+        // This must come AFTER UseStaticFiles so it overrides the source appsettings.json
         _app.MapGet("/appsettings.json", () =>
         {
             var config = new
@@ -429,14 +459,8 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
             return Results.Json(config);
         });
 
-        // Serve static WASM files
-        _app.UseStaticFiles(new StaticFileOptions
-        {
-            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wasmRoot),
-            ServeUnknownFileTypes = true // Required for .wasm, .dll, .dat files
-        });
-
         // SPA fallback — serve index.html for all non-file routes (Blazor client-side routing)
+        // This must be last to catch client-side routes like /login, /dashboard
         _app.MapFallbackToFile("index.html", new StaticFileOptions
         {
             FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wasmRoot)
