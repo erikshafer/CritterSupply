@@ -9,6 +9,7 @@ internal static class ScenarioContextKeys
     public const string Fixture = "E2ETestFixture";
     public const string Playwright = "Playwright";
     public const string Browser = "Browser";
+    public const string Context = "Context";
     public const string Page = "Page";
     public const string AdminUserId = "AdminUserId";
     public const string OrderId = "OrderId";
