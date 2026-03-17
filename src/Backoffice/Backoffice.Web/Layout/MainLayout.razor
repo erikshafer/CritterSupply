@@ -1,0 +1,49 @@
+@inherits LayoutComponentBase
+@inject BackofficeAuthState AuthState
+@inject BackofficeAuthService AuthService
+
+<MudThemeProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Inherit"
+                       Edge="Edge.Start"
+                       OnClick="@(() => drawerOpen = !drawerOpen)" />
+        <MudText Typo="Typo.h6">Backoffice</MudText>
+        <MudSpacer />
+
+        <AuthorizeView>
+            <Authorized>
+                <MudText Typo="Typo.body2" Class="mr-4">
+                    @AuthState.FirstName @AuthState.LastName (@AuthState.RoleDisplayName)
+                </MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Logout"
+                               Color="Color.Inherit"
+                               OnClick="HandleLogout"
+                               Title="Logout" />
+            </Authorized>
+        </AuthorizeView>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool drawerOpen = true;
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+    }
+}

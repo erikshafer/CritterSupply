@@ -1,0 +1,296 @@
+@page "/alerts"
+@using System.Net.Http.Json
+@using System.Text.Json
+@using Microsoft.AspNetCore.SignalR.Client
+@using Backoffice.Web.Auth
+@using Backoffice.Web.Hub
+@attribute [Authorize(Roles = "operations-manager,warehouse-manager,system-admin")]
+@inject BackofficeAuthState AuthState
+@inject BackofficeHubService HubService
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@inject ILogger<Alerts> Logger
+@implements IDisposable
+
+<PageTitle>Operations Alerts — Backoffice</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">
+    Operations Alert Feed
+</MudText>
+<MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+    Real-time system alerts and operational warnings
+</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4"
+                       aria-label="Loading alerts" />
+}
+
+@* SignalR disconnection warning *@
+@if (HubService.State == HubConnectionState.Disconnected)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3"
+              aria-live="assertive" data-testid="hub-disconnected-banner">
+        <MudIcon Icon="@Icons.Material.Filled.WifiOff" Class="mr-1" aria-hidden="true" />
+        Live alerts are paused.
+        <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small"
+                   OnClick="ReconnectAsync" Class="ml-1 pa-0" Style="min-width:auto; text-transform:none;">
+            Reconnect
+        </MudButton>
+        or refresh the page.
+    </MudAlert>
+}
+
+@if (_newAlertsCount > 0)
+{
+    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3"
+              aria-live="polite" data-testid="new-alerts-banner">
+        @_newAlertsCount new alert(s) received.
+        <MudButton Variant="Variant.Text" Color="Color.Info" Size="Size.Small"
+                   OnClick="LoadAlertsAsync" Class="ml-1 pa-0"
+                   Style="min-width:auto; text-transform:none; font-size:inherit;">
+            Refresh
+        </MudButton>
+    </MudAlert>
+}
+
+@if (_alerts is not null)
+{
+    <MudPaper Elevation="2" Class="pa-4">
+        <div class="d-flex justify-space-between align-center mb-3">
+            <MudText Typo="Typo.h6">Recent Alerts (@_alerts.TotalCount)</MudText>
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Primary"
+                       Size="Size.Small"
+                       OnClick="LoadAlertsAsync"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       data-testid="refresh-alerts-btn">
+                Refresh
+            </MudButton>
+        </div>
+
+        @if (_alerts.TotalCount == 0)
+        {
+            <MudAlert Severity="Severity.Success" Dense="true">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-1" aria-hidden="true" />
+                No active alerts. All systems operational.
+            </MudAlert>
+        }
+        else
+        {
+            <MudList T="string" Dense="true" data-testid="alerts-list">
+                @foreach (var alert in _alerts.Alerts)
+                {
+                    <MudListItem>
+                        <div class="d-flex align-start">
+                            <MudIcon Icon="@GetAlertIcon(alert.Severity)"
+                                     Color="@GetAlertColor(alert.Severity)"
+                                     Class="mr-2 mt-1"
+                                     aria-hidden="true" />
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-space-between align-center">
+                                    <MudText Typo="Typo.body1">
+                                        <strong>@alert.Title</strong>
+                                    </MudText>
+                                    <MudChip T="string" Size="Size.Small"
+                                             Color="@GetAlertColor(alert.Severity)"
+                                             Variant="Variant.Text">
+                                        @alert.Severity
+                                    </MudChip>
+                                </div>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    @alert.Message
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @alert.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                                    @if (!string.IsNullOrEmpty(alert.Source))
+                                    {
+                                        <span> — @alert.Source</span>
+                                    }
+                                </MudText>
+                            </div>
+                        </div>
+                    </MudListItem>
+                    <MudDivider />
+                }
+            </MudList>
+        }
+    </MudPaper>
+}
+
+@code {
+    private OperationsAlertsResponse? _alerts;
+    private bool _isLoading = true;
+    private int _newAlertsCount;
+
+    // Hub message listener registration
+    private IDisposable? _hubMessageHandler;
+
+    protected override async Task OnInitializedAsync()
+    {
+        HubService.OnStateChanged += OnHubStateChanged;
+        await LoadAlertsAsync();
+        RegisterHubListeners();
+    }
+
+    private async void OnHubStateChanged()
+    {
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+
+            if (HubService.State == HubConnectionState.Connected)
+            {
+                RegisterHubListeners();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Non-fatal exception in OnHubStateChanged.");
+        }
+    }
+
+    private async Task ReconnectAsync()
+    {
+        await HubService.ConnectAsync();
+    }
+
+    private void RegisterHubListeners()
+    {
+        if (HubService.Connection is null) return;
+
+        _hubMessageHandler?.Dispose();
+
+        _hubMessageHandler = HubService.Connection.On<JsonElement>(
+            "ReceiveMessage",
+            async envelope =>
+            {
+                if (!TryGetEventType(envelope, out var eventType)) return;
+
+                if (eventType?.EndsWith("AlertCreated") == true)
+                {
+                    // New alert created — increment count and show toast
+                    _newAlertsCount++;
+
+                    var alertData = ExtractAlertFromEnvelope(envelope);
+                    if (alertData.Title is not null)
+                    {
+                        var severity = alertData.Severity switch
+                        {
+                            "Critical" => Severity.Error,
+                            "Warning" => Severity.Warning,
+                            _ => Severity.Info
+                        };
+
+                        Snackbar.Add($"{alertData.Title}", severity, config =>
+                        {
+                            config.Action = "View";
+                            config.ActionColor = severity == Severity.Error ? Color.Error : Color.Warning;
+                            config.OnClick = _ => LoadAlertsAsync();
+                        });
+                    }
+
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+    }
+
+    private async Task LoadAlertsAsync()
+    {
+        _isLoading = true;
+        _newAlertsCount = 0; // Reset new alerts count on refresh
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.GetAsync("/api/backoffice/alerts");
+            if (response.IsSuccessStatusCode)
+            {
+                _alerts = await response.Content.ReadFromJsonAsync<OperationsAlertsResponse>();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Snackbar.Add("Session expired. Please log in again.", Severity.Warning);
+            }
+            else
+            {
+                Snackbar.Add("Failed to load alerts.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception loading operations alerts");
+            Snackbar.Add("Failed to load alerts. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private (string? Title, string Severity) ExtractAlertFromEnvelope(JsonElement envelope)
+    {
+        try
+        {
+            if (envelope.TryGetProperty("data", out var data))
+            {
+                var title = data.TryGetProperty("title", out var titleEl) ? titleEl.GetString() : null;
+                var severity = data.TryGetProperty("severity", out var sevEl) ? sevEl.GetString() ?? "Info" : "Info";
+                return (title, severity);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to extract alert from hub envelope");
+        }
+        return (null, "Info");
+    }
+
+    private static bool TryGetEventType(JsonElement envelope, out string? eventType)
+    {
+        eventType = null;
+        if (envelope.ValueKind != JsonValueKind.Object) return false;
+        if (!envelope.TryGetProperty("type", out var typeEl)) return false;
+        eventType = typeEl.GetString();
+        return eventType is not null;
+    }
+
+    private static string GetAlertIcon(string severity) => severity switch
+    {
+        "Critical" => Icons.Material.Filled.Error,
+        "Warning" => Icons.Material.Filled.Warning,
+        "Info" => Icons.Material.Filled.Info,
+        _ => Icons.Material.Filled.Notifications
+    };
+
+    private static Color GetAlertColor(string severity) => severity switch
+    {
+        "Critical" => Color.Error,
+        "Warning" => Color.Warning,
+        "Info" => Color.Info,
+        _ => Color.Default
+    };
+
+    public void Dispose()
+    {
+        HubService.OnStateChanged -= OnHubStateChanged;
+        _hubMessageHandler?.Dispose();
+    }
+
+    private sealed record OperationsAlertsResponse(
+        IReadOnlyList<OperationsAlert> Alerts,
+        int TotalCount,
+        DateTimeOffset QueriedAt);
+
+    private sealed record OperationsAlert(
+        Guid AlertId,
+        string Title,
+        string Message,
+        string Severity,
+        string Source,
+        DateTimeOffset CreatedAt);
+}

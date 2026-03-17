@@ -1,0 +1,61 @@
+<MudNavMenu>
+    <MudText Typo="Typo.h6" Class="px-4 py-2">Navigation</MudText>
+
+    <MudNavLink Href="/" Icon="@Icons.Material.Filled.Home" Match="NavLinkMatch.All">
+        Home
+    </MudNavLink>
+
+    <AuthorizeView Policy="CustomerService">
+        <MudNavLink Href="/customers/search" Icon="@Icons.Material.Filled.Search">
+            Customer Search
+        </MudNavLink>
+    </AuthorizeView>
+
+    <AuthorizeView Policy="Executive">
+        <MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard">
+            Executive Dashboard
+        </MudNavLink>
+    </AuthorizeView>
+
+    <AuthorizeView Policy="OperationsManager">
+        <MudNavLink Href="/alerts" Icon="@Icons.Material.Filled.Notifications">
+            Operations Alerts
+        </MudNavLink>
+    </AuthorizeView>
+
+    <AuthorizeView Policy="WarehouseClerk">
+        <MudNavLink Href="/warehouse" Icon="@Icons.Material.Filled.Warehouse" Disabled="true">
+            Warehouse Tools
+        </MudNavLink>
+    </AuthorizeView>
+
+    <AuthorizeView Policy="PricingManager">
+        <MudNavLink Href="/pricing" Icon="@Icons.Material.Filled.AttachMoney" Disabled="true">
+            Pricing Admin
+        </MudNavLink>
+    </AuthorizeView>
+
+    <AuthorizeView Policy="CopyWriter">
+        <MudNavLink Href="/products" Icon="@Icons.Material.Filled.Edit" Disabled="true">
+            Product Catalog
+        </MudNavLink>
+    </AuthorizeView>
+
+    <AuthorizeView Policy="SystemAdmin">
+        <MudNavLink Href="/admin/users" Icon="@Icons.Material.Filled.AdminPanelSettings" Disabled="true">
+            User Management
+        </MudNavLink>
+    </AuthorizeView>
+
+    <MudDivider Class="my-2" />
+
+    <MudText Typo="Typo.caption" Class="px-4 text-muted">
+        Session 7-8: Add real pages
+    </MudText>
+</MudNavMenu>
+
+@code {
+    // NOTE: Authorization policies checked against AuthorizeView are configured
+    // server-side in BackofficeIdentity.Api. The UI uses these same policy names
+    // for role-based menu visibility (ADR 0031: Backoffice RBAC Model).
+}

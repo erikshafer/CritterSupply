@@ -1,0 +1,65 @@
+@page "/"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject BackofficeAuthState AuthState
+
+<PageTitle>Dashboard — Backoffice</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Welcome to Backoffice</MudText>
+
+<MudText Typo="Typo.body1" Class="mb-4">
+    Hello, @AuthState.FirstName @AuthState.LastName (@AuthState.RoleDisplayName)
+</MudText>
+
+<MudPaper Class="pa-4" Elevation="2">
+    <MudText Typo="Typo.h6" GutterBottom="true">Quick Links</MudText>
+
+    <MudList T="string">
+        <AuthorizeView Policy="CustomerService">
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Search">
+                Customer Search (Coming in Session 7)
+            </MudListItem>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="Executive">
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Dashboard">
+                Executive Dashboard (Coming in Session 7)
+            </MudListItem>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="OperationsManager">
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Notifications">
+                Operations Alerts (Coming in Session 7)
+            </MudListItem>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="WarehouseClerk">
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Warehouse">
+                Warehouse Tools (Coming in Session 7)
+            </MudListItem>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="PricingManager">
+            <MudListItem T="string" Icon="@Icons.Material.Filled.AttachMoney">
+                Pricing Admin (Coming in Sessions 9-12)
+            </MudListItem>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="CopyWriter">
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Edit">
+                Product Catalog (Coming in Sessions 9-12)
+            </MudListItem>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="SystemAdmin">
+            <MudListItem T="string" Icon="@Icons.Material.Filled.AdminPanelSettings">
+                User Management (Coming in Sessions 9-12)
+            </MudListItem>
+        </AuthorizeView>
+    </MudList>
+</MudPaper>
+
+<MudAlert Severity="Severity.Info" Class="mt-4">
+    <strong>M32.1 Session 6:</strong> Blazor WASM scaffolding complete.
+    Navigation, dashboards, and workflows will be added in Sessions 7-8.
+</MudAlert>

@@ -174,6 +174,7 @@
   <Folder Name="/src/Backoffice/">
     <Project Path="src/Backoffice/Backoffice.Api/Backoffice.Api.csproj" />
     <Project Path="src/Backoffice/Backoffice/Backoffice.csproj" />
+    <Project Path="src/Backoffice/Backoffice.Web/Backoffice.Web.csproj" />
   </Folder>
   <Folder Name="/src/Correspondence/">
     <Project Path="src/Correspondence/Correspondence.Api/Correspondence.Api.csproj" />
