@@ -104,7 +104,7 @@
                     <MudTd DataLabel="Name">@context.FirstName @context.LastName</MudTd>
                     <MudTd DataLabel="Email">@context.Email</MudTd>
                     <MudTd DataLabel="Status">
-                        <MudChip Size="Size.Small"
+                        <MudChip T="string" Size="Size.Small"
                                  Color="@(context.Status == "Active" ? Color.Success : Color.Default)"
                                  Variant="Variant.Text">
                             @context.Status
