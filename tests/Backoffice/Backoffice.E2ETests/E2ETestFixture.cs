@@ -1,0 +1,501 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Marten;
+using Testcontainers.PostgreSql;
+using Wolverine;
+using Backoffice.E2ETests.Stubs;
+using Backoffice.Clients;
+
+namespace Backoffice.E2ETests;
+
+/// <summary>
+/// E2E test fixture that starts real Kestrel servers for BackofficeIdentity.Api,
+/// Backoffice.Api, and a static file host serving Backoffice.Web (Blazor WASM),
+/// backed by TestContainers PostgreSQL instances.
+///
+/// Architecture:
+///   Playwright Browser (Chromium)
+///         │
+///         ▼
+///   Backoffice.Web (WASM static files served by thin ASP.NET host, random port)
+///         │ (cross-origin HTTP + WebSocket)
+///         ├──────────────────────────┐
+///         ▼                          ▼
+///   Backoffice.Api                BackofficeIdentity.Api
+///   (Kestrel, random port)        (Kestrel, random port)
+///   ├── Marten (backoffice)       ├── EF Core (backofficeidentity)
+///   ├── SignalR hub               ├── JWT issuance
+///   ├── Wolverine (local only)    └── Demo account seeding
+///   ├── Domain BC stubs
+///   └── JWT validation
+///         │                          │
+///         └── Shared PostgreSQL ─────┘
+///             (TestContainers)
+///
+/// Key constraints:
+///   - All services use REAL Kestrel (not TestServer) — Playwright requires TCP ports.
+///   - BackofficeIdentity.Api is a real server (not stubbed) — E2E tests need real JWTs.
+///   - Domain BC clients (Orders, Returns, Inventory, etc.) are stubbed.
+///   - CORS is opened to allow the WASM host's random-port origin.
+///   - RabbitMQ transports are disabled — Wolverine runs in local-only mode.
+/// </summary>
+public sealed class E2ETestFixture : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
+        .WithDatabase("backoffice_e2e_test_db")
+        .WithName($"backoffice-e2e-postgres-{Guid.NewGuid():N}")
+        .WithCleanUp(true)
+        .Build();
+
+    private BackofficeIdentityApiKestrelFactory? _identityFactory;
+    private BackofficeApiKestrelFactory? _backofficeApiFactory;
+    private WasmStaticFileHost? _wasmHost;
+
+    /// <summary>Stub clients to configure domain BC behavior per scenario.</summary>
+    public StubOrdersClient StubOrdersClient { get; } = new();
+    public StubReturnsClient StubReturnsClient { get; } = new();
+    public StubInventoryClient StubInventoryClient { get; } = new();
+    public StubCustomerIdentityClient StubCustomerIdentityClient { get; } = new();
+    public StubCatalogClient StubCatalogClient { get; } = new();
+    public StubFulfillmentClient StubFulfillmentClient { get; } = new();
+    public StubCorrespondenceClient StubCorrespondenceClient { get; } = new();
+
+    /// <summary>Base URL of Backoffice.Web WASM host — what Playwright navigates to.</summary>
+    public string WasmBaseUrl { get; private set; } = string.Empty;
+
+    /// <summary>Base URL of Backoffice.Api — for direct API calls in test hooks.</summary>
+    public string BackofficeApiBaseUrl { get; private set; } = string.Empty;
+
+    /// <summary>Base URL of BackofficeIdentity.Api — for direct API calls in test hooks.</summary>
+    public string IdentityApiBaseUrl { get; private set; } = string.Empty;
+
+    /// <summary>Direct access to Backoffice.Api host for SignalR hub context injection.</summary>
+    public IHost BackofficeApiHost { get; private set; } = null!;
+
+    public async Task InitializeAsync()
+    {
+        // Step 1: Start TestContainers PostgreSQL
+        await _postgres.StartAsync();
+        var connectionString = _postgres.GetConnectionString();
+
+        // Step 2: Start BackofficeIdentity.Api (EF Core — JWT issuer)
+        _identityFactory = new BackofficeIdentityApiKestrelFactory(connectionString);
+        _identityFactory.StartKestrel();
+        IdentityApiBaseUrl = _identityFactory.ServerAddress;
+
+        // Step 3: Start Backoffice.Api (Marten — BFF, SignalR)
+        _backofficeApiFactory = new BackofficeApiKestrelFactory(
+            connectionString,
+            IdentityApiBaseUrl,
+            StubOrdersClient,
+            StubReturnsClient,
+            StubInventoryClient,
+            StubCustomerIdentityClient,
+            StubCatalogClient,
+            StubFulfillmentClient,
+            StubCorrespondenceClient);
+        _backofficeApiFactory.StartKestrel();
+        BackofficeApiBaseUrl = _backofficeApiFactory.ServerAddress;
+        BackofficeApiHost = _backofficeApiFactory.Services.GetRequiredService<IHost>();
+
+        // Step 4: Start WASM static file host serving Backoffice.Web with test API URLs
+        _wasmHost = new WasmStaticFileHost(IdentityApiBaseUrl, BackofficeApiBaseUrl);
+        await _wasmHost.StartAsync();
+        WasmBaseUrl = _wasmHost.BaseUrl;
+    }
+
+    public async Task DisposeAsync()
+    {
+        if (_wasmHost != null) await _wasmHost.DisposeAsync();
+        if (_backofficeApiFactory != null) await _backofficeApiFactory.DisposeAsync();
+        if (_identityFactory != null) await _identityFactory.DisposeAsync();
+        await _postgres.DisposeAsync();
+    }
+
+    /// <summary>
+    /// Cleans all Marten document/event data from the Backoffice test database.
+    /// Call in DataHooks.AfterScenario for complete test isolation.
+    /// Note: BackofficeIdentity EF Core seed data (admin users) is NOT cleaned — it's shared.
+    /// </summary>
+    public async Task CleanMartenDataAsync()
+    {
+        var store = _backofficeApiFactory?.Services.GetRequiredService<IDocumentStore>();
+        if (store != null)
+        {
+            await store.Advanced.Clean.DeleteAllDocumentsAsync();
+            await store.Advanced.Clean.DeleteAllEventDataAsync();
+        }
+    }
+
+    /// <summary>
+    /// Clears all stub client data between scenarios for test isolation.
+    /// </summary>
+    public void ClearAllStubs()
+    {
+        StubOrdersClient.Clear();
+        StubReturnsClient.Clear();
+        StubInventoryClient.Clear();
+        StubCustomerIdentityClient.Clear();
+        StubCatalogClient.Clear();
+        StubFulfillmentClient.Clear();
+        StubCorrespondenceClient.Clear();
+    }
+
+    /// <summary>
+    /// Seeds an admin user into BackofficeIdentity EF Core database.
+    /// Used by authentication scenario steps to create test admin accounts.
+    /// </summary>
+    public void SeedAdminUser(Guid userId, string email, string fullName, string password)
+    {
+        if (_identityFactory == null)
+            throw new InvalidOperationException("BackofficeIdentity factory not initialized. Call InitializeAsync() first.");
+
+        using var scope = _identityFactory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BackofficeIdentity.Identity.BackofficeIdentityDbContext>();
+
+        // Check if user already exists
+        if (dbContext.Users.Any(u => u.Id == userId))
+            return; // Already seeded
+
+        // Split full name into first and last name
+        var nameParts = fullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        var firstName = nameParts.Length > 0 ? nameParts[0] : "Test";
+        var lastName = nameParts.Length > 1 ? nameParts[1] : "User";
+
+        // Use ASP.NET Core Identity's PasswordHasher (PBKDF2-SHA256) - matches production code
+        var passwordHasher = new Microsoft.AspNetCore.Identity.PasswordHasher<BackofficeIdentity.Identity.BackofficeUser>();
+        var passwordHash = passwordHasher.HashPassword(null!, password);
+
+        var adminUser = new BackofficeIdentity.Identity.BackofficeUser
+        {
+            Id = userId,
+            Email = email,
+            PasswordHash = passwordHash,
+            FirstName = firstName,
+            LastName = lastName,
+            Role = BackofficeIdentity.Identity.BackofficeRole.SystemAdmin, // Default to SystemAdmin for E2E tests
+            Status = BackofficeIdentity.Identity.BackofficeUserStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        dbContext.Users.Add(adminUser);
+        dbContext.SaveChanges();
+    }
+
+    /// <summary>
+    /// Seeds standard test data for E2E scenarios (customers, orders, returns, alerts).
+    /// </summary>
+    public void SeedStandardScenario()
+    {
+        // Seed customer
+        StubCustomerIdentityClient.AddCustomer(
+            WellKnownTestData.Customers.TestCustomer,
+            WellKnownTestData.Customers.TestCustomerEmail,
+            WellKnownTestData.Customers.TestCustomerName);
+
+        // Seed order
+        StubOrdersClient.AddOrder(
+            WellKnownTestData.Orders.TestOrder,
+            WellKnownTestData.Customers.TestCustomer,
+            "Confirmed",
+            DateTimeOffset.UtcNow.AddDays(-2),
+            WellKnownTestData.Orders.TestOrderTotal);
+
+        // Seed return
+        StubReturnsClient.AddReturn(
+            WellKnownTestData.Returns.TestReturn,
+            WellKnownTestData.Orders.TestOrder,
+            WellKnownTestData.Customers.TestCustomer,
+            "Pending",
+            DateTimeOffset.UtcNow.AddDays(-1));
+
+        // Seed low-stock alert
+        StubInventoryClient.AddLowStockAlert(
+            WellKnownTestData.Alerts.LowStockAlert,
+            WellKnownTestData.Alerts.LowStockSku,
+            10,
+            50,
+            DateTimeOffset.UtcNow.AddHours(-2),
+            isAcknowledged: false);
+
+        // Seed catalog product
+        StubCatalogClient.AddProduct(
+            WellKnownTestData.Products.CeramicDogBowl,
+            "Ceramic Dog Bowl",
+            "Premium ceramic feeding bowl for dogs",
+            WellKnownTestData.Products.CeramicDogBowlPrice);
+    }
+}
+
+
+/// <summary>
+/// WebApplicationFactory for BackofficeIdentity.Api that binds to a real Kestrel TCP port.
+/// Runs the real EF Core service with auto-seeded demo accounts.
+/// Uses BackofficeIdentity.Api.TestMarker as anchor.
+/// </summary>
+internal sealed class BackofficeIdentityApiKestrelFactory(string connectionString)
+    : WebApplicationFactory<BackofficeIdentity.Api.TestMarker>
+{
+    public string ServerAddress { get; private set; } = string.Empty;
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureAppConfiguration(config =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:postgres"] = connectionString
+            });
+        });
+
+        builder.ConfigureServices(services =>
+        {
+            // Disable external Wolverine transports (RabbitMQ)
+            services.DisableAllExternalWolverineTransports();
+
+            // Open CORS for test (random ports)
+            services.AddCors(opts =>
+            {
+                opts.AddDefaultPolicy(policy => policy
+                    .SetIsOriginAllowed(_ => true)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials());
+            });
+        });
+    }
+
+    internal void StartKestrel()
+    {
+        UseKestrel(0);
+        CreateDefaultClient();
+
+        var serverAddresses = Services
+            .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
+            .Features
+            .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
+
+        var rawAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
+        ServerAddress = NormalizeAddress(rawAddress);
+    }
+
+    internal static string NormalizeAddress(string rawAddress) => rawAddress
+        .Replace("//[::]:", "//localhost:")
+        .Replace("//0.0.0.0:", "//localhost:");
+}
+
+/// <summary>
+/// WebApplicationFactory for Backoffice.Api that binds to a real Kestrel TCP port.
+/// Uses TestContainers Postgres for Marten and validates JWTs from the test BackofficeIdentity.Api.
+/// Stubs all domain BC clients.
+/// Uses Backoffice.Api.BackofficeHub as anchor (Program ambiguous).
+/// </summary>
+internal sealed class BackofficeApiKestrelFactory(
+    string connectionString,
+    string identityApiUrl,
+    StubOrdersClient stubOrdersClient,
+    StubReturnsClient stubReturnsClient,
+    StubInventoryClient stubInventoryClient,
+    StubCustomerIdentityClient stubCustomerIdentityClient,
+    StubCatalogClient stubCatalogClient,
+    StubFulfillmentClient stubFulfillmentClient,
+    StubCorrespondenceClient stubCorrespondenceClient)
+    : WebApplicationFactory<Backoffice.Api.BackofficeHub>
+{
+    public string ServerAddress { get; private set; } = string.Empty;
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureAppConfiguration(config =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:postgres"] = connectionString,
+                ["ApiClients:BackofficeIdentityApiUrl"] = identityApiUrl
+            });
+        });
+
+        builder.ConfigureServices(services =>
+        {
+            // Override Marten connection to use TestContainers Postgres
+            services.ConfigureMarten(opts => opts.Connection(connectionString));
+
+            // Replace real HTTP clients with stubs
+            services.RemoveAndReplaceClient<IOrdersClient>(stubOrdersClient);
+            services.RemoveAndReplaceClient<IReturnsClient>(stubReturnsClient);
+            services.RemoveAndReplaceClient<IInventoryClient>(stubInventoryClient);
+            services.RemoveAndReplaceClient<ICustomerIdentityClient>(stubCustomerIdentityClient);
+            services.RemoveAndReplaceClient<ICatalogClient>(stubCatalogClient);
+            services.RemoveAndReplaceClient<IFulfillmentClient>(stubFulfillmentClient);
+            services.RemoveAndReplaceClient<ICorrespondenceClient>(stubCorrespondenceClient);
+
+            // Disable external Wolverine transports (RabbitMQ)
+            services.DisableAllExternalWolverineTransports();
+
+            // Open CORS for test (random ports)
+            services.AddCors(opts =>
+            {
+                opts.AddDefaultPolicy(policy => policy
+                    .SetIsOriginAllowed(_ => true)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials());
+            });
+        });
+    }
+
+    internal void StartKestrel()
+    {
+        UseKestrel(0);
+        CreateDefaultClient();
+
+        var serverAddresses = Services
+            .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
+            .Features
+            .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
+
+        var rawAddress = serverAddresses?.Addresses.FirstOrDefault() ?? string.Empty;
+        ServerAddress = BackofficeIdentityApiKestrelFactory.NormalizeAddress(rawAddress);
+    }
+}
+
+/// <summary>
+/// Lightweight ASP.NET Core host that serves the compiled Blazor WASM static files
+/// from Backoffice.Web's build output, with a test-specific appsettings.json
+/// that points at the test API server URLs.
+///
+/// Blazor WASM apps fetch appsettings.json via HTTP from their own origin at startup.
+/// This host intercepts that request and returns the test configuration dynamically.
+/// </summary>
+internal sealed class WasmStaticFileHost : IAsyncDisposable
+{
+    private readonly string _identityApiUrl;
+    private readonly string _backofficeApiUrl;
+    private WebApplication? _app;
+
+    public string BaseUrl { get; private set; } = string.Empty;
+
+    public WasmStaticFileHost(string identityApiUrl, string backofficeApiUrl)
+    {
+        _identityApiUrl = identityApiUrl;
+        _backofficeApiUrl = backofficeApiUrl;
+    }
+
+    public async Task StartAsync()
+    {
+        // Locate the Backoffice.Web wwwroot output directory
+        var wasmRoot = FindWasmRoot();
+
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0"); // Random port
+
+        // Open CORS for cross-origin API calls from WASM
+        builder.Services.AddCors(opts =>
+        {
+            opts.AddDefaultPolicy(policy => policy
+                .SetIsOriginAllowed(_ => true)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials());
+        });
+
+        _app = builder.Build();
+
+        _app.UseCors();
+
+        // Intercept appsettings.json requests to inject test API URLs
+        _app.MapGet("/appsettings.json", () => Results.Json(new
+        {
+            ApiClients = new
+            {
+                BackofficeIdentityApiUrl = _identityApiUrl,
+                BackofficeApiUrl = _backofficeApiUrl
+            }
+        }));
+
+        // Serve static WASM files
+        _app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wasmRoot),
+            ServeUnknownFileTypes = true // Required for .wasm, .dll, .dat files
+        });
+
+        // SPA fallback — serve index.html for all non-file routes (Blazor client-side routing)
+        _app.MapFallbackToFile("index.html", new StaticFileOptions
+        {
+            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wasmRoot)
+        });
+
+        await _app.StartAsync();
+
+        var addresses = _app.Services
+            .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
+            .Features
+            .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
+
+        BaseUrl = BackofficeIdentityApiKestrelFactory.NormalizeAddress(
+            addresses?.Addresses.FirstOrDefault() ?? string.Empty);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_app != null) await _app.DisposeAsync();
+    }
+
+    /// <summary>
+    /// Locates the Backoffice.Web wwwroot directory containing compiled WASM files.
+    /// Walks up from the test output directory to find the source project.
+    /// </summary>
+    private static string FindWasmRoot()
+    {
+        // Strategy: find the Backoffice.Web project's wwwroot from the repo root
+        var current = AppContext.BaseDirectory;
+        while (current != null)
+        {
+            var candidate = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "wwwroot");
+            if (Directory.Exists(candidate))
+                return candidate;
+
+            // Also check for the published output (bin/Debug or bin/Release)
+            var binCandidate = Directory.GetDirectories(current, "Backoffice.Web", SearchOption.AllDirectories)
+                .Select(d => Path.Combine(d, "wwwroot"))
+                .FirstOrDefault(Directory.Exists);
+
+            if (binCandidate != null)
+                return binCandidate;
+
+            current = Directory.GetParent(current)?.FullName;
+        }
+
+        throw new InvalidOperationException(
+            "Could not locate Backoffice.Web/wwwroot directory. " +
+            "Ensure the Backoffice.Web project is built before running E2E tests.");
+    }
+}
+
+
+/// <summary>
+/// Service collection extensions for test setup (stub client registration, CORS).
+/// </summary>
+internal static class ServiceCollectionExtensions
+{
+    /// <summary>
+    /// Removes the existing client registration and replaces it with a stub implementation.
+    /// </summary>
+    public static void RemoveAndReplaceClient<TClient>(
+        this IServiceCollection services,
+        TClient implementation)
+        where TClient : class
+    {
+        var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(TClient));
+        if (descriptor != null) services.Remove(descriptor);
+        services.AddSingleton<TClient>(implementation);
+    }
+
+}

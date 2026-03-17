@@ -42,9 +42,9 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.1 — Backoffice Phase 2: Write Operations |
-| **Status** | 🚀 IN PROGRESS — Sessions 1-8 completed, stub endpoints replaced with real projections |
+| **Status** | 🚀 IN PROGRESS — Sessions 1-10 completed, E2E test infrastructure built, first test run completed |
 | **Deliverables** | Blazor WASM frontend, write operations (Product Catalog, Pricing, Inventory), E2E tests |
-| **Next Session** | Session 9: E2E Playwright tests (or close milestone if sufficient) |
+| **Next Session** | Session 11: Enable Playwright tracing, diagnose E2E test timeout root cause, fix failures |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
 *Last Updated: 2026-03-17*
@@ -55,9 +55,9 @@
 
 ### 🚀 M32.1: Backoffice Phase 2 — Write Operations
 
-**Status:** 🚀 **IN PROGRESS** — Sessions 1-8 completed, stub endpoints replaced with real Marten projections
+**Status:** 🚀 **IN PROGRESS** — Sessions 1-10 completed, E2E test infrastructure built, all 32 tests timeout at ~30 seconds
 **Duration Estimate:** 3-4 cycles (12-18 sessions)
-**Current Phase:** Ready for E2E tests or milestone completion decision (Session 9)
+**Current Phase:** Diagnosing E2E test failures (Session 11) — Playwright tracing and WASM hydration investigation
 
 **What's Shipping:**
 - **Phase 2 Prerequisite (Sessions 1-3):** Domain BC endpoint gaps closed (Product Catalog write, Pricing write, Inventory write, Payments query)
@@ -67,11 +67,12 @@
 - **Documentation (Session 16):** Retrospectives, skills updates, gap register closure
 
 **Phase 2 Approach:**
-1. **Sessions 1-3:** Close 9 endpoint gaps in domain BCs (prerequisite for write operations)
-2. **Sessions 4-8:** Build Blazor WASM frontend shell with JWT auth and read-only views
-3. **Sessions 9-12:** Add write operations UI (product, pricing, inventory, users)
-4. **Sessions 13-15:** Write E2E tests with Playwright + Reqnroll
-5. **Session 16:** Documentation and retrospective
+1. **Sessions 1-3:** ✅ Close 9 endpoint gaps in domain BCs (prerequisite for write operations)
+2. **Sessions 4-8:** ✅ Build Blazor WASM frontend shell with JWT auth and read-only views
+3. **Sessions 9-10:** ✅ Build E2E test infrastructure + run first test execution (all 32 tests failing)
+4. **Session 11:** 🔄 Enable Playwright tracing, diagnose WASM hydration or appsettings.json injection
+5. **Sessions 12-15:** Add write operations UI (product, pricing, inventory, users)
+6. **Session 16:** Documentation and retrospective
 
 **Key Decisions:**
 - Session 1 will write **4 ADRs documenting M32.0 decisions** (0034-0037: BFF Architecture, SignalR Hub, Projections Strategy, OrderNote Ownership)
@@ -133,10 +134,31 @@
 - ✅ Fix SignalRNotificationTests to match BackofficeEvent discriminated union signatures
 - ✅ All 75 Backoffice integration tests passing
 
-**Session 9 Goals:** (Next)
-- Decide: E2E Playwright tests or close milestone?
-- Option A: Add E2E tests for critical workflows (order lookup, dashboard real-time updates)
-- Option B: Close M32.1 and defer E2E tests to future milestone (sufficient integration test coverage)
+**Session 9 Goals:** ✅ COMPLETED (split into 9a and 9b due to context limit)
+- ✅ Create E2E test infrastructure (Backoffice.E2ETests project)
+- ✅ 3-server WASM E2E fixture (BackofficeIdentity.Api + Backoffice.Api + Backoffice.Web)
+- ✅ 3 BDD feature files (Authentication, CustomerService, OperationsAlerts) with 32 scenarios
+- ✅ Page Object Models (LoginPage, DashboardPage, CustomerSearchPage, OperationsAlertsPage)
+- ✅ Playwright v1.51.0 configuration with browser downloads
+- ✅ Fix compilation errors (appsettings.json injection, WasmStaticFileHost, test hooks)
+- ✅ Project builds successfully (0 errors, 6 nullable warnings)
+
+**Session 10 Goals:** ✅ COMPLETED
+- ✅ Start infrastructure (Postgres, RabbitMQ, Jaeger) via Docker Compose
+- ✅ Run E2E tests for first time (`dotnet test Backoffice.E2ETests`)
+- ✅ Document test failures: All 32 scenarios timeout at ~30 seconds
+- ✅ Root cause analysis: Likely Blazor WASM hydration failure or appsettings.json injection failure
+- ✅ Write comprehensive Session 10 retrospective with diagnostic strategy
+- ✅ Update CURRENT-CYCLE.md
+
+**Session 11 Goals:** (Next)
+- Enable Playwright tracing to capture browser console logs, network traffic, screenshots
+- Run headed browser for manual inspection of WASM loading
+- Diagnose root cause: Blazor WASM hydration failure vs appsettings.json injection
+- Add explicit waits for MudBlazor component loading (`WaitForLoadStateAsync(LoadState.NetworkIdle)`)
+- Fix test failures and verify at least 1 happy path scenario passes
+- Add Playwright tracing to CI workflow
+- Consider: Close M32.1 after fixing tests or defer to M32.2?
 
 **References:**
 - [M32.1 Plan](./milestones/m32-1-backoffice-phase-2-plan.md)
@@ -149,6 +171,8 @@
 - [Session 6 Retrospective](./milestones/m32-1-session-6-retrospective.md)
 - [Session 7 Retrospective](./milestones/m32-1-session-7-retrospective.md)
 - [Session 8 Retrospective](./milestones/m32-1-session-8-retrospective.md)
+- [Session 9 Retrospective](./milestones/m32-1-session-9-retrospective.md)
+- [Session 10 Retrospective](./milestones/m32-1-session-10-retrospective.md)
 - [Backoffice Event Modeling](./backoffice-event-modeling-revised.md)
 - [Backoffice Frontend Design](./backoffice-frontend-design.md)
 - [Frontend Design Alignment Analysis](./backoffice-frontend-design-alignment-analysis.md)

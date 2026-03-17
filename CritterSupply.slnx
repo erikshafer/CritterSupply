@@ -188,6 +188,7 @@
   <Folder Name="/tests/" />
   <Folder Name="/tests/Backoffice/">
     <Project Path="tests/Backoffice/Backoffice.Api.IntegrationTests/Backoffice.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Backoffice/Backoffice.E2ETests/Backoffice.E2ETests.csproj" />
     <Project Path="tests/Backoffice/Backoffice.UnitTests/Backoffice.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tests/Correspondence/">

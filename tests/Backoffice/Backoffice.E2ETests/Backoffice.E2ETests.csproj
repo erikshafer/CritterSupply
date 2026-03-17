@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <AssemblyName>Backoffice.E2ETests</AssemblyName>
+        <RootNamespace>Backoffice.E2ETests</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="coverlet.collector" />
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="Microsoft.Playwright" />
+        <PackageReference Include="Reqnroll" />
+        <PackageReference Include="Reqnroll.xUnit" />
+        <PackageReference Include="Shouldly" />
+        <PackageReference Include="Testcontainers.PostgreSql" />
+        <PackageReference Include="xunit" />
+        <PackageReference Include="xunit.runner.visualstudio" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="Xunit" />
+        <Using Include="Shouldly" />
+        <Using Include="Reqnroll" />
+        <Using Include="Microsoft.Playwright" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- BackofficeIdentity.Api (EF Core auth service — real Kestrel server in E2E) -->
+        <ProjectReference Include="..\..\..\src\Backoffice Identity\BackofficeIdentity.Api\BackofficeIdentity.Api.csproj" />
+        <!-- Backoffice (domain project — notification handlers) -->
+        <ProjectReference Include="..\..\..\src\Backoffice\Backoffice\Backoffice.csproj" />
+        <!-- Backoffice.Api (Marten BFF + SignalR hub — real Kestrel server in E2E) -->
+        <ProjectReference Include="..\..\..\src\Backoffice\Backoffice.Api\Backoffice.Api.csproj" />
+        <!-- Backoffice.Web (Blazor WASM — served as static files in E2E) -->
+        <ProjectReference Include="..\..\..\src\Backoffice\Backoffice.Web\Backoffice.Web.csproj" />
+    </ItemGroup>
+
+    <!-- xUnit configuration for test execution (disable parallelization for E2E tests) -->
+    <ItemGroup>
+        <None Update="xunit.runner.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+    <!-- Playwright browser installation target (run once after build).
+         Use pwsh on Windows and the bundled Node.js CLI on Unix-like systems so builds
+         are cross-platform (macOS/Linux don't necessarily have pwsh installed).
+         Honor PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD. -->
+    <Target Name="InstallPlaywrightBrowsers" AfterTargets="Build">
+        <!-- Windows: prefer pwsh -> playwright.ps1. Don't fail the build if pwsh is missing (IgnoreExitCode). -->
+        <Exec Command="pwsh bin/$(Configuration)/$(TargetFramework)/playwright.ps1 install chromium"
+              Condition="'$(OS)' == 'Windows_NT' and '$(PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD)' != '1'"
+              IgnoreExitCode="true" />
+
+        <!-- Non-Windows: Try pwsh if present, otherwise use the Node.js CLI bundled by
+             the Microsoft.Playwright NuGet package. If neither is possible, print a message
+             but don't fail the build. -->
+        <Exec Condition="'$(OS)' != 'Windows_NT' and '$(PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD)' != '1'"
+              Command="bash -c 'BIN=bin/$(Configuration)/$(TargetFramework); if command -v pwsh &gt;/dev/null 2&gt;&amp;1; then pwsh $BIN/playwright.ps1 install chromium; else for ARCH in linux-x64 darwin-arm64 darwin-x64; do N=&quot;$BIN/.playwright/node/$ARCH/node&quot;; if [ -x &quot;$N&quot; ]; then &quot;$N&quot; &quot;$BIN/.playwright/package/cli.js&quot; install chromium; exit 0; fi; done; echo &quot;Playwright browser install skipped — see docs/PLAYWRIGHT-SETUP.md&quot;; fi'"
+              IgnoreExitCode="true" />
+    </Target>
+
+</Project>
