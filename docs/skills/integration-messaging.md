@@ -18,6 +18,18 @@ Patterns, conventions, and pitfalls for asynchronous message-based communication
 10. [Relationship to CONTEXTS.md](#relationship-to-contextsmd)
 11. [Critical Warnings](#critical-warnings)
 12. [Lessons Learned](#lessons-learned)
+    - [Lesson 1: Integration Queue Wiring Must Be Verified End-to-End](#lesson-1-integration-queue-wiring-must-be-verified-end-to-end-cycle-26-l1)
+    - [Lesson 2: Contract Expansion Must Include ALL Downstream Consumers](#lesson-2-contract-expansion-must-include-all-downstream-consumers-cycle-26-l2)
+    - [Lesson 3: Saga Terminal State Handlers Must Cover ALL Terminal Events](#lesson-3-saga-terminal-state-handlers-must-cover-all-terminal-events-cycle-26-l4)
+    - [Lesson 4: Integration Event Payload Schema Must Be Rich](#lesson-4-integration-event-payload-schema-must-be-rich-cycle-27-uxe-revision)
+    - [Lesson 5: Required Non-Nullable Fields on Message Records](#lesson-5-required-non-nullable-fields-on-message-records-cycle-22-l6)
+    - [Lesson 6: Event Tuple Returns Don't Persist Events](#lesson-6-event-tuple-returns-dont-persist-events-cycle-18-bug-5--m300)
+    - [Lesson 7: Publisher Configuration Must Match Subscriber Expectations](#lesson-7-publisher-configuration-must-match-subscriber-expectations-cycle-28)
+    - [Lesson 8: Commands Should Build Messages from Command Values, Not Entity State](#lesson-8-commands-should-build-messages-from-command-values-not-entity-state-cycle-22-l2)
+    - [Lesson 9: Fan-Out Pattern via OutgoingMessages](#lesson-9-fan-out-pattern-via-outgoingmessages-m300-pattern-2)
+    - [Lesson 10: Test Timing for Fan-Out Workflows](#lesson-10-test-timing-for-fan-out-workflows-m300-d4)
+    - [Lesson 11: Integration Contract Assertion Tests](#lesson-11-integration-contract-assertion-tests)
+    - [Lesson 12: Integration Message Handler → SignalR Broadcast Pattern](#lesson-12-integration-message-handler--signalr-broadcast-pattern-m320-w3) ⭐ *M32 Addition*
 13. [Appendix](#appendix)
 
 ---
@@ -1365,6 +1377,78 @@ public async Task ProvideAdditionalInfo_CreatesMessageWithFullPayload()
     evt.Timestamp.ShouldBeGreaterThan(DateTimeOffset.UtcNow.AddSeconds(-5));
 }
 ```
+
+---
+
+### Lesson 12: Integration Message Handler → SignalR Broadcast Pattern (M32.0, W3)
+
+**Use Case:** BFF integration message handlers that need to broadcast real-time updates via SignalR after processing external BC events.
+
+**Key Insight from M32.0:** Handlers must call `await session.SaveChangesAsync()` **before** returning SignalR events to ensure projection updates are committed.
+
+**Pattern — Async Handler with SaveChanges:**
+
+```csharp
+public static class OrderPlacedHandler
+{
+    // ✅ CORRECT: Async handler with explicit SaveChanges
+    public static async Task<LiveMetricUpdated> Handle(
+        Messages.Contracts.Orders.OrderPlaced message,
+        IDocumentSession session)
+    {
+        // 1. Append event to trigger inline projection
+        session.Events.Append(Guid.NewGuid(), message);
+
+        // 2. Commit transaction (inline projection updates here)
+        await session.SaveChangesAsync();
+
+        // 3. Now query the updated projection
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var metrics = await session.LoadAsync<AdminDailyMetrics>(today);
+
+        // 4. Return SignalR event with current metrics
+        return new LiveMetricUpdated(
+            metrics.TodaysOrders,
+            metrics.TodaysRevenue,
+            DateTimeOffset.UtcNow);
+    }
+}
+```
+
+**Why This Pattern:**
+- ✅ Inline projections update during `SaveChangesAsync()` (not before)
+- ✅ SignalR event contains current projection state (no stale data)
+- ✅ Clients receive real-time updates with accurate metrics
+
+**Common Pitfall — Missing SaveChanges:**
+
+```csharp
+// ❌ WRONG: Synchronous handler can't call SaveChangesAsync()
+public static LiveMetricUpdated Handle(
+    Messages.Contracts.Orders.OrderPlaced message,
+    IDocumentSession session)
+{
+    session.Events.Append(Guid.NewGuid(), message);
+
+    // ❌ Projection not updated yet!
+    var metrics = session.Load<AdminDailyMetrics>(today);
+
+    // ❌ SignalR event contains stale metrics
+    return new LiveMetricUpdated(metrics.TodaysOrders, ...);
+}
+```
+
+**Async vs Sync Handler Decision Matrix:**
+
+| Handler Needs | Return Type | Signature |
+|---------------|-------------|-----------|
+| Query projection after append | `Task<SignalREvent>` | `async Task<T> Handle(..., IDocumentSession session)` |
+| Just return SignalR event | `SignalREvent` | `T Handle(...)` |
+| Multi-BC orchestration | `Task<OutgoingMessages>` | `async Task<OutgoingMessages> Handle(..., IMessageBus bus)` |
+
+**Key Rule:** If your handler appends events and queries projections in the same transaction, it MUST be `async Task<T>` to call `await session.SaveChangesAsync()`.
+
+**Cross-Reference:** See `docs/skills/event-sourcing-projections.md` → "Lesson 0: Inline Projections Require Explicit SaveChanges" for projection-specific details.
 
 ---
 

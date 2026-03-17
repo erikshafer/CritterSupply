@@ -4,6 +4,28 @@
 
 Patterns for testing Wolverine and Marten applications in CritterSupply.
 
+## Table of Contents
+
+1. [Core Philosophy](#core-philosophy)
+2. [Testing Tools](#testing-tools)
+3. [Integration Test Fixture](#integration-test-fixture)
+4. [Test Isolation Checklist](#test-isolation-checklist)
+5. [Event Sourcing Race Conditions and Direct Command Invocation](#event-sourcing-race-conditions-and-direct-command-invocation)
+6. [Integration Test Pattern](#integration-test-pattern)
+7. [TestFixture Helper Methods](#testfixture-helper-methods)
+8. [Unit Testing Pure Functions](#unit-testing-pure-functions)
+9. [Testing Validators](#testing-validators)
+10. [Testing Event-Sourced Aggregates](#testing-event-sourced-aggregates)
+11. [Cross-Context Refactoring Checklist](#cross-context-refactoring-checklist)
+12. [Shouldly Assertions](#shouldly-assertions)
+13. [Test Organization](#test-organization)
+14. [Testing Async Patterns and Fan-Out Commands](#testing-async-patterns-and-fan-out-commands)
+15. [Multi-BC BFF Testing Patterns](#multi-bc-bff-testing-patterns) ⭐ *M32 Addition*
+16. [Key Principles](#key-principles)
+17. [TestFixture Standardization Summary](#testfixture-standardization-summary)
+
+---
+
 ## Planned: End-to-End Testing
 
 This document is intended for integration and unit level tests, not end-to-end (E2E) tests. The intent is that system-wide E2E testing will be appended here in its own section or be included in another document. The idea at the moment is to leverage a BDD-aligned framework like SpecFlow and write the specifications in the Gherkin language.
@@ -1357,6 +1379,343 @@ public async Task GenerateCouponBatch_ForDraftPromotion_CreatesSuccessfully()
 **When discovered:** M30.0 batch generation tests failed intermittently with 300ms delay. Increasing to 1000ms achieved 100% reliability.
 
 **Reference:** [M30.0 Retrospective - D4: Fan-Out Timing in Integration Tests](../../planning/milestones/m30-0-retrospective.md#d4-fan-out-timing-in-integration-tests)
+
+---
+
+## Multi-BC BFF Testing Patterns
+
+**From:** Backoffice BC (M32.0 Session 10)
+
+Backend-for-Frontend (BFF) bounded contexts orchestrate multiple domain BCs via HTTP clients. Testing these integrations requires **stub clients** to isolate tests from domain BC availability.
+
+### The Challenge: BFF Tests Depend on Multiple BCs
+
+**Problem:** BFF integration tests call 6+ domain BCs (Orders, Returns, Payments, Inventory, Fulfillment, Correspondence, Customer Identity). Running tests requires:
+- All domain BC APIs running
+- Each BC's database seeded with test data
+- Network calls across 6+ services
+- Flaky tests when any BC is down
+
+**Solution:** Stub HTTP clients that return in-memory data.
+
+### Stub Client Pattern
+
+**Anatomy of a stub client:**
+
+```csharp
+public class StubOrdersClient : IOrdersClient
+{
+    // Separate storage for list vs detail views
+    private readonly Dictionary<Guid, OrderSummaryDto> _orders = new();
+    private readonly Dictionary<Guid, OrderDetailDto> _orderDetails = new();
+
+    // Setup methods for tests
+    public void AddOrder(OrderSummaryDto order)
+    {
+        _orders[order.OrderId] = order;
+    }
+
+    public void AddOrderDetail(OrderDetailDto detail)
+    {
+        _orderDetails[detail.OrderId] = detail;
+    }
+
+    // Client interface implementations
+    public Task<IReadOnlyList<OrderSummaryDto>> GetOrders(Guid customerId)
+    {
+        var orders = _orders.Values
+            .Where(o => o.CustomerId == customerId)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<OrderSummaryDto>>(orders);
+    }
+
+    public Task<OrderDetailDto?> GetOrderDetail(Guid orderId)
+    {
+        return Task.FromResult(_orderDetails.GetValueOrDefault(orderId));
+    }
+}
+```
+
+**Key insight:** Stub clients have **separate storage** for list vs detail DTOs. This mirrors real BC API design where list endpoints return summaries and detail endpoints return full objects.
+
+### BFF TestFixture with Stub Clients
+
+**From:** Backoffice.Api.IntegrationTests (M32.0)
+
+```csharp
+public class BackofficeTestFixture : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
+        .WithDatabase("backoffice_test_db")
+        .WithName($"backoffice-postgres-test-{Guid.NewGuid():N}")
+        .WithCleanUp(true)
+        .Build();
+
+    private string? _connectionString;
+
+    public IAlbaHost Host { get; private set; } = null!;
+
+    // Stub clients (public for test setup)
+    public StubCustomerIdentityClient CustomerIdentityClient { get; private set; } = null!;
+    public StubOrdersClient OrdersClient { get; private set; } = null!;
+    public StubReturnsClient ReturnsClient { get; private set; } = null!;
+    public StubCorrespondenceClient CorrespondenceClient { get; private set; } = null!;
+    public StubInventoryClient InventoryClient { get; private set; } = null!;
+    public StubFulfillmentClient FulfillmentClient { get; private set; } = null!;
+
+    public async Task InitializeAsync()
+    {
+        await _postgres.StartAsync();
+        _connectionString = _postgres.GetConnectionString();
+
+        // Initialize stub clients
+        CustomerIdentityClient = new StubCustomerIdentityClient();
+        OrdersClient = new StubOrdersClient();
+        ReturnsClient = new StubReturnsClient();
+        CorrespondenceClient = new StubCorrespondenceClient();
+        InventoryClient = new StubInventoryClient();
+        FulfillmentClient = new StubFulfillmentClient();
+
+        JasperFxEnvironment.AutoStartHost = true;
+
+        Host = await AlbaHost.For<Program>(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                services.ConfigureMarten(opts =>
+                {
+                    opts.Connection(_connectionString);
+                });
+
+                services.DisableAllExternalWolverineTransports();
+
+                // Register stub clients in DI
+                services.AddScoped<ICustomerIdentityClient>(_ => CustomerIdentityClient);
+                services.AddScoped<IOrdersClient>(_ => OrdersClient);
+                services.AddScoped<IReturnsClient>(_ => ReturnsClient);
+                services.AddScoped<ICorrespondenceClient>(_ => CorrespondenceClient);
+                services.AddScoped<IInventoryClient>(_ => InventoryClient);
+                services.AddScoped<IFulfillmentClient>(_ => FulfillmentClient);
+            });
+        });
+    }
+
+    public async Task DisposeAsync()
+    {
+        if (Host != null)
+            await Host.DisposeAsync();
+        await _postgres.DisposeAsync();
+    }
+}
+```
+
+**Key decisions:**
+1. **Stub clients are public properties** — Tests can seed data via `_fixture.OrdersClient.AddOrder(...)`
+2. **Scoped registration** — Each test request gets the same stub instance
+3. **Factory delegates** — `_ => CustomerIdentityClient` ensures Alba's DI uses fixture instances
+
+### End-to-End CS Workflow Tests
+
+**Pattern:** Test complete customer service workflows spanning multiple BCs.
+
+**Example from Backoffice BC (M32.0 Session 10):**
+
+```csharp
+[Fact]
+public async Task CustomerServiceWorkflow_SearchToReturnApproval_CompletesSuccessfully()
+{
+    // Arrange — Seed all domain BCs with test data
+    var customerId = Guid.NewGuid();
+    var orderId = Guid.NewGuid();
+    var returnId = Guid.NewGuid();
+
+    // 1. Customer Identity BC
+    _fixture.CustomerIdentityClient.AddCustomer(new CustomerDto(
+        customerId,
+        "customer@example.com",
+        "John Doe",
+        [new AddressDto("123 Main St", null, "Portland", "OR", "97201", "US")]
+    ));
+
+    // 2. Orders BC (list + detail!)
+    _fixture.OrdersClient.AddOrder(new OrderSummaryDto(
+        orderId, customerId, 99.99m, "Delivered", DateTimeOffset.UtcNow.AddDays(-5)
+    ));
+
+    _fixture.OrdersClient.AddOrderDetail(new OrderDetailDto(
+        orderId,
+        customerId,
+        "Delivered",
+        99.99m,
+        [new OrderLineItemDto("SKU123", "Dog Food 5lb", 2, 24.99m)],
+        DateTimeOffset.UtcNow.AddDays(-5)
+    ));
+
+    // 3. Returns BC
+    _fixture.ReturnsClient.AddReturn(new ReturnDetailDto(
+        returnId,
+        orderId,
+        customerId,
+        "Pending",
+        [new ReturnItemDto("SKU123", 1, 24.99m, "Wrong size")],
+        DateTimeOffset.UtcNow.AddDays(-1)
+    ));
+
+    // 4. Correspondence BC
+    _fixture.CorrespondenceClient.AddMessage(new CorrespondenceMessageDto(
+        Guid.NewGuid(),
+        customerId,
+        "Order confirmation",
+        "Your order #12345 has shipped",
+        "Email",
+        DateTimeOffset.UtcNow.AddDays(-5)
+    ));
+
+    // Act & Assert — Test complete CS workflow
+    // Step 1: Search customer by email
+    var customer = await _fixture.CustomerIdentityClient.GetCustomerByEmail("customer@example.com");
+    customer.ShouldNotBeNull();
+
+    // Step 2: Get customer's orders
+    var orders = await _fixture.OrdersClient.GetOrders(customerId);
+    orders.Count.ShouldBe(1);
+
+    // Step 3: Get order details
+    var orderDetail = await _fixture.OrdersClient.GetOrderDetail(orderId);
+    orderDetail.ShouldNotBeNull();
+    orderDetail.Items.Count.ShouldBe(1);
+
+    // Step 4: Get return details
+    var returnDetail = await _fixture.ReturnsClient.GetReturn(returnId);
+    returnDetail.ShouldNotBeNull();
+    returnDetail.Status.ShouldBe("Pending");
+
+    // Step 5: Approve return
+    await _fixture.Host.Scenario(s =>
+    {
+        s.Post.Json(new { }).ToUrl($"/api/backoffice/returns/{returnId}/approve");
+        s.StatusCodeShouldBe(200);
+    });
+
+    // Step 6: Get correspondence history
+    var messages = await _fixture.CorrespondenceClient.GetMessages(customerId);
+    messages.Count.ShouldBe(1);
+}
+```
+
+**Why this test is valuable:**
+
+1. **End-to-end workflow** — Tests complete CS agent scenario (search → orders → returns → approval → correspondence)
+2. **Multi-BC composition** — Verifies BFF orchestrates 4 domain BCs correctly
+3. **Real HTTP calls** — Uses Alba to test actual HTTP endpoints, not just handler logic
+4. **Isolated from domain BCs** — No dependency on Orders.Api, Returns.Api, etc.
+
+### Common Pitfall: Forgetting AddOrderDetail()
+
+**From:** Backoffice BC (M32.0 Session 10 — Issue 4)
+
+**Problem:** Tests failed with 404 "Order not found" when getting order details:
+
+```csharp
+// ❌ BAD: Only added summary, not detail
+_fixture.OrdersClient.AddOrder(new OrderSummaryDto(orderId, ...));
+
+// Test calls GetOrderDetail(orderId)
+var detail = await _fixture.OrdersClient.GetOrderDetail(orderId);
+// detail is null! ❌
+```
+
+**Root cause:** StubOrdersClient has **separate storage** for `OrderSummaryDto` (list view) and `OrderDetailDto` (detail view). This mirrors real BC API design where:
+- `GET /api/orders?customerId=X` returns `OrderSummaryDto[]` (lightweight)
+- `GET /api/orders/{orderId}` returns `OrderDetailDto` (full object with line items)
+
+**Fix:** Call both `AddOrder()` and `AddOrderDetail()`:
+
+```csharp
+// ✅ GOOD: Add both summary and detail
+_fixture.OrdersClient.AddOrder(new OrderSummaryDto(orderId, customerId, 99.99m, "Delivered", ...));
+
+_fixture.OrdersClient.AddOrderDetail(new OrderDetailDto(
+    orderId,
+    customerId,
+    "Delivered",
+    99.99m,
+    Items: [new OrderLineItemDto("SKU123", "Dog Food", 2, 24.99m)],
+    PlacedAt: DateTimeOffset.UtcNow
+));
+
+// Now GetOrderDetail() works ✅
+var detail = await _fixture.OrdersClient.GetOrderDetail(orderId);
+detail.ShouldNotBeNull();
+```
+
+**Lesson:** Stub clients must mirror real BC API structure. If the real BC has separate endpoints for list vs detail, stub client needs separate storage.
+
+### Event-Driven Projection Tests
+
+**Pattern:** Test BFF projections sourced from domain BC integration messages.
+
+**Example from Backoffice BC (M32.0 Session 10):**
+
+```csharp
+[Fact]
+public async Task OrderPlacedEvent_UpdatesDashboardMetrics_WithIncrementedOrderCount()
+{
+    // Arrange — Clean slate
+    await _fixture.CleanAllDocumentsAsync();
+
+    var orderId = Guid.NewGuid();
+    var customerId = Guid.NewGuid();
+
+    // Act — Simulate OrderPlaced integration message from Orders BC
+    await using (var session = _fixture.GetDocumentSession())
+    {
+        var message = new Orders.OrderPlaced(
+            orderId,
+            customerId,
+            LineItems: [new OrderLineItemSnapshot("SKU123", 2, 24.99m)],
+            OrderTotal: 49.98m,
+            PlacedAt: DateTimeOffset.UtcNow
+        );
+
+        // Append to BFF event store (triggers inline projection)
+        session.Events.Append(Guid.NewGuid(), message);
+        await session.SaveChangesAsync();
+    }
+
+    // Assert — Verify projection updated
+    await using (var session = _fixture.GetDocumentSession())
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var metrics = await session.LoadAsync<AdminDailyMetrics>(today);
+
+        metrics.ShouldNotBeNull();
+        metrics.OrderCount.ShouldBe(1);
+        metrics.Revenue.ShouldBe(49.98m);
+    }
+}
+```
+
+**Key pattern:** Directly append integration messages to BFF's event store to test projections in isolation (no RabbitMQ required).
+
+### When to Use Multi-BC Composition Tests
+
+✅ **Use when:**
+- BFF composes data from 2+ domain BCs
+- Testing end-to-end CS/admin workflows
+- Verifying HTTP client orchestration
+- Ensuring view models aggregate correctly
+
+❌ **Don't use when:**
+- Testing single-BC logic (use domain BC's own tests)
+- Testing domain BC internals (use domain BC integration tests)
+- Simple HTTP proxying (stub clients add unnecessary complexity)
+
+**Takeaway:** Multi-BC composition tests verify BFF orchestration without requiring all domain BCs to be running. Stub clients + end-to-end scenario tests are the gold standard for BFF integration testing.
+
+**References:**
+- [M32.0 Session 10 Retrospective](../../planning/milestones/m32-0-session-10-retrospective.md)
+- [M32.0 Milestone Retrospective — Lesson L3](../../planning/milestones/m32-0-retrospective.md#l3-stub-clients-require-separate-list-vs-detail-storage)
 
 ---
 

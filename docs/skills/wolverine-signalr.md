@@ -2,6 +2,31 @@
 
 Comprehensive guide for using Wolverine's native SignalR transport in CritterSupply — covering server setup, hub design, authentication, client integration, the SignalR Client transport, group-based routing, Marten side-effect pipelines, and lessons learned from the Storefront and Vendor Portal bounded contexts.
 
+## Table of Contents
+
+1. [When to Use This Skill](#when-to-use-this-skill)
+2. [Core Concepts](#core-concepts)
+3. [Server Configuration](#server-configuration)
+4. [Marker Interfaces and Message Routing](#marker-interfaces-and-message-routing)
+5. [Hub Group Management](#hub-group-management)
+   - [Server-Side Group Enrollment](#server-side-group-enrollment)
+   - [Handler-Driven Group Management](#handler-driven-group-management)
+   - [Targeted Group Publishing](#targeted-group-publishing-towebsocketgroup)
+   - [Role-Based Groups](#role-based-groups-m320-pattern) ⭐ *M32 Addition*
+   - [Responding to the Originating Connection](#responding-to-the-originating-connection)
+6. [Authentication Patterns](#authentication-patterns)
+7. [Marten Projection Side Effects Pipeline](#marten-projection-side-effects-pipeline)
+8. [Client-Side Integration](#client-side-integration)
+9. [SignalR Client Transport](#signalr-client-transport)
+10. [WebSocket Sagas](#websocket-sagas)
+11. [Lessons Learned in CritterSupply](#lessons-learned-in-crittersupply)
+12. [Scaling Considerations](#scaling-considerations)
+13. [Diagnostics](#diagnostics)
+14. [Common Pitfalls Summary](#common-pitfalls-summary)
+15. [See Also](#see-also)
+
+---
+
 ## When to Use This Skill
 
 **Use Wolverine's SignalR transport when:**
@@ -367,6 +392,134 @@ public static class LowStockHandler
     }
 }
 ```
+
+### Role-Based Groups (M32.0 Pattern)
+
+**Use Case:** Backoffice BC where users have different roles (Admin, CS Rep, Operations) and should receive different real-time updates based on their permissions.
+
+**Key Insight from M32.0:** Use **role-based group enrollment** in addition to user-specific groups to enable broadcasting to all users with a specific role.
+
+**Backoffice Hub Pattern:**
+
+```csharp
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+public sealed class BackofficeHub : WolverineHub
+{
+    public override async Task OnConnectedAsync()
+    {
+        var userId = Context.User!.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var roles = Context.User!.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+
+        if (userId is null || !roles.Any())
+        {
+            Context.Abort();
+            return;
+        }
+
+        // User-specific group (for targeted notifications)
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"user:{userId}");
+
+        // Role-based groups (for role-scoped broadcasts)
+        foreach (var role in roles)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"role:{role.ToLowerInvariant()}");
+        }
+
+        // Global "all backoffice users" group
+        await Groups.AddToGroupAsync(Context.ConnectionId, "backoffice:all");
+
+        await base.OnConnectedAsync();
+    }
+}
+```
+
+**Group Enrollment Strategy:**
+
+| Group Pattern | Purpose | Example Message |
+|---------------|---------|----------------|
+| `user:{userId}` | User-specific notifications | "Your CS ticket #123 was assigned to you" |
+| `role:admin` | Admin-only broadcasts | "New admin-level alert: Database migration pending" |
+| `role:csrep` | CS rep broadcasts | "New CS ticket #456 requires attention" |
+| `role:operations` | Operations team broadcasts | "Fulfillment delay detected on Order #789" |
+| `backoffice:all` | Global announcements | "System maintenance in 10 minutes" |
+
+**Handler Examples:**
+
+**User-Specific Notification:**
+```csharp
+public static class TicketAssignedHandler
+{
+    public static SignalRMessage<TicketAssigned> Handle(Messages.Contracts.Support.TicketAssigned message)
+    {
+        // Send to specific user only
+        return new TicketAssigned(message.TicketId, message.AssignedTo)
+            .ToWebSocketGroup($"user:{message.AssignedTo}");
+    }
+}
+```
+
+**Role-Based Broadcast:**
+```csharp
+public static class NewTicketHandler
+{
+    public static SignalRMessage<NewTicketAlert> Handle(Messages.Contracts.Support.TicketCreated message)
+    {
+        // Broadcast to all CS reps
+        return new NewTicketAlert(message.TicketId, message.Priority)
+            .ToWebSocketGroup("role:csrep");
+    }
+}
+```
+
+**Global Broadcast:**
+```csharp
+public static class SystemMaintenanceHandler
+{
+    public static SignalRMessage<MaintenanceAlert> Handle(MaintenanceScheduled message)
+    {
+        // Broadcast to all backoffice users
+        return new MaintenanceAlert(message.ScheduledAt, message.DurationMinutes)
+            .ToWebSocketGroup("backoffice:all");
+    }
+}
+```
+
+**When to Use Each Pattern:**
+
+| Scenario | Group Pattern | Rationale |
+|----------|---------------|-----------|
+| Personal task assignment | `user:{userId}` | Only the assigned user needs to know |
+| Role-specific alerts (CS tickets) | `role:csrep` | All CS reps should see new tickets |
+| Admin-only system events | `role:admin` | Only admins have permission to act on these |
+| Global system announcements | `backoffice:all` | All users need to see maintenance windows |
+
+**Anti-Pattern: User-List Iteration**
+
+```csharp
+// ❌ WRONG: Iterating users and sending individually
+public static async Task Handle(NewTicketAlert message, IHubContext<BackofficeHub> hub)
+{
+    var csReps = await GetAllCsRepUserIds();  // Database query!
+    foreach (var userId in csReps)
+    {
+        await hub.Clients.Group($"user:{userId}").SendAsync("NewTicket", message);
+    }
+}
+
+// ✅ CORRECT: Use role-based group
+public static SignalRMessage<NewTicketAlert> Handle(NewTicketAlert message)
+{
+    return message.ToWebSocketGroup("role:csrep");
+}
+```
+
+**Why Role-Based Groups:**
+- ✅ No database query per broadcast
+- ✅ Scales to 100s of users per role
+- ✅ Group enrollment happens once at connection time
+- ✅ Permissions enforced via JWT claims
+
+**Cross-Reference:** See `docs/skills/blazor-wasm-jwt.md` → "RBAC: Role-Based UI with Server-Side Enforcement" for client-side role checks.
 
 ### Responding to the Originating Connection
 

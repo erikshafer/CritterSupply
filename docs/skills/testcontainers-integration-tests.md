@@ -7,6 +7,29 @@ description: Write integration tests using TestContainers for .NET with xUnit. C
 
 > **Scope:** This skill covers TestContainers infrastructure setup (Postgres, RabbitMQ, etc.) — getting real databases running in Docker for tests. For testing patterns using Wolverine handlers, Marten aggregates, and Alba HTTP scenarios, see `critterstack-testing-patterns.md`.
 
+## Table of Contents
+
+1. [When to Use This Skill](#when-to-use-this-skill)
+2. [Core Principles](#core-principles)
+3. [Why TestContainers Over Mocks?](#why-testcontainers-over-mocks)
+4. [Required NuGet Packages](#required-nuget-packages)
+5. [TestContainers Setup Patterns](#testcontainers-setup-patterns)
+   - [Pattern 1: Marten-Based BC](#pattern-1-marten-based-bc-event-store-or-document-store)
+   - [Pattern 2: EF Core-Based BC](#pattern-2-ef-core-based-bc)
+   - [Pattern 3: Multi-BC BFF with Stub Clients](#pattern-3-multi-bc-bff-with-stub-clients) ⭐ *M32 Addition*
+   - [Collection Fixtures](#collection-fixtures-for-sequential-test-execution)
+6. [Data Cleanup Strategies](#data-cleanup-strategies)
+7. [Best Practices](#best-practices)
+8. [Performance Tips](#performance-tips)
+9. [Testing Patterns](#testing-patterns)
+10. [Common Pitfalls](#common-pitfalls)
+11. [CI/CD Considerations](#cicd-considerations)
+12. [Summary](#summary)
+13. [Polecat (SQL Server Event Store) Support](#polecat-sql-server-event-store-support)
+14. [References](#references)
+
+---
+
 ## When to Use This Skill
 
 Use this skill when:
@@ -673,6 +696,215 @@ public class TestFixture : IAsyncLifetime
 - Calls `Database.MigrateAsync()` to apply migrations after container startup
 - Provides `GetDbContext()` for direct database access in tests
 - Uses `ExecuteDeleteAsync()` for efficient bulk delete operations between tests
+
+### Pattern 3: Multi-BC BFF with Stub Clients
+
+**Use Case:** Backend-for-Frontend (BFF) projects like Backoffice that compose data from multiple bounded contexts via HTTP clients.
+
+**Key Insight from M32.0:** BFF TestFixtures need **stub HTTP clients** for all dependencies to avoid real network calls and enable deterministic testing.
+
+```csharp
+using Alba;
+using JasperFx.CommandLine;
+using Marten;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Testcontainers.PostgreSql;
+using Wolverine;
+
+namespace Backoffice.Api.IntegrationTests;
+
+public class BackofficeTestFixture : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
+        .WithDatabase("backoffice_test_db")
+        .WithName($"backoffice-postgres-test-{Guid.NewGuid():N}")
+        .WithCleanUp(true)
+        .Build();
+
+    private string? _connectionString;
+
+    public IAlbaHost Host { get; private set; } = null!;
+
+    // Expose stub clients for test data setup
+    public StubCustomerIdentityClient CustomerIdentityClient { get; private set; } = null!;
+    public StubOrdersClient OrdersClient { get; private set; } = null!;
+    public StubReturnsClient ReturnsClient { get; private set; } = null!;
+    public StubCorrespondenceClient CorrespondenceClient { get; private set; } = null!;
+    public StubInventoryClient InventoryClient { get; private set; } = null!;
+    public StubFulfillmentClient FulfillmentClient { get; private set; } = null!;
+
+    public async Task InitializeAsync()
+    {
+        await _postgres.StartAsync();
+
+        _connectionString = _postgres.GetConnectionString();
+
+        // Initialize stub clients
+        CustomerIdentityClient = new StubCustomerIdentityClient();
+        OrdersClient = new StubOrdersClient();
+        ReturnsClient = new StubReturnsClient();
+        CorrespondenceClient = new StubCorrespondenceClient();
+        InventoryClient = new StubInventoryClient();
+        FulfillmentClient = new StubFulfillmentClient();
+
+        JasperFxEnvironment.AutoStartHost = true;
+
+        Host = await AlbaHost.For<Program>(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                services.ConfigureMarten(opts =>
+                {
+                    opts.Connection(_connectionString);
+                });
+
+                // Replace real HTTP clients with stubs
+                services.RemoveAll<ICustomerIdentityClient>();
+                services.AddSingleton<ICustomerIdentityClient>(CustomerIdentityClient);
+
+                services.RemoveAll<IOrdersClient>();
+                services.AddSingleton<IOrdersClient>(OrdersClient);
+
+                services.RemoveAll<IReturnsClient>();
+                services.AddSingleton<IReturnsClient>(ReturnsClient);
+
+                services.RemoveAll<ICorrespondenceClient>();
+                services.AddSingleton<ICorrespondenceClient>(CorrespondenceClient);
+
+                services.RemoveAll<IInventoryClient>();
+                services.AddSingleton<IInventoryClient>(InventoryClient);
+
+                services.RemoveAll<IFulfillmentClient>();
+                services.AddSingleton<IFulfillmentClient>(FulfillmentClient);
+
+                services.DisableAllExternalWolverineTransports();
+            });
+        });
+    }
+
+    public async Task DisposeAsync()
+    {
+        if (Host != null)
+        {
+            try
+            {
+                await Host.StopAsync();
+                await Host.DisposeAsync();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Ignore if already disposed during async shutdown
+            }
+            catch (TaskCanceledException)
+            {
+                // Ignore if tasks were canceled during async shutdown
+            }
+            catch (AggregateException ex) when (ex.InnerExceptions.All(e =>
+                e is OperationCanceledException or ObjectDisposedException))
+            {
+                // Ignore cancellation/disposal exceptions during shutdown
+            }
+        }
+
+        await _postgres.DisposeAsync();
+    }
+
+    public IDocumentSession GetDocumentSession()
+    {
+        return Host.Services.GetRequiredService<IDocumentStore>().LightweightSession();
+    }
+
+    public IDocumentStore GetDocumentStore()
+    {
+        return Host.Services.GetRequiredService<IDocumentStore>();
+    }
+
+    public async Task CleanAllDataAsync()
+    {
+        var store = GetDocumentStore();
+        await store.Advanced.Clean.DeleteAllDocumentsAsync();
+
+        // Clean stub client data
+        CustomerIdentityClient.Clear();
+        OrdersClient.Clear();
+        ReturnsClient.Clear();
+        CorrespondenceClient.Clear();
+        InventoryClient.Clear();
+        FulfillmentClient.Clear();
+    }
+}
+```
+
+**Key Points:**
+- **Stub clients as public properties** — Tests can seed data directly via `_fixture.OrdersClient.AddOrderDetail(dto)`
+- **RemoveAll<T>() + AddSingleton<T>()** — Replace production HTTP clients with in-memory stubs
+- **CleanAllDataAsync() clears stub data** — Each test gets fresh stub state (prevents data leakage)
+- **6 stub clients** — One for each BC dependency (CustomerIdentity, Orders, Returns, Correspondence, Inventory, Fulfillment)
+
+**Why This Pattern:**
+- ✅ No real HTTP calls (tests run in isolation)
+- ✅ Deterministic test data (no flaky network issues)
+- ✅ Fast (no network latency)
+- ✅ Testable end-to-end workflows (multi-BC orchestration)
+
+**Example Stub Client:**
+
+```csharp
+public class StubOrdersClient : IOrdersClient
+{
+    private readonly Dictionary<Guid, OrderSummaryDto> _orders = new();
+    private readonly Dictionary<Guid, OrderDetailDto> _orderDetails = new();
+
+    public void AddOrder(OrderSummaryDto order)
+    {
+        _orders[order.OrderId] = order;
+    }
+
+    public void AddOrderDetail(OrderDetailDto detail)
+    {
+        _orderDetails[detail.OrderId] = detail;
+    }
+
+    public void Clear()
+    {
+        _orders.Clear();
+        _orderDetails.Clear();
+    }
+
+    // Interface implementations
+    public Task<PagedResult<OrderSummaryDto>> GetOrders(string? searchTerm, int page, int pageSize)
+    {
+        var query = _orders.Values.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            query = query.Where(o => o.OrderId.ToString().Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        var total = query.Count();
+
+        return Task.FromResult(new PagedResult<OrderSummaryDto>
+        {
+            Items = items,
+            TotalCount = total,
+            Page = page,
+            PageSize = pageSize
+        });
+    }
+
+    public Task<OrderDetailDto?> GetOrderDetail(Guid orderId)
+    {
+        _orderDetails.TryGetValue(orderId, out var detail);
+        return Task.FromResult(detail);
+    }
+}
+```
+
+**Critical Pattern from M32.0:** Stub clients maintain **separate storage for list vs detail DTOs**. This allows tests to control exactly what data is returned for list queries vs detail queries.
+
+**Common Pitfall:** Forgetting to call both `AddOrder()` (for list view) AND `AddOrderDetail()` (for detail view). See `critterstack-testing-patterns.md` → "Multi-BC BFF Testing Patterns" for full examples.
 
 ### Collection Fixtures for Sequential Test Execution
 

@@ -12,6 +12,7 @@ Patterns and practices for building message handlers and HTTP endpoints with Wol
 4. [Aggregate Handler Workflow (Decider Pattern)](#aggregate-handler-workflow-decider-pattern)
 5. [Entity and Document Loading](#entity-and-document-loading)
 6. [Handler Return Patterns](#handler-return-patterns)
+   - [Pattern 8: Async vs Sync Return Types](#pattern-8-async-vs-sync-return-types-m320-lesson) ⭐ *M32 Addition*
 7. [Railway Programming in Handlers](#railway-programming-in-handlers)
 8. [HTTP Endpoints](#http-endpoints)
 9. [Handler Discovery](#handler-discovery)
@@ -760,6 +761,122 @@ public static IEnumerable<object> Handle(
 if (request is null || !request.IsActive)
     return [];  // Silently skip — Wolverine traces the no-op
 ```
+
+### Pattern 8: Async vs Sync Return Types (M32.0 Lesson)
+
+**Key Insight from M32.0:** Handlers that append events and query projections in the same transaction MUST be `async Task<T>` to call `await session.SaveChangesAsync()`.
+
+**Decision Matrix:**
+
+| Handler Needs | Return Type | Method Signature |
+|---------------|-------------|------------------|
+| **Query projection after event append** | `Task<SignalREvent>` | `async Task<T> Handle(..., IDocumentSession session)` |
+| **Just return SignalR event (no projection query)** | `SignalREvent` | `T Handle(...)` |
+| **Multi-BC orchestration** | `Task<OutgoingMessages>` | `async Task<OutgoingMessages> Handle(..., IMessageBus bus)` |
+| **Simple event append** | `Events` | `Events Handle(..., [WriteAggregate] Aggregate agg)` |
+| **HTTP query endpoint** | `Task<ViewDto>` | `async Task<ViewDto> Handle(..., IDocumentSession session)` |
+
+**✅ CORRECT — Async handler with SaveChanges:**
+
+```csharp
+public static class OrderPlacedHandler
+{
+    // ✅ Handler appends event AND queries projection → MUST be async
+    public static async Task<LiveMetricUpdated> Handle(
+        Messages.Contracts.Orders.OrderPlaced message,
+        IDocumentSession session)
+    {
+        // 1. Append event to trigger inline projection
+        session.Events.Append(Guid.NewGuid(), message);
+
+        // 2. Commit transaction (inline projection updates here)
+        await session.SaveChangesAsync();
+
+        // 3. Now query the updated projection
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var metrics = await session.LoadAsync<AdminDailyMetrics>(today);
+
+        // 4. Return SignalR event with current metrics
+        return new LiveMetricUpdated(
+            metrics.TodaysOrders,
+            metrics.TodaysRevenue,
+            DateTimeOffset.UtcNow);
+    }
+}
+```
+
+**❌ WRONG — Synchronous handler can't query after append:**
+
+```csharp
+// ❌ Synchronous handler can't call SaveChangesAsync()
+public static LiveMetricUpdated Handle(
+    Messages.Contracts.Orders.OrderPlaced message,
+    IDocumentSession session)
+{
+    session.Events.Append(Guid.NewGuid(), message);
+
+    // ❌ Projection not updated yet!
+    var metrics = session.Load<AdminDailyMetrics>(today);
+
+    // ❌ SignalR event contains stale metrics
+    return new LiveMetricUpdated(metrics.TodaysOrders, ...);
+}
+```
+
+**Why This Matters:**
+- Inline projections update during `SaveChangesAsync()`, not before
+- Synchronous handlers can't call `await session.SaveChangesAsync()`
+- Querying projections before `SaveChangesAsync()` returns stale data
+- SignalR clients receive incorrect metrics/state
+
+**Common Use Cases:**
+
+**Use Case 1: BFF Integration Handler → SignalR Broadcast**
+```csharp
+// Integration message handler that broadcasts via SignalR
+public static async Task<BackofficeEvent> Handle(
+    OrderPlaced message,
+    IDocumentSession session)
+{
+    // Trigger projection update
+    session.Events.Append(Guid.NewGuid(), message);
+    await session.SaveChangesAsync();
+
+    // Query updated projection
+    var metrics = await session.LoadAsync<AdminDailyMetrics>(DateOnly.FromDateTime(DateTime.UtcNow));
+
+    // Broadcast to SignalR (BackofficeEvent is routed by Wolverine)
+    return new LiveMetricUpdated(metrics.TodaysOrders, metrics.TodaysRevenue, DateTimeOffset.UtcNow);
+}
+```
+
+**Use Case 2: Simple Event Append (No Projection Query)**
+```csharp
+// No projection query → synchronous is fine
+public static Events Handle(AddItemToCart cmd, [WriteAggregate] ShoppingCart cart)
+{
+    return [new ItemAdded(cart.Id, cmd.Sku, cmd.Quantity)];
+}
+```
+
+**Use Case 3: HTTP Query Endpoint**
+```csharp
+// Query endpoint → async required
+[WolverineGet("/api/dashboard/metrics")]
+public static async Task<AdminDailyMetrics> Handle(GetDailyMetrics query, IDocumentSession session)
+{
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+    var metrics = await session.LoadAsync<AdminDailyMetrics>(today);
+    return metrics ?? AdminDailyMetrics.Empty;
+}
+```
+
+**Rule of Thumb:**
+- If your handler calls `await` on **anything** → Use `async Task<T>`
+- If your handler is pure function with no I/O → Use synchronous `T`
+- When in doubt → Use `async Task<T>` (Wolverine handles both identically)
+
+**Cross-Reference:** See `docs/skills/integration-messaging.md` → "Lesson 12: Integration Message Handler → SignalR Broadcast Pattern" for more context.
 
 ### Summary Table
 
