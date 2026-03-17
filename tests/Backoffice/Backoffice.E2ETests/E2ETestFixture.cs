@@ -148,6 +148,44 @@ public sealed class E2ETestFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Seeds an admin user into BackofficeIdentity EF Core database.
+    /// Used by authentication scenario steps to create test admin accounts.
+    /// </summary>
+    public void SeedAdminUser(Guid userId, string email, string fullName, string password)
+    {
+        if (_identityFactory == null)
+            throw new InvalidOperationException("BackofficeIdentity factory not initialized. Call InitializeAsync() first.");
+
+        using var scope = _identityFactory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BackofficeIdentity.Identity.BackofficeIdentityDbContext>();
+
+        // Check if user already exists
+        if (dbContext.Users.Any(u => u.Id == userId))
+            return; // Already seeded
+
+        // Split full name into first and last name
+        var nameParts = fullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        var firstName = nameParts.Length > 0 ? nameParts[0] : "Test";
+        var lastName = nameParts.Length > 1 ? nameParts[1] : "User";
+
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(password);
+        var adminUser = new BackofficeIdentity.Identity.BackofficeUser
+        {
+            Id = userId,
+            Email = email,
+            PasswordHash = passwordHash,
+            FirstName = firstName,
+            LastName = lastName,
+            Role = BackofficeIdentity.Identity.BackofficeRole.SystemAdmin, // Default to SystemAdmin for E2E tests
+            Status = BackofficeIdentity.Identity.BackofficeUserStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        dbContext.Users.Add(adminUser);
+        dbContext.SaveChanges();
+    }
+
+    /// <summary>
     /// Seeds standard test data for E2E scenarios (customers, orders, returns, alerts).
     /// </summary>
     public void SeedStandardScenario()
@@ -196,10 +234,10 @@ public sealed class E2ETestFixture : IAsyncLifetime
 /// <summary>
 /// WebApplicationFactory for BackofficeIdentity.Api that binds to a real Kestrel TCP port.
 /// Runs the real EF Core service with auto-seeded demo accounts.
-/// Uses BackofficeIdentity.Api.Auth.AdminLoginEndpoint as anchor (Program ambiguous).
+/// Uses BackofficeIdentity.Api.TestMarker as anchor.
 /// </summary>
 internal sealed class BackofficeIdentityApiKestrelFactory(string connectionString)
-    : WebApplicationFactory<BackofficeIdentity.Api.Auth.AdminLoginEndpoint>
+    : WebApplicationFactory<BackofficeIdentity.Api.TestMarker>
 {
     public string ServerAddress { get; private set; } = string.Empty;
 
