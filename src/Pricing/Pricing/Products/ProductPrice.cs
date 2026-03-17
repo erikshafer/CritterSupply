@@ -118,6 +118,15 @@ public sealed record ProductPrice
         return new Guid(hash[..16]);
     }
 
+    public ProductPrice Apply(ProductRegistered @event) =>
+        this with
+        {
+            Id = @event.ProductPriceId,
+            Sku = @event.Sku.ToUpperInvariant(),
+            Status = PriceStatus.Unpriced,
+            RegisteredAt = @event.RegisteredAt
+        };
+
     public ProductPrice Apply(InitialPriceSet @event) =>
         this with
         {

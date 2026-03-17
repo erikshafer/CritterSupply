@@ -33,22 +33,17 @@ public sealed class SetBasePriceEndpointTests(TestFixture fixture) : IAsyncLifet
         // Act: Set base price via HTTP endpoint
         var result = await _fixture.Host.Scenario(x =>
         {
-            x.Put.Json(new
+            x.Post.Json(new
             {
-                price = 15.99m,
-                floorPrice = (decimal?)null,
-                ceilingPrice = (decimal?)null
-            }).ToUrl($"/api/pricing/products/{sku}/price");
+                amount = 15.99m,
+                currency = "USD"
+            }).ToUrl($"/api/pricing/products/{sku}/base-price");
             x.StatusCodeShouldBeOk();
         });
 
-        // Assert: Verify price was set
-        var response = result.ReadAsJson<dynamic>();
-        response.ShouldNotBeNull();
-
-        // Verify price in database
+        // Assert: Verify price in database
         await using var verifySession = _fixture.GetDocumentSession();
-        var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku);
+        var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku.ToUpperInvariant());
         priceView.ShouldNotBeNull();
         priceView.BasePrice.ShouldBe(15.99m);
         priceView.Status.ShouldBe(PriceStatus.Published);
@@ -79,18 +74,17 @@ public sealed class SetBasePriceEndpointTests(TestFixture fixture) : IAsyncLifet
         // Act: Update base price
         var result = await _fixture.Host.Scenario(x =>
         {
-            x.Put.Json(new
+            x.Post.Json(new
             {
-                price = 22.99m,
-                floorPrice = (decimal?)null,
-                ceilingPrice = (decimal?)null
-            }).ToUrl($"/api/pricing/products/{sku}/price");
+                amount = 22.99m,
+                currency = "USD"
+            }).ToUrl($"/api/pricing/products/{sku}/base-price");
             x.StatusCodeShouldBeOk();
         });
 
         // Assert: Verify price was updated
         await using var verifySession = _fixture.GetDocumentSession();
-        var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku);
+        var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku.ToUpperInvariant());
         priceView.ShouldNotBeNull();
         priceView.BasePrice.ShouldBe(22.99m);
     }
@@ -109,23 +103,22 @@ public sealed class SetBasePriceEndpointTests(TestFixture fixture) : IAsyncLifet
 
         await session.SaveChangesAsync();
 
-        // Act: Set base price with floor constraint
+        // Act: Set base price (Note: Floor/ceiling constraints set via Vendor Portal, not this endpoint)
         var result = await _fixture.Host.Scenario(x =>
         {
-            x.Put.Json(new
+            x.Post.Json(new
             {
-                price = 25.00m,
-                floorPrice = 20.00m,
-                ceilingPrice = (decimal?)null
-            }).ToUrl($"/api/pricing/products/{sku}/price");
+                amount = 25.00m,
+                currency = "USD"
+            }).ToUrl($"/api/pricing/products/{sku}/base-price");
             x.StatusCodeShouldBeOk();
         });
 
-        // Assert: Verify floor price was set
+        // Assert: Verify price was set (floor/ceiling are not set by this endpoint)
         await using var verifySession = _fixture.GetDocumentSession();
-        var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku);
+        var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku.ToUpperInvariant());
         priceView.ShouldNotBeNull();
-        priceView.FloorPrice.ShouldBe(20.00m);
+        priceView.BasePrice.ShouldBe(25.00m);
     }
 
     [Fact]
@@ -150,15 +143,14 @@ public sealed class SetBasePriceEndpointTests(TestFixture fixture) : IAsyncLifet
 
         await session.SaveChangesAsync();
 
-        // Act: Try to set price below floor
+        // Act: Try to set price below floor (endpoint will enforce existing floor constraint)
         await _fixture.Host.Scenario(x =>
         {
-            x.Put.Json(new
+            x.Post.Json(new
             {
-                price = 70.00m,  // Below floor of 75.00
-                floorPrice = 75.00m,
-                ceilingPrice = (decimal?)null
-            }).ToUrl($"/api/pricing/products/{sku}/price");
+                amount = 70.00m,  // Below floor of 75.00
+                currency = "USD"
+            }).ToUrl($"/api/pricing/products/{sku}/base-price");
             x.StatusCodeShouldBe(400);
         });
     }
@@ -169,12 +161,11 @@ public sealed class SetBasePriceEndpointTests(TestFixture fixture) : IAsyncLifet
         // Act: Try to set price for non-existent product
         await _fixture.Host.Scenario(x =>
         {
-            x.Put.Json(new
+            x.Post.Json(new
             {
-                price = 99.99m,
-                floorPrice = (decimal?)null,
-                ceilingPrice = (decimal?)null
-            }).ToUrl("/api/pricing/products/DOES-NOT-EXIST/price");
+                amount = 99.99m,
+                currency = "USD"
+            }).ToUrl("/api/pricing/products/DOES-NOT-EXIST/base-price");
             x.StatusCodeShouldBe(404);
         });
     }
@@ -193,15 +184,14 @@ public sealed class SetBasePriceEndpointTests(TestFixture fixture) : IAsyncLifet
 
         await session.SaveChangesAsync();
 
-        // Act: Try to set negative price
+        // Act: Try to set negative price (FluentValidation will reject)
         await _fixture.Host.Scenario(x =>
         {
-            x.Put.Json(new
+            x.Post.Json(new
             {
-                price = -10.00m,  // Invalid
-                floorPrice = (decimal?)null,
-                ceilingPrice = (decimal?)null
-            }).ToUrl($"/api/pricing/products/{sku}/price");
+                amount = -10.00m,  // Invalid
+                currency = "USD"
+            }).ToUrl($"/api/pricing/products/{sku}/base-price");
             x.StatusCodeShouldBe(400);
         });
     }

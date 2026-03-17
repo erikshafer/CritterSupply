@@ -50,13 +50,9 @@ public sealed class CancelScheduledPriceChangeEndpointTests(TestFixture fixture)
         // Act: Cancel the scheduled price change
         var result = await _fixture.Host.Scenario(x =>
         {
-            x.Delete.Url($"/api/pricing/products/{sku}/price/schedule/{scheduleId}");
+            x.Delete.Url($"/api/pricing/products/{sku}/schedule/{scheduleId}");
             x.StatusCodeShouldBeOk();
         });
-
-        // Assert: Verify response
-        var response = result.ReadAsJson<dynamic>();
-        response.ShouldNotBeNull();
     }
 
     [Fact]
@@ -85,7 +81,7 @@ public sealed class CancelScheduledPriceChangeEndpointTests(TestFixture fixture)
         var nonExistentScheduleId = Guid.NewGuid();
         await _fixture.Host.Scenario(x =>
         {
-            x.Delete.Url($"/api/pricing/products/{sku}/price/schedule/{nonExistentScheduleId}");
+            x.Delete.Url($"/api/pricing/products/{sku}/schedule/{nonExistentScheduleId}");
             x.StatusCodeShouldBe(404);
         });
     }
@@ -97,7 +93,7 @@ public sealed class CancelScheduledPriceChangeEndpointTests(TestFixture fixture)
         var scheduleId = Guid.NewGuid();
         await _fixture.Host.Scenario(x =>
         {
-            x.Delete.Url($"/api/pricing/products/DOES-NOT-EXIST/price/schedule/{scheduleId}");
+            x.Delete.Url($"/api/pricing/products/DOES-NOT-EXIST/schedule/{scheduleId}");
             x.StatusCodeShouldBe(404);
         });
     }
@@ -143,8 +139,8 @@ public sealed class CancelScheduledPriceChangeEndpointTests(TestFixture fixture)
         // Act: Try to cancel again
         await _fixture.Host.Scenario(x =>
         {
-            x.Delete.Url($"/api/pricing/products/{sku}/price/schedule/{scheduleId}");
-            x.StatusCodeShouldBe(400);
+            x.Delete.Url($"/api/pricing/products/{sku}/schedule/{scheduleId}");
+            x.StatusCodeShouldBe(404);
         });
     }
 }

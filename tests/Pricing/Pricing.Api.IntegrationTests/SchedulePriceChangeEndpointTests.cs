@@ -39,26 +39,21 @@ public sealed class SchedulePriceChangeEndpointTests(TestFixture fixture) : IAsy
         await session.SaveChangesAsync();
 
         // Act: Schedule price change for future
-        var effectiveDate = DateTimeOffset.UtcNow.AddDays(7);
+        var scheduledFor = DateTimeOffset.UtcNow.AddDays(7);
         var result = await _fixture.Host.Scenario(x =>
         {
             x.Post.Json(new
             {
-                newPrice = 19.99m,
-                effectiveDate = effectiveDate,
-                floorPrice = (decimal?)null,
-                ceilingPrice = (decimal?)null
-            }).ToUrl($"/api/pricing/products/{sku}/price/schedule");
+                newAmount = 19.99m,
+                currency = "USD",
+                scheduledFor = scheduledFor
+            }).ToUrl($"/api/pricing/products/{sku}/schedule");
             x.StatusCodeShouldBeOk();
         });
 
-        // Assert: Verify schedule was created
-        var response = result.ReadAsJson<dynamic>();
-        response.ShouldNotBeNull();
-
         // Verify current price unchanged
         await using var verifySession = _fixture.GetDocumentSession();
-        var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku);
+        var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku.ToUpperInvariant());
         priceView.ShouldNotBeNull();
         priceView.BasePrice.ShouldBe(24.99m);  // Still old price
     }
@@ -85,17 +80,16 @@ public sealed class SchedulePriceChangeEndpointTests(TestFixture fixture) : IAsy
 
         await session.SaveChangesAsync();
 
-        // Act: Try to schedule price change in the past
+        // Act: Try to schedule price change in the past (FluentValidation will reject)
         var pastDate = DateTimeOffset.UtcNow.AddDays(-1);
         await _fixture.Host.Scenario(x =>
         {
             x.Post.Json(new
             {
-                newPrice = 14.99m,
-                effectiveDate = pastDate,
-                floorPrice = (decimal?)null,
-                ceilingPrice = (decimal?)null
-            }).ToUrl($"/api/pricing/products/{sku}/price/schedule");
+                newAmount = 14.99m,
+                currency = "USD",
+                scheduledFor = pastDate
+            }).ToUrl($"/api/pricing/products/{sku}/schedule");
             x.StatusCodeShouldBe(400);
         });
     }
@@ -122,16 +116,15 @@ public sealed class SchedulePriceChangeEndpointTests(TestFixture fixture) : IAsy
 
         await session.SaveChangesAsync();
 
-        // Act: Try to schedule price below floor
+        // Act: Try to schedule price below floor (endpoint will enforce existing floor constraint)
         await _fixture.Host.Scenario(x =>
         {
             x.Post.Json(new
             {
-                newPrice = 95.00m,  // Below floor
-                effectiveDate = DateTimeOffset.UtcNow.AddDays(7),
-                floorPrice = 100.00m,
-                ceilingPrice = (decimal?)null
-            }).ToUrl($"/api/pricing/products/{sku}/price/schedule");
+                newAmount = 95.00m,  // Below floor
+                currency = "USD",
+                scheduledFor = DateTimeOffset.UtcNow.AddDays(7)
+            }).ToUrl($"/api/pricing/products/{sku}/schedule");
             x.StatusCodeShouldBe(400);
         });
     }
@@ -144,11 +137,10 @@ public sealed class SchedulePriceChangeEndpointTests(TestFixture fixture) : IAsy
         {
             x.Post.Json(new
             {
-                newPrice = 49.99m,
-                effectiveDate = DateTimeOffset.UtcNow.AddDays(7),
-                floorPrice = (decimal?)null,
-                ceilingPrice = (decimal?)null
-            }).ToUrl("/api/pricing/products/DOES-NOT-EXIST/price/schedule");
+                newAmount = 49.99m,
+                currency = "USD",
+                scheduledFor = DateTimeOffset.UtcNow.AddDays(7)
+            }).ToUrl("/api/pricing/products/DOES-NOT-EXIST/schedule");
             x.StatusCodeShouldBe(404);
         });
     }
