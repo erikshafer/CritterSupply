@@ -260,6 +260,141 @@ public static async Task<IResult> Handle(
 **Testing the Boundary:**
 If you can write a unit test for the BFF logic without mocking domain BCs, **you've likely leaked domain logic into the BFF**. BFF handlers should be so thin that only integration tests make sense.
 
+### BFF-Owned Projections vs Separate Analytics BC (M32.0 Decision)
+
+**Key Decision from M32.0:** Backoffice BFF owns lightweight projections (`AdminDailyMetrics`) instead of creating a separate Analytics BC.
+
+**Decision Tree:**
+
+```
+Should this be a BFF-owned projection or a separate BC?
+
+├─ Q1: Is this projection used ONLY by this BFF?
+│  ├─ YES → Q2
+│  └─ NO (multiple consumers) → ❌ Separate BC required
+│
+├─ Q2: Is the projection logic simple aggregation (count, sum, average)?
+│  ├─ YES → Q3
+│  └─ NO (complex rules, ML models, multi-stage pipelines) → ❌ Separate BC required
+│
+├─ Q3: Does the projection require <10 domain events to build?
+│  ├─ YES → ✅ BFF-owned projection
+│  └─ NO (needs 20+ event types) → ⚠️  Consider separate BC for maintainability
+```
+
+**Examples:**
+
+| Use Case | Decision | Rationale |
+|----------|----------|-----------|
+| **Admin dashboard metrics** (M32.0: `AdminDailyMetrics`) | ✅ BFF-owned | Only Backoffice needs it; simple count/sum; 5 events |
+| **Customer order history** (Storefront: `CustomerOrdersView`) | ✅ BFF-owned | Only Storefront needs it; simple list; 3 events |
+| **ML-based product recommendations** | ❌ Separate BC | Complex ML pipeline; multiple consumers (Storefront, Email campaigns) |
+| **Multi-tenant analytics dashboard** | ❌ Separate BC | Multiple tenants; complex aggregations; 30+ event types |
+| **Live inventory dashboard** (Backoffice) | ✅ BFF-owned | Only Backoffice needs it; simple stock count; 4 events |
+
+**BFF-Owned Projection Pattern (Backoffice Example):**
+
+```csharp
+// Backoffice/Backoffice/Metrics/AdminDailyMetrics.cs
+public sealed record AdminDailyMetrics
+{
+    public DateOnly Date { get; init; }
+    public int TodaysOrders { get; set; }
+    public decimal TodaysRevenue { get; set; }
+    public int TodaysReturns { get; set; }
+    public int ActiveCustomers { get; set; }
+
+    public static AdminDailyMetrics Create(DateOnly date) => new()
+    {
+        Date = date,
+        TodaysOrders = 0,
+        TodaysRevenue = 0m,
+        TodaysReturns = 0,
+        ActiveCustomers = 0
+    };
+}
+
+// Projection: consumes integration messages from Orders, Returns, Customer Identity
+public sealed class AdminDailyMetricsProjection : SingleStreamProjection<AdminDailyMetrics>
+{
+    public static AdminDailyMetrics Create(Messages.Contracts.Orders.OrderPlaced @event)
+    {
+        var date = DateOnly.FromDateTime(@event.PlacedAt.Date);
+        var metrics = AdminDailyMetrics.Create(date);
+        metrics.TodaysOrders = 1;
+        metrics.TodaysRevenue = @event.TotalAmount;
+        return metrics;
+    }
+
+    public void Apply(Messages.Contracts.Orders.OrderPlaced @event, AdminDailyMetrics metrics)
+    {
+        metrics.TodaysOrders++;
+        metrics.TodaysRevenue += @event.TotalAmount;
+    }
+
+    public void Apply(Messages.Contracts.Returns.ReturnApproved @event, AdminDailyMetrics metrics)
+    {
+        metrics.TodaysReturns++;
+    }
+
+    // ... other events
+}
+
+// Register in Program.cs
+builder.Services.AddMarten(opts =>
+{
+    opts.Connection(connectionString);
+    opts.Projections.Add<AdminDailyMetricsProjection>(ProjectionLifecycle.Inline);
+});
+```
+
+**Integration Message Handler → Projection Query → SignalR (M32.0 Pattern):**
+
+```csharp
+// Backoffice/Backoffice/Notifications/OrderPlacedHandler.cs
+public static class OrderPlacedHandler
+{
+    // Handler consumes integration message, queries updated projection, returns SignalR event
+    public static async Task<LiveMetricUpdated> Handle(
+        Messages.Contracts.Orders.OrderPlaced message,
+        IDocumentSession session)
+    {
+        // 1. Append event (triggers inline projection)
+        session.Events.Append(Guid.NewGuid(), message);
+
+        // 2. Commit transaction (projection updates here)
+        await session.SaveChangesAsync();
+
+        // 3. Query updated projection
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var metrics = await session.LoadAsync<AdminDailyMetrics>(today);
+
+        // 4. Return SignalR event (Wolverine routes to SignalR hub)
+        return new LiveMetricUpdated(
+            metrics.TodaysOrders,
+            metrics.TodaysRevenue,
+            DateTimeOffset.UtcNow);
+    }
+}
+```
+
+**When NOT to Own Projections in BFF:**
+
+1. **Multiple Consumers** — If 2+ BCs need the same projection → separate BC
+2. **Complex Logic** — If projection requires ML models, multi-stage pipelines, or business rules → separate BC
+3. **Large Event Surface** — If projection consumes 20+ event types → separate BC (maintainability)
+4. **Different Scaling Needs** — If projection needs different compute/storage scaling than BFF → separate BC
+5. **Regulatory/Compliance** — If projection data has different retention/audit requirements → separate BC
+
+**Benefits of BFF-Owned Projections (M32.0 Wins):**
+
+- ✅ **No Extra Service** — One less BC to deploy, monitor, and maintain
+- ✅ **Inline Updates** — Zero latency between event and projection update
+- ✅ **Simpler Testing** — BFF integration tests cover projection + SignalR pipeline
+- ✅ **Reduced Complexity** — No cross-BC HTTP calls for simple aggregates
+
+**Cross-Reference:** See `docs/skills/event-sourcing-projections.md` → "Lesson 6: BFF-Owned Projections vs Analytics BC" for full projection implementation patterns.
+
 ---
 
 ## View Model Composition
