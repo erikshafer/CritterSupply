@@ -125,10 +125,10 @@
 | Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
 |------------------|------|----------|--------|---------------|-------|
 | Get payment detail | Query | `GET /api/payments/{paymentId}` | ✅ Fully Defined | — | Protected with `FinanceClerk` policy (M31.5 Session 5); Returns payment saga state, amounts, transaction IDs |
-| List payments for order | Query | `GET /api/payments?orderId={id}` | ⚠️ **GAP** | **Known Deferral (P2)** | CS needs to see payment history for an order. Only single-payment lookup exists today. Not a Phase 1 blocker (CS can find paymentId from order detail). |
+| List payments for order | Query | `GET /api/payments?orderId={id}` | ✅ Fully Defined | — | Implemented in M32.1 Session 3; Protected with `CustomerService` policy; Returns list of PaymentResponse for the given orderId |
 | Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ✅ Fully Defined | — | Configured in M31.5 Session 4 |
 
-**Phase 0.5 gaps closed in M31.5 Sessions 4-5 (PR #376).** List payments for order query remains a Phase 2 deferral.
+**Phase 0.5 gaps closed in M31.5 Sessions 4-5 (PR #376).** Phase 2 gap (list payments for order) closed in M32.1 Session 3.
 
 ---
 
@@ -142,12 +142,12 @@
 |------------------|------|----------|--------|---------------|-------|
 | Get stock level for SKU | Query | `GET /api/inventory/{sku}` | ✅ Fully Defined | — | Protected with `WarehouseClerk` policy (M31.5 Session 5); Implemented in M31.5 Session 2 |
 | Get low-stock alerts | Query | `GET /api/inventory/low-stock` | ✅ Fully Defined | — | Protected with `WarehouseClerk` policy (M31.5 Session 5); Implemented in M31.5 Session 2 |
-| **Adjust inventory** | Command | `POST /api/inventory/{sku}/adjust` | ❌ **Does not exist** | **Phase 2 Blocker** | `ReceiveStock` and `InitializeInventory` handlers exist as Wolverine message handlers but are NOT exposed as HTTP endpoints. |
-| **Receive stock** | Command | `POST /api/inventory/{sku}/receive` | ❌ **Does not exist** | **Phase 2 Blocker** | Same as above — handler exists, HTTP endpoint does not. |
+| **Adjust inventory** | Command | `POST /api/inventory/{sku}/adjust` | ✅ Fully Defined | — | Implemented in M32.1 Session 3; Protected with `WarehouseClerk` policy; Supports positive and negative adjustments with validation |
+| **Receive stock** | Command | `POST /api/inventory/{sku}/receive` | ✅ Fully Defined | — | Implemented in M32.1 Session 3; Protected with `WarehouseClerk` policy; Records inbound stock from suppliers |
 | **Acknowledge low-stock alert** | Command | `POST /api/inventory/alerts/{id}/acknowledge` | ❌ **Does not exist** | **Phase 2 Blocker** | No concept of alert acknowledgment in Inventory BC today. Backoffice may own this (AlertAcknowledgment aggregate). |
 | Admin JWT acceptance | Auth | Named JWT Bearer scheme | ✅ Fully Defined | — | Configured in M31.5 Session 4 |
 
-**Phase 0.5 gaps closed in M31.5 Sessions 2, 4, and 5 (PR #376).** Phase 2 write endpoints remain as blockers for warehouse operations.
+**Phase 0.5 gaps closed in M31.5 Sessions 2, 4, and 5 (PR #376).** Two Phase 2 write endpoints closed in M32.1 Session 3. Alert acknowledgment remains as a Phase 2 blocker.
 
 ---
 
@@ -263,9 +263,9 @@
 
 | Status | Count | Blocking Phase |
 |--------|-------|---------------|
-| ✅ Fully Defined | **38** (18 original + 7 BackofficeIdentity + 13 M31.5) | Ready to integrate |
+| ✅ Fully Defined | **41** (18 original + 7 BackofficeIdentity + 13 M31.5 + 3 M32.1) | Ready to integrate |
 | Phase 0.5 Blockers | **0** (all closed in M31.5) | ✅ **Ready for Phase 1** |
-| Phase 2 Blockers | **9** | Must resolve before Phase 2 |
+| Phase 2 Blockers | **6** | Must resolve before Phase 2 |
 | Known Deferrals | **3** | Acknowledged, resolution planned |
 
 ### M31.5 Session 5 Summary
@@ -288,7 +288,19 @@
 | Phase | Gaps to Close | Estimated Sessions |
 |-------|--------------|-------------------|
 | Phase 0.5 | ✅ **Closed** (M31.5 Sessions 1-5) | Complete |
-| Phase 2 prep | 9 gaps across 4 BCs (Pricing write endpoints, Inventory write endpoints, Product Catalog admin write, Payments order query) | 4-5 sessions |
+| Phase 2 prep | 6 gaps across 3 BCs (Pricing write endpoints, Product Catalog admin write, Inventory alert acknowledgment) | 3-4 sessions |
+
+### M32.1 Session 3 Summary (2026-03-17)
+
+**What Changed:**
+- Added 3 HTTP endpoints closing Phase 2 blockers
+- Inventory BC: `POST /api/inventory/{sku}/adjust` (manual adjustments with reason tracking)
+- Inventory BC: `POST /api/inventory/{sku}/receive` (inbound stock from suppliers)
+- Payments BC: `GET /api/payments?orderId={id}` (list payments for order, CustomerService policy)
+- Created `InventoryAdjusted` domain event with reason and adjusted-by tracking
+- Modified `ProductInventory` aggregate to apply `InventoryAdjusted` event
+
+**Phase 2 Status:** 9 blockers → 6 blockers (3 closed in this session)
 
 ### Phase 0.5 Work Order (COMPLETED)
 

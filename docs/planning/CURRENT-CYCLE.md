@@ -42,9 +42,9 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.1 — Backoffice Phase 2: Write Operations |
-| **Status** | 🚀 IN PROGRESS — Session 1 of ~16 |
+| **Status** | 🚀 IN PROGRESS — Session 3 of ~16 |
 | **Deliverables** | Blazor WASM frontend, write operations (Product Catalog, Pricing, Inventory), E2E tests |
-| **Next Session** | Session 1: Gap closure + ADRs (4 ADRs to document M32.0) |
+| **Next Session** | Session 4: Pricing BC write endpoints (3 endpoints + admin JWT) |
 | **Active BCs** | 18 total (including Backoffice BFF) |
 
 *Last Updated: 2026-03-17*
@@ -55,9 +55,9 @@
 
 ### 🚀 M32.1: Backoffice Phase 2 — Write Operations
 
-**Status:** 🚀 **IN PROGRESS** — Session 1 started
+**Status:** 🚀 **IN PROGRESS** — Session 3 completed
 **Duration Estimate:** 3-4 cycles (12-18 sessions)
-**Current Session:** Session 1 of ~16
+**Current Session:** Session 3 of ~16
 
 **What's Shipping:**
 - **Phase 2 Prerequisite (Sessions 1-3):** Domain BC endpoint gaps closed (Product Catalog write, Pricing write, Inventory write, Payments query)
@@ -79,14 +79,31 @@
 - E2E tests use real Kestrel servers (not TestServer) for SignalR testing
 - Gap closure first (Sessions 1-3) prevents mid-cycle blockers
 
-**Session 1 Goals:**
-- Close Product Catalog admin write endpoint gaps (add/update/delete products)
-- Write ADRs 0034-0037 (M32.0 architectural decisions)
-- 10+ integration tests for Product Catalog write endpoints
+**Session 1 Goals:** ✅ COMPLETED
+- ✅ Close Product Catalog admin write endpoint gaps (add/update/delete products)
+- ✅ Write ADRs 0034-0037 (M32.0 architectural decisions)
+- ✅ 10+ integration tests for Product Catalog write endpoints
+
+**Session 2 Goals:** ✅ COMPLETED (with timeout)
+- ✅ Close Pricing BC write endpoint gaps (set base price, schedule price change, cancel schedule)
+- ✅ Add admin JWT scheme to Pricing BC
+- ❌ Integration tests (deferred to Session 4+ due to timeout)
+
+**Session 3 Goals:** ✅ COMPLETED
+- ✅ Close Inventory BC write endpoints (adjust inventory, receive inbound stock)
+- ✅ Close Payments BC query endpoint (list payments for order)
+- ✅ Update Gap Register (9 Phase 2 blockers → 6 blockers)
+- ✅ Session 2 and Session 3 retrospectives completed
+
+**Session 4 Goals:** (Next)
+- Integration tests for Sessions 2-3 endpoints (6 endpoints total)
+- Consider ADRs for deferred architectural decisions (if needed)
 
 **References:**
 - [M32.1 Plan](./milestones/m32-1-backoffice-phase-2-plan.md)
 - [M32.0 Retrospective](./milestones/m32-0-retrospective.md)
+- [Session 2 Retrospective](./milestones/m32-1-session-2-retrospective.md)
+- [Session 3 Retrospective](./milestones/m32-1-session-3-retrospective.md)
 - [Backoffice Event Modeling](./backoffice-event-modeling-revised.md)
 - [Integration Gap Register](./backoffice-integration-gap-register.md)
 
@@ -527,6 +544,6 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Document Last Updated: 2026-03-15*
-*Active Milestone: M31.5 (Backoffice Prerequisites) — READY TO START*
+*Document Last Updated: 2026-03-17*
+*Active Milestone: M32.1 (Backoffice Phase 2) — Session 3 Completed*
 *Update Policy: At milestone start, milestone end, and significant task changes*
