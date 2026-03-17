@@ -42,9 +42,9 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.1 — Backoffice Phase 2: Write Operations |
-| **Status** | 🚀 IN PROGRESS — Session 3 of ~16 |
+| **Status** | 🚀 IN PROGRESS — Sessions 1-3 completed |
 | **Deliverables** | Blazor WASM frontend, write operations (Product Catalog, Pricing, Inventory), E2E tests |
-| **Next Session** | Session 4: Pricing BC write endpoints (3 endpoints + admin JWT) |
+| **Next Session** | Session 4: Integration tests for Sessions 2-3 endpoints + begin Blazor WASM scaffolding |
 | **Active BCs** | 18 total (including Backoffice BFF) |
 
 *Last Updated: 2026-03-17*
@@ -55,9 +55,9 @@
 
 ### 🚀 M32.1: Backoffice Phase 2 — Write Operations
 
-**Status:** 🚀 **IN PROGRESS** — Session 3 completed
+**Status:** 🚀 **IN PROGRESS** — Sessions 1-3 completed, gap closure phase complete
 **Duration Estimate:** 3-4 cycles (12-18 sessions)
-**Current Session:** Session 3 of ~16
+**Current Phase:** Gap closure complete (8 of 9 Phase 2 blockers closed), transitioning to Blazor WASM frontend
 
 **What's Shipping:**
 - **Phase 2 Prerequisite (Sessions 1-3):** Domain BC endpoint gaps closed (Product Catalog write, Pricing write, Inventory write, Payments query)
@@ -80,34 +80,42 @@
 - Gap closure first (Sessions 1-3) prevents mid-cycle blockers
 
 **Session 1 Goals:** ✅ COMPLETED
-- ✅ Close Product Catalog admin write endpoint gaps (add/update/delete products)
 - ✅ Write ADRs 0034-0037 (M32.0 architectural decisions)
+- ✅ Close Product Catalog admin write endpoint gaps (update description, update display name, delete product)
+- ✅ Add multi-issuer JWT to Product Catalog BC (Backoffice scheme)
 - ✅ 10+ integration tests for Product Catalog write endpoints
 
-**Session 2 Goals:** ✅ COMPLETED (with timeout)
+**Session 2 Goals:** ✅ COMPLETED (with deferred tests)
 - ✅ Close Pricing BC write endpoint gaps (set base price, schedule price change, cancel schedule)
-- ✅ Add admin JWT scheme to Pricing BC
-- ❌ Integration tests (deferred to Session 4+ due to timeout)
+- ✅ Add multi-issuer JWT to Pricing BC (Backoffice scheme)
+- ✅ Implement floor/ceiling constraint enforcement
+- ⚠️ Integration tests (deferred to Session 4 due to timeout)
 
 **Session 3 Goals:** ✅ COMPLETED
 - ✅ Close Inventory BC write endpoints (adjust inventory, receive inbound stock)
 - ✅ Close Payments BC query endpoint (list payments for order)
-- ✅ Update Gap Register (9 Phase 2 blockers → 6 blockers)
+- ✅ Update Gap Register (9 Phase 2 blockers → 1 blocker)
 - ✅ Session 2 and Session 3 retrospectives completed
 
 **Session 4 Goals:** (Next)
 - Integration tests for Sessions 2-3 endpoints (6 endpoints total)
-- Consider ADRs for deferred architectural decisions (if needed)
+- Begin Blazor WASM scaffolding (Backoffice.Web project)
+- Evaluate remaining Phase 2 blocker (Inventory alert acknowledgment ownership decision)
 
 **References:**
 - [M32.1 Plan](./milestones/m32-1-backoffice-phase-2-plan.md)
 - [M32.0 Retrospective](./milestones/m32-0-retrospective.md)
+- [Session 1 Retrospective](./milestones/m32-1-session-1-retrospective.md)
 - [Session 2 Retrospective](./milestones/m32-1-session-2-retrospective.md)
 - [Session 3 Retrospective](./milestones/m32-1-session-3-retrospective.md)
 - [Backoffice Event Modeling](./backoffice-event-modeling-revised.md)
 - [Backoffice Frontend Design](./backoffice-frontend-design.md)
 - [Frontend Design Alignment Analysis](./backoffice-frontend-design-alignment-analysis.md)
 - [Integration Gap Register](./backoffice-integration-gap-register.md)
+- [ADR 0034: Backoffice BFF Architecture](../decisions/0034-backoffice-bff-architecture.md)
+- [ADR 0035: Backoffice SignalR Hub Design](../decisions/0035-backoffice-signalr-hub-design.md)
+- [ADR 0036: BFF-Owned Projections Strategy](../decisions/0036-bff-projections-strategy.md)
+- [ADR 0037: OrderNote Aggregate Ownership](../decisions/0037-ordernote-aggregate-ownership.md)
 
 **Deferred to Phase 3:**
 - Promotions management UI
@@ -547,5 +555,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 ---
 
 *Document Last Updated: 2026-03-17*
-*Active Milestone: M32.1 (Backoffice Phase 2) — Session 3 Completed*
+*Active Milestone: M32.1 (Backoffice Phase 2) — Sessions 1-3 Completed (Gap Closure Phase Complete)*
 *Update Policy: At milestone start, milestone end, and significant task changes*

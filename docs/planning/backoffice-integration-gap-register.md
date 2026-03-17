@@ -178,10 +178,14 @@
 | Get product detail | Query | `GET /api/products/{sku}` | ✅ Fully Defined | — | |
 | Add product | Command | `POST /api/products` | ✅ Fully Defined | — | Protected with `VendorAdmin` policy (M31.5 Session 5) |
 | Update product | Command | `PUT /api/products/{sku}` | ✅ Fully Defined | — | Protected with `VendorAdmin` policy (M31.5 Session 5); Updates entire product |
-| **Update product description** | Command | `PUT /api/products/{sku}/description` | ⚠️ **GAP** | **Phase 2 Blocker** | `PUT /api/products/{sku}` exists but updates the entire product, not just description. CopyWriter needs a scoped description-only endpoint. |
+| **Update product description** | Command | `PUT /api/products/{sku}/description` | ✅ Fully Defined | — | Implemented in M32.1 Session 1; Protected with `CopyWriter` policy; Scoped endpoint for description-only updates |
+| **Update product display name** | Command | `PUT /api/products/{sku}/display-name` | ✅ Fully Defined | — | Implemented in M32.1 Session 1; Protected with `ProductManager` policy |
+| **Delete product** | Command | `DELETE /api/products/{sku}` | ✅ Fully Defined | — | Implemented in M32.1 Session 1; Protected with `ProductManager` policy; Soft delete with status transition |
 | Change product status | Command | `PATCH /api/products/{sku}/status` | ✅ Fully Defined | — | Exists but unprotected. Needs admin auth policy. |
 | Vendor assignment | Command | `POST /api/admin/products/{sku}/vendor-assignment` | ✅ Fully Defined | — | Protected with `VendorAdmin` policy |
-| **Multi-issuer JWT** | Auth | Named schemes (`"Vendor"`, `"Backoffice"`) | ⚠️ **GAP** | **Phase 2 Blocker** | Currently only Vendor JWT scheme. Needs admin scheme added when multi-issuer JWT is introduced to Product Catalog. |
+| **Multi-issuer JWT** | Auth | Named schemes (`"Vendor"`, `"Backoffice"`) | ✅ Fully Defined | — | Implemented in M32.1 Session 1; Backoffice scheme (port 5249) added alongside existing Vendor scheme |
+
+**Phase 2 write endpoint gaps closed in M32.1 Session 1. Multi-issuer JWT now supports both Vendor and Backoffice schemes.**
 
 **Session 5 Note:** The policy name "VendorAdmin" was already correct in the codebase. No rename was needed. AddProduct and UpdateProduct endpoints now protected.
 
@@ -191,19 +195,19 @@
 
 **Folder:** `src/Pricing/`
 **Technology:** Marten event sourcing (ProductPrice aggregate)
-**Auth Status:** No authentication
+**Auth Status:** ✅ Multi-issuer JWT configured (M32.1 Session 2); Write endpoints protected with `[Authorize(Policy = "PricingManager")]`
 
 | Integration Point | Type | Endpoint | Status | Phase Blocking | Notes |
 |------------------|------|----------|--------|---------------|-------|
 | Get current price | Query | `GET /api/pricing/products/{sku}` | ✅ Fully Defined | — | Returns CurrentPriceView with base, floor, ceiling prices |
 | Get bulk prices | Query | `GET /api/pricing/products` | ✅ Fully Defined | — | Multiple SKU price lookup |
-| **Set/change base price** | Command | `PUT /api/pricing/products/{sku}/price` | ⚠️ **GAP** | **Phase 2 Blocker** | `ChangePrice` command exists as Wolverine handler but is NOT exposed as HTTP endpoint. |
-| **Schedule price change** | Command | `POST /api/pricing/products/{sku}/price/schedule` | ⚠️ **GAP** | **Phase 2 Blocker** | `PriceChangeScheduled` event exists. Scheduling logic exists internally. No HTTP endpoint. |
-| **Cancel scheduled price change** | Command | `DELETE /api/pricing/products/{sku}/price/schedule/{id}` | ⚠️ **GAP** | **Phase 2 Blocker** | `ScheduledPriceChangeCancelled` event exists. No HTTP endpoint. |
+| **Set/change base price** | Command | `POST /api/pricing/products/{sku}/base-price` | ✅ Fully Defined | — | Implemented in M32.1 Session 2; Protected with `PricingManager` policy; Unified endpoint handles both SetInitialPrice (Unpriced) and ChangePrice (Published) |
+| **Schedule price change** | Command | `POST /api/pricing/products/{sku}/schedule` | ✅ Fully Defined | — | Implemented in M32.1 Session 2; Protected with `PricingManager` policy; Uses Wolverine delayed message pattern with stale-message guard |
+| **Cancel scheduled price change** | Command | `DELETE /api/pricing/products/{sku}/schedule/{scheduleId}` | ✅ Fully Defined | — | Implemented in M32.1 Session 2; Protected with `PricingManager` policy |
 | **Floor price visibility** | Query | Included in `GET /api/pricing/products/{sku}` | ✅ Fully Defined | — | `FloorPrice` is a field on `CurrentPriceView` — already returned by the existing GET endpoint |
-| Admin JWT acceptance | Auth | Named JWT Bearer scheme | ⚠️ **GAP** | **Phase 2 Blocker** | |
+| Admin JWT acceptance | Auth | Named JWT Bearer scheme (`"Backoffice"`) | ✅ Fully Defined | — | Implemented in M32.1 Session 2; Backoffice scheme (port 5249) added alongside existing Vendor scheme |
 
-**Estimated Effort:** 1 session for 3 admin write endpoints + admin JWT scheme.
+**All Phase 2 gaps closed in M32.1 Sessions 1-2.**
 
 ---
 
@@ -263,9 +267,9 @@
 
 | Status | Count | Blocking Phase |
 |--------|-------|---------------|
-| ✅ Fully Defined | **41** (18 original + 7 BackofficeIdentity + 13 M31.5 + 3 M32.1) | Ready to integrate |
+| ✅ Fully Defined | **49** (18 original + 7 BackofficeIdentity + 13 M31.5 + 3 M32.1 Session 3 + 5 M32.1 Session 1 + 3 M32.1 Session 2) | Ready to integrate |
 | Phase 0.5 Blockers | **0** (all closed in M31.5) | ✅ **Ready for Phase 1** |
-| Phase 2 Blockers | **6** | Must resolve before Phase 2 |
+| Phase 2 Blockers | **1** | Inventory alert acknowledgment (may be BFF-owned) |
 | Known Deferrals | **3** | Acknowledged, resolution planned |
 
 ### M31.5 Session 5 Summary
@@ -288,7 +292,38 @@
 | Phase | Gaps to Close | Estimated Sessions |
 |-------|--------------|-------------------|
 | Phase 0.5 | ✅ **Closed** (M31.5 Sessions 1-5) | Complete |
-| Phase 2 prep | 6 gaps across 3 BCs (Pricing write endpoints, Product Catalog admin write, Inventory alert acknowledgment) | 3-4 sessions |
+| Phase 2 prep | ✅ **8 of 9 closed** (M32.1 Sessions 1-3) | **1 remaining blocker** |
+
+**Remaining Phase 2 Blocker:**
+- Inventory BC: Alert acknowledgment (decision needed: Inventory BC vs Backoffice BFF ownership)
+
+### M32.1 Session 1 Summary (2026-03-17)
+
+**What Changed:**
+- Added 5 HTTP endpoints closing Phase 2 blockers in Product Catalog BC
+- Product Catalog: `PUT /api/products/{sku}/description` (CopyWriter policy, description-only updates)
+- Product Catalog: `PUT /api/products/{sku}/display-name` (ProductManager policy)
+- Product Catalog: `DELETE /api/products/{sku}` (ProductManager policy, soft delete)
+- Multi-issuer JWT: Added Backoffice scheme (port 5249) alongside existing Vendor scheme
+- Authorization policies: CopyWriter (description edits), ProductManager (full product control)
+- Wrote ADRs 0034-0037 documenting M32.0 architectural decisions
+
+**Phase 2 Status:** 9 blockers → 7 blockers (2 Product Catalog endpoints + multi-issuer JWT closed)
+
+### M32.1 Session 2 Summary (2026-03-17)
+
+**What Changed:**
+- Added 3 HTTP endpoints closing Phase 2 blockers in Pricing BC
+- Pricing BC: `POST /api/pricing/products/{sku}/base-price` (PricingManager policy, unified SetInitialPrice + ChangePrice)
+- Pricing BC: `POST /api/pricing/products/{sku}/schedule` (PricingManager policy, Wolverine delayed message pattern)
+- Pricing BC: `DELETE /api/pricing/products/{sku}/schedule/{scheduleId}` (PricingManager policy)
+- Multi-issuer JWT: Added Backoffice scheme to Pricing BC
+- Floor/ceiling constraint enforcement in all endpoints
+- Scheduled activation handler with stale-message guard (ScheduleId correlation)
+
+**Phase 2 Status:** 7 blockers → 4 blockers (3 Pricing endpoints + multi-issuer JWT closed)
+
+**Note:** Session 2 timed out before integration tests; tests deferred to Session 4+
 
 ### M32.1 Session 3 Summary (2026-03-17)
 
@@ -300,7 +335,7 @@
 - Created `InventoryAdjusted` domain event with reason and adjusted-by tracking
 - Modified `ProductInventory` aggregate to apply `InventoryAdjusted` event
 
-**Phase 2 Status:** 9 blockers → 6 blockers (3 closed in this session)
+**Phase 2 Status:** 4 blockers → 1 blocker (3 endpoints closed: 2 Inventory + 1 Payments)
 
 ### Phase 0.5 Work Order (COMPLETED)
 
