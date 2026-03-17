@@ -42,9 +42,9 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.1 — Backoffice Phase 2: Write Operations |
-| **Status** | 🚀 IN PROGRESS — Sessions 1-3 completed |
+| **Status** | 🚀 IN PROGRESS — Sessions 1-5 completed, endpoint testing complete |
 | **Deliverables** | Blazor WASM frontend, write operations (Product Catalog, Pricing, Inventory), E2E tests |
-| **Next Session** | Session 4: Integration tests for Sessions 2-3 endpoints + begin Blazor WASM scaffolding |
+| **Next Session** | Session 6: Blazor WASM scaffolding (Backoffice.Web project) |
 | **Active BCs** | 18 total (including Backoffice BFF) |
 
 *Last Updated: 2026-03-17*
@@ -55,9 +55,9 @@
 
 ### 🚀 M32.1: Backoffice Phase 2 — Write Operations
 
-**Status:** 🚀 **IN PROGRESS** — Sessions 1-3 completed, gap closure phase complete
+**Status:** 🚀 **IN PROGRESS** — Sessions 1-5 completed, endpoint testing complete (all 97 tests passing)
 **Duration Estimate:** 3-4 cycles (12-18 sessions)
-**Current Phase:** Gap closure complete (8 of 9 Phase 2 blockers closed), transitioning to Blazor WASM frontend
+**Current Phase:** Ready for Blazor WASM frontend scaffolding (Session 6)
 
 **What's Shipping:**
 - **Phase 2 Prerequisite (Sessions 1-3):** Domain BC endpoint gaps closed (Product Catalog write, Pricing write, Inventory write, Payments query)
@@ -97,10 +97,25 @@
 - ✅ Update Gap Register (9 Phase 2 blockers → 1 blocker)
 - ✅ Session 2 and Session 3 retrospectives completed
 
-**Session 4 Goals:** (Next)
-- Integration tests for Sessions 2-3 endpoints (6 endpoints total)
+**Session 4 Goals:** ✅ COMPLETED
+- ✅ Fix Pricing BC integration tests (25 tests, all passing)
+- ✅ Add authorization bypass pattern to test fixtures
+- ✅ Fix missing Apply method for ProductRegistered event
+- ✅ Session 4 retrospective completed
+
+**Session 5 Goals:** ✅ COMPLETED
+- ✅ Fix Inventory BC integration tests (48 tests, all passing)
+- ✅ Fix Payments BC integration tests (24 tests, all passing)
+- ✅ Add AdjustInventoryRequestValidator for HTTP endpoint validation
+- ✅ Multi-policy authorization bypass (CustomerService + FinanceClerk)
+- ✅ Session 5 retrospective completed
+
+**Session 6 Goals:** (Next)
 - Begin Blazor WASM scaffolding (Backoffice.Web project)
-- Evaluate remaining Phase 2 blocker (Inventory alert acknowledgment ownership decision)
+- Basic project structure following Vendor Portal pattern
+- JWT authentication infrastructure (in-memory token storage)
+- Login page + authentication state provider
+- Stub navigation shell (AppBar, Drawer, role-based menu)
 
 **References:**
 - [M32.1 Plan](./milestones/m32-1-backoffice-phase-2-plan.md)
@@ -108,6 +123,8 @@
 - [Session 1 Retrospective](./milestones/m32-1-session-1-retrospective.md)
 - [Session 2 Retrospective](./milestones/m32-1-session-2-retrospective.md)
 - [Session 3 Retrospective](./milestones/m32-1-session-3-retrospective.md)
+- [Session 4 Retrospective](./milestones/m32-1-session-4-retrospective.md)
+- [Session 5 Retrospective](./milestones/m32-1-session-5-retrospective.md)
 - [Backoffice Event Modeling](./backoffice-event-modeling-revised.md)
 - [Backoffice Frontend Design](./backoffice-frontend-design.md)
 - [Frontend Design Alignment Analysis](./backoffice-frontend-design-alignment-analysis.md)

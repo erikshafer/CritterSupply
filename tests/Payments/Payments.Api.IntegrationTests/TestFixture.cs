@@ -44,6 +44,14 @@ public class TestFixture : IAsyncLifetime
                     opts.Connection(_connectionString);
                 });
 
+                // Replace authorization with test handler
+                // Use AllowAnonymous policy that bypasses all authorization
+                services.AddAuthorization(opts =>
+                {
+                    opts.AddPolicy("CustomerService", policy => policy.RequireAssertion(_ => true));
+                    opts.AddPolicy("FinanceClerk", policy => policy.RequireAssertion(_ => true));
+                });
+
                 // Disable external Wolverine transports for testing
                 services.DisableAllExternalWolverineTransports();
             });
