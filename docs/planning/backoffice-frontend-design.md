@@ -301,7 +301,7 @@ The navigation groups align with bounded context ownership so that when teams ev
 | Caption / metadata | `Typo.caption` | 12px | 400 | Timestamps, secondary labels, freshness indicators |
 | KPI value | `Typo.h4` | 34px | 400 | Dashboard counter numbers |
 
-**Font:** System font stack (`-apple-system, BlazorKitBlack, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`). MudBlazor default. No custom web fonts — reduces load time and respects the internal-tool context.
+**Font:** System font stack (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`). MudBlazor default. No custom web fonts — reduces load time and respects the internal-tool context.
 
 #### Status Visual Language
 
