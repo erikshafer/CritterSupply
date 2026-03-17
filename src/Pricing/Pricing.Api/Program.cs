@@ -130,6 +130,9 @@ builder.Host.UseWolverine(opts =>
     // Discover all handlers in the Pricing domain assembly
     opts.Discovery.IncludeAssembly(typeof(ProductPrice).Assembly);
 
+    // Discover HTTP endpoints in the Pricing.Api assembly
+    opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
+
     // Configure RabbitMQ for integration messages
     var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");
     opts.UseRabbitMq(rabbit =>
