@@ -9,6 +9,7 @@ CritterSupply uses a structured documentation approach optimized for AI assistan
 - **[planning/](./planning/)** - Development cycles, detailed plans, and roadmap
 - **[decisions/](./decisions/)** - Architectural Decision Records (ADRs) explaining key choices
 - **[features/](./features/)** - BDD specifications in Gherkin format (Given/When/Then scenarios)
+- **[AI-ASSISTED-DEVELOPMENT.md](./AI-ASSISTED-DEVELOPMENT.md)** - Guide to AI-assisted development and custom GitHub Copilot agents
 
 These are automatically discoverable by AI assistants through [CLAUDE.md](../CLAUDE.md), which serves as the entry point for AI-assisted development. This structure ensures AI tools can locate planning context, understand architectural decisions, and reference user stories without manual prompting.
 
@@ -98,6 +99,9 @@ _(Feature files for other BCs to be added over time)_
 - [CLAUDE.md](../CLAUDE.md) - AI assistant development guidelines
 - [CONTEXTS.md](../CONTEXTS.md) - Bounded context specifications (architectural source of truth)
 - [DEVPROGRESS.md](../DEVPROGRESS.md) - **Deprecated** (see deprecation notice, migrated to `planning/CURRENT-CYCLE.md`)
+
+**AI & Development:**
+- [AI-ASSISTED-DEVELOPMENT.md](./AI-ASSISTED-DEVELOPMENT.md) - Guide to AI-assisted development and custom GitHub Copilot agents
 
 **Skills Documentation:**
 - [docs/skills/](../skills/) - Pattern documentation for Wolverine, Marten, EF Core, BDD, testing, etc.

@@ -57,46 +57,11 @@ A non-exhaustive list of the patterns, paradigms, and principles demonstrated in
 
 This project is built with Claude as a collaborative coding partner. Beyond just generating code, it's an exercise in teaching AI tools to think in event-driven patterns and leverage the Critter Stack idiomatically—helping to improve the guidance these tools can offer the broader community.
 
-That is to say, the more these tools see well-structured examples, the better guidance they can offer developers exploring these approaches for the first time.
-
 See [CLAUDE.md](./CLAUDE.md) for AI development guidelines and [docs/README.md](./docs/README.md) for comprehensive documentation structure.
 
+**🤖 Custom Agents:** CritterSupply includes specialized GitHub Copilot agents (Principal Architect, Product Owner, DevOps Engineer, QA Engineer, UX Engineer) to provide expert feedback on PRs and issues. See [docs/AI-ASSISTED-DEVELOPMENT.md](./docs/AI-ASSISTED-DEVELOPMENT.md) for details on how to use them.
+
 **📋 Architectural Review:** See [docs/ARCHITECTURAL-REVIEW.md](./docs/ARCHITECTURAL-REVIEW.md) for an independent review of bounded context design, service communication patterns, and recommendations from an experienced software architect perspective.
-
-### Custom Agents
-
-CritterSupply includes specialized GitHub Copilot agents with domain expertise to assist with development:
-
-- **👨‍💼 Principal Software Architect** ([`.github/agents/principal-architect.md`](./.github/agents/principal-architect.md)) - Expert in .NET, event-driven systems, distributed architecture, and the Critter Stack (Wolverine + Marten). Reviews code quality, system design, bounded context boundaries, and project trajectory with 15+ years of production experience.
-
-- **🏪 Product Owner** ([`.github/agents/product-owner.md`](./.github/agents/product-owner.md)) - E-commerce domain expert with 10+ years experience in vendor relations, product/inventory management, and marketplace channels. Provides business-focused feedback on event-driven workflows, bounded context boundaries, and how business processes translate into distributed architecture.
-
-- **🚀 DevOps Engineer** ([`.github/agents/devops-engineer.md`](./.github/agents/devops-engineer.md)) - DevOps/GitOps specialist with expertise in CI/CD orchestration, Infrastructure as Code (IaC), deployment strategies (blue/green, canary, rollback), GitHub Actions, Docker/Kubernetes, and observability (OpenTelemetry). Designs autonomous deployment pipelines with risk analysis and environment-aware strategy adaptation.
-
-- **🧪 QA Engineer** ([`.github/agents/qa-engineer.md`](./.github/agents/qa-engineer.md)) - Seasoned quality assurance professional with expertise in manual and automated testing, BDD, and full-stack quality strategy. Expert in building test coverage for event-driven, distributed .NET systems using the Critter Stack (Wolverine + Marten) and verifying system integrity across bounded contexts.
-
-- **🎨 UX Engineer** ([`.github/agents/ux-engineer.md`](./.github/agents/ux-engineer.md)) - Senior UX Engineer with expertise in WCAG 2.1/2.2 accessibility, responsive design, and e-commerce interaction patterns for Blazor applications. Applies Event Storming and Event Modeling lenses to ensure read models are designed from the user's perspective first. Brings Domain-Driven Design (ubiquitous language in the UI, bounded context seams as UX risk) and Team Topologies (Conway's Law, cognitive load) thinking to every frontend decision. Reviews Blazor components for accessibility, usability, and interaction quality; designs projections and dashboards starting from user information needs.
-
-**How to use:** Tag the agent (`@principal-architect`, `@product-owner`, `@devops-engineer`, `@qa-engineer`, or `@ux-engineer`) in pull request or issue comments to get specialized feedback.
-
-**Example prompts:**
-```
-@principal-architect Can you review the event sourcing implementation in this PR?
-
-@product-owner Does this order cancellation flow match real-world e-commerce policies?
-
-@devops-engineer How should we deploy this Orders BC refactor with zero downtime?
-
-@qa-engineer What integration tests should we add to cover the new checkout flow?
-
-@ux-engineer Does this checkout page layout follow good UX principles?
-
-@principal-architect Is this bounded context boundary properly defined?
-
-@product-owner Should "BackorderRequested" be a separate event or extend "ReservationFailed"?
-
-@qa-engineer Is the BDD coverage sufficient for the Order saga happy path?
-```
 
 
 ## 🛠️ Technology Stack <a id='1.4'></a>
