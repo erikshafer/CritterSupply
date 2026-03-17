@@ -41,11 +41,11 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M32.0 (Backoffice Phase 1 — Read-Only Dashboards) |
-| **Status** | 🚀 ACTIVE — Session 10 complete (10/11 sessions, 91% progress) |
-| **Deliverables** | BFF infrastructure + CS tooling + dashboard KPIs + ops alerts + warehouse dashboard + integration tests |
+| **Current Milestone** | None — M32.0 just completed |
+| **Status** | ✅ MILESTONE COMPLETE — All 11 sessions delivered |
+| **Deliverables** | M32.0: Backoffice BFF (read-only dashboards, CS tooling, 75 integration tests) |
 | **Next Milestone** | M32.1 (Backoffice Phase 2 — Write Operations) |
-| **Active BCs** | 17 total (18 after M32.0 — Backoffice BFF) |
+| **Active BCs** | 18 total (including Backoffice BFF) |
 
 *Last Updated: 2026-03-16*
 
@@ -53,73 +53,12 @@
 
 ## Active Milestone
 
-**M32.0 — Backoffice Phase 1: Read-Only Dashboards & CS Tooling**
+**None — M32.0 Just Completed**
 
-**Status:** 🚀 **ACTIVE** — Session 10 complete (10/11 sessions, 91% progress)
-**Duration:** 2-3 cycles (10-15 sessions estimated, ~24-32 hours)
-**Implementation Branch:** `claude/m32-customer-service-workflows-part-1`
+**Status:** ✅ **MILESTONE COMPLETE** — All 11 sessions delivered
+**Next Work:** Plan M32.1 (Backoffice Phase 2 — Write Operations)
 
-**GitHub Links:**
-- Milestone: [M32.0: Backoffice Phase 1](https://github.com/erikshafer/CritterSupply/milestone/TBD)
-- Project Board: [CritterSupply Development](https://github.com/users/erikshafer/projects/9)
-
-**Planning Documents:**
-- [Milestone Plan](./milestones/m32-0-backoffice-phase-1-plan.md) (comprehensive 11-session plan)
-- [Session 1: Preparation & Discovery](./milestones/m32-0-session-1-preparation.md)
-- [Backoffice Event Modeling (Revised)](./backoffice-event-modeling-revised.md)
-- [Backoffice Integration Gap Register](./backoffice-integration-gap-register.md)
-- [ADR 0031: Backoffice RBAC Model](../decisions/0031-admin-portal-rbac-model.md)
-- [ADR 0032: Multi-Issuer JWT Strategy](../decisions/0032-multi-issuer-jwt-strategy.md)
-- [ADR 0033: Backoffice Rename](../decisions/0033-admin-portal-to-backoffice-rename.md)
-
-**ADRs to Write:**
-- ADR 0034: Backoffice BFF Architecture (Session 1)
-- ADR 0035: Backoffice SignalR Hub Design (Session 8)
-- ADR 0036: BFF-Owned Projections Strategy (Session 6)
-- ADR 0037: OrderNote Aggregate Ownership (Session 5)
-
-**Phase 1 Scope (P0 Features):**
-1. **BFF Infrastructure** — Projects, Marten, Wolverine, JWT, SignalR hub
-2. **Customer Service Workflows** — Search, orders, returns, correspondence, order notes
-3. **Executive Dashboard KPIs** — 5 metrics with real-time updates
-4. **Operations Alert Feed** — 4 alert types with SignalR push
-5. **Warehouse Clerk Dashboard** — Stock visibility, alert acknowledgment
-
-**Implementation Sessions:**
-1. ✅ **Session 1** — Project scaffolding & infrastructure ([retrospective](./milestones/m32-0-session-1-retrospective.md))
-2. ✅ **Session 2** — HTTP client abstractions ([retrospective](./milestones/m32-0-session-2-retrospective.md))
-3. ✅ **Session 3** — CS workflows Part 1: Search & Orders ([retrospective](./milestones/m32-0-session-3-retrospective.md))
-4. ✅ **Session 4** — CS workflows Part 2: Returns & Correspondence ([retrospective](./milestones/m32-0-session-4-retrospective.md))
-5. ✅ **Session 5** — OrderNote aggregate ([retrospective](./milestones/m32-0-session-5-retrospective.md))
-6. ✅ **Session 6** — BFF projections: AdminDailyMetrics ([retrospective](./milestones/m32-0-session-6-retrospective.md))
-7. ✅ **Session 7** — BFF projections: AlertFeedView ([retrospective](./milestones/m32-0-session-7-retrospective.md))
-8. ✅ **Session 8** — SignalR hub ([retrospective](./milestones/m32-0-session-8-retrospective.md))
-9. ✅ **Session 9** — Warehouse clerk dashboard ([retrospective](./milestones/m32-0-session-9-retrospective.md))
-10. ✅ **Session 10** — Integration testing & CI ([retrospective](./milestones/m32-0-session-10-retrospective.md))
-11. ⏳ **Session 11** — Documentation & retrospective (2-3 hours)
-
-**Prerequisites Status:** ✅ All complete (M31.5 — Multi-issuer JWT + endpoint gaps)
-
-**What Will Ship:**
-- Backoffice BFF (Backend-for-Frontend) for internal employees
-- CS agent workflows: customer search, order lookup, return management, correspondence history, order notes
-- Executive dashboard with 5 KPIs and real-time updates
-- Operations alert feed with SignalR push
-- Warehouse clerk stock visibility and alert acknowledgment
-- BFF-owned Marten projections (AdminDailyMetrics, AlertFeedView)
-- Integration tests with Alba + TestContainers
-- 14+ RabbitMQ event subscriptions from 7 domain BCs
-
-**Technology Stack:**
-- Backoffice.Api (port 5243), Marten (`backoffice` schema), Wolverine, SignalR, JWT Bearer (BackofficeIdentity)
-
-**Build Status:** Not yet started
-
-**References:**
-- [M31.5 Session 5 Retrospective](./milestones/m31-5-session-5-retrospective.md)
-- [Backoffice Integration Gap Register](./backoffice-integration-gap-register.md) (38 fully defined endpoints)
-
-*Started: 2026-03-16*
+See [Recent Completions](#recent-completions) for M32.0 details.
 
 ---
 
@@ -127,6 +66,60 @@
 
 > **Contains:** Last 3 completed milestones for quick reference.
 > **Archive Policy:** After 3 milestones accumulate, move oldest to [Milestone Archive](#milestone-archive).
+
+### ✅ M32.0: Backoffice Phase 1 — Read-Only Dashboards (2026-03-16)
+
+**What shipped:**
+- Backoffice BFF (Backend-for-Frontend) for internal operations portal
+- CS agent workflows: customer search, order lookup, return management, correspondence history, order notes
+- Executive dashboard with 5 real-time KPIs (order count, revenue, AOV, payment failure rate)
+- Operations alert feed with SignalR push notifications
+- Warehouse clerk tools: stock visibility, low-stock alerts, alert acknowledgment
+- BFF-owned Marten projections (AdminDailyMetrics, AlertFeedView)
+- OrderNote aggregate (BFF-owned internal CS comments)
+- 75 integration tests (Alba + TestContainers) — all passing
+- 14+ RabbitMQ event subscriptions from 7 domain BCs
+
+**Key Technical Wins:**
+- BFF pattern consistency (3rd successful implementation: Storefront, Vendor Portal, Backoffice)
+- Multi-issuer JWT integration (domain BCs accept tokens from 2+ identity providers)
+- BFF-owned projections for real-time dashboards (alternative to Analytics BC)
+- Integration testing pattern for multi-BC BFFs (stub client fixture design)
+- OrderNote aggregate ownership decision (ADR 0037 — operational metadata belongs in BFF)
+
+**Key Decisions:**
+- Pre-wired SignalR configuration accelerated Session 8 (3h → 2h)
+- Inline projections require explicit `SaveChangesAsync()` before querying
+- Role-based SignalR groups scale better than user-specific groups for internal portals
+- Stub clients must mirror real BC API design (separate list vs detail storage)
+
+**Build Status:** 0 errors, 7 pre-existing warnings (OrderNoteTests nullable false positives)
+
+**Duration:** 11 sessions (~28 hours) — within estimate (26-32 hours)
+
+**References:**
+- [Milestone Plan](./milestones/m32-0-backoffice-phase-1-plan.md)
+- [Milestone Retrospective](./milestones/m32-0-retrospective.md)
+- [Session 11 Retrospective](./milestones/m32-0-session-11-retrospective.md)
+- [ADR 0031: Backoffice RBAC Model](../decisions/0031-admin-portal-rbac-model.md)
+- [ADR 0032: Multi-Issuer JWT Strategy](../decisions/0032-multi-issuer-jwt-strategy.md)
+- [ADR 0033: Backoffice Rename](../decisions/0033-admin-portal-to-backoffice-rename.md)
+
+**ADRs to Write (Phase 2):**
+- ADR 0034: Backoffice BFF Architecture
+- ADR 0035: Backoffice SignalR Hub Design
+- ADR 0036: BFF-Owned Projections Strategy
+- ADR 0037: OrderNote Aggregate Ownership
+
+**Deferred to M32.1 (Phase 2):**
+- 9 endpoint gaps (Product Catalog write, Pricing write, Inventory write, Payments order query)
+- Blazor WASM frontend (Backoffice.Web)
+- Write operations (product admin, pricing adjustments, inventory adjustments)
+- E2E tests (Playwright)
+
+*Completed: 2026-03-16*
+
+---
 
 ### ✅ M31.5: Backoffice Prerequisites (2026-03-16)
 
