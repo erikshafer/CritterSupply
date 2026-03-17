@@ -1,3 +1,4 @@
+using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Wolverine.Http;
@@ -12,15 +13,20 @@ public static class GetDashboardSummary
 {
     [WolverineGet("/api/backoffice/dashboard")]
     [Authorize(Policy = "Executive")]
-    public static Ok<DashboardMetrics> Get()
+    public static async Task<Ok<DashboardMetrics>> Get(IDocumentSession session, CancellationToken ct)
     {
-        // STUB: Return hardcoded metrics for now
-        // Will be replaced with real Marten projections in Phase 3
+        // Query today's metrics from AdminDailyMetrics projection
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var dateKey = today.ToString("yyyy-MM-dd");
+
+        var dailyMetrics = await session.LoadAsync<Backoffice.Projections.AdminDailyMetrics>(dateKey, ct);
+
+        // Map projection to DTO (use zero values if no data exists for today)
         var metrics = new DashboardMetrics(
-            ActiveOrders: 42,
-            PendingReturns: 7,
-            LowStockAlerts: 3,
-            TodaysRevenue: 15_432.50m,
+            ActiveOrders: dailyMetrics?.OrderCount ?? 0,
+            PendingReturns: 0, // STUB: Will be populated from Returns projection in Phase 3
+            LowStockAlerts: 0, // STUB: Will be populated from Inventory projection in Phase 3
+            TodaysRevenue: dailyMetrics?.TotalRevenue ?? 0m,
             GeneratedAt: DateTimeOffset.UtcNow);
 
         return TypedResults.Ok(metrics);

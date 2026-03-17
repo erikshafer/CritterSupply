@@ -73,9 +73,10 @@ public class SignalRNotificationTests
 
         // Assert — verify handler returned LiveMetricUpdated SignalR event with correct data
         result.ShouldNotBeNull();
-        result.OrderCount.ShouldBe(1); // One order placed
-        result.Revenue.ShouldBe(0m); // OrderPlaced doesn't capture revenue (PaymentCaptured does)
-        result.PaymentFailureRate.ShouldBe(0m); // No payment failures yet
+        result.ActiveOrders.ShouldBe(1); // One order placed
+        result.TodaysRevenue.ShouldBe(0m); // OrderPlaced doesn't capture revenue (PaymentCaptured does)
+        result.PendingReturns.ShouldBe(0); // No returns yet (stub field)
+        result.LowStockAlerts.ShouldBe(0); // No alerts yet (stub field)
 
         // Verify projection was updated in database
         using (var session = _fixture.GetDocumentSession())
@@ -111,7 +112,7 @@ public class SignalRNotificationTests
 
         // Assert
         result.ShouldNotBeNull();
-        result.AlertType.ShouldBe("PaymentFailed");
+        result.Title.ShouldBe("Payment Failed");
         result.Severity.ShouldBe("High");
         result.Message.ShouldContain(orderId.ToString());
         result.Message.ShouldContain("Insufficient funds");
@@ -122,16 +123,18 @@ public class SignalRNotificationTests
     {
         // Arrange
         var evt = new LiveMetricUpdated(
-            OrderCount: 42,
-            Revenue: 12345.67m,
-            PaymentFailureRate: 2.5m,
+            ActiveOrders: 42,
+            PendingReturns: 7,
+            LowStockAlerts: 3,
+            TodaysRevenue: 12345.67m,
             OccurredAt: DateTimeOffset.UtcNow);
 
         // Assert
         evt.ShouldBeAssignableTo<IBackofficeWebSocketMessage>();
-        evt.OrderCount.ShouldBe(42);
-        evt.Revenue.ShouldBe(12345.67m);
-        evt.PaymentFailureRate.ShouldBe(2.5m);
+        evt.ActiveOrders.ShouldBe(42);
+        evt.PendingReturns.ShouldBe(7);
+        evt.LowStockAlerts.ShouldBe(3);
+        evt.TodaysRevenue.ShouldBe(12345.67m);
     }
 
     [Fact]
@@ -139,14 +142,14 @@ public class SignalRNotificationTests
     {
         // Arrange
         var evt = new AlertCreated(
-            AlertType: "PaymentFailed",
+            Title: "Payment Failed",
             Severity: "High",
             Message: "Payment failed for order abc-123",
             OccurredAt: DateTimeOffset.UtcNow);
 
         // Assert
         evt.ShouldBeAssignableTo<IBackofficeWebSocketMessage>();
-        evt.AlertType.ShouldBe("PaymentFailed");
+        evt.Title.ShouldBe("Payment Failed");
         evt.Severity.ShouldBe("High");
         evt.Message.ShouldContain("Payment failed");
     }
@@ -155,7 +158,7 @@ public class SignalRNotificationTests
     public void BackofficeEvent_SupportsJsonPolymorphism()
     {
         // Arrange — Verify discriminated union pattern with JsonPolymorphic attributes
-        var liveMetric = new LiveMetricUpdated(10, 500m, 1.5m, DateTimeOffset.UtcNow);
+        var liveMetric = new LiveMetricUpdated(10, 5, 2, 500m, DateTimeOffset.UtcNow);
         var alert = new AlertCreated("TestAlert", "Medium", "Test message", DateTimeOffset.UtcNow);
 
         // Assert — both should be assignable to base BackofficeEvent
