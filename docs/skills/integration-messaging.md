@@ -1368,6 +1368,78 @@ public async Task ProvideAdditionalInfo_CreatesMessageWithFullPayload()
 
 ---
 
+### Lesson 12: Integration Message Handler → SignalR Broadcast Pattern (M32.0, W3)
+
+**Use Case:** BFF integration message handlers that need to broadcast real-time updates via SignalR after processing external BC events.
+
+**Key Insight from M32.0:** Handlers must call `await session.SaveChangesAsync()` **before** returning SignalR events to ensure projection updates are committed.
+
+**Pattern — Async Handler with SaveChanges:**
+
+```csharp
+public static class OrderPlacedHandler
+{
+    // ✅ CORRECT: Async handler with explicit SaveChanges
+    public static async Task<LiveMetricUpdated> Handle(
+        Messages.Contracts.Orders.OrderPlaced message,
+        IDocumentSession session)
+    {
+        // 1. Append event to trigger inline projection
+        session.Events.Append(Guid.NewGuid(), message);
+
+        // 2. Commit transaction (inline projection updates here)
+        await session.SaveChangesAsync();
+
+        // 3. Now query the updated projection
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var metrics = await session.LoadAsync<AdminDailyMetrics>(today);
+
+        // 4. Return SignalR event with current metrics
+        return new LiveMetricUpdated(
+            metrics.TodaysOrders,
+            metrics.TodaysRevenue,
+            DateTimeOffset.UtcNow);
+    }
+}
+```
+
+**Why This Pattern:**
+- ✅ Inline projections update during `SaveChangesAsync()` (not before)
+- ✅ SignalR event contains current projection state (no stale data)
+- ✅ Clients receive real-time updates with accurate metrics
+
+**Common Pitfall — Missing SaveChanges:**
+
+```csharp
+// ❌ WRONG: Synchronous handler can't call SaveChangesAsync()
+public static LiveMetricUpdated Handle(
+    Messages.Contracts.Orders.OrderPlaced message,
+    IDocumentSession session)
+{
+    session.Events.Append(Guid.NewGuid(), message);
+
+    // ❌ Projection not updated yet!
+    var metrics = session.Load<AdminDailyMetrics>(today);
+
+    // ❌ SignalR event contains stale metrics
+    return new LiveMetricUpdated(metrics.TodaysOrders, ...);
+}
+```
+
+**Async vs Sync Handler Decision Matrix:**
+
+| Handler Needs | Return Type | Signature |
+|---------------|-------------|-----------|
+| Query projection after append | `Task<SignalREvent>` | `async Task<T> Handle(..., IDocumentSession session)` |
+| Just return SignalR event | `SignalREvent` | `T Handle(...)` |
+| Multi-BC orchestration | `Task<OutgoingMessages>` | `async Task<OutgoingMessages> Handle(..., IMessageBus bus)` |
+
+**Key Rule:** If your handler appends events and queries projections in the same transaction, it MUST be `async Task<T>` to call `await session.SaveChangesAsync()`.
+
+**Cross-Reference:** See `docs/skills/event-sourcing-projections.md` → "Lesson 0: Inline Projections Require Explicit SaveChanges" for projection-specific details.
+
+---
+
 ## Appendix
 
 ### Cross-References to Related Skills
