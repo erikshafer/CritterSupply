@@ -22,8 +22,8 @@ public sealed class AuthenticationSteps
     public void GivenTheBackofficeApplicationIsRunning()
     {
         // Fixture already initialized by hooks, just verify servers are up
-        Fixture.BackofficeIdentityApiUrl.ShouldNotBeNullOrEmpty();
-        Fixture.BackofficeApiUrl.ShouldNotBeNullOrEmpty();
+        Fixture.IdentityApiBaseUrl.ShouldNotBeNullOrEmpty();
+        Fixture.BackofficeApiBaseUrl.ShouldNotBeNullOrEmpty();
         Fixture.WasmBaseUrl.ShouldNotBeNullOrEmpty();
     }
 

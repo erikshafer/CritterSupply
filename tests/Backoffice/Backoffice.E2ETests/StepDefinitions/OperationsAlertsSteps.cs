@@ -60,9 +60,9 @@ public sealed class OperationsAlertsSteps
             Fixture.StubInventoryClient.AddLowStockAlert(
                 alertId,
                 sku,
-                currentStock: 5 + i,
-                reorderThreshold: 50,
-                triggeredAt: DateTimeOffset.UtcNow.AddHours(-(i + 1)),
+                availableQuantity: 5 + i,
+                thresholdQuantity: 50,
+                createdAt: DateTimeOffset.UtcNow.AddHours(-(i + 1)),
                 isAcknowledged: false,
                 severity: severity);
         }
@@ -75,9 +75,9 @@ public sealed class OperationsAlertsSteps
         Fixture.StubInventoryClient.AddLowStockAlert(
             alertId,
             sku,
-            currentStock: 10,
-            reorderThreshold: 50,
-            triggeredAt: DateTimeOffset.UtcNow.AddHours(-1),
+            availableQuantity: 10,
+            thresholdQuantity: 50,
+            createdAt: DateTimeOffset.UtcNow.AddHours(-1),
             isAcknowledged: false,
             severity: "Critical");
 
@@ -95,9 +95,9 @@ public sealed class OperationsAlertsSteps
             Fixture.StubInventoryClient.AddLowStockAlert(
                 alertId,
                 sku,
-                currentStock: 2 + i,
-                reorderThreshold: 50,
-                triggeredAt: DateTimeOffset.UtcNow.AddHours(-(i + 1)),
+                availableQuantity: 2 + i,
+                thresholdQuantity: 50,
+                createdAt: DateTimeOffset.UtcNow.AddHours(-(i + 1)),
                 isAcknowledged: false,
                 severity: "Critical");
         }
@@ -114,9 +114,9 @@ public sealed class OperationsAlertsSteps
             Fixture.StubInventoryClient.AddLowStockAlert(
                 alertId,
                 sku,
-                currentStock: 15 + i,
-                reorderThreshold: 50,
-                triggeredAt: DateTimeOffset.UtcNow.AddHours(-(i + 1)),
+                availableQuantity: 15 + i,
+                thresholdQuantity: 50,
+                createdAt: DateTimeOffset.UtcNow.AddHours(-(i + 1)),
                 isAcknowledged: false,
                 severity: "Warning");
         }
@@ -133,9 +133,9 @@ public sealed class OperationsAlertsSteps
             Fixture.StubInventoryClient.AddLowStockAlert(
                 alertId,
                 sku,
-                currentStock: 5 + i,
-                reorderThreshold: 50,
-                triggeredAt: DateTimeOffset.UtcNow.AddHours(-(i + 1)),
+                availableQuantity: 5 + i,
+                thresholdQuantity: 50,
+                createdAt: DateTimeOffset.UtcNow.AddHours(-(i + 1)),
                 isAcknowledged: true,
                 severity: "Warning");
         }
@@ -154,9 +154,9 @@ public sealed class OperationsAlertsSteps
         Fixture.StubInventoryClient.AddLowStockAlert(
             alertId,
             "TEST-SKU-001",
-            currentStock: 10,
-            reorderThreshold: 50,
-            triggeredAt: DateTimeOffset.UtcNow.AddHours(-1),
+            availableQuantity: 10,
+            thresholdQuantity: 50,
+            createdAt: DateTimeOffset.UtcNow.AddHours(-1),
             isAcknowledged: false,
             severity: "Critical");
 
@@ -172,9 +172,9 @@ public sealed class OperationsAlertsSteps
             Fixture.StubInventoryClient.AddLowStockAlert(
                 alertId,
                 sku,
-                currentStock: 5 + i,
-                reorderThreshold: 50,
-                triggeredAt: DateTimeOffset.UtcNow.AddHours(-(i + 1)),
+                availableQuantity: 5 + i,
+                thresholdQuantity: 50,
+                createdAt: DateTimeOffset.UtcNow.AddHours(-(i + 1)),
                 isAcknowledged: false,
                 severity: "Critical");
         }
@@ -225,9 +225,9 @@ public sealed class OperationsAlertsSteps
         Fixture.StubInventoryClient.AddLowStockAlert(
             newAlertId,
             sku,
-            currentStock: 5,
-            reorderThreshold: 50,
-            triggeredAt: DateTimeOffset.UtcNow,
+            availableQuantity: 5,
+            thresholdQuantity: 50,
+            createdAt: DateTimeOffset.UtcNow,
             isAcknowledged: false,
             severity: "Critical");
 

@@ -168,7 +168,10 @@ public sealed class E2ETestFixture : IAsyncLifetime
         var firstName = nameParts.Length > 0 ? nameParts[0] : "Test";
         var lastName = nameParts.Length > 1 ? nameParts[1] : "User";
 
-        var passwordHash = BCrypt.Net.BCrypt.HashPassword(password);
+        // Use ASP.NET Core Identity's PasswordHasher (PBKDF2-SHA256) - matches production code
+        var passwordHasher = new Microsoft.AspNetCore.Identity.PasswordHasher<BackofficeIdentity.Identity.BackofficeUser>();
+        var passwordHash = passwordHasher.HashPassword(null!, password);
+
         var adminUser = new BackofficeIdentity.Identity.BackofficeUser
         {
             Id = userId,
@@ -495,14 +498,4 @@ internal static class ServiceCollectionExtensions
         services.AddSingleton<TClient>(implementation);
     }
 
-    /// <summary>
-    /// Disables all external Wolverine transports (RabbitMQ) for tests.
-    /// </summary>
-    public static void DisableAllExternalWolverineTransports(this IServiceCollection services)
-    {
-        services.ConfigureWolverine(opts =>
-        {
-            opts.DisableAllExternalTransports();
-        });
-    }
 }
