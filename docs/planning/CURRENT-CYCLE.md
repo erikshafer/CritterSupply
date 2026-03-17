@@ -41,24 +41,61 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | None — M32.0 just completed |
-| **Status** | ✅ MILESTONE COMPLETE — All 11 sessions delivered |
-| **Deliverables** | M32.0: Backoffice BFF (read-only dashboards, CS tooling, 75 integration tests) |
-| **Next Milestone** | M32.1 (Backoffice Phase 2 — Write Operations) |
+| **Current Milestone** | M32.1 — Backoffice Phase 2: Write Operations |
+| **Status** | 🚀 IN PROGRESS — Session 1 of ~16 |
+| **Deliverables** | Blazor WASM frontend, write operations (Product Catalog, Pricing, Inventory), E2E tests |
+| **Next Session** | Session 1: Gap closure + ADRs (4 ADRs to document M32.0) |
 | **Active BCs** | 18 total (including Backoffice BFF) |
 
-*Last Updated: 2026-03-16*
+*Last Updated: 2026-03-17*
 
 ---
 
 ## Active Milestone
 
-**None — M32.0 Just Completed**
+### 🚀 M32.1: Backoffice Phase 2 — Write Operations
 
-**Status:** ✅ **MILESTONE COMPLETE** — All 11 sessions delivered
-**Next Work:** Plan M32.1 (Backoffice Phase 2 — Write Operations)
+**Status:** 🚀 **IN PROGRESS** — Session 1 started
+**Duration Estimate:** 3-4 cycles (12-18 sessions)
+**Current Session:** Session 1 of ~16
 
-See [Recent Completions](#recent-completions) for M32.0 details.
+**What's Shipping:**
+- **Phase 2 Prerequisite (Sessions 1-3):** Domain BC endpoint gaps closed (Product Catalog write, Pricing write, Inventory write, Payments query)
+- **Blazor WASM Frontend (Sessions 4-8):** Backoffice.Web with JWT auth, role-based navigation, dashboard UI, CS workflows UI
+- **Write Operations UI (Sessions 9-12):** Product admin, pricing admin, warehouse admin, user management
+- **E2E Testing (Sessions 13-15):** Playwright tests for critical workflows
+- **Documentation (Session 16):** Retrospectives, skills updates, gap register closure
+
+**Phase 2 Approach:**
+1. **Sessions 1-3:** Close 9 endpoint gaps in domain BCs (prerequisite for write operations)
+2. **Sessions 4-8:** Build Blazor WASM frontend shell with JWT auth and read-only views
+3. **Sessions 9-12:** Add write operations UI (product, pricing, inventory, users)
+4. **Sessions 13-15:** Write E2E tests with Playwright + Reqnroll
+5. **Session 16:** Documentation and retrospective
+
+**Key Decisions:**
+- Session 1 will write **4 ADRs documenting M32.0 decisions** (0034-0037: BFF Architecture, SignalR Hub, Projections Strategy, OrderNote Ownership)
+- Blazor WASM follows Vendor Portal pattern (in-memory JWT, background token refresh, SignalR with JWT Bearer)
+- E2E tests use real Kestrel servers (not TestServer) for SignalR testing
+- Gap closure first (Sessions 1-3) prevents mid-cycle blockers
+
+**Session 1 Goals:**
+- Close Product Catalog admin write endpoint gaps (add/update/delete products)
+- Write ADRs 0034-0037 (M32.0 architectural decisions)
+- 10+ integration tests for Product Catalog write endpoints
+
+**References:**
+- [M32.1 Plan](./milestones/m32-1-backoffice-phase-2-plan.md)
+- [M32.0 Retrospective](./milestones/m32-0-retrospective.md)
+- [Backoffice Event Modeling](./backoffice-event-modeling-revised.md)
+- [Integration Gap Register](./backoffice-integration-gap-register.md)
+
+**Deferred to Phase 3:**
+- Promotions management UI
+- CSV/Excel exports
+- Bulk operations pattern
+- Returns analytics dashboard
+- Audit log viewer
 
 ---
 
