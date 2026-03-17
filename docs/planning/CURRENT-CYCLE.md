@@ -88,6 +88,8 @@
 - [M32.1 Plan](./milestones/m32-1-backoffice-phase-2-plan.md)
 - [M32.0 Retrospective](./milestones/m32-0-retrospective.md)
 - [Backoffice Event Modeling](./backoffice-event-modeling-revised.md)
+- [Backoffice Frontend Design](./backoffice-frontend-design.md)
+- [Frontend Design Alignment Analysis](./backoffice-frontend-design-alignment-analysis.md)
 - [Integration Gap Register](./backoffice-integration-gap-register.md)
 
 **Deferred to Phase 3:**

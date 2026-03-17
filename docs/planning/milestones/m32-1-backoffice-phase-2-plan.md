@@ -291,6 +291,8 @@ src/Backoffice/
 
 **Goal:** Create Backoffice.Web project with JWT authentication
 
+**Design Reference:** See [Backoffice Frontend Design](../backoffice-frontend-design.md) for visual theme, color palette, and authentication flow.
+
 **Tasks:**
 1. Create `src/Backoffice/Backoffice.Web/Backoffice.Web.csproj` (Blazor WASM SDK)
 2. Add project to `CritterSupply.sln` and `CritterSupply.slnx`
@@ -321,6 +323,8 @@ src/Backoffice/
 ### Session 5: Main Layout & Navigation
 
 **Goal:** Build main layout with role-based navigation
+
+**Design Reference:** See [Backoffice Frontend Design](../backoffice-frontend-design.md) Decision 4 (Navigation Architecture) and Stage 3 wireframes for layout structure.
 
 **Tasks:**
 1. Create `Components/Layout/MainLayout.razor`:
@@ -355,6 +359,8 @@ src/Backoffice/
 
 **Goal:** Build executive dashboard with real-time KPIs
 
+**Design Reference:** See [Backoffice Frontend Design](../backoffice-frontend-design.md) Decision 2 (Real-Time UI) and Sketch 3 (Operations Alert Feed) for dashboard patterns.
+
 **Tasks:**
 1. Create `Pages/Dashboard.razor`:
    - 5 KPI cards (order count, revenue, AOV, payment failure rate, fulfillment pipeline)
@@ -385,6 +391,8 @@ src/Backoffice/
 ### Session 7: Customer Service Workflows UI
 
 **Goal:** Build CS workflows (customer search, order detail, return approval)
+
+**Design Reference:** See [Backoffice Frontend Design](../backoffice-frontend-design.md) Sketch 1 (CS Agent Dashboard) and Sketch 2 (Order Detail) for CS workspace patterns.
 
 **Tasks:**
 1. Create `Pages/CustomerSearch.razor`:
@@ -423,6 +431,8 @@ src/Backoffice/
 ### Session 8: Operations Alert Feed UI
 
 **Goal:** Build operations alert feed with SignalR push
+
+**Design Reference:** See [Backoffice Frontend Design](../backoffice-frontend-design.md) Decision 2 (3-tier notification system) and Sketch 3 (Operations Alert Feed) for alert patterns.
 
 **Tasks:**
 1. Create `Pages/OperationsAlerts.razor`:
@@ -880,6 +890,8 @@ src/Backoffice/
 - [M32.0 Session 11 Retrospective](./m32-0-session-11-retrospective.md)
 - [Backoffice Event Modeling (Revised)](../backoffice-event-modeling-revised.md)
 - [Backoffice Integration Gap Register](../backoffice-integration-gap-register.md)
+- [Backoffice Frontend Design](../backoffice-frontend-design.md) — **UI/UX decisions, wireframes, visual theme**
+- [Backoffice Frontend Design Alignment Analysis](../backoffice-frontend-design-alignment-analysis.md) — **Design validation against M32.1 plan**
 
 **ADRs:**
 - [ADR 0031: Backoffice RBAC Model](../../decisions/0031-admin-portal-rbac-model.md)

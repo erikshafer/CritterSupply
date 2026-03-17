@@ -6,7 +6,7 @@
 **Participants:** Principal Software Architect, Product Owner, UX Engineer
 **Status:** 🟡 Revised Model — Awaiting Owner Sign-Off on Open Questions (Phase 0 complete)
 **Input Documents:** Original event model, [Research & Discovery](backoffice-research-discovery.md), [UX Research](backoffice-ux-research.md), Cycle 21-28 retrospectives, codebase audit, [Cycle 29 Phase 1 Retrospective](cycles/cycle-29-admin-identity-phase-1-retrospective.md)
-**Companion Documents:** [Integration Gap Register](backoffice-integration-gap-register.md), [Decision Log](backoffice-revised-decision-log.md), [Open Questions](backoffice-open-questions.md)
+**Companion Documents:** [Integration Gap Register](backoffice-integration-gap-register.md), [Decision Log](backoffice-revised-decision-log.md), [Open Questions](backoffice-open-questions.md), [Frontend Design](backoffice-frontend-design.md), [Frontend Design Alignment Analysis](backoffice-frontend-design-alignment-analysis.md)
 
 > **Revision Note:** This document replaces the original `backoffice-event-modeling.md` as the current-state event model. The original is preserved as-is for historical reference. All changes are marked with `[REVISED]` tags and rationale. The companion [Decision Log](backoffice-revised-decision-log.md) records what was kept, changed, or removed from the original.
 >
