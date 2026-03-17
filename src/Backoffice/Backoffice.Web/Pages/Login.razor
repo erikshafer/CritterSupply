@@ -1,0 +1,123 @@
+@page "/login"
+@inject BackofficeAuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ILogger<Login> Logger
+
+<PageTitle>Login — Backoffice</PageTitle>
+
+<MudThemeProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-16">
+    <MudPaper Elevation="4" Class="pa-8">
+        <MudText Typo="Typo.h4" Align="Align.Center" GutterBottom="true">
+            Backoffice Login
+        </MudText>
+        <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-6" Color="Color.Secondary">
+            CritterSupply Internal Operations Portal
+        </MudText>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+        }
+
+        @if (signedOut)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">You have been signed out.</MudAlert>
+        }
+
+        <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+
+            <MudTextField @bind-Value="loginModel.Email"
+                          Label="Email"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          FullWidth="true"
+                          Required="true"
+                          InputType="InputType.Email"
+                          Class="mb-4" />
+
+            <MudTextField @bind-Value="loginModel.Password"
+                          Label="Password"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          FullWidth="true"
+                          Required="true"
+                          InputType="InputType.Password"
+                          Class="mb-4" />
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Size="Size.Large"
+                       Disabled="isLoggingIn">
+                @if (isLoggingIn)
+                {
+                    <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
+                    <span>Signing in...</span>
+                }
+                else
+                {
+                    <span>Sign In</span>
+                }
+            </MudButton>
+        </EditForm>
+    </MudPaper>
+
+    <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-4" Color="Color.Secondary">
+        CritterSupply Backoffice — Internal Use Only
+    </MudText>
+</MudContainer>
+
+@code {
+    private LoginModel loginModel = new();
+    private string? errorMessage;
+    private bool isLoggingIn;
+    private bool signedOut;
+
+    protected override void OnInitialized()
+    {
+        var uri = new Uri(NavigationManager.Uri);
+        signedOut = uri.Query.Contains("signedOut=true");
+    }
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+        isLoggingIn = true;
+
+        try
+        {
+            var success = await AuthService.LoginAsync(loginModel.Email, loginModel.Password);
+
+            if (success)
+            {
+                Logger.LogInformation("User {Email} logged in successfully", loginModel.Email);
+                NavigationManager.NavigateTo("/");
+            }
+            else
+            {
+                errorMessage = "Invalid email or password.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Login failed for {Email}", loginModel.Email);
+            errorMessage = "An error occurred during login. Please try again.";
+        }
+        finally
+        {
+            isLoggingIn = false;
+        }
+    }
+
+    private class LoginModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+}
