@@ -41,8 +41,6 @@ public sealed class CancelScheduledPriceChangeEndpointTests(TestFixture fixture)
                 sku,
                 scheduleId,
                 Money.Of(29.99m, "USD"),
-                null,
-                null,
                 DateTimeOffset.UtcNow.AddDays(7),
                 Guid.NewGuid(),
                 DateTimeOffset.UtcNow));
@@ -129,8 +127,6 @@ public sealed class CancelScheduledPriceChangeEndpointTests(TestFixture fixture)
                 sku,
                 scheduleId,
                 Money.Of(49.99m, "USD"),
-                null,
-                null,
                 DateTimeOffset.UtcNow.AddDays(7),
                 Guid.NewGuid(),
                 DateTimeOffset.UtcNow.AddDays(-1)),
@@ -138,6 +134,7 @@ public sealed class CancelScheduledPriceChangeEndpointTests(TestFixture fixture)
                 streamId,
                 sku,
                 scheduleId,
+                null,
                 Guid.NewGuid(),
                 DateTimeOffset.UtcNow.AddHours(-1)));
 
