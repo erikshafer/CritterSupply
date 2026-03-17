@@ -7,6 +7,29 @@ description: Write integration tests using TestContainers for .NET with xUnit. C
 
 > **Scope:** This skill covers TestContainers infrastructure setup (Postgres, RabbitMQ, etc.) — getting real databases running in Docker for tests. For testing patterns using Wolverine handlers, Marten aggregates, and Alba HTTP scenarios, see `critterstack-testing-patterns.md`.
 
+## Table of Contents
+
+1. [When to Use This Skill](#when-to-use-this-skill)
+2. [Core Principles](#core-principles)
+3. [Why TestContainers Over Mocks?](#why-testcontainers-over-mocks)
+4. [Required NuGet Packages](#required-nuget-packages)
+5. [TestContainers Setup Patterns](#testcontainers-setup-patterns)
+   - [Pattern 1: Marten-Based BC](#pattern-1-marten-based-bc-event-store-or-document-store)
+   - [Pattern 2: EF Core-Based BC](#pattern-2-ef-core-based-bc)
+   - [Pattern 3: Multi-BC BFF with Stub Clients](#pattern-3-multi-bc-bff-with-stub-clients) ⭐ *M32 Addition*
+   - [Collection Fixtures](#collection-fixtures-for-sequential-test-execution)
+6. [Data Cleanup Strategies](#data-cleanup-strategies)
+7. [Best Practices](#best-practices)
+8. [Performance Tips](#performance-tips)
+9. [Testing Patterns](#testing-patterns)
+10. [Common Pitfalls](#common-pitfalls)
+11. [CI/CD Considerations](#cicd-considerations)
+12. [Summary](#summary)
+13. [Polecat (SQL Server Event Store) Support](#polecat-sql-server-event-store-support)
+14. [References](#references)
+
+---
+
 ## When to Use This Skill
 
 Use this skill when:

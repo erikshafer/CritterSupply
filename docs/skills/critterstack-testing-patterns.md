@@ -4,6 +4,28 @@
 
 Patterns for testing Wolverine and Marten applications in CritterSupply.
 
+## Table of Contents
+
+1. [Core Philosophy](#core-philosophy)
+2. [Testing Tools](#testing-tools)
+3. [Integration Test Fixture](#integration-test-fixture)
+4. [Test Isolation Checklist](#test-isolation-checklist)
+5. [Event Sourcing Race Conditions and Direct Command Invocation](#event-sourcing-race-conditions-and-direct-command-invocation)
+6. [Integration Test Pattern](#integration-test-pattern)
+7. [TestFixture Helper Methods](#testfixture-helper-methods)
+8. [Unit Testing Pure Functions](#unit-testing-pure-functions)
+9. [Testing Validators](#testing-validators)
+10. [Testing Event-Sourced Aggregates](#testing-event-sourced-aggregates)
+11. [Cross-Context Refactoring Checklist](#cross-context-refactoring-checklist)
+12. [Shouldly Assertions](#shouldly-assertions)
+13. [Test Organization](#test-organization)
+14. [Testing Async Patterns and Fan-Out Commands](#testing-async-patterns-and-fan-out-commands)
+15. [Multi-BC BFF Testing Patterns](#multi-bc-bff-testing-patterns) ⭐ *M32 Addition*
+16. [Key Principles](#key-principles)
+17. [TestFixture Standardization Summary](#testfixture-standardization-summary)
+
+---
+
 ## Planned: End-to-End Testing
 
 This document is intended for integration and unit level tests, not end-to-end (E2E) tests. The intent is that system-wide E2E testing will be appended here in its own section or be included in another document. The idea at the moment is to leverage a BDD-aligned framework like SpecFlow and write the specifications in the Gherkin language.

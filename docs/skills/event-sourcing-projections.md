@@ -15,6 +15,7 @@
 3. [Projection Types and Lifecycles](#projection-types-and-lifecycles)
 4. [Single-Stream Projections](#single-stream-projections)
 5. [Multi-Stream Projections](#multi-stream-projections)
+   - [Discriminated Unions for Projection Views (JSON Polymorphism)](#discriminated-unions-for-projection-views-json-polymorphism)
 6. [Live Aggregation and FetchForWriting](#live-aggregation-and-fetchforwriting)
 7. [Snapshot Projections](#snapshot-projections)
 8. [Projection Registration and Configuration](#projection-registration-and-configuration)
@@ -24,6 +25,13 @@
 12. [Polecat Compatibility](#polecat-compatibility)
 13. [Common Pitfalls and Warnings](#common-pitfalls-and-warnings)
 14. [Production Lessons Learned](#production-lessons-learned)
+    - [Lesson 0: Inline Projections Require Explicit SaveChanges Before Querying](#lesson-0-inline-projections-require-explicit-savechanges-before-querying) ⭐ *M32 Addition*
+    - [Lesson 1: Always Test Projected Documents, Not Just Events](#lesson-1-always-test-projected-documents-not-just-events)
+    - [Lesson 2: Inline Projections for Hot-Path Queries Are Non-Negotiable](#lesson-2-inline-projections-for-hot-path-queries-are-non-negotiable)
+    - [Lesson 3: MultiStreamProjection Identity Mapping Is Subtle](#lesson-3-multiststreamprojection-identity-mapping-is-subtle)
+    - [Lesson 4: Snapshot Projections Are Cheaper Than You Think](#lesson-4-snapshot-projections-are-cheaper-than-you-think)
+    - [Lesson 5: FetchForWriting() vs. Snapshot — Know the Difference](#lesson-5-fetchforwriting-vs-snapshot--know-the-difference)
+    - [Lesson 6: BFF-Owned Projections Avoid Need for Separate Analytics BC](#lesson-6-bff-owned-projections-avoid-need-for-separate-analytics-bc) ⭐ *M32 Addition*
 15. [Decision Matrix: Which Projection Pattern?](#decision-matrix-which-projection-pattern)
 16. [Appendix: How Projections Work Under the Hood](#appendix-how-projections-work-under-the-hood)
 

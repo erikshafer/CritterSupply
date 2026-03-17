@@ -12,6 +12,7 @@ Patterns and practices for building message handlers and HTTP endpoints with Wol
 4. [Aggregate Handler Workflow (Decider Pattern)](#aggregate-handler-workflow-decider-pattern)
 5. [Entity and Document Loading](#entity-and-document-loading)
 6. [Handler Return Patterns](#handler-return-patterns)
+   - [Pattern 8: Async vs Sync Return Types](#pattern-8-async-vs-sync-return-types-m320-lesson) ⭐ *M32 Addition*
 7. [Railway Programming in Handlers](#railway-programming-in-handlers)
 8. [HTTP Endpoints](#http-endpoints)
 9. [Handler Discovery](#handler-discovery)

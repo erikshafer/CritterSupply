@@ -14,6 +14,9 @@
 - [When to Use a BFF](#when-to-use-a-bff)
 - [Project Structure (CritterSupply Pattern)](#project-structure-crittersupply-pattern)
 - [BFF Responsibilities and Boundaries](#bff-responsibilities-and-boundaries)
+  - [What Belongs in the BFF](#what-belongs-in-the-bff)
+  - [What Does NOT Belong in the BFF](#what-does-not-belong-in-the-bff)
+  - [BFF-Owned Projections vs Separate Analytics BC](#bff-owned-projections-vs-separate-analytics-bc-m320-decision) ⭐ *M32 Addition*
 - [View Model Composition](#view-model-composition)
 - [Cross-BC Query Orchestration](#cross-bc-query-orchestration)
 - [Real-Time Patterns: SignalR (Current Standard)](#real-time-patterns-signalr-current-standard)

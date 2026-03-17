@@ -2,6 +2,31 @@
 
 Comprehensive guide for using Wolverine's native SignalR transport in CritterSupply — covering server setup, hub design, authentication, client integration, the SignalR Client transport, group-based routing, Marten side-effect pipelines, and lessons learned from the Storefront and Vendor Portal bounded contexts.
 
+## Table of Contents
+
+1. [When to Use This Skill](#when-to-use-this-skill)
+2. [Core Concepts](#core-concepts)
+3. [Server Configuration](#server-configuration)
+4. [Marker Interfaces and Message Routing](#marker-interfaces-and-message-routing)
+5. [Hub Group Management](#hub-group-management)
+   - [Server-Side Group Enrollment](#server-side-group-enrollment)
+   - [Handler-Driven Group Management](#handler-driven-group-management)
+   - [Targeted Group Publishing](#targeted-group-publishing-towebsocketgroup)
+   - [Role-Based Groups](#role-based-groups-m320-pattern) ⭐ *M32 Addition*
+   - [Responding to the Originating Connection](#responding-to-the-originating-connection)
+6. [Authentication Patterns](#authentication-patterns)
+7. [Marten Projection Side Effects Pipeline](#marten-projection-side-effects-pipeline)
+8. [Client-Side Integration](#client-side-integration)
+9. [SignalR Client Transport](#signalr-client-transport)
+10. [WebSocket Sagas](#websocket-sagas)
+11. [Lessons Learned in CritterSupply](#lessons-learned-in-crittersupply)
+12. [Scaling Considerations](#scaling-considerations)
+13. [Diagnostics](#diagnostics)
+14. [Common Pitfalls Summary](#common-pitfalls-summary)
+15. [See Also](#see-also)
+
+---
+
 ## When to Use This Skill
 
 **Use Wolverine's SignalR transport when:**
