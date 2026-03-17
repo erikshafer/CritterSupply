@@ -1,11 +1,6 @@
 using JasperFx.CommandLine;
 using Marten;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using System.Security.Claims;
-using System.Text.Encodings.Web;
 using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.Tracking;
@@ -45,14 +40,11 @@ public class TestFixture : IAsyncLifetime
                     opts.Connection(_connectionString);
                 });
 
-                // Configure test authentication (bypasses JWT validation)
-                services.AddAuthentication()
-                    .AddScheme<AuthenticationSchemeOptions, BackofficeTestAuthHandler>(
-                        "Backoffice", _ => { });
-                services.PostConfigure<AuthenticationOptions>(options =>
+                // Replace authorization with test handler
+                // Use AllowAnonymous policy that bypasses all authorization
+                services.AddAuthorization(opts =>
                 {
-                    options.DefaultAuthenticateScheme = "Backoffice";
-                    options.DefaultChallengeScheme = "Backoffice";
+                    opts.AddPolicy("PricingManager", policy => policy.RequireAssertion(_ => true));
                 });
 
                 // Disable external Wolverine transports for testing
@@ -141,32 +133,5 @@ public class TestFixture : IAsyncLifetime
         });
 
         return (tracked, result);
-    }
-}
-
-/// <summary>
-/// Test authentication handler that simulates Backoffice JWT authentication.
-/// Always succeeds and provides PricingManager role claim.
-/// </summary>
-internal sealed class BackofficeTestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
-{
-    public BackofficeTestAuthHandler(
-        IOptionsMonitor<AuthenticationSchemeOptions> options,
-        ILoggerFactory logger,
-        UrlEncoder encoder)
-        : base(options, logger, encoder) { }
-
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
-    {
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.Name, "test-pricing-manager"),
-            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-            new Claim("role", "PricingManager"),  // Role claim for PricingManager policy
-        };
-        var identity = new ClaimsIdentity(claims, "Backoffice");
-        var principal = new ClaimsPrincipal(identity);
-        var ticket = new AuthenticationTicket(principal, "Backoffice");
-        return Task.FromResult(AuthenticateResult.Success(ticket));
     }
 }
