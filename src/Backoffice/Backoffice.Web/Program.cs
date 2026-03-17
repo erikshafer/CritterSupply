@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
 using Backoffice.Web.Auth;
+using Backoffice.Web.Hub;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<Backoffice.Web.App>("#app");
@@ -35,6 +36,9 @@ builder.Services.AddMudServices();
 builder.Services.AddSingleton<BackofficeAuthState>();
 builder.Services.AddSingleton<BackofficeAuthService>();
 builder.Services.AddSingleton<TokenRefreshService>();
+
+// SignalR hub service (singleton — manages persistent connection)
+builder.Services.AddSingleton<BackofficeHubService>();
 
 // Custom AuthenticationStateProvider (reads from BackofficeAuthState)
 builder.Services.AddAuthorizationCore();
