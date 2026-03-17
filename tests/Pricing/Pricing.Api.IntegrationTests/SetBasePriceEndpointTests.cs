@@ -49,7 +49,7 @@ public sealed class SetBasePriceEndpointTests(TestFixture fixture) : IAsyncLifet
         await using var verifySession = _fixture.GetDocumentSession();
         var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku.ToUpperInvariant());
         priceView.ShouldNotBeNull();
-        priceView.BasePrice.Amount.ShouldBe(15.99m);
+        priceView.BasePrice.ShouldBe(15.99m);
         priceView.Status.ShouldBe(PriceStatus.Published);
     }
 
@@ -90,7 +90,7 @@ public sealed class SetBasePriceEndpointTests(TestFixture fixture) : IAsyncLifet
         await using var verifySession = _fixture.GetDocumentSession();
         var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku.ToUpperInvariant());
         priceView.ShouldNotBeNull();
-        priceView.BasePrice.Amount.ShouldBe(22.99m);
+        priceView.BasePrice.ShouldBe(22.99m);
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public sealed class SetBasePriceEndpointTests(TestFixture fixture) : IAsyncLifet
         await using var verifySession = _fixture.GetDocumentSession();
         var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku.ToUpperInvariant());
         priceView.ShouldNotBeNull();
-        priceView.BasePrice.Amount.ShouldBe(25.00m);
+        priceView.BasePrice.ShouldBe(25.00m);
     }
 
     [Fact]

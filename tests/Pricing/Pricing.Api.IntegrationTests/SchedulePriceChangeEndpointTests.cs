@@ -59,7 +59,7 @@ public sealed class SchedulePriceChangeEndpointTests(TestFixture fixture) : IAsy
         await using var verifySession = _fixture.GetDocumentSession();
         var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku.ToUpperInvariant());
         priceView.ShouldNotBeNull();
-        priceView.BasePrice.Amount.ShouldBe(24.99m);  // Still old price
+        priceView.BasePrice.ShouldBe(24.99m);  // Still old price
     }
 
     [Fact]
