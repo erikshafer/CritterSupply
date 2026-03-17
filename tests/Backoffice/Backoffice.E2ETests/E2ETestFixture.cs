@@ -467,40 +467,47 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
     /// </summary>
     private static string FindWasmRoot()
     {
-        // Strategy: Start from test output directory and find the Backoffice.Web build output
-        var current = AppContext.BaseDirectory;
+        // Strategy: Start from test output directory (bin/Debug/net10.0) and look for sibling Backoffice.Web build
+        var current = AppContext.BaseDirectory; // e.g., tests/Backoffice/Backoffice.E2ETests/bin/Debug/net10.0
+
+        // Walk up directory tree to find repo root (has .git or src/ directory)
         while (current != null)
         {
-            // PRIORITY 1: Check for bin/Debug or bin/Release output (has _framework directory)
-            var binCandidate = Directory.GetDirectories(current, "Backoffice.Web", SearchOption.AllDirectories)
-                .Select(d => Path.Combine(d, "wwwroot"))
-                .Where(Directory.Exists)
-                .Where(wwwroot => Directory.Exists(Path.Combine(wwwroot, "_framework"))) // Verify _framework exists
-                .FirstOrDefault();
-
-            if (binCandidate != null)
+            // Check if we're at repo root (has src/ directory)
+            var srcDir = Path.Combine(current, "src");
+            if (Directory.Exists(srcDir))
             {
-                Console.WriteLine($"✅ [FindWasmRoot] Found compiled wwwroot with _framework: {binCandidate}");
-                return binCandidate;
-            }
+                // PRIORITY 1: Check bin output directory (relative to repo root)
+                var binWwwroot = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "bin", "Debug", "net10.0", "wwwroot");
+                if (Directory.Exists(binWwwroot) && Directory.Exists(Path.Combine(binWwwroot, "_framework")))
+                {
+                    Console.WriteLine($"✅ [FindWasmRoot] Found compiled wwwroot with _framework: {binWwwroot}");
+                    return binWwwroot;
+                }
 
-            // PRIORITY 2: Check src directory as fallback (but warn if no _framework)
-            var srcCandidate = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "wwwroot");
-            if (Directory.Exists(srcCandidate))
-            {
-                var hasFramework = Directory.Exists(Path.Combine(srcCandidate, "_framework"));
-                Console.WriteLine($"⚠️  [FindWasmRoot] Found source wwwroot (has _framework: {hasFramework}): {srcCandidate}");
-                if (hasFramework)
-                    return srcCandidate;
+                // PRIORITY 2: Check source directory as fallback (only if it has _framework compiled into it)
+                var srcWwwroot = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "wwwroot");
+                if (Directory.Exists(srcWwwroot))
+                {
+                    var hasFramework = Directory.Exists(Path.Combine(srcWwwroot, "_framework"));
+                    Console.WriteLine($"⚠️  [FindWasmRoot] Found source wwwroot (has _framework: {hasFramework}): {srcWwwroot}");
+                    if (hasFramework)
+                        return srcWwwroot;
+                }
+
+                // Neither location has compiled files
+                throw new InvalidOperationException(
+                    $"Could not locate Backoffice.Web/wwwroot directory with compiled _framework files. " +
+                    $"Checked: {binWwwroot} and {srcWwwroot}. " +
+                    $"Ensure the Backoffice.Web project is built before running E2E tests.");
             }
 
             current = Directory.GetParent(current)?.FullName;
         }
 
         throw new InvalidOperationException(
-            "Could not locate Backoffice.Web/wwwroot directory with compiled _framework files. " +
-            "Ensure the Backoffice.Web project is built before running E2E tests. " +
-            "Expected location: bin/Debug/net10.0/wwwroot/_framework/");
+            "Could not locate repository root (expected directory with src/ subdirectory). " +
+            $"Started from: {AppContext.BaseDirectory}");
     }
 }
 
