@@ -491,7 +491,7 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
     /// </summary>
     private static string FindWasmRoot()
     {
-        // Strategy: Start from test output directory (bin/Debug/net10.0) and look for sibling Backoffice.Web build
+        // Strategy: Start from test output directory (bin/Debug/net10.0) and look for sibling Backoffice.Web publish output
         var current = AppContext.BaseDirectory; // e.g., tests/Backoffice/Backoffice.E2ETests/bin/Debug/net10.0
 
         // Walk up directory tree to find repo root (has .git or src/ directory)
@@ -501,29 +501,38 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
             var srcDir = Path.Combine(current, "src");
             if (Directory.Exists(srcDir))
             {
-                // PRIORITY 1: Check bin output directory (relative to repo root)
-                var binWwwroot = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "bin", "Debug", "net10.0", "wwwroot");
-                if (Directory.Exists(binWwwroot) && Directory.Exists(Path.Combine(binWwwroot, "_framework")))
+                // PRIORITY 1: Check publish output directory (has index.html + _framework)
+                var publishWwwroot = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "bin", "Debug", "net10.0", "publish", "wwwroot");
+                if (Directory.Exists(publishWwwroot) && Directory.Exists(Path.Combine(publishWwwroot, "_framework")) && File.Exists(Path.Combine(publishWwwroot, "index.html")))
                 {
-                    Console.WriteLine($"✅ [FindWasmRoot] Found compiled wwwroot with _framework: {binWwwroot}");
+                    Console.WriteLine($"✅ [FindWasmRoot] Found publish wwwroot with _framework and index.html: {publishWwwroot}");
+                    return publishWwwroot;
+                }
+
+                // PRIORITY 2: Check bin output directory (has _framework but may be missing index.html)
+                var binWwwroot = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "bin", "Debug", "net10.0", "wwwroot");
+                if (Directory.Exists(binWwwroot) && Directory.Exists(Path.Combine(binWwwroot, "_framework")) && File.Exists(Path.Combine(binWwwroot, "index.html")))
+                {
+                    Console.WriteLine($"✅ [FindWasmRoot] Found compiled wwwroot with _framework and index.html: {binWwwroot}");
                     return binWwwroot;
                 }
 
-                // PRIORITY 2: Check source directory as fallback (only if it has _framework compiled into it)
+                // PRIORITY 3: Check source directory as fallback (only if it has _framework compiled into it)
                 var srcWwwroot = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "wwwroot");
                 if (Directory.Exists(srcWwwroot))
                 {
                     var hasFramework = Directory.Exists(Path.Combine(srcWwwroot, "_framework"));
-                    Console.WriteLine($"⚠️  [FindWasmRoot] Found source wwwroot (has _framework: {hasFramework}): {srcWwwroot}");
-                    if (hasFramework)
+                    var hasIndexHtml = File.Exists(Path.Combine(srcWwwroot, "index.html"));
+                    Console.WriteLine($"⚠️  [FindWasmRoot] Found source wwwroot (has _framework: {hasFramework}, has index.html: {hasIndexHtml}): {srcWwwroot}");
+                    if (hasFramework && hasIndexHtml)
                         return srcWwwroot;
                 }
 
-                // Neither location has compiled files
+                // None of the locations have all required files
                 throw new InvalidOperationException(
-                    $"Could not locate Backoffice.Web/wwwroot directory with compiled _framework files. " +
-                    $"Checked: {binWwwroot} and {srcWwwroot}. " +
-                    $"Ensure the Backoffice.Web project is built before running E2E tests.");
+                    $"Could not locate Backoffice.Web/wwwroot directory with compiled _framework files AND index.html. " +
+                    $"Checked (in order): {publishWwwroot}, {binWwwroot}, {srcWwwroot}. " +
+                    $"Ensure the Backoffice.Web project is published before running E2E tests (run: dotnet publish src/Backoffice/Backoffice.Web).");
             }
 
             current = Directory.GetParent(current)?.FullName;
