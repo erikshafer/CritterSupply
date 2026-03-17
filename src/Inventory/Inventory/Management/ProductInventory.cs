@@ -98,4 +98,7 @@ public sealed record ProductInventory(
 
     public ProductInventory Apply(StockRestocked @event) =>
         this with { AvailableQuantity = AvailableQuantity + @event.Quantity };
+
+    public ProductInventory Apply(InventoryAdjusted @event) =>
+        this with { AvailableQuantity = AvailableQuantity + @event.AdjustmentQuantity };
 }

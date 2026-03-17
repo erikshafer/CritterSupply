@@ -40,14 +40,14 @@ builder.Services.AddMarten(opts =>
     .UseLightweightSessions()
     .IntegrateWithWolverine();
 
-// JWT Bearer authentication for admin endpoints.
-// Tokens are issued by VendorIdentity.Api (Phase 1: shared signing key; Phase 2: dedicated admin IdP).
+// JWT Bearer authentication with multi-issuer support (Vendor + Backoffice)
 var jwtSigningKey = builder.Configuration["Jwt:SigningKey"]
     ?? "dev-only-signing-key-change-in-production-must-be-at-least-32-chars";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "vendor-identity";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "vendor-portal";
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    // Vendor JWT scheme (Vendor Portal admins managing vendor-assigned products)
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
@@ -61,16 +61,49 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30),
         };
+    })
+    // Backoffice JWT scheme (Backoffice admins managing product catalog)
+    .AddJwtBearer("Backoffice", options =>
+    {
+        options.Authority = "https://localhost:5249";
+        options.Audience = "https://localhost:5249";
+        if (builder.Environment.IsDevelopment())
+        {
+            options.RequireHttpsMetadata = false;
+        }
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            RoleClaimType = "role"
+        };
     });
 
-// Authorization policy: "VendorAdmin" requires a JWT with Role == "Admin".
-// Phase 2: replace with a dedicated backoffice identity provider and finer-grained policies.
+// Authorization policies
 builder.Services.AddAuthorization(opts =>
 {
+    // Vendor admins can add/update/assign vendor-specific products
     opts.AddPolicy("VendorAdmin", policy => policy
         .RequireAuthenticatedUser()
         .RequireRole("Admin"));
+
+    // Backoffice CopyWriter can update product descriptions
+    opts.AddPolicy("CopyWriter", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Backoffice");
+        policy.RequireRole("CopyWriter", "ProductManager", "SystemAdmin");
+    });
+
+    // Backoffice ProductManager has full product catalog control
+    opts.AddPolicy("ProductManager", policy =>
+    {
+        policy.AuthenticationSchemes.Add("Backoffice");
+        policy.RequireRole("ProductManager", "SystemAdmin");
+    });
 });
+
 
 // Wolverine messaging and HTTP
 builder.Host.UseWolverine(opts =>
