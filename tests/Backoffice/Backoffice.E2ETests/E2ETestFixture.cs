@@ -462,32 +462,45 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
 
     /// <summary>
     /// Locates the Backoffice.Web wwwroot directory containing compiled WASM files.
-    /// Walks up from the test output directory to find the source project.
+    /// Walks up from the test output directory to find the bin build output.
+    /// IMPORTANT: Must use bin/Debug/net10.0/wwwroot (not src/*/wwwroot) to get compiled _framework files.
     /// </summary>
     private static string FindWasmRoot()
     {
-        // Strategy: find the Backoffice.Web project's wwwroot from the repo root
+        // Strategy: Start from test output directory and find the Backoffice.Web build output
         var current = AppContext.BaseDirectory;
         while (current != null)
         {
-            var candidate = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "wwwroot");
-            if (Directory.Exists(candidate))
-                return candidate;
-
-            // Also check for the published output (bin/Debug or bin/Release)
+            // PRIORITY 1: Check for bin/Debug or bin/Release output (has _framework directory)
             var binCandidate = Directory.GetDirectories(current, "Backoffice.Web", SearchOption.AllDirectories)
                 .Select(d => Path.Combine(d, "wwwroot"))
-                .FirstOrDefault(Directory.Exists);
+                .Where(Directory.Exists)
+                .Where(wwwroot => Directory.Exists(Path.Combine(wwwroot, "_framework"))) // Verify _framework exists
+                .FirstOrDefault();
 
             if (binCandidate != null)
+            {
+                Console.WriteLine($"✅ [FindWasmRoot] Found compiled wwwroot with _framework: {binCandidate}");
                 return binCandidate;
+            }
+
+            // PRIORITY 2: Check src directory as fallback (but warn if no _framework)
+            var srcCandidate = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "wwwroot");
+            if (Directory.Exists(srcCandidate))
+            {
+                var hasFramework = Directory.Exists(Path.Combine(srcCandidate, "_framework"));
+                Console.WriteLine($"⚠️  [FindWasmRoot] Found source wwwroot (has _framework: {hasFramework}): {srcCandidate}");
+                if (hasFramework)
+                    return srcCandidate;
+            }
 
             current = Directory.GetParent(current)?.FullName;
         }
 
         throw new InvalidOperationException(
-            "Could not locate Backoffice.Web/wwwroot directory. " +
-            "Ensure the Backoffice.Web project is built before running E2E tests.");
+            "Could not locate Backoffice.Web/wwwroot directory with compiled _framework files. " +
+            "Ensure the Backoffice.Web project is built before running E2E tests. " +
+            "Expected location: bin/Debug/net10.0/wwwroot/_framework/");
     }
 }
 
