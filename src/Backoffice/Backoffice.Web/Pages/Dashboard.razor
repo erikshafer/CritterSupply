@@ -209,17 +209,17 @@
                     _lastMetricUpdate = DateTimeOffset.UtcNow;
                     await InvokeAsync(StateHasChanged);
                 }
-                else if (eventType?.EndsWith("OrderPlaced") == true)
+                else if (eventType?.EndsWith("ActiveOrderIncremented") == true)
                 {
                     _activeOrders++;
                     await InvokeAsync(StateHasChanged);
                 }
-                else if (eventType?.EndsWith("OrderFulfilled") == true)
+                else if (eventType?.EndsWith("ActiveOrderDecremented") == true)
                 {
                     _activeOrders = Math.Max(0, _activeOrders - 1);
                     await InvokeAsync(StateHasChanged);
                 }
-                else if (eventType?.EndsWith("ReturnRequested") == true)
+                else if (eventType?.EndsWith("PendingReturnIncremented") == true)
                 {
                     _pendingReturns++;
                     await InvokeAsync(StateHasChanged);

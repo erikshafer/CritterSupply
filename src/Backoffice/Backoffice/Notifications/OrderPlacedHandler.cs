@@ -30,9 +30,10 @@ public static class OrderPlacedHandler
 
         // Publish LiveMetricUpdated for executive dashboard (SignalR to role:executive group)
         return new LiveMetricUpdated(
-            OrderCount: metrics?.OrderCount ?? 0,
-            Revenue: metrics?.TotalRevenue ?? 0m,
-            PaymentFailureRate: metrics?.PaymentFailureRate ?? 0m,
+            ActiveOrders: metrics?.OrderCount ?? 0,
+            PendingReturns: 0, // STUB: Will be populated from Returns projection in Phase 3
+            LowStockAlerts: 0, // STUB: Will be populated from Inventory projection in Phase 3
+            TodaysRevenue: metrics?.TotalRevenue ?? 0m,
             OccurredAt: DateTimeOffset.UtcNow);
     }
 }

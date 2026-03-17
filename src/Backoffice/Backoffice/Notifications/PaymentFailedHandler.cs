@@ -23,7 +23,7 @@ public static class PaymentFailedHandler
 
         // Publish AlertCreated for operations dashboard (SignalR to role:operations group)
         return new AlertCreated(
-            AlertType: "PaymentFailed",
+            Title: "Payment Failed",
             Severity: "High",
             Message: $"Payment failed for order {message.OrderId}: {message.FailureReason}",
             OccurredAt: DateTimeOffset.UtcNow);
