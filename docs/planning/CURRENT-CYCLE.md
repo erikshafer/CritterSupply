@@ -42,9 +42,9 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.1 — Backoffice Phase 2: Write Operations |
-| **Status** | 🚀 IN PROGRESS — Sessions 1-6 completed, Blazor WASM scaffolding complete |
+| **Status** | 🚀 IN PROGRESS — Sessions 1-8 completed, stub endpoints replaced with real projections |
 | **Deliverables** | Blazor WASM frontend, write operations (Product Catalog, Pricing, Inventory), E2E tests |
-| **Next Session** | Session 7: Real pages (Customer Search, Executive Dashboard, Operations Alerts) |
+| **Next Session** | Session 9: E2E Playwright tests (or close milestone if sufficient) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
 *Last Updated: 2026-03-17*
@@ -55,9 +55,9 @@
 
 ### 🚀 M32.1: Backoffice Phase 2 — Write Operations
 
-**Status:** 🚀 **IN PROGRESS** — Sessions 1-6 completed, Blazor WASM scaffolding complete (17 files, JWT auth, role-based nav)
+**Status:** 🚀 **IN PROGRESS** — Sessions 1-8 completed, stub endpoints replaced with real Marten projections
 **Duration Estimate:** 3-4 cycles (12-18 sessions)
-**Current Phase:** Ready for real page implementations (Session 7)
+**Current Phase:** Ready for E2E tests or milestone completion decision (Session 9)
 
 **What's Shipping:**
 - **Phase 2 Prerequisite (Sessions 1-3):** Domain BC endpoint gaps closed (Product Catalog write, Pricing write, Inventory write, Payments query)
@@ -119,13 +119,24 @@
 - ✅ TokenRefreshService for background token refresh
 - ✅ 17 files created, project builds successfully (0 errors)
 
-**Session 7 Goals:** (Next)
-- Create Customer Search page (CS role — highest-frequency workflow)
-- Create Executive Dashboard page (Executive role — KPI metrics)
-- Create Operations Alert Feed page (OperationsManager role)
-- Wire SignalR hub connection (BackofficeHubService)
-- Create typed HTTP client interfaces
-- Test role-based navigation visibility
+**Session 7 Goals:** ✅ COMPLETED
+- ✅ Create Customer Search page (CS role — highest-frequency workflow)
+- ✅ Create Executive Dashboard page (Executive role — KPI metrics)
+- ✅ Create Operations Alert Feed page (OperationsManager role)
+- ✅ Wire SignalR hub connection (BackofficeHubService)
+- ✅ Create typed HTTP client interfaces (stub-backed for rapid iteration)
+- ✅ Test role-based navigation visibility
+
+**Session 8 Goals:** ✅ COMPLETED
+- ✅ Replace GetDashboardSummary stub with real AdminDailyMetrics projection query
+- ✅ Remove duplicate stub endpoints (GetOperationsAlerts, SearchCustomers already had real implementations)
+- ✅ Fix SignalRNotificationTests to match BackofficeEvent discriminated union signatures
+- ✅ All 75 Backoffice integration tests passing
+
+**Session 9 Goals:** (Next)
+- Decide: E2E Playwright tests or close milestone?
+- Option A: Add E2E tests for critical workflows (order lookup, dashboard real-time updates)
+- Option B: Close M32.1 and defer E2E tests to future milestone (sufficient integration test coverage)
 
 **References:**
 - [M32.1 Plan](./milestones/m32-1-backoffice-phase-2-plan.md)
@@ -136,6 +147,8 @@
 - [Session 4 Retrospective](./milestones/m32-1-session-4-retrospective.md)
 - [Session 5 Retrospective](./milestones/m32-1-session-5-retrospective.md)
 - [Session 6 Retrospective](./milestones/m32-1-session-6-retrospective.md)
+- [Session 7 Retrospective](./milestones/m32-1-session-7-retrospective.md)
+- [Session 8 Retrospective](./milestones/m32-1-session-8-retrospective.md)
 - [Backoffice Event Modeling](./backoffice-event-modeling-revised.md)
 - [Backoffice Frontend Design](./backoffice-frontend-design.md)
 - [Frontend Design Alignment Analysis](./backoffice-frontend-design-alignment-analysis.md)
