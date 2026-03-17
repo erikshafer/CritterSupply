@@ -391,6 +391,7 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
     {
         // Locate the Backoffice.Web wwwroot output directory
         var wasmRoot = FindWasmRoot();
+        Console.WriteLine($"✅ [WasmStaticFileHost] Located wwwroot: {wasmRoot}");
 
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0"); // Random port
@@ -410,14 +411,23 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
         _app.UseCors();
 
         // Intercept appsettings.json requests to inject test API URLs
-        _app.MapGet("/appsettings.json", () => Results.Json(new
+        _app.MapGet("/appsettings.json", () =>
         {
-            ApiClients = new
+            var config = new
             {
-                BackofficeIdentityApiUrl = _identityApiUrl,
-                BackofficeApiUrl = _backofficeApiUrl
-            }
-        }));
+                ApiClients = new
+                {
+                    BackofficeIdentityApiUrl = _identityApiUrl,
+                    BackofficeApiUrl = _backofficeApiUrl
+                }
+            };
+
+            Console.WriteLine("✅ [WasmStaticFileHost] Intercepted appsettings.json request");
+            Console.WriteLine($"   BackofficeIdentityApiUrl: {_identityApiUrl}");
+            Console.WriteLine($"   BackofficeApiUrl: {_backofficeApiUrl}");
+
+            return Results.Json(config);
+        });
 
         // Serve static WASM files
         _app.UseStaticFiles(new StaticFileOptions
@@ -441,6 +451,8 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
 
         BaseUrl = BackofficeIdentityApiKestrelFactory.NormalizeAddress(
             addresses?.Addresses.FirstOrDefault() ?? string.Empty);
+
+        Console.WriteLine($"✅ [WasmStaticFileHost] Started on: {BaseUrl}");
     }
 
     public async ValueTask DisposeAsync()
