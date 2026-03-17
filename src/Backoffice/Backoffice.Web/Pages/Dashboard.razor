@@ -1,0 +1,314 @@
+@page "/dashboard"
+@using System.Net.Http.Json
+@using System.Text.Json
+@using Microsoft.AspNetCore.SignalR.Client
+@using Backoffice.Web.Auth
+@using Backoffice.Web.Hub
+@attribute [Authorize(Roles = "executive,operations-manager,system-admin")]
+@inject BackofficeAuthState AuthState
+@inject BackofficeHubService HubService
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@inject ILogger<Dashboard> Logger
+@implements IDisposable
+
+<PageTitle>Dashboard — Backoffice</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">
+    Executive Dashboard
+</MudText>
+<MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+    Real-time business metrics — @AuthState.RoleDisplayName view
+</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4"
+                       aria-label="Loading dashboard data" />
+}
+
+@* SignalR disconnection warning *@
+@if (HubService.State == HubConnectionState.Disconnected)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3"
+              aria-live="assertive" data-testid="hub-disconnected-banner">
+        <MudIcon Icon="@Icons.Material.Filled.WifiOff" Class="mr-1" aria-hidden="true" />
+        Live updates are paused.
+        <MudButton Variant="Variant.Text" Color="Color.Warning" Size="Size.Small"
+                   OnClick="ReconnectAsync" Class="ml-1 pa-0" Style="min-width:auto; text-transform:none;">
+            Reconnect
+        </MudButton>
+        or refresh the page to restore live data.
+    </MudAlert>
+}
+
+@if (_metrics is not null)
+{
+    <section aria-label="Dashboard metrics">
+        @* KPI cards ordered urgency-first: Active Orders → Pending Returns → Revenue *@
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center"
+                          aria-label="@($"Active Orders: {_activeOrders}")"
+                          data-testid="kpi-active-orders">
+                    <MudIcon Icon="@Icons.Material.Filled.ShoppingCart"
+                             Color="Color.Primary"
+                             Style="font-size:2rem;" aria-hidden="true" />
+                    <div aria-live="polite" aria-atomic="true">
+                        <MudText Typo="Typo.h4">@_activeOrders</MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Active Orders</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center"
+                          aria-label="@($"Pending Returns: {_pendingReturns}")"
+                          data-testid="kpi-pending-returns">
+                    <MudIcon Icon="@Icons.Material.Filled.AssignmentReturn"
+                             Color="@(_pendingReturns > 0 ? Color.Warning : Color.Success)"
+                             Style="font-size:2rem;" aria-hidden="true" />
+                    <div aria-live="polite" aria-atomic="true">
+                        <MudText Typo="Typo.h4">@_pendingReturns</MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Pending Returns</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center"
+                          aria-label="@($"Low Stock Alerts: {_lowStockAlerts}")"
+                          data-testid="kpi-low-stock-alerts">
+                    <MudIcon Icon="@Icons.Material.Filled.Warning"
+                             Color="@(_lowStockAlerts > 0 ? Color.Error : Color.Success)"
+                             Style="font-size:2rem;" aria-hidden="true" />
+                    <div aria-live="polite" aria-atomic="true">
+                        <MudText Typo="Typo.h4">@_lowStockAlerts</MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Low Stock Alerts</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 d-flex flex-column align-center"
+                          aria-label="@($"Today's Revenue: {_todaysRevenue:C0}")"
+                          data-testid="kpi-todays-revenue">
+                    <MudIcon Icon="@Icons.Material.Filled.AttachMoney"
+                             Color="Color.Success"
+                             Style="font-size:2rem;" aria-hidden="true" />
+                    <div aria-live="polite" aria-atomic="true">
+                        <MudText Typo="Typo.h4">@_todaysRevenue.ToString("C0")</MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Today's Revenue</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </section>
+
+    @if (_lastMetricUpdate.HasValue)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3"
+                  aria-live="polite" data-testid="metrics-updated-banner">
+            Metrics updated at @_lastMetricUpdate.Value.ToLocalTime().ToString("HH:mm:ss").
+            <MudButton Variant="Variant.Text" Color="Color.Info" Size="Size.Small"
+                       OnClick="LoadDashboardAsync" Class="ml-1 pa-0"
+                       Style="min-width:auto; text-transform:none; font-size:inherit;">
+                Refresh
+            </MudButton>
+        </MudAlert>
+    }
+
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudText Typo="Typo.h6" GutterBottom="true">Quick Actions</MudText>
+
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Search" Class="mr-2"
+                   Href="/customers/search"
+                   data-testid="customer-search-btn">
+            Customer Search
+        </MudButton>
+
+        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                   StartIcon="@Icons.Material.Filled.Notifications" Class="mr-2"
+                   Href="/alerts"
+                   data-testid="view-alerts-btn">
+            View Alerts
+        </MudButton>
+
+        @if (AuthState.Role == "system-admin")
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.Settings" Class="mr-2"
+                       Href="/admin"
+                       data-testid="admin-btn">
+                Admin Settings
+            </MudButton>
+        }
+    </MudPaper>
+}
+
+@code {
+    private DashboardMetrics? _metrics;
+    private bool _isLoading = true;
+
+    // Live metrics — updated by SignalR hub messages
+    private int _activeOrders;
+    private int _pendingReturns;
+    private int _lowStockAlerts;
+    private decimal _todaysRevenue;
+    private DateTimeOffset? _lastMetricUpdate;
+
+    // Hub message listener registration
+    private IDisposable? _hubMessageHandler;
+
+    protected override async Task OnInitializedAsync()
+    {
+        HubService.OnStateChanged += OnHubStateChanged;
+        await LoadDashboardAsync();
+        RegisterHubListeners();
+    }
+
+    private async void OnHubStateChanged()
+    {
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+
+            if (HubService.State == HubConnectionState.Connected)
+            {
+                RegisterHubListeners();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Non-fatal exception in OnHubStateChanged.");
+        }
+    }
+
+    private async Task ReconnectAsync()
+    {
+        await HubService.ConnectAsync();
+    }
+
+    private void RegisterHubListeners()
+    {
+        if (HubService.Connection is null) return;
+
+        _hubMessageHandler?.Dispose();
+
+        _hubMessageHandler = HubService.Connection.On<JsonElement>(
+            "ReceiveMessage",
+            async envelope =>
+            {
+                if (!TryGetEventType(envelope, out var eventType)) return;
+
+                if (eventType?.EndsWith("LiveMetricUpdated") == true)
+                {
+                    // Real-time metric update from the server
+                    UpdateMetricsFromEnvelope(envelope);
+                    _lastMetricUpdate = DateTimeOffset.UtcNow;
+                    await InvokeAsync(StateHasChanged);
+                }
+                else if (eventType?.EndsWith("OrderPlaced") == true)
+                {
+                    _activeOrders++;
+                    await InvokeAsync(StateHasChanged);
+                }
+                else if (eventType?.EndsWith("OrderFulfilled") == true)
+                {
+                    _activeOrders = Math.Max(0, _activeOrders - 1);
+                    await InvokeAsync(StateHasChanged);
+                }
+                else if (eventType?.EndsWith("ReturnRequested") == true)
+                {
+                    _pendingReturns++;
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+    }
+
+    private async Task LoadDashboardAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.GetAsync("/api/backoffice/dashboard");
+            if (response.IsSuccessStatusCode)
+            {
+                _metrics = await response.Content.ReadFromJsonAsync<DashboardMetrics>();
+                if (_metrics is not null)
+                {
+                    _activeOrders = _metrics.ActiveOrders;
+                    _pendingReturns = _metrics.PendingReturns;
+                    _lowStockAlerts = _metrics.LowStockAlerts;
+                    _todaysRevenue = _metrics.TodaysRevenue;
+                    _lastMetricUpdate = null; // Reset after explicit refresh
+                }
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Snackbar.Add("Session expired. Please log in again.", Severity.Warning);
+            }
+            else
+            {
+                Snackbar.Add("Failed to load dashboard.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception loading dashboard metrics");
+            Snackbar.Add("Failed to load dashboard. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void UpdateMetricsFromEnvelope(JsonElement envelope)
+    {
+        try
+        {
+            if (!envelope.TryGetProperty("data", out var data)) return;
+
+            if (data.TryGetProperty("activeOrders", out var orders))
+                _activeOrders = orders.GetInt32();
+            if (data.TryGetProperty("pendingReturns", out var returns))
+                _pendingReturns = returns.GetInt32();
+            if (data.TryGetProperty("lowStockAlerts", out var alerts))
+                _lowStockAlerts = alerts.GetInt32();
+            if (data.TryGetProperty("todaysRevenue", out var revenue))
+                _todaysRevenue = revenue.GetDecimal();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Failed to update metrics from hub envelope");
+        }
+    }
+
+    private static bool TryGetEventType(JsonElement envelope, out string? eventType)
+    {
+        eventType = null;
+        if (envelope.ValueKind != JsonValueKind.Object) return false;
+        if (!envelope.TryGetProperty("type", out var typeEl)) return false;
+        eventType = typeEl.GetString();
+        return eventType is not null;
+    }
+
+    public void Dispose()
+    {
+        HubService.OnStateChanged -= OnHubStateChanged;
+        _hubMessageHandler?.Dispose();
+    }
+
+    private sealed record DashboardMetrics(
+        int ActiveOrders,
+        int PendingReturns,
+        int LowStockAlerts,
+        decimal TodaysRevenue,
+        DateTimeOffset GeneratedAt);
+}

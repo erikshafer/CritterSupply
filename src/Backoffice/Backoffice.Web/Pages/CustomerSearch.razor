@@ -1,0 +1,210 @@
+@page "/customers/search"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.SignalR.Client
+@using Backoffice.Web.Auth
+@using Backoffice.Web.Hub
+@attribute [Authorize(Roles = "customer-service,operations-manager,system-admin")]
+@inject BackofficeAuthState AuthState
+@inject BackofficeHubService HubService
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject ILogger<CustomerSearch> Logger
+
+<PageTitle>Customer Search — Backoffice</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">
+    Customer Search
+</MudText>
+<MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+    Search customers by name, email, or ID
+</MudText>
+
+@* Search bar with instant feedback *@
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudTextField @bind-Value="_searchQuery"
+                          Label="Search customers"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Placeholder="Name, email, or customer ID..."
+                          Immediate="true"
+                          DebounceInterval="300"
+                          OnDebounceIntervalElapsed="SearchCustomersAsync"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          FullWidth="true"
+                          aria-label="Customer search input"
+                          data-testid="customer-search-input" />
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-center">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="SearchCustomersAsync"
+                       Disabled="_isSearching"
+                       FullWidth="true"
+                       data-testid="search-btn">
+                @if (_isSearching)
+                {
+                    <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
+                    <span>Searching...</span>
+                }
+                else
+                {
+                    <span>Search</span>
+                }
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_isSearching)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4"
+                       aria-label="Searching for customers" />
+}
+
+@if (_searchResults is not null)
+{
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+        Found @_searchResults.TotalCount customer(s) in @_searchDurationMs ms
+    </MudText>
+
+    @if (_searchResults.TotalCount == 0)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+            No customers found matching "@_searchQuery". Try a different search term.
+        </MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="2">
+            <MudTable Items="_searchResults.Customers"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Dense="true"
+                      Striped="true"
+                      FixedHeader="true"
+                      Height="500px"
+                      aria-label="Customer search results"
+                      data-testid="customer-results-table">
+                <HeaderContent>
+                    <MudTh>Customer ID</MudTh>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Email</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Total Orders</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Customer ID">
+                        <code style="font-size:0.75rem;">@context.CustomerId.ToString("N")[..8]</code>
+                    </MudTd>
+                    <MudTd DataLabel="Name">@context.FirstName @context.LastName</MudTd>
+                    <MudTd DataLabel="Email">@context.Email</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip Size="Size.Small"
+                                 Color="@(context.Status == "Active" ? Color.Success : Color.Default)"
+                                 Variant="Variant.Text">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Total Orders">@context.TotalOrders</MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="@(() => ViewCustomerDetails(context.CustomerId))"
+                                   data-testid="@($"view-customer-{context.CustomerId}")">
+                            View Details
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    }
+}
+
+@code {
+    private string _searchQuery = string.Empty;
+    private bool _isSearching;
+    private CustomerSearchResponse? _searchResults;
+    private int _searchDurationMs;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Connect to hub for real-time customer updates (if not already connected)
+        if (HubService.State != HubConnectionState.Connected)
+        {
+            await HubService.ConnectAsync();
+        }
+    }
+
+    private async Task SearchCustomersAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            _searchResults = null;
+            return;
+        }
+
+        _isSearching = true;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var encodedQuery = Uri.EscapeDataString(_searchQuery);
+            var response = await client.GetAsync($"/api/backoffice/customers/search?q={encodedQuery}");
+
+            sw.Stop();
+            _searchDurationMs = (int)sw.ElapsedMilliseconds;
+
+            if (response.IsSuccessStatusCode)
+            {
+                _searchResults = await response.Content.ReadFromJsonAsync<CustomerSearchResponse>();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Snackbar.Add("Session expired. Please log in again.", Severity.Warning);
+            }
+            else
+            {
+                Snackbar.Add("Search failed. Please try again.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception searching customers with query: {Query}", _searchQuery);
+            Snackbar.Add("Search failed. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _isSearching = false;
+        }
+    }
+
+    private void ViewCustomerDetails(Guid customerId)
+    {
+        // Navigate to customer detail page (will be implemented later)
+        Navigation.NavigateTo($"/customers/{customerId}");
+    }
+
+    private sealed record CustomerSearchResponse(
+        IReadOnlyList<CustomerSearchResult> Customers,
+        int TotalCount,
+        DateTimeOffset SearchedAt);
+
+    private sealed record CustomerSearchResult(
+        Guid CustomerId,
+        string FirstName,
+        string LastName,
+        string Email,
+        string Status,
+        int TotalOrders,
+        DateTimeOffset CreatedAt);
+}

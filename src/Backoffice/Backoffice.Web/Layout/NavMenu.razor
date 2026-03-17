@@ -6,19 +6,19 @@
     </MudNavLink>
 
     <AuthorizeView Policy="CustomerService">
-        <MudNavLink Href="/customer-search" Icon="@Icons.Material.Filled.Search" Disabled="true">
+        <MudNavLink Href="/customers/search" Icon="@Icons.Material.Filled.Search">
             Customer Search
         </MudNavLink>
     </AuthorizeView>
 
     <AuthorizeView Policy="Executive">
-        <MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard" Disabled="true">
+        <MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard">
             Executive Dashboard
         </MudNavLink>
     </AuthorizeView>
 
     <AuthorizeView Policy="OperationsManager">
-        <MudNavLink Href="/operations" Icon="@Icons.Material.Filled.Notifications" Disabled="true">
+        <MudNavLink Href="/alerts" Icon="@Icons.Material.Filled.Notifications">
             Operations Alerts
         </MudNavLink>
     </AuthorizeView>
