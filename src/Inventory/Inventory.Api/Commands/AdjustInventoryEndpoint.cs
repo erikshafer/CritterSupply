@@ -11,17 +11,6 @@ namespace Inventory.Api.Commands;
 /// </summary>
 public static class AdjustInventoryEndpoint
 {
-    public sealed record AdjustInventoryRequest(
-        int AdjustmentQuantity,
-        string Reason,
-        string AdjustedBy);
-
-    public sealed record AdjustInventoryResult(
-        Guid InventoryId,
-        string Sku,
-        string WarehouseId,
-        int NewAvailableQuantity);
-
     /// <summary>
     /// Adjusts inventory quantity (positive or negative).
     /// </summary>

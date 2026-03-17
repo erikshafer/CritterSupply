@@ -11,16 +11,6 @@ namespace Inventory.Api.Commands;
 /// </summary>
 public static class ReceiveInboundStockEndpoint
 {
-    public sealed record ReceiveInboundStockRequest(
-        int Quantity,
-        string Source);
-
-    public sealed record ReceiveInboundStockResult(
-        Guid InventoryId,
-        string Sku,
-        string WarehouseId,
-        int NewAvailableQuantity);
-
     /// <summary>
     /// Records receipt of new stock from a supplier or transfer.
     /// </summary>

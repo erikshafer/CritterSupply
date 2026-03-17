@@ -1,3 +1,4 @@
+using Inventory.Api.Commands;
 using Inventory.Management;
 using Marten;
 using Shouldly;
@@ -45,7 +46,7 @@ public sealed class AdjustInventoryEndpointTests : IAsyncLifetime
         });
 
         // Assert: Verify new quantity
-        var response = result.ReadAsJson<Api.Commands.AdjustInventoryEndpoint.AdjustInventoryResult>();
+        var response = result.ReadAsJson<AdjustInventoryResult>();
         response.ShouldNotBeNull();
         response.Sku.ShouldBe(sku);
         response.WarehouseId.ShouldBe(warehouseId);
@@ -76,7 +77,7 @@ public sealed class AdjustInventoryEndpointTests : IAsyncLifetime
         });
 
         // Assert: Verify new quantity
-        var response = result.ReadAsJson<Api.Commands.AdjustInventoryEndpoint.AdjustInventoryResult>();
+        var response = result.ReadAsJson<AdjustInventoryResult>();
         response.ShouldNotBeNull();
         response.NewAvailableQuantity.ShouldBe(90);  // 100 - 10
     }
@@ -215,7 +216,7 @@ public sealed class AdjustInventoryEndpointTests : IAsyncLifetime
         });
 
         // Assert: Verify final quantity
-        var response = finalResult.ReadAsJson<Api.Commands.AdjustInventoryEndpoint.AdjustInventoryResult>();
+        var response = finalResult.ReadAsJson<AdjustInventoryResult>();
         response.NewAvailableQuantity.ShouldBe(140);  // 100 + 50 - 20 + 10
     }
 }

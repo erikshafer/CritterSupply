@@ -1,7 +1,7 @@
+using Inventory.Api.Commands;
 using Inventory.Management;
 using Marten;
 using Shouldly;
-using static Inventory.Api.Commands.ReceiveInboundStockEndpoint;
 
 namespace Inventory.Api.IntegrationTests.Commands;
 
