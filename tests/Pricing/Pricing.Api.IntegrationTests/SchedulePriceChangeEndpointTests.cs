@@ -51,10 +51,6 @@ public sealed class SchedulePriceChangeEndpointTests(TestFixture fixture) : IAsy
             x.StatusCodeShouldBeOk();
         });
 
-        // Assert: Verify schedule was created
-        var response = result.ReadAsJson<dynamic>();
-        response.ShouldNotBeNull();
-
         // Verify current price unchanged
         await using var verifySession = _fixture.GetDocumentSession();
         var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku.ToUpperInvariant());

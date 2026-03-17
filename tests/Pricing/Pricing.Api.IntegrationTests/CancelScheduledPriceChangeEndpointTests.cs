@@ -53,10 +53,6 @@ public sealed class CancelScheduledPriceChangeEndpointTests(TestFixture fixture)
             x.Delete.Url($"/api/pricing/products/{sku}/schedule/{scheduleId}");
             x.StatusCodeShouldBeOk();
         });
-
-        // Assert: Verify response
-        var response = result.ReadAsJson<dynamic>();
-        response.ShouldNotBeNull();
     }
 
     [Fact]

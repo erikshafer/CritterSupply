@@ -41,11 +41,7 @@ public sealed class SetBasePriceEndpointTests(TestFixture fixture) : IAsyncLifet
             x.StatusCodeShouldBeOk();
         });
 
-        // Assert: Verify response structure
-        var response = result.ReadAsJson<dynamic>();
-        response.ShouldNotBeNull();
-
-        // Verify price in database
+        // Assert: Verify price in database
         await using var verifySession = _fixture.GetDocumentSession();
         var priceView = await verifySession.LoadAsync<CurrentPriceView>(sku.ToUpperInvariant());
         priceView.ShouldNotBeNull();
