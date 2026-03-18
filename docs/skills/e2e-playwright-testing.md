@@ -284,6 +284,66 @@ public sealed class CheckoutPage(IPage page)
 | "Save & Continue" on step 1 | `SaveAddressButton` | `ClickSaveAddressAndContinueAsync()` |
 | Order totals | `OrderTotal` | `GetOrderTotalAsync()` |
 
+### Test-ID Naming Conventions (data-testid attributes)
+
+**Established:** M32.1 Sessions 14-15 (Backoffice E2E tests)
+
+Use semantic, kebab-case identifiers that describe **what** the element represents, not **how** it looks:
+
+| Element Type | Pattern | Examples | Anti-Pattern |
+|--------------|---------|----------|--------------|
+| KPI Cards | `kpi-{metric-name}` | `kpi-total-orders`<br>`kpi-revenue`<br>`kpi-pending-returns` | ❌ `card-1`, `metric-box` |
+| KPI Values (nested) | `kpi-value` | Always nested within KPI card element | ❌ `value-123`, `number-display` |
+| Navigation Links | `nav-{destination}` | `nav-customer-service`<br>`nav-operations`<br>`nav-analytics` | ❌ `button-cs`, `link-1` |
+| Form Inputs | `{form}-{field}` | `login-email`<br>`login-password`<br>`checkout-phone` | ❌ `input1`, `email-box` |
+| Form Buttons | `{form}-{action}` | `login-submit`<br>`logout-button`<br>`checkout-continue` | ❌ `btn1`, `submit-btn` |
+| Real-time Indicators | `realtime-{state}` | `realtime-connected`<br>`realtime-disconnected` | ❌ `hub-status`, `connection-icon` |
+
+**Rationale:**
+- **Semantic names** survive UI refactoring (reordering, restyling, component library changes)
+- **Kebab-case** aligns with HTML attribute conventions and is URL-safe
+- **Hierarchical structure** (parent-child) makes nested locators robust (e.g., `KpiCard.Locator("[data-testid='kpi-value']")`)
+- **Stable identifiers** don't break when CSS classes, colors, fonts, or ordering changes
+
+**Anti-Patterns to Avoid:**
+- ❌ Generic names: `button1`, `div-content`, `label-text`
+- ❌ Component-specific names: `mud-button`, `mud-card` (these are CSS classes, not test-ids)
+- ❌ Presentational names: `red-banner`, `large-font` (describe semantics, not appearance)
+- ❌ Index-based names: `kpi-1`, `alert-2` (fragile, breaks on reordering)
+- ❌ Mixed conventions: `loginEmail` (camelCase), `Login_Submit` (snake_case with capitals)
+
+**When to Use Nested test-ids:**
+
+Use parent/child test-id hierarchies when an element appears multiple times but each instance has unique meaning:
+
+```razor
+<!-- Good: Hierarchical test-ids -->
+<MudPaper data-testid="kpi-total-orders">
+    <MudText Typo="Typo.h6">Total Orders</MudText>
+    <MudText Typo="Typo.h4" data-testid="kpi-value">@_activeOrders</MudText>
+</MudPaper>
+
+<MudPaper data-testid="kpi-revenue">
+    <MudText Typo="Typo.h6">Revenue</MudText>
+    <MudText Typo="Typo.h4" data-testid="kpi-value">@_todaysRevenue.ToString("C0")</MudText>
+</MudPaper>
+```
+
+```csharp
+// Page Object Model usage
+private ILocator TotalOrdersCard => _page.GetByTestId("kpi-total-orders");
+private ILocator RevenueCard => _page.GetByTestId("kpi-revenue");
+
+public async Task<string?> GetTotalOrdersValueAsync()
+{
+    // Scoped locator: finds kpi-value within TotalOrdersCard only
+    var valueLocator = TotalOrdersCard.Locator("[data-testid='kpi-value']");
+    return await valueLocator.TextContentAsync();
+}
+```
+
+**Reference:** See `tests/Backoffice/Backoffice.E2ETests/Pages/DashboardPage.cs` for complete implementation.
+
 ## Pattern 3: MudBlazor `MudSelect` Interaction
 
 MudBlazor's `MudSelect` renders a layered HTML structure. Getting the click right in headless Chromium requires `Force = true` on the inner `.mud-select-input` element. Two timeout constants model the two distinct wait phases.
