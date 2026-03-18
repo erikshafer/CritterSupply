@@ -34,6 +34,107 @@ Recent work is concentrated in **Backoffice** (formerly Admin Portal), with M32.
 | P2 | Operator vs customer language consistency | BC boundaries are strong, but terminology/copy drift risk rises across Backoffice + Storefront | Establish shared term glossary and copy checks for role-specific surfaces | Reduces cognitive load, training cost, and support mistakes | Low | New discovery | Mostly governance; minor DTO/display-label normalization |
 | P2 | Catalog/Listings startup/backfill UX | Planning flags empty/stale projection windows during transition | Add explicit bootstrap/backfill admin flow and empty-state messaging | Avoids ambiguous "missing data" interpretation during rollout | Medium | Known gap | Backfill endpoint/job and projection readiness telemetry |
 
+## Milestone-ready UX backlog (issue-ready with acceptance criteria)
+
+### P0 (execute next)
+
+1. **Fix Backoffice authorization mismatch on Alerts route**
+   - **Area:** Backoffice.Web
+   - **Acceptance criteria:**
+     - `[Authorize]` role strings on `/alerts` are aligned with configured policies (`warehouse-clerk`, `operations-manager`, `system-admin`).
+     - A WarehouseClerk-authenticated user can open `/alerts`; unauthorized roles are denied.
+     - Add/update integration or E2E auth coverage for this route.
+
+2. **Add alert acknowledgment action in Alerts UI**
+   - **Area:** Backoffice.Web + Backoffice.Api
+   - **Acceptance criteria:**
+     - Each actionable alert row has an **Acknowledge** control.
+     - Acknowledge calls `POST /api/backoffice/alerts/{alertId}/acknowledge`.
+     - Successful acknowledgment updates UI state without full page reload.
+     - `409 already acknowledged` shows non-destructive feedback and keeps page usable.
+
+3. **Implement session-expired recovery UX**
+   - **Area:** Backoffice.Web auth/session
+   - **Acceptance criteria:**
+     - On refresh/auth expiry failure, user sees a clear blocking session-expired state (modal/overlay).
+     - Re-auth returns user to prior page context (not generic home redirect).
+     - Existing pages no longer rely on snackbar-only handling for 401.
+
+4. **Standardize error/recovery states for Backoffice workflows**
+   - **Area:** Backoffice.Web shared UX pattern
+   - **Acceptance criteria:**
+     - Network-disconnected state is persistent and visible until recovery.
+     - 409 conflict uses persistent inline/banner treatment with explicit recovery action.
+     - Retry actions are provided for fetch-driven views (dashboard, alerts, search).
+
+### P1 (planned after P0 unless already in-flight)
+
+5. **Remove or gate navigation dead ends (`/customers/{id}`, `/admin`)**
+   - **Area:** Backoffice.Web navigation
+   - **Acceptance criteria:**
+     - No primary nav or CTA leads to unimplemented route without an explicit placeholder.
+     - If placeholder route is used, it includes user-facing "not yet available" + safe next action.
+
+6. **Add async freshness indicators to operator views**
+   - **Area:** Backoffice composed read models
+   - **Acceptance criteria:**
+     - Dashboard and Alerts show last refresh/update timestamp.
+     - UI communicates "updating" vs "stale" clearly after writes or reconnect events.
+     - At least one E2E scenario validates stale/reconnect messaging.
+
+7. **Product Catalog history + significance filtering (ES-dependent)**
+   - **Area:** Product Catalog + Backoffice product admin
+   - **Acceptance criteria:**
+     - Product History tab exists with default "Significant only" and optional "All changes."
+     - Each history item includes actor, timestamp, event label, and field-level summary.
+     - `ProductMigrated` is excluded from default user-visible history.
+
+8. **Pre-flight safety UX for product discontinuation cascades (ES + Listings dependent)**
+   - **Area:** Product Catalog admin workflow
+   - **Acceptance criteria:**
+     - Discontinue action presents impact count by marketplace before confirmation.
+     - Post-action uses grouped notification summary (not one toast per listing).
+     - Copy explicitly communicates irreversible/operational impact.
+
+### P2 (follow-on quality and adoption)
+
+9. **Operator/customer terminology consistency pass**
+   - **Acceptance criteria:** Glossary + UI copy pass completed for Backoffice core screens.
+
+10. **Backfill/bootstrap empty-state UX for Catalog/Listings transition**
+    - **Acceptance criteria:** Empty/stale states are explicit; operators receive next-step guidance.
+
+## Overlap with deferred M32.1 scope and proposed scheduling
+
+### Overlap analysis
+
+- **Direct overlap with M32.1 deferred items (write operations UI deferred to M32.3+):**
+  - P1 #7 (Product History tab) and P1 #8 (discontinuation pre-flight) align with product/admin write workflows and should be coordinated with Backoffice Phase 3.
+- **Partial overlap with M32.2 deferred stabilization work:**
+  - P0 #1 and P0 #3/#4 strengthen authorization/session/error behavior and should reduce E2E fragility during M32.2 stabilization.
+- **No major overlap (net-new UX hardening):**
+  - P0 #2 (alert acknowledgment UX), P1 #5 (dead-end nav), P1 #6 (freshness messaging).
+
+### Recommended scheduling (starting next session)
+
+1. **Next session (M32.2 Session 1):**
+   - P0 #1 Authorization mismatch fix
+   - P1 #5 Dead-end route gating
+
+2. **M32.2 Sessions 2-3:**
+   - P0 #2 Alert acknowledgment UX
+   - P0 #3 Session-expired recovery UX
+   - P0 #4 Error/recovery state standardization
+
+3. **M32.2 Sessions 4+:**
+   - P1 #6 Async freshness indicators
+   - Add/extend E2E scenarios for reconnect/session/conflict paths
+
+4. **M32.3 (Backoffice Phase 3 coordination):**
+   - P1 #7 Product history/significance filtering (depends on Product Catalog ES work)
+   - P1 #8 Product discontinuation pre-flight and grouped cascade notification
+   - P2 #9/#10 if capacity permits
+
 ## Product Catalog: target UX for full event sourcing
 
 The minimum viable operator UX for a fully event-sourced catalog should include:
