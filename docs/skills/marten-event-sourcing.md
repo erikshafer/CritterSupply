@@ -1775,6 +1775,243 @@ var promotion = promotions.Single(); // ✅ Works!
 - **Reference:** `docs/planning/cycles/cycle-29-phase-2-retrospective-notes.md` (Session 2, Lesson #3)
 - **Commit:** Promotions BC Program.cs configuration
 
+### ❌ 9. Missing Apply Methods for Event Types in Stream (M32.1)
+
+**CRITICAL DISCOVERY (M32.1 Session 4):** Marten event-sourced aggregates MUST have an `Apply(TEvent)` method for **every event type** that appears in their stream. Missing Apply methods cause `AggregateStreamAsync<T>()` to return `null` even when events exist.
+
+**Problem:** Aggregate loads return `null` even though events are successfully stored in `mt_events` table.
+
+**Symptom:**
+```csharp
+// After successful event append:
+var streamId = ProductPrice.StreamId(sku);
+session.Events.Append(streamId, new BasePriceSet(sku, 99.99m, DateTimeOffset.UtcNow));
+await session.SaveChangesAsync();
+
+// Events exist in database:
+var stream = await session.Events.FetchStreamAsync(streamId);
+stream.Count.ShouldBe(1); // ✅ Events exist
+
+// BUT aggregate load returns null:
+var price = await session.Events.AggregateStreamAsync<ProductPrice>(streamId);
+price.ShouldNotBeNull(); // ❌ FAILS! price is null
+```
+
+**Root Cause:** Aggregate is missing `Apply(BasePriceSet)` method. Marten can't reconstitute the aggregate without knowing how to apply each event.
+
+**BAD:**
+```csharp
+public sealed record ProductPrice
+{
+    // Aggregate state
+    public string Sku { get; init; } = default!;
+    public decimal CurrentPrice { get; init; }
+
+    // ❌ MISSING: No Apply method for BasePriceSet event
+    // Marten tries to apply BasePriceSet, can't find Apply method, returns null
+}
+```
+
+**GOOD:**
+```csharp
+public sealed record ProductPrice
+{
+    // Aggregate state
+    public string Sku { get; init; } = default!;
+    public decimal CurrentPrice { get; init; }
+
+    // ✅ REQUIRED: Apply method for BasePriceSet event
+    public ProductPrice Apply(BasePriceSet @event) => this with
+    {
+        Sku = @event.Sku,
+        CurrentPrice = @event.BasePrice
+    };
+
+    // ✅ REQUIRED: Apply method for every other event type in stream
+    public ProductPrice Apply(DiscountApplied @event) => this with
+    {
+        CurrentPrice = CurrentPrice - @event.DiscountAmount
+    };
+}
+```
+
+**Why This Happens:**
+- Marten reconstitutes aggregates by replaying events from the stream
+- For each event, Marten looks for an `Apply(TEvent)` method on the aggregate
+- If no matching `Apply` method exists, Marten can't transform the state and returns `null`
+- **This is a silent failure** — no exceptions thrown, just `null` returned
+
+**Debugging Checklist:**
+
+1. **Verify events exist:**
+   ```csharp
+   var stream = await session.Events.FetchStreamAsync(streamId);
+   stream.Count.ShouldBeGreaterThan(0); // Events exist?
+   ```
+
+2. **Check for missing Apply methods:**
+   ```csharp
+   // For each event type in the stream, verify Apply(TEvent) exists
+   // Example: Stream contains [BasePriceSet, DiscountApplied]
+   // Aggregate must have Apply(BasePriceSet) AND Apply(DiscountApplied)
+   ```
+
+3. **Verify Apply method signatures:**
+   ```csharp
+   // ✅ Correct: exact type match
+   public ProductPrice Apply(BasePriceSet @event) => ...
+
+   // ❌ Wrong: base class or interface won't match
+   public ProductPrice Apply(IEvent @event) => ...  // Won't be called!
+   ```
+
+4. **Test aggregate loading directly:**
+   ```csharp
+   var price = await session.Events.AggregateStreamAsync<ProductPrice>(streamId);
+   price.ShouldNotBeNull(); // If this fails, missing Apply method(s)
+   ```
+
+**Common Scenarios:**
+
+**Scenario 1: Adding New Event Type to Existing Aggregate**
+```csharp
+// OLD: Aggregate has Apply(BasePriceSet)
+public sealed record ProductPrice
+{
+    public ProductPrice Apply(BasePriceSet @event) => this with { CurrentPrice = @event.BasePrice };
+}
+
+// NEW: Adding DiscountApplied event
+// ❌ WRONG: Forgetting to add Apply method
+session.Events.Append(streamId, new DiscountApplied(5.00m));
+var price = await session.Events.AggregateStreamAsync<ProductPrice>(streamId);
+// price is null! ❌
+
+// ✅ CORRECT: Add Apply method for new event
+public sealed record ProductPrice
+{
+    public ProductPrice Apply(BasePriceSet @event) => this with { CurrentPrice = @event.BasePrice };
+    public ProductPrice Apply(DiscountApplied @event) => this with { CurrentPrice = CurrentPrice - @event.Amount };
+}
+```
+
+**Scenario 2: Multi-Event Stream with Partial Apply Methods**
+```csharp
+// Stream contains 3 event types:
+// 1. ProductRegistered
+// 2. BasePriceSet
+// 3. DiscountApplied
+
+// ❌ WRONG: Missing Apply(ProductRegistered)
+public sealed record ProductPrice
+{
+    public ProductPrice Apply(BasePriceSet @event) => this with { CurrentPrice = @event.BasePrice };
+    public ProductPrice Apply(DiscountApplied @event) => this with { CurrentPrice = CurrentPrice - @event.Amount };
+    // ❌ Missing Apply(ProductRegistered) — aggregate load returns null!
+}
+
+// ✅ CORRECT: Apply method for every event type
+public sealed record ProductPrice
+{
+    public ProductPrice Apply(ProductRegistered @event) => this with { Sku = @event.Sku };
+    public ProductPrice Apply(BasePriceSet @event) => this with { CurrentPrice = @event.BasePrice };
+    public ProductPrice Apply(DiscountApplied @event) => this with { CurrentPrice = CurrentPrice - @event.Amount };
+}
+```
+
+**Real-World Example (M32.1 Pricing BC):**
+
+```csharp
+// File: src/Pricing/Pricing/ProductPrice.cs
+
+public sealed record ProductPrice
+{
+    public string Sku { get; init; } = default!;
+    public decimal BasePrice { get; init; }
+    public decimal CurrentPrice { get; init; }
+
+    // Initial event: product added to pricing system
+    public ProductPrice Apply(ProductRegistered @event) => this with
+    {
+        Sku = @event.Sku
+    };
+
+    // Base price set by pricing manager
+    public ProductPrice Apply(BasePriceSet @event) => this with
+    {
+        BasePrice = @event.BasePrice,
+        CurrentPrice = @event.BasePrice  // No discounts yet
+    };
+
+    // Discount applied (from promotions)
+    public ProductPrice Apply(DiscountApplied @event) => this with
+    {
+        CurrentPrice = BasePrice - @event.DiscountAmount
+    };
+
+    // Discount removed (promotion expired)
+    public ProductPrice Apply(DiscountRemoved @event) => this with
+    {
+        CurrentPrice = BasePrice  // Revert to base price
+    };
+}
+```
+
+**Testing Strategy:**
+
+```csharp
+[Fact]
+public async Task ProductPrice_WithAllEventTypes_LoadsCorrectly()
+{
+    // Arrange
+    var streamId = ProductPrice.StreamId("SKU123");
+    var events = new object[]
+    {
+        new ProductRegistered("SKU123"),
+        new BasePriceSet("SKU123", 100.00m, DateTimeOffset.UtcNow),
+        new DiscountApplied("SKU123", 10.00m, DateTimeOffset.UtcNow)
+    };
+
+    foreach (var evt in events)
+    {
+        _session.Events.Append(streamId, evt);
+    }
+    await _session.SaveChangesAsync();
+
+    // Act
+    var price = await _session.Events.AggregateStreamAsync<ProductPrice>(streamId);
+
+    // Assert
+    price.ShouldNotBeNull();  // ✅ If this fails, missing Apply method
+    price.Sku.ShouldBe("SKU123");
+    price.BasePrice.ShouldBe(100.00m);
+    price.CurrentPrice.ShouldBe(90.00m);  // Base - discount
+}
+```
+
+**Key Learnings (M32.1 Session 4):**
+
+1. **One Apply Method Per Event Type**
+   - Every event type in stream needs exactly one matching `Apply` method
+   - Method signature must exactly match event type (no base classes or interfaces)
+
+2. **Silent Null Return**
+   - Missing Apply methods don't throw exceptions during event append
+   - Only discovered when loading aggregate: `AggregateStreamAsync` returns `null`
+   - Can go unnoticed in tests if you don't explicitly verify aggregate load
+
+3. **Event-First Discovery**
+   - Before implementing aggregate, list all event types it will handle
+   - Write Apply methods for all events upfront
+   - Add new Apply methods immediately when adding new event types
+
+4. **Testing Is Critical**
+   - Always test aggregate loading after event append
+   - Verify `AggregateStreamAsync` returns non-null before asserting state
+   - Cover all event types in aggregate load tests
+
+**Reference:** [M32.1 Retrospective - Session 4 Debugging](../../planning/milestones/m32.1-retrospective.md)
+
 ---
 
 ## Lessons Learned from Production
