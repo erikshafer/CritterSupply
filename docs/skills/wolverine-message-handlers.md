@@ -1375,6 +1375,298 @@ Content-Type: application/json
 public static Task<List<OrderItem>> GetOrderItems([FromQuery] Guid orderId) { /* ... */ }
 ```
 
+### HTTP Endpoint Validation (M32.1)
+
+**Key Insight from M32.1:** HTTP endpoints that bypass domain command handlers need their own FluentValidation validators at the HTTP boundary.
+
+**When This Pattern Applies:**
+- HTTP endpoint constructs events directly (no command handler)
+- HTTP endpoint uses different DTO than domain command
+- Endpoint accepts route parameters + body (validation needed for both)
+- Domain command validators exist but endpoint bypasses them
+
+#### Pattern: Separate HTTP Request Validators
+
+**✅ CORRECT Pattern (HTTP validator + direct event construction):**
+
+```csharp
+// File: SetBasePrice.cs
+
+// HTTP layer DTO
+public sealed record SetBasePriceRequest(decimal BasePrice);
+
+// HTTP layer validator (validates HTTP boundary)
+public sealed class SetBasePriceValidator : AbstractValidator<SetBasePriceRequest>
+{
+    public SetBasePriceValidator()
+    {
+        RuleFor(x => x.BasePrice)
+            .GreaterThan(0)
+            .WithMessage("Base price must be greater than 0");
+    }
+}
+
+// HTTP endpoint (bypasses domain command handler)
+public static class SetBasePriceEndpoint
+{
+    [WolverinePost("/api/pricing/products/{sku}/base-price")]
+    public static BasePriceSet Handle(
+        string sku,                      // From route
+        SetBasePriceRequest request)     // From body (validated)
+    {
+        // Direct event construction (no command handler)
+        return new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
+    }
+}
+```
+
+**Why This Works:**
+- FluentValidation automatically validates `SetBasePriceRequest` before `Handle()` is called
+- Endpoint constructs event directly (no domain command needed)
+- HTTP layer owns validation for its own DTOs
+- Clear separation: HTTP validation vs domain validation
+
+#### Comparison: HTTP Endpoint vs Domain Command Pattern
+
+**When to use HTTP validators vs domain command validators:**
+
+| Scenario | Pattern | Example |
+|----------|---------|---------|
+| **Endpoint bypasses commands** | HTTP validator only | Pricing BC `SetBasePriceRequest` (direct event construction) |
+| **Endpoint invokes command** | Domain command validator | Shopping BC `ApplyCouponToCart` (command handler exists) |
+| **Endpoint needs HTTP-specific validation** | Both validators | Route param validation (HTTP) + business rules (domain) |
+
+**Pattern 1: HTTP Validator Only (No Command Handler)**
+
+```csharp
+// HTTP DTO + validator
+public sealed record SetBasePriceRequest(decimal BasePrice);
+
+public sealed class SetBasePriceValidator : AbstractValidator<SetBasePriceRequest>
+{
+    public SetBasePriceValidator()
+    {
+        RuleFor(x => x.BasePrice).GreaterThan(0);
+    }
+}
+
+// HTTP endpoint (direct event construction)
+[WolverinePost("/api/pricing/products/{sku}/base-price")]
+public static BasePriceSet Handle(string sku, SetBasePriceRequest request)
+{
+    return new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
+}
+```
+
+**Pattern 2: Domain Command Validator (Command Handler Exists)**
+
+```csharp
+// Domain command + validator
+public sealed record AddItemToCart(Guid CartId, string Sku, int Quantity);
+
+public sealed class AddItemToCartValidator : AbstractValidator<AddItemToCart>
+{
+    public AddItemToCartValidator()
+    {
+        RuleFor(x => x.CartId).NotEmpty();
+        RuleFor(x => x.Sku).NotEmpty();
+        RuleFor(x => x.Quantity).GreaterThan(0);
+    }
+}
+
+// HTTP endpoint (invokes command handler)
+[WolverinePost("/api/carts/{cartId}/items")]
+public static Task<(Events, OutgoingMessages)> Handle(
+    AddItemToCart command,
+    [WriteAggregate] Cart cart,
+    IPricingClient pricingClient,
+    CancellationToken ct)
+{
+    // Command handler logic...
+}
+```
+
+**Pattern 3: Both Validators (HTTP-Specific + Domain Validation)**
+
+```csharp
+// HTTP request DTO for route validation
+public sealed record UpdateProductPriceRequest(decimal Price);
+
+public sealed class UpdateProductPriceRequestValidator : AbstractValidator<UpdateProductPriceRequest>
+{
+    public UpdateProductPriceRequestValidator()
+    {
+        // HTTP layer validation: route + body structure
+        RuleFor(x => x.Price).GreaterThan(0);
+    }
+}
+
+// Domain command for business rules
+public sealed record UpdatePrice(string Sku, decimal Price);
+
+public sealed class UpdatePriceValidator : AbstractValidator<UpdatePrice>
+{
+    public UpdatePriceValidator()
+    {
+        // Domain validation: business rules
+        RuleFor(x => x.Sku).NotEmpty();
+        RuleFor(x => x.Price).GreaterThan(0).LessThanOrEqualTo(10000);
+    }
+}
+
+// HTTP endpoint maps request to command
+[WolverinePost("/api/products/{sku}/price")]
+public static async Task Handle(
+    string sku,
+    UpdateProductPriceRequest request,
+    IMessageBus bus)
+{
+    // Map HTTP request to domain command
+    var command = new UpdatePrice(sku, request.Price);
+
+    // Send to domain command handler (validated again)
+    await bus.InvokeAsync(command);
+}
+```
+
+#### Anti-Patterns
+
+**❌ ANTI-PATTERN 1: Missing HTTP Validator When Bypassing Commands**
+
+```csharp
+// ❌ WRONG: No validator at HTTP boundary
+public sealed record SetBasePriceRequest(decimal BasePrice);
+
+[WolverinePost("/api/pricing/products/{sku}/base-price")]
+public static BasePriceSet Handle(string sku, SetBasePriceRequest request)
+{
+    // Direct event construction with NO validation!
+    // Negative prices, zero prices, all accepted!
+    return new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
+}
+```
+
+**Why Wrong:** HTTP endpoints that bypass domain commands have no validation layer. Invalid data reaches event stream.
+
+**✅ FIX: Add HTTP validator:**
+
+```csharp
+public sealed class SetBasePriceValidator : AbstractValidator<SetBasePriceRequest>
+{
+    public SetBasePriceValidator()
+    {
+        RuleFor(x => x.BasePrice).GreaterThan(0);
+    }
+}
+```
+
+**❌ ANTI-PATTERN 2: Relying on Domain Validator When Endpoint Bypasses Command**
+
+```csharp
+// Domain command validator (never invoked!)
+public sealed class SetBasePriceValidator : AbstractValidator<SetBasePrice>
+{
+    public SetBasePriceValidator()
+    {
+        RuleFor(x => x.BasePrice).GreaterThan(0);
+    }
+}
+
+// ❌ WRONG: HTTP endpoint bypasses command, validator never runs
+[WolverinePost("/api/pricing/products/{sku}/base-price")]
+public static BasePriceSet Handle(string sku, SetBasePriceRequest request)
+{
+    // No SetBasePrice command instantiated, validator never invoked
+    return new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
+}
+```
+
+**Why Wrong:** FluentValidation only runs validators for types passed to handlers. If endpoint takes `SetBasePriceRequest` but validator is for `SetBasePrice`, validator is not invoked.
+
+**✅ FIX: Validator must match parameter type:**
+
+```csharp
+// Validator for the type in the handler signature
+public sealed class SetBasePriceRequestValidator : AbstractValidator<SetBasePriceRequest>
+{
+    public SetBasePriceRequestValidator()
+    {
+        RuleFor(x => x.BasePrice).GreaterThan(0);
+    }
+}
+
+[WolverinePost("/api/pricing/products/{sku}/base-price")]
+public static BasePriceSet Handle(string sku, SetBasePriceRequest request)
+{
+    // Validator runs automatically because type matches
+    return new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
+}
+```
+
+#### When to Bypass Domain Commands in HTTP Endpoints
+
+**Valid reasons to bypass domain command handlers:**
+1. **Performance:** Direct event construction avoids extra handler invocation
+2. **Simplicity:** Single-responsibility endpoints (no complex business logic)
+3. **CQRS Boundary:** HTTP layer is the command boundary (no internal commands needed)
+4. **Event-First Design:** Events are the source of truth, commands are optional
+
+**Real-World Example from Pricing BC (M32.1):**
+
+```csharp
+// File: Pricing.Api/Endpoints/SetBasePrice.cs
+
+public sealed record SetBasePriceRequest(decimal BasePrice);
+
+public sealed class SetBasePriceValidator : AbstractValidator<SetBasePriceRequest>
+{
+    public SetBasePriceValidator()
+    {
+        RuleFor(x => x.BasePrice)
+            .GreaterThan(0)
+            .WithMessage("Base price must be greater than 0");
+    }
+}
+
+public static class SetBasePriceEndpoint
+{
+    [WolverinePost("/api/pricing/products/{sku}/base-price")]
+    [Authorize(Policy = "PricingManager")]
+    public static BasePriceSet Handle(
+        string sku,
+        SetBasePriceRequest request)
+    {
+        // Direct event construction (no command handler needed)
+        return new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
+    }
+}
+```
+
+**Why This Works:**
+- Single responsibility: set base price for a SKU
+- No complex business logic (no need for command handler)
+- Validation at HTTP boundary (FluentValidation + route validation)
+- Events are persisted by Wolverine's transactional middleware
+
+#### Key Learnings (M32.1 Session 5)
+
+1. **Validator Type Must Match Parameter Type**
+   - FluentValidation runs validators for types in handler signatures
+   - If handler takes `SetBasePriceRequest`, validator must be `AbstractValidator<SetBasePriceRequest>`
+   - Domain command validators don't run if endpoint bypasses commands
+
+2. **HTTP Validation vs Domain Validation**
+   - HTTP validators: structural validation (not empty, > 0, format checks)
+   - Domain validators: business rules (price ranges, SKU existence, state transitions)
+   - Endpoints bypassing commands need HTTP validators
+
+3. **When in Doubt, Add Both Validators**
+   - HTTP validator for request structure
+   - Domain validator for business rules
+   - Map HTTP request to domain command, let Wolverine validate both
+
+**Reference:** [M32.1 Retrospective - Session 5 Lesson L2](../../planning/milestones/m32.1-retrospective.md)
+
 ---
 
 ## Handler Discovery

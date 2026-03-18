@@ -139,6 +139,129 @@ public abstract class BunitTestBase : BunitContext, IAsyncLifetime
 
 5. **Currency formatting is locale-dependent** — `ToString("C")` produces `$129.99` in `en-US` but `¤129.99` in `C.UTF-8` (common in CI). Assert on the numeric portion (e.g., `"129.99"`) rather than the formatted string.
 
+### MudBlazor v9+ Type Parameters (M32.1)
+
+**CRITICAL DISCOVERY (M32.1 Session 6):** MudBlazor v9+ is **generic-first** — many components that worked without explicit type parameters in v8 now require them in v9+.
+
+**Key Affected Components:**
+- `MudList` + `MudListItem`
+- `MudSelect` + `MudSelectItem`
+- `MudTable`
+- `MudDataGrid`
+- `MudTreeView` + `MudTreeViewItem`
+
+**Pattern:**
+
+```razor
+<!-- ❌ WRONG (v8 syntax - throws compilation error in v9) -->
+<MudList>
+    <MudListItem Icon="@Icons.Material.Filled.Home">
+        Home
+    </MudListItem>
+</MudList>
+
+<!-- ✅ CORRECT (v9+ syntax - explicit type parameters) -->
+<MudList T="string">
+    <MudListItem T="string" Icon="@Icons.Material.Filled.Home">
+        Home
+    </MudListItem>
+</MudList>
+```
+
+**Why This Matters:**
+- MudBlazor v9+ refactored components to be generic-first for better data binding
+- Type inference fails for non-data-bound lists (static text items)
+- **Every nested item** needs the same type parameter as its parent
+- Forgetting type parameters causes compilation errors or runtime exceptions
+
+**Real-World Example from M32.1 (Backoffice.Web Dashboard):**
+
+```razor
+<!-- Navigation sidebar with icon list -->
+<MudList T="string" Clickable="true" Color="Color.Primary">
+    <MudListItem T="string" Icon="@Icons.Material.Filled.Dashboard" Href="/">
+        Dashboard
+    </MudListItem>
+    <MudListItem T="string" Icon="@Icons.Material.Filled.ShoppingCart" Href="/orders">
+        Orders
+    </MudListItem>
+    <MudListItem T="string" Icon="@Icons.Material.Filled.Inventory" Href="/catalog">
+        Product Catalog
+    </MudListItem>
+    <MudListItem T="string" Icon="@Icons.Material.Filled.LocalShipping" Href="/fulfillment">
+        Fulfillment
+    </MudListItem>
+    <MudListItem T="string" Icon="@Icons.Material.Filled.Headset" Href="/customer-service">
+        Customer Service
+    </MudListItem>
+</MudList>
+```
+
+**Testing Pattern:**
+
+```csharp
+[Fact]
+public void NavMenu_RendersAllLinks()
+{
+    // Component uses <MudList T="string"><MudListItem T="string">...
+    var cut = RenderWithMud<NavMenu>();
+
+    var links = cut.FindAll("a.mud-nav-link");
+    links.Count.ShouldBe(5);
+
+    var hrefs = links.Select(l => l.GetAttribute("href")).ToArray();
+    hrefs.ShouldContain("/");
+    hrefs.ShouldContain("/orders");
+    hrefs.ShouldContain("/catalog");
+}
+```
+
+**Common Type Parameters:**
+
+| Component Use Case | Type Parameter | Example |
+|--------------------|----------------|---------|
+| **Static text list** | `T="string"` | Navigation menu, quick links |
+| **Data-bound list** | `T="TModel"` | Product list (`T="Product"`), order list (`T="Order"`) |
+| **String dropdown** | `T="string"` | Category filter, status selector |
+| **Enum dropdown** | `T="OrderStatus"` | Status filter, role selector |
+| **Entity dropdown** | `T="Product"` | Product picker with `ToStringFunc` |
+
+**Decision Matrix:**
+
+| Component Renders | Use Type Parameter | Example |
+|-------------------|-------------------|---------|
+| Static text (no data binding) | `T="string"` | `<MudList T="string">` with hardcoded `<MudListItem T="string">` |
+| Collection of entities | `T="TEntity"` | `<MudTable T="Order" Items="@orders">` |
+| Enum values | `T="TEnum"` | `<MudSelect T="OrderStatus" @bind-Value="filter">` |
+
+**Anti-Pattern — Forgetting Type Parameters:**
+
+```razor
+<!-- ❌ Compilation error in v9+ -->
+<MudList>
+    <MudListItem>Home</MudListItem>
+</MudList>
+
+<!-- Compiler error message:
+CS1503: Argument 1: cannot convert from 'method group' to '...'
+OR
+CS0411: The type arguments for method '...' cannot be inferred from the usage
+-->
+```
+
+**Migration Checklist (v8 → v9+):**
+
+- [ ] Search codebase for `<MudList>` — add `T="string"` to all occurrences
+- [ ] Search for `<MudListItem>` — add `T="string"` to all occurrences
+- [ ] Search for `<MudSelect>` — verify explicit `T="{Type}"` exists
+- [ ] Search for `<MudTable>` — verify `Items="@collection"` has matching `T="{Type}"`
+- [ ] Run tests — type parameter mismatches cause runtime failures
+- [ ] Check for nested generics — `MudList<T>` inside `MudExpansionPanel` needs careful nesting
+
+**Reference:** [M32.1 Retrospective - Session 6 Discovery D1](../../planning/milestones/m32.1-retrospective.md)
+
+---
+
 ## Writing Tests
 
 ### Rendering Simple Components
