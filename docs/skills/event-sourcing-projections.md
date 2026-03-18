@@ -126,102 +126,51 @@ Projections are denormalized read models built from event-sourced aggregates. Th
 
 ### Anatomy: Create() and Apply() Methods
 
-Marten discovers projection methods via **convention-based naming**:
+**Key conventions:**
+- `Create()` — Optional; runs on first event; if omitted, uses parameterless constructor
+- `Apply()` — One overload per event type; can be instance or static (CritterSupply uses instance methods for consistency)
+- Method names are exact: `Create` and `Apply` (case-sensitive)
+- Return type must match document type
+- Parameter order: `(document, event)`
 
 ```csharp
 public sealed class MyProjection : SingleStreamProjection<MyDocument>
 {
-    // OPTIONAL: Create() method runs on the first event
-    // If omitted, Marten creates an empty document
-    public MyDocument Create(FirstEvent evt)
-    {
-        return new MyDocument
-        {
-            Id = evt.AggregateId,
-            Property = evt.Value,
-            CreatedAt = evt.Timestamp
-        };
-    }
+    public MyDocument Create(FirstEvent evt) =>
+        new MyDocument { Id = evt.AggregateId, Property = evt.Value };
 
-    // Apply() methods handle subsequent events
-    // MUST be static for inline projections (thread safety)
-    public static MyDocument Apply(MyDocument current, SubsequentEvent evt)
-    {
-        return current with { Property = evt.NewValue, UpdatedAt = evt.Timestamp };
-    }
-
-    // Additional Apply() overloads for each event type
-    public static MyDocument Apply(MyDocument current, AnotherEvent evt)
-    {
-        return current with { AnotherProperty = evt.Data };
-    }
+    public static MyDocument Apply(MyDocument current, SubsequentEvent evt) =>
+        current with { Property = evt.NewValue };
 }
 ```
 
-**Key conventions:**
-- `Create()` is optional — if omitted, Marten creates an empty document using the parameterless constructor
-- `Apply()` methods can be either instance or static (both work correctly with Marten inline projections)
-  - **CritterSupply convention:** Use instance methods for consistency across the codebase
-  - Instance pattern: `public MyDocument Apply(MyDocument current, SubsequentEvent evt)`
-  - Static pattern: `public static MyDocument Apply(MyDocument current, SubsequentEvent evt)`
-  - All 9 production aggregates in CritterSupply (Cart, Checkout, Return, Promotion, Coupon, ProductInventory, Payment, Shipment, OrderNote) use instance methods successfully
-- Method names are **exact** — `Create` and `Apply`, case-sensitive
-- Return type must match the projection document type
-- Parameter order: `(document, event)` for Apply methods
-
 ### Example: Checkout Snapshot (Orders BC)
 
-The `Checkout` aggregate in Orders BC uses a snapshot projection for queryable state:
-
 ```csharp
-// In Orders.Api/Program.cs
+// Registration
 opts.Projections.Snapshot<Checkout>(SnapshotLifecycle.Inline);
-```
 
-**Why inline?** Checkout status queries must be zero-lag — cart expiry, checkout completion, and order placement all check `Checkout` state synchronously.
-
-**What this enables:**
-- `GET /api/checkout/{checkoutId}` queries the snapshot document (no event replay)
-- `CompleteCheckout` handler loads snapshot to validate state before appending `CheckoutCompleted`
-- Snapshot is always current (updated in same transaction as events)
-
-**Aggregate as projection document:**
-
-When the aggregate type itself serves as the projection document (common with snapshots), the `Create()` and `Apply()` methods live on the aggregate:
-
-```csharp
+// Aggregate with Create/Apply methods
 public sealed record Checkout
 {
     public Guid Id { get; init; }
     public CheckoutStatus Status { get; init; }
     public IReadOnlyList<CheckoutLineItem> Items { get; init; } = [];
-    public Address? ShippingAddress { get; init; }
 
-    // Create method for CheckoutInitiated (first event)
-    public static Checkout Create(CheckoutInitiated evt)
-    {
-        return new Checkout
-        {
-            Id = evt.CheckoutId,
-            Status = CheckoutStatus.InProgress,
-            Items = evt.Items,
-        };
-    }
+    public static Checkout Create(CheckoutInitiated evt) =>
+        new Checkout { Id = evt.CheckoutId, Status = CheckoutStatus.InProgress, Items = evt.Items };
 
-    // Apply methods for subsequent events
-    public static Checkout Apply(Checkout current, ShippingAddressSet evt)
-    {
-        return current with { ShippingAddress = evt.Address };
-    }
+    public static Checkout Apply(Checkout current, ShippingAddressSet evt) =>
+        current with { ShippingAddress = evt.Address };
 
-    public static Checkout Apply(Checkout current, CheckoutCompleted evt)
-    {
-        return current with { Status = CheckoutStatus.Completed };
-    }
+    public static Checkout Apply(Checkout current, CheckoutCompleted evt) =>
+        current with { Status = CheckoutStatus.Completed };
 }
 ```
 
-**Key pattern:** Marten discovers `Create()` and `Apply()` methods on the aggregate type when you configure `.Snapshot<Checkout>()`. No separate projection class needed.
+**Why inline?** Hot-path queries (cart expiry, checkout status) require zero lag.
+
+**Key pattern:** Marten discovers `Create()`/`Apply()` on the aggregate type via `.Snapshot<Checkout>()`. No separate projection class needed.
 
 ---
 
@@ -238,125 +187,70 @@ public sealed record Checkout
 
 ### Anatomy: Identity<T>() Mapping
 
-Multi-stream projections require explicit identity mapping — you tell Marten which property from each event type becomes the document ID:
+**Key concepts:**
+- Call `Identity<TEvent>(x => x.Property)` in constructor for each event type
+- The property value becomes the document ID (enables Guid streams → string documents)
+- `Create()` determines which event type creates the document
+- All events with matching identity values update the same document
 
 ```csharp
-public sealed class MyMultiStreamProjection : MultiStreamProjection<MyDocument, string>
+public sealed class MyProjection : MultiStreamProjection<MyDocument, string>
 {
-    public MyMultiStreamProjection()
+    public MyProjection()
     {
-        // Map each event type to the document ID property
-        Identity<EventTypeA>(x => x.Sku);  // Use SKU as document ID
-        Identity<EventTypeB>(x => x.Sku);
-        Identity<EventTypeC>(x => x.Sku);
+        Identity<EventA>(x => x.Sku);  // Map event property to document ID
+        Identity<EventB>(x => x.Sku);
     }
 
-    // Create() for the first event type that creates the document
-    public MyDocument Create(EventTypeA evt)
-    {
-        return new MyDocument
-        {
-            Id = evt.Sku,  // Document ID matches the Identity mapping
-            // ... other properties
-        };
-    }
+    public MyDocument Create(EventA evt) =>
+        new MyDocument { Id = evt.Sku };  // Document ID matches Identity
 
-    // Apply() methods for subsequent events
-    public static MyDocument Apply(MyDocument current, EventTypeB evt)
-    {
-        return current with { /* updates */ };
-    }
+    public static MyDocument Apply(MyDocument current, EventB evt) =>
+        current with { /* updates */ };
 }
 ```
 
-**Key differences from single-stream:**
-- Inherit from `MultiStreamProjection<TDoc, TId>` (TId is the document key type, often `string`)
-- Call `Identity<TEvent>(x => x.Property)` in the constructor for each event type
-- The `Create()` method's event type determines which event *creates* the document
-- All events with matching identity values update the same document
-
 ### Example: CurrentPriceView (Pricing BC)
-
-The Pricing BC uses a multi-stream projection to map Guid event streams to string-keyed documents (SKU as ID):
 
 ```csharp
 public sealed class CurrentPriceViewProjection : MultiStreamProjection<CurrentPriceView, string>
 {
     public CurrentPriceViewProjection()
     {
-        // Tell Marten which property to use as the document ID for each event type
-        // This allows Guid streams to produce string-keyed documents
+        // Map all price events to SKU-keyed documents
         Identity<InitialPriceSet>(x => x.Sku);
         Identity<PriceChanged>(x => x.Sku);
         Identity<PriceChangeScheduled>(x => x.Sku);
-        Identity<ScheduledPriceChangeCancelled>(x => x.Sku);
-        Identity<ScheduledPriceActivated>(x => x.Sku);
-        Identity<FloorPriceSet>(x => x.Sku);
-        Identity<CeilingPriceSet>(x => x.Sku);
-        Identity<PriceCorrected>(x => x.Sku);
-        Identity<PriceDiscontinued>(x => x.Sku);
+        // ... other price events
     }
 
-    // Create method for InitialPriceSet (first event creates the document)
-    public CurrentPriceView Create(InitialPriceSet evt)
-    {
-        return new CurrentPriceView
+    public CurrentPriceView Create(InitialPriceSet evt) =>
+        new CurrentPriceView
         {
             Id = evt.Sku,  // Document ID is SKU string
-            Sku = evt.Sku,
             BasePrice = evt.Price.Amount,
-            Currency = evt.Price.Currency,
-            FloorPrice = evt.FloorPrice?.Amount,
-            CeilingPrice = evt.CeilingPrice?.Amount,
             Status = PriceStatus.Published,
-            HasPendingSchedule = false,
             LastUpdatedAt = evt.PricedAt
         };
-    }
 
-    // Apply methods for subsequent events
-    public static CurrentPriceView Apply(CurrentPriceView view, PriceChanged evt)
-    {
-        return view with
+    public static CurrentPriceView Apply(CurrentPriceView view, PriceChanged evt) =>
+        view with
         {
             BasePrice = evt.NewPrice.Amount,
-            Currency = evt.NewPrice.Currency,
             PreviousBasePrice = evt.OldPrice.Amount,
-            PreviousPriceSetAt = evt.PreviousPriceSetAt,
             LastUpdatedAt = evt.ChangedAt
         };
-    }
-
-    public static CurrentPriceView Apply(CurrentPriceView view, PriceChangeScheduled evt)
-    {
-        return view with
-        {
-            HasPendingSchedule = true,
-            ScheduledChangeAt = evt.ScheduledFor,
-            ScheduledPrice = evt.ScheduledPrice.Amount,
-            LastUpdatedAt = evt.ScheduledAt
-        };
-    }
-
-    // ... other Apply() methods for remaining event types
 }
-```
 
-**Registration:**
-
-```csharp
-// In Pricing.Api/Program.cs
+// Registration
 opts.Projections.Add<CurrentPriceViewProjection>(ProjectionLifecycle.Inline);
 ```
 
 **Why this pattern?**
-
-- **ProductPrice** event streams use Guid stream IDs (UUID v5 from SKU via `ProductPrice.StreamId(sku)` — see ADR 0016)
-- **CurrentPriceView** queries use SKU strings as document IDs (`session.LoadAsync<CurrentPriceView>("DOG-FOOD-5LB")`)
-- Multi-stream projection bridges the gap: `Identity<>(x => x.Sku)` maps Guid streams → string-keyed documents
-- Inline lifecycle ensures zero-lag price queries for Shopping BC (hot path)
-
-**Key insight:** Multi-stream projections enable **different identity spaces**. Event streams use one ID type (Guid); projection documents use another (string).
+- **ProductPrice** streams use Guid IDs (UUID v5 from SKU — see ADR 0016)
+- **CurrentPriceView** queries use SKU strings (`session.LoadAsync<CurrentPriceView>("DOG-FOOD-5LB")`)
+- Multi-stream projection bridges: Guid streams → string-keyed documents via `Identity<>(x => x.Sku)`
+- Inline lifecycle ensures zero-lag for Shopping BC price queries (hot path)
 
 ### Discriminated Unions for Projection Views (JSON Polymorphism)
 
@@ -463,8 +357,6 @@ switch (baseEvent)
 
 ### Example: CouponLookupView (Promotions BC)
 
-Similar pattern for coupon code lookups:
-
 ```csharp
 public sealed class CouponLookupViewProjection : MultiStreamProjection<CouponLookupView, string>
 {
@@ -473,179 +365,85 @@ public sealed class CouponLookupViewProjection : MultiStreamProjection<CouponLoo
         Identity<CouponIssued>(x => x.CouponCode);
         Identity<CouponRedeemed>(x => x.CouponCode);
         Identity<CouponRevoked>(x => x.CouponCode);
-        Identity<CouponExpired>(x => x.CouponCode);
     }
 
-    public CouponLookupView Create(CouponIssued evt)
-    {
-        return new CouponLookupView
+    public CouponLookupView Create(CouponIssued evt) =>
+        new CouponLookupView
         {
-            Id = evt.CouponCode.ToUpperInvariant(),  // Case-insensitive lookups
+            Id = evt.CouponCode.ToUpperInvariant(),  // Case-insensitive
             Code = evt.CouponCode.ToUpperInvariant(),
             PromotionId = evt.PromotionId,
-            Status = CouponStatus.Issued,
-            IssuedAt = evt.IssuedAt
+            Status = CouponStatus.Issued
         };
-    }
-
-    // ... Apply() methods
 }
 ```
 
-**Why inline for coupon lookups?** Coupon redemption is hot-path — the Shopping BC validates coupon codes synchronously during checkout. Inline projection ensures the lookup view is always current.
+**Why inline?** Hot-path coupon redemption during checkout requires zero-lag validation.
 
-**Case normalization note:** The `Create()` method normalizes the coupon code to uppercase for case-insensitive queries. This is critical for string-keyed documents in Marten/Polecat.
+**Case normalization:** `ToUpperInvariant()` ensures case-insensitive queries.
 
 ---
 
 ## Live Aggregation and FetchForWriting
 
-### Overview
+### Why FetchForWriting() Is Preferred
 
-**Live aggregation** means "replay events on-demand" instead of maintaining a persistent projection. Marten provides `AggregateStreamAsync<T>()` for this pattern.
-
-**However:** As of Marten 7.0+, the **preferred pattern** is `FetchForWriting<T>()`, which is optimized for the command handler workflow.
-
-### Why FetchForWriting() Is Better
-
-**The problem with naive event replay:**
+**Pattern:**
 
 ```csharp
-// ❌ ANTI-PATTERN: Manual event replay in command handlers
-public static class MyHandler
+// ✅ Use FetchForWriting() for command handlers
+public static async Task<IEnumerable<object>> Handle(
+    ChangePrice cmd,
+    IDocumentSession session)
 {
-    public static async Task<IEnumerable<object>> Handle(MyCommand cmd, IDocumentSession session)
-    {
-        // Load the aggregate by replaying events (slow)
-        var aggregate = await session.Events.AggregateStreamAsync<MyAggregate>(cmd.AggregateId);
+    var streamId = ProductPrice.StreamId(cmd.Sku);
+    var price = await session.Events.FetchForWriting<ProductPrice>(streamId);
 
-        // Business logic
-        var events = aggregate.Process(cmd);
-
-        // Append events
-        session.Events.Append(cmd.AggregateId, events);
-
-        return events;
-    }
-}
-```
-
-**Problems:**
-1. Event replay happens on every command (performance overhead)
-2. No optimistic concurrency check — concurrent commands can corrupt state
-3. Boilerplate ceremony in every handler
-
-**The solution: FetchForWriting()**
-
-`FetchForWriting<T>()` combines event replay, optimistic concurrency, and aggregate persistence into one API:
-
-```csharp
-// ✅ CORRECT PATTERN: Use FetchForWriting() for command handlers
-public static class MyHandler
-{
-    public static async Task<IEnumerable<object>> Handle(
-        MyCommand cmd,
-        IDocumentSession session)
-    {
-        // Fetch aggregate with optimistic concurrency tracking
-        var aggregate = await session.Events
-            .FetchForWriting<MyAggregate>(cmd.AggregateId);
-
-        // Business logic (pure function)
-        var events = aggregate.Process(cmd);
-
-        // Marten automatically appends events with version check
-        return events;
-    }
+    return [new PriceChanged(...)];  // Marten auto-appends with optimistic concurrency
 }
 ```
 
 **What FetchForWriting() does:**
-
-1. **Replays events** to reconstitute the aggregate
-2. **Tracks the stream version** for optimistic concurrency
-3. **Automatically appends events** returned by the handler
-4. **Throws ConcurrencyException** if another command modified the stream concurrently
-5. **Uses inline snapshot** if available (performance optimization — see below)
-
-**Key insight:** FetchForWriting() is **not** a projection — it's an optimization for command handlers. The aggregate state is ephemeral (exists only during the command). If you need **queryable** aggregate state, use a snapshot projection instead.
+1. Replays events to reconstitute aggregate
+2. Tracks stream version for optimistic concurrency
+3. Automatically appends events returned by handler
+4. Throws `ConcurrencyException` if stream modified concurrently
+5. Uses inline snapshot if available (performance boost)
 
 ### When to Use Each Pattern
 
 | Pattern | Use Case | Performance | Queryable? |
 |---------|----------|-------------|------------|
-| **Inline Snapshot** | Queryable aggregate state (queries + commands) | ⚡ Fastest (no replay) | ✅ Yes |
-| **FetchForWriting()** | Command-only workflows (no queries) | 🟡 Medium (replay + concurrency) | ❌ No |
-| **AggregateStreamAsync()** | Ad-hoc queries, time travel, debugging | 🔴 Slow (full replay) | ❌ No (ephemeral) |
+| **Inline Snapshot** | Queryable aggregate (queries + commands) | ⚡ Fastest (no replay) | ✅ Yes |
+| **FetchForWriting()** | Command-only (no queries) | 🟡 Medium (replay + concurrency) | ❌ No |
+| **AggregateStreamAsync()** | Ad-hoc/debugging | 🔴 Slow (full replay) | ❌ No |
 
-**Recommendation:** Use **inline snapshots** for aggregates that are both queried and modified. Use **FetchForWriting()** for write-only aggregates. Avoid `AggregateStreamAsync()` in production hot paths.
+**Recommendation:** Use inline snapshots for queried aggregates; FetchForWriting() for write-only aggregates.
 
-### Example: ProductPrice (Pricing BC)
+### Example: ProductPrice vs. Checkout
 
-The Pricing BC uses `FetchForWriting()` for `ProductPrice` commands because the aggregate is **not** directly queried — `CurrentPriceView` projection is the query model:
-
+**ProductPrice (write-only):**
 ```csharp
-// Command handler uses FetchForWriting()
-public static class ChangePriceHandler
-{
-    public static async Task<IEnumerable<object>> Handle(
-        ChangePrice cmd,
-        IDocumentSession session)
-    {
-        var streamId = ProductPrice.StreamId(cmd.Sku);
-
-        // Fetch with optimistic concurrency
-        var price = await session.Events.FetchForWriting<ProductPrice>(streamId);
-
-        // Business logic
-        var evt = new PriceChanged(
-            price.Id,
-            cmd.Sku,
-            price.BasePrice,
-            Money.Of(cmd.NewPrice),
-            price.LastChangedAt ?? price.RegisteredAt,
-            cmd.Reason,
-            cmd.ChangedBy,
-            DateTimeOffset.UtcNow,
-            null,
-            null
-        );
-
-        return [evt];
-    }
-}
+// FetchForWriting() — aggregate not queried
+var price = await session.Events.FetchForWriting<ProductPrice>(streamId);
+return [new PriceChanged(...)];
 ```
+- CurrentPriceView projection handles queries
+- Commands use FetchForWriting()
 
-**Why FetchForWriting() here?**
-- `ProductPrice` aggregate is **write-only** in command handlers
-- `CurrentPriceView` projection handles all queries (inline, zero-lag)
-- No need to persist aggregate state separately — events + inline projection is sufficient
-
-**Contrast with Checkout (Orders BC):**
-
-The `Checkout` aggregate uses an **inline snapshot** because it's both queried and modified:
-
+**Checkout (queried + modified):**
 ```csharp
-// Snapshot projection for queryable state
+// Snapshot projection — aggregate is queried
 opts.Projections.Snapshot<Checkout>(SnapshotLifecycle.Inline);
 
-// Command handler loads snapshot (not FetchForWriting)
-public static class SetShippingAddressHandler
-{
-    public static async Task<ShippingAddressSet> Handle(
-        SetShippingAddress cmd,
-        [ReadAggregate] Checkout checkout)  // Wolverine loads snapshot
-    {
-        // Business logic
-        return new ShippingAddressSet(checkout.Id, cmd.Address);
-    }
-}
+// Command loads snapshot
+public static ShippingAddressSet Handle(SetShippingAddress cmd, [ReadAggregate] Checkout checkout)
+    => new ShippingAddressSet(checkout.Id, cmd.Address);
 ```
+- Queries use snapshot (`GET /api/checkout/{id}`)
+- Commands load snapshot (zero-cost)
 
-**Why snapshot instead of FetchForWriting()?**
-- `Checkout` is queried by `GET /api/checkout/{id}` (BFF needs to display cart contents)
-- Snapshot ensures queries don't replay events
-- Command handlers get zero-cost aggregate loading (snapshot is already current)
+**Decision rule:** Snapshot if queried; FetchForWriting() if write-only.
 
 ---
 
@@ -653,103 +451,45 @@ public static class SetShippingAddressHandler
 
 ### Overview
 
-**Snapshot projections** are a special case of single-stream projections where the aggregate type itself serves as the projection document. They're called "snapshots" because they capture the current aggregate state.
+**Snapshot projections** capture current aggregate state in a queryable document. The aggregate type itself is the projection document.
 
-**Key differences from regular projections:**
-- The aggregate type **is** the projection document (no separate document class)
-- `Create()` and `Apply()` methods live on the aggregate type
-- Configuration uses `.Snapshot<T>()` instead of `.Add<TProjection>()`
+**Key differences:**
+- Aggregate type **is** the projection document (no separate class)
+- `Create()`/`Apply()` methods live on aggregate
+- Configuration: `.Snapshot<T>()` (not `.Add<TProjection>()`)
 
-### When to Use Snapshots
+✅ **Use snapshots when:**
+- Aggregate is queried and modified
+- Event replay is too slow (100+ events)
+- Hot-path commands need fast aggregate loading
 
-✅ **Use snapshot projections when:**
-
-1. **Aggregate is queried and modified** — Commands and queries both need access to current state
-2. **Event replay is too slow** — Aggregates with 100+ events per stream benefit from snapshots
-3. **Hot-path command handlers** — Snapshots eliminate replay latency for high-throughput commands
-
-❌ **Do NOT use snapshots when:**
-
-1. **Write-only aggregates** — If queries don't need aggregate state, use FetchForWriting() instead
-2. **Separate query model** — If you already have a denormalized projection for queries, snapshot is redundant
+❌ **Do NOT use when:**
+- Write-only aggregates (use FetchForWriting())
+- Separate query model exists (projection is redundant)
 
 ### Snapshot Lifecycles
 
-| Lifecycle | When Snapshot Updates | Use Case |
-|-----------|----------------------|----------|
-| **Inline** | Same transaction as events | Hot-path queries (zero lag required) |
-| **Async** | Background daemon (seconds) | Reporting, analytics, less-critical reads |
+| Lifecycle | When Updated | Use Case |
+|-----------|-------------|----------|
+| **Inline** | Same transaction | Hot-path queries (zero lag) |
+| **Async** | Background daemon | Reporting, analytics |
 
-**Inline is almost always correct for snapshots** — if you're using a snapshot, you likely need zero-lag queries.
+**Inline is almost always correct** — if you need a snapshot, you likely need zero-lag queries.
 
-### Example: Checkout Snapshot (Orders BC)
-
-```csharp
-// In Orders.Api/Program.cs
-opts.Projections.Snapshot<Checkout>(SnapshotLifecycle.Inline);
-```
-
-**Aggregate with snapshot methods:**
+### Example: Promotion and Coupon (Promotions BC)
 
 ```csharp
-public sealed record Checkout
-{
-    public Guid Id { get; init; }
-    public CheckoutStatus Status { get; init; }
-    public IReadOnlyList<CheckoutLineItem> Items { get; init; } = [];
-    public Address? ShippingAddress { get; init; }
-    public PaymentMethod? PaymentMethod { get; init; }
-
-    // Create method for first event
-    public static Checkout Create(CheckoutInitiated evt)
-    {
-        return new Checkout
-        {
-            Id = evt.CheckoutId,
-            Status = CheckoutStatus.InProgress,
-            Items = evt.Items,
-        };
-    }
-
-    // Apply methods for subsequent events
-    public static Checkout Apply(Checkout current, ShippingAddressSet evt)
-    {
-        return current with { ShippingAddress = evt.Address };
-    }
-
-    public static Checkout Apply(Checkout current, PaymentMethodSet evt)
-    {
-        return current with { PaymentMethod = evt.PaymentMethod };
-    }
-
-    public static Checkout Apply(Checkout current, CheckoutCompleted evt)
-    {
-        return current with { Status = CheckoutStatus.Completed };
-    }
-}
-```
-
-**What Marten does:**
-
-1. Discovers `Create()` and `Apply()` methods on `Checkout` type
-2. Creates `mt_doc_checkout` table to store snapshot documents
-3. Updates snapshot in same transaction as event appends (inline lifecycle)
-4. Queries use `session.LoadAsync<Checkout>(checkoutId)` (no event replay)
-
-### Example: Promotion and Coupon Snapshots (Promotions BC)
-
-```csharp
-// In Promotions.Api/Program.cs
+// Registration
 opts.Projections.Snapshot<Promotion>(SnapshotLifecycle.Inline);
 opts.Projections.Snapshot<Coupon>(SnapshotLifecycle.Inline);
 ```
 
-**Why snapshots for both?**
-- Promotion status is checked by Shopping BC during cart operations (hot path)
-- Coupon status is checked during redemption (hot path)
-- Both aggregates have 5-10 events per stream — snapshot avoids replay overhead
+**Why snapshots?**
+- Promotion status checked by Shopping BC (hot path)
+- Coupon status checked during redemption (hot path)
+- 5-10 events per stream — snapshot eliminates replay overhead
 
-**Key insight:** Even aggregates with relatively few events benefit from snapshots if queries are frequent. A 5-event replay is ~10ms — acceptable for one query, but a 10% latency tax on every cart operation adds up.
+**Key insight:** Even small streams benefit from snapshots on hot paths. A 5-event replay (~10ms) × 1,000 queries/hour = 10 seconds cumulative overhead.
 
 ---
 
