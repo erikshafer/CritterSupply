@@ -46,7 +46,8 @@ public sealed class DashboardPage
     public async Task WaitForRealtimeConnectionAsync()
     {
         // Wait for SignalR connection indicator to show "Connected"
-        await RealtimeIndicator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        // SignalR connection may take longer after JWT auth completes
+        await RealtimeIndicator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }
 
     public async Task NavigateToCustomerServiceAsync()

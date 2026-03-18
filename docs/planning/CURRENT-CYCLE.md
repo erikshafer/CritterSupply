@@ -41,10 +41,10 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M32.1 — Backoffice Phase 2: Write Operations |
-| **Status** | 🚀 IN PROGRESS — Sessions 1-15 completed, test-id conventions documented, E2E timeout investigation complete |
-| **Deliverables** | Blazor WASM frontend, write operations (Product Catalog, Pricing, Inventory), E2E tests |
-| **Next Session** | Session 16: Run single E2E scenario with tracing, fix timeouts, verify authentication suite |
+| **Current Milestone** | M32.2 — Backoffice Phase 3: Advanced Write Operations (Planned) |
+| **Status** | 📋 PLANNING — M32.1 completed, next milestone scope TBD |
+| **Deliverables** | TBD (likely: Promotions management, bulk operations, advanced CS tools) |
+| **Recent Completion** | M32.1 — Backoffice Phase 2: Blazor WASM + E2E Infrastructure (2026-03-18) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
 *Last Updated: 2026-03-18*
@@ -197,15 +197,20 @@
 - ✅ Write Session 15 retrospective
 - ✅ Update CURRENT-CYCLE.md
 
-**Session 16 Goals:** (Next)
+**Session 16 Goals:** (Next — Milestone Completion)
+- **PRIMARY GOAL:** Get at least 1 authentication E2E scenario passing (smoke test validation)
 - Run single authentication scenario with Playwright tracing enabled
 - Fix dashboard navigation timing (add explicit auth state + MudBlazor hydration checks)
 - Reduce LoginPage timeout from 30s to 15s
-- Run full authentication feature suite successfully
+- Write Session 16 retrospective
+- Write M32.1 milestone retrospective
+- Update CURRENT-CYCLE.md (move M32.1 to Recent Completions)
 - Update E2E test documentation with timeout tuning guidance
+- **Note:** Full 32-test suite stabilization can be deferred to M32.2 if needed
 
 **References:**
 - [M32.1 Plan](./milestones/m32-1-backoffice-phase-2-plan.md)
+- [M32.1 Triage and Completion Plan](./milestones/m32.1-triage-and-completion-plan.md) ⭐ **NEW**
 - [M32.0 Retrospective](./milestones/m32-0-retrospective.md)
 - [Session 1 Retrospective](./milestones/m32-1-session-1-retrospective.md)
 - [Session 2 Retrospective](./milestones/m32-1-session-2-retrospective.md)

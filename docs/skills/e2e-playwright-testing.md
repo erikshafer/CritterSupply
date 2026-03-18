@@ -298,6 +298,8 @@ Use semantic, kebab-case identifiers that describe **what** the element represen
 | Form Inputs | `{form}-{field}` | `login-email`<br>`login-password`<br>`checkout-phone` | ❌ `input1`, `email-box` |
 | Form Buttons | `{form}-{action}` | `login-submit`<br>`logout-button`<br>`checkout-continue` | ❌ `btn1`, `submit-btn` |
 | Real-time Indicators | `realtime-{state}` | `realtime-connected`<br>`realtime-disconnected` | ❌ `hub-status`, `connection-icon` |
+| Error/Success Alerts | `{form}-{type}` | `login-error`<br>`checkout-success`<br>`order-confirmation` | ❌ `error-msg`, `alert-1` |
+| Loading Indicators | `{form}-loading` | `login-loading`<br>`dashboard-loading`<br>`cart-loading` | ❌ `spinner`, `loader` |
 
 **Rationale:**
 - **Semantic names** survive UI refactoring (reordering, restyling, component library changes)
@@ -619,6 +621,209 @@ StubOrdersClient.AddOrder(new OrderDto(
 - Faster execution (no 4-step browser checkout per SignalR test)
 - Clearer test intent: *"Given an order exists, when a payment event arrives, the page updates"*
 
+---
+
+## Pattern 10: Blazor WASM Timeout Tuning (M32.1 Sessions 15-16)
+
+Blazor WebAssembly (WASM) has fundamentally different cold-start timing characteristics than Blazor Server:
+
+| Blazor Server | Blazor WASM |
+|---------------|-------------|
+| ✅ SSR: HTML rendered server-side, instant display | ❌ CSR: Browser downloads .NET runtime + assemblies (5-30s) |
+| ✅ SignalR connection ready immediately | ❌ SignalR depends on WASM hydration + JWT auth (1-3s delay) |
+| ✅ Navigation instant (server-rendered) | ❌ Navigation requires full client-side routing stack |
+| ✅ Minimal bundle size (KB) | ❌ Large bundle size (MB) — especially on first load |
+
+**Challenge:** Default 30s Playwright timeouts mask real timing issues. If a test passes with 30s but fails in production with a 10s user patience threshold, the test provides false confidence.
+
+**Solution:** Use a **tiered timeout strategy** that models real-world user behavior and separates infrastructure delays from application responsiveness.
+
+### Tiered Timeout Strategy
+
+| Operation Type | Timeout | Rationale | Example |
+|----------------|---------|-----------|---------|
+| **Initial page load** | 15s | WASM bundle download + runtime boot + MudBlazor hydration | `NavigateAsync()` in LoginPage.cs |
+| **Authenticated navigation** | 15s | JWT auth state propagation + Blazor router + component mount | `LoginAndWaitForDashboardAsync()` |
+| **Element visibility** | 10s | Component render + data binding (no network) | `EmailInput.WaitForAsync()` |
+| **SignalR connection** | 15s | Depends on JWT auth completion (1-3s) + WebSocket upgrade | `WaitForRealtimeConnectionAsync()` |
+| **State checks** | 5s | Immediate DOM queries (no async operations) | `IsRealtimeConnectedAsync()` |
+| **KPI updates (real-time)** | 5s | SignalR already connected, just polling DOM for value change | `WaitForKpiUpdateAsync()` |
+
+### LoginPage.cs Example (M32.1 Session 16)
+
+```csharp
+public async Task NavigateAsync()
+{
+    await _page.GotoAsync($"{_baseUrl}/login");
+
+    // Step 1: Wait for network idle (HTTP resources complete)
+    await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+    // Step 2: Wait for MudBlazor initialization (WASM hydration check)
+    // MudBlazor renders .mud-dialog-provider only after Blazor runtime is ready
+    await _page.WaitForSelectorAsync(".mud-dialog-provider", new() {
+        State = WaitForSelectorState.Attached,
+        Timeout = 15_000  // ← WASM cold start headroom
+    });
+
+    // Step 3: Wait for login form to be interactive (reduced from 30s to 15s)
+    await EmailInput.WaitForAsync(new() {
+        State = WaitForSelectorState.Visible,
+        Timeout = 15_000  // ← Form render after hydration
+    });
+}
+
+public async Task LoginAndWaitForDashboardAsync(string email, string password)
+{
+    await EmailInput.FillAsync(email);
+    await PasswordInput.FillAsync(password);
+    await LoginButton.ClickAsync();
+
+    // Wait for successful navigation to dashboard (increased from 10s to 15s)
+    // Auth state propagation takes 1-3s in WASM (in-memory token → AuthenticationStateProvider → Blazor router)
+    await _page.WaitForURLAsync(url => url.Contains("/dashboard"), new() { Timeout = 15_000 });
+
+    // Wait for dashboard to be fully loaded (MudBlazor hydration)
+    await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+}
+```
+
+### DashboardPage.cs Example (M32.1 Session 16)
+
+```csharp
+public async Task WaitForRealtimeConnectionAsync()
+{
+    // Wait for SignalR connection indicator to show "Connected"
+    // SignalR connection depends on:
+    // 1. JWT auth state fully propagated (1-3s)
+    // 2. SignalR client initialization
+    // 3. WebSocket upgrade handshake
+    // Total: typically 2-5s, but allow 15s for CI headroom
+    await RealtimeIndicator.WaitForAsync(new() {
+        State = WaitForSelectorState.Visible,
+        Timeout = 15_000  // ← Increased from 10s (Session 16)
+    });
+}
+
+public async Task<bool> IsRealtimeConnectedAsync()
+{
+    try
+    {
+        // Fast state check — SignalR connection either exists or doesn't
+        await RealtimeIndicator.WaitForAsync(new() {
+            State = WaitForSelectorState.Visible,
+            Timeout = 2_000  // ← Short timeout for immediate feedback
+        });
+        return true;
+    }
+    catch (TimeoutException)
+    {
+        return false;
+    }
+}
+```
+
+### When to Use Each Timeout
+
+**15s Timeouts (Infrastructure + Hydration):**
+- ✅ Initial page navigation to WASM app (`NavigateAsync()`)
+- ✅ Navigation after login (auth state propagation)
+- ✅ SignalR connection establishment (depends on JWT)
+- ✅ MudBlazor component hydration checks (`.mud-dialog-provider`)
+
+**10s Timeouts (Component Rendering):**
+- ✅ Element visibility after page load
+- ✅ MudSelect dropdown popover appearance
+- ✅ Form validation messages
+
+**5s Timeouts (State Checks):**
+- ✅ Checking if element is visible (immediate DOM query)
+- ✅ Checking connection status (indicator already rendered)
+- ✅ KPI value updates via SignalR (connection already active)
+
+**2s Timeouts (Fast Feedback):**
+- ✅ Negative assertions (`IsErrorVisibleAsync()` — should fail fast if no error)
+- ✅ Polling-based state checks where failure is expected
+
+### MudBlazor Hydration Detection Pattern
+
+WASM apps require explicit hydration checks because `NetworkIdle` only waits for HTTP — not for Blazor runtime initialization:
+
+```csharp
+// ❌ WRONG — NetworkIdle alone is insufficient for WASM
+await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+await EmailInput.WaitForAsync(new() { Timeout = 30_000 }); // ← Times out in CI
+
+// ✅ CORRECT — Explicit MudBlazor hydration check
+await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+await _page.WaitForSelectorAsync(".mud-dialog-provider", new() {
+    State = WaitForSelectorState.Attached,
+    Timeout = 15_000
+}); // ← MudBlazor only renders this after Blazor runtime ready
+await EmailInput.WaitForAsync(new() { Timeout = 15_000 });
+```
+
+**Why `.mud-dialog-provider`?**
+- MudBlazor v9+ renders this element in `MudLayout.razor` during its initialization phase
+- It's a stable, non-user-visible element that signals "MudBlazor JS interop is ready"
+- Alternative markers: `.mud-popover-provider`, `.mud-theme-provider` (all work)
+
+### CI-Specific Considerations
+
+**Problem:** Tests pass locally (fast desktop CPU) but timeout in GitHub Actions (shared runners, slower CPUs).
+
+**Solutions:**
+1. **Use tiered timeouts** — Don't use 30s for everything; model real operations
+2. **Add explicit hydration checks** — Don't assume `NetworkIdle` = "app ready"
+3. **Increase only infrastructure timeouts** — 10s → 15s for WASM cold start, not for all operations
+4. **Test in headless mode locally** — `PLAYWRIGHT_HEADLESS=true dotnet test` simulates CI environment
+
+### Anti-Patterns
+
+**❌ Uniform 30s Timeouts:**
+```csharp
+// Hides real timing issues — app might be broken but test passes
+await EmailInput.WaitForAsync(new() { Timeout = 30_000 });
+await DashboardCard.WaitForAsync(new() { Timeout = 30_000 });
+await SignalRIndicator.WaitForAsync(new() { Timeout = 30_000 });
+```
+
+**❌ No Hydration Checks:**
+```csharp
+// Fails in CI because NetworkIdle completes before WASM runtime ready
+await _page.GotoAsync("/login");
+await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+await EmailInput.WaitForAsync(); // ← Times out
+```
+
+**❌ Mixing Initial Load and State Check Timeouts:**
+```csharp
+// Initial navigation should be 15s, but state check should be 2-5s
+await LoginPage.NavigateAsync(); // 15s
+await LoginPage.IsErrorVisibleAsync(); // Should be 2s, not 15s
+```
+
+### Lessons Learned (M32.1 Sessions 12-16)
+
+1. **Session 12:** E2E tests timed out with 30s defaults — root cause was missing MudBlazor hydration check
+2. **Session 13:** Added authorization policies (WASM requires client-side `AddAuthorizationCore()`)
+3. **Session 14:** Added `data-testid` attributes (form inputs were missing test-ids)
+4. **Session 15:** Fixed JWT role claim format (kebab-case required for policy matching)
+5. **Session 16:** Applied tiered timeout strategy (15s initial, 15s navigation, 10s elements, 5s state checks)
+
+**Result:** Auth E2E scenario passes consistently with realistic timeouts that model production behavior.
+
+### References
+
+- **Implementation:** `tests/Backoffice/Backoffice.E2ETests/Pages/LoginPage.cs`, `DashboardPage.cs`
+- **Session Retrospectives:**
+  - `docs/planning/milestones/m32.1-session-13-retrospective.md` (authorization policies)
+  - `docs/planning/milestones/m32.1-session-16-retrospective.md` (tiered timeout strategy)
+- **Triage Plan:** `docs/planning/milestones/m32.1-triage-and-completion-plan.md` (comprehensive timeout analysis)
+
+---
+
+## Test Lifecycle Hooks
 
 ### Hooks Overview
 
