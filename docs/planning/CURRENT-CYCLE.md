@@ -42,9 +42,9 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.1 — Backoffice Phase 2: Write Operations |
-| **Status** | 🚀 IN PROGRESS — Sessions 1-13 completed, 4 major E2E blockers fixed, 1 navigation issue remains |
+| **Status** | 🚀 IN PROGRESS — Sessions 1-14 completed, LoginHandler + Dashboard test-ids fixed, E2E tests still failing |
 | **Deliverables** | Blazor WASM frontend, write operations (Product Catalog, Pricing, Inventory), E2E tests |
-| **Next Session** | Session 14: Fix dashboard navigation + test-id mismatches, run full E2E suite |
+| **Next Session** | Session 15: Investigate E2E test failures (timeout diagnostics), resolve Active Customers KPI |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
 *Last Updated: 2026-03-18*
@@ -180,11 +180,19 @@
 - ⚠️ Dashboard navigation still failing — test times out at URL check
 - ✅ Write Session 13 retrospective documenting major fixes + ongoing issue
 
-**Session 14 Goals:** (Next)
-- Fix dashboard navigation failure (diagnose timing/authorization issue)
-- Fix `LoginHandler` Line 133 to use `ToRoleString()` for consistency
-- Align Dashboard.razor test-ids with DashboardPage.cs expectations
-- Run full authentication feature test suite
+**Session 14 Goals:** ✅ COMPLETED (with test failures)
+- ✅ Fix `LoginHandler` Line 133 to use `ToRoleString()` for consistency
+- ✅ Align Dashboard.razor test-ids with DashboardPage.cs expectations (17 changes)
+- ✅ Add `realtime-connected` and `realtime-disconnected` test-id indicators
+- ✅ Add nested `kpi-value` test-ids to all KPI cards
+- ❌ Run full authentication feature suite (tests failed — needs debugging in Session 15)
+- ✅ Write comprehensive Session 14 retrospective
+- ✅ Update CURRENT-CYCLE.md
+
+**Session 15 Goals:** (Next)
+- Investigate E2E test timeout/failures (check Playwright traces, run single scenario)
+- Resolve Active Customers KPI mismatch (remove from test expectations or add metric)
+- Run full authentication feature test suite successfully
 - Update E2E test documentation
 
 **References:**
@@ -203,6 +211,7 @@
 - [Session 11 Retrospective](./milestones/m32-1-session-11-retrospective.md)
 - [Session 12 Retrospective](./milestones/m32-1-session-12-retrospective.md)
 - [Session 13 Retrospective](./milestones/m32-1-session-13-retrospective.md)
+- [Session 14 Retrospective](./milestones/m32-1-session-14-retrospective.md)
 - [Backoffice Event Modeling](./backoffice-event-modeling-revised.md)
 - [Backoffice Frontend Design](./backoffice-frontend-design.md)
 - [Frontend Design Alignment Analysis](./backoffice-frontend-design-alignment-analysis.md)
