@@ -197,15 +197,20 @@
 - ✅ Write Session 15 retrospective
 - ✅ Update CURRENT-CYCLE.md
 
-**Session 16 Goals:** (Next)
+**Session 16 Goals:** (Next — Milestone Completion)
+- **PRIMARY GOAL:** Get at least 1 authentication E2E scenario passing (smoke test validation)
 - Run single authentication scenario with Playwright tracing enabled
 - Fix dashboard navigation timing (add explicit auth state + MudBlazor hydration checks)
 - Reduce LoginPage timeout from 30s to 15s
-- Run full authentication feature suite successfully
+- Write Session 16 retrospective
+- Write M32.1 milestone retrospective
+- Update CURRENT-CYCLE.md (move M32.1 to Recent Completions)
 - Update E2E test documentation with timeout tuning guidance
+- **Note:** Full 32-test suite stabilization can be deferred to M32.2 if needed
 
 **References:**
 - [M32.1 Plan](./milestones/m32-1-backoffice-phase-2-plan.md)
+- [M32.1 Triage and Completion Plan](./milestones/m32.1-triage-and-completion-plan.md) ⭐ **NEW**
 - [M32.0 Retrospective](./milestones/m32-0-retrospective.md)
 - [Session 1 Retrospective](./milestones/m32-1-session-1-retrospective.md)
 - [Session 2 Retrospective](./milestones/m32-1-session-2-retrospective.md)
