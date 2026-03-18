@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.1 — Backoffice Phase 2: Write Operations |
-| **Status** | 🚀 IN PROGRESS — Sessions 1-12 completed, all 404 errors fixed, discovered authorization policy issue |
+| **Status** | 🚀 IN PROGRESS — Sessions 1-13 completed, 4 major E2E blockers fixed, 1 navigation issue remains |
 | **Deliverables** | Blazor WASM frontend, write operations (Product Catalog, Pricing, Inventory), E2E tests |
-| **Next Session** | Session 13: Fix authorization policy registration, get first test passing |
+| **Next Session** | Session 14: Fix dashboard navigation + test-id mismatches, run full E2E suite |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-17*
+*Last Updated: 2026-03-18*
 
 ---
 
@@ -172,13 +172,20 @@
 - ✅ Write Session 12 retrospective documenting fixes and new issue
 - ✅ Update CURRENT-CYCLE.md
 
-**Session 13 Goals:** (Next)
-- Register authorization policies in `Backoffice.Web/Program.cs`
-- Verify policy names match `<AuthorizeView Policy="..." />` usage
-- Run test to verify Blazor hydration completes successfully
-- If test passes: Celebrate first passing E2E test! 🎉
-- If test fails: Diagnose next error in browser console
-- Update E2E test documentation (dotnet publish requirement, Playwright tracing usage)
+**Session 13 Goals:** ✅ COMPLETED (with caveats)
+- ✅ Register authorization policies in `Backoffice.Web/Program.cs` (7 policies added)
+- ✅ Add `data-testid` attributes to `Login.razor` (5 test-ids added)
+- ✅ Fix JWT role claims to use kebab-case (created `ToRoleString()` extension)
+- ✅ Update post-login navigation to `/dashboard`
+- ⚠️ Dashboard navigation still failing — test times out at URL check
+- ✅ Write Session 13 retrospective documenting major fixes + ongoing issue
+
+**Session 14 Goals:** (Next)
+- Fix dashboard navigation failure (diagnose timing/authorization issue)
+- Fix `LoginHandler` Line 133 to use `ToRoleString()` for consistency
+- Align Dashboard.razor test-ids with DashboardPage.cs expectations
+- Run full authentication feature test suite
+- Update E2E test documentation
 
 **References:**
 - [M32.1 Plan](./milestones/m32-1-backoffice-phase-2-plan.md)
@@ -195,6 +202,7 @@
 - [Session 10 Retrospective](./milestones/m32-1-session-10-retrospective.md)
 - [Session 11 Retrospective](./milestones/m32-1-session-11-retrospective.md)
 - [Session 12 Retrospective](./milestones/m32-1-session-12-retrospective.md)
+- [Session 13 Retrospective](./milestones/m32-1-session-13-retrospective.md)
 - [Backoffice Event Modeling](./backoffice-event-modeling-revised.md)
 - [Backoffice Frontend Design](./backoffice-frontend-design.md)
 - [Frontend Design Alignment Analysis](./backoffice-frontend-design-alignment-analysis.md)
