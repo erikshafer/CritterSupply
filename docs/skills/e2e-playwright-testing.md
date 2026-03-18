@@ -1572,3 +1572,527 @@ await hubContext.Clients
 - **Feature Files:** `vendor-auth.feature`, `vendor-dashboard.feature`, `vendor-change-requests.feature`
 - **Test Data:** `WellKnownVendorTestData.cs` — matches VendorIdentitySeedData demo accounts
 - **Cycle Plan:** `docs/planning/cycles/cycle-23-vendor-portal-e2e-testing.md`
+
+---
+
+## WASM-Specific Testing Patterns (M32.1)
+
+Blazor WASM E2E tests require different timing strategies than Blazor Server tests due to cold start delays, MudBlazor initialization, JWT auth propagation, and SignalR connection establishment. The patterns below are derived from Backoffice WASM E2E testing (M32.1 Sessions 12-16).
+
+### Tiered Timeout Strategy
+
+**Problem:** Blazor WASM cold start (5-30s) + MudBlazor initialization (2-5s) + JWT auth (1-3s) + SignalR connection (1-5s) compound to create 30-40s total delay. Fixed 30s timeout is too aggressive for initial load but wasteful for fast operations.
+
+**Solution:** Use operation-specific timeouts optimized for actual timing behavior:
+
+| Operation | Timeout | Rationale |
+|-----------|---------|-----------|
+| **Initial page load** | 15s + hydration check | WASM download + .NET runtime + app assemblies |
+| **Authenticated navigation** | 15s | Auth state propagation (1-3s) + component re-render |
+| **SignalR connection** | 15s | JWT must complete first + retry attempts |
+| **Element visibility** | 10s | Standard Playwright wait (sufficient after hydration) |
+| **State checks** | 5s | DOM polling for real-time indicators |
+
+**Pattern:**
+
+```csharp
+// LoginPage.cs — Initial page load with MudBlazor hydration check
+public async Task NavigateAsync()
+{
+    await _page.GotoAsync(_baseUrl);
+
+    // Step 1: Wait for network idle
+    await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+    // Step 2: Wait for MudBlazor initialization (CRITICAL for WASM)
+    await _page.WaitForSelectorAsync(".mud-dialog-provider", new() { Timeout = 15_000 });
+
+    // Step 3: Wait for specific form element
+    await EmailInput.WaitForAsync(new() { Timeout = 15_000 });
+}
+
+// LoginPage.cs — Post-login navigation with auth state propagation
+public async Task LoginAsync(string email, string password)
+{
+    await EmailInput.FillAsync(email);
+    await PasswordInput.FillAsync(password);
+    await LoginButton.ClickAsync();
+
+    // Auth state propagation needs 15s (not 10s)
+    await _page.WaitForURLAsync(url => url.Contains("/dashboard"), new() { Timeout = 15_000 });
+}
+
+// DashboardPage.cs — SignalR connection check
+public async Task WaitForSignalRConnectionAsync()
+{
+    // SignalR depends on JWT auth completing first
+    await RealtimeConnectedIndicator.WaitForAsync(new() { Timeout = 15_000 });
+}
+
+// DashboardPage.cs — Fast element checks after hydration
+public async Task<bool> IsKpiCardVisibleAsync(string kpiName)
+{
+    var locator = _page.Locator($"[data-testid='kpi-{kpiName}']");
+    await locator.WaitForAsync(new() { Timeout = 10_000 }); // Standard timeout
+    return await locator.IsVisibleAsync();
+}
+```
+
+**Anti-Patterns:**
+
+```csharp
+// ❌ WRONG: Fixed 30s timeout everywhere (wasteful for fast operations)
+await EmailInput.WaitForAsync(new() { Timeout = 30_000 });
+await LoginButton.ClickAsync();
+await _page.WaitForURLAsync(url => url.Contains("/dashboard"), new() { Timeout = 30_000 });
+
+// ❌ WRONG: Too aggressive for WASM initial load
+await EmailInput.WaitForAsync(new() { Timeout = 5_000 }); // Times out during cold start
+
+// ❌ WRONG: Using NetworkIdle alone without MudBlazor hydration check
+await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+// Components not ready yet — clicking elements before MudBlazor event handlers attach
+```
+
+---
+
+### Explicit Hydration Detection
+
+**Problem:** `NetworkIdle` doesn't guarantee MudBlazor components are ready. Tests were clicking elements before MudBlazor event handlers attached, causing flaky failures.
+
+**Solution:** Check for framework-specific markers (MudBlazor provider classes, SignalR connection state, auth state) in addition to `NetworkIdle`.
+
+**MudBlazor Hydration Check:**
+
+```csharp
+// Wait for MudBlazor initialization (check for MudBlazor provider classes)
+await _page.WaitForSelectorAsync(".mud-dialog-provider",
+    new() { State = WaitForSelectorState.Attached, Timeout = 15_000 });
+```
+
+**Why This Works:** MudBlazor v9+ creates `.mud-dialog-provider` and `.mud-snackbar-provider` containers during initialization. These providers are the last step of MudBlazor setup. If provider exists, MudBlazor is ready.
+
+**Multi-Layer Verification Pattern:**
+
+```csharp
+public async Task WaitForPageReadyAsync()
+{
+    // Layer 1: Wait for network idle (basic HTML loaded)
+    await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+    // Layer 2: Wait for framework initialization (MudBlazor ready)
+    await _page.WaitForSelectorAsync(".mud-dialog-provider", new() { Timeout = 15_000 });
+
+    // Layer 3: Wait for auth state (if authenticated page)
+    if (_requiresAuth)
+    {
+        await _page.WaitForURLAsync(url => url.Contains("/dashboard"), new() { Timeout = 15_000 });
+    }
+
+    // Layer 4: Wait for SignalR connection (if real-time page)
+    if (_requiresSignalR)
+    {
+        await _page.Locator("[data-testid='realtime-connected']")
+            .WaitForAsync(new() { Timeout = 15_000 });
+    }
+}
+```
+
+**Anti-Pattern:**
+
+```csharp
+// ❌ WRONG: Skipping hydration checks causes race conditions
+await _page.GotoAsync(_baseUrl);
+await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+// Immediately clicking — MudBlazor not ready yet!
+await _page.Locator("[data-testid='login-submit']").ClickAsync();
+```
+
+---
+
+### Auth State Propagation in WASM
+
+**Problem:** After successful login API call, Blazor WASM takes 1-3s to:
+1. Update `BackofficeAuthState` (or equivalent auth service)
+2. Fire `OnChange` event
+3. Call `NotifyAuthenticationStateChanged()`
+4. Re-render protected components
+5. Execute `NavigationManager.NavigateTo("/dashboard")`
+
+**Impact:** 10s timeout for dashboard navigation was insufficient. 15s is more reliable.
+
+**Pattern:**
+
+```csharp
+public async Task LoginAsync(string email, string password)
+{
+    await EmailInput.FillAsync(email);
+    await PasswordInput.FillAsync(password);
+    await LoginButton.ClickAsync();
+
+    // Wait for auth state propagation + navigation (15s for WASM, not 10s)
+    await _page.WaitForURLAsync(url => url.Contains("/dashboard"), new() { Timeout = 15_000 });
+
+    // Optional: Verify auth state reflected in UI
+    await _page.Locator("[data-testid='logout-button']").WaitForAsync(new() { Timeout = 5_000 });
+}
+```
+
+**Why 15s Not 10s:**
+- Login API call: 100-500ms
+- Auth state update: 500-1000ms (in-memory state mutation)
+- `NotifyAuthenticationStateChanged()` propagation: 500-1000ms (Blazor change detection)
+- Protected route check: 100-500ms (auth guard evaluation)
+- Component re-render: 500-1000ms (Blazor rendering pipeline)
+- Navigation execution: 100-500ms (URL update)
+
+**Total:** 1,800-4,500ms typical, up to 8-10s in slow CI environments. 15s provides safety margin.
+
+---
+
+### SignalR Connection Dependency on JWT
+
+**Problem:** SignalR hub uses `AccessTokenProvider` delegate to get JWT from auth state. If auth state isn't ready, connection fails silently and retries.
+
+**Impact:** SignalR connection timeout must be >= auth propagation timeout. 10s was insufficient because auth state took 1-3s to propagate, leaving only 7-9s for SignalR connection + retries.
+
+**Solution:** Increase SignalR connection timeout to 15s (same as auth propagation timeout).
+
+**Pattern:**
+
+```csharp
+public async Task WaitForDashboardReadyAsync()
+{
+    // Step 1: Wait for auth state propagation + navigation
+    await _page.WaitForURLAsync(url => url.Contains("/dashboard"), new() { Timeout = 15_000 });
+
+    // Step 2: Wait for SignalR connection (15s to allow for retry attempts)
+    await _page.Locator("[data-testid='realtime-connected']")
+        .WaitForAsync(new() { Timeout = 15_000 });
+
+    // Step 3: Wait for initial data load (KPI cards, etc.)
+    await _page.Locator("[data-testid='kpi-total-orders']")
+        .WaitForAsync(new() { Timeout = 10_000 });
+}
+```
+
+**Why SignalR Needs 15s:**
+- JWT retrieval from auth state: 500-1000ms (waits for auth state ready)
+- SignalR connection attempt: 2-5s (WebSocket handshake + JWT validation)
+- Retry on failure: 2-5s (if JWT not ready on first attempt)
+- Hub connection established: 500-1000ms (connection confirmation)
+
+**Total:** 5-12s typical. 15s allows for 2-3 retry attempts if JWT retrieval is slow.
+
+**SignalR Client Pattern (Blazor WASM):**
+
+```csharp
+// Program.cs or hub service
+builder.Services.AddSingleton<IBackofficeHubService>(sp =>
+{
+    var authState = sp.GetRequiredService<BackofficeAuthState>();
+    var connection = new HubConnectionBuilder()
+        .WithUrl("http://localhost:5243/hub/backoffice", opts =>
+        {
+            // CRITICAL: AccessTokenProvider must wait for auth state ready
+            opts.AccessTokenProvider = async () =>
+            {
+                // Wait for JWT to be available (auth state may not be ready immediately)
+                var maxWait = TimeSpan.FromSeconds(5);
+                var elapsed = TimeSpan.Zero;
+                var pollInterval = TimeSpan.FromMilliseconds(100);
+
+                while (string.IsNullOrEmpty(authState.AccessToken) && elapsed < maxWait)
+                {
+                    await Task.Delay(pollInterval);
+                    elapsed += pollInterval;
+                }
+
+                return authState.AccessToken;
+            };
+        })
+        .WithAutomaticReconnect()
+        .Build();
+
+    return new BackofficeHubService(connection);
+});
+```
+
+---
+
+### Test-ID Naming Conventions
+
+**Problem:** Session 14 found 17 test-id mismatches between Page Object Models and Razor components. Inconsistent naming (`kpi-active-orders` vs `kpi-total-orders`, `customer-search-btn` vs `nav-customer-service`) caused test failures even though functionality worked.
+
+**Solution:** Document test-id conventions with clear patterns, examples, and anti-patterns.
+
+**Convention Table:**
+
+| Element Type | Pattern | Examples | Anti-Patterns |
+|--------------|---------|----------|---------------|
+| **KPI Cards** | `kpi-{metric-name}` | `kpi-total-orders`, `kpi-revenue`, `kpi-pending-returns` | ❌ `kpi-active-orders` (ambiguous)<br>❌ `kpi-card-orders` (redundant) |
+| **KPI Values (nested)** | `kpi-value` | Always nested within KPI card | ❌ `kpi-total-orders-value` (redundant)<br>❌ `value` (too generic) |
+| **Navigation Links** | `nav-{destination}` | `nav-customer-service`, `nav-operations`, `nav-pricing` | ❌ `customer-search-btn` (component name)<br>❌ `nav-cs` (abbreviation) |
+| **Form Inputs** | `{form}-{field}` | `login-email`, `login-password`, `search-query` | ❌ `email-input` (presentational)<br>❌ `txt-email` (Hungarian notation) |
+| **Form Buttons** | `{form}-{action}` | `login-submit`, `logout-button`, `search-submit` | ❌ `submit-btn` (generic)<br>❌ `btn-1` (positional) |
+| **Real-time Indicators** | `realtime-{state}` | `realtime-connected`, `realtime-disconnected`, `realtime-reconnecting` | ❌ `hub-status` (implementation detail)<br>❌ `connection-indicator` (verbose) |
+| **Data Tables** | `table-{entity-plural}` | `table-orders`, `table-customers`, `table-products` | ❌ `grid-orders` (component name)<br>❌ `orders-table` (inconsistent order) |
+| **Table Rows** | `row-{entity}-{id}` | `row-order-12345`, `row-customer-67890` | ❌ `order-row-12345` (inconsistent)<br>❌ `table-row-0` (positional index) |
+| **Action Buttons** | `{entity}-{action}` | `order-cancel`, `product-edit`, `customer-view` | ❌ `cancel-order` (verb-first)<br>❌ `btn-cancel-order` (redundant prefix) |
+
+**Key Principles:**
+
+1. **Semantic names:** Describe what element represents, not how it looks
+2. **Kebab-case:** Aligns with HTML attribute conventions (`data-testid="login-email"`)
+3. **Hierarchical structure:** Parent-child relationships (KPI card contains `kpi-value`)
+4. **Stable identifiers:** Don't change when UI styling or ordering changes
+5. **Noun before verb:** `order-cancel` (not `cancel-order`)
+6. **Avoid implementation details:** Use semantic names (`nav-customer-service`) not component names (`customer-search-btn`)
+
+**Razor Component Example:**
+
+```razor
+<!-- ✅ GOOD: Semantic, hierarchical test-ids -->
+<MudCard data-testid="kpi-total-orders">
+    <MudCardContent>
+        <MudText Typo="Typo.h6">Total Orders</MudText>
+        <MudText Typo="Typo.h3" data-testid="kpi-value">@TotalOrders</MudText>
+    </MudCardContent>
+</MudCard>
+
+<MudNavLink Href="/customer-service" data-testid="nav-customer-service">
+    Customer Service
+</MudNavLink>
+
+<!-- ❌ BAD: Presentational, component-specific test-ids -->
+<MudCard data-testid="kpi-card-orders">
+    <MudCardContent>
+        <MudText Typo="Typo.h6">Total Orders</MudText>
+        <MudText Typo="Typo.h3" data-testid="kpi-total-orders-value">@TotalOrders</MudText>
+    </MudCardContent>
+</MudCard>
+
+<MudNavLink Href="/customer-service" data-testid="customer-search-btn">
+    Customer Service
+</MudNavLink>
+```
+
+**Page Object Model Example:**
+
+```csharp
+// Page Object Model defines the contract (expected test-ids)
+public class DashboardPage
+{
+    private readonly IPage _page;
+
+    // KPI cards
+    private ILocator TotalOrdersCard => _page.Locator("[data-testid='kpi-total-orders']");
+    private ILocator RevenueCard => _page.Locator("[data-testid='kpi-revenue']");
+    private ILocator PendingReturnsCard => _page.Locator("[data-testid='kpi-pending-returns']");
+
+    // KPI values (nested within cards)
+    public async Task<string> GetTotalOrdersAsync()
+        => await TotalOrdersCard.Locator("[data-testid='kpi-value']").TextContentAsync();
+
+    // Navigation links
+    private ILocator CustomerServiceLink => _page.Locator("[data-testid='nav-customer-service']");
+    private ILocator OperationsLink => _page.Locator("[data-testid='nav-operations']");
+
+    // Real-time indicator
+    private ILocator RealtimeConnectedIndicator => _page.Locator("[data-testid='realtime-connected']");
+}
+```
+
+---
+
+### Page Object Model Best Practices
+
+**Problem:** Session 14 found test-id mismatches because Dashboard.razor was written first with arbitrary test-ids, then DashboardPage.cs expected different test-ids. Tests failed due to contract mismatch (not functional bugs).
+
+**Better Approach:** Write Page Object Model BEFORE Razor component to define test-id contract upfront.
+
+**Recommended Workflow:**
+
+1. **Write Gherkin `.feature` file** (user stories, scenarios)
+2. **Write Page Object Model** with expected test-ids (defines contract)
+3. **Write Razor component** implementing those test-ids (fulfills contract)
+4. **Write step definitions** using Page Object Model
+
+**Why This Works:**
+- POM defines the contract (expected test-ids)
+- Razor component fulfills the contract (implements those test-ids)
+- If component is written first, POM must adapt to component's arbitrary test-ids
+- Contract-first prevents mismatches during implementation
+
+**Example Workflow:**
+
+```gherkin
+# Step 1: Write Gherkin feature file
+Feature: Dashboard KPI Display
+  As a system administrator
+  I want to view real-time KPI metrics
+  So that I can monitor system health
+
+  Scenario: View total orders KPI
+    Given I am logged in as a system administrator
+    When I navigate to the dashboard
+    Then I should see the total orders KPI card
+    And the total orders count should be greater than zero
+```
+
+```csharp
+// Step 2: Write Page Object Model (defines test-id contract)
+public class DashboardPage
+{
+    private readonly IPage _page;
+
+    // Contract: Razor component MUST have data-testid="kpi-total-orders"
+    private ILocator TotalOrdersCard => _page.Locator("[data-testid='kpi-total-orders']");
+
+    // Contract: KPI value MUST be nested with data-testid="kpi-value"
+    public async Task<int> GetTotalOrdersAsync()
+    {
+        var text = await TotalOrdersCard.Locator("[data-testid='kpi-value']").TextContentAsync();
+        return int.Parse(text);
+    }
+
+    public async Task<bool> IsTotalOrdersCardVisibleAsync()
+        => await TotalOrdersCard.IsVisibleAsync();
+}
+```
+
+```razor
+<!-- Step 3: Write Razor component (implements contract) -->
+<MudCard data-testid="kpi-total-orders">
+    <MudCardContent>
+        <MudText Typo="Typo.h6">Total Orders</MudText>
+        <MudText Typo="Typo.h3" data-testid="kpi-value">@TotalOrders</MudText>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter] public int TotalOrders { get; set; }
+}
+```
+
+```csharp
+// Step 4: Write step definitions (uses POM contract)
+[When(@"I navigate to the dashboard")]
+public async Task WhenINavigateToDashboard()
+{
+    var page = _scenarioContext.Get<IPage>(ScenarioContextKeys.Page);
+    var dashboardPage = new DashboardPage(page);
+    await dashboardPage.NavigateAsync();
+}
+
+[Then(@"I should see the total orders KPI card")]
+public async Task ThenIShouldSeeTotalOrdersKpiCard()
+{
+    var page = _scenarioContext.Get<IPage>(ScenarioContextKeys.Page);
+    var dashboardPage = new DashboardPage(page);
+    (await dashboardPage.IsTotalOrdersCardVisibleAsync()).ShouldBeTrue();
+}
+
+[Then(@"the total orders count should be greater than zero")]
+public async Task ThenTotalOrdersCountShouldBeGreaterThanZero()
+{
+    var page = _scenarioContext.Get<IPage>(ScenarioContextKeys.Page);
+    var dashboardPage = new DashboardPage(page);
+    var count = await dashboardPage.GetTotalOrdersAsync();
+    count.ShouldBeGreaterThan(0);
+}
+```
+
+**Anti-Pattern Workflow (Component-First):**
+
+```razor
+<!-- ❌ WRONG: Write component first with arbitrary test-ids -->
+<MudCard data-testid="dashboard-card-orders">
+    <MudCardContent>
+        <MudText Typo="Typo.h6">Total Orders</MudText>
+        <MudText Typo="Typo.h3" data-testid="order-count">@TotalOrders</MudText>
+    </MudCardContent>
+</MudCard>
+```
+
+```csharp
+// ❌ WRONG: POM expects different test-ids (mismatch!)
+public class DashboardPage
+{
+    // Test expects "kpi-total-orders" but component has "dashboard-card-orders"
+    private ILocator TotalOrdersCard => _page.Locator("[data-testid='kpi-total-orders']");
+
+    // Test expects "kpi-value" but component has "order-count"
+    public async Task<int> GetTotalOrdersAsync()
+    {
+        var text = await TotalOrdersCard.Locator("[data-testid='kpi-value']").TextContentAsync();
+        return int.Parse(text);
+    }
+}
+
+// Result: Test fails with "Locator not found" (not a functional bug, just contract mismatch)
+```
+
+---
+
+### MudBlazor v9+ Type Parameters
+
+**Problem:** MudBlazor v9+ requires explicit type parameters even for non-data-bound lists. Build errors: "The type of component 'MudList' cannot be inferred..."
+
+**Root Cause:** MudBlazor v9+ is generic-first. Type inference fails for non-data-bound lists.
+
+**Fix:**
+
+```razor
+<!-- ❌ WRONG (v8 syntax) -->
+<MudList>
+    <MudListItem Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudListItem>
+    <MudListItem Icon="@Icons.Material.Filled.Search">Customer Search</MudListItem>
+</MudList>
+
+<!-- ✅ RIGHT (v9+ syntax) -->
+<MudList T="string">
+    <MudListItem T="string" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudListItem>
+    <MudListItem T="string" Icon="@Icons.Material.Filled.Search">Customer Search</MudListItem>
+</MudList>
+```
+
+**Impact:** All components using `MudList`, `MudListItem`, `MudTable`, `MudSelect`, and other generic MudBlazor components must specify `T` parameter.
+
+**When to Use What Type:**
+- Navigation lists (non-data-bound): `T="string"`
+- Data tables: `T="ProductDto"`, `T="OrderDto"`, etc.
+- Dropdowns: `T="string"` (for string values) or `T="ProductDto"` (for object binding)
+
+**Common MudBlazor Components Requiring Type Parameters:**
+
+| Component | Type Parameter | Example |
+|-----------|----------------|---------|
+| `MudList` | `T="string"` | Navigation menus |
+| `MudListItem` | `T="string"` | Individual nav items |
+| `MudTable` | `T="OrderDto"` | Data tables |
+| `MudSelect` | `T="string"` or `T="ProductDto"` | Dropdowns |
+| `MudAutocomplete` | `T="string"` or `T="CustomerDto"` | Autocomplete |
+| `MudChipSet` | `T="string"` | Chip collections |
+
+---
+
+### Reference Implementations
+
+**Backoffice E2E Tests (M32.1):**
+- **Fixture:** `tests/Backoffice/Backoffice.E2ETests/E2ETestFixture.cs` (3-server WASM pattern)
+- **Page Objects:** `LoginPage.cs` (tiered timeout strategy), `DashboardPage.cs` (test-id conventions)
+- **Features:** `Authentication.feature`, `CustomerService.feature`, `OperationsAlerts.feature`
+- **Test Data:** `WellKnownBackofficeTestData.cs`
+
+**Vendor Portal E2E Tests (Cycle 23):**
+- **Fixture:** `tests/Vendor Portal/VendorPortal.E2ETests/E2ETestFixture.cs`
+- **Page Objects:** `VendorLoginPage.cs`, `VendorDashboardPage.cs`
+- **Features:** `vendor-auth.feature`, `vendor-dashboard.feature`
+
+**Milestone Retrospectives:**
+- **M32.1 Session 16:** Tiered timeout strategy, hydration detection, auth/SignalR timing
+- **M32.1 Session 14-15:** Test-ID naming conventions, POM-first workflow
+- **M32.1 Session 6:** MudBlazor v9+ type parameters
+
+---

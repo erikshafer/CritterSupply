@@ -596,6 +596,291 @@ access to instance services:
 
 ---
 
+## Multi-Issuer JWT for Domain BCs (M32.1)
+
+Domain BCs (Product Catalog, Pricing, Inventory, Payments, etc.) need to accept JWT tokens from multiple identity providers — **Backoffice Identity** (internal admin), **Vendor Identity** (vendor portal), and potentially others. This enables single BC to serve multiple frontends without duplicating authorization logic.
+
+### Problem
+
+Before M32.1, domain BCs only accepted JWT from a single issuer. When Backoffice Phase 2 needed to call Pricing BC endpoints, Pricing had to add a second JWT scheme (Backoffice scheme) alongside the existing Vendor scheme.
+
+**Without multi-issuer support:**
+- Each BC needs custom code per issuer
+- Authorization policies duplicated
+- Testing complexity increases (multiple test fixtures per issuer)
+
+### Solution: Named JWT Schemes
+
+ASP.NET Core supports multiple JWT authentication schemes via named `AddJwtBearer()` calls. Domain BC Program.cs registers one scheme per identity provider:
+
+```csharp
+// Pricing.Api/Program.cs
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer("Backoffice", opts =>
+    {
+        opts.Authority = builder.Configuration["BackofficeIdentity:Authority"] ?? "http://localhost:5249";
+        opts.Audience = "backoffice-api";
+        opts.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true
+        };
+    })
+    .AddJwtBearer("Vendor", opts =>
+    {
+        opts.Authority = builder.Configuration["VendorIdentity:Authority"] ?? "http://localhost:5240";
+        opts.Audience = "vendor-api";
+        opts.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true
+        };
+    });
+
+// Authorization policies reference role claims (issuer-agnostic)
+builder.Services.AddAuthorization(opts =>
+{
+    opts.AddPolicy("PricingManager", policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireRole("pricing-manager"));  // Works for ANY issuer with this role
+
+    opts.AddPolicy("VendorPricing", policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireRole("vendor"));
+});
+```
+
+**Key Points:**
+1. **Default scheme:** `JwtBearerDefaults.AuthenticationScheme` (unnamed) is fallback
+2. **Named schemes:** `"Backoffice"`, `"Vendor"` are issuer-specific
+3. **Authority:** Each scheme validates tokens from a specific issuer (Backoffice: port 5249, Vendor: port 5240)
+4. **Audience:** Must match token's `aud` claim (`"backoffice-api"` or `"vendor-api"`)
+5. **Policies:** Role-based policies work across ALL issuers (role claim is standard)
+
+### Endpoint Configuration
+
+**Pattern 1: Default scheme (no attribute needed):**
+```csharp
+[WolverineGet("/api/pricing/products/{sku}")]
+[Authorize]  // Uses default JwtBearerDefaults.AuthenticationScheme (first registered)
+public static Task<ProductPriceDto> GetProductPrice(string sku, IPricingClient client)
+    => client.GetProductPrice(sku);
+```
+
+**Pattern 2: Explicit scheme (for issuer-specific endpoints):**
+```csharp
+[WolverinePost("/api/pricing/products/{sku}/base-price")]
+[Authorize(AuthenticationSchemes = "Backoffice", Policy = "PricingManager")]
+public static BasePriceSet SetBasePrice(string sku, SetBasePriceRequest request)
+{
+    return new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
+}
+```
+
+**Pattern 3: Multiple schemes (accepts tokens from ANY configured issuer):**
+```csharp
+[WolverineGet("/api/pricing/products/{sku}/history")]
+[Authorize(AuthenticationSchemes = "Backoffice,Vendor", Policy = "ViewPricing")]
+public static Task<PriceHistoryDto> GetPriceHistory(string sku, IPricingClient client)
+    => client.GetPriceHistory(sku);
+```
+
+### Configuration (appsettings.json)
+
+```json
+{
+  "BackofficeIdentity": {
+    "Authority": "http://localhost:5249"
+  },
+  "VendorIdentity": {
+    "Authority": "http://localhost:5240"
+  }
+}
+```
+
+**Environment-specific overrides:**
+- **Development:** Use `localhost` with fixed ports (5249, 5240)
+- **Docker Compose:** Use service names (`http://backofficeidentity:5249`, `http://vendoridentity:5240`)
+- **Production:** Use HTTPS with real domain names
+
+### Docker Compose Environment Variables
+
+```yaml
+# docker-compose.yml
+services:
+  pricing:
+    image: critter-pricing:latest
+    environment:
+      - BackofficeIdentity__Authority=http://backofficeidentity:5249
+      - VendorIdentity__Authority=http://vendoridentity:5240
+    ports:
+      - "5242:8080"
+```
+
+### JWT Claims Structure
+
+**Backoffice JWT (issued by BackofficeIdentity.Api):**
+```json
+{
+  "sub": "admin-user-123",
+  "email": "admin@critter.local",
+  "name": "System Admin",
+  "role": "system-admin",
+  "aud": "backoffice-api",
+  "iss": "http://localhost:5249",
+  "exp": 1678886400
+}
+```
+
+**Vendor JWT (issued by VendorIdentity.Api):**
+```json
+{
+  "sub": "vendor-user-456",
+  "email": "vendor@example.com",
+  "name": "Acme Pet Supply",
+  "role": "vendor",
+  "tenant_id": "tenant-789",
+  "aud": "vendor-api",
+  "iss": "http://localhost:5240",
+  "exp": 1678886400
+}
+```
+
+**Key Differences:**
+- **Issuer (`iss`):** Identifies which identity provider issued the token
+- **Audience (`aud`):** Identifies which API the token is intended for
+- **Role (`role`):** Standard claim used by authorization policies (issuer-agnostic)
+- **Tenant ID:** Vendor tokens have `tenant_id` claim for multi-tenancy; Backoffice tokens do not
+
+### Testing Multi-Issuer Endpoints
+
+**Integration test fixture must bypass ALL auth policies:**
+
+```csharp
+// Pricing.Api.IntegrationTests/TestFixture.cs
+public sealed class PricingTestFixture : WebApplicationFactory<Pricing.Api.Program>, IAsyncLifetime
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureServices(services =>
+        {
+            // Bypass ALL authorization policies (multi-policy BCs need all policies added)
+            services.AddAuthorization(opts =>
+            {
+                opts.AddPolicy("PricingManager", policy => policy.RequireAssertion(_ => true));
+                opts.AddPolicy("VendorPricing", policy => policy.RequireAssertion(_ => true));
+            });
+
+            // Configure Marten with test connection string
+            services.ConfigureMarten(o => o.Connection(_connectionString));
+        });
+    }
+}
+```
+
+**Alba test does not need JWT header (auth bypassed):**
+
+```csharp
+[Fact]
+public async Task SetBasePrice_WithValidRequest_ReturnsSuccess()
+{
+    // Arrange
+    var request = new SetBasePriceRequest("SKU123", 29.99m);
+
+    // Act — no Authorization header needed (policies bypassed in test fixture)
+    var result = await _fixture.Host
+        .PostJson($"/api/pricing/products/SKU123/base-price", request)
+        .StatusCodeShouldBe(200);
+}
+```
+
+### Common Pitfalls
+
+**❌ WRONG: Forgetting to add second scheme to existing BC:**
+```csharp
+// Domain BC only has Vendor scheme — Backoffice calls fail with 401 Unauthorized
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer("Vendor", opts => { /* ... */ });
+
+// Result: Backoffice JWT rejected (issuer mismatch)
+```
+
+**❌ WRONG: Mismatched audience claim:**
+```csharp
+// Pricing BC expects "backoffice-api" but BackofficeIdentity issues "pricing-api"
+opts.Audience = "backoffice-api";  // BC config
+
+// JWT from BackofficeIdentity.Api
+{
+  "aud": "pricing-api",  // Mismatch!
+  "iss": "http://localhost:5249"
+}
+
+// Result: 401 Unauthorized (audience validation fails)
+```
+
+**❌ WRONG: Test fixture only bypasses one policy:**
+```csharp
+// Pricing BC has 2 policies: PricingManager + VendorPricing
+services.AddAuthorization(opts =>
+{
+    opts.AddPolicy("PricingManager", policy => policy.RequireAssertion(_ => true));
+    // Missing VendorPricing policy!
+});
+
+// Result: Tests using VendorPricing policy fail with 403 Forbidden
+```
+
+**✅ RIGHT: All policies bypassed in test fixture:**
+```csharp
+services.AddAuthorization(opts =>
+{
+    opts.AddPolicy("PricingManager", policy => policy.RequireAssertion(_ => true));
+    opts.AddPolicy("VendorPricing", policy => policy.RequireAssertion(_ => true));
+    // Add ALL policies used by the BC
+});
+```
+
+### When to Use Multi-Issuer JWT
+
+**Use multi-issuer JWT when:**
+- Domain BC serves multiple frontends (Backoffice + Vendor Portal)
+- Role-based authorization policies are issuer-agnostic (same role claim name)
+- Each issuer has distinct audience claim (`backoffice-api` vs `vendor-api`)
+
+**Do NOT use multi-issuer JWT when:**
+- Single issuer sufficient (e.g., Backoffice-only BC)
+- BFF layer (Storefront, Backoffice, Vendor Portal) — BFF uses own identity provider only
+- Policies are issuer-specific (use `AuthenticationSchemes` attribute per endpoint)
+
+### Reference Implementations
+
+**Multi-Issuer Domain BCs (M32.1):**
+- **Product Catalog:** `src/Product Catalog/ProductCatalog.Api/Program.cs` (Backoffice + Vendor)
+- **Pricing:** `src/Pricing/Pricing.Api/Program.cs` (Backoffice + Vendor)
+- **Inventory:** `src/Inventory/Inventory.Api/Program.cs` (Backoffice + Vendor)
+- **Payments:** `src/Payments/Payments.Api/Program.cs` (Backoffice + Vendor)
+
+**Single-Issuer BFFs:**
+- **Backoffice:** `src/Backoffice/Backoffice.Api/Program.cs` (BackofficeIdentity only)
+- **Vendor Portal:** `src/Vendor Portal/VendorPortal.Api/Program.cs` (VendorIdentity only)
+- **Storefront:** `src/Customer Experience/Storefront.Api/Program.cs` (Session cookies, not JWT)
+
+**Test Fixtures:**
+- **Multi-policy bypass:** `tests/Pricing/Pricing.Api.IntegrationTests/TestFixture.cs`
+- **Single-policy bypass:** `tests/Inventory/Inventory.Api.IntegrationTests/TestFixture.cs`
+
+**Milestone Retrospectives:**
+- **M32.1 Sessions 1-3:** Multi-issuer JWT added to Product Catalog, Pricing, Inventory, Payments
+
+---
+
 ## Checklist: New Blazor WASM Feature
 
 - [ ] SDK is `Microsoft.NET.Sdk.BlazorWebAssembly` (not `Microsoft.NET.Sdk.Web`)

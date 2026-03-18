@@ -367,7 +367,252 @@ public async Task CreateOrderNote_ThenUpdateAsCreator_Returns200()
 4. **Inject `ITestAuthContext` into `TestAuthHandler`** for stable user ID
 5. **Document why stability matters** — prevents confusing 403 failures in authorization tests
 
+### Authorization Bypass for Policy-Based Endpoints (M32.1)
 
+**CRITICAL DISCOVERY (M32.1 Sessions 4-5):** Integration test fixtures must bypass **all** authorization policies defined in the API. Missing policies cause 403 Forbidden errors in tests even with valid test authentication.
+
+**Problem:** API endpoints protected by `[Authorize(Policy = "...")]` return 403 Forbidden in tests despite valid test authentication.
+
+**Symptom:**
+```csharp
+// API endpoint with policy requirement:
+[WolverinePost("/api/pricing/products/{sku}/base-price")]
+[Authorize(Policy = "PricingManager")]  // ← Requires policy authorization
+public static BasePriceSet Handle(string sku, SetBasePriceRequest request) { /* ... */ }
+
+// Test fails with 403 Forbidden:
+await _fixture.Host.Scenario(s =>
+{
+    s.Post.Json(request).ToUrl($"/api/pricing/products/{sku}/base-price");
+    s.StatusCodeShouldBe(200);  // ❌ FAILS! Returns 403 Forbidden
+});
+```
+
+**Root Cause:** Test authentication handler authenticates the user, but authorization policies are **not automatically bypassed**. ASP.NET Core checks policies independently from authentication.
+
+**Pattern: Single-Policy Bypass**
+
+For APIs with one authorization policy:
+
+```csharp
+public async Task InitializeAsync()
+{
+    await _postgres.StartAsync();
+    _connectionString = _postgres.GetConnectionString();
+
+    JasperFxEnvironment.AutoStartHost = true;
+
+    Host = await AlbaHost.For<Program>(builder =>
+    {
+        builder.ConfigureServices(services =>
+        {
+            services.ConfigureMarten(opts => opts.Connection(_connectionString));
+            services.DisableAllExternalWolverineTransports();
+
+            // Test authentication
+            services.AddSingleton<ITestAuthContext, TestAuthContext>();
+            services.AddAuthentication("Test")
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
+
+            // ✅ Authorization bypass: Add policy that always succeeds
+            services.AddAuthorization(opts =>
+            {
+                opts.AddPolicy("PricingManager", policy =>
+                    policy.RequireAssertion(_ => true));  // Always succeeds
+            });
+        });
+    });
+}
+```
+
+**Why This Works:**
+- `RequireAssertion(_ => true)` creates a policy that always succeeds
+- Test authentication provides valid identity (via `TestAuthHandler`)
+- Policy authorization passes (via always-true assertion)
+- Test can focus on business logic, not authorization rules
+
+**Pattern: Multi-Policy Bypass (M32.1 Critical Pattern)**
+
+**CRITICAL:** BCs with **multiple authorization policies** need **all policies** added to test fixture. Missing even one policy causes 403 Forbidden for endpoints using that policy.
+
+**Example from M32.1 (Backoffice.Api with 3 policies):**
+
+```csharp
+// Backoffice.Api has 3 authorization policies:
+[Authorize(Policy = "CustomerService")]  // Used by customer service endpoints
+[Authorize(Policy = "FinanceClerk")]     // Used by refund endpoints
+[Authorize(Policy = "BackofficeUser")]   // Used by general backoffice endpoints
+
+// ❌ WRONG: Only bypassing one policy
+services.AddAuthorization(opts =>
+{
+    opts.AddPolicy("CustomerService", policy => policy.RequireAssertion(_ => true));
+    // ❌ Missing FinanceClerk and BackofficeUser — tests for those endpoints return 403!
+});
+
+// ✅ CORRECT: Bypass ALL policies
+services.AddAuthorization(opts =>
+{
+    opts.AddPolicy("CustomerService", policy => policy.RequireAssertion(_ => true));
+    opts.AddPolicy("FinanceClerk", policy => policy.RequireAssertion(_ => true));
+    opts.AddPolicy("BackofficeUser", policy => policy.RequireAssertion(_ => true));
+});
+```
+
+**Real-World Example (Backoffice.Api TestFixture):**
+
+```csharp
+// File: tests/Backoffice/Backoffice.Api.IntegrationTests/BackofficeTestFixture.cs
+
+public class BackofficeTestFixture : IAsyncLifetime
+{
+    // ... (container + connection string setup)
+
+    public async Task InitializeAsync()
+    {
+        await _postgres.StartAsync();
+        _connectionString = _postgres.GetConnectionString();
+
+        JasperFxEnvironment.AutoStartHost = true;
+
+        Host = await AlbaHost.For<Program>(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                // Infrastructure
+                services.AddSingleton(new DbContextOptionsBuilder<BackofficeDbContext>()
+                    .UseNpgsql(_connectionString)
+                    .Options);
+                services.DisableAllExternalWolverineTransports();
+
+                // Test authentication (stable user ID)
+                services.AddSingleton<ITestAuthContext, TestAuthContext>();
+                services.AddAuthentication("Test")
+                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
+
+                // ✅ Authorization bypass for ALL 3 policies
+                services.AddAuthorization(opts =>
+                {
+                    opts.AddPolicy("CustomerService", policy =>
+                        policy.RequireAssertion(_ => true));
+
+                    opts.AddPolicy("FinanceClerk", policy =>
+                        policy.RequireAssertion(_ => true));
+
+                    opts.AddPolicy("BackofficeUser", policy =>
+                        policy.RequireAssertion(_ => true));
+                });
+            });
+        });
+
+        // Run migrations
+        await using var dbContext = new BackofficeDbContext(
+            Host.Services.GetRequiredService<DbContextOptions<BackofficeDbContext>>());
+        await dbContext.Database.MigrateAsync();
+    }
+}
+```
+
+**How to Discover All Policies:**
+
+1. **Search API project for `[Authorize(Policy = "...")]` attributes:**
+   ```bash
+   grep -r "Authorize(Policy" src/YourBC/YourBC.Api/
+   ```
+
+2. **Check Program.cs for policy definitions:**
+   ```csharp
+   // Look for AddPolicy calls:
+   builder.Services.AddAuthorization(opts =>
+   {
+       opts.AddPolicy("PricingManager", policy => ...);
+       opts.AddPolicy("FinanceClerk", policy => ...);
+   });
+   ```
+
+3. **List all unique policy names** and add bypass for each
+
+**Decision Matrix:**
+
+| BC Scenario | Auth Bypass Pattern | Example |
+|-------------|---------------------|---------|
+| **No authorization** | No bypass needed | Shopping BC (anonymous cart access) |
+| **Single policy** | Add one `RequireAssertion(_ => true)` | Pricing BC (`PricingManager` only) |
+| **Multiple policies** | Add bypass for **every** policy | Backoffice BC (3 policies: `CustomerService`, `FinanceClerk`, `BackofficeUser`) |
+| **Role-based (no policies)** | Use `TestAuthHandler` with roles | Vendor Portal BC (role claims in `TestAuthHandler`) |
+
+**Anti-Patterns:**
+
+**❌ ANTI-PATTERN 1: Partial Policy Bypass**
+```csharp
+// BC has 3 policies but only 2 are bypassed
+services.AddAuthorization(opts =>
+{
+    opts.AddPolicy("CustomerService", policy => policy.RequireAssertion(_ => true));
+    opts.AddPolicy("FinanceClerk", policy => policy.RequireAssertion(_ => true));
+    // ❌ Missing BackofficeUser — tests for general backoffice endpoints fail with 403!
+});
+```
+
+**❌ ANTI-PATTERN 2: Assuming Authentication = Authorization**
+```csharp
+// Test authentication is configured:
+services.AddAuthentication("Test")
+    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
+
+// ❌ WRONG: Assuming this bypasses policies
+// Reality: Policies are checked AFTER authentication — need explicit bypass!
+```
+
+**❌ ANTI-PATTERN 3: Copy-Paste Policy Bypass Without Verification**
+```csharp
+// Copied from another BC's TestFixture:
+services.AddAuthorization(opts =>
+{
+    opts.AddPolicy("PricingManager", policy => policy.RequireAssertion(_ => true));
+});
+
+// ❌ WRONG: Current BC doesn't use "PricingManager" policy!
+// Reality: BC uses "CustomerService" policy — copy-paste doesn't help
+```
+
+**Debugging Checklist:**
+
+1. **Test returns 403 Forbidden:**
+   - Check if endpoint has `[Authorize(Policy = "...")]` attribute
+   - Verify TestFixture includes bypass for that policy name
+   - Confirm policy name spelling matches exactly (case-sensitive)
+
+2. **Test passes locally but fails in CI:**
+   - Verify all policies are bypassed (not just the ones you tested locally)
+   - Check for recently added policies in API project
+   - Search for `[Authorize(Policy` in API project to find all policies
+
+3. **Multiple tests fail with 403:**
+   - Likely missing policy bypass (affects all endpoints using that policy)
+   - Add `Console.WriteLine` in TestFixture to log registered policies
+   - Compare logged policies vs. API project policy definitions
+
+**Key Learnings (M32.1 Sessions 4-5):**
+
+1. **Authentication ≠ Authorization**
+   - Test authentication proves "who you are" (identity)
+   - Authorization bypass proves "what you can do" (permissions)
+   - Both are required for policy-protected endpoints
+
+2. **Every Policy Needs Bypass**
+   - Forgetting one policy causes 403 for all endpoints using that policy
+   - No exceptions thrown — just silent 403 Forbidden responses
+   - Must discover all policies via code search or API inspection
+
+3. **Explicit Over Implicit**
+   - Better to list all policies explicitly (even if verbose)
+   - Copy-paste from another BC's TestFixture can introduce bugs
+   - Verify policy names match API project exactly
+
+**Reference:** [M32.1 Retrospective - Sessions 4-5 Warnings W2, W1](../../planning/milestones/m32.1-retrospective.md)
+
+---
 
 ### EF Core TestFixture Pattern
 
