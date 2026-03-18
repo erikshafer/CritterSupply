@@ -41,7 +41,19 @@ builder.Services.AddSingleton<TokenRefreshService>();
 builder.Services.AddSingleton<BackofficeHubService>();
 
 // Custom AuthenticationStateProvider (reads from BackofficeAuthState)
-builder.Services.AddAuthorizationCore();
+// Authorization policies matching ADR 0031 (Backoffice RBAC Model)
+// GOTCHA: In Blazor WASM, policies must be registered client-side for <AuthorizeView Policy="..." />
+// These match the role names in JWT claims issued by BackofficeIdentity.Api
+builder.Services.AddAuthorizationCore(opts =>
+{
+    opts.AddPolicy("CustomerService", policy => policy.RequireRole("cs-agent", "system-admin"));
+    opts.AddPolicy("Executive", policy => policy.RequireRole("executive", "system-admin"));
+    opts.AddPolicy("OperationsManager", policy => policy.RequireRole("operations-manager", "system-admin"));
+    opts.AddPolicy("WarehouseClerk", policy => policy.RequireRole("warehouse-clerk", "system-admin"));
+    opts.AddPolicy("PricingManager", policy => policy.RequireRole("pricing-manager", "system-admin"));
+    opts.AddPolicy("CopyWriter", policy => policy.RequireRole("copywriter", "system-admin"));
+    opts.AddPolicy("SystemAdmin", policy => policy.RequireRole("system-admin"));
+});
 builder.Services.AddScoped<AuthenticationStateProvider, BackofficeAuthStateProvider>();
 
 var app = builder.Build();
