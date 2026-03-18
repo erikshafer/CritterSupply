@@ -130,7 +130,7 @@ public static class LoginHandler
                 user.Email,
                 user.FirstName,
                 user.LastName,
-                user.Role.ToString()));
+                user.Role.ToRoleString()));
 
         return (response, null);
     }

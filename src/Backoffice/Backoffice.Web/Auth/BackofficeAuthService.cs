@@ -6,8 +6,21 @@ namespace Backoffice.Web.Auth;
 
 public sealed record LoginRequest(string Email, string Password);
 
+/// <summary>
+/// Matches the JSON response from BackofficeIdentity.Api's login endpoint.
+/// The API returns user info nested under the "user" property.
+/// </summary>
 public sealed record LoginResponse(
     string AccessToken,
+    DateTimeOffset ExpiresAt,
+    BackofficeUserInfoResponse User);
+
+/// <summary>
+/// Nested user info returned by the login endpoint.
+/// Role is kebab-case (e.g., "system-admin") to match JWT claims.
+/// </summary>
+public sealed record BackofficeUserInfoResponse(
+    Guid Id,
     string Email,
     string FirstName,
     string LastName,
@@ -54,7 +67,7 @@ public sealed class BackofficeAuthService
                 return false;
 
             var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
-            if (loginResponse is null)
+            if (loginResponse is null || loginResponse.User is null)
                 return false;
 
             var expiresAt = ParseTokenExpiry(loginResponse.AccessToken);
@@ -62,16 +75,16 @@ public sealed class BackofficeAuthService
 
             if (userId == Guid.Empty)
             {
-                _logger.LogError("Login response token is missing AdminUserId claim");
+                _logger.LogError("Login response token is missing sub (user ID) claim");
                 return false;
             }
 
             _authState.SetAuthenticated(
                 accessToken: loginResponse.AccessToken,
-                email: loginResponse.Email,
-                firstName: loginResponse.FirstName,
-                lastName: loginResponse.LastName,
-                role: loginResponse.Role,
+                email: loginResponse.User.Email,
+                firstName: loginResponse.User.FirstName,
+                lastName: loginResponse.User.LastName,
+                role: loginResponse.User.Role,
                 adminUserId: userId,
                 expiresAt: expiresAt);
 
@@ -151,12 +164,13 @@ public sealed class BackofficeAuthService
         {
             var handler = new JwtSecurityTokenHandler();
             var jwt = handler.ReadJwtToken(token);
-            var userIdStr = jwt.Claims.FirstOrDefault(c => c.Type == "AdminUserId")?.Value;
+            // JWT generator uses JwtRegisteredClaimNames.Sub ("sub") for user ID
+            var userIdStr = jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value;
 
             var userId = Guid.TryParse(userIdStr, out var u) ? u : Guid.Empty;
 
             if (userId == Guid.Empty)
-                _logger.LogWarning("Token is missing required AdminUserId claim");
+                _logger.LogWarning("Token is missing required sub (AdminUserId) claim");
 
             return userId;
         }

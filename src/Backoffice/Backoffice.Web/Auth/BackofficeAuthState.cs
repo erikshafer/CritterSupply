@@ -58,26 +58,27 @@ public sealed class BackofficeAuthState
     }
 
     // Role-based permissions (ADR 0031: Backoffice RBAC Model)
-    public bool IsSystemAdmin => Role == "SystemAdmin";
-    public bool IsExecutive => Role == "Executive";
-    public bool IsOperationsManager => Role == "OperationsManager";
-    public bool IsCustomerService => Role == "CustomerService";
-    public bool IsPricingManager => Role == "PricingManager";
-    public bool IsCopyWriter => Role == "CopyWriter";
-    public bool IsWarehouseClerk => Role == "WarehouseClerk";
-    public bool IsFinanceClerk => Role == "FinanceClerk";
+    // Role values are kebab-case to match JWT claims from BackofficeIdentity.Api (e.g. "system-admin")
+    public bool IsSystemAdmin => Role == "system-admin";
+    public bool IsExecutive => Role == "executive";
+    public bool IsOperationsManager => Role == "operations-manager";
+    public bool IsCustomerService => Role == "customer-service";
+    public bool IsPricingManager => Role == "pricing-manager";
+    public bool IsCopyWriter => Role == "copy-writer";
+    public bool IsWarehouseClerk => Role == "warehouse-clerk";
+    public bool IsFinanceClerk => Role == "finance-clerk";
 
     /// <summary>Human-readable display name for the role.</summary>
     public string RoleDisplayName => Role switch
     {
-        "SystemAdmin" => "System Admin",
-        "Executive" => "Executive",
-        "OperationsManager" => "Operations Manager",
-        "CustomerService" => "Customer Service",
-        "PricingManager" => "Pricing Manager",
-        "CopyWriter" => "Copywriter",
-        "WarehouseClerk" => "Warehouse Clerk",
-        "FinanceClerk" => "Finance Clerk",
+        "system-admin" => "System Admin",
+        "executive" => "Executive",
+        "operations-manager" => "Operations Manager",
+        "customer-service" => "Customer Service",
+        "pricing-manager" => "Pricing Manager",
+        "copy-writer" => "Copywriter",
+        "warehouse-clerk" => "Warehouse Clerk",
+        "finance-clerk" => "Finance Clerk",
         _ => Role ?? "Unknown"
     };
 }

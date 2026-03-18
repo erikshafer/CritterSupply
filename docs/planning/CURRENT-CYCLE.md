@@ -42,9 +42,9 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.1 — Backoffice Phase 2: Write Operations |
-| **Status** | 🚀 IN PROGRESS — Sessions 1-13 completed, 4 major E2E blockers fixed, 1 navigation issue remains |
+| **Status** | 🚀 IN PROGRESS — Sessions 1-15 completed, test-id conventions documented, E2E timeout investigation complete |
 | **Deliverables** | Blazor WASM frontend, write operations (Product Catalog, Pricing, Inventory), E2E tests |
-| **Next Session** | Session 14: Fix dashboard navigation + test-id mismatches, run full E2E suite |
+| **Next Session** | Session 16: Run single E2E scenario with tracing, fix timeouts, verify authentication suite |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
 *Last Updated: 2026-03-18*
@@ -180,12 +180,29 @@
 - ⚠️ Dashboard navigation still failing — test times out at URL check
 - ✅ Write Session 13 retrospective documenting major fixes + ongoing issue
 
-**Session 14 Goals:** (Next)
-- Fix dashboard navigation failure (diagnose timing/authorization issue)
-- Fix `LoginHandler` Line 133 to use `ToRoleString()` for consistency
-- Align Dashboard.razor test-ids with DashboardPage.cs expectations
-- Run full authentication feature test suite
-- Update E2E test documentation
+**Session 14 Goals:** ✅ COMPLETED (with test failures)
+- ✅ Fix `LoginHandler` Line 133 to use `ToRoleString()` for consistency
+- ✅ Align Dashboard.razor test-ids with DashboardPage.cs expectations (17 changes)
+- ✅ Add `realtime-connected` and `realtime-disconnected` test-id indicators
+- ✅ Add nested `kpi-value` test-ids to all KPI cards
+- ❌ Run full authentication feature suite (tests failed — needs debugging in Session 15)
+- ✅ Write comprehensive Session 14 retrospective
+- ✅ Update CURRENT-CYCLE.md
+
+**Session 15 Goals:** ✅ COMPLETED (with deferred E2E fixes)
+- ✅ Investigate E2E test failures (identified 4 root causes: WASM hydration, navigation, KPI rendering, SignalR connection timeouts)
+- ✅ Resolve Active Customers KPI mismatch (removed from DashboardPage.cs - not in M32.1 scope)
+- ⚠️ Run full authentication test suite (deferred to Session 16 - requires timeout fixes)
+- ✅ Document test-id conventions in e2e-playwright-testing.md (comprehensive naming guide added)
+- ✅ Write Session 15 retrospective
+- ✅ Update CURRENT-CYCLE.md
+
+**Session 16 Goals:** (Next)
+- Run single authentication scenario with Playwright tracing enabled
+- Fix dashboard navigation timing (add explicit auth state + MudBlazor hydration checks)
+- Reduce LoginPage timeout from 30s to 15s
+- Run full authentication feature suite successfully
+- Update E2E test documentation with timeout tuning guidance
 
 **References:**
 - [M32.1 Plan](./milestones/m32-1-backoffice-phase-2-plan.md)
@@ -203,6 +220,8 @@
 - [Session 11 Retrospective](./milestones/m32-1-session-11-retrospective.md)
 - [Session 12 Retrospective](./milestones/m32-1-session-12-retrospective.md)
 - [Session 13 Retrospective](./milestones/m32-1-session-13-retrospective.md)
+- [Session 14 Retrospective](./milestones/m32-1-session-14-retrospective.md)
+- [Session 15 Retrospective](./milestones/m32.1-session-15-retrospective.md)
 - [Backoffice Event Modeling](./backoffice-event-modeling-revised.md)
 - [Backoffice Frontend Design](./backoffice-frontend-design.md)
 - [Frontend Design Alignment Analysis](./backoffice-frontend-design-alignment-analysis.md)
