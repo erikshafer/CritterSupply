@@ -139,6 +139,8 @@ Recent work is concentrated in **Backoffice** (formerly Admin Portal), with M32.
 
 Use these issue drafts directly for milestone intake.
 
+**Decision update (2026-03-18):** Option A selected — keep M32.2 narrow (stabilization + UX hardening) and defer heavier write-ops/UI depth to M32.3.
+
 ### M32.2 backlog intake
 
 ```markdown

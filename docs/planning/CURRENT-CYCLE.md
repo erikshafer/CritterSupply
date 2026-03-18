@@ -41,9 +41,9 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M32.2 — Backoffice Phase 3: Advanced Write Operations (Planned) |
-| **Status** | 📋 PLANNING — M32.1 completed, next milestone scope TBD |
-| **Deliverables** | Scope split decision pending: M32.2 stabilization + UX hardening vs. defer write-ops UI to M32.3 |
+| **Current Milestone** | M32.2 — Backoffice Phase 3A: E2E/CI Stabilization + UX Hardening |
+| **Status** | ✅ Option A selected — M32.2 narrowed, heavier write-ops/UI depth deferred to M32.3 |
+| **Deliverables** | M32.2: stabilization + UX hardening backlog. M32.3: write-ops/UI depth and cross-BC dependent UX |
 | **Recent Completion** | M32.1 — Backoffice Phase 2: Blazor WASM + E2E Infrastructure (2026-03-18) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
@@ -53,10 +53,10 @@
 
 ## Active Milestone
 
-### 📋 M32.2: Backoffice Phase 3 — Scope Decision (Planning)
+### 🚀 M32.2: Backoffice Phase 3A — Option A Selected
 
-**Status:** 📋 **PLANNING** — backlog intake prepared, final split decision needed
-**Goal:** Confirm what ships in M32.2 vs. what is deferred to M32.3, then convert drafts to GitHub Issues
+**Status:** ✅ **DECIDED** — Option A selected by owner on 2026-03-18
+**Goal:** Execute narrow M32.2 scope (stabilization + UX hardening) and defer heavier write-ops/UI depth to M32.3
 
 **Current findings (2026-03-18):**
 - ✅ UX audit backlog has been converted to copy/paste issue drafts:
@@ -84,13 +84,14 @@
 - P2: Catalog/listings bootstrap/backfill UX states
 - Existing deferred Phase 3 items: Promotions management UI, CSV/Excel exports, bulk operations pattern, returns analytics dashboard, audit log viewer
 
-**Decision options:**
-1. **Option A (recommended):** Keep M32.2 narrow (stability + UX hardening), push heavier write-ops/UI depth to M32.3
-2. **Option B:** Pull one medium M32.3 item into M32.2 if stabilization work is completed early
-3. **Option C:** Push nearly all net-new UX work to M32.3 and keep M32.2 E2E/CI-only
+**Decision record:**
+- ✅ **Option A selected:** Keep M32.2 narrow (stability + UX hardening), push heavier write-ops/UI depth to M32.3
+- ⏸️ Option B/C not selected at this time
 
-**Next action to finalize scope:**
-- Decide Option A/B/C, then create GitHub Issues from the prepared drafts and assign milestone labels.
+**Next actions:**
+1. Create GitHub Issues from M32.2 drafts in `ux-audit-discovery-2026-03-18.md`
+2. Assign milestone labels (`M32.2` and `M32.3`) per the selected split
+3. Start M32.2 Session 1 with P0 authorization + dead-end route gating items
 
 ---
 
@@ -722,5 +723,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 ---
 
 *Document Last Updated: 2026-03-18*
-*Active Milestone: M32.2 (Backoffice Phase 3) — Planning and scope split decision in progress*
+*Active Milestone: M32.2 (Backoffice Phase 3A) — Option A selected, backlog intake in progress*
 *Update Policy: At milestone start, milestone end, and significant task changes*
