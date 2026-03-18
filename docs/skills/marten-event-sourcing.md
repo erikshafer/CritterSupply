@@ -267,128 +267,13 @@ public sealed record Cart(
 
 ### CritterSupply Conventions
 
-#### 1. Parameter Naming: Always `@event`
+**1. Parameter naming:** Always use `@event` (not `evt`, `e`, or other abbreviations). The `@` escapes the C# keyword.
 
-**✅ GOOD — Use `@event` for event parameters:**
-```csharp
-public ProductPrice Apply(InitialPriceSet @event) =>
-    this with
-    {
-        Status = PriceStatus.Published,
-        BasePrice = @event.Price
-    };
-```
+**2. Expression bodies:** Use `=>` for simple Apply methods; block bodies only for complex logic (e.g., dictionary manipulation).
 
-**❌ BAD — Do not use `evt`, `e`, or other abbreviations:**
-```csharp
-public ProductPrice Apply(InitialPriceSet evt) =>  // ❌ Wrong!
-    this with { BasePrice = evt.Price };
-```
+**3. No behavior in aggregates:** Aggregates contain immutable state + `Apply()` methods only. Business logic lives in handlers.
 
-**Why `@event`?**
-- `@` prefix escapes the C# keyword `event`
-- Consistent across the entire codebase
-- Self-documenting (clearly an event parameter)
-- Matches Marten and Wolverine documentation conventions
-
-#### 2. Expression Body Syntax for Apply Methods
-
-**✅ GOOD — Use expression bodies (`=>`):**
-```csharp
-public Checkout Apply(ShippingAddressProvided @event) =>
-    this with
-    {
-        ShippingAddress = new ShippingAddress(
-            @event.AddressLine1,
-            @event.AddressLine2,
-            @event.City,
-            @event.StateOrProvince,
-            @event.PostalCode,
-            @event.Country)
-    };
-```
-
-**❌ BAD — Do not use block bodies when expression bodies work:**
-```csharp
-public Checkout Apply(ShippingAddressProvided @event)
-{
-    return this with
-    {
-        ShippingAddress = new ShippingAddress(/* ... */)
-    };
-}
-```
-
-**Why expression bodies?**
-- More concise (less ceremony)
-- Emphasizes the pure function nature of Apply methods
-- Consistent with functional programming style
-- Used throughout the codebase (Cart, Checkout, ProductPrice, etc.)
-
-**Exception:** Use block bodies when you need temporary variables (e.g., `Cart.Apply(ItemAdded)` with dictionary manipulation).
-
-#### 3. No Behavior in Aggregates
-
-**Aggregates only contain:**
-- Immutable state (properties)
-- `Create()` factory method (for Marten stream initialization)
-- `Apply()` methods (pure state transformations)
-- Derived properties (computed from state, no side effects)
-
-**Aggregates do NOT contain:**
-- ❌ Business logic / decision logic
-- ❌ Side effects (HTTP calls, database writes, logging)
-- ❌ Validation logic
-- ❌ Command handling logic
-
-**✅ GOOD — Aggregate only applies events:**
-```csharp
-public sealed record ProductPrice(
-    Guid Id,
-    string Sku,
-    PriceStatus Status,
-    Money? BasePrice,
-    DateTimeOffset RegisteredAt)
-{
-    public static ProductPrice Create(string sku, DateTimeOffset registeredAt) =>
-        new ProductPrice
-        {
-            Id = StreamId(sku),
-            Sku = sku.ToUpperInvariant(),
-            Status = PriceStatus.Unpriced,
-            RegisteredAt = registeredAt
-        };
-
-    public ProductPrice Apply(InitialPriceSet @event) =>
-        this with
-        {
-            Status = PriceStatus.Published,
-            BasePrice = @event.Price
-        };
-}
-```
-
-**❌ BAD — Do not put business logic in aggregates:**
-```csharp
-public sealed record ProductPrice(/* ... */)
-{
-    // ❌ WRONG — validation belongs in handlers or validators
-    public ProductPrice SetPrice(Money newPrice)
-    {
-        if (newPrice.Amount <= 0)
-            throw new InvalidOperationException("Price must be positive");
-
-        if (newPrice.Amount < FloorPrice?.Amount)
-            throw new InvalidOperationException("Price below floor");
-
-        return this with { BasePrice = newPrice };
-    }
-}
-```
-
-#### 4. Static vs Instance Methods
-
-**Current convention: Prefer instance methods for consistency.**
+**4. Instance methods:** Prefer instance `Apply()` methods for consistency across the codebase.
 
 Both patterns are valid in C#:
 
@@ -1026,135 +911,32 @@ public static UpdatedAggregate<XAccount> Handle(
 }
 ```
 
-#### 5. `IStartStream` (New Aggregate) — ⚠️ **CRITICAL: Required for Stream Creation**
+#### 5. `IStartStream` — ⚠️ **CRITICAL for New Streams**
 
-**IMPORTANT:** Handlers that create new event streams MUST return `IStartStream` from `MartenOps.StartStream()`. Direct `session.Events.StartStream()` usage DOES NOT enroll in Wolverine's transactional middleware and events will not be persisted.
+**Rule:** Handlers creating new streams MUST return `IStartStream` from `MartenOps.StartStream()`. Direct `session.Events.StartStream()` bypasses transactional middleware and events are NOT persisted.
 
-**✅ CORRECT — Return IStartStream:**
+**✅ CORRECT:**
 ```csharp
 [WolverinePost("/api/carts")]
-public static (IStartStream, CreationResponse) Handle(InitializeCart command)
+public static (CreationResponse, IStartStream) Handle(InitializeCart cmd)
 {
     var cartId = Guid.CreateVersion7();
-    var @event = new CartInitialized(
-        cartId,
-        command.CustomerId,
-        command.SessionId,
-        DateTimeOffset.UtcNow);
-
-    // ✅ CORRECT: Return IStartStream from MartenOps.StartStream()
-    var stream = MartenOps.StartStream<Cart>(cartId, @event);
-    return (stream, new CreationResponse($"/api/carts/{cartId}"));
+    var stream = MartenOps.StartStream<Cart>(cartId, new CartInitialized(/* ... */));
+    return (new CreationResponse($"/api/carts/{cartId}"), stream);
 }
 ```
 
-**❌ ANTI-PATTERN — Direct session usage (does NOT persist):**
-```csharp
-[WolverinePost("/api/carts")]
-public static CreationResponse Handle(InitializeCart command, IDocumentSession session)
-{
-    var cartId = Guid.CreateVersion7();
-    var @event = new CartInitialized(/* ... */);
-
-    // ❌ WRONG: Direct session usage does NOT enroll in transactional middleware
-    session.Events.StartStream<Cart>(cartId, @event);
-
-    // Events are NOT persisted — no transaction enrolled!
-    return new CreationResponse($"/api/carts/{cartId}");
-}
-```
-
-**Tuple return order matters:**
-- First element: Response object (e.g., `CreationResponse`, `SetPriceResult`)
-- Second element: `IStartStream` (Wolverine uses this to enroll transaction)
-
-**Example with multiple return values:**
-```csharp
-public static (SetPriceResult, IStartStream) Handle(SetPrice cmd)
-{
-    var streamId = ProductPrice.StreamId(cmd.Sku);
-    var @event = new InitialPriceSet(/* ... */);
-
-    var stream = MartenOps.StartStream<ProductPrice>(streamId, @event);
-    var result = new SetPriceResult(streamId);
-
-    // Response first, IStartStream second
-    return (result, stream);
-}
-```
+**Note:** HTTP response MUST be first in tuple.
 
 ### Aggregate Loading Attributes
 
-| Attribute | Purpose | When to Use |
-|-----------|---------|-------------|
-| `[WriteAggregate]` | Load aggregate, append events, save | Command handlers that modify aggregate |
-| `[ReadAggregate]` | Load aggregate read-only (no save) | Queries, read-only operations |
-| `[AggregateHandler]` | Class-level attribute for aggregate workflow | Single-stream handlers (less common than `[WriteAggregate]`) |
+| Attribute | Purpose |
+|-----------|---------|
+| `[WriteAggregate]` | Load, modify, save |
+| `[ReadAggregate]` | Load read-only |
+| `[AggregateHandler]` | Class-level (less common) |
 
-**Examples:**
-
-```csharp
-// Load aggregate by ID from command property
-public static Events Handle(
-    ChangePrice command, // command.ProductPriceId
-    [WriteAggregate] ProductPrice productPrice) // Loaded by command.ProductPriceId
-{
-    // Wolverine convention: command.{AggregateType}Id or command.Id
-    return [new PriceChanged(/* ... */)];
-}
-
-// Explicit ID mapping
-public static Events Handle(
-    ApproveReturn command, // command.ReturnId (not command.Id)
-    [WriteAggregate(nameof(ApproveReturn.ReturnId))] Return @return)
-{
-    return [new ReturnApproved(/* ... */)];
-}
-
-// Multiple aggregates
-public static void Handle(
-    TransferFunds command,
-    [WriteAggregate(nameof(TransferFunds.FromAccountId))] Account fromAccount,
-    [WriteAggregate(nameof(TransferFunds.ToAccountId))] Account toAccount)
-{
-    // Append events to both streams
-}
-```
-
-### IEventStream\<T\> (Advanced)
-
-For fine-grained control over event appending:
-
-```csharp
-[AggregateHandler]
-public static void Handle(
-    MarkItemReady command,
-    IEventStream<Order> stream)
-{
-    var order = stream.Aggregate; // Current state
-
-    if (order.Items.TryGetValue(command.ItemName, out var item))
-    {
-        item.Ready = true;
-        stream.AppendOne(new ItemReady(command.ItemName));
-    }
-
-    if (order.IsReadyToShip())
-    {
-        stream.AppendOne(new OrderReady());
-    }
-}
-```
-
-**Use `IEventStream<T>` when:**
-- You need to inspect aggregate state before appending
-- Conditional event appending based on current state
-- Multiple events appended in sequence
-
-**Prefer `[WriteAggregate]` + return `Events` when:**
-- Simple one-to-one command → event mapping
-- Clearer intent (pure function style)
-- Easier to test (no Marten dependency in test)
+**ID Convention:** Wolverine looks for `command.{AggregateType}Id` or `command.Id`. Use `[WriteAggregate(nameof(cmd.FieldName))]` for custom mapping.
 
 ---
 
