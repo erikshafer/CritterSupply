@@ -135,6 +135,255 @@ Recent work is concentrated in **Backoffice** (formerly Admin Portal), with M32.
    - P1 #8 Product discontinuation pre-flight and grouped cascade notification
    - P2 #9/#10 if capacity permits
 
+## Drop-in backlog entries (copy/paste into GitHub Issues)
+
+Use these issue drafts directly for milestone intake.
+
+### M32.2 backlog intake
+
+```markdown
+Title: [Backoffice][P0] Fix Alerts authorization role mismatch
+
+Labels: bc:backoffice, type:bug, priority:high, status:backlog, ux
+Milestone: M32.2
+
+Body:
+## Description
+Align `/alerts` authorization attributes with existing Backoffice policy role vocabulary.
+
+## Overlap
+- Overlaps deferred/follow-up stabilization concerns from M32.1: **Partial**
+- Classification: **P0 UX hardening**
+
+## Acceptance Criteria
+- [ ] `[Authorize]` role strings for Alerts route match configured role names (`warehouse-clerk`, `operations-manager`, `system-admin`).
+- [ ] WarehouseClerk role can access `/alerts`.
+- [ ] Unauthorized roles are rejected.
+- [ ] Add/update auth-focused test coverage for the route.
+
+## Effort
+0.5-1 session
+```
+
+```markdown
+Title: [Backoffice][P0] Add alert acknowledgment UX in Alerts page
+
+Labels: bc:backoffice, type:feature, priority:high, status:backlog, ux
+Milestone: M32.2
+
+Body:
+## Description
+Complete operator alert workflow by adding in-list acknowledge action and resilient state handling.
+
+## Overlap
+- Overlaps deferred M32.1 scope: **No (net-new UX hardening)**
+- Classification: **P0**
+
+## Acceptance Criteria
+- [ ] Actionable alert rows expose an **Acknowledge** control.
+- [ ] UI invokes `POST /api/backoffice/alerts/{alertId}/acknowledge`.
+- [ ] Successful acknowledgment updates row state without full-page refresh.
+- [ ] `409 already acknowledged` is handled with non-blocking feedback.
+
+## Effort
+1 session
+```
+
+```markdown
+Title: [Backoffice][P0] Implement session-expired recovery UX
+
+Labels: bc:backoffice, type:feature, priority:high, status:backlog, ux
+Milestone: M32.2
+
+Body:
+## Description
+Replace snackbar-only auth-expiry handling with explicit recovery UX that preserves user workflow context.
+
+## Overlap
+- Overlaps deferred/follow-up stabilization concerns from M32.1: **Partial**
+- Classification: **P0 UX reliability**
+
+## Acceptance Criteria
+- [ ] Expired session/token-refresh failure shows a clear blocking expired-session state.
+- [ ] Re-auth flow returns user to prior route/context when possible.
+- [ ] 401 handling no longer depends on transient snackbar-only messaging.
+
+## Effort
+1 session
+```
+
+```markdown
+Title: [Backoffice][P0] Standardize network/conflict/retry UX states
+
+Labels: bc:backoffice, type:feature, priority:high, status:backlog, ux
+Milestone: M32.2
+
+Body:
+## Description
+Implement shared persistent UX patterns for network outage, conflict resolution, and retry actions across key Backoffice views.
+
+## Overlap
+- Overlaps deferred/follow-up stabilization concerns from M32.1: **Partial**
+- Classification: **P0 UX reliability**
+
+## Acceptance Criteria
+- [ ] Network-disconnected state is persistent and visible until recovery.
+- [ ] 409 conflict state is displayed as persistent inline/banner UI with a clear recovery action.
+- [ ] Dashboard, Alerts, and Search views expose explicit retry action(s) after failed fetch.
+- [ ] Add/extend E2E scenario coverage for at least one conflict/retry path.
+
+## Effort
+1-2 sessions
+```
+
+```markdown
+Title: [Backoffice][P1] Gate or replace dead-end navigation routes
+
+Labels: bc:backoffice, type:feature, priority:medium, status:backlog, ux
+Milestone: M32.2
+
+Body:
+## Description
+Prevent user dead ends by gating unimplemented routes (for example `/customers/{id}`, `/admin`) or replacing with explicit placeholders.
+
+## Overlap
+- Overlaps deferred M32.1 scope: **No (net-new UX hardening)**
+- Classification: **P1**
+
+## Acceptance Criteria
+- [ ] No primary nav item or main CTA routes to an unimplemented page without explicit placeholder handling.
+- [ ] Placeholder routes include “not yet available” context and safe next-step action.
+- [ ] Route visibility remains role-aware.
+
+## Effort
+0.5-1 session
+```
+
+```markdown
+Title: [Backoffice][P1] Add data freshness indicators to operator views
+
+Labels: bc:backoffice, type:feature, priority:medium, status:backlog, ux
+Milestone: M32.2
+
+Body:
+## Description
+Improve operator confidence in eventual consistency by surfacing freshness and updating states in composed views.
+
+## Overlap
+- Overlaps deferred M32.1 scope: **No (net-new UX hardening)**
+- Classification: **P1**
+
+## Acceptance Criteria
+- [ ] Dashboard and Alerts display last refresh/update timestamp.
+- [ ] UI indicates “updating” vs “stale” after writes/reconnects.
+- [ ] Add at least one E2E scenario validating stale/reconnect messaging behavior.
+
+## Effort
+1 session
+```
+
+### M32.3 backlog intake
+
+```markdown
+Title: [Product Catalog][P1] Product History tab with significance filtering
+
+Labels: bc:product-catalog, bc:backoffice, type:feature, priority:medium, status:backlog, ux
+Milestone: M32.3
+
+Body:
+## Description
+Deliver operator-facing event history for products with default significant-only visibility and optional full history.
+
+## Overlap
+- Overlaps deferred M32.1 write-operations/UI scope: **Yes (direct)**
+- Classification: **P1 (ES-dependent)**
+
+## Dependencies
+- Product Catalog event-sourcing migration and history projection availability.
+
+## Acceptance Criteria
+- [ ] Product admin UI includes a Product History tab.
+- [ ] Default filter is “Significant changes only,” with an “All changes” option.
+- [ ] Each history row includes actor, timestamp, event label, and field-level summary/diff.
+- [ ] `ProductMigrated` (bootstrap/system noise) is excluded from default view.
+
+## Effort
+2 sessions
+```
+
+```markdown
+Title: [Product Catalog][P1] Add discontinuation pre-flight impact UX + grouped notifications
+
+Labels: bc:product-catalog, bc:listings, bc:marketplaces, bc:backoffice, type:feature, priority:medium, status:backlog, ux
+Milestone: M32.3
+
+Body:
+## Description
+Add safety rails for high-impact catalog actions by presenting marketplace/listing impact before confirmation and summarizing outcomes after completion.
+
+## Overlap
+- Overlaps deferred M32.1 write-operations/UI scope: **Yes (direct)**
+- Classification: **P1 (cross-BC dependency)**
+
+## Dependencies
+- Listings/Marketplaces impact-count query.
+- Grouped post-action notification model/event.
+
+## Acceptance Criteria
+- [ ] Discontinue action requires user confirmation after pre-flight impact summary (counts by marketplace/listing).
+- [ ] Post-action feedback is grouped into an operator-readable summary (not toast-per-item spam).
+- [ ] UX copy clearly communicates business/operational impact.
+
+## Effort
+2 sessions
+```
+
+```markdown
+Title: [Backoffice][P2] Operator terminology consistency pass across core screens
+
+Labels: bc:backoffice, type:documentation, priority:low, status:backlog, ux
+Milestone: M32.3
+
+Body:
+## Description
+Run terminology and copy consistency pass to reduce operator confusion across dashboard, alerts, and support workflows.
+
+## Overlap
+- Overlaps deferred M32.1 scope: **No**
+- Classification: **P2**
+
+## Acceptance Criteria
+- [ ] Shared glossary is documented and referenced by Backoffice UI copy.
+- [ ] High-traffic screens apply glossary terms consistently.
+- [ ] Any intentionally divergent terms are documented with rationale.
+
+## Effort
+0.5 session
+```
+
+```markdown
+Title: [Backoffice][P2] Catalog/Listings bootstrap and backfill UX states
+
+Labels: bc:backoffice, bc:product-catalog, type:feature, priority:low, status:backlog, ux
+Milestone: M32.3
+
+Body:
+## Description
+Clarify transitional data states during catalog/listings projection bootstrap and backfill.
+
+## Overlap
+- Overlaps deferred M32.1 scope: **Partial**
+- Classification: **P2**
+
+## Acceptance Criteria
+- [ ] Empty or partial data states explicitly indicate bootstrap/backfill in progress.
+- [ ] Operator-facing next steps are shown (retry, refresh, or expected completion guidance).
+- [ ] No ambiguous “missing data” messaging remains in affected views.
+
+## Effort
+1 session
+```
+
 ## Product Catalog: target UX for full event sourcing
 
 The minimum viable operator UX for a fully event-sourced catalog should include:
