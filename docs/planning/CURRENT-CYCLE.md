@@ -41,9 +41,9 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M32.2 — Backoffice Phase 3: Advanced Write Operations (Planned) |
-| **Status** | 📋 PLANNING — M32.1 completed, next milestone scope TBD |
-| **Deliverables** | TBD (likely: Promotions management, bulk operations, advanced CS tools) |
+| **Current Milestone** | M32.2 — Backoffice Phase 3A: E2E/CI Stabilization + UX Hardening |
+| **Status** | ✅ Option A selected — M32.2 narrowed, heavier write-ops/UI depth deferred to M32.3 |
+| **Deliverables** | M32.2: stabilization + UX hardening backlog. M32.3: write-ops/UI depth and cross-BC dependent UX |
 | **Recent Completion** | M32.1 — Backoffice Phase 2: Blazor WASM + E2E Infrastructure (2026-03-18) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
@@ -52,6 +52,50 @@
 ---
 
 ## Active Milestone
+
+### 🚀 M32.2: Backoffice Phase 3A — Option A Selected
+
+**Status:** ✅ **DECIDED** — Option A selected by owner on 2026-03-18
+**Goal:** Execute narrow M32.2 scope (stabilization + UX hardening) and defer heavier write-ops/UI depth to M32.3
+
+**Current findings (2026-03-18):**
+- ✅ UX audit backlog has been converted to copy/paste issue drafts:
+  - `docs/planning/ux-audit-discovery-2026-03-18.md` → “Drop-in backlog entries”
+- ✅ M32.1 retrospective already recommends:
+  - M32.2 focus on E2E stabilization
+  - Write-operations UI deferred to M32.3+
+- ✅ No existing `m32.2*` / `m32.3*` milestone plan files found under `docs/planning/milestones/`
+- ✅ No existing GitHub Issues currently assigned to milestone `M32.2` or `M32.3`
+
+**Proposed backlog intake split:**
+
+**Candidate for M32.2 (stabilization + UX hardening):**
+- P0: Alerts authorization role mismatch
+- P0: Alert acknowledgment UX
+- P0: Session-expired recovery UX
+- P0: Network/conflict/retry state standardization
+- P1: Dead-end route gating/replacement
+- P1: Data freshness indicators
+
+**Candidate for M32.3 (write-ops/UI depth + cross-BC dependencies):**
+- P1: Product history tab with significance filtering (event-sourcing dependent)
+- P1: Discontinuation pre-flight impact + grouped notification UX (Listings/Marketplaces dependency)
+- P2: Operator terminology consistency pass
+- P2: Catalog/listings bootstrap/backfill UX states
+- Existing deferred Phase 3 items: Promotions management UI, CSV/Excel exports, bulk operations pattern, returns analytics dashboard, audit log viewer
+
+**Decision record:**
+- ✅ **Option A selected:** Keep M32.2 narrow (stability + UX hardening), push heavier write-ops/UI depth to M32.3
+- ⏸️ Option B/C not selected at this time
+
+**Next actions:**
+1. Create GitHub Issues from M32.2 drafts in `ux-audit-discovery-2026-03-18.md`
+2. Assign milestone labels (`M32.2` and `M32.3`) per the selected split
+3. Start M32.2 Session 1 with P0 authorization + dead-end route gating items
+
+---
+
+### M32.1 Historical Detail (to be condensed after M32.2 kickoff)
 
 ### 🚀 M32.1: Backoffice Phase 2 — Write Operations
 
@@ -227,6 +271,7 @@
 - [Session 13 Retrospective](./milestones/m32-1-session-13-retrospective.md)
 - [Session 14 Retrospective](./milestones/m32-1-session-14-retrospective.md)
 - [Session 15 Retrospective](./milestones/m32.1-session-15-retrospective.md)
+- [UX Audit Discovery (includes M32.2/M32.3 issue drafts)](./ux-audit-discovery-2026-03-18.md) ⭐ **NEW**
 - [Backoffice Event Modeling](./backoffice-event-modeling-revised.md)
 - [Backoffice Frontend Design](./backoffice-frontend-design.md)
 - [Frontend Design Alignment Analysis](./backoffice-frontend-design-alignment-analysis.md)
@@ -630,12 +675,16 @@
 
 ### Next 3-4 Milestones
 
-- **M32.0+:** Backoffice Phase 1 — Read-Only Dashboards
-  - Prerequisites: Multi-issuer JWT (M31.5), endpoint gaps closed (M31.5)
-  - Read-only dashboards: Orders, Returns, Customers, Inventory
-  - Customer Service tooling: Return approval/denial, correspondence history
-  - Event Modeling: [backoffice-event-modeling-revised.md](backoffice-event-modeling-revised.md)
-  - Integration Gap Register: [backoffice-integration-gap-register.md](backoffice-integration-gap-register.md)
+- **M32.2 (planned):** Backoffice Phase 3A — E2E/CI stabilization + UX hardening
+  - Finish E2E stability work and CI integration
+  - Execute P0/P1 UX hardening backlog from UX audit issue drafts
+  - Keep scope intentionally narrow; avoid large cross-BC dependencies
+
+- **M32.3 (planned):** Backoffice Phase 3B — write-ops depth + cross-BC UX
+  - Product/pricing/warehouse/user-management UI depth
+  - Product history significance filtering (event-sourcing dependent)
+  - Discontinuation pre-flight impact + grouped notifications (Listings/Marketplaces dependency)
+  - Deeper operator tooling (bulk operations, exports, audit/analytics views)
 
 ### Future BCs (Priority Roadmap)
 
@@ -673,6 +722,6 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Document Last Updated: 2026-03-17*
-*Active Milestone: M32.1 (Backoffice Phase 2) — Sessions 1-3 Completed (Gap Closure Phase Complete)*
+*Document Last Updated: 2026-03-18*
+*Active Milestone: M32.2 (Backoffice Phase 3A) — Option A selected, backlog intake in progress*
 *Update Policy: At milestone start, milestone end, and significant task changes*
