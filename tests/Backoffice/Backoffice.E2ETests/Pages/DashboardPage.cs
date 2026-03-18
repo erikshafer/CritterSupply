@@ -22,7 +22,7 @@ public sealed class DashboardPage
     private ILocator RevenueCard => _page.GetByTestId("kpi-revenue");
     private ILocator PendingReturnsCard => _page.GetByTestId("kpi-pending-returns");
     private ILocator LowStockAlertsCard => _page.GetByTestId("kpi-low-stock-alerts");
-    private ILocator ActiveCustomersCard => _page.GetByTestId("kpi-active-customers");
+    // Note: Active Customers KPI removed - not in M32.1 scope (deferred to Phase 3+)
 
     // Locators - Navigation
     private ILocator CustomerServiceLink => _page.GetByTestId("nav-customer-service");
@@ -92,11 +92,7 @@ public sealed class DashboardPage
         return await valueLocator.TextContentAsync();
     }
 
-    public async Task<string?> GetActiveCustomersValueAsync()
-    {
-        var valueLocator = ActiveCustomersCard.Locator("[data-testid='kpi-value']");
-        return await valueLocator.TextContentAsync();
-    }
+    // Note: GetActiveCustomersValueAsync removed - Active Customers KPI not in M32.1 scope
 
     // Assertions - Real-time
     public async Task<bool> IsRealtimeConnectedAsync()
