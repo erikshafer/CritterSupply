@@ -560,20 +560,14 @@ Wolverine interprets return values from `Handle()` methods to determine what to 
 | `UpdatedAggregate` or `UpdatedAggregate<T>` | Return updated aggregate state |
 | `void` | No events, no messages |
 
-### Pattern 1: Single Event
+### Pattern 1: Events (Single or Multiple)
 
 ```csharp
+// Single event
 public static Events Handle(ConfirmOrder cmd, [WriteAggregate] Order order)
-{
-    return [new OrderConfirmed(order.Id, DateTimeOffset.UtcNow)];
-}
-```
+    => [new OrderConfirmed(order.Id, DateTimeOffset.UtcNow)];
 
-**Wolverine automatically appends `OrderConfirmed` to the `Order` stream.**
-
-### Pattern 2: Multiple Events
-
-```csharp
+// Multiple events
 public static IEnumerable<object> Handle(CompleteCheckout cmd, [WriteAggregate] Checkout checkout)
 {
     yield return new ShippingAddressProvided(cmd.Address);
@@ -582,9 +576,7 @@ public static IEnumerable<object> Handle(CompleteCheckout cmd, [WriteAggregate] 
 }
 ```
 
-**All events appended in order to the `Checkout` stream.**
-
-### Pattern 3: Events + Integration Messages
+### Pattern 2: Events + Integration Messages
 
 ```csharp
 public static (Events, OutgoingMessages) Handle(
@@ -603,280 +595,74 @@ public static (Events, OutgoingMessages) Handle(
 
 **Events appended to stream, integration message published to RabbitMQ.**
 
-### Pattern 4: Start New Stream (Message Handler)
+### Pattern 3: Start New Stream
 
-**⚠️ CRITICAL:** Handlers that create new event streams **MUST return `IStartStream`** from `MartenOps.StartStream()`. Direct `session.Events.StartStream()` usage does **NOT** enroll in Wolverine's transactional middleware and events will **NOT** be persisted.
+**⚠️ CRITICAL:** Handlers that create new event streams **MUST return `IStartStream`** from `MartenOps.StartStream()`.
 
-**✅ CORRECT — Return IStartStream:**
-
+**Message Handler:**
 ```csharp
 public static IStartStream Handle(StartPayment cmd)
 {
     var paymentId = Guid.CreateVersion7();
     var initiated = new PaymentInitiated(paymentId, cmd.OrderId, cmd.Amount);
-
-    // ✅ CORRECT: Return IStartStream from MartenOps.StartStream()
     return MartenOps.StartStream<Payment>(paymentId, initiated);
 }
 ```
-
-**❌ ANTI-PATTERN — Direct session usage (does NOT persist):**
-
-```csharp
-public static void Handle(StartPayment cmd, IDocumentSession session)
-{
-    var paymentId = Guid.CreateVersion7();
-    var initiated = new PaymentInitiated(paymentId, cmd.OrderId, cmd.Amount);
-
-    // ❌ WRONG: Direct session usage does NOT enroll in transactional middleware
-    session.Events.StartStream<Payment>(paymentId, initiated);
-
-    // Events are NOT persisted — no transaction enrolled!
-}
-```
-
-**Why this matters:**
-- `MartenOps.StartStream()` returns `IStartStream` which Wolverine recognizes as a side effect to persist
-- Direct `session.Events.StartStream()` bypasses Wolverine's transactional middleware entirely
-- Without `IStartStream` return, events appear to succeed but are silently discarded
-- This pattern is **REQUIRED**, not optional — see `docs/skills/marten-event-sourcing.md` for full explanation
-
-**Wolverine creates a new `Payment` stream with the `PaymentInitiated` event.**
-
-### Pattern 5: Start New Stream (HTTP Endpoint)
-
-**⚠️ CRITICAL:** HTTP endpoints that create new streams **MUST return `IStartStream`** in the tuple. The tuple order is critical: `(CreationResponse, IStartStream)` — HTTP response MUST be first.
 
 ```csharp
 [WolverinePost("/api/carts")]
 public static (CreationResponse<Guid>, IStartStream) Handle(InitializeCart cmd)
 {
     var cartId = Guid.CreateVersion7();
-    var @event = new CartInitialized(cmd.CustomerId, cmd.SessionId);
-
-    // ✅ CORRECT: Return IStartStream from MartenOps.StartStream()
-    var stream = MartenOps.StartStream<Cart>(cartId, @event);
-
-    // CRITICAL: CreationResponse MUST be first in tuple!
-    var response = new CreationResponse<Guid>($"/api/carts/{cartId}", cartId);
-    return (response, stream);
+    var stream = MartenOps.StartStream<Cart>(cartId, new CartInitialized(cmd.CustomerId));
+    return (new CreationResponse<Guid>($"/api/carts/{cartId}", cartId), stream);
 }
 ```
 
-**⚠️ CRITICAL: HTTP Response Must Be First**
+**⚠️ Tuple Order:** HTTP response MUST be first: `(CreationResponse, IStartStream)` not `(IStartStream, CreationResponse)`
 
-In Wolverine HTTP handlers, **the FIRST item in a return tuple is ALWAYS the HTTP response**.
-
-**Correct order:**
-- ✅ `(CreationResponse, IStartStream)` → Returns 201 Created with JSON body
-- ✅ `(UpdatedAggregate, Events)` → Returns 200 OK with aggregate state
-- ✅ `(IResult, Events)` → Returns custom HTTP response
-
-**Wrong order (common mistakes):**
-- ❌ `(IStartStream, CreationResponse)` → Returns 204 No Content (no body!)
-- ❌ `(Events, CreationResponse)` → Returns 200 OK with EVENT as JSON (not CreationResponse!)
-
-**Why this happens:**
-Wolverine serializes the first tuple element as the response body. All other elements are treated as side effects (events to append, messages to publish, etc.).
-
-**See also:** `docs/skills/marten-event-sourcing.md` for detailed explanation of IStartStream requirements and AutoApplyTransactions() policy.
-
-**Example response:**
-
-```http
-HTTP/1.1 201 Created
-Location: /api/carts/019c49bf-9852-73c1-bb67-da545727eca4
-Content-Type: application/json
-
-{
-  "value": "019c49bf-9852-73c1-bb67-da545727eca4",
-  "url": "/api/carts/019c49bf-9852-73c1-bb67-da545727eca4"
-}
-```
-
-### Pattern 6: Return Updated Aggregate
-
-Use `UpdatedAggregate` or `UpdatedAggregate<T>` to return the updated aggregate state as the HTTP response:
+**Why:** Direct `session.Events.StartStream()` bypasses transactional middleware — events are silently discarded. See `docs/skills/marten-event-sourcing.md` for details.
 
 ```csharp
 [WolverinePost("/orders/{orderId}/confirm")]
-public static (UpdatedAggregate, Events) Handle(
-    ConfirmOrder cmd,
-    [WriteAggregate] Order order)
-{
-    return (new UpdatedAggregate(), [new OrderConfirmed()]);
-}
+public static (UpdatedAggregate, Events) Handle(ConfirmOrder cmd, [WriteAggregate] Order order)
+    => (new UpdatedAggregate(), [new OrderConfirmed()]);
 ```
 
-**Wolverine calls Marten's `FetchLatest()` API to retrieve the updated aggregate after appending events.**
-
-**When to use:**
-- Hot Chocolate GraphQL mutations (must return current state)
-- Client needs updated aggregate immediately after command
-- Performance optimization (avoid extra round trip)
-
-**Multi-stream variant:**
+**Use when:** GraphQL mutations, client needs immediate state, or to avoid extra round trip.
 
 ```csharp
-public static UpdatedAggregate<Account> Handle(
-    MakePurchase cmd,
-    [WriteAggregate] IEventStream<Account> account,
-    [WriteAggregate] IEventStream<Inventory> inventory)
+public static IEnumerable<object> Handle(DescriptionChangeApproved @event)
 {
-    if (cmd.Number > inventory.Aggregate.Quantity)
-        return new UpdatedAggregate<Account>();  // No events appended
-
-    account.AppendOne(new ItemPurchased(cmd.InventoryId, cmd.Number));
-    inventory.AppendOne(new Drawdown(cmd.Number));
-
-    return new UpdatedAggregate<Account>();  // Returns Account, not Inventory
-}
-```
-
-### Pattern 7: IEnumerable<object> for Multi-Type Dispatch
-
-Return `IEnumerable<object>` when publishing messages to different transports:
-
-```csharp
-public static IEnumerable<object> Handle(
-    DescriptionChangeApproved @event,
-    IDocumentSession session)
-{
-    // ... update document ...
-
     return
     [
-        new ChangeRequestStatusUpdated(...),     // → SignalR: vendor:{tenantId}
-        new ChangeRequestDecisionPersonal(...),  // → SignalR: user:{userId}
-        new SomeRabbitMqMessage(...)             // → RabbitMQ exchange
+        new ChangeRequestStatusUpdated(...),     // → SignalR
+        new SomeRabbitMqMessage(...)             // → RabbitMQ
     ];
 }
 ```
 
-**Wolverine routes each element by its runtime type** (configured in `Program.cs` publish rules).
+**Wolverine routes by runtime type.** Return `[]` to no-op.
 
-**Return empty to no-op:**
+### Pattern 6: Async vs Sync Return Types (M32.0 Lesson)
 
+**Critical Rule:** Handlers querying projections after event appends MUST be `async Task<T>` to call `await session.SaveChangesAsync()`.
+
+**✅ CORRECT:**
 ```csharp
-if (request is null || !request.IsActive)
-    return [];  // Silently skip — Wolverine traces the no-op
-```
-
-### Pattern 8: Async vs Sync Return Types (M32.0 Lesson)
-
-**Key Insight from M32.0:** Handlers that append events and query projections in the same transaction MUST be `async Task<T>` to call `await session.SaveChangesAsync()`.
-
-**Decision Matrix:**
-
-| Handler Needs | Return Type | Method Signature |
-|---------------|-------------|------------------|
-| **Query projection after event append** | `Task<SignalREvent>` | `async Task<T> Handle(..., IDocumentSession session)` |
-| **Just return SignalR event (no projection query)** | `SignalREvent` | `T Handle(...)` |
-| **Multi-BC orchestration** | `Task<OutgoingMessages>` | `async Task<OutgoingMessages> Handle(..., IMessageBus bus)` |
-| **Simple event append** | `Events` | `Events Handle(..., [WriteAggregate] Aggregate agg)` |
-| **HTTP query endpoint** | `Task<ViewDto>` | `async Task<ViewDto> Handle(..., IDocumentSession session)` |
-
-**✅ CORRECT — Async handler with SaveChanges:**
-
-```csharp
-public static class OrderPlacedHandler
-{
-    // ✅ Handler appends event AND queries projection → MUST be async
-    public static async Task<LiveMetricUpdated> Handle(
-        Messages.Contracts.Orders.OrderPlaced message,
-        IDocumentSession session)
-    {
-        // 1. Append event to trigger inline projection
-        session.Events.Append(Guid.NewGuid(), message);
-
-        // 2. Commit transaction (inline projection updates here)
-        await session.SaveChangesAsync();
-
-        // 3. Now query the updated projection
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var metrics = await session.LoadAsync<AdminDailyMetrics>(today);
-
-        // 4. Return SignalR event with current metrics
-        return new LiveMetricUpdated(
-            metrics.TodaysOrders,
-            metrics.TodaysRevenue,
-            DateTimeOffset.UtcNow);
-    }
-}
-```
-
-**❌ WRONG — Synchronous handler can't query after append:**
-
-```csharp
-// ❌ Synchronous handler can't call SaveChangesAsync()
-public static LiveMetricUpdated Handle(
-    Messages.Contracts.Orders.OrderPlaced message,
-    IDocumentSession session)
+public static async Task<LiveMetricUpdated> Handle(OrderPlaced message, IDocumentSession session)
 {
     session.Events.Append(Guid.NewGuid(), message);
+    await session.SaveChangesAsync();  // Inline projections update HERE
 
-    // ❌ Projection not updated yet!
-    var metrics = session.Load<AdminDailyMetrics>(today);
-
-    // ❌ SignalR event contains stale metrics
-    return new LiveMetricUpdated(metrics.TodaysOrders, ...);
-}
-```
-
-**Why This Matters:**
-- Inline projections update during `SaveChangesAsync()`, not before
-- Synchronous handlers can't call `await session.SaveChangesAsync()`
-- Querying projections before `SaveChangesAsync()` returns stale data
-- SignalR clients receive incorrect metrics/state
-
-**Common Use Cases:**
-
-**Use Case 1: BFF Integration Handler → SignalR Broadcast**
-```csharp
-// Integration message handler that broadcasts via SignalR
-public static async Task<BackofficeEvent> Handle(
-    OrderPlaced message,
-    IDocumentSession session)
-{
-    // Trigger projection update
-    session.Events.Append(Guid.NewGuid(), message);
-    await session.SaveChangesAsync();
-
-    // Query updated projection
     var metrics = await session.LoadAsync<AdminDailyMetrics>(DateOnly.FromDateTime(DateTime.UtcNow));
-
-    // Broadcast to SignalR (BackofficeEvent is routed by Wolverine)
     return new LiveMetricUpdated(metrics.TodaysOrders, metrics.TodaysRevenue, DateTimeOffset.UtcNow);
 }
 ```
 
-**Use Case 2: Simple Event Append (No Projection Query)**
-```csharp
-// No projection query → synchronous is fine
-public static Events Handle(AddItemToCart cmd, [WriteAggregate] ShoppingCart cart)
-{
-    return [new ItemAdded(cart.Id, cmd.Sku, cmd.Quantity)];
-}
-```
+**❌ WRONG:** Querying before `SaveChangesAsync()` returns stale data.
 
-**Use Case 3: HTTP Query Endpoint**
-```csharp
-// Query endpoint → async required
-[WolverineGet("/api/dashboard/metrics")]
-public static async Task<AdminDailyMetrics> Handle(GetDailyMetrics query, IDocumentSession session)
-{
-    var today = DateOnly.FromDateTime(DateTime.UtcNow);
-    var metrics = await session.LoadAsync<AdminDailyMetrics>(today);
-    return metrics ?? AdminDailyMetrics.Empty;
-}
-```
-
-**Rule of Thumb:**
-- If your handler calls `await` on **anything** → Use `async Task<T>`
-- If your handler is pure function with no I/O → Use synchronous `T`
-- When in doubt → Use `async Task<T>` (Wolverine handles both identically)
-
-**Cross-Reference:** See `docs/skills/integration-messaging.md` → "Lesson 12: Integration Message Handler → SignalR Broadcast Pattern" for more context.
+**Decision Rule:** Use `async Task<T>` when calling `await` on anything; use synchronous `T` for pure functions.
 
 ### Summary Table
 
@@ -1377,67 +1163,9 @@ public static Task<List<OrderItem>> GetOrderItems([FromQuery] Guid orderId) { /*
 
 ### HTTP Endpoint Validation (M32.1)
 
-**Key Insight from M32.1:** HTTP endpoints that bypass domain command handlers need their own FluentValidation validators at the HTTP boundary.
+**Key Insight:** HTTP endpoints that bypass domain command handlers need their own FluentValidation validators.
 
-**When This Pattern Applies:**
-- HTTP endpoint constructs events directly (no command handler)
-- HTTP endpoint uses different DTO than domain command
-- Endpoint accepts route parameters + body (validation needed for both)
-- Domain command validators exist but endpoint bypasses them
-
-#### Pattern: Separate HTTP Request Validators
-
-**✅ CORRECT Pattern (HTTP validator + direct event construction):**
-
-```csharp
-// File: SetBasePrice.cs
-
-// HTTP layer DTO
-public sealed record SetBasePriceRequest(decimal BasePrice);
-
-// HTTP layer validator (validates HTTP boundary)
-public sealed class SetBasePriceValidator : AbstractValidator<SetBasePriceRequest>
-{
-    public SetBasePriceValidator()
-    {
-        RuleFor(x => x.BasePrice)
-            .GreaterThan(0)
-            .WithMessage("Base price must be greater than 0");
-    }
-}
-
-// HTTP endpoint (bypasses domain command handler)
-public static class SetBasePriceEndpoint
-{
-    [WolverinePost("/api/pricing/products/{sku}/base-price")]
-    public static BasePriceSet Handle(
-        string sku,                      // From route
-        SetBasePriceRequest request)     // From body (validated)
-    {
-        // Direct event construction (no command handler)
-        return new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
-    }
-}
-```
-
-**Why This Works:**
-- FluentValidation automatically validates `SetBasePriceRequest` before `Handle()` is called
-- Endpoint constructs event directly (no domain command needed)
-- HTTP layer owns validation for its own DTOs
-- Clear separation: HTTP validation vs domain validation
-
-#### Comparison: HTTP Endpoint vs Domain Command Pattern
-
-**When to use HTTP validators vs domain command validators:**
-
-| Scenario | Pattern | Example |
-|----------|---------|---------|
-| **Endpoint bypasses commands** | HTTP validator only | Pricing BC `SetBasePriceRequest` (direct event construction) |
-| **Endpoint invokes command** | Domain command validator | Shopping BC `ApplyCouponToCart` (command handler exists) |
-| **Endpoint needs HTTP-specific validation** | Both validators | Route param validation (HTTP) + business rules (domain) |
-
-**Pattern 1: HTTP Validator Only (No Command Handler)**
-
+**✅ CORRECT:**
 ```csharp
 // HTTP DTO + validator
 public sealed record SetBasePriceRequest(decimal BasePrice);
@@ -1450,222 +1178,23 @@ public sealed class SetBasePriceValidator : AbstractValidator<SetBasePriceReques
     }
 }
 
-// HTTP endpoint (direct event construction)
+// Endpoint (direct event construction)
 [WolverinePost("/api/pricing/products/{sku}/base-price")]
 public static BasePriceSet Handle(string sku, SetBasePriceRequest request)
-{
-    return new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
-}
+    => new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
 ```
 
-**Pattern 2: Domain Command Validator (Command Handler Exists)**
+**When to Use:**
 
-```csharp
-// Domain command + validator
-public sealed record AddItemToCart(Guid CartId, string Sku, int Quantity);
+| Scenario | Pattern |
+|----------|---------|
+| Endpoint bypasses commands | HTTP validator only (example above) |
+| Endpoint invokes command | Domain command validator |
+| HTTP-specific validation needed | Both validators |
 
-public sealed class AddItemToCartValidator : AbstractValidator<AddItemToCart>
-{
-    public AddItemToCartValidator()
-    {
-        RuleFor(x => x.CartId).NotEmpty();
-        RuleFor(x => x.Sku).NotEmpty();
-        RuleFor(x => x.Quantity).GreaterThan(0);
-    }
-}
+**❌ ANTI-PATTERN:** Missing validator when bypassing commands — invalid data reaches event stream.
 
-// HTTP endpoint (invokes command handler)
-[WolverinePost("/api/carts/{cartId}/items")]
-public static Task<(Events, OutgoingMessages)> Handle(
-    AddItemToCart command,
-    [WriteAggregate] Cart cart,
-    IPricingClient pricingClient,
-    CancellationToken ct)
-{
-    // Command handler logic...
-}
-```
-
-**Pattern 3: Both Validators (HTTP-Specific + Domain Validation)**
-
-```csharp
-// HTTP request DTO for route validation
-public sealed record UpdateProductPriceRequest(decimal Price);
-
-public sealed class UpdateProductPriceRequestValidator : AbstractValidator<UpdateProductPriceRequest>
-{
-    public UpdateProductPriceRequestValidator()
-    {
-        // HTTP layer validation: route + body structure
-        RuleFor(x => x.Price).GreaterThan(0);
-    }
-}
-
-// Domain command for business rules
-public sealed record UpdatePrice(string Sku, decimal Price);
-
-public sealed class UpdatePriceValidator : AbstractValidator<UpdatePrice>
-{
-    public UpdatePriceValidator()
-    {
-        // Domain validation: business rules
-        RuleFor(x => x.Sku).NotEmpty();
-        RuleFor(x => x.Price).GreaterThan(0).LessThanOrEqualTo(10000);
-    }
-}
-
-// HTTP endpoint maps request to command
-[WolverinePost("/api/products/{sku}/price")]
-public static async Task Handle(
-    string sku,
-    UpdateProductPriceRequest request,
-    IMessageBus bus)
-{
-    // Map HTTP request to domain command
-    var command = new UpdatePrice(sku, request.Price);
-
-    // Send to domain command handler (validated again)
-    await bus.InvokeAsync(command);
-}
-```
-
-#### Anti-Patterns
-
-**❌ ANTI-PATTERN 1: Missing HTTP Validator When Bypassing Commands**
-
-```csharp
-// ❌ WRONG: No validator at HTTP boundary
-public sealed record SetBasePriceRequest(decimal BasePrice);
-
-[WolverinePost("/api/pricing/products/{sku}/base-price")]
-public static BasePriceSet Handle(string sku, SetBasePriceRequest request)
-{
-    // Direct event construction with NO validation!
-    // Negative prices, zero prices, all accepted!
-    return new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
-}
-```
-
-**Why Wrong:** HTTP endpoints that bypass domain commands have no validation layer. Invalid data reaches event stream.
-
-**✅ FIX: Add HTTP validator:**
-
-```csharp
-public sealed class SetBasePriceValidator : AbstractValidator<SetBasePriceRequest>
-{
-    public SetBasePriceValidator()
-    {
-        RuleFor(x => x.BasePrice).GreaterThan(0);
-    }
-}
-```
-
-**❌ ANTI-PATTERN 2: Relying on Domain Validator When Endpoint Bypasses Command**
-
-```csharp
-// Domain command validator (never invoked!)
-public sealed class SetBasePriceValidator : AbstractValidator<SetBasePrice>
-{
-    public SetBasePriceValidator()
-    {
-        RuleFor(x => x.BasePrice).GreaterThan(0);
-    }
-}
-
-// ❌ WRONG: HTTP endpoint bypasses command, validator never runs
-[WolverinePost("/api/pricing/products/{sku}/base-price")]
-public static BasePriceSet Handle(string sku, SetBasePriceRequest request)
-{
-    // No SetBasePrice command instantiated, validator never invoked
-    return new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
-}
-```
-
-**Why Wrong:** FluentValidation only runs validators for types passed to handlers. If endpoint takes `SetBasePriceRequest` but validator is for `SetBasePrice`, validator is not invoked.
-
-**✅ FIX: Validator must match parameter type:**
-
-```csharp
-// Validator for the type in the handler signature
-public sealed class SetBasePriceRequestValidator : AbstractValidator<SetBasePriceRequest>
-{
-    public SetBasePriceRequestValidator()
-    {
-        RuleFor(x => x.BasePrice).GreaterThan(0);
-    }
-}
-
-[WolverinePost("/api/pricing/products/{sku}/base-price")]
-public static BasePriceSet Handle(string sku, SetBasePriceRequest request)
-{
-    // Validator runs automatically because type matches
-    return new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
-}
-```
-
-#### When to Bypass Domain Commands in HTTP Endpoints
-
-**Valid reasons to bypass domain command handlers:**
-1. **Performance:** Direct event construction avoids extra handler invocation
-2. **Simplicity:** Single-responsibility endpoints (no complex business logic)
-3. **CQRS Boundary:** HTTP layer is the command boundary (no internal commands needed)
-4. **Event-First Design:** Events are the source of truth, commands are optional
-
-**Real-World Example from Pricing BC (M32.1):**
-
-```csharp
-// File: Pricing.Api/Endpoints/SetBasePrice.cs
-
-public sealed record SetBasePriceRequest(decimal BasePrice);
-
-public sealed class SetBasePriceValidator : AbstractValidator<SetBasePriceRequest>
-{
-    public SetBasePriceValidator()
-    {
-        RuleFor(x => x.BasePrice)
-            .GreaterThan(0)
-            .WithMessage("Base price must be greater than 0");
-    }
-}
-
-public static class SetBasePriceEndpoint
-{
-    [WolverinePost("/api/pricing/products/{sku}/base-price")]
-    [Authorize(Policy = "PricingManager")]
-    public static BasePriceSet Handle(
-        string sku,
-        SetBasePriceRequest request)
-    {
-        // Direct event construction (no command handler needed)
-        return new BasePriceSet(sku, request.BasePrice, DateTimeOffset.UtcNow);
-    }
-}
-```
-
-**Why This Works:**
-- Single responsibility: set base price for a SKU
-- No complex business logic (no need for command handler)
-- Validation at HTTP boundary (FluentValidation + route validation)
-- Events are persisted by Wolverine's transactional middleware
-
-#### Key Learnings (M32.1 Session 5)
-
-1. **Validator Type Must Match Parameter Type**
-   - FluentValidation runs validators for types in handler signatures
-   - If handler takes `SetBasePriceRequest`, validator must be `AbstractValidator<SetBasePriceRequest>`
-   - Domain command validators don't run if endpoint bypasses commands
-
-2. **HTTP Validation vs Domain Validation**
-   - HTTP validators: structural validation (not empty, > 0, format checks)
-   - Domain validators: business rules (price ranges, SKU existence, state transitions)
-   - Endpoints bypassing commands need HTTP validators
-
-3. **When in Doubt, Add Both Validators**
-   - HTTP validator for request structure
-   - Domain validator for business rules
-   - Map HTTP request to domain command, let Wolverine validate both
-
-**Reference:** [M32.1 Retrospective - Session 5 Lesson L2](../../planning/milestones/m32.1-retrospective.md)
+**Rule:** Validator type must match handler parameter type. If handler takes `SetBasePriceRequest`, validator must be `AbstractValidator<SetBasePriceRequest>`.
 
 ---
 

@@ -10,25 +10,19 @@ Patterns for testing Wolverine and Marten applications in CritterSupply.
 2. [Testing Tools](#testing-tools)
 3. [Integration Test Fixture](#integration-test-fixture)
 4. [Test Isolation Checklist](#test-isolation-checklist)
-5. [Event Sourcing Race Conditions and Direct Command Invocation](#event-sourcing-race-conditions-and-direct-command-invocation)
+5. [Event Sourcing Race Conditions](#event-sourcing-race-conditions)
 6. [Integration Test Pattern](#integration-test-pattern)
 7. [TestFixture Helper Methods](#testfixture-helper-methods)
 8. [Unit Testing Pure Functions](#unit-testing-pure-functions)
 9. [Testing Validators](#testing-validators)
-10. [Testing Event-Sourced Aggregates](#testing-event-sourced-aggregates)
-11. [Cross-Context Refactoring Checklist](#cross-context-refactoring-checklist)
-12. [Shouldly Assertions](#shouldly-assertions)
-13. [Test Organization](#test-organization)
-14. [Testing Async Patterns and Fan-Out Commands](#testing-async-patterns-and-fan-out-commands)
-15. [Multi-BC BFF Testing Patterns](#multi-bc-bff-testing-patterns) ⭐ *M32 Addition*
-16. [Key Principles](#key-principles)
-17. [TestFixture Standardization Summary](#testfixture-standardization-summary)
+10. [Cross-Context Refactoring](#cross-context-refactoring)
+11. [Shouldly Assertions](#shouldly-assertions)
+12. [Test Organization](#test-organization)
+13. [Testing Async Patterns](#testing-async-patterns)
+14. [Multi-BC BFF Testing](#multi-bc-bff-testing)
+15. [Key Principles](#key-principles)
 
 ---
-
-## Planned: End-to-End Testing
-
-This document is intended for integration and unit level tests, not end-to-end (E2E) tests. The intent is that system-wide E2E testing will be appended here in its own section or be included in another document. The idea at the moment is to leverage a BDD-aligned framework like SpecFlow and write the specifications in the Gherkin language.
 
 ## Core Philosophy
 
@@ -47,13 +41,11 @@ This document is intended for integration and unit level tests, not end-to-end (
 | **TestContainers** | Real Postgres/RabbitMQ in Docker |
 | **NSubstitute**    | Mocking (only when necessary)    |
 
-Simply put, xUnit is mature and proven as a test framework. Shouldly provides great error messages ontop of being declaritive. Alba is another open-source project from the JasperFx team, like Wolverine and Marten, enabling effortless usage and a declarative syntax for ASP.NET Core application testing. TestContainers allow us to use actual databases for testing our applications that we can spin-up and spin-down with ease. NSubstitute is the tool of choice if we absolutely need to mock something, as it provides a succinct syntax to focus on behavior instead of configuration.
-
 ## Integration Test Fixture
 
 ### Standard TestFixture Pattern (Marten)
 
-All Marten-based BCs (event store or document store) use this standardized fixture pattern:
+All Marten-based BCs use this standardized fixture:
 
 ```csharp
 using JasperFx.CommandLine;
@@ -65,10 +57,6 @@ using Wolverine.Tracking;
 
 namespace YourBC.Api.IntegrationTests;
 
-/// <summary>
-/// Test fixture providing PostgreSQL via TestContainers and Alba host for integration tests.
-/// Uses collection fixture pattern to ensure sequential test execution and proper resource sharing.
-/// </summary>
 public class TestFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
@@ -84,23 +72,15 @@ public class TestFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-
         _connectionString = _postgres.GetConnectionString();
 
-        // Necessary for WebApplicationFactory usage with Alba for integration testing
         JasperFxEnvironment.AutoStartHost = true;
 
         Host = await AlbaHost.For<Program>(builder =>
         {
             builder.ConfigureServices(services =>
             {
-                // Configure Marten with the test container connection string directly
-                services.ConfigureMarten(opts =>
-                {
-                    opts.Connection(_connectionString);
-                });
-
-                // Disable external Wolverine transports for testing
+                services.ConfigureMarten(opts => opts.Connection(_connectionString));
                 services.DisableAllExternalWolverineTransports();
             });
         });
@@ -115,55 +95,27 @@ public class TestFixture : IAsyncLifetime
                 await Host.StopAsync();
                 await Host.DisposeAsync();
             }
-            catch (ObjectDisposedException)
-            {
-                // Ignore if already disposed during async shutdown
-            }
-            catch (TaskCanceledException)
-            {
-                // Ignore if tasks were canceled during async shutdown
-            }
+            catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
             catch (AggregateException ex) when (ex.InnerExceptions.All(e =>
-                e is OperationCanceledException or ObjectDisposedException))
-            {
-                // Ignore cancellation/disposal exceptions during shutdown
-            }
+                e is OperationCanceledException or ObjectDisposedException)) { }
         }
 
         await _postgres.DisposeAsync();
     }
 
-    /// <summary>
-    /// Gets a Marten document session for direct database operations.
-    /// Caller is responsible for disposing the session.
-    /// </summary>
-    public IDocumentSession GetDocumentSession()
-    {
-        return Host.Services.GetRequiredService<IDocumentStore>().LightweightSession();
-    }
+    public IDocumentSession GetDocumentSession() =>
+        Host.Services.GetRequiredService<IDocumentStore>().LightweightSession();
 
-    /// <summary>
-    /// Gets the document store for advanced operations like cleaning data.
-    /// </summary>
-    public IDocumentStore GetDocumentStore()
-    {
-        return Host.Services.GetRequiredService<IDocumentStore>();
-    }
+    public IDocumentStore GetDocumentStore() =>
+        Host.Services.GetRequiredService<IDocumentStore>();
 
-    /// <summary>
-    /// Cleans all document data from the database. Use between tests that need isolation.
-    /// </summary>
     public async Task CleanAllDocumentsAsync()
     {
         var store = GetDocumentStore();
         await store.Advanced.Clean.DeleteAllDocumentsAsync();
     }
 
-    /// <summary>
-    /// Executes a message through Wolverine and waits for all cascading messages to complete.
-    /// This ensures all side effects are persisted before assertions.
-    /// Messages with no routes (like integration messages to other contexts) are allowed.
-    /// </summary>
     public async Task<ITrackedSession> ExecuteAndWaitAsync<T>(T message, int timeoutSeconds = 15)
         where T : class
     {
@@ -176,12 +128,6 @@ public class TestFixture : IAsyncLifetime
             }));
     }
 
-    /// <summary>
-    /// This method allows us to make HTTP calls into our system in memory with Alba while
-    /// leveraging Wolverine's test support for message tracking to both record outgoing messages.
-    /// This ensures that any cascaded work spawned by the initial command is completed before
-    /// passing control back to the calling test.
-    /// </summary>
     protected async Task<(ITrackedSession, IScenarioResult)> TrackedHttpCall(Action<Scenario> configuration)
     {
         IScenarioResult result = null!;
@@ -198,69 +144,32 @@ public class TestFixture : IAsyncLifetime
 
 ### Test Authentication with Stable User IDs
 
-**⚠️ CRITICAL for Multi-Request Authorization Tests:**
+**⚠️ CRITICAL:** Multi-request authorization tests need **stable user IDs** across requests.
 
-When testing authorization scenarios that involve **multiple HTTP requests** against the same resource (create → edit/delete), the test authentication handler MUST provide **stable user IDs** across requests.
-
-**The Problem: Random User IDs Break Multi-Request Tests**
+**Problem:** Random user IDs break multi-request tests:
 
 ```csharp
-// ❌ ANTI-PATTERN: Random Guid for `sub` claim on EVERY request
-public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
-{
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
-    {
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()), // ❌ NEW GUID EVERY REQUEST!
-            new Claim(ClaimTypes.Name, "Test Admin"),
-            new Claim(ClaimTypes.Role, "Admin")
-        };
+// ❌ BAD: Random Guid for `sub` claim on EVERY request
+new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
 
-        // Result: Request 1 has UserId = "abc...", Request 2 has UserId = "xyz..."
-        // Resource created by "abc..." cannot be edited by "xyz..." → 403 Forbidden
-    }
-}
+// Result: Request 1 creates resource with UserId = "abc..."
+//         Request 2 tries to edit with UserId = "xyz..." → 403 Forbidden
 ```
 
-**Why This Breaks Multi-Request Tests:**
-
-1. **Create request** → `UserId = Guid-A` → Resource created with `CreatedBy = Guid-A`
-2. **Edit/Delete request** → `UserId = Guid-B` (NEW RANDOM GUID!) → Authorization check fails: `Guid-B != Guid-A` → 403 Forbidden
-3. Test fails with unexpected 403 instead of 200
-
-**The Solution: Stable User IDs via ITestAuthContext**
-
-Use a constant user ID stored in a test context interface:
+**Solution:** Use stable user ID via ITestAuthContext:
 
 ```csharp
-/// <summary>
-/// Provides stable authentication context for integration tests.
-/// CRITICAL: User IDs must remain stable across multiple HTTP requests in the same test
-/// to allow authorization checks to pass (e.g., create → edit/delete same resource).
-/// </summary>
 public interface ITestAuthContext
 {
     Guid UserId { get; }
 }
 
-/// <summary>
-/// Default implementation with a stable admin user ID.
-/// </summary>
 public class TestAuthContext : ITestAuthContext
 {
-    /// <summary>
-    /// Stable admin user ID for all test requests.
-    /// DO NOT use Guid.NewGuid() here — breaks multi-request authorization tests.
-    /// </summary>
     public static readonly Guid TestAdminUserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-
     public Guid UserId => TestAdminUserId;
 }
 
-/// <summary>
-/// Test authentication handler with stable user ID from ITestAuthContext.
-/// </summary>
 public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
     private readonly ITestAuthContext _authContext;
@@ -279,7 +188,6 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
     {
         var claims = new[]
         {
-            // ✅ STABLE: Same user ID for all requests in a test
             new Claim(ClaimTypes.NameIdentifier, _authContext.UserId.ToString()),
             new Claim(ClaimTypes.Name, "Test Admin"),
             new Claim(ClaimTypes.Role, "Admin")
@@ -297,160 +205,29 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
 **TestFixture Registration:**
 
 ```csharp
-public async Task InitializeAsync()
-{
-    await _postgres.StartAsync();
-    _connectionString = _postgres.GetConnectionString();
-
-    JasperFxEnvironment.AutoStartHost = true;
-
-    Host = await AlbaHost.For<Program>(builder =>
-    {
-        builder.ConfigureServices(services =>
-        {
-            services.ConfigureMarten(opts => opts.Connection(_connectionString));
-            services.DisableAllExternalWolverineTransports();
-
-            // ✅ Register test auth context with stable user ID
-            services.AddSingleton<ITestAuthContext, TestAuthContext>();
-
-            // Configure authentication with TestAuthHandler
-            services.AddAuthentication("Test")
-                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
-        });
-    });
-}
+services.AddSingleton<ITestAuthContext, TestAuthContext>();
+services.AddAuthentication("Test")
+    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
 ```
 
-**Example: Multi-Request Authorization Test**
+### Authorization Bypass for Policy-Based Endpoints
+
+**CRITICAL:** Integration test fixtures must bypass **all** authorization policies. Missing policies cause 403 Forbidden.
+
+**Single Policy Bypass:**
 
 ```csharp
-[Fact]
-public async Task CreateOrderNote_ThenUpdateAsCreator_Returns200()
-{
-    var orderId = Guid.CreateVersion7();
-    var customerId = Guid.CreateVersion7();
-
-    // Request 1: Create note (UserId = TestAdminUserId)
-    var createCmd = new CreateOrderNote(orderId, customerId, "Original note");
-    var createResult = await _fixture.Host.PostJson("/api/order-notes", createCmd)
-        .Receive<CreateOrderNoteResult>();
-
-    var noteId = createResult.NoteId;
-
-    // Request 2: Edit note (UserId = SAME TestAdminUserId)
-    var editCmd = new EditOrderNote(noteId, "Updated note");
-    await _fixture.Host.Scenario(s =>
-    {
-        s.Put.Json(editCmd).ToUrl($"/api/order-notes/{noteId}");
-        s.StatusCodeShouldBe(200); // ✅ Passes — same UserId across requests
-    });
-}
-```
-
-**Without Stable IDs (Anti-Pattern):**
-```csharp
-// ❌ Request 1: UserId = "abc..." → Note created with CreatedBy = "abc..."
-// ❌ Request 2: UserId = "xyz..." → Authorization fails: "xyz..." != "abc..." → 403 Forbidden
-```
-
-**With Stable IDs (Correct Pattern):**
-```csharp
-// ✅ Request 1: UserId = TestAdminUserId → Note created with CreatedBy = TestAdminUserId
-// ✅ Request 2: UserId = TestAdminUserId → Authorization passes: TestAdminUserId == TestAdminUserId → 200 OK
-```
-
-**Key Takeaways:**
-1. **Never use `Guid.NewGuid()` in test auth handlers** — breaks multi-request tests
-2. **Use a constant user ID** stored in `ITestAuthContext`
-3. **Register `ITestAuthContext` as singleton** in TestFixture
-4. **Inject `ITestAuthContext` into `TestAuthHandler`** for stable user ID
-5. **Document why stability matters** — prevents confusing 403 failures in authorization tests
-
-### Authorization Bypass for Policy-Based Endpoints (M32.1)
-
-**CRITICAL DISCOVERY (M32.1 Sessions 4-5):** Integration test fixtures must bypass **all** authorization policies defined in the API. Missing policies cause 403 Forbidden errors in tests even with valid test authentication.
-
-**Problem:** API endpoints protected by `[Authorize(Policy = "...")]` return 403 Forbidden in tests despite valid test authentication.
-
-**Symptom:**
-```csharp
-// API endpoint with policy requirement:
-[WolverinePost("/api/pricing/products/{sku}/base-price")]
-[Authorize(Policy = "PricingManager")]  // ← Requires policy authorization
-public static BasePriceSet Handle(string sku, SetBasePriceRequest request) { /* ... */ }
-
-// Test fails with 403 Forbidden:
-await _fixture.Host.Scenario(s =>
-{
-    s.Post.Json(request).ToUrl($"/api/pricing/products/{sku}/base-price");
-    s.StatusCodeShouldBe(200);  // ❌ FAILS! Returns 403 Forbidden
-});
-```
-
-**Root Cause:** Test authentication handler authenticates the user, but authorization policies are **not automatically bypassed**. ASP.NET Core checks policies independently from authentication.
-
-**Pattern: Single-Policy Bypass**
-
-For APIs with one authorization policy:
-
-```csharp
-public async Task InitializeAsync()
-{
-    await _postgres.StartAsync();
-    _connectionString = _postgres.GetConnectionString();
-
-    JasperFxEnvironment.AutoStartHost = true;
-
-    Host = await AlbaHost.For<Program>(builder =>
-    {
-        builder.ConfigureServices(services =>
-        {
-            services.ConfigureMarten(opts => opts.Connection(_connectionString));
-            services.DisableAllExternalWolverineTransports();
-
-            // Test authentication
-            services.AddSingleton<ITestAuthContext, TestAuthContext>();
-            services.AddAuthentication("Test")
-                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
-
-            // ✅ Authorization bypass: Add policy that always succeeds
-            services.AddAuthorization(opts =>
-            {
-                opts.AddPolicy("PricingManager", policy =>
-                    policy.RequireAssertion(_ => true));  // Always succeeds
-            });
-        });
-    });
-}
-```
-
-**Why This Works:**
-- `RequireAssertion(_ => true)` creates a policy that always succeeds
-- Test authentication provides valid identity (via `TestAuthHandler`)
-- Policy authorization passes (via always-true assertion)
-- Test can focus on business logic, not authorization rules
-
-**Pattern: Multi-Policy Bypass (M32.1 Critical Pattern)**
-
-**CRITICAL:** BCs with **multiple authorization policies** need **all policies** added to test fixture. Missing even one policy causes 403 Forbidden for endpoints using that policy.
-
-**Example from M32.1 (Backoffice.Api with 3 policies):**
-
-```csharp
-// Backoffice.Api has 3 authorization policies:
-[Authorize(Policy = "CustomerService")]  // Used by customer service endpoints
-[Authorize(Policy = "FinanceClerk")]     // Used by refund endpoints
-[Authorize(Policy = "BackofficeUser")]   // Used by general backoffice endpoints
-
-// ❌ WRONG: Only bypassing one policy
 services.AddAuthorization(opts =>
 {
-    opts.AddPolicy("CustomerService", policy => policy.RequireAssertion(_ => true));
-    // ❌ Missing FinanceClerk and BackofficeUser — tests for those endpoints return 403!
+    opts.AddPolicy("PricingManager", policy =>
+        policy.RequireAssertion(_ => true));  // Always succeeds
 });
+```
 
-// ✅ CORRECT: Bypass ALL policies
+**Multi-Policy Bypass (M32.1):**
+
+```csharp
+// BCs with multiple policies need ALL bypassed
 services.AddAuthorization(opts =>
 {
     opts.AddPolicy("CustomerService", policy => policy.RequireAssertion(_ => true));
@@ -459,176 +236,26 @@ services.AddAuthorization(opts =>
 });
 ```
 
-**Real-World Example (Backoffice.Api TestFixture):**
+**Decision Matrix:**
 
-```csharp
-// File: tests/Backoffice/Backoffice.Api.IntegrationTests/BackofficeTestFixture.cs
-
-public class BackofficeTestFixture : IAsyncLifetime
-{
-    // ... (container + connection string setup)
-
-    public async Task InitializeAsync()
-    {
-        await _postgres.StartAsync();
-        _connectionString = _postgres.GetConnectionString();
-
-        JasperFxEnvironment.AutoStartHost = true;
-
-        Host = await AlbaHost.For<Program>(builder =>
-        {
-            builder.ConfigureServices(services =>
-            {
-                // Infrastructure
-                services.AddSingleton(new DbContextOptionsBuilder<BackofficeDbContext>()
-                    .UseNpgsql(_connectionString)
-                    .Options);
-                services.DisableAllExternalWolverineTransports();
-
-                // Test authentication (stable user ID)
-                services.AddSingleton<ITestAuthContext, TestAuthContext>();
-                services.AddAuthentication("Test")
-                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
-
-                // ✅ Authorization bypass for ALL 3 policies
-                services.AddAuthorization(opts =>
-                {
-                    opts.AddPolicy("CustomerService", policy =>
-                        policy.RequireAssertion(_ => true));
-
-                    opts.AddPolicy("FinanceClerk", policy =>
-                        policy.RequireAssertion(_ => true));
-
-                    opts.AddPolicy("BackofficeUser", policy =>
-                        policy.RequireAssertion(_ => true));
-                });
-            });
-        });
-
-        // Run migrations
-        await using var dbContext = new BackofficeDbContext(
-            Host.Services.GetRequiredService<DbContextOptions<BackofficeDbContext>>());
-        await dbContext.Database.MigrateAsync();
-    }
-}
-```
+| BC Scenario | Auth Bypass Pattern |
+|-------------|---------------------|
+| No authorization | No bypass needed |
+| Single policy | Add one `RequireAssertion(_ => true)` |
+| Multiple policies | Bypass **every** policy |
+| Role-based (no policies) | Use `TestAuthHandler` with roles |
 
 **How to Discover All Policies:**
 
-1. **Search API project for `[Authorize(Policy = "...")]` attributes:**
-   ```bash
-   grep -r "Authorize(Policy" src/YourBC/YourBC.Api/
-   ```
-
-2. **Check Program.cs for policy definitions:**
-   ```csharp
-   // Look for AddPolicy calls:
-   builder.Services.AddAuthorization(opts =>
-   {
-       opts.AddPolicy("PricingManager", policy => ...);
-       opts.AddPolicy("FinanceClerk", policy => ...);
-   });
-   ```
-
-3. **List all unique policy names** and add bypass for each
-
-**Decision Matrix:**
-
-| BC Scenario | Auth Bypass Pattern | Example |
-|-------------|---------------------|---------|
-| **No authorization** | No bypass needed | Shopping BC (anonymous cart access) |
-| **Single policy** | Add one `RequireAssertion(_ => true)` | Pricing BC (`PricingManager` only) |
-| **Multiple policies** | Add bypass for **every** policy | Backoffice BC (3 policies: `CustomerService`, `FinanceClerk`, `BackofficeUser`) |
-| **Role-based (no policies)** | Use `TestAuthHandler` with roles | Vendor Portal BC (role claims in `TestAuthHandler`) |
-
-**Anti-Patterns:**
-
-**❌ ANTI-PATTERN 1: Partial Policy Bypass**
-```csharp
-// BC has 3 policies but only 2 are bypassed
-services.AddAuthorization(opts =>
-{
-    opts.AddPolicy("CustomerService", policy => policy.RequireAssertion(_ => true));
-    opts.AddPolicy("FinanceClerk", policy => policy.RequireAssertion(_ => true));
-    // ❌ Missing BackofficeUser — tests for general backoffice endpoints fail with 403!
-});
+```bash
+grep -r "Authorize(Policy" src/YourBC/YourBC.Api/
 ```
-
-**❌ ANTI-PATTERN 2: Assuming Authentication = Authorization**
-```csharp
-// Test authentication is configured:
-services.AddAuthentication("Test")
-    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
-
-// ❌ WRONG: Assuming this bypasses policies
-// Reality: Policies are checked AFTER authentication — need explicit bypass!
-```
-
-**❌ ANTI-PATTERN 3: Copy-Paste Policy Bypass Without Verification**
-```csharp
-// Copied from another BC's TestFixture:
-services.AddAuthorization(opts =>
-{
-    opts.AddPolicy("PricingManager", policy => policy.RequireAssertion(_ => true));
-});
-
-// ❌ WRONG: Current BC doesn't use "PricingManager" policy!
-// Reality: BC uses "CustomerService" policy — copy-paste doesn't help
-```
-
-**Debugging Checklist:**
-
-1. **Test returns 403 Forbidden:**
-   - Check if endpoint has `[Authorize(Policy = "...")]` attribute
-   - Verify TestFixture includes bypass for that policy name
-   - Confirm policy name spelling matches exactly (case-sensitive)
-
-2. **Test passes locally but fails in CI:**
-   - Verify all policies are bypassed (not just the ones you tested locally)
-   - Check for recently added policies in API project
-   - Search for `[Authorize(Policy` in API project to find all policies
-
-3. **Multiple tests fail with 403:**
-   - Likely missing policy bypass (affects all endpoints using that policy)
-   - Add `Console.WriteLine` in TestFixture to log registered policies
-   - Compare logged policies vs. API project policy definitions
-
-**Key Learnings (M32.1 Sessions 4-5):**
-
-1. **Authentication ≠ Authorization**
-   - Test authentication proves "who you are" (identity)
-   - Authorization bypass proves "what you can do" (permissions)
-   - Both are required for policy-protected endpoints
-
-2. **Every Policy Needs Bypass**
-   - Forgetting one policy causes 403 for all endpoints using that policy
-   - No exceptions thrown — just silent 403 Forbidden responses
-   - Must discover all policies via code search or API inspection
-
-3. **Explicit Over Implicit**
-   - Better to list all policies explicitly (even if verbose)
-   - Copy-paste from another BC's TestFixture can introduce bugs
-   - Verify policy names match API project exactly
-
-**Reference:** [M32.1 Retrospective - Sessions 4-5 Warnings W2, W1](../../planning/milestones/m32.1-retrospective.md)
-
----
 
 ### EF Core TestFixture Pattern
 
-For BCs using Entity Framework Core (like Customer Identity):
+For BCs using Entity Framework Core:
 
 ```csharp
-using Alba;
-using JasperFx.CommandLine;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Testcontainers.PostgreSql;
-using Wolverine;
-
-namespace YourBC.Api.IntegrationTests;
-
 public class TestFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
@@ -638,13 +265,11 @@ public class TestFixture : IAsyncLifetime
         .Build();
 
     private string? _connectionString;
-
     public IAlbaHost Host { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-
         _connectionString = _postgres.GetConnectionString();
 
         JasperFxEnvironment.AutoStartHost = true;
@@ -653,11 +278,9 @@ public class TestFixture : IAsyncLifetime
         {
             builder.ConfigureServices(services =>
             {
-                // Remove the default DbContext registration
                 services.RemoveAll<DbContextOptions<YourDbContext>>();
                 services.RemoveAll<YourDbContext>();
 
-                // Register DbContext with test connection string
                 services.AddDbContext<YourDbContext>(options =>
                     options.UseNpgsql(_connectionString));
 
@@ -665,7 +288,6 @@ public class TestFixture : IAsyncLifetime
             });
         });
 
-        // Apply migrations
         using var scope = Host.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<YourDbContext>();
         await dbContext.Database.MigrateAsync();
@@ -680,19 +302,10 @@ public class TestFixture : IAsyncLifetime
                 await Host.StopAsync();
                 await Host.DisposeAsync();
             }
-            catch (ObjectDisposedException)
-            {
-                // Ignore if already disposed during async shutdown
-            }
-            catch (TaskCanceledException)
-            {
-                // Ignore if tasks were canceled during async shutdown
-            }
+            catch (ObjectDisposedException) { }
+            catch (TaskCanceledException) { }
             catch (AggregateException ex) when (ex.InnerExceptions.All(e =>
-                e is OperationCanceledException or ObjectDisposedException))
-            {
-                // Ignore cancellation/disposal exceptions during shutdown
-            }
+                e is OperationCanceledException or ObjectDisposedException)) { }
         }
 
         await _postgres.DisposeAsync();
@@ -708,8 +321,6 @@ public class TestFixture : IAsyncLifetime
     {
         using var scope = Host.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<YourDbContext>();
-
-        // Use EF Core's ExecuteDeleteAsync for bulk delete operations
         await dbContext.YourEntitySet.ExecuteDeleteAsync();
     }
 }
@@ -717,83 +328,41 @@ public class TestFixture : IAsyncLifetime
 
 ## Test Isolation Checklist
 
-Before writing integration tests, ensure proper isolation by following this checklist:
-
 ### ✅ TestFixture Setup
 - [ ] TestFixture does NOT seed data in `InitializeAsync()`
-- [ ] TestFixture provides `CleanAllDocumentsAsync()` helper (Marten) or `CleanAllDataAsync()` (EF Core)
-- [ ] TestFixture provides `GetDocumentSession()` helper (Marten) or `GetDbContext()` (EF Core)
+- [ ] TestFixture provides `CleanAllDocumentsAsync()` or `CleanAllDataAsync()`
+- [ ] TestFixture provides `GetDocumentSession()` or `GetDbContext()`
 - [ ] Container has unique name: `$"{bc}-postgres-test-{Guid.NewGuid():N}"`
-- [ ] Collection fixture is defined for sequential execution
+- [ ] Collection fixture defined for sequential execution
 
 ### ✅ Test Class Setup
 - [ ] Test class implements `IAsyncLifetime`
-- [ ] `InitializeAsync()` calls `_fixture.CleanAllDocumentsAsync()` or `_fixture.CleanAllDataAsync()`
+- [ ] `InitializeAsync()` calls `_fixture.CleanAllDocumentsAsync()`
 - [ ] `DisposeAsync()` returns `Task.CompletedTask`
-- [ ] Test class has `[Collection(IntegrationTestCollection.Name)]` attribute
+- [ ] Test class has `[Collection(IntegrationTestCollection.Name)]`
 
 ### ✅ Test Method Setup
-- [ ] Each test seeds its own data inline (or uses test class seed for read-only scenarios)
+- [ ] Each test seeds its own data inline
 - [ ] Tests do NOT rely on data from other tests
 - [ ] Tests can run in any order
 
-### ✅ Warning Signs (Anti-Patterns)
-- ❌ Tests fail when run in isolation but pass when run together
-- ❌ Tests pass in one order, fail in another order
+### ✅ Warning Signs
+- ❌ Tests fail when run in isolation but pass together
+- ❌ Tests pass in one order, fail in another
 - ❌ Test depends on data created by fixture
-- ❌ Test assumes database contains specific data without seeding it
-- ❌ `OperationCanceledException` during TestFixture disposal
-- ❌ Data leakage between tests (test B sees data from test A)
+- ❌ Data leakage between tests
 
-### Example: Proper Test Isolation
+### Collection Fixtures for Sequential Execution
 
-```csharp
-// ✅ GOOD: Complete isolation pattern
-[Collection(IntegrationTestCollection.Name)]
-public class OrderTests : IAsyncLifetime
-{
-    private readonly TestFixture _fixture;
-
-    public OrderTests(TestFixture fixture) => _fixture = fixture;
-
-    // Clean before EVERY test
-    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
-
-    public Task DisposeAsync() => Task.CompletedTask;
-
-    [Fact]
-    public async Task PlaceOrder_CreatesNewOrder()
-    {
-        // Seed exactly what this test needs
-        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage();
-
-        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
-
-        // Assertions - verify against real database
-        using var session = _fixture.GetDocumentSession();
-        var orders = await session.Query<Order>().ToListAsync();
-
-        orders.ShouldNotBeEmpty();
-        orders.First().Status.ShouldBe(OrderStatus.Placed);
-    }
-}
-```
-
-### Collection Fixtures for Sequential Test Execution
-
-**IMPORTANT:** Use xUnit collection fixtures to ensure sequential test execution and avoid Marten DDL concurrency issues:
+Use xUnit collection fixtures to ensure sequential test execution:
 
 ```csharp
-// IntegrationTestCollection.cs
-namespace YourBC.Api.IntegrationTests;
-
 [CollectionDefinition(Name)]
 public class IntegrationTestCollection : ICollectionFixture<TestFixture>
 {
     public const string Name = "Integration Tests";
 }
 
-// In test classes
 [Collection(IntegrationTestCollection.Name)]
 public class YourFeatureTests
 {
@@ -803,266 +372,88 @@ public class YourFeatureTests
     {
         _fixture = fixture;
     }
-
-    // Tests...
 }
 ```
 
-> **Reference:** [Alba Documentation](https://jasperfx.github.io/alba/)
+## Event Sourcing Race Conditions
 
-## Event Sourcing Race Conditions and Direct Command Invocation
+### The Problem: HTTP-Based Testing
 
-### The Problem: HTTP-Based Testing with Event Sourcing
+When testing event-sourced aggregates via HTTP endpoints, a race condition occurs:
 
-When testing event-sourced aggregates via HTTP endpoints, a subtle race condition can occur:
+1. Command handler returns domain events
+2. Wolverine's transaction middleware commits **asynchronously**
+3. HTTP 200 response sent **BEFORE** transaction commits
+4. Subsequent GET request reads stale aggregate state
+5. Test fails with unexpected status or stale data
 
-1. **Command handler** with `[WriteAggregate]` returns domain events
-2. **Wolverine's transaction middleware** commits asynchronously
-3. **HTTP 200 response** is sent BEFORE transaction commits
-4. **Subsequent GET request** reads stale aggregate state before Marten's inline snapshot projections update
-5. **Test fails** with unexpected status codes or stale data
-
-**Example of the Problem:**
+**Example:**
 
 ```csharp
-// ❌ BAD: HTTP-based test with race condition
-[Fact]
-public async Task POST_approve_transitions_return_to_Approved()
+// ❌ BAD: HTTP POST → immediate GET (race condition)
+await _fixture.Host.Scenario(s =>
 {
-    var returnId = Guid.CreateVersion7();
+    s.Post.Json(new ApproveReturn(returnId))
+        .ToUrl($"/api/returns/{returnId}/approve");
+    s.StatusCodeShouldBe(200); // ✅ HTTP response sent
+});
 
-    // Create return (works fine)
-    await CreateReturnUnderReview(returnId);
-
-    // Approve return via HTTP POST
-    await _fixture.Host.Scenario(s =>
-    {
-        s.Post.Json(new ApproveReturn(returnId))
-            .ToUrl($"/api/returns/{returnId}/approve");
-        s.StatusCodeShouldBe(200); // ✅ HTTP response sent
-    });
-
-    // RACE CONDITION: Transaction may not be committed yet!
-
-    // Immediate GET to verify state
-    await _fixture.Host.Scenario(s =>
-    {
-        s.Get.Url($"/api/returns/{returnId}");
-        s.StatusCodeShouldBe(200); // ❌ May fail with 409 or stale data
-    });
-}
+// RACE: Transaction may not be committed yet!
+await _fixture.Host.Scenario(s =>
+{
+    s.Get.Url($"/api/returns/{returnId}");
+    s.StatusCodeShouldBe(200); // ❌ May fail with stale data
+});
 ```
-
-**Why This Happens:**
-
-- Wolverine's `AutoApplyTransactions()` policy commits transactions **asynchronously**
-- HTTP response returns **before** transaction completes
-- Marten inline snapshot projections update **after** transaction commits
-- Subsequent reads see stale data
-
-**Why Delays Don't Work:**
-
-```csharp
-// ❌ BAD: Adding delays is unreliable
-await _fixture.Host.Scenario(s => { /* POST */ });
-await Task.Delay(500); // Still fails sometimes!
-await _fixture.Host.Scenario(s => { /* GET */ });
-```
-
-Timing-based solutions are inherently fragile — they depend on system load, CI environment, and other unpredictable factors.
 
 ### The Solution: Direct Command Invocation
 
-Instead of testing via HTTP, invoke commands **directly through Wolverine's message bus** and query the **event store directly**:
+Invoke commands **directly through Wolverine's message bus** and query **event store directly**:
 
 ```csharp
-// ✅ GOOD: Direct command invocation with no race condition
-[Fact]
-public async Task POST_approve_transitions_return_to_Approved()
+// ✅ GOOD: Direct invocation (no race condition)
+var command = new ApproveReturn(returnId);
+await _fixture.ExecuteAndWaitAsync(command);
+
+// Query event store directly
+await using var session = _fixture.GetDocumentSession();
+var aggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
+
+aggregate.ShouldNotBeNull();
+aggregate.Status.ShouldBe(ReturnStatus.Approved);
+aggregate.ApprovedAt.ShouldNotBeNull();
+
+// Verify HTTP GET still works (optional)
+var getResult = await _fixture.Host.Scenario(s =>
 {
-    var orderId = Guid.CreateVersion7();
-    var customerId = Guid.CreateVersion7();
-    await SeedEligibilityWindow(orderId, customerId);
-
-    // Create return under review
-    var createResponse = await CreateReturnUnderReview(orderId, customerId);
-    var returnId = createResponse.ReturnId!.Value;
-
-    // ✅ Invoke command directly through Wolverine (not HTTP)
-    var command = new ApproveReturn(returnId);
-    await _fixture.ExecuteAndWaitAsync(command);
-
-    // ✅ Query event store directly (guaranteed to see committed events)
-    await using var session = _fixture.GetDocumentSession();
-    var aggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
-
-    aggregate.ShouldNotBeNull();
-    aggregate.Status.ShouldBe(ReturnStatus.Approved);
-    aggregate.ApprovedAt.ShouldNotBeNull();
-    aggregate.ShipByDeadline.ShouldNotBeNull();
-
-    // ✅ Still verify HTTP GET endpoint works (optional)
-    var getResult = await _fixture.Host.Scenario(s =>
-    {
-        s.Get.Url($"/api/returns/{returnId}");
-        s.StatusCodeShouldBe(200);
-    });
-
-    var summary = getResult.ReadAsJson<ReturnSummaryResponse>();
-    summary.ShouldNotBeNull();
-    summary.Status.ShouldBe("Approved");
-}
+    s.Get.Url($"/api/returns/{returnId}");
+    s.StatusCodeShouldBe(200);
+});
 ```
 
 ### Why This Pattern Works
 
-1. **ExecuteAndWaitAsync guarantees completion** — Wolverine's tracking API ensures ALL side effects (events, outgoing messages, projections) complete before returning
-2. **Query event store directly** — Event-sourced aggregates are the source of truth; query them directly instead of relying on projections
-3. **Separate concerns** — Integration tests verify business logic (commands → events → aggregate state); HTTP endpoints verified separately
-4. **Aligns with eventual consistency** — Respects that projections are eventually consistent, not immediately consistent
-
-### TestFixture Helper Method
-
-All Marten-based TestFixtures provide this helper:
-
-```csharp
-/// <summary>
-/// Executes a message through Wolverine and waits for all cascading messages to complete.
-/// This ensures all side effects are persisted before assertions.
-/// </summary>
-public async Task<ITrackedSession> ExecuteAndWaitAsync<T>(T message, int timeoutSeconds = 15)
-    where T : class
-{
-    return await Host.TrackActivity(TimeSpan.FromSeconds(timeoutSeconds))
-        .DoNotAssertOnExceptionsDetected()
-        .AlsoTrack(Host)
-        .ExecuteAndWaitAsync((Func<IMessageContext, Task>)(async ctx =>
-        {
-            await ctx.InvokeAsync(message);
-        }));
-}
-```
+1. **ExecuteAndWaitAsync guarantees completion** — All side effects complete before returning
+2. **Query event store directly** — Event-sourced aggregates are source of truth
+3. **Separate concerns** — Business logic tested separately from HTTP layer
+4. **Aligns with eventual consistency** — Respects that projections are eventually consistent
 
 ### When to Use Each Pattern
 
-| Pattern | Use Case | Example |
-|---------|----------|---------|
-| **Direct Command Invocation** | State-changing operations on event-sourced aggregates | `ApproveReturn`, `DenyReturn`, `SubmitInspection` |
-| **HTTP POST Tests** | Testing HTTP contract (status codes, validation errors, error messages) | Invalid command payloads, authorization failures |
-| **HTTP GET Tests** | Testing query endpoints and projections | `GetReturnById`, `GetReturnsForOrder` |
-| **E2E Tests (future)** | Testing full user flows with eventual consistency | Playwright/Reqnroll scenarios |
-
-### Complete Example: Returns BC
-
-**Before (HTTP-based, race condition):**
-
-```csharp
-[Fact]
-public async Task POST_deny_transitions_return_to_Denied()
-{
-    var returnId = CreateReturn();
-
-    // ❌ Race condition here
-    await _fixture.Host.Scenario(s =>
-    {
-        s.Post.Json(new DenyReturn(returnId, "Policy violation"))
-            .ToUrl($"/api/returns/{returnId}/deny");
-        s.StatusCodeShouldBe(200);
-    });
-
-    // May read stale data
-    await _fixture.Host.Scenario(s =>
-    {
-        s.Get.Url($"/api/returns/{returnId}");
-        s.StatusCodeShouldBe(200);
-    });
-}
-```
-
-**After (Direct invocation, no race condition):**
-
-```csharp
-[Fact]
-public async Task POST_deny_transitions_return_to_Denied()
-{
-    var orderId = Guid.CreateVersion7();
-    var customerId = Guid.CreateVersion7();
-    await SeedEligibilityWindow(orderId, customerId);
-
-    var createResponse = await CreateReturnUnderReview(orderId, customerId);
-    var returnId = createResponse.ReturnId!.Value;
-
-    // ✅ Direct invocation
-    var command = new DenyReturn(returnId, "Policy violation");
-    await _fixture.ExecuteAndWaitAsync(command);
-
-    // ✅ Query event store directly
-    await using var session = _fixture.GetDocumentSession();
-    var aggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
-
-    aggregate.ShouldNotBeNull();
-    aggregate.Status.ShouldBe(ReturnStatus.Denied);
-    aggregate.DenialReason.ShouldBe("Policy violation");
-    aggregate.DeniedAt.ShouldNotBeNull();
-
-    // ✅ Verify HTTP GET still works
-    var getResult = await _fixture.Host.Scenario(s =>
-    {
-        s.Get.Url($"/api/returns/{returnId}");
-        s.StatusCodeShouldBe(200);
-    });
-
-    var summary = getResult.ReadAsJson<ReturnSummaryResponse>();
-    summary.Status.ShouldBe("Denied");
-}
-```
-
-### Benefits of This Approach
-
-1. **No race conditions** — `ExecuteAndWaitAsync()` guarantees all side effects complete
-2. **Tests the source of truth** — Event-sourced aggregates, not projections
-3. **Faster tests** — No artificial delays needed
-4. **More reliable** — No flaky tests due to timing issues
-5. **Better separation of concerns** — Business logic tested separately from HTTP layer
-6. **Aligns with eventual consistency** — Respects that projections are eventually consistent
-
-### HTTP Testing Still Has a Place
-
-You should still test HTTP endpoints for:
-
-- **Validation errors** — Ensure bad requests return 400 with correct error messages
-- **Authorization failures** — Ensure unauthorized requests return 401/403
-- **Not found scenarios** — Ensure missing resources return 404
-- **HTTP contract compliance** — Ensure response formats match API specification
-
-**Example: Testing HTTP validation:**
-
-```csharp
-[Fact]
-public async Task POST_approve_returns_404_when_return_not_found()
-{
-    var nonExistentId = Guid.CreateVersion7();
-
-    // HTTP test is appropriate here - testing HTTP contract
-    await _fixture.Host.Scenario(s =>
-    {
-        s.Post.Json(new ApproveReturn(nonExistentId))
-            .ToUrl($"/api/returns/{nonExistentId}/approve");
-        s.StatusCodeShouldBe(404);
-    });
-}
-```
+| Pattern | Use Case |
+|---------|----------|
+| **Direct Command Invocation** | State-changing operations on event-sourced aggregates |
+| **HTTP POST Tests** | Testing HTTP contract (status codes, validation errors) |
+| **HTTP GET Tests** | Testing query endpoints and projections |
 
 ### Key Takeaway
 
 For event-sourced aggregates:
-- ✅ **DO** use direct command invocation (`ExecuteAndWaitAsync`) for state-changing operations
-- ✅ **DO** query event store directly (`session.Events.AggregateStreamAsync`) for aggregate assertions
+- ✅ **DO** use direct command invocation (`ExecuteAndWaitAsync`)
+- ✅ **DO** query event store directly (`session.Events.AggregateStreamAsync`)
 - ✅ **DO** verify HTTP GET endpoints work after state changes
-- ❌ **DON'T** rely on HTTP POST → immediate GET pattern for event-sourced aggregates
+- ❌ **DON'T** rely on HTTP POST → immediate GET pattern
 - ❌ **DON'T** add delays to work around race conditions
-
-This pattern respects eventual consistency, tests the source of truth, and eliminates flaky tests.
 
 ---
 
@@ -1076,30 +467,13 @@ public class AddProductTests
 {
     private readonly TestFixture _fixture;
 
-    public AddProductTests(TestFixture fixture)
-    {
-        _fixture = fixture;
-    }
+    public AddProductTests(TestFixture fixture) => _fixture = fixture;
 
     [Fact]
     public async Task CanAddProduct_WithValidData_ReturnsCreated()
     {
-        // Arrange
-        var command = new AddProduct(
-            "TEST-001",
-            "Test Product",
-            "Test Description",
-            "Dogs",
-            null, // Subcategory
-            null, // Long description
-            new List<ProductImageDto>
-            {
-                new("https://example.com/image.jpg", "Product image", 0)
-            },
-            new ProductDimensionsDto(10m, 10m, 5m, 2.5m)
-        );
+        var command = new AddProduct("TEST-001", "Test Product", "Description", "Dogs");
 
-        // Act & Assert
         await _fixture.Host.Scenario(s =>
         {
             s.Post.Json(command).ToUrl("/api/products");
@@ -1107,26 +481,17 @@ public class AddProductTests
             s.Header("Location").ShouldNotBeNullOrEmpty();
         });
 
-        // Verify product was persisted
         using var session = _fixture.GetDocumentSession();
         var product = await session.LoadAsync<Product>("TEST-001");
 
         product.ShouldNotBeNull();
         product.Name.Value.ShouldBe("Test Product");
-        product.Category.ShouldBe("Dogs");
-        product.Images.Count.ShouldBe(1);
     }
 
     [Fact]
     public async Task CanAddProduct_WithInvalidSku_Returns400()
     {
-        var command = new AddProduct(
-            "invalid sku!", // Invalid SKU format
-            "Test Product",
-            "Description",
-            "Dogs",
-            null, null, null, null
-        );
+        var command = new AddProduct("invalid sku!", "Test Product", "Description", "Dogs");
 
         await _fixture.Host.Scenario(s =>
         {
@@ -1145,15 +510,12 @@ public class CapturePaymentTests
 {
     private readonly TestFixture _fixture;
 
-    public CapturePaymentTests(TestFixture fixture)
-    {
-        _fixture = fixture;
-    }
+    public CapturePaymentTests(TestFixture fixture) => _fixture = fixture;
 
     [Fact]
     public async Task CapturePayment_WithAuthorizedPayment_ReturnsSuccess()
     {
-        // Arrange — seed the event stream
+        // Arrange — seed event stream
         var paymentId = Guid.CreateVersion7();
         var orderId = Guid.CreateVersion7();
 
@@ -1164,7 +526,7 @@ public class CapturePaymentTests
             await session.SaveChangesAsync();
         }
 
-        // Act — invoke the endpoint
+        // Act
         var command = new CapturePayment(paymentId, 100m);
 
         await _fixture.Host.Scenario(s =>
@@ -1173,7 +535,7 @@ public class CapturePaymentTests
             s.StatusCodeShouldBe(200);
         });
 
-        // Assert — verify the aggregate state
+        // Assert — verify aggregate state
         using (var session = _fixture.GetDocumentSession())
         {
             var payment = await session.Events.AggregateStreamAsync<Payment>(paymentId);
@@ -1183,34 +545,19 @@ public class CapturePaymentTests
             payment.CapturedAt.ShouldNotBeNull();
         }
     }
-
-    [Fact]
-    public async Task CapturePayment_WithNonExistentPayment_Returns404()
-    {
-        var command = new CapturePayment(Guid.NewGuid(), 100m);
-
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Json(command).ToUrl($"/api/payments/{command.PaymentId}/capture");
-            s.StatusCodeShouldBe(404);
-        });
-    }
 }
 ```
 
 ## TestFixture Helper Methods
 
-The standardized TestFixture provides several helper methods for common test scenarios:
-
 ### GetDocumentSession() / GetDbContext()
 
-Use for **direct database access** when you need to seed data or verify state:
+Use for **direct database access** when seeding data or verifying state:
 
 ```csharp
 [Fact]
 public async Task CanRetrieveProduct()
 {
-    // Seed data directly
     using (var session = _fixture.GetDocumentSession())
     {
         var product = Product.Create("TEST-001", "Test Product", "Description", "Dogs");
@@ -1218,7 +565,6 @@ public async Task CanRetrieveProduct()
         await session.SaveChangesAsync();
     }
 
-    // Test retrieval via HTTP
     await _fixture.Host.Scenario(s =>
     {
         s.Get.Url("/api/products/TEST-001");
@@ -1235,10 +581,8 @@ Use for **test isolation** when tests need a clean slate:
 [Fact]
 public async Task TestWithCleanState()
 {
-    // Clean all data before test
     await _fixture.CleanAllDocumentsAsync();
 
-    // Now test with guaranteed empty database
     await _fixture.Host.Scenario(s =>
     {
         s.Get.Url("/api/products");
@@ -1246,13 +590,13 @@ public async Task TestWithCleanState()
     });
 
     var result = await s.ReadAsJsonAsync<ProductListResponse>();
-    result.Products.Count.ShouldBe(0); // No products exist
+    result.Products.Count.ShouldBe(0);
 }
 ```
 
 ### ExecuteAndWaitAsync()
 
-Use for **message-based testing** when you need to invoke Wolverine handlers directly:
+Use for **message-based testing** when invoking Wolverine handlers directly:
 
 ```csharp
 [Fact]
@@ -1262,10 +606,9 @@ public async Task CanProcessMessageWithCascading()
 
     var tracked = await _fixture.ExecuteAndWaitAsync(command);
 
-    // All cascading messages and side effects completed
     using var session = _fixture.GetDocumentSession();
     var inventory = await session.LoadAsync<ProductInventory>("SKU-001:WH-01");
-    inventory.AvailableQuantity.ShouldBe(90); // Reduced by 10
+    inventory.AvailableQuantity.ShouldBe(90);
 }
 ```
 
@@ -1285,14 +628,13 @@ public async Task HttpEndpoint_PublishesIntegrationMessage()
         s.StatusCodeShouldBe(200);
     });
 
-    // Verify integration message was sent (even though no route exists in test)
     tracked.Sent.MessagesOf<CheckoutCompleted>().Any().ShouldBeTrue();
 }
 ```
 
 ## Unit Testing Pure Functions
 
-Thanks to A-Frame architecture, handlers are pure functions that are easy to unit test:
+Thanks to A-Frame architecture, handlers are pure functions:
 
 ```csharp
 public class ProcessPaymentHandlerTests
@@ -1306,17 +648,6 @@ public class ProcessPaymentHandlerTests
 
         result.Status.ShouldBe(404);
         result.Detail.ShouldBe("Payment not found");
-    }
-
-    [Fact]
-    public void Before_WithAlreadyProcessedPayment_Returns400()
-    {
-        var command = new ProcessPayment(Guid.NewGuid(), 100m);
-        var payment = CreatePayment(PaymentStatus.Processed);
-
-        var result = ProcessPaymentHandler.Before(command, payment);
-
-        result.Status.ShouldBe(400);
     }
 
     [Fact]
@@ -1354,17 +685,6 @@ public class ProcessPaymentValidatorTests
     }
 
     [Fact]
-    public void Validate_WithZeroAmount_Fails()
-    {
-        var command = new ProcessPayment(Guid.NewGuid(), 0m);
-
-        var result = _validator.Validate(command);
-
-        result.IsValid.ShouldBeFalse();
-        result.Errors.ShouldContain(e => e.PropertyName == "Amount");
-    }
-
-    [Fact]
     public void Validate_WithValidCommand_Passes()
     {
         var command = new ProcessPayment(Guid.NewGuid(), 100m);
@@ -1376,46 +696,14 @@ public class ProcessPaymentValidatorTests
 }
 ```
 
-> **Reference:** [FluentValidation Testing](https://docs.fluentvalidation.net/en/latest/testing.html)
-
-## Testing Event-Sourced Aggregates
-
-```csharp
-public class PaymentAggregateTests
-{
-    [Fact]
-    public void Apply_PaymentProcessed_UpdatesStatus()
-    {
-        var payment = CreatePendingPayment();
-        var @event = new PaymentProcessed(payment.Id, DateTimeOffset.UtcNow);
-
-        var updated = payment.Apply(@event);
-
-        updated.Status.ShouldBe(PaymentStatus.Processed);
-        updated.ProcessedAt.ShouldNotBeNull();
-    }
-
-    [Fact]
-    public void Apply_PaymentFailed_IncrementsRetryCount()
-    {
-        var payment = CreatePendingPayment();
-        var @event = new PaymentFailed(payment.Id, "Insufficient funds", true, DateTimeOffset.UtcNow);
-
-        var updated = payment.Apply(@event);
-
-        updated.Status.ShouldBe(PaymentStatus.Failed);
-        updated.RetryCount.ShouldBe(1);
-        updated.FailureReason.ShouldBe("Insufficient funds");
-    }
-
-    private static Payment CreatePendingPayment() =>
-        new(Guid.NewGuid(), Guid.NewGuid(), 100m, PaymentStatus.Pending, 0, null, null);
-}
-```
-
-## Cross-Context Refactoring Checklist
+## Cross-Context Refactoring
 
 After changes affecting multiple bounded contexts, **always run the full test suite**:
+
+```bash
+dotnet build
+dotnet test
+```
 
 **When to run all tests:**
 - Adding/removing project references between BCs
@@ -1424,24 +712,10 @@ After changes affecting multiple bounded contexts, **always run the full test su
 - Refactoring handlers or sagas
 - Modifying shared infrastructure
 
-**Test execution:**
-```bash
-# Build first (catches compile errors)
-dotnet build
-
-# Run all tests
-dotnet test
-
-# Or by category
-dotnet test --filter "Category=Unit"
-dotnet test --filter "Category=Integration"
-```
-
 **Exit criteria:**
 - Solution builds with 0 errors
 - All unit tests pass
 - All integration tests pass
-- No unused project references remain
 
 ## Shouldly Assertions
 
@@ -1460,8 +734,6 @@ events.Count.ShouldBe(1);
 Should.Throw<InvalidOperationException>(() => payment.Process());
 ```
 
-> **Reference:** [Shouldly Documentation](https://docs.shouldly.org/)
-
 ## Test Organization
 
 ```
@@ -1477,130 +749,56 @@ tests/
         ProcessPaymentHandlerTests.cs
       Validators/
         ProcessPaymentValidatorTests.cs
-      Domain/
-        PaymentAggregateTests.cs
 ```
 
-## Testing Async Patterns and Fan-Out Commands
+## Testing Async Patterns
 
-### Fan-Out Pattern Timing ⚠️ **Important for Reliable Tests**
+### Fan-Out Pattern Timing
 
-**Problem:** When testing fan-out patterns (one command creates N child commands via `OutgoingMessages`), tests need sufficient delays for async processing and projection updates.
+**Problem:** Fan-out patterns (one command creates N child commands) need sufficient delays for async processing.
 
-**Pattern:** Fan-out via OutgoingMessages
+**Pattern:**
 
 ```csharp
-// Handler that creates multiple child commands
+// Handler creates multiple child commands
 public static async Task<OutgoingMessages> Handle(
     GenerateCouponBatch cmd,
-    IDocumentSession session,
-    CancellationToken ct)
+    IDocumentSession session)
 {
-    var promotion = await session.Events.AggregateStreamAsync<Promotion>(cmd.PromotionId, token: ct);
     var outgoing = new OutgoingMessages();
 
-    // Fan-out: Generate N IssueCoupon commands
     for (int i = 1; i <= cmd.Count; i++)
     {
         var couponCode = $"{cmd.Prefix.ToUpperInvariant()}-{i:D4}";
-        outgoing.Add(new IssueCoupon(couponCode, promotion.Id));
+        outgoing.Add(new IssueCoupon(couponCode, cmd.PromotionId));
     }
 
     return outgoing;
 }
 ```
 
-**Testing challenge:** Each child command handler creates an aggregate + updates projections asynchronously.
-
-**Wrong (Insufficient delay):**
+**Testing with Generous Delay:**
 
 ```csharp
 [Fact]
 public async Task GenerateCouponBatch_Creates100Coupons()
 {
-    // Arrange
     var promotionId = await CreatePromotion();
     var batchCmd = new GenerateCouponBatch(promotionId, "SAVE20", 100);
 
-    // Act
-    await _fixture.ExecuteAndWaitAsync(batchCmd);
-
-    // ❌ Wait 300ms — insufficient for 100 commands + projections
-    await Task.Delay(300);
-
-    // Assert
-    await using var session = _fixture.GetDocumentSession();
-    for (int i = 1; i <= 100; i++)
-    {
-        var code = $"SAVE20-{i:D4}";
-        var coupon = await session.LoadAsync<CouponLookupView>(code);
-        coupon.ShouldNotBeNull();  // ❌ Fails intermittently
-    }
-}
-```
-
-**Correct (Generous delay):**
-
-```csharp
-[Fact]
-public async Task GenerateCouponBatch_Creates100Coupons()
-{
-    // Arrange
-    var promotionId = await CreatePromotion();
-    var batchCmd = new GenerateCouponBatch(promotionId, "SAVE20", 100);
-
-    // Act
     await _fixture.ExecuteAndWaitAsync(batchCmd);
 
     // ✅ Wait 1000ms for async processing
-    // GenerateCouponBatch creates N IssueCoupon commands via OutgoingMessages
-    // Each IssueCoupon handler:
-    //   1. Creates a Coupon aggregate (UUID v5 stream)
-    //   2. Triggers CouponLookupView projection update (inline)
-    // 1000ms ensures all N commands + projections complete
+    // GenerateCouponBatch creates N IssueCoupon commands
+    // Each command creates aggregate + updates projections
     await Task.Delay(1000);
 
-    // Assert
     await using var session = _fixture.GetDocumentSession();
     for (int i = 1; i <= 100; i++)
     {
         var code = $"SAVE20-{i:D4}";
         var coupon = await session.LoadAsync<CouponLookupView>(code);
-        coupon.ShouldNotBeNull();  // ✅ Reliable
-    }
-}
-```
-
-**Why 1000ms?**
-- Each child command goes through Wolverine's handler pipeline
-- Each aggregate creation persists events to Marten
-- Inline projections update synchronously but still require DB writes
-- 300ms was insufficient in M30.0 tests (intermittent failures)
-- 1000ms provides reliable execution with safety margin
-
-**Real example from CritterSupply:**
-
-```csharp
-// From Promotions.IntegrationTests/CouponRedemptionTests.cs (M30.0)
-[Fact]
-public async Task GenerateCouponBatch_ForDraftPromotion_CreatesSuccessfully()
-{
-    // ... setup ...
-
-    var batch = new GenerateCouponBatch(promotionId, "TEST", batchSize);
-    await _fixture.ExecuteAndWaitAsync(batch);
-
-    // Wait for fan-out IssueCoupon commands to be processed asynchronously
-    await Task.Delay(1000); // Increased from 300ms after test failures
-
-    // Verify all coupons created
-    await using var session = _fixture.GetDocumentSession();
-    for (int i = 1; i <= batchSize; i++)
-    {
-        var code = $"TEST-{i:D4}";
-        var coupon = await session.LoadAsync<CouponLookupView>(code);
         coupon.ShouldNotBeNull();
-        coupon.Status.ShouldBe(CouponStatus.Issued);
     }
 }
 ```
@@ -1609,43 +807,19 @@ public async Task GenerateCouponBatch_ForDraftPromotion_CreatesSuccessfully()
 
 | Pattern | Recommended Delay | Why |
 |---------|------------------|-----|
-| Single command execution | 0ms (use `ExecuteAndWaitAsync`) | Wolverine waits for handler completion |
-| Fan-out (N < 10 commands) | 500ms | Small batch, projections update quickly |
-| Fan-out (N ≥ 10 commands) | 1000ms | Larger batch, multiple DB operations |
-| Saga with scheduled messages | Test-specific (use Wolverine test helpers) | See wolverine-sagas.md testing section |
-
-**Best practices:**
-
-1. **Document why you're delaying** — Add comments explaining the async workflow
-2. **Start generous, optimize later** — 1000ms is safe; reduce only if tests are slow
-3. **Use ExecuteAndWaitAsync first** — Only add Task.Delay for fan-out/projection cases
-4. **Test with different batch sizes** — Ensure timing works for 1, 10, 100 items
-
-**When discovered:** M30.0 batch generation tests failed intermittently with 300ms delay. Increasing to 1000ms achieved 100% reliability.
-
-**Reference:** [M30.0 Retrospective - D4: Fan-Out Timing in Integration Tests](../../planning/milestones/m30-0-retrospective.md#d4-fan-out-timing-in-integration-tests)
+| Single command | 0ms (use `ExecuteAndWaitAsync`) | Wolverine waits for completion |
+| Fan-out (N < 10) | 500ms | Small batch |
+| Fan-out (N ≥ 10) | 1000ms | Larger batch, multiple DB ops |
 
 ---
 
-## Multi-BC BFF Testing Patterns
+## Multi-BC BFF Testing
 
 **From:** Backoffice BC (M32.0 Session 10)
 
-Backend-for-Frontend (BFF) bounded contexts orchestrate multiple domain BCs via HTTP clients. Testing these integrations requires **stub clients** to isolate tests from domain BC availability.
-
-### The Challenge: BFF Tests Depend on Multiple BCs
-
-**Problem:** BFF integration tests call 6+ domain BCs (Orders, Returns, Payments, Inventory, Fulfillment, Correspondence, Customer Identity). Running tests requires:
-- All domain BC APIs running
-- Each BC's database seeded with test data
-- Network calls across 6+ services
-- Flaky tests when any BC is down
-
-**Solution:** Stub HTTP clients that return in-memory data.
+Backend-for-Frontend (BFF) bounded contexts orchestrate multiple domain BCs via HTTP clients. Testing requires **stub clients** to isolate tests.
 
 ### Stub Client Pattern
-
-**Anatomy of a stub client:**
 
 ```csharp
 public class StubOrdersClient : IOrdersClient
@@ -1654,18 +828,12 @@ public class StubOrdersClient : IOrdersClient
     private readonly Dictionary<Guid, OrderSummaryDto> _orders = new();
     private readonly Dictionary<Guid, OrderDetailDto> _orderDetails = new();
 
-    // Setup methods for tests
-    public void AddOrder(OrderSummaryDto order)
-    {
+    public void AddOrder(OrderSummaryDto order) =>
         _orders[order.OrderId] = order;
-    }
 
-    public void AddOrderDetail(OrderDetailDto detail)
-    {
+    public void AddOrderDetail(OrderDetailDto detail) =>
         _orderDetails[detail.OrderId] = detail;
-    }
 
-    // Client interface implementations
     public Task<IReadOnlyList<OrderSummaryDto>> GetOrders(Guid customerId)
     {
         var orders = _orders.Values
@@ -1674,115 +842,66 @@ public class StubOrdersClient : IOrdersClient
         return Task.FromResult<IReadOnlyList<OrderSummaryDto>>(orders);
     }
 
-    public Task<OrderDetailDto?> GetOrderDetail(Guid orderId)
-    {
-        return Task.FromResult(_orderDetails.GetValueOrDefault(orderId));
-    }
+    public Task<OrderDetailDto?> GetOrderDetail(Guid orderId) =>
+        Task.FromResult(_orderDetails.GetValueOrDefault(orderId));
 }
 ```
 
-**Key insight:** Stub clients have **separate storage** for list vs detail DTOs. This mirrors real BC API design where list endpoints return summaries and detail endpoints return full objects.
-
 ### BFF TestFixture with Stub Clients
-
-**From:** Backoffice.Api.IntegrationTests (M32.0)
 
 ```csharp
 public class BackofficeTestFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
-        .WithDatabase("backoffice_test_db")
-        .WithName($"backoffice-postgres-test-{Guid.NewGuid():N}")
-        .WithCleanUp(true)
-        .Build();
-
-    private string? _connectionString;
-
+    private readonly PostgreSqlContainer _postgres = /* ... */;
     public IAlbaHost Host { get; private set; } = null!;
 
     // Stub clients (public for test setup)
     public StubCustomerIdentityClient CustomerIdentityClient { get; private set; } = null!;
     public StubOrdersClient OrdersClient { get; private set; } = null!;
     public StubReturnsClient ReturnsClient { get; private set; } = null!;
-    public StubCorrespondenceClient CorrespondenceClient { get; private set; } = null!;
-    public StubInventoryClient InventoryClient { get; private set; } = null!;
-    public StubFulfillmentClient FulfillmentClient { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
         _connectionString = _postgres.GetConnectionString();
 
-        // Initialize stub clients
         CustomerIdentityClient = new StubCustomerIdentityClient();
         OrdersClient = new StubOrdersClient();
         ReturnsClient = new StubReturnsClient();
-        CorrespondenceClient = new StubCorrespondenceClient();
-        InventoryClient = new StubInventoryClient();
-        FulfillmentClient = new StubFulfillmentClient();
-
-        JasperFxEnvironment.AutoStartHost = true;
 
         Host = await AlbaHost.For<Program>(builder =>
         {
             builder.ConfigureServices(services =>
             {
-                services.ConfigureMarten(opts =>
-                {
-                    opts.Connection(_connectionString);
-                });
-
+                services.ConfigureMarten(opts => opts.Connection(_connectionString));
                 services.DisableAllExternalWolverineTransports();
 
-                // Register stub clients in DI
+                // Register stub clients
                 services.AddScoped<ICustomerIdentityClient>(_ => CustomerIdentityClient);
                 services.AddScoped<IOrdersClient>(_ => OrdersClient);
                 services.AddScoped<IReturnsClient>(_ => ReturnsClient);
-                services.AddScoped<ICorrespondenceClient>(_ => CorrespondenceClient);
-                services.AddScoped<IInventoryClient>(_ => InventoryClient);
-                services.AddScoped<IFulfillmentClient>(_ => FulfillmentClient);
             });
         });
-    }
-
-    public async Task DisposeAsync()
-    {
-        if (Host != null)
-            await Host.DisposeAsync();
-        await _postgres.DisposeAsync();
     }
 }
 ```
 
-**Key decisions:**
-1. **Stub clients are public properties** — Tests can seed data via `_fixture.OrdersClient.AddOrder(...)`
-2. **Scoped registration** — Each test request gets the same stub instance
-3. **Factory delegates** — `_ => CustomerIdentityClient` ensures Alba's DI uses fixture instances
-
-### End-to-End CS Workflow Tests
-
-**Pattern:** Test complete customer service workflows spanning multiple BCs.
-
-**Example from Backoffice BC (M32.0 Session 10):**
+### End-to-End Workflow Tests
 
 ```csharp
 [Fact]
 public async Task CustomerServiceWorkflow_SearchToReturnApproval_CompletesSuccessfully()
 {
-    // Arrange — Seed all domain BCs with test data
     var customerId = Guid.NewGuid();
     var orderId = Guid.NewGuid();
     var returnId = Guid.NewGuid();
 
-    // 1. Customer Identity BC
+    // Seed Customer Identity BC
     _fixture.CustomerIdentityClient.AddCustomer(new CustomerDto(
-        customerId,
-        "customer@example.com",
-        "John Doe",
-        [new AddressDto("123 Main St", null, "Portland", "OR", "97201", "US")]
+        customerId, "customer@example.com", "John Doe", []
     ));
 
-    // 2. Orders BC (list + detail!)
+    // Seed Orders BC (list + detail!)
     _fixture.OrdersClient.AddOrder(new OrderSummaryDto(
         orderId, customerId, 99.99m, "Delivered", DateTimeOffset.UtcNow.AddDays(-5)
     ));
@@ -1792,156 +911,57 @@ public async Task CustomerServiceWorkflow_SearchToReturnApproval_CompletesSucces
         customerId,
         "Delivered",
         99.99m,
-        [new OrderLineItemDto("SKU123", "Dog Food 5lb", 2, 24.99m)],
+        [new OrderLineItemDto("SKU123", "Dog Food", 2, 24.99m)],
         DateTimeOffset.UtcNow.AddDays(-5)
     ));
 
-    // 3. Returns BC
+    // Seed Returns BC
     _fixture.ReturnsClient.AddReturn(new ReturnDetailDto(
-        returnId,
-        orderId,
-        customerId,
-        "Pending",
-        [new ReturnItemDto("SKU123", 1, 24.99m, "Wrong size")],
-        DateTimeOffset.UtcNow.AddDays(-1)
+        returnId, orderId, customerId, "Pending", [], DateTimeOffset.UtcNow.AddDays(-1)
     ));
 
-    // 4. Correspondence BC
-    _fixture.CorrespondenceClient.AddMessage(new CorrespondenceMessageDto(
-        Guid.NewGuid(),
-        customerId,
-        "Order confirmation",
-        "Your order #12345 has shipped",
-        "Email",
-        DateTimeOffset.UtcNow.AddDays(-5)
-    ));
-
-    // Act & Assert — Test complete CS workflow
-    // Step 1: Search customer by email
+    // Test complete CS workflow
     var customer = await _fixture.CustomerIdentityClient.GetCustomerByEmail("customer@example.com");
     customer.ShouldNotBeNull();
 
-    // Step 2: Get customer's orders
     var orders = await _fixture.OrdersClient.GetOrders(customerId);
     orders.Count.ShouldBe(1);
 
-    // Step 3: Get order details
     var orderDetail = await _fixture.OrdersClient.GetOrderDetail(orderId);
     orderDetail.ShouldNotBeNull();
-    orderDetail.Items.Count.ShouldBe(1);
 
-    // Step 4: Get return details
     var returnDetail = await _fixture.ReturnsClient.GetReturn(returnId);
     returnDetail.ShouldNotBeNull();
-    returnDetail.Status.ShouldBe("Pending");
 
-    // Step 5: Approve return
     await _fixture.Host.Scenario(s =>
     {
         s.Post.Json(new { }).ToUrl($"/api/backoffice/returns/{returnId}/approve");
         s.StatusCodeShouldBe(200);
     });
-
-    // Step 6: Get correspondence history
-    var messages = await _fixture.CorrespondenceClient.GetMessages(customerId);
-    messages.Count.ShouldBe(1);
 }
 ```
 
-**Why this test is valuable:**
-
-1. **End-to-end workflow** — Tests complete CS agent scenario (search → orders → returns → approval → correspondence)
-2. **Multi-BC composition** — Verifies BFF orchestrates 4 domain BCs correctly
-3. **Real HTTP calls** — Uses Alba to test actual HTTP endpoints, not just handler logic
-4. **Isolated from domain BCs** — No dependency on Orders.Api, Returns.Api, etc.
-
 ### Common Pitfall: Forgetting AddOrderDetail()
 
-**From:** Backoffice BC (M32.0 Session 10 — Issue 4)
-
-**Problem:** Tests failed with 404 "Order not found" when getting order details:
+**Problem:** Only added summary, not detail:
 
 ```csharp
-// ❌ BAD: Only added summary, not detail
+// ❌ BAD: Only added summary
 _fixture.OrdersClient.AddOrder(new OrderSummaryDto(orderId, ...));
 
-// Test calls GetOrderDetail(orderId)
+// GetOrderDetail returns null!
 var detail = await _fixture.OrdersClient.GetOrderDetail(orderId);
-// detail is null! ❌
 ```
-
-**Root cause:** StubOrdersClient has **separate storage** for `OrderSummaryDto` (list view) and `OrderDetailDto` (detail view). This mirrors real BC API design where:
-- `GET /api/orders?customerId=X` returns `OrderSummaryDto[]` (lightweight)
-- `GET /api/orders/{orderId}` returns `OrderDetailDto` (full object with line items)
 
 **Fix:** Call both `AddOrder()` and `AddOrderDetail()`:
 
 ```csharp
 // ✅ GOOD: Add both summary and detail
-_fixture.OrdersClient.AddOrder(new OrderSummaryDto(orderId, customerId, 99.99m, "Delivered", ...));
-
-_fixture.OrdersClient.AddOrderDetail(new OrderDetailDto(
-    orderId,
-    customerId,
-    "Delivered",
-    99.99m,
-    Items: [new OrderLineItemDto("SKU123", "Dog Food", 2, 24.99m)],
-    PlacedAt: DateTimeOffset.UtcNow
-));
-
-// Now GetOrderDetail() works ✅
-var detail = await _fixture.OrdersClient.GetOrderDetail(orderId);
-detail.ShouldNotBeNull();
+_fixture.OrdersClient.AddOrder(new OrderSummaryDto(orderId, ...));
+_fixture.OrdersClient.AddOrderDetail(new OrderDetailDto(orderId, ...));
 ```
 
-**Lesson:** Stub clients must mirror real BC API structure. If the real BC has separate endpoints for list vs detail, stub client needs separate storage.
-
-### Event-Driven Projection Tests
-
-**Pattern:** Test BFF projections sourced from domain BC integration messages.
-
-**Example from Backoffice BC (M32.0 Session 10):**
-
-```csharp
-[Fact]
-public async Task OrderPlacedEvent_UpdatesDashboardMetrics_WithIncrementedOrderCount()
-{
-    // Arrange — Clean slate
-    await _fixture.CleanAllDocumentsAsync();
-
-    var orderId = Guid.NewGuid();
-    var customerId = Guid.NewGuid();
-
-    // Act — Simulate OrderPlaced integration message from Orders BC
-    await using (var session = _fixture.GetDocumentSession())
-    {
-        var message = new Orders.OrderPlaced(
-            orderId,
-            customerId,
-            LineItems: [new OrderLineItemSnapshot("SKU123", 2, 24.99m)],
-            OrderTotal: 49.98m,
-            PlacedAt: DateTimeOffset.UtcNow
-        );
-
-        // Append to BFF event store (triggers inline projection)
-        session.Events.Append(Guid.NewGuid(), message);
-        await session.SaveChangesAsync();
-    }
-
-    // Assert — Verify projection updated
-    await using (var session = _fixture.GetDocumentSession())
-    {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var metrics = await session.LoadAsync<AdminDailyMetrics>(today);
-
-        metrics.ShouldNotBeNull();
-        metrics.OrderCount.ShouldBe(1);
-        metrics.Revenue.ShouldBe(49.98m);
-    }
-}
-```
-
-**Key pattern:** Directly append integration messages to BFF's event store to test projections in isolation (no RabbitMQ required).
+**Lesson:** Stub clients must mirror real BC API structure (separate list vs detail endpoints).
 
 ### When to Use Multi-BC Composition Tests
 
@@ -1949,53 +969,42 @@ public async Task OrderPlacedEvent_UpdatesDashboardMetrics_WithIncrementedOrderC
 - BFF composes data from 2+ domain BCs
 - Testing end-to-end CS/admin workflows
 - Verifying HTTP client orchestration
-- Ensuring view models aggregate correctly
 
 ❌ **Don't use when:**
 - Testing single-BC logic (use domain BC's own tests)
-- Testing domain BC internals (use domain BC integration tests)
-- Simple HTTP proxying (stub clients add unnecessary complexity)
-
-**Takeaway:** Multi-BC composition tests verify BFF orchestration without requiring all domain BCs to be running. Stub clients + end-to-end scenario tests are the gold standard for BFF integration testing.
-
-**References:**
-- [M32.0 Session 10 Retrospective](../../planning/milestones/m32-0-session-10-retrospective.md)
-- [M32.0 Milestone Retrospective — Lesson L3](../../planning/milestones/m32-0-retrospective.md#l3-stub-clients-require-separate-list-vs-detail-storage)
+- Simple HTTP proxying (unnecessary complexity)
 
 ---
 
 ## Key Principles
 
-1. **Standardized TestFixture across all BCs** — Use the same helper methods for consistency
+1. **Standardized TestFixture across all BCs** — Use same helper methods
 2. **Integration tests cover vertical slices** — HTTP request to database verification
 3. **Unit tests cover pure functions** — `Before()`, `Handle()`, `Apply()` methods
 4. **Use stubs for external services** — Tests shouldn't depend on third-party APIs
 5. **Real infrastructure via TestContainers** — Postgres, RabbitMQ in Docker
-6. **Collection fixtures prevent DDL concurrency** — Sequential test execution avoids Marten schema conflicts
+6. **Collection fixtures prevent DDL concurrency** — Sequential test execution
 7. **Test code follows production standards** — Same C# conventions apply
 
-## TestFixture Standardization Summary
+### TestFixture Helper Methods Summary
 
-**All Marten-based BCs have these 5 helper methods:**
+**All Marten-based BCs have these 5 methods:**
 
 | Method | Purpose | When to Use |
 |--------|---------|-------------|
 | `GetDocumentSession()` | Direct DB access | Seeding data, verifying state |
 | `GetDocumentStore()` | Advanced operations | Getting store for cleanup |
-| `CleanAllDocumentsAsync()` | Clear all data | Test isolation between runs |
+| `CleanAllDocumentsAsync()` | Clear all data | Test isolation |
 | `ExecuteAndWaitAsync<T>()` | Message execution | Testing commands with cascading |
 | `TrackedHttpCall()` | HTTP + tracking | Testing endpoints that publish messages |
 
 **EF Core BCs have equivalent methods:**
-
-| Method | Purpose |
-|--------|---------|
-| `GetDbContext()` | Direct DB access |
-| `CleanAllDataAsync()` | Clear all data via `ExecuteDeleteAsync()` |
+- `GetDbContext()` — Direct DB access
+- `CleanAllDataAsync()` — Clear all data via `ExecuteDeleteAsync()`
 
 **Exception handling in DisposeAsync():**
 - Catches `ObjectDisposedException` (already disposed)
 - Catches `TaskCanceledException` (async cleanup canceled)
 - Catches `AggregateException` with cancellation/disposal inner exceptions
 
-This ensures clean test teardown without spurious errors in test output.
+This ensures clean test teardown without spurious errors.
