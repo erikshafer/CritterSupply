@@ -20,7 +20,7 @@
 
         @if (!string.IsNullOrEmpty(errorMessage))
         {
-            <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+            <MudAlert Severity="Severity.Error" Class="mb-4" data-testid="login-error">@errorMessage</MudAlert>
         }
 
         @if (signedOut)
@@ -38,7 +38,8 @@
                           FullWidth="true"
                           Required="true"
                           InputType="InputType.Email"
-                          Class="mb-4" />
+                          Class="mb-4"
+                          data-testid="login-email" />
 
             <MudTextField @bind-Value="loginModel.Password"
                           Label="Password"
@@ -47,17 +48,19 @@
                           FullWidth="true"
                           Required="true"
                           InputType="InputType.Password"
-                          Class="mb-4" />
+                          Class="mb-4"
+                          data-testid="login-password" />
 
             <MudButton ButtonType="ButtonType.Submit"
                        Variant="Variant.Filled"
                        Color="Color.Primary"
                        FullWidth="true"
                        Size="Size.Large"
-                       Disabled="isLoggingIn">
+                       Disabled="isLoggingIn"
+                       data-testid="login-submit">
                 @if (isLoggingIn)
                 {
-                    <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
+                    <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" data-testid="login-loading" />
                     <span>Signing in...</span>
                 }
                 else
