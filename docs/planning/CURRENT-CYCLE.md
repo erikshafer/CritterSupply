@@ -41,10 +41,10 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M32.1 — Backoffice Phase 2: Write Operations |
-| **Status** | 🚀 IN PROGRESS — Sessions 1-15 completed, test-id conventions documented, E2E timeout investigation complete |
-| **Deliverables** | Blazor WASM frontend, write operations (Product Catalog, Pricing, Inventory), E2E tests |
-| **Next Session** | Session 16: Run single E2E scenario with tracing, fix timeouts, verify authentication suite |
+| **Current Milestone** | M32.2 — Backoffice Phase 3: Advanced Write Operations (Planned) |
+| **Status** | 📋 PLANNING — M32.1 completed, next milestone scope TBD |
+| **Deliverables** | TBD (likely: Promotions management, bulk operations, advanced CS tools) |
+| **Recent Completion** | M32.1 — Backoffice Phase 2: Blazor WASM + E2E Infrastructure (2026-03-18) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
 *Last Updated: 2026-03-18*
