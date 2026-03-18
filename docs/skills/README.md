@@ -17,8 +17,9 @@ This directory contains implementation patterns and best practices for building 
 
 **Working with Aggregates:**
 - 📝 [Event-Sourced Aggregate Design](./marten-event-sourcing.md) - Event-sourced aggregates, decider pattern, factory methods
-- 📊 [Event Sourcing Projections](./event-sourcing-projections.md) - Marten projections: snapshots, multi-stream, live aggregation, FetchForWriting()
+- 📊 [Event Sourcing Projections](./event-sourcing-projections.md) - Marten projections: snapshots, multi-stream, live aggregation, views, FetchForWriting()
 - 📦 [Marten Document Store](./marten-document-store.md) - Document models, CRUD patterns, value objects for queryable fields
+- 🔀 [Dynamic Consistency Boundary](./dynamic-consistency-boundary.md) - Multi-stream consistency without sagas: EventTagQuery, BoundaryModel, cross-entity invariants
 
 **Traditional Relational Data:**
 - 🗄️ [EF Core + Wolverine Integration](./efcore-wolverine-integration.md) - Entity models, DbContext setup, migrations, navigation properties
