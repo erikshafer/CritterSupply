@@ -285,12 +285,12 @@ else
             else if (failureCount > 0)
             {
                 Snackbar.Add($"Some updates failed ({failureCount} failed, {successCount} succeeded)", Severity.Warning);
-            Logger.LogWarning("Session expired while saving product {Sku}", Sku?.Replace("\r", "").Replace("\n", ""));
+            Logger.LogWarning("Session expired while saving product {Sku}", SanitizeForLog(Sku));
             }
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
-            Logger.LogError(ex, "Error saving product {Sku}", Sku?.Replace("\r", "").Replace("\n", ""));
+            Logger.LogError(ex, "Error saving product {Sku}", SanitizeForLog(Sku));
             SessionExpiredService.TriggerSessionExpired();
         }
         catch (Exception ex)
@@ -335,12 +335,12 @@ else
             }
             else
             {
-            Logger.LogWarning("Session expired while discontinuing product {Sku}", Sku?.Replace("\r", "").Replace("\n", ""));
+            Logger.LogWarning("Session expired while discontinuing product {Sku}", SanitizeForLog(Sku));
             }
             var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
             Logger.LogWarning("Session expired while discontinuing product {Sku}", safeSku);
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            Logger.LogError(ex, "Error discontinuing product {Sku}", Sku?.Replace("\r", "").Replace("\n", ""));
+            Logger.LogError(ex, "Error discontinuing product {Sku}", SanitizeForLog(Sku));
             Logger.LogWarning("Session expired while discontinuing product {Sku}", Sku);
             SessionExpiredService.TriggerSessionExpired();
             var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
@@ -349,6 +349,18 @@ else
         {
             Logger.LogError(ex, "Error discontinuing product {Sku}", Sku);
             Snackbar.Add("Failed to discontinue product", Severity.Error);
+    private static string SanitizeForLog(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        // Remove line breaks to prevent log forging via user-controlled values
+        return value.Replace("\r", string.Empty)
+                    .Replace("\n", string.Empty);
+    }
+
         }
         finally
         {
