@@ -47,7 +47,7 @@
 | **Recent Completion** | M32.1 — Backoffice Phase 2: Blazor WASM + E2E Infrastructure (2026-03-18) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-18*
+*Last Updated: 2026-03-19*
 
 ---
 
@@ -55,31 +55,37 @@
 
 ### 🚀 M32.2: Backoffice Phase 3A — Option A Selected
 
-**Status:** ✅ **DECIDED** — Option A selected by owner on 2026-03-18
+**Status:** 🚀 **IN PROGRESS** — Session 1 completed
 **Goal:** Execute narrow M32.2 scope (stabilization + UX hardening) and defer heavier write-ops/UI depth to M32.3
 
 **Current findings (2026-03-18):**
 - ✅ UX audit backlog has been converted to copy/paste issue drafts:
-  - `docs/planning/ux-audit-discovery-2026-03-18.md` → “Drop-in backlog entries”
+  - `docs/planning/ux-audit-discovery-2026-03-18.md` → "Drop-in backlog entries"
 - ✅ M32.1 retrospective already recommends:
   - M32.2 focus on E2E stabilization
   - Write-operations UI deferred to M32.3+
 - ✅ No existing `m32.2*` / `m32.3*` milestone plan files found under `docs/planning/milestones/`
 - ✅ No existing GitHub Issues currently assigned to milestone `M32.2` or `M32.3`
 
-**Proposed backlog intake split:**
+**Session 1 Progress (2026-03-19):**
+- ✅ P0-1: Fixed Alerts.razor authorization role mismatch (warehouse-manager → warehouse-clerk)
+- ✅ P1-1: Gated dead-end navigation in CustomerSearch.razor ("View Details" button disabled with tooltip)
+- ✅ Verified build succeeds with both fixes (0 errors)
+- ✅ Stored memories for future sessions
 
-**Candidate for M32.2 (stabilization + UX hardening):**
-- P0: Alerts authorization role mismatch
-- P0: Alert acknowledgment UX
-- P0: Session-expired recovery UX
-- P0: Network/conflict/retry state standardization
-- P1: Dead-end route gating/replacement
-- P1: Data freshness indicators
+**Backlog Status:**
 
-**Candidate for M32.3 (write-ops/UI depth + cross-BC dependencies):**
-- P1: Product history tab with significance filtering (event-sourcing dependent)
-- P1: Discontinuation pre-flight impact + grouped notification UX (Listings/Marketplaces dependency)
+**M32.2 (stabilization + UX hardening):**
+- ✅ P0-1: Alerts authorization role mismatch (COMPLETED Session 1)
+- ⏸️ P0-2: Alert acknowledgment UX (PENDING)
+- ⏸️ P0-3: Session-expired recovery UX (PENDING)
+- ⏸️ P0-4: Network/conflict/retry state standardization (PENDING)
+- ✅ P1-1: Dead-end route gating/replacement (COMPLETED Session 1)
+- ⏸️ P1-2: Data freshness indicators (PENDING)
+
+**M32.3 (write-ops/UI depth + cross-BC dependencies):**
+- P1-3: Product history tab with significance filtering (event-sourcing dependent)
+- P1-4: Discontinuation pre-flight impact + grouped notification UX (Listings/Marketplaces dependency)
 - P2: Operator terminology consistency pass
 - P2: Catalog/listings bootstrap/backfill UX states
 - Existing deferred Phase 3 items: Promotions management UI, CSV/Excel exports, bulk operations pattern, returns analytics dashboard, audit log viewer
@@ -88,10 +94,9 @@
 - ✅ **Option A selected:** Keep M32.2 narrow (stability + UX hardening), push heavier write-ops/UI depth to M32.3
 - ⏸️ Option B/C not selected at this time
 
-**Next actions:**
-1. Create GitHub Issues from M32.2 drafts in `ux-audit-discovery-2026-03-18.md`
-2. Assign milestone labels (`M32.2` and `M32.3`) per the selected split
-3. Start M32.2 Session 1 with P0 authorization + dead-end route gating items
+**Next Session (Session 2):**
+1. P0-2: Add alert acknowledgment UX in Alerts page
+2. P0-3: Implement session-expired recovery UX (if time permits)
 
 ---
 
