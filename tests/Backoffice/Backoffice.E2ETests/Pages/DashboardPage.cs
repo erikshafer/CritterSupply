@@ -24,6 +24,10 @@ public sealed class DashboardPage
     private ILocator LowStockAlertsCard => _page.GetByTestId("kpi-low-stock-alerts");
     // Note: Active Customers KPI removed - not in M32.1 scope (deferred to Phase 3+)
 
+    // Locators - Data Freshness (P1-2)
+    private ILocator MetricsUpdatedBanner => _page.GetByTestId("metrics-updated-banner");
+    private ILocator DashboardRefreshButton => _page.GetByTestId("dashboard-refresh-btn");
+
     // Locators - Navigation
     private ILocator CustomerServiceLink => _page.GetByTestId("nav-customer-service");
     private ILocator OperationsLink => _page.GetByTestId("nav-operations");
@@ -148,5 +152,42 @@ public sealed class DashboardPage
         }
 
         throw new TimeoutException($"KPI '{kpiTestId}' did not update to '{expectedValue}' within {timeoutMs}ms");
+    }
+
+    // P1-2: Data Freshness Indicators
+    public async Task<bool> IsMetricsUpdatedBannerVisibleAsync()
+    {
+        try
+        {
+            await MetricsUpdatedBanner.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public async Task<string?> GetMetricsUpdatedBannerTextAsync()
+    {
+        if (await IsMetricsUpdatedBannerVisibleAsync())
+        {
+            return await MetricsUpdatedBanner.TextContentAsync();
+        }
+        return null;
+    }
+
+    public async Task ClickRefreshButtonInBannerAsync()
+    {
+        // The banner has a "Refresh" button inside it
+        var refreshButtonInBanner = MetricsUpdatedBanner.Locator("button:has-text('Refresh')");
+        await refreshButtonInBanner.ClickAsync();
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+    }
+
+    public async Task ClickDashboardRefreshButtonAsync()
+    {
+        await DashboardRefreshButton.ClickAsync();
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
     }
 }

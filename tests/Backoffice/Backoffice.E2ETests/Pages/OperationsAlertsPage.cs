@@ -21,6 +21,9 @@ public sealed class OperationsAlertsPage
     private ILocator AlertFeed => _page.GetByTestId("operations-alerts-feed");
     private ILocator AlertRows => AlertFeed.Locator("[data-testid^='alert-']");
     private ILocator NoAlertsMessage => _page.GetByTestId("no-alerts-message");
+    private ILocator LastUpdatedTimestamp => _page.GetByTestId("alerts-last-updated");
+    private ILocator RefreshButton => _page.GetByTestId("refresh-alerts-btn");
+    private ILocator NewAlertsBanner => _page.GetByTestId("new-alerts-banner");
 
     // Locators - Filters (MudBlazor MudSelect pattern)
     private ILocator SeverityFilter => _page.GetByTestId("alert-severity-filter");
@@ -336,5 +339,123 @@ public sealed class OperationsAlertsPage
         }
 
         throw new TimeoutException($"Alert '{alertId}' status did not change to '{expectedStatus}' within {timeoutMs}ms");
+    }
+
+    // P1-2: Data Freshness Indicators
+    public async Task<string?> GetLastUpdatedTimestampAsync()
+    {
+        try
+        {
+            await LastUpdatedTimestamp.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
+            return await LastUpdatedTimestamp.TextContentAsync();
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<bool> IsLastUpdatedTimestampVisibleAsync()
+    {
+        try
+        {
+            await LastUpdatedTimestamp.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public async Task ClickRefreshButtonAsync()
+    {
+        await RefreshButton.ClickAsync();
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+    }
+
+    // P1-2: New Alerts Banner
+    public async Task<bool> IsNewAlertsBannerVisibleAsync()
+    {
+        try
+        {
+            await NewAlertsBanner.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public async Task<string?> GetNewAlertsBannerTextAsync()
+    {
+        if (await IsNewAlertsBannerVisibleAsync())
+        {
+            return await NewAlertsBanner.TextContentAsync();
+        }
+        return null;
+    }
+
+    public async Task ClickRefreshButtonInBannerAsync()
+    {
+        // The banner has a "Refresh" button inside it
+        var refreshButtonInBanner = NewAlertsBanner.Locator("button:has-text('Refresh')");
+        await refreshButtonInBanner.ClickAsync();
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+    }
+
+    public async Task<bool> IsBannerHiddenAsync()
+    {
+        try
+        {
+            await NewAlertsBanner.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 2_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    // SessionExpirySteps and AuthorizationSteps support methods
+    public async Task<bool> IsAlertFeedVisibleAsync()
+    {
+        try
+        {
+            await AlertFeed.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public async Task ClickFirstAlertAsync()
+    {
+        var firstAlert = AlertRows.First;
+        await firstAlert.ClickAsync();
+        await AlertDetailsModal.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+    }
+
+    public async Task ClickAlertBySku(string sku)
+    {
+        // Find alert row by SKU text content
+        var alertRow = AlertRows.Filter(new() { HasText = sku }).First;
+        await alertRow.ClickAsync();
+        await AlertDetailsModal.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+    }
+
+    public async Task FilterByStatus(string status)
+    {
+        await FilterByStatusAsync(status);
+    }
+
+    public async Task AcknowledgeAlertAsync()
+    {
+        // Acknowledge currently open alert in modal
+        await AcknowledgeButton.ClickAsync();
+        await AlertDetailsModal.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
     }
 }

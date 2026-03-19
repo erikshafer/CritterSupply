@@ -122,3 +122,68 @@ Feature: Operations Alert Feed with Real-Time Updates
     And I acknowledge all 5 alerts one by one
     Then all alert statuses should change to "Acknowledged"
     And I should see a "no unacknowledged alerts" message when filtering by status "Unacknowledged"
+
+  Scenario: P0-2 - Acknowledge alert with 409 Conflict (already acknowledged by someone else)
+    Given there is an unacknowledged low-stock alert with ID "{AlertId1}" for SKU "TREAT-001"
+    And I am on the operations alerts page
+    When another admin acknowledges alert "{AlertId1}" from a different session
+    And I click on the alert for SKU "TREAT-001"
+    And I acknowledge the alert
+    Then I should see an info message "Alert was already acknowledged"
+    And the alert should be removed from my feed
+    And the acknowledge button should return to normal state
+
+  Scenario: P0-2 - Acknowledge alert with optimistic UI update
+    Given there is an unacknowledged low-stock alert for SKU "FOOD-005"
+    And I am on the operations alerts page
+    When I click on the alert for SKU "FOOD-005"
+    And I click the acknowledge button
+    Then the button should show "Acknowledging..." immediately
+    And the button should be disabled during the request
+    When the acknowledgment succeeds
+    Then the alert should be removed from the feed immediately
+    And I should see a success message "Alert acknowledged"
+
+  Scenario: P0-2 - Acknowledge alert with 401 Unauthorized (session expired)
+    Given there is an unacknowledged low-stock alert for SKU "TOY-010"
+    And I am on the operations alerts page
+    When my session expires
+    And I click on the alert for SKU "TOY-010"
+    And I acknowledge the alert
+    Then the button should show "Acknowledging..." briefly
+    And the session expired modal should appear
+    And the alert should still be visible in the feed
+    And the acknowledge button should return to normal state
+
+  Scenario: P0-2 - Multiple rapid acknowledgments with race condition handling
+    Given there are 3 unacknowledged low-stock alerts
+    And I am on the operations alerts page
+    When I rapidly acknowledge all 3 alerts within 2 seconds
+    Then each button should show "Acknowledging..." in sequence
+    And all 3 alerts should be removed from the feed
+    And I should see 3 success messages
+
+  Scenario: P1-2 - Data freshness indicator shows "Last updated" timestamp
+    Given there are 3 unacknowledged low-stock alerts
+    When I navigate to the operations alerts page
+    Then I should see "Last updated: just now" below the alert count
+    And the timestamp should be visible
+
+  Scenario: P1-2 - Data freshness indicator updates after manual refresh
+    Given there are 3 unacknowledged low-stock alerts
+    And I am on the operations alerts page
+    And I wait 2 minutes
+    When I click the refresh button
+    Then the "Last updated" timestamp should change to "just now"
+    And the alert count should be refreshed
+
+  Scenario: P1-2 - New alerts banner appears with refresh option
+    Given I am on the operations alerts page
+    And there are 2 unacknowledged low-stock alerts
+    When 3 new low-stock alerts are triggered via SignalR
+    Then I should see a banner "3 new alert(s) received"
+    And the banner should have a "Refresh" button
+    When I click the "Refresh" button in the banner
+    Then the alert feed should show 5 total alerts
+    And the new alerts banner should disappear
+    And the "Last updated" timestamp should change to "just now"

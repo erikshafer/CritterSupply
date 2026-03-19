@@ -1,0 +1,63 @@
+@inject SessionExpiredService SessionExpiredService
+@inject NavigationManager NavigationManager
+@inject BackofficeAuthState AuthState
+@implements IDisposable
+
+<MudOverlay Visible="@_isVisible" ZIndex="9999" DarkBackground="true" AutoClose="false">
+    <MudPaper Elevation="8" Class="pa-6" Style="max-width: 500px;">
+        <MudText Typo="Typo.h5" GutterBottom="true">
+            <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Color="Color.Warning" Class="mr-2" />
+            Session Expired
+        </MudText>
+        <MudText Typo="Typo.body1" Class="mb-4">
+            Your session has expired. Please log in again to continue.
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+            You'll be returned to this page after logging in.
+        </MudText>
+        <div class="d-flex justify-end">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="HandleReLogin"
+                       data-testid="session-expired-relogin-btn">
+                Log In Again
+            </MudButton>
+        </div>
+    </MudPaper>
+</MudOverlay>
+
+@code {
+    private bool _isVisible;
+    private string? _returnUrl;
+
+    protected override void OnInitialized()
+    {
+        SessionExpiredService.OnSessionExpired += ShowModal;
+    }
+
+    private void ShowModal()
+    {
+        // Capture current URL for post-auth redirect
+        _returnUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        _isVisible = true;
+        StateHasChanged();
+    }
+
+    private void HandleReLogin()
+    {
+        // Clear auth state to force login
+        AuthState.ClearAuthentication();
+
+        // Navigate to login with returnUrl query parameter
+        var loginUrl = string.IsNullOrEmpty(_returnUrl) || _returnUrl == "login"
+            ? "/login"
+            : $"/login?returnUrl={Uri.EscapeDataString(_returnUrl)}";
+
+        NavigationManager.NavigateTo(loginUrl);
+    }
+
+    public void Dispose()
+    {
+        SessionExpiredService.OnSessionExpired -= ShowModal;
+    }
+}

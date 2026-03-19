@@ -10,6 +10,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject ILogger<CustomerSearch> Logger
+@inject SessionExpiredService SessionExpiredService
 
 <PageTitle>Customer Search — Backoffice</PageTitle>
 
@@ -112,13 +113,15 @@
                     </MudTd>
                     <MudTd DataLabel="Total Orders">@context.TotalOrders</MudTd>
                     <MudTd DataLabel="Actions">
-                        <MudButton Variant="Variant.Text"
-                                   Color="Color.Primary"
-                                   Size="Size.Small"
-                                   OnClick="@(() => ViewCustomerDetails(context.CustomerId))"
-                                   data-testid="@($"view-customer-{context.CustomerId}")">
-                            View Details
-                        </MudButton>
+                        <MudTooltip Text="Customer detail page coming soon">
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Secondary"
+                                       Size="Size.Small"
+                                       Disabled="true"
+                                       data-testid="@($"view-customer-{context.CustomerId}")">
+                                View Details
+                            </MudButton>
+                        </MudTooltip>
                     </MudTd>
                 </RowTemplate>
             </MudTable>
@@ -170,7 +173,8 @@
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Snackbar.Add("Session expired. Please log in again.", Severity.Warning);
+                // Session expired: trigger blocking modal (P0-3/P0-4)
+                SessionExpiredService.TriggerSessionExpired();
             }
             else
             {
@@ -186,12 +190,6 @@
         {
             _isSearching = false;
         }
-    }
-
-    private void ViewCustomerDetails(Guid customerId)
-    {
-        // Navigate to customer detail page (will be implemented later)
-        Navigation.NavigateTo($"/customers/{customerId}");
     }
 
     private sealed record CustomerSearchResponse(

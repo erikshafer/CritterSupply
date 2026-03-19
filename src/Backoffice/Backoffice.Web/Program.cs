@@ -36,6 +36,7 @@ builder.Services.AddMudServices();
 builder.Services.AddSingleton<BackofficeAuthState>();
 builder.Services.AddSingleton<BackofficeAuthService>();
 builder.Services.AddSingleton<TokenRefreshService>();
+builder.Services.AddSingleton<SessionExpiredService>();
 
 // SignalR hub service (singleton — manages persistent connection)
 builder.Services.AddSingleton<BackofficeHubService>();

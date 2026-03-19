@@ -81,11 +81,16 @@
     private string? errorMessage;
     private bool isLoggingIn;
     private bool signedOut;
+    private string? returnUrl;
 
     protected override void OnInitialized()
     {
         var uri = new Uri(NavigationManager.Uri);
         signedOut = uri.Query.Contains("signedOut=true");
+
+        // Extract returnUrl query parameter for post-auth redirect (P0-3)
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        returnUrl = query["returnUrl"];
     }
 
     private async Task HandleLogin()
@@ -100,7 +105,13 @@
             if (success)
             {
                 Logger.LogInformation("User {Email} logged in successfully", loginModel.Email);
-                NavigationManager.NavigateTo("/dashboard");
+
+                // Redirect to returnUrl if present, otherwise dashboard (P0-3)
+                var redirectUrl = !string.IsNullOrEmpty(returnUrl) && returnUrl != "/login"
+                    ? returnUrl
+                    : "/dashboard";
+
+                NavigationManager.NavigateTo(redirectUrl);
             }
             else
             {

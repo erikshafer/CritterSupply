@@ -12,6 +12,12 @@ public sealed class StubInventoryClient : IInventoryClient
     private readonly Dictionary<string, StockLevelDto> _stockLevels = new();
     private readonly List<LowStockAlertDto> _lowStockAlerts = new();
 
+    /// <summary>
+    /// When true, all API methods will throw HttpRequestException with 401 Unauthorized.
+    /// Used by SessionExpirySteps to simulate session expiry.
+    /// </summary>
+    public bool SimulateSessionExpired { get; set; }
+
     public sealed record LowStockAlertDto(
         Guid Id,
         string Sku,
@@ -62,6 +68,9 @@ public sealed class StubInventoryClient : IInventoryClient
 
     public Task<StockLevelDto?> GetStockLevelAsync(string sku, CancellationToken ct = default)
     {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
         return Task.FromResult(_stockLevels.GetValueOrDefault(sku));
     }
 
@@ -69,6 +78,9 @@ public sealed class StubInventoryClient : IInventoryClient
         int? threshold = null,
         CancellationToken ct = default)
     {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
         var alerts = _lowStockAlerts
             .Where(a => !a.IsAcknowledged)
             .Where(a => threshold == null || a.AvailableQuantity <= threshold)

@@ -52,7 +52,8 @@ public static class GetAlertFeed
                 a.Message,
                 a.ContextData
             )).ToList(),
-            alerts.Count);
+            alerts.Count,
+            DateTimeOffset.UtcNow);
 
         return TypedResults.Ok(response);
     }
@@ -63,7 +64,8 @@ public static class GetAlertFeed
 /// </summary>
 public sealed record AlertFeedResponse(
     IReadOnlyList<AlertDto> Alerts,
-    int TotalCount);
+    int TotalCount,
+    DateTimeOffset QueriedAt);
 
 /// <summary>
 /// DTO for individual alert in feed.

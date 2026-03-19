@@ -2094,5 +2094,616 @@ public class DashboardPage
 - **M32.1 Session 16:** Tiered timeout strategy, hydration detection, auth/SignalR timing
 - **M32.1 Session 14-15:** Test-ID naming conventions, POM-first workflow
 - **M32.1 Session 6:** MudBlazor v9+ type parameters
+- **M32.2 Sessions 4-6:** Session expiry, authorization, data freshness E2E patterns
+
+---
+
+## M32.2: Session Expiry & Authorization E2E Patterns
+
+**Context:** M32.2 added UX hardening for Backoffice WASM app (8 features: session expiry recovery, authorization/RBAC, alert acknowledgment 409/401 handling, data freshness indicators). E2E tests validate these cross-cutting concerns.
+
+---
+
+### Pattern: SimulateSessionExpired for Stub Clients
+
+**Problem:** Need to test session expiry (401 Unauthorized) responses across all API clients without spinning up real auth infrastructure.
+
+**Solution:** Add `SimulateSessionExpired` bool property to all stub clients. When true, throw `HttpRequestException` with `HttpStatusCode.Unauthorized`.
+
+**Implementation:**
+
+```csharp
+// tests/Backoffice/Backoffice.E2ETests/Stubs/StubInventoryClient.cs
+public sealed class StubInventoryClient : IInventoryClient
+{
+    /// <summary>
+    /// When true, all API methods will throw HttpRequestException with 401 Unauthorized.
+    /// Used by SessionExpirySteps to simulate session expiry.
+    /// </summary>
+    public bool SimulateSessionExpired { get; set; }
+
+    public Task<StockLevelDto?> GetStockLevelAsync(string sku, CancellationToken ct = default)
+    {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
+        return Task.FromResult(_stockLevels.GetValueOrDefault(sku));
+    }
+
+    public Task<IReadOnlyList<LowStockDto>> GetLowStockAsync(
+        int? threshold = null,
+        CancellationToken ct = default)
+    {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
+        // ... rest of method
+    }
+}
+```
+
+**Step Definition Usage:**
+
+```csharp
+// tests/Backoffice/Backoffice.E2ETests/StepDefinitions/SessionExpirySteps.cs
+[When(@"my session expires")]
+public void WhenMySessionExpires()
+{
+    // Mark session as expired — stub will return 401 for next API call
+    Fixture.StubInventoryClient.SimulateSessionExpired = true;
+    Fixture.StubOrdersClient.SimulateSessionExpired = true;
+    Fixture.StubCustomerIdentityClient.SimulateSessionExpired = true;
+}
+
+[When(@"I trigger a data refresh")]
+public async Task WhenITriggerADataRefresh()
+{
+    var dashboardPage = new DashboardPage(Page, Fixture.WasmBaseUrl);
+    await dashboardPage.ClickRefreshButtonInBannerAsync();
+}
+
+[Then(@"I should see the session expired modal")]
+public async Task ThenIShouldSeeTheSessionExpiredModal()
+{
+    var sessionExpiredPage = new SessionExpiredPage(Page);
+    var isVisible = await sessionExpiredPage.IsSessionExpiredModalVisibleAsync();
+    isVisible.ShouldBeTrue();
+}
+```
+
+**Why This Works:**
+- ✅ In-process exception (no HTTP layer mocking needed)
+- ✅ Works with all 3 stub clients (Inventory, Orders, CustomerIdentity)
+- ✅ Simulates real 401 response behavior
+- ✅ Triggers SessionExpiredService event globally
+
+**What to Stub:**
+- All API clients that require authentication
+- All methods that might be called during user workflows
+- Example clients: StubInventoryClient, StubOrdersClient, StubCustomerIdentityClient
+
+---
+
+### Pattern: Multi-Role Admin User Seeding
+
+**Problem:** Authorization tests need deterministic admin users with specific roles (system-admin, operations-manager, warehouse-clerk, customer-service, copy-writer, pricing-manager, executive).
+
+**Solution:** Extend E2ETestFixture with `SeedAdminUserWithRole()` method + WellKnownTestData constants.
+
+**Implementation:**
+
+```csharp
+// tests/Backoffice/Backoffice.E2ETests/WellKnownTestData.cs
+internal static class WellKnownTestData
+{
+    internal static class AdminUsers
+    {
+        // Multi-role admin users for Authorization scenarios
+        public static readonly Guid SystemAdmin = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA");
+        public const string SystemAdminEmail = "sysadmin@crittersupply.com";
+        public const string SystemAdminRole = "system-admin";
+
+        public static readonly Guid OperationsManager = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB");
+        public const string OperationsManagerEmail = "opsmgr@crittersupply.com";
+        public const string OperationsManagerRole = "operations-manager";
+
+        public static readonly Guid WarehouseClerk = Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC");
+        public const string WarehouseClerkEmail = "warehouse@crittersupply.com";
+        public const string WarehouseClerkRole = "warehouse-clerk";
+
+        public static readonly Guid CustomerService = Guid.Parse("DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD");
+        public const string CustomerServiceEmail = "support@crittersupply.com";
+        public const string CustomerServiceRole = "customer-service";
+
+        public static readonly Guid CopyWriter = Guid.Parse("EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE");
+        public const string CopyWriterEmail = "copywriter@crittersupply.com";
+        public const string CopyWriterRole = "copy-writer";
+
+        public static readonly Guid PricingManager = Guid.Parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF");
+        public const string PricingManagerEmail = "pricing@crittersupply.com";
+        public const string PricingManagerRole = "pricing-manager";
+
+        public static readonly Guid Executive = Guid.Parse("99999999-9999-9999-9999-999999999999");
+        public const string ExecutiveEmail = "exec@crittersupply.com";
+        public const string ExecutiveRole = "executive";
+    }
+}
+```
+
+```csharp
+// tests/Backoffice/Backoffice.E2ETests/E2ETestFixture.cs
+public void SeedAdminUserWithRole(Guid userId, string email, string displayName, string role)
+{
+    var passwordHasher = new PasswordHasher<BackofficeUser>();
+
+    // Map role string to BackofficeRole enum
+    var backofficeRole = role switch
+    {
+        "system-admin" => BackofficeIdentity.Identity.BackofficeRole.SystemAdmin,
+        "operations-manager" => BackofficeIdentity.Identity.BackofficeRole.OperationsManager,
+        "warehouse-clerk" => BackofficeIdentity.Identity.BackofficeRole.WarehouseClerk,
+        "customer-service" => BackofficeIdentity.Identity.BackofficeRole.CustomerService,
+        "copy-writer" => BackofficeIdentity.Identity.BackofficeRole.CopyWriter,
+        "pricing-manager" => BackofficeIdentity.Identity.BackofficeRole.PricingManager,
+        "executive" => BackofficeIdentity.Identity.BackofficeRole.Executive,
+        _ => throw new ArgumentException($"Unknown role: {role}")
+    };
+
+    var user = new BackofficeUser(
+        userId,
+        email,
+        displayName,
+        backofficeRole,
+        IsActive: true
+    );
+
+    // Hash password using ASP.NET Core Identity's PBKDF2-SHA256
+    user.PasswordHash = passwordHasher.HashPassword(user, "Password123!");
+
+    _backofficeIdentityDbContext.BackofficeUsers.Add(user);
+    _backofficeIdentityDbContext.SaveChanges();
+}
+```
+
+**Step Definition Usage:**
+
+```csharp
+// tests/Backoffice/Backoffice.E2ETests/StepDefinitions/AuthorizationSteps.cs
+[Given(@"I am logged in as a ""(.*)"" user")]
+public async Task GivenIAmLoggedInAsAUser(string role)
+{
+    // Map role to well-known test data
+    var (userId, email, displayName) = role switch
+    {
+        "system-admin" => (WellKnownTestData.AdminUsers.SystemAdmin,
+                           WellKnownTestData.AdminUsers.SystemAdminEmail,
+                           "System Admin"),
+        "warehouse-clerk" => (WellKnownTestData.AdminUsers.WarehouseClerk,
+                              WellKnownTestData.AdminUsers.WarehouseClerkEmail,
+                              "Warehouse Clerk"),
+        _ => throw new ArgumentException($"Unknown role: {role}")
+    };
+
+    // Seed user with specific role
+    Fixture.SeedAdminUserWithRole(userId, email, displayName, role);
+
+    // Log in
+    var loginPage = new LoginPage(Page, Fixture.WasmBaseUrl);
+    await loginPage.NavigateAsync();
+    await loginPage.LoginAsync(email, "Password123!");
+}
+```
+
+**Why This Works:**
+- ✅ Deterministic GUIDs (repeatable tests)
+- ✅ Role-specific permissions enforced by Backoffice Identity BC
+- ✅ Uses production PasswordHasher (PBKDF2-SHA256)
+- ✅ Supports all 7 BackofficeRole enum values
+
+**When to Use:**
+- Authorization/RBAC tests
+- Role-specific feature visibility tests
+- Permission-based workflow tests
+
+---
+
+### Pattern: Role Enum Mismatch Resolution
+
+**Problem:** Test data used "finance-clerk" role, but production enum uses `PricingManager` (not `FinanceClerk`).
+
+**Error:**
+```
+CS0117: 'BackofficeRole' does not contain a definition for 'FinanceClerk'
+```
+
+**Root Cause:** Switch statement in E2ETestFixture.cs mapped "finance-clerk" to non-existent enum value.
+
+**Solution:** Always check production enum FIRST before writing test data.
+
+**Investigation Process:**
+
+```bash
+# Step 1: Find production enum definition
+grep -A 20 "enum BackofficeRole" src/Backoffice\ Identity/BackofficeIdentity/Identity/BackofficeUser.cs
+
+# Output shows actual enum values:
+public enum BackofficeRole
+{
+    CopyWriter = 1,
+    PricingManager = 2,        // Not FinanceClerk!
+    WarehouseClerk = 3,
+    CustomerService = 4,
+    OperationsManager = 5,
+    Executive = 6,
+    SystemAdmin = 7
+}
+```
+
+**Fix Applied:**
+
+```csharp
+// E2ETestFixture.cs - BEFORE (wrong)
+var backofficeRole = role switch
+{
+    // ... other roles
+    "finance-clerk" => BackofficeIdentity.Identity.BackofficeRole.FinanceClerk,  // ❌ Doesn't exist
+    // ... other roles
+};
+
+// E2ETestFixture.cs - AFTER (correct)
+var backofficeRole = role switch
+{
+    // ... other roles
+    "pricing-manager" => BackofficeIdentity.Identity.BackofficeRole.PricingManager,  // ✅ Correct
+    // ... other roles
+};
+```
+
+**WellKnownTestData Update:**
+
+```csharp
+// BEFORE (wrong)
+public static readonly Guid FinanceClerk = Guid.Parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF");
+public const string FinanceClerkEmail = "finance@crittersupply.com";
+public const string FinanceClerkRole = "finance-clerk";
+
+// AFTER (correct)
+public static readonly Guid PricingManager = Guid.Parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF");
+public const string PricingManagerEmail = "pricing@crittersupply.com";
+public const string PricingManagerRole = "pricing-manager";
+```
+
+**Key Lesson:** **NEVER** assume enum values — always verify production code first.
+
+**Checklist for Role/Enum Testing:**
+1. ✅ Grep production enum definition
+2. ✅ Map kebab-case strings to actual enum values
+3. ✅ Update both E2ETestFixture switch statement AND WellKnownTestData constants
+4. ✅ Build succeeds with 0 errors
+
+---
+
+### Pattern: Playwright `.First` Property (Not Method)
+
+**Problem:** Used LINQ-style `.First()` method but Playwright uses `.First` property.
+
+**Error:**
+```
+CS1061: 'ILocator' does not contain a definition for 'First' and no accessible extension method 'First' accepting a first argument of type 'ILocator' could be found
+```
+
+**Root Cause:** Playwright's `ILocator` interface uses properties, not methods, for indexing.
+
+**Wrong:**
+```csharp
+public async Task ClickFirstAlertAsync()
+{
+    var firstAlert = AlertRows.First();  // ❌ Method call
+    await firstAlert.ClickAsync();
+}
+
+public async Task ClickAlertBySku(string sku)
+{
+    var alertRow = AlertRows.Filter(new() { HasText = sku }).First();  // ❌ Method call
+    await alertRow.ClickAsync();
+}
+```
+
+**Right:**
+```csharp
+public async Task ClickFirstAlertAsync()
+{
+    var firstAlert = AlertRows.First;  // ✅ Property access
+    await firstAlert.ClickAsync();
+    await AlertDetailsModal.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+}
+
+public async Task ClickAlertBySku(string sku)
+{
+    // Find alert row by SKU text content
+    var alertRow = AlertRows.Filter(new() { HasText = sku }).First;  // ✅ Property access
+    await alertRow.ClickAsync();
+    await AlertDetailsModal.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+}
+```
+
+**Playwright Indexing Properties:**
+
+| Property | Purpose | Example |
+|----------|---------|---------|
+| `.First` | First matching element | `AlertRows.First` |
+| `.Last` | Last matching element | `AlertRows.Last` |
+| `.Nth(n)` | Nth matching element (0-indexed) | `AlertRows.Nth(2)` |
+
+**Key Lesson:** Playwright uses properties for indexing, not LINQ methods.
+
+**When to Use:**
+- Clicking first/last item in a list
+- Iterating through filtered elements
+- Selecting specific items by index
+
+---
+
+### Pattern: Session Expiry Modal as Global Page Object
+
+**Problem:** Session expiry modal appears across all pages — don't duplicate locators in every page object.
+
+**Solution:** Create dedicated `SessionExpiredPage.cs` page object with modal-specific locators and actions.
+
+**Implementation:**
+
+```csharp
+// tests/Backoffice/Backoffice.E2ETests/Pages/SessionExpiredPage.cs
+public sealed class SessionExpiredPage
+{
+    private readonly IPage _page;
+
+    public SessionExpiredPage(IPage page)
+    {
+        _page = page;
+    }
+
+    // Locators - Session Expired Modal (global overlay)
+    private ILocator SessionExpiredModal => _page.GetByTestId("session-expired-modal");
+    private ILocator ModalMessage => SessionExpiredModal.Locator("[data-testid='modal-message']");
+    private ILocator LogInAgainButton => SessionExpiredModal.GetByTestId("log-in-again-button");
+    private ILocator CloseButton => SessionExpiredModal.GetByTestId("close-button");
+
+    // Actions
+    public async Task<bool> IsSessionExpiredModalVisibleAsync()
+    {
+        try
+        {
+            await SessionExpiredModal.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public async Task<string?> GetModalMessageAsync()
+    {
+        if (await IsSessionExpiredModalVisibleAsync())
+        {
+            return await ModalMessage.TextContentAsync();
+        }
+        return null;
+    }
+
+    public async Task ClickLogInAgainAsync()
+    {
+        await LogInAgainButton.ClickAsync();
+        await _page.WaitForURLAsync("**/auth/login**");
+    }
+
+    public async Task<bool> CanInteractWithPageBehindModalAsync()
+    {
+        // Modal should block interaction with page behind it
+        try
+        {
+            await _page.GetByTestId("dashboard-title").ClickAsync(new() { Timeout = 1_000 });
+            return true;  // Should not reach here if modal blocks
+        }
+        catch (TimeoutException)
+        {
+            return false;  // Modal correctly blocks interaction
+        }
+    }
+
+    public async Task<int> GetSessionExpiredModalCountAsync()
+    {
+        // Verify no duplicate modals
+        return await _page.GetByTestId("session-expired-modal").CountAsync();
+    }
+
+    public async Task CloseModalAsync()
+    {
+        await CloseButton.ClickAsync();
+        await SessionExpiredModal.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 3_000 });
+    }
+
+    public async Task<bool> IsModalHiddenAsync()
+    {
+        try
+        {
+            await SessionExpiredModal.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 2_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+}
+```
+
+**Why Separate Page Object:**
+- ✅ Modal appears globally (not tied to specific page)
+- ✅ Avoids duplicating locators across DashboardPage, CustomerSearchPage, OperationsAlertsPage, etc.
+- ✅ Testable modal behavior (blocking interaction, returnUrl preservation, duplicate detection)
+- ✅ Reusable across all SessionExpirySteps scenarios
+
+**When to Create Global Page Objects:**
+- Modals/overlays that appear across multiple pages
+- Navigation bars (shared across all authenticated pages)
+- Footer components
+- Toast notifications
+
+---
+
+### Pattern: ReturnUrl Preservation Testing
+
+**Problem:** After session expiry, user should be redirected back to original page after re-authentication.
+
+**Solution:** Verify `returnUrl` query parameter is preserved and page is restored post-login.
+
+**Implementation:**
+
+```csharp
+// tests/Backoffice/Backoffice.E2ETests/StepDefinitions/SessionExpirySteps.cs
+[Then(@"the returnUrl query parameter should be ""(.*)""")]
+public async Task ThenTheReturnUrlQueryParameterShouldBe(string expectedReturnUrl)
+{
+    await Task.Delay(500); // Allow navigation to complete
+    var url = Page.Url;
+    url.ShouldContain($"returnUrl={Uri.EscapeDataString(expectedReturnUrl)}");
+}
+
+[Then(@"I should be redirected back to the dashboard")]
+public async Task ThenIShouldBeRedirectedBackToTheDashboard()
+{
+    var dashboardPage = new DashboardPage(Page, Fixture.WasmBaseUrl);
+    var isOnDashboard = await dashboardPage.IsOnDashboardPageAsync();
+    isOnDashboard.ShouldBeTrue();
+}
+
+[Then(@"I should be redirected back to the operations alerts page")]
+public async Task ThenIShouldBeRedirectedBackToTheOperationsAlertsPage()
+{
+    var alertsPage = new OperationsAlertsPage(Page, Fixture.WasmBaseUrl);
+    var isOnAlerts = await alertsPage.IsOnOperationsAlertsPageAsync();
+    isOnAlerts.ShouldBeTrue();
+}
+```
+
+**Gherkin Scenario:**
+
+```gherkin
+Scenario: Session expiry on dashboard preserves returnUrl
+  Given I am logged in as "alice.admin@crittersupply.com" with password "Password123!"
+  And I am on the dashboard
+  When my session expires
+  And I trigger a data refresh
+  Then I should see the session expired modal
+  When I click "Log In Again"
+  Then I should be redirected to the login page
+  And the returnUrl query parameter should be "/dashboard"
+  When I log in as "alice.admin@crittersupply.com" with password "Password123!"
+  Then I should be redirected back to the dashboard
+
+Scenario: Session expiry on operations alerts page preserves returnUrl
+  Given I am logged in as "alice.admin@crittersupply.com" with password "Password123!"
+  And I am on the operations alerts page
+  When my session expires
+  And I try to acknowledge an alert
+  Then I should see the session expired modal
+  When I click "Log In Again"
+  Then I should be redirected to the login page
+  And the returnUrl query parameter should be "/operations/alerts"
+  When I log in as "alice.admin@crittersupply.com" with password "Password123!"
+  Then I should be redirected back to the operations alerts page
+  And I should see the operations alerts feed
+```
+
+**Why This Matters:**
+- ✅ User returns to exact page they were working on
+- ✅ No lost context (filters, scroll position preserved by page state)
+- ✅ Matches real-world UX expectations
+- ✅ Validates navigation guard + returnUrl wiring
+
+**Key Assertions:**
+1. `returnUrl` query parameter present and correctly URL-encoded
+2. Post-login redirect lands on original page
+3. Page-specific elements visible (proves full navigation completed)
+
+---
+
+### M32.2 Key Learnings
+
+**1. Stub Client Session Expiry Pattern**
+- ✅ **DO** add `SimulateSessionExpired` bool property to all API client stubs
+- ✅ **DO** throw `HttpRequestException` with `HttpStatusCode.Unauthorized`
+- ✅ **DO** check this flag at the start of EVERY API method
+- ❌ **DON'T** mock HttpClient directly (in-process exceptions are simpler)
+
+**2. Multi-Role Admin User Seeding**
+- ✅ **DO** use deterministic GUIDs in WellKnownTestData
+- ✅ **DO** check production enum values BEFORE writing test data
+- ✅ **DO** map kebab-case strings to actual enum values
+- ❌ **DON'T** assume role names match enum values (verify first!)
+
+**3. Playwright Indexing**
+- ✅ **DO** use `.First` property (not `.First()` method)
+- ✅ **DO** use `.Last` property, `.Nth(n)` method
+- ❌ **DON'T** use LINQ extension methods on `ILocator`
+
+**4. Global Page Objects**
+- ✅ **DO** create separate page objects for global modals/overlays
+- ✅ **DO** verify modal blocks interaction with page behind
+- ✅ **DO** check for duplicate modals (should always be exactly 1)
+- ❌ **DON'T** duplicate modal locators in every page object
+
+**5. ReturnUrl Preservation**
+- ✅ **DO** verify `returnUrl` query parameter is URL-encoded
+- ✅ **DO** assert user lands back on original page post-login
+- ✅ **DO** check page-specific elements are visible (proves full navigation)
+- ❌ **DON'T** just check URL — verify page state is restored
+
+**6. Authorization Testing**
+- ✅ **DO** seed role-specific admin users for RBAC tests
+- ✅ **DO** verify 403 responses for insufficient permissions
+- ✅ **DO** check UI elements hidden/disabled based on roles
+- ❌ **DON'T** skip server-side enforcement tests (UI hiding is not enough)
+
+**7. Build Verification**
+- ✅ **DO** run `dotnet build` after adding step definitions
+- ✅ **DO** fix all compile errors before attempting test execution
+- ✅ **DO** verify 0 errors (warnings OK if pre-existing)
+- ❌ **DON'T** rely on IDE intellisense alone — full build catches more issues
+
+**8. CI/Local Test Execution**
+- ✅ **DO** run E2E tests in CI (TestContainers + Playwright environment)
+- ✅ **DO** verify build succeeds locally (validates all code is correct)
+- ❌ **DON'T** attempt full E2E test execution without TestContainers + Playwright setup
+
+---
+
+### M32.2 Reference Files
+
+**Feature Files:**
+- `tests/Backoffice/Backoffice.E2ETests/Features/SessionExpiry.feature` (P0-3)
+- `tests/Backoffice/Backoffice.E2ETests/Features/Authorization.feature` (P0-1)
+- `tests/Backoffice/Backoffice.E2ETests/Features/DataFreshness.feature` (P1-2)
+- `tests/Backoffice/Backoffice.E2ETests/Features/AlertAcknowledgment.feature` (P0-2)
+
+**Step Definitions:**
+- `SessionExpirySteps.cs` - 17 step definitions
+- `AuthorizationSteps.cs` - 12 step definitions
+- `OperationsAlertsSteps.cs` - Extended with P0-2/P1-2 steps
+
+**Page Objects:**
+- `SessionExpiredPage.cs` - Global modal page object
+- `OperationsAlertsPage.cs` - Extended with data freshness methods
+- `CustomerSearchPage.cs` - Extended with session expiry support
+
+**Test Infrastructure:**
+- `E2ETestFixture.cs` - `SeedAdminUserWithRole()` method
+- `WellKnownTestData.cs` - Multi-role admin user constants
+- `StubInventoryClient.cs`, `StubOrdersClient.cs`, `StubCustomerIdentityClient.cs` - SimulateSessionExpired
+
+**Production Enum:**
+- `src/Backoffice Identity/BackofficeIdentity/Identity/BackofficeUser.cs` - BackofficeRole enum (7 values)
 
 ---
