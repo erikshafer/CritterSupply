@@ -269,4 +269,24 @@ public sealed class CustomerSearchPage
     {
         return _page.Url.Contains("/customer-service");
     }
+
+    // SessionExpirySteps support methods
+    public async Task SearchAsync(string email)
+    {
+        await SearchByEmailAsync(email);
+    }
+
+    public async Task<bool> IsSearchFormVisibleAsync()
+    {
+        try
+        {
+            await EmailSearchInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
+            await SearchButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 }

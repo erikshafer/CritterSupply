@@ -12,6 +12,12 @@ public sealed class StubOrdersClient : IOrdersClient
     private readonly Dictionary<Guid, OrderDetailDto> _orders = new();
     private readonly Dictionary<Guid, List<ReturnableItemDto>> _returnableItems = new();
 
+    /// <summary>
+    /// When true, all API methods will throw HttpRequestException with 401 Unauthorized.
+    /// Used by SessionExpirySteps to simulate session expiry.
+    /// </summary>
+    public bool SimulateSessionExpired { get; set; }
+
     public void AddOrder(
         Guid orderId,
         Guid customerId,
@@ -52,6 +58,9 @@ public sealed class StubOrdersClient : IOrdersClient
         int? limit = null,
         CancellationToken ct = default)
     {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
         var orders = _orders.Values
             .Where(o => o.CustomerId == customerId)
             .OrderByDescending(o => o.PlacedAt)
@@ -64,11 +73,17 @@ public sealed class StubOrdersClient : IOrdersClient
 
     public Task<OrderDetailDto?> GetOrderAsync(Guid orderId, CancellationToken ct = default)
     {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
         return Task.FromResult(_orders.GetValueOrDefault(orderId));
     }
 
     public Task CancelOrderAsync(Guid orderId, CancellationToken ct = default)
     {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
         if (!_orders.ContainsKey(orderId))
             throw new HttpRequestException($"Order {orderId} not found", null, HttpStatusCode.NotFound);
 
@@ -80,6 +95,9 @@ public sealed class StubOrdersClient : IOrdersClient
         Guid orderId,
         CancellationToken ct = default)
     {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
         var items = _returnableItems.GetValueOrDefault(orderId) ?? new List<ReturnableItemDto>();
         return Task.FromResult<IReadOnlyList<ReturnableItemDto>>(items);
     }

@@ -221,7 +221,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
             "warehouse-clerk" => BackofficeIdentity.Identity.BackofficeRole.WarehouseClerk,
             "customer-service" => BackofficeIdentity.Identity.BackofficeRole.CustomerService,
             "copy-writer" => BackofficeIdentity.Identity.BackofficeRole.CopyWriter,
-            "finance-clerk" => BackofficeIdentity.Identity.BackofficeRole.FinanceClerk,
+            "pricing-manager" => BackofficeIdentity.Identity.BackofficeRole.PricingManager,
             "executive" => BackofficeIdentity.Identity.BackofficeRole.Executive,
             _ => throw new ArgumentException($"Unknown role: {role}")
         };

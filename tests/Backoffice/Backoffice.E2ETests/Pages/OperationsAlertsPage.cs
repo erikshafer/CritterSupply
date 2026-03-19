@@ -417,4 +417,45 @@ public sealed class OperationsAlertsPage
             return false;
         }
     }
+
+    // SessionExpirySteps and AuthorizationSteps support methods
+    public async Task<bool> IsAlertFeedVisibleAsync()
+    {
+        try
+        {
+            await AlertFeed.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public async Task ClickFirstAlertAsync()
+    {
+        var firstAlert = AlertRows.First;
+        await firstAlert.ClickAsync();
+        await AlertDetailsModal.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+    }
+
+    public async Task ClickAlertBySku(string sku)
+    {
+        // Find alert row by SKU text content
+        var alertRow = AlertRows.Filter(new() { HasText = sku }).First;
+        await alertRow.ClickAsync();
+        await AlertDetailsModal.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+    }
+
+    public async Task FilterByStatus(string status)
+    {
+        await FilterByStatusAsync(status);
+    }
+
+    public async Task AcknowledgeAlertAsync()
+    {
+        // Acknowledge currently open alert in modal
+        await AcknowledgeButton.ClickAsync();
+        await AlertDetailsModal.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
+    }
 }

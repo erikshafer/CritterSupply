@@ -39,9 +39,9 @@ internal static class WellKnownTestData
         public const string CopyWriterEmail = "copywriter@crittersupply.com";
         public const string CopyWriterRole = "copy-writer";
 
-        public static readonly Guid FinanceClerk = Guid.Parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF");
-        public const string FinanceClerkEmail = "finance@crittersupply.com";
-        public const string FinanceClerkRole = "finance-clerk";
+        public static readonly Guid PricingManager = Guid.Parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF");
+        public const string PricingManagerEmail = "pricing@crittersupply.com";
+        public const string PricingManagerRole = "pricing-manager";
 
         public static readonly Guid Executive = Guid.Parse("99999999-9999-9999-9999-999999999999");
         public const string ExecutiveEmail = "exec@crittersupply.com";
