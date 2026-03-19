@@ -24,6 +24,11 @@ public interface ICatalogClient
     /// Discontinue product (prevent future sales - terminal state)
     /// </summary>
     Task<bool> DiscontinueProductAsync(string sku, CancellationToken ct = default);
+
+    /// <summary>
+    /// List products with optional pagination and filtering
+    /// </summary>
+    Task<ProductListResult?> ListProductsAsync(int page = 1, int pageSize = 20, string? category = null, string? status = null, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -35,3 +40,12 @@ public sealed record ProductDto(
     string Description,
     string Category,
     string Status);
+
+/// <summary>
+/// Product list result with pagination metadata
+/// </summary>
+public sealed record ProductListResult(
+    IReadOnlyList<ProductDto> Products,
+    int Page,
+    int PageSize,
+    int TotalCount);

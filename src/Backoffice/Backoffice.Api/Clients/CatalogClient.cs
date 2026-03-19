@@ -59,4 +59,31 @@ public sealed class CatalogClient : ICatalogClient
 
         return response.IsSuccessStatusCode;
     }
+
+    public async Task<ProductListResult?> ListProductsAsync(int page = 1, int pageSize = 20, string? category = null, string? status = null, CancellationToken ct = default)
+    {
+        var queryParams = new List<string>
+        {
+            $"page={page}",
+            $"pageSize={pageSize}"
+        };
+
+        if (!string.IsNullOrEmpty(category))
+            queryParams.Add($"category={Uri.EscapeDataString(category)}");
+
+        if (!string.IsNullOrEmpty(status))
+            queryParams.Add($"status={Uri.EscapeDataString(status)}");
+
+        var query = string.Join("&", queryParams);
+        var response = await _httpClient.GetAsync($"/api/products?{query}", ct);
+
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        return JsonSerializer.Deserialize<ProductListResult>(content, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+    }
 }
