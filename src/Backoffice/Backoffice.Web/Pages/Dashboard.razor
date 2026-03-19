@@ -118,7 +118,7 @@ else if (HubService.State == HubConnectionState.Connected)
     {
         <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3"
                   aria-live="polite" data-testid="metrics-updated-banner">
-            Metrics updated at @_lastMetricUpdate.Value.ToLocalTime().ToString("HH:mm:ss").
+            Metrics updated @FormatTimeSince(_lastMetricUpdate.Value).
             <MudButton Variant="Variant.Text" Color="Color.Info" Size="Size.Small"
                        OnClick="LoadDashboardAsync" Class="ml-1 pa-0"
                        Style="min-width:auto; text-transform:none; font-size:inherit;">
@@ -255,7 +255,7 @@ else if (HubService.State == HubConnectionState.Connected)
                     _pendingReturns = _metrics.PendingReturns;
                     _lowStockAlerts = _metrics.LowStockAlerts;
                     _todaysRevenue = _metrics.TodaysRevenue;
-                    _lastMetricUpdate = null; // Reset after explicit refresh
+                    _lastMetricUpdate = _metrics.GeneratedAt; // Use backend timestamp (P1-2)
                 }
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
@@ -307,6 +307,20 @@ else if (HubService.State == HubConnectionState.Connected)
         if (!envelope.TryGetProperty("type", out var typeEl)) return false;
         eventType = typeEl.GetString();
         return eventType is not null;
+    }
+
+    private static string FormatTimeSince(DateTimeOffset timestamp)
+    {
+        var elapsed = DateTimeOffset.UtcNow - timestamp;
+
+        if (elapsed.TotalSeconds < 60)
+            return "just now";
+        if (elapsed.TotalMinutes < 60)
+            return $"{(int)elapsed.TotalMinutes} minute{((int)elapsed.TotalMinutes == 1 ? "" : "s")} ago";
+        if (elapsed.TotalHours < 24)
+            return $"{(int)elapsed.TotalHours} hour{((int)elapsed.TotalHours == 1 ? "" : "s")} ago";
+
+        return timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
     }
 
     public void Dispose()
