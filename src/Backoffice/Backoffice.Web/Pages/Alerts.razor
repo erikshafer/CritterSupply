@@ -10,6 +10,7 @@
 @inject IHttpClientFactory HttpClientFactory
 @inject ISnackbar Snackbar
 @inject ILogger<Alerts> Logger
+@inject SessionExpiredService SessionExpiredService
 @implements IDisposable
 
 <PageTitle>Operations Alerts — Backoffice</PageTitle>
@@ -187,7 +188,8 @@
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Snackbar.Add("Session expired. Please log in again.", Severity.Warning);
+                // Session expired: trigger blocking modal (P0-3)
+                SessionExpiredService.TriggerSessionExpired();
             }
             else
             {
@@ -285,7 +287,8 @@
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Snackbar.Add("Session expired. Please log in again.", Severity.Warning);
+                // Session expired: trigger blocking modal (P0-3)
+                SessionExpiredService.TriggerSessionExpired();
             }
             else
             {
