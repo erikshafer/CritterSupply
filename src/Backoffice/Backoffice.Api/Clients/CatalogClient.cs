@@ -30,7 +30,7 @@ public sealed class CatalogClient : ICatalogClient
     public async Task<bool> UpdateProductDescriptionAsync(string sku, string description, CancellationToken ct = default)
     {
         var request = new { Sku = sku, Description = description };
-        var response = await _httpClient.PutAsJsonAsync(
+        using var response = await _httpClient.PutAsJsonAsync(
             $"/api/products/{Uri.EscapeDataString(sku)}/description",
             request,
             ct);
@@ -41,7 +41,7 @@ public sealed class CatalogClient : ICatalogClient
     public async Task<bool> UpdateProductDisplayNameAsync(string sku, string displayName, CancellationToken ct = default)
     {
         var request = new { Sku = sku, Name = displayName };
-        var response = await _httpClient.PutAsJsonAsync(
+        using var response = await _httpClient.PutAsJsonAsync(
             $"/api/products/{Uri.EscapeDataString(sku)}/display-name",
             request,
             ct);
@@ -52,7 +52,7 @@ public sealed class CatalogClient : ICatalogClient
     public async Task<bool> DiscontinueProductAsync(string sku, CancellationToken ct = default)
     {
         var request = new { Sku = sku, NewStatus = "Discontinued" };
-        var response = await _httpClient.PatchAsJsonAsync(
+        using var response = await _httpClient.PatchAsJsonAsync(
             $"/api/products/{Uri.EscapeDataString(sku)}/status",
             request,
             ct);

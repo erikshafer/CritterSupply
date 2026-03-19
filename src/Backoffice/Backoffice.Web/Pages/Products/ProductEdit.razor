@@ -195,7 +195,7 @@ else
         _breadcrumbItems = new List<BreadcrumbItem>
         {
             new BreadcrumbItem("Dashboard", href: "/"),
-            new BreadcrumbItem("Products", href: "/products"),
+            new BreadcrumbItem("Products", href: "/", disabled: true),
             new BreadcrumbItem("Edit", href: null, disabled: true)
         };
 
@@ -214,24 +214,31 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("BackofficeApi");
-            _product = await client.GetFromJsonAsync<ProductDto>($"/api/catalog/products/{Uri.EscapeDataString(Sku)}");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
 
-            if (_product is not null)
+            var response = await client.GetAsync($"/api/catalog/products/{Uri.EscapeDataString(Sku)}");
+
+            if (response.IsSuccessStatusCode)
             {
-                _displayName = _product.Name;
-                _description = _product.Description;
+                _product = await response.Content.ReadFromJsonAsync<ProductDto>();
+
+                if (_product is not null)
+                {
+                    _displayName = _product.Name;
+                    _description = _product.Description;
+                }
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Logger.LogWarning("Session expired while loading product {Sku}", Sku);
+                SessionExpiredService.TriggerSessionExpired();
+            }
+            else
+            {
+                Snackbar.Add("Failed to load product details", Severity.Error);
             }
         }
-        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-        {
-            var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
-            Logger.LogWarning("Session expired while loading product {Sku}", safeSku);
-                .Replace("\r", string.Empty)
-                .Replace("\n", string.Empty);
-            Logger.LogWarning("Session expired while loading product {Sku}", sanitizedSku);
-            SessionExpiredService.TriggerSessionExpired();
-            var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
-            Logger.LogError(ex, "Error loading product {Sku}", safeSku);
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading product {Sku}", Sku);
@@ -254,6 +261,8 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
 
             // Update display name if changed and user has permission
             if (_displayName != _product.Name && _canEditName)
@@ -262,6 +271,13 @@ else
                 var response = await client.PutAsJsonAsync(
                     $"/api/products/{Uri.EscapeDataString(Sku)}/display-name",
                     request);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    Logger.LogWarning("Session expired while saving product {Sku}", Sku);
+                    SessionExpiredService.TriggerSessionExpired();
+                    return;
+                }
 
                 if (response.IsSuccessStatusCode) successCount++; else failureCount++;
             }
@@ -274,6 +290,13 @@ else
                     $"/api/products/{Uri.EscapeDataString(Sku)}/description",
                     request);
 
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    Logger.LogWarning("Session expired while saving product {Sku}", Sku);
+                    SessionExpiredService.TriggerSessionExpired();
+                    return;
+                }
+
                 if (response.IsSuccessStatusCode) successCount++; else failureCount++;
             }
 
@@ -285,13 +308,8 @@ else
             else if (failureCount > 0)
             {
                 Snackbar.Add($"Some updates failed ({failureCount} failed, {successCount} succeeded)", Severity.Warning);
-            Logger.LogWarning("Session expired while saving product {Sku}", SanitizeForLog(Sku));
+                await LoadProductAsync(); // Refresh to see what actually changed
             }
-        }
-        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-        {
-            Logger.LogError(ex, "Error saving product {Sku}", SanitizeForLog(Sku));
-            SessionExpiredService.TriggerSessionExpired();
         }
         catch (Exception ex)
         {
@@ -314,7 +332,7 @@ else
         if (!_confirmDiscontinue)
         {
             _confirmDiscontinue = true;
-            Snackbar.Add("Click 'Confirm Discontinue' again to confirm", Severity.Warning);
+            Snackbar.Add("Click the discontinue button again to confirm", Severity.Warning);
             return;
         }
 
@@ -323,45 +341,35 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
             var request = new { Sku, NewStatus = "Discontinued" };
             var response = await client.PatchAsJsonAsync(
                 $"/api/products/{Uri.EscapeDataString(Sku)}/status",
                 request);
 
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Logger.LogWarning("Session expired while discontinuing product {Sku}", Sku);
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
             if (response.IsSuccessStatusCode)
             {
                 Snackbar.Add("Product discontinued successfully", Severity.Success);
-                Navigation.NavigateTo("/products");
+                Navigation.NavigateTo("/");
             }
             else
             {
-            var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
-            Logger.LogWarning("Session expired while discontinuing product {Sku}", safeSku);
+                Snackbar.Add("Failed to discontinue product", Severity.Error);
             }
-            var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
-            Logger.LogWarning("Session expired while discontinuing product {Sku}", safeSku);
-        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            Logger.LogError(ex, "Error discontinuing product {Sku}", SanitizeForLog(Sku));
-            Logger.LogWarning("Session expired while discontinuing product {Sku}", Sku);
-            SessionExpiredService.TriggerSessionExpired();
-            var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
-            Logger.LogError(ex, "Error discontinuing product {Sku}", safeSku);
+        }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error discontinuing product {Sku}", Sku);
             Snackbar.Add("Failed to discontinue product", Severity.Error);
-    private static string SanitizeForLog(string? value)
-    {
-        if (string.IsNullOrEmpty(value))
-        {
-            return string.Empty;
-        }
-
-        // Remove line breaks to prevent log forging via user-controlled values
-        return value.Replace("\r", string.Empty)
-                    .Replace("\n", string.Empty);
-    }
-
         }
         finally
         {
@@ -371,7 +379,7 @@ else
 
     private Task CancelAsync()
     {
-        Navigation.NavigateTo("/products");
+        Navigation.NavigateTo("/");
         return Task.CompletedTask;
     }
 }

@@ -16,7 +16,7 @@ public interface ICatalogClient
     Task<bool> UpdateProductDescriptionAsync(string sku, string description, CancellationToken ct = default);
 
     /// <summary>
-    /// Update product display name (CopyWriter workflow)
+    /// Update product display name (ProductManager/SystemAdmin workflow)
     /// </summary>
     Task<bool> UpdateProductDisplayNameAsync(string sku, string displayName, CancellationToken ct = default);
 

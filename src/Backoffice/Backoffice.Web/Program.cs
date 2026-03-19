@@ -52,6 +52,7 @@ builder.Services.AddAuthorizationCore(opts =>
     opts.AddPolicy("OperationsManager", policy => policy.RequireRole("operations-manager", "system-admin"));
     opts.AddPolicy("WarehouseClerk", policy => policy.RequireRole("warehouse-clerk", "system-admin"));
     opts.AddPolicy("PricingManager", policy => policy.RequireRole("pricing-manager", "system-admin"));
+    opts.AddPolicy("ProductManager", policy => policy.RequireRole("product-manager", "system-admin"));
     opts.AddPolicy("CopyWriter", policy => policy.RequireRole("copy-writer", "system-admin"));
     opts.AddPolicy("SystemAdmin", policy => policy.RequireRole("system-admin"));
 });
