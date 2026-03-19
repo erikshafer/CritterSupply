@@ -17,6 +17,35 @@ internal static class WellKnownTestData
         public const string BobEmail = "bob.exec@crittersupply.com";
         public const string BobPassword = "Password123!";
         public const string BobName = "Bob Executive";
+
+        // Multi-role admin users for Authorization scenarios
+        public static readonly Guid SystemAdmin = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA");
+        public const string SystemAdminEmail = "sysadmin@crittersupply.com";
+        public const string SystemAdminRole = "system-admin";
+
+        public static readonly Guid OperationsManager = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB");
+        public const string OperationsManagerEmail = "opsmgr@crittersupply.com";
+        public const string OperationsManagerRole = "operations-manager";
+
+        public static readonly Guid WarehouseClerk = Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC");
+        public const string WarehouseClerkEmail = "warehouse@crittersupply.com";
+        public const string WarehouseClerkRole = "warehouse-clerk";
+
+        public static readonly Guid CustomerService = Guid.Parse("DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD");
+        public const string CustomerServiceEmail = "support@crittersupply.com";
+        public const string CustomerServiceRole = "customer-service";
+
+        public static readonly Guid CopyWriter = Guid.Parse("EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE");
+        public const string CopyWriterEmail = "copywriter@crittersupply.com";
+        public const string CopyWriterRole = "copy-writer";
+
+        public static readonly Guid FinanceClerk = Guid.Parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF");
+        public const string FinanceClerkEmail = "finance@crittersupply.com";
+        public const string FinanceClerkRole = "finance-clerk";
+
+        public static readonly Guid Executive = Guid.Parse("99999999-9999-9999-9999-999999999999");
+        public const string ExecutiveEmail = "exec@crittersupply.com";
+        public const string ExecutiveRole = "executive";
     }
 
     internal static class Customers

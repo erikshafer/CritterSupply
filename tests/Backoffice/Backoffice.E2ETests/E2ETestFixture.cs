@@ -189,6 +189,76 @@ public sealed class E2ETestFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Seeds an admin user with a specific role into BackofficeIdentity EF Core database.
+    /// Used by authorization scenario steps to create test admin accounts with specific roles.
+    /// </summary>
+    public void SeedAdminUserWithRole(Guid userId, string email, string fullName, string password, string role)
+    {
+        if (_identityFactory == null)
+            throw new InvalidOperationException("BackofficeIdentity factory not initialized. Call InitializeAsync() first.");
+
+        using var scope = _identityFactory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BackofficeIdentity.Identity.BackofficeIdentityDbContext>();
+
+        // Check if user already exists
+        if (dbContext.Users.Any(u => u.Id == userId))
+            return; // Already seeded
+
+        // Split full name into first and last name
+        var nameParts = fullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        var firstName = nameParts.Length > 0 ? nameParts[0] : "Test";
+        var lastName = nameParts.Length > 1 ? nameParts[1] : "User";
+
+        // Use ASP.NET Core Identity's PasswordHasher (PBKDF2-SHA256) - matches production code
+        var passwordHasher = new Microsoft.AspNetCore.Identity.PasswordHasher<BackofficeIdentity.Identity.BackofficeUser>();
+        var passwordHash = passwordHasher.HashPassword(null!, password);
+
+        // Map role string to BackofficeRole enum
+        var backofficeRole = role switch
+        {
+            "system-admin" => BackofficeIdentity.Identity.BackofficeRole.SystemAdmin,
+            "operations-manager" => BackofficeIdentity.Identity.BackofficeRole.OperationsManager,
+            "warehouse-clerk" => BackofficeIdentity.Identity.BackofficeRole.WarehouseClerk,
+            "customer-service" => BackofficeIdentity.Identity.BackofficeRole.CustomerService,
+            "copy-writer" => BackofficeIdentity.Identity.BackofficeRole.CopyWriter,
+            "finance-clerk" => BackofficeIdentity.Identity.BackofficeRole.FinanceClerk,
+            "executive" => BackofficeIdentity.Identity.BackofficeRole.Executive,
+            _ => throw new ArgumentException($"Unknown role: {role}")
+        };
+
+        var adminUser = new BackofficeIdentity.Identity.BackofficeUser
+        {
+            Id = userId,
+            Email = email,
+            PasswordHash = passwordHash,
+            FirstName = firstName,
+            LastName = lastName,
+            Role = backofficeRole,
+            Status = BackofficeIdentity.Identity.BackofficeUserStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        dbContext.Users.Add(adminUser);
+        dbContext.SaveChanges();
+    }
+
+    /// <summary>
+    /// Seeds an admin user with multiple roles into BackofficeIdentity EF Core database.
+    /// Used by authorization scenario steps to test multi-role users.
+    /// Note: BackofficeUser currently supports single role only, so this picks the first role.
+    /// If multi-role support is needed, BackofficeIdentity schema needs updating.
+    /// </summary>
+    public void SeedAdminUserWithRoles(Guid userId, string email, string fullName, string password, string[] roles)
+    {
+        // For now, just seed with first role since BackofficeUser has single Role property
+        // If multi-role support is needed, BackofficeIdentity BC needs schema migration
+        if (roles.Length == 0)
+            throw new ArgumentException("At least one role required");
+
+        SeedAdminUserWithRole(userId, email, fullName, password, roles[0]);
+    }
+
+    /// <summary>
     /// Seeds standard test data for E2E scenarios (customers, orders, returns, alerts).
     /// </summary>
     public void SeedStandardScenario()
