@@ -55,7 +55,7 @@
 
 ### 🚀 M32.2: Backoffice Phase 3A — Option A Selected
 
-**Status:** 🚀 **IN PROGRESS** — Session 1 completed
+**Status:** 🚀 **IN PROGRESS** — Session 2 completed (3 P0 items)
 **Goal:** Execute narrow M32.2 scope (stabilization + UX hardening) and defer heavier write-ops/UI depth to M32.3
 
 **Current findings (2026-03-18):**
@@ -72,16 +72,25 @@
 - ✅ P1-1: Gated dead-end navigation in CustomerSearch.razor ("View Details" button disabled with tooltip)
 - ✅ Verified build succeeds with both fixes (0 errors)
 - ✅ Stored memories for future sessions
+- **Retrospective:** `docs/planning/milestones/m32.2-session-1-retrospective.md`
+
+**Session 2 Progress (2026-03-19):**
+- ✅ P0-2: Alert acknowledgment UX (Alerts.razor) — Acknowledge button, optimistic UI, 409 handling
+- ✅ P0-3: Session-expired recovery UX — SessionExpiredModal, returnUrl redirect, standardized 401 handling
+- ✅ P0-4: Network/conflict/retry state standardization — Applied session-expired pattern to Dashboard + CustomerSearch
+- ✅ All 3 P0 items completed with zero rework (199 lines added, 10 removed, 9 files changed)
+- ✅ Stored memory: event-based SessionExpiredService pattern for Blazor WASM 401 handling
+- **Retrospective:** `docs/planning/milestones/m32.2-session-2-retrospective.md`
 
 **Backlog Status:**
 
 **M32.2 (stabilization + UX hardening):**
 - ✅ P0-1: Alerts authorization role mismatch (COMPLETED Session 1)
-- ⏸️ P0-2: Alert acknowledgment UX (PENDING)
-- ⏸️ P0-3: Session-expired recovery UX (PENDING)
-- ⏸️ P0-4: Network/conflict/retry state standardization (PENDING)
+- ✅ P0-2: Alert acknowledgment UX (COMPLETED Session 2)
+- ✅ P0-3: Session-expired recovery UX (COMPLETED Session 2)
+- ✅ P0-4: Network/conflict/retry state standardization (COMPLETED Session 2)
 - ✅ P1-1: Dead-end route gating/replacement (COMPLETED Session 1)
-- ⏸️ P1-2: Data freshness indicators (PENDING)
+- ⏸️ P1-2: Data freshness indicators (PENDING — optional)
 
 **M32.3 (write-ops/UI depth + cross-BC dependencies):**
 - P1-3: Product history tab with significance filtering (event-sourcing dependent)
@@ -94,9 +103,10 @@
 - ✅ **Option A selected:** Keep M32.2 narrow (stability + UX hardening), push heavier write-ops/UI depth to M32.3
 - ⏸️ Option B/C not selected at this time
 
-**Next Session (Session 2):**
-1. P0-2: Add alert acknowledgment UX in Alerts page
-2. P0-3: Implement session-expired recovery UX (if time permits)
+**Next Session (Session 3 — if continuing M32.2):**
+1. P1-2: Add data freshness indicators (Dashboard + Alerts show last refresh timestamp) — optional
+2. E2E tests for P0 features (session-expired recovery, alert acknowledgment with 409 handling)
+3. Consider closing M32.2 if all critical P0 items complete
 
 ---
 
