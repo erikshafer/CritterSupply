@@ -224,7 +224,10 @@ else
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
-            Logger.LogWarning("Session expired while loading product {Sku}", Sku);
+            var sanitizedSku = (Sku ?? string.Empty)
+                .Replace("\r", string.Empty)
+                .Replace("\n", string.Empty);
+            Logger.LogWarning("Session expired while loading product {Sku}", sanitizedSku);
             SessionExpiredService.TriggerSessionExpired();
         }
         catch (Exception ex)
