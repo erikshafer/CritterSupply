@@ -93,11 +93,21 @@
                                     <MudText Typo="Typo.body1">
                                         <strong>@alert.Title</strong>
                                     </MudText>
-                                    <MudChip T="string" Size="Size.Small"
-                                             Color="@GetAlertColor(alert.Severity)"
-                                             Variant="Variant.Text">
-                                        @alert.Severity
-                                    </MudChip>
+                                    <div class="d-flex align-center gap-2">
+                                        <MudChip T="string" Size="Size.Small"
+                                                 Color="@GetAlertColor(alert.Severity)"
+                                                 Variant="Variant.Text">
+                                            @alert.Severity
+                                        </MudChip>
+                                        <MudButton Variant="Variant.Text"
+                                                   Color="Color.Secondary"
+                                                   Size="Size.Small"
+                                                   OnClick="@(() => AcknowledgeAlertAsync(alert.AlertId))"
+                                                   Disabled="@_acknowledgingAlerts.Contains(alert.AlertId)"
+                                                   data-testid="@($"acknowledge-alert-{alert.AlertId}")">
+                                            @(_acknowledgingAlerts.Contains(alert.AlertId) ? "Acknowledging..." : "Acknowledge")
+                                        </MudButton>
+                                    </div>
                                 </div>
                                 <MudText Typo="Typo.body2" Color="Color.Secondary">
                                     @alert.Message
@@ -123,6 +133,7 @@
     private OperationsAlertsResponse? _alerts;
     private bool _isLoading = true;
     private int _newAlertsCount;
+    private readonly HashSet<Guid> _acknowledgingAlerts = new();
 
     // Hub message listener registration
     private IDisposable? _hubMessageHandler;
@@ -132,6 +143,66 @@
         HubService.OnStateChanged += OnHubStateChanged;
         await LoadAlertsAsync();
         RegisterHubListeners();
+    }
+
+    private async Task AcknowledgeAlertAsync(Guid alertId)
+    {
+        // Optimistic update: add to in-progress set
+        _acknowledgingAlerts.Add(alertId);
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.PostAsync($"/api/backoffice/alerts/{alertId}/acknowledge", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Success: remove alert from UI optimistically
+                if (_alerts is not null)
+                {
+                    _alerts = _alerts with
+                    {
+                        Alerts = _alerts.Alerts.Where(a => a.AlertId != alertId).ToList(),
+                        TotalCount = _alerts.TotalCount - 1
+                    };
+                }
+                Snackbar.Add("Alert acknowledged.", Severity.Success);
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                // 409 Conflict: already acknowledged by someone else
+                Snackbar.Add("Alert was already acknowledged.", Severity.Info);
+                // Remove from local list since it's acknowledged
+                if (_alerts is not null)
+                {
+                    _alerts = _alerts with
+                    {
+                        Alerts = _alerts.Alerts.Where(a => a.AlertId != alertId).ToList(),
+                        TotalCount = _alerts.TotalCount - 1
+                    };
+                }
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Snackbar.Add("Session expired. Please log in again.", Severity.Warning);
+            }
+            else
+            {
+                Snackbar.Add("Failed to acknowledge alert. Please try again.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception acknowledging alert {AlertId}", alertId);
+            Snackbar.Add("Failed to acknowledge alert. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _acknowledgingAlerts.Remove(alertId);
+        }
     }
 
     private async void OnHubStateChanged()
