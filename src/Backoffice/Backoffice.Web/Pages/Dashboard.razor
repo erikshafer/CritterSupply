@@ -10,6 +10,7 @@
 @inject IHttpClientFactory HttpClientFactory
 @inject ISnackbar Snackbar
 @inject ILogger<Dashboard> Logger
+@inject SessionExpiredService SessionExpiredService
 @implements IDisposable
 
 <PageTitle>Dashboard — Backoffice</PageTitle>
@@ -259,7 +260,8 @@ else if (HubService.State == HubConnectionState.Connected)
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Snackbar.Add("Session expired. Please log in again.", Severity.Warning);
+                // Session expired: trigger blocking modal (P0-3/P0-4)
+                SessionExpiredService.TriggerSessionExpired();
             }
             else
             {
