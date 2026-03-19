@@ -224,12 +224,14 @@ else
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
-            var sanitizedSku = (Sku ?? string.Empty)
+            var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
+            Logger.LogWarning("Session expired while loading product {Sku}", safeSku);
                 .Replace("\r", string.Empty)
                 .Replace("\n", string.Empty);
             Logger.LogWarning("Session expired while loading product {Sku}", sanitizedSku);
             SessionExpiredService.TriggerSessionExpired();
-        }
+            var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
+            Logger.LogError(ex, "Error loading product {Sku}", safeSku);
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading product {Sku}", Sku);
@@ -335,12 +337,14 @@ else
             {
                 Snackbar.Add("Failed to discontinue product", Severity.Error);
             }
-        }
+            var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
+            Logger.LogWarning("Session expired while discontinuing product {Sku}", safeSku);
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
             Logger.LogWarning("Session expired while discontinuing product {Sku}", Sku);
             SessionExpiredService.TriggerSessionExpired();
-        }
+            var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
+            Logger.LogError(ex, "Error discontinuing product {Sku}", safeSku);
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error discontinuing product {Sku}", Sku);
