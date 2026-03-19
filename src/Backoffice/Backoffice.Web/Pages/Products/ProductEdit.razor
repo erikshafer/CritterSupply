@@ -285,12 +285,12 @@ else
             else if (failureCount > 0)
             {
                 Snackbar.Add($"Some updates failed ({failureCount} failed, {successCount} succeeded)", Severity.Warning);
-                await LoadProductAsync(); // Refresh to see what actually changed
+            Logger.LogWarning("Session expired while saving product {Sku}", Sku?.Replace("\r", "").Replace("\n", ""));
             }
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
-            Logger.LogWarning("Session expired while saving product {Sku}", Sku);
+            Logger.LogError(ex, "Error saving product {Sku}", Sku?.Replace("\r", "").Replace("\n", ""));
             SessionExpiredService.TriggerSessionExpired();
         }
         catch (Exception ex)
@@ -335,12 +335,12 @@ else
             }
             else
             {
-                Snackbar.Add("Failed to discontinue product", Severity.Error);
+            Logger.LogWarning("Session expired while discontinuing product {Sku}", Sku?.Replace("\r", "").Replace("\n", ""));
             }
             var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
             Logger.LogWarning("Session expired while discontinuing product {Sku}", safeSku);
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-        {
+            Logger.LogError(ex, "Error discontinuing product {Sku}", Sku?.Replace("\r", "").Replace("\n", ""));
             Logger.LogWarning("Session expired while discontinuing product {Sku}", Sku);
             SessionExpiredService.TriggerSessionExpired();
             var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
