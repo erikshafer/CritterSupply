@@ -41,25 +41,31 @@
 
         <AuthorizeView Policy="PricingManager">
             <MudListItem T="string" Icon="@Icons.Material.Filled.AttachMoney">
-                Pricing Admin (Coming in Sessions 9-12)
+                Pricing Admin (Coming in future sessions)
+            </MudListItem>
+        </AuthorizeView>
+
+        <AuthorizeView Policy="ProductManager">
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Inventory" Href="/products/DEMO-001/edit">
+                Product Admin (Edit Product)
             </MudListItem>
         </AuthorizeView>
 
         <AuthorizeView Policy="CopyWriter">
-            <MudListItem T="string" Icon="@Icons.Material.Filled.Edit">
-                Product Catalog (Coming in Sessions 9-12)
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Edit" Href="/products/DEMO-001/edit">
+                Product Catalog (Edit Descriptions)
             </MudListItem>
         </AuthorizeView>
 
         <AuthorizeView Policy="SystemAdmin">
             <MudListItem T="string" Icon="@Icons.Material.Filled.AdminPanelSettings">
-                User Management (Coming in Sessions 9-12)
+                User Management (Coming in future sessions)
             </MudListItem>
         </AuthorizeView>
     </MudList>
 </MudPaper>
 
 <MudAlert Severity="Severity.Info" Class="mt-4">
-    <strong>M32.1 Session 6:</strong> Blazor WASM scaffolding complete.
-    Navigation, dashboards, and workflows will be added in Sessions 7-8.
+    <strong>M32.3 Session 1:</strong> Product Admin write UI now available.
+    ProductManager and CopyWriter roles can edit product details via the links above.
 </MudAlert>
