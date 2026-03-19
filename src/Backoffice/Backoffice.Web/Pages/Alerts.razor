@@ -4,7 +4,7 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using Backoffice.Web.Auth
 @using Backoffice.Web.Hub
-@attribute [Authorize(Roles = "operations-manager,warehouse-manager,system-admin")]
+@attribute [Authorize(Roles = "operations-manager,warehouse-clerk,system-admin")]
 @inject BackofficeAuthState AuthState
 @inject BackofficeHubService HubService
 @inject IHttpClientFactory HttpClientFactory
