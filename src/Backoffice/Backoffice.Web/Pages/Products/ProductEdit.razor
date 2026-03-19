@@ -335,7 +335,8 @@ else
             }
             else
             {
-            Logger.LogWarning("Session expired while discontinuing product {Sku}", SanitizeForLog(Sku));
+            var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
+            Logger.LogWarning("Session expired while discontinuing product {Sku}", safeSku);
             }
             var safeSku = (Sku ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
             Logger.LogWarning("Session expired while discontinuing product {Sku}", safeSku);
