@@ -64,7 +64,7 @@
                 <MudText Typo="Typo.h6">Recent Alerts (@_alerts.TotalCount)</MudText>
                 @if (_alerts.QueriedAt != default)
                 {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="alerts-last-updated">
                         Last updated: @FormatTimeSince(_alerts.QueriedAt)
                     </MudText>
                 }
