@@ -25,6 +25,36 @@ public sealed class StubCatalogClient : ICatalogClient
         return Task.FromResult(_products.GetValueOrDefault(sku));
     }
 
+    public Task<bool> UpdateProductDescriptionAsync(string sku, string description, CancellationToken ct = default)
+    {
+        if (_products.TryGetValue(sku, out var product))
+        {
+            _products[sku] = product with { Description = description };
+            return Task.FromResult(true);
+        }
+        return Task.FromResult(false);
+    }
+
+    public Task<bool> UpdateProductDisplayNameAsync(string sku, string displayName, CancellationToken ct = default)
+    {
+        if (_products.TryGetValue(sku, out var product))
+        {
+            _products[sku] = product with { Name = displayName };
+            return Task.FromResult(true);
+        }
+        return Task.FromResult(false);
+    }
+
+    public Task<bool> DiscontinueProductAsync(string sku, CancellationToken ct = default)
+    {
+        if (_products.TryGetValue(sku, out var product))
+        {
+            _products[sku] = product with { Status = "Discontinued" };
+            return Task.FromResult(true);
+        }
+        return Task.FromResult(false);
+    }
+
     public void Clear()
     {
         _products.Clear();

@@ -223,4 +223,13 @@ public class StubCatalogClient : ICatalogClient
 {
     public Task<ProductDto?> GetProductAsync(string sku, CancellationToken ct = default)
         => Task.FromResult<ProductDto?>(null);
+
+    public Task<bool> UpdateProductDescriptionAsync(string sku, string description, CancellationToken ct = default)
+        => Task.FromResult(true);
+
+    public Task<bool> UpdateProductDisplayNameAsync(string sku, string displayName, CancellationToken ct = default)
+        => Task.FromResult(true);
+
+    public Task<bool> DiscontinueProductAsync(string sku, CancellationToken ct = default)
+        => Task.FromResult(true);
 }

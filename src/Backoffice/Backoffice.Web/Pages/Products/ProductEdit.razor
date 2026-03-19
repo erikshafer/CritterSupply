@@ -1,0 +1,398 @@
+@page "/products/{sku}/edit"
+@using System.Net.Http.Json
+@using Backoffice.Web.Auth
+@using Backoffice.Web.Hub
+@attribute [Authorize(Roles = "copy-writer,product-manager,system-admin")]
+@inject BackofficeAuthState AuthState
+@inject BackofficeHubService HubService
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject ILogger<ProductEdit> Logger
+@inject SessionExpiredService SessionExpiredService
+
+<PageTitle>Edit Product — Backoffice</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbItems" Separator=">"></MudBreadcrumbs>
+
+<MudText Typo="Typo.h4" GutterBottom="true">
+    Edit Product
+</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4"
+                       aria-label="Loading product details" />
+}
+else if (_product is null)
+{
+    <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">
+        Product not found or you don't have permission to view it.
+    </MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" GutterBottom="true">Product Details</MudText>
+
+                <MudTextField Label="SKU"
+                              Value="@_product.Sku"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              ReadOnly="true"
+                              Class="mb-3"
+                              data-testid="product-sku" />
+
+                <MudTextField Label="Display Name"
+                              @bind-Value="_displayName"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              MaxLength="100"
+                              Counter="100"
+                              Immediate="true"
+                              Class="mb-3"
+                              Disabled="@(_isSaving || !_canEditName)"
+                              HelperText="@(_canEditName ? "Product display name (max 100 characters)" : "You don't have permission to edit the display name")"
+                              data-testid="product-name-input" />
+
+                <MudTextField Label="Description"
+                              @bind-Value="_description"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Lines="5"
+                              MaxLength="2000"
+                              Counter="2000"
+                              Immediate="true"
+                              Class="mb-3"
+                              Disabled="@(_isSaving || !_canEditDescription)"
+                              HelperText="@(_canEditDescription ? "Product description for customers (max 2000 characters)" : "You don't have permission to edit the description")"
+                              data-testid="product-description-input" />
+
+                <MudTextField Label="Category"
+                              Value="@_product.Category"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              ReadOnly="true"
+                              Class="mb-3"
+                              data-testid="product-category" />
+
+                <MudTextField Label="Status"
+                              Value="@_product.Status"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              ReadOnly="true"
+                              Class="mb-3"
+                              data-testid="product-status" />
+
+                <MudDivider Class="my-4" />
+
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="SaveChangesAsync"
+                               Disabled="@(_isSaving || !_hasChanges)"
+                               data-testid="save-btn">
+                        @if (_isSaving)
+                        {
+                            <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Save" Class="mr-1" />
+                            <span>Save Changes</span>
+                        }
+                    </MudButton>
+
+                    @if (_product.Status == "Active" && _canDiscontinue)
+                    {
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Warning"
+                                   OnClick="DiscontinueProductAsync"
+                                   Disabled="_isSaving"
+                                   data-testid="discontinue-btn">
+                            <MudIcon Icon="@Icons.Material.Filled.Block" Class="mr-1" />
+                            Discontinue Product
+                        </MudButton>
+                    }
+
+                    <MudSpacer />
+
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               OnClick="CancelAsync"
+                               Disabled="_isSaving"
+                               data-testid="cancel-btn">
+                        Cancel
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" GutterBottom="true">Change Summary</MudText>
+
+                @if (!_hasChanges)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        No unsaved changes
+                    </MudText>
+                }
+                else
+                {
+                    <MudList T="string" Dense="true">
+                        @if (_displayName != _product.Name)
+                        {
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.Edit">
+                                <MudText Typo="Typo.body2">Display name changed</MudText>
+                            </MudListItem>
+                        }
+                        @if (_description != _product.Description)
+                        {
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.Edit">
+                                <MudText Typo="Typo.body2">Description updated</MudText>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public string Sku { get; set; } = string.Empty;
+
+    private ProductDto? _product;
+    private string _displayName = string.Empty;
+    private string _description = string.Empty;
+    private bool _isLoading = true;
+    private bool _isSaving = false;
+    private bool _canEditName = false;
+    private bool _canEditDescription = false;
+    private bool _canDiscontinue = false;
+
+    private List<BreadcrumbItem> _breadcrumbItems = new();
+
+    private bool _hasChanges =>
+        _product is not null &&
+        (_displayName != _product.Name || _description != _product.Description);
+
+    // Local DTO matching Backoffice.Clients.ProductDto
+    private sealed record ProductDto(
+        string Sku,
+        string Name,
+        string Description,
+        string Category,
+        string Status);
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Set up breadcrumbs
+        _breadcrumbItems = new List<BreadcrumbItem>
+        {
+            new BreadcrumbItem("Dashboard", href: "/"),
+            new BreadcrumbItem("Products", href: "/", disabled: true),
+            new BreadcrumbItem("Edit", href: null, disabled: true)
+        };
+
+        // Check role permissions
+        var role = AuthState.Role ?? string.Empty;
+        _canEditName = role == "product-manager" || role == "system-admin";
+        _canEditDescription = role == "copy-writer" || role == "product-manager" || role == "system-admin";
+        _canDiscontinue = role == "product-manager" || role == "system-admin";
+
+        await LoadProductAsync();
+    }
+
+    private async Task LoadProductAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.GetAsync($"/api/catalog/products/{Uri.EscapeDataString(Sku)}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                _product = await response.Content.ReadFromJsonAsync<ProductDto>();
+
+                if (_product is not null)
+                {
+                    _displayName = _product.Name;
+                    _description = _product.Description;
+                }
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Logger.LogWarning("Session expired while loading product {Sku}", SanitizeForLog(Sku));
+                SessionExpiredService.TriggerSessionExpired();
+            }
+            else
+            {
+                Snackbar.Add("Failed to load product details", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading product {Sku}", SanitizeForLog(Sku));
+            Snackbar.Add("Failed to load product details", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveChangesAsync()
+    {
+        if (_product is null || !_hasChanges) return;
+
+        _isSaving = true;
+        var successCount = 0;
+        var failureCount = 0;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            // Update display name if changed and user has permission
+            if (_displayName != _product.Name && _canEditName)
+            {
+                var request = new { Sku, Name = _displayName };
+                var response = await client.PutAsJsonAsync(
+                    $"/api/products/{Uri.EscapeDataString(Sku)}/display-name",
+                    request);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    Logger.LogWarning("Session expired while saving product {Sku}", SanitizeForLog(Sku));
+                    SessionExpiredService.TriggerSessionExpired();
+                    return;
+                }
+
+                if (response.IsSuccessStatusCode) successCount++; else failureCount++;
+            }
+
+            // Update description if changed and user has permission
+            if (_description != _product.Description && _canEditDescription)
+            {
+                var request = new { Sku, Description = _description };
+                var response = await client.PutAsJsonAsync(
+                    $"/api/products/{Uri.EscapeDataString(Sku)}/description",
+                    request);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    Logger.LogWarning("Session expired while saving product {Sku}", SanitizeForLog(Sku));
+                    SessionExpiredService.TriggerSessionExpired();
+                    return;
+                }
+
+                if (response.IsSuccessStatusCode) successCount++; else failureCount++;
+            }
+
+            if (successCount > 0 && failureCount == 0)
+            {
+                Snackbar.Add("Product updated successfully", Severity.Success);
+                await LoadProductAsync(); // Refresh to get latest state
+            }
+            else if (failureCount > 0)
+            {
+                Snackbar.Add($"Some updates failed ({failureCount} failed, {successCount} succeeded)", Severity.Warning);
+                await LoadProductAsync(); // Refresh to see what actually changed
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving product {Sku}", SanitizeForLog(Sku));
+            Snackbar.Add("Failed to save changes", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private bool _confirmDiscontinue = false;
+
+    private async Task DiscontinueProductAsync()
+    {
+        if (_product is null || !_canDiscontinue) return;
+
+        // Simple confirmation - just toggle bool and show the button again
+        if (!_confirmDiscontinue)
+        {
+            _confirmDiscontinue = true;
+            Snackbar.Add("Click the discontinue button again to confirm", Severity.Warning);
+            return;
+        }
+
+        _isSaving = true;
+        _confirmDiscontinue = false;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var request = new { Sku, NewStatus = "Discontinued" };
+            var response = await client.PatchAsJsonAsync(
+                $"/api/products/{Uri.EscapeDataString(Sku)}/status",
+                request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Logger.LogWarning("Session expired while discontinuing product {Sku}", SanitizeForLog(Sku));
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Product discontinued successfully", Severity.Success);
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                Snackbar.Add("Failed to discontinue product", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error discontinuing product {Sku}", SanitizeForLog(Sku));
+            Snackbar.Add("Failed to discontinue product", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private Task CancelAsync()
+    {
+        Navigation.NavigateTo("/");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Sanitize user input for logging to prevent log injection attacks.
+    /// Removes newline and carriage return characters that could forge log entries.
+    /// </summary>
+    private static string SanitizeForLog(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return string.Empty;
+
+        return value.Replace("\r", string.Empty)
+                    .Replace("\n", string.Empty);
+    }
+}

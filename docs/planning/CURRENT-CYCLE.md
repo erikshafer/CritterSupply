@@ -41,19 +41,65 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M32.2 — Backoffice Phase 3A: Stabilization + UX Hardening (COMPLETE) |
-| **Status** | ✅ COMPLETE — All P0 + P1 + P2 items delivered across 3 sessions |
-| **Deliverables** | 8 UX improvements (P0: 4, P1: 2, P2: 2) — Build: 0 errors, 0 warnings |
+| **Current Milestone** | M32.3 — Backoffice Phase 3B: Write Operations Depth (IN PROGRESS) |
+| **Status** | 🚀 IN PROGRESS — Session 1 complete (Product Admin write UI) |
+| **Deliverables** | Product Admin write UI with role-based permissions — Build: 0 errors, 0 warnings |
 | **Recent Completion** | M32.2 — Backoffice Phase 3A (2026-03-19), M32.1 — Backoffice Phase 2 (2026-03-18) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-19 (Session 3 complete)*
+*Last Updated: 2026-03-19 (M32.3 Session 1 complete)*
 
 ---
 
 ## Active Milestone
 
-### 🚀 M32.2: Backoffice Phase 3A — Option A Selected
+### 🚀 M32.3: Backoffice Phase 3B — Write Operations Depth
+
+**Status:** 🚀 **IN PROGRESS** — Session 1 complete (Product Admin write UI)
+**Goal:** Implement write-operations UI depth (Product Admin, Pricing Admin, Warehouse Admin, User Management)
+
+**Session 1 Progress (2026-03-19):**
+- ✅ Created M32.3 Session 1 planning document (`m32-3-session-1-plan.md`)
+- ✅ Extended ICatalogClient with 3 write methods (UpdateProductDescription, UpdateProductDisplayName, DiscontinueProduct)
+- ✅ Implemented CatalogClient methods calling Product Catalog BC endpoints
+- ✅ Fixed stub clients in integration and E2E tests (StubClients.cs, StubCatalogClient.cs)
+- ✅ Created ProductEdit.razor page at `/products/{sku}/edit`:
+  - Role-based permissions (copy-writer, product-manager, system-admin)
+  - Edit display name and description with character limits
+  - Change tracking sidebar
+  - Session-expired handling
+  - Two-click discontinuation workflow
+  - MudBlazor v9 components with explicit type parameters
+  - WASM pattern: HttpClient direct calls, local ProductDto record
+- ✅ Added navigation links from Index.razor (ProductManager and CopyWriter roles)
+- ✅ Build succeeds with 0 errors, 0 warnings
+- **Retrospective:** `docs/planning/milestones/m32-3-session-1-retrospective.md`
+
+**Next Session Goals:**
+- Product Search/List UI (enable discovering product SKUs)
+- E2E tests for ProductEdit page
+- Pricing Admin write UI (set base price, update list price)
+
+**Planned Sessions:**
+1. ✅ Session 1: Product Admin write UI (COMPLETE)
+2. Session 2: Product Search + Pricing Admin write UI
+3. Session 3: Warehouse Admin write UI
+4. Session 4: User Management write UI
+5. Session 5: CSV/Excel exports
+6. Session 6: Bulk operations pattern
+7. Session 7: E2E test coverage
+8. Session 8: Documentation and retrospective
+
+**References:**
+- Planning: `docs/planning/milestones/m32-3-session-1-plan.md`
+- Retrospective: `docs/planning/milestones/m32-3-session-1-retrospective.md`
+- Skills: `docs/skills/blazor-wasm-jwt.md`, `docs/skills/wolverine-message-handlers.md`
+
+---
+
+## Recent Completions
+
+### M32.2: Backoffice Phase 3A — Stabilization + UX Hardening
 
 **Status:** ✅ **COMPLETE** — All 3 sessions finished (all P0 + P1 + P2 items)
 **Goal:** Execute narrow M32.2 scope (stabilization + UX hardening) and defer heavier write-ops/UI depth to M32.3
