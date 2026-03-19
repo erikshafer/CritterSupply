@@ -231,7 +231,7 @@ else
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Logger.LogWarning("Session expired while loading product {Sku}", Sku);
+                Logger.LogWarning("Session expired while loading product {Sku}", SanitizeForLog(Sku));
                 SessionExpiredService.TriggerSessionExpired();
             }
             else
@@ -241,7 +241,7 @@ else
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error loading product {Sku}", Sku);
+            Logger.LogError(ex, "Error loading product {Sku}", SanitizeForLog(Sku));
             Snackbar.Add("Failed to load product details", Severity.Error);
         }
         finally
@@ -274,7 +274,7 @@ else
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
-                    Logger.LogWarning("Session expired while saving product {Sku}", Sku);
+                    Logger.LogWarning("Session expired while saving product {Sku}", SanitizeForLog(Sku));
                     SessionExpiredService.TriggerSessionExpired();
                     return;
                 }
@@ -292,7 +292,7 @@ else
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
-                    Logger.LogWarning("Session expired while saving product {Sku}", Sku);
+                    Logger.LogWarning("Session expired while saving product {Sku}", SanitizeForLog(Sku));
                     SessionExpiredService.TriggerSessionExpired();
                     return;
                 }
@@ -313,7 +313,7 @@ else
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error saving product {Sku}", Sku);
+            Logger.LogError(ex, "Error saving product {Sku}", SanitizeForLog(Sku));
             Snackbar.Add("Failed to save changes", Severity.Error);
         }
         finally
@@ -351,7 +351,7 @@ else
 
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Logger.LogWarning("Session expired while discontinuing product {Sku}", Sku);
+                Logger.LogWarning("Session expired while discontinuing product {Sku}", SanitizeForLog(Sku));
                 SessionExpiredService.TriggerSessionExpired();
                 return;
             }
@@ -368,7 +368,7 @@ else
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error discontinuing product {Sku}", Sku);
+            Logger.LogError(ex, "Error discontinuing product {Sku}", SanitizeForLog(Sku));
             Snackbar.Add("Failed to discontinue product", Severity.Error);
         }
         finally
@@ -381,5 +381,18 @@ else
     {
         Navigation.NavigateTo("/");
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Sanitize user input for logging to prevent log injection attacks.
+    /// Removes newline and carriage return characters that could forge log entries.
+    /// </summary>
+    private static string SanitizeForLog(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return string.Empty;
+
+        return value.Replace("\r", string.Empty)
+                    .Replace("\n", string.Empty);
     }
 }
