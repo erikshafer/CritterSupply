@@ -232,4 +232,7 @@ public class StubCatalogClient : ICatalogClient
 
     public Task<bool> DiscontinueProductAsync(string sku, CancellationToken ct = default)
         => Task.FromResult(true);
+
+    public Task<ProductListResult?> ListProductsAsync(int page = 1, int pageSize = 20, string? category = null, string? status = null, CancellationToken ct = default)
+        => Task.FromResult<ProductListResult?>(new ProductListResult(Array.Empty<ProductDto>(), page, pageSize, 0));
 }

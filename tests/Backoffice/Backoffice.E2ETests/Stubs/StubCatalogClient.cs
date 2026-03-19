@@ -55,6 +55,27 @@ public sealed class StubCatalogClient : ICatalogClient
         return Task.FromResult(false);
     }
 
+    public Task<ProductListResult?> ListProductsAsync(int page = 1, int pageSize = 20, string? category = null, string? status = null, CancellationToken ct = default)
+    {
+        var query = _products.Values.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(category))
+            query = query.Where(p => p.Category == category);
+
+        if (!string.IsNullOrEmpty(status))
+            query = query.Where(p => p.Status == status);
+
+        var products = query.ToList();
+        var totalCount = products.Count;
+        var paginatedProducts = products
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList()
+            .AsReadOnly();
+
+        return Task.FromResult<ProductListResult?>(new ProductListResult(paginatedProducts, page, pageSize, totalCount));
+    }
+
     public void Clear()
     {
         _products.Clear();

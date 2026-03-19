@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.3 — Backoffice Phase 3B: Write Operations Depth (IN PROGRESS) |
-| **Status** | 🚀 IN PROGRESS — Session 1 complete (Product Admin write UI) |
-| **Deliverables** | Product Admin write UI with role-based permissions — Build: 0 errors, 0 warnings |
+| **Status** | 🚀 IN PROGRESS — Sessions 1-2 complete (Product Admin write UI + Product List UI) |
+| **Deliverables** | Product Admin write UI + Product List UI with role-based permissions — Build: 0 errors, 10 warnings |
 | **Recent Completion** | M32.2 — Backoffice Phase 3A (2026-03-19), M32.1 — Backoffice Phase 2 (2026-03-18) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-19 (M32.3 Session 1 complete)*
+*Last Updated: 2026-03-19 (M32.3 Session 2 complete)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 🚀 M32.3: Backoffice Phase 3B — Write Operations Depth
 
-**Status:** 🚀 **IN PROGRESS** — Session 1 complete (Product Admin write UI)
+**Status:** 🚀 **IN PROGRESS** — Sessions 1-2 complete (Product Admin write + Product List UI)
 **Goal:** Implement write-operations UI depth (Product Admin, Pricing Admin, Warehouse Admin, User Management)
 
 **Session 1 Progress (2026-03-19):**
@@ -75,24 +75,43 @@
 - ✅ Build succeeds with 0 errors, 0 warnings
 - **Retrospective:** `docs/planning/milestones/m32-3-session-1-retrospective.md`
 
+**Session 2 Progress (2026-03-19):**
+- ✅ Created M32.3 Session 2 planning document (`m32-3-session-2-plan.md`)
+- ✅ API routing audit: confirmed Product Catalog BC uses `/api/products`, Backoffice.Api proxies via `/api/catalog/products` (intentional BFF pattern)
+- ✅ Extended ICatalogClient with `ListProductsAsync` method (pagination + filtering)
+- ✅ Implemented CatalogClient HTTP client calling `/api/products` with query parameters
+- ✅ Created GetProductList.cs query handler in Backoffice.Api (BFF proxy endpoint at `/api/catalog/products`)
+- ✅ Added 3 missing authorization policies to Backoffice.Api Program.cs (ProductManager, CopyWriter, PricingManager)
+- ✅ Created ProductList.razor page at `/products` route:
+  - MudTable with pagination (25 items/page)
+  - Client-side search filtering by SKU/name
+  - Role-based authorization (product-manager, copy-writer, system-admin)
+  - Session-expired handling
+  - MudChip status badges with T="string" type parameter
+  - WASM pattern: HttpClient direct calls, local DTO records
+- ✅ Updated Index.razor navigation: ProductManager and CopyWriter now link to `/products` (removed DEMO-001 hardcoded SKU)
+- ✅ Fixed stub clients (integration + E2E tests) with ListProductsAsync implementation
+- ✅ Build succeeds with 0 errors, 10 pre-existing warnings (Correspondence BC)
+- **Retrospective:** `docs/planning/milestones/m32-3-session-2-retrospective.md`
+
 **Next Session Goals:**
-- Product Search/List UI (enable discovering product SKUs)
-- E2E tests for ProductEdit page
+- E2E tests for ProductEdit and ProductList pages
 - Pricing Admin write UI (set base price, update list price)
 
 **Planned Sessions:**
 1. ✅ Session 1: Product Admin write UI (COMPLETE)
-2. Session 2: Product Search + Pricing Admin write UI
-3. Session 3: Warehouse Admin write UI
-4. Session 4: User Management write UI
-5. Session 5: CSV/Excel exports
-6. Session 6: Bulk operations pattern
-7. Session 7: E2E test coverage
-8. Session 8: Documentation and retrospective
+2. ✅ Session 2: Product List UI + API routing audit (COMPLETE)
+3. Session 3: E2E tests + Pricing Admin write UI
+4. Session 4: Warehouse Admin write UI
+5. Session 5: User Management write UI
+6. Session 6: CSV/Excel exports
+7. Session 7: Bulk operations pattern
+8. Session 8: E2E test coverage (comprehensive)
+9. Session 9: Documentation and retrospective
 
 **References:**
-- Planning: `docs/planning/milestones/m32-3-session-1-plan.md`
-- Retrospective: `docs/planning/milestones/m32-3-session-1-retrospective.md`
+- Planning: `docs/planning/milestones/m32-3-session-1-plan.md`, `docs/planning/milestones/m32-3-session-2-plan.md`
+- Retrospective: `docs/planning/milestones/m32-3-session-1-retrospective.md`, `docs/planning/milestones/m32-3-session-2-retrospective.md`
 - Skills: `docs/skills/blazor-wasm-jwt.md`, `docs/skills/wolverine-message-handlers.md`
 
 ---

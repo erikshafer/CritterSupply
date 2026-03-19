@@ -66,6 +66,15 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("Executive", policy => policy
         .RequireAuthenticatedUser()
         .RequireRole("executive"))
+    .AddPolicy("PricingManager", policy => policy
+        .RequireAuthenticatedUser()
+        .RequireRole("pricing-manager"))
+    .AddPolicy("ProductManager", policy => policy
+        .RequireAuthenticatedUser()
+        .RequireRole("product-manager"))
+    .AddPolicy("CopyWriter", policy => policy
+        .RequireAuthenticatedUser()
+        .RequireRole("copy-writer"))
     .AddPolicy("SystemAdmin", policy => policy
         .RequireAuthenticatedUser()
         .RequireRole("system-admin"));
