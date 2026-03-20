@@ -211,6 +211,49 @@ public class StubInventoryClient : IInventoryClient
         };
         return Task.FromResult<IReadOnlyList<LowStockDto>>(lowStockItems);
     }
+
+    public Task<IReadOnlyList<InventoryListItemDto>> ListInventoryAsync(int? page = null, int? pageSize = null, CancellationToken ct = default)
+    {
+        // Return mock inventory list for testing
+        var inventoryItems = new List<InventoryListItemDto>
+        {
+            new InventoryListItemDto("SKU-001", "Test Product 1", 50, 10, 60),
+            new InventoryListItemDto("SKU-002", "Test Product 2", 30, 5, 35),
+            new InventoryListItemDto("SKU-003", "Test Product 3", 0, 0, 0)
+        };
+        return Task.FromResult<IReadOnlyList<InventoryListItemDto>>(inventoryItems);
+    }
+
+    public Task<AdjustInventoryResultDto?> AdjustInventoryAsync(
+        string sku,
+        int adjustmentQuantity,
+        string reason,
+        string adjustedBy,
+        CancellationToken ct = default)
+    {
+        // Return mock adjustment result
+        var result = new AdjustInventoryResultDto(
+            Id: Guid.NewGuid(),
+            Sku: sku,
+            WarehouseId: "warehouse-central",
+            AvailableQuantity: 50 + adjustmentQuantity);
+        return Task.FromResult<AdjustInventoryResultDto?>(result);
+    }
+
+    public Task<ReceiveStockResultDto?> ReceiveInboundStockAsync(
+        string sku,
+        int quantity,
+        string source,
+        CancellationToken ct = default)
+    {
+        // Return mock receive stock result
+        var result = new ReceiveStockResultDto(
+            Id: Guid.NewGuid(),
+            Sku: sku,
+            WarehouseId: "warehouse-central",
+            AvailableQuantity: 50 + quantity);
+        return Task.FromResult<ReceiveStockResultDto?>(result);
+    }
 }
 
 public class StubFulfillmentClient : IFulfillmentClient

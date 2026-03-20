@@ -34,8 +34,8 @@
         </AuthorizeView>
 
         <AuthorizeView Policy="WarehouseClerk">
-            <MudListItem T="string" Icon="@Icons.Material.Filled.Warehouse">
-                Warehouse Tools (Coming in Session 7)
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Warehouse" Href="/inventory">
+                Warehouse Admin (Manage Inventory)
             </MudListItem>
         </AuthorizeView>
 
@@ -66,6 +66,6 @@
 </MudPaper>
 
 <MudAlert Severity="Severity.Info" Class="mt-4">
-    <strong>M32.3 Session 2:</strong> Product catalog browsing now available.
-    ProductManager and CopyWriter roles can browse products and edit details.
+    <strong>M32.3 Session 4:</strong> Warehouse Admin now available.
+    WarehouseClerk role can browse inventory, adjust stock levels, and receive inbound shipments.
 </MudAlert>

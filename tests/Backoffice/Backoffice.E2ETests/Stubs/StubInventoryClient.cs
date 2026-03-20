@@ -90,6 +90,90 @@ public sealed class StubInventoryClient : IInventoryClient
         return Task.FromResult<IReadOnlyList<LowStockDto>>(alerts);
     }
 
+    public Task<IReadOnlyList<InventoryListItemDto>> ListInventoryAsync(
+        int? page = null,
+        int? pageSize = null,
+        CancellationToken ct = default)
+    {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
+        // Return all stock levels as inventory list items
+        var items = _stockLevels.Values
+            .Select(s => new InventoryListItemDto(
+                s.Sku,
+                $"Product {s.Sku}",
+                s.AvailableQuantity,
+                s.ReservedQuantity,
+                s.TotalQuantity))
+            .ToList();
+
+        return Task.FromResult<IReadOnlyList<InventoryListItemDto>>(items);
+    }
+
+    public Task<AdjustInventoryResultDto?> AdjustInventoryAsync(
+        string sku,
+        int adjustmentQuantity,
+        string reason,
+        string adjustedBy,
+        CancellationToken ct = default)
+    {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
+        // Update in-memory stock level
+        if (_stockLevels.TryGetValue(sku, out var existing))
+        {
+            var newAvailable = existing.AvailableQuantity + adjustmentQuantity;
+            _stockLevels[sku] = existing with
+            {
+                AvailableQuantity = newAvailable,
+                TotalQuantity = newAvailable + existing.ReservedQuantity
+            };
+
+            var result = new AdjustInventoryResultDto(
+                Id: Guid.NewGuid(),
+                Sku: sku,
+                WarehouseId: existing.WarehouseId,
+                AvailableQuantity: newAvailable);
+
+            return Task.FromResult<AdjustInventoryResultDto?>(result);
+        }
+
+        return Task.FromResult<AdjustInventoryResultDto?>(null);
+    }
+
+    public Task<ReceiveStockResultDto?> ReceiveInboundStockAsync(
+        string sku,
+        int quantity,
+        string source,
+        CancellationToken ct = default)
+    {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
+        // Update in-memory stock level
+        if (_stockLevels.TryGetValue(sku, out var existing))
+        {
+            var newAvailable = existing.AvailableQuantity + quantity;
+            _stockLevels[sku] = existing with
+            {
+                AvailableQuantity = newAvailable,
+                TotalQuantity = newAvailable + existing.ReservedQuantity
+            };
+
+            var result = new ReceiveStockResultDto(
+                Id: Guid.NewGuid(),
+                Sku: sku,
+                WarehouseId: existing.WarehouseId,
+                AvailableQuantity: newAvailable);
+
+            return Task.FromResult<ReceiveStockResultDto?>(result);
+        }
+
+        return Task.FromResult<ReceiveStockResultDto?>(null);
+    }
+
     public void Clear()
     {
         _stockLevels.Clear();
