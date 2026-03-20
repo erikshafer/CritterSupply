@@ -23,7 +23,7 @@ public sealed class ProductAdminSteps
     {
         // StubCatalogClient in fixture already provides test products (DEMO-001, DEMO-002, etc.)
         // Verify we have access to the stub
-        var stubClient = Fixture.GetStubCatalogClient();
+        var stubClient = Fixture.StubCatalogClient;
         stubClient.ShouldNotBeNull();
     }
 
@@ -37,8 +37,8 @@ public sealed class ProductAdminSteps
             _ => Guid.NewGuid()
         };
 
-        // Seed admin user via BackofficeIdentity EF Core context
-        Fixture.SeedAdminUser(userId, email, userName, "Password123!", role);
+        // Seed admin user via BackofficeIdentity EF Core context with specific role
+        Fixture.SeedAdminUserWithRole(userId, email, userName, "Password123!", role);
         _scenarioContext[ScenarioContextKeys.AdminUserId] = userId;
     }
 
@@ -186,7 +186,7 @@ public sealed class ProductAdminSteps
     public void ThenTheProductChangesShouldBeSaved()
     {
         // Verify stub client received the update call
-        var stubClient = Fixture.GetStubCatalogClient();
+        var stubClient = Fixture.StubCatalogClient;
         // In reality, we'd check stubClient state, but for now just confirm it exists
         stubClient.ShouldNotBeNull();
     }
