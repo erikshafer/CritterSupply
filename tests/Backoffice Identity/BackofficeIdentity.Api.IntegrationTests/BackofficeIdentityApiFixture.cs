@@ -43,6 +43,13 @@ public sealed class BackofficeIdentityApiFixture : IAsyncLifetime
 
                 // Disable RabbitMQ for integration tests
                 services.DisableAllExternalWolverineTransports();
+
+                // Bypass authorization for integration tests
+                // Use AllowAnonymous policy that bypasses all authorization
+                services.AddAuthorization(opts =>
+                {
+                    opts.AddPolicy("SystemAdmin", policy => policy.RequireAssertion(_ => true));
+                });
             });
         });
 
