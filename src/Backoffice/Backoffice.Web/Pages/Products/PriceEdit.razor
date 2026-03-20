@@ -1,0 +1,479 @@
+@page "/products/{sku}/price"
+@using System.Net.Http.Json
+@using Backoffice.Web.Auth
+@using Backoffice.Web.Hub
+@attribute [Authorize(Roles = "pricing-manager,system-admin")]
+@inject BackofficeAuthState AuthState
+@inject BackofficeHubService HubService
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject ILogger<PriceEdit> Logger
+@inject SessionExpiredService SessionExpiredService
+
+<PageTitle>Edit Price — Backoffice</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbItems" Separator=">"></MudBreadcrumbs>
+
+<MudText Typo="Typo.h4" GutterBottom="true">
+    Manage Product Price
+</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4"
+                       aria-label="Loading product price details" />
+}
+else if (_product is null)
+{
+    <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">
+        Product not found or you don't have permission to view it.
+    </MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" GutterBottom="true">Product Information</MudText>
+
+                <MudTextField Label="SKU"
+                              Value="@_product.Sku"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              ReadOnly="true"
+                              Class="mb-3"
+                              data-testid="price-sku" />
+
+                <MudTextField Label="Product Name"
+                              Value="@_product.Name"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              ReadOnly="true"
+                              Class="mb-3"
+                              data-testid="price-product-name" />
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.h6" GutterBottom="true">Current Price</MudText>
+
+                @if (_productPrice is not null && _productPrice.BasePrice.HasValue)
+                {
+                    <MudTextField Label="Current Base Price"
+                                  Value="@($"{_productPrice.BasePrice:F2} {_productPrice.Currency}")"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  ReadOnly="true"
+                                  Class="mb-3"
+                                  data-testid="current-base-price" />
+
+                    <MudTextField Label="Price Status"
+                                  Value="@_productPrice.Status"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  ReadOnly="true"
+                                  Class="mb-3"
+                                  data-testid="price-status" />
+
+                    @if (_productPrice.LastChangedAt.HasValue)
+                    {
+                        <MudTextField Label="Last Changed"
+                                      Value="@_productPrice.LastChangedAt.Value.ToString("yyyy-MM-dd HH:mm")"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      ReadOnly="true"
+                                      Class="mb-3"
+                                      data-testid="price-last-changed" />
+                    }
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                        No price set for this product yet.
+                    </MudAlert>
+                }
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.h6" GutterBottom="true">Set/Update Price</MudText>
+
+                <MudNumericField Label="Amount"
+                                 @bind-Value="_newAmount"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 Min="0.01m"
+                                 Step="0.01m"
+                                 Format="F2"
+                                 Class="mb-3"
+                                 Disabled="_isSaving"
+                                 HelperText="Enter new price amount (min 0.01)"
+                                 data-testid="price-amount-input" />
+
+                <MudTextField Label="Currency"
+                              @bind-Value="_currency"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              MaxLength="3"
+                              Class="mb-3"
+                              Disabled="_isSaving"
+                              HelperText="3-letter ISO currency code (e.g., USD)"
+                              data-testid="price-currency-input" />
+
+                <MudStack Row="true" Spacing="2" Class="mb-4">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="SetBasePriceAsync"
+                               Disabled="@(_isSaving || !_canSetBasePrice)"
+                               data-testid="set-base-price-btn">
+                        @if (_isSaving && _currentAction == "SetBasePrice")
+                        {
+                            <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
+                            <span>Setting Price...</span>
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Class="mr-1" />
+                            <span>Set Base Price</span>
+                        }
+                    </MudButton>
+                </MudStack>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.h6" GutterBottom="true">Schedule Future Price Change</MudText>
+
+                <MudNumericField Label="Scheduled Amount"
+                                 @bind-Value="_scheduledAmount"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 Min="0.01m"
+                                 Step="0.01m"
+                                 Format="F2"
+                                 Class="mb-3"
+                                 Disabled="_isSaving"
+                                 HelperText="Enter scheduled price amount (min 0.01)"
+                                 data-testid="schedule-amount-input" />
+
+                <MudTextField Label="Currency"
+                              @bind-Value="_scheduledCurrency"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              MaxLength="3"
+                              Class="mb-3"
+                              Disabled="_isSaving"
+                              HelperText="3-letter ISO currency code (e.g., USD)"
+                              data-testid="schedule-currency-input" />
+
+                <MudDatePicker Label="Scheduled Date"
+                               @bind-Date="_scheduledDate"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Class="mb-3"
+                               Disabled="_isSaving"
+                               MinDate="@DateTime.Today.AddDays(1)"
+                               HelperText="Date when price change will activate"
+                               data-testid="schedule-date-input" />
+
+                <MudTimePicker Label="Scheduled Time"
+                               @bind-Time="_scheduledTime"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Class="mb-3"
+                               Disabled="_isSaving"
+                               HelperText="Time when price change will activate (UTC)"
+                               data-testid="schedule-time-input" />
+
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Secondary"
+                               OnClick="SchedulePriceChangeAsync"
+                               Disabled="@(_isSaving || !_canSchedulePrice)"
+                               data-testid="schedule-price-btn">
+                        @if (_isSaving && _currentAction == "SchedulePrice")
+                        {
+                            <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
+                            <span>Scheduling...</span>
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Schedule" Class="mr-1" />
+                            <span>Schedule Price Change</span>
+                        }
+                    </MudButton>
+
+                    <MudSpacer />
+
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               OnClick="CancelAsync"
+                               Disabled="_isSaving"
+                               data-testid="cancel-btn">
+                        Cancel
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" GutterBottom="true">Pricing Rules</MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    • Price must be greater than 0
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    • Scheduled date must be in the future
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    • Only one pending scheduled price change allowed per product
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    • Product must be Published to schedule price changes
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public string Sku { get; set; } = string.Empty;
+
+    private ProductDto? _product;
+    private ProductPriceDto? _productPrice;
+    private bool _isLoading = true;
+    private bool _isSaving = false;
+    private string _currentAction = string.Empty;
+
+    private decimal _newAmount = 0;
+    private string _currency = "USD";
+
+    private decimal _scheduledAmount = 0;
+    private string _scheduledCurrency = "USD";
+    private DateTime? _scheduledDate = DateTime.Today.AddDays(1);
+    private TimeSpan? _scheduledTime = new TimeSpan(12, 0, 0); // Default to noon UTC
+
+    private List<BreadcrumbItem> _breadcrumbItems = new();
+
+    private bool _canSetBasePrice =>
+        _newAmount > 0 &&
+        !string.IsNullOrWhiteSpace(_currency) &&
+        _currency.Length == 3;
+
+    private bool _canSchedulePrice =>
+        _scheduledAmount > 0 &&
+        !string.IsNullOrWhiteSpace(_scheduledCurrency) &&
+        _scheduledCurrency.Length == 3 &&
+        _scheduledDate.HasValue &&
+        _scheduledTime.HasValue &&
+        _scheduledDate.Value >= DateTime.Today;
+
+    // Local DTOs matching Backoffice.Clients
+    private sealed record ProductDto(
+        string Sku,
+        string Name,
+        string Description,
+        string Category,
+        string Status);
+
+    private sealed record ProductPriceDto(
+        string Sku,
+        decimal? BasePrice,
+        string? Currency,
+        string Status,
+        DateTimeOffset? LastChangedAt);
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Set up breadcrumbs
+        _breadcrumbItems = new List<BreadcrumbItem>
+        {
+            new BreadcrumbItem("Dashboard", href: "/"),
+            new BreadcrumbItem("Products", href: "/", disabled: true),
+            new BreadcrumbItem("Price", href: null, disabled: true)
+        };
+
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            // Load product details
+            var productResponse = await client.GetAsync($"/api/catalog/products/{Uri.EscapeDataString(Sku)}");
+
+            if (productResponse.IsSuccessStatusCode)
+            {
+                _product = await productResponse.Content.ReadFromJsonAsync<ProductDto>();
+            }
+            else if (productResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Logger.LogWarning("Session expired while loading product {Sku}", SanitizeForLog(Sku));
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+            else
+            {
+                Snackbar.Add("Failed to load product details", Severity.Error);
+            }
+
+            // Load product price (may not exist yet - that's OK)
+            var priceResponse = await client.GetAsync($"/api/pricing/products/{Uri.EscapeDataString(Sku)}");
+
+            if (priceResponse.IsSuccessStatusCode)
+            {
+                _productPrice = await priceResponse.Content.ReadFromJsonAsync<ProductPriceDto>();
+
+                // Pre-fill current price in form fields
+                if (_productPrice is not null && _productPrice.BasePrice.HasValue)
+                {
+                    _newAmount = _productPrice.BasePrice.Value;
+                    _currency = _productPrice.Currency ?? "USD";
+                    _scheduledAmount = _productPrice.BasePrice.Value;
+                    _scheduledCurrency = _productPrice.Currency ?? "USD";
+                }
+            }
+            // 404 is OK - product may not have a price set yet
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading product/price data for {Sku}", SanitizeForLog(Sku));
+            Snackbar.Add("Failed to load product/price data", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SetBasePriceAsync()
+    {
+        if (!_canSetBasePrice) return;
+
+        _isSaving = true;
+        _currentAction = "SetBasePrice";
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var request = new { Amount = _newAmount, Currency = _currency.ToUpperInvariant() };
+            var response = await client.PostAsJsonAsync(
+                $"/api/pricing/products/{Uri.EscapeDataString(Sku)}/base-price",
+                request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Logger.LogWarning("Session expired while setting base price for {Sku}", SanitizeForLog(Sku));
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Base price set successfully", Severity.Success);
+                await LoadDataAsync(); // Refresh to get latest state
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Logger.LogWarning("Failed to set base price for {Sku}: {StatusCode} - {Error}",
+                    SanitizeForLog(Sku), response.StatusCode, SanitizeForLog(errorContent));
+                Snackbar.Add($"Failed to set base price: {response.StatusCode}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error setting base price for {Sku}", SanitizeForLog(Sku));
+            Snackbar.Add("Failed to set base price", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+            _currentAction = string.Empty;
+        }
+    }
+
+    private async Task SchedulePriceChangeAsync()
+    {
+        if (!_canSchedulePrice || !_scheduledDate.HasValue || !_scheduledTime.HasValue) return;
+
+        _isSaving = true;
+        _currentAction = "SchedulePrice";
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var scheduledFor = new DateTimeOffset(
+                _scheduledDate.Value.Date + _scheduledTime.Value,
+                TimeSpan.Zero); // UTC
+
+            var request = new
+            {
+                NewAmount = _scheduledAmount,
+                Currency = _scheduledCurrency.ToUpperInvariant(),
+                ScheduledFor = scheduledFor
+            };
+
+            var response = await client.PostAsJsonAsync(
+                $"/api/pricing/products/{Uri.EscapeDataString(Sku)}/schedule",
+                request);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Logger.LogWarning("Session expired while scheduling price change for {Sku}", SanitizeForLog(Sku));
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Price change scheduled for {scheduledFor:yyyy-MM-dd HH:mm} UTC", Severity.Success);
+                await LoadDataAsync(); // Refresh to get latest state
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Logger.LogWarning("Failed to schedule price change for {Sku}: {StatusCode} - {Error}",
+                    SanitizeForLog(Sku), response.StatusCode, SanitizeForLog(errorContent));
+                Snackbar.Add($"Failed to schedule price change: {response.StatusCode}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error scheduling price change for {Sku}", SanitizeForLog(Sku));
+            Snackbar.Add("Failed to schedule price change", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+            _currentAction = string.Empty;
+        }
+    }
+
+    private Task CancelAsync()
+    {
+        Navigation.NavigateTo("/");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Sanitize user input for logging to prevent log injection attacks.
+    /// Removes newline and carriage return characters that could forge log entries.
+    /// </summary>
+    private static string SanitizeForLog(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return string.Empty;
+
+        return value.Replace("\r", string.Empty)
+                    .Replace("\n", string.Empty);
+    }
+}

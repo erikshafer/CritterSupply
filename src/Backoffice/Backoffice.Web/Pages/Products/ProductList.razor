@@ -1,9 +1,11 @@
 @page "/products"
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = "copy-writer,product-manager,system-admin")]
+@using Backoffice.Web.Auth
+@attribute [Authorize(Roles = "copy-writer,product-manager,pricing-manager,system-admin")]
 @inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager Navigation
 @inject SessionExpiredService SessionExpiredService
+@inject BackofficeAuthState AuthState
 
 <PageTitle>Products — Backoffice</PageTitle>
 
@@ -54,11 +56,22 @@
             </MudChip>
         </MudTd>
         <MudTd DataLabel="Actions">
-            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
-                       Href="@($"/products/{context.Sku}/edit")"
-                       data-testid="@($"edit-product-{context.Sku}")">
-                Edit
-            </MudButton>
+            @if (AuthState.Role == "product-manager" || AuthState.Role == "copy-writer" || AuthState.Role == "system-admin")
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                           Href="@($"/products/{context.Sku}/edit")"
+                           data-testid="@($"edit-product-{context.Sku}")">
+                    Edit
+                </MudButton>
+            }
+            @if (AuthState.Role == "pricing-manager" || AuthState.Role == "system-admin")
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary"
+                           Href="@($"/products/{context.Sku}/price")"
+                           data-testid="@($"edit-price-{context.Sku}")">
+                    Edit Price
+                </MudButton>
+            }
         </MudTd>
     </RowTemplate>
     <NoRecordsContent>

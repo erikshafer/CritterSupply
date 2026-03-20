@@ -34,20 +34,6 @@ public sealed class AuthenticationSteps
         await loginPage.NavigateAsync();
     }
 
-    [Given(@"admin user ""(.*)"" exists with email ""(.*)""")]
-    public void GivenAdminUserExistsWithEmail(string userName, string email)
-    {
-        // Seed admin user via BackofficeIdentity EF Core context
-        var userId = userName switch
-        {
-            "Alice" => WellKnownTestData.AdminUsers.Alice,
-            _ => Guid.NewGuid()
-        };
-
-        Fixture.SeedAdminUser(userId, email, userName, "Password123!");
-        _scenarioContext[ScenarioContextKeys.AdminUserId] = userId;
-    }
-
     [When(@"I log in with email ""(.*)"" and password ""(.*)""")]
     public async Task WhenILogInWithEmailAndPassword(string email, string password)
     {

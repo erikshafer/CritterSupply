@@ -222,7 +222,13 @@ public sealed class E2ETestFixture : IAsyncLifetime
             "customer-service" => BackofficeIdentity.Identity.BackofficeRole.CustomerService,
             "copy-writer" => BackofficeIdentity.Identity.BackofficeRole.CopyWriter,
             "pricing-manager" => BackofficeIdentity.Identity.BackofficeRole.PricingManager,
+            "product-manager" => BackofficeIdentity.Identity.BackofficeRole.SystemAdmin, // TEMP: ProductManager not in enum yet, map to SystemAdmin
             "executive" => BackofficeIdentity.Identity.BackofficeRole.Executive,
+            // PascalCase aliases for convenience in Gherkin scenarios
+            "ProductManager" => BackofficeIdentity.Identity.BackofficeRole.SystemAdmin, // TEMP: map to SystemAdmin
+            "CopyWriter" => BackofficeIdentity.Identity.BackofficeRole.CopyWriter,
+            "PricingManager" => BackofficeIdentity.Identity.BackofficeRole.PricingManager,
+            "SystemAdmin" => BackofficeIdentity.Identity.BackofficeRole.SystemAdmin,
             _ => throw new ArgumentException($"Unknown role: {role}")
         };
 

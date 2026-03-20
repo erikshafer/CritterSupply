@@ -18,13 +18,33 @@ public sealed class AuthorizationSteps
     private E2ETestFixture Fixture => _scenarioContext.Get<E2ETestFixture>(ScenarioContextKeys.Fixture);
     private IPage Page => _scenarioContext.Get<IPage>(ScenarioContextKeys.Page);
 
+    [Given(@"admin user ""(.*)"" exists with email ""([^""]*)""(?! and)")]
+    public void GivenAdminUserExistsWithEmail(string userName, string email)
+    {
+        var userId = userName switch
+        {
+            "Alice" => WellKnownTestData.AdminUsers.Alice,
+            "Bob" => WellKnownTestData.AdminUsers.Bob,
+            _ => Guid.NewGuid()
+        };
+
+        Fixture.SeedAdminUser(userId, email, userName, "Password123!");
+        _scenarioContext[ScenarioContextKeys.AdminUserId] = userId;
+    }
+
     [Given(@"admin user ""(.*)"" exists with email ""(.*)"" and role ""(.*)""")]
     public void GivenAdminUserExistsWithEmailAndRole(string userName, string email, string role)
     {
-        var userId = Guid.NewGuid();
+        var userId = userName switch
+        {
+            "Alice" => WellKnownTestData.AdminUsers.Alice,
+            "Bob" => WellKnownTestData.AdminUsers.Bob,
+            _ => Guid.NewGuid()
+        };
+
         Fixture.SeedAdminUserWithRole(userId, email, userName, "Password123!", role);
-        _scenarioContext[ScenarioContextKeys.AdminUserId] = userId;
         _scenarioContext["CurrentUserRole"] = role;
+        _scenarioContext[ScenarioContextKeys.AdminUserId] = userId;
     }
 
     [Given(@"admin user ""(.*)"" exists with email ""(.*)"" and roles ""(.*)""")]

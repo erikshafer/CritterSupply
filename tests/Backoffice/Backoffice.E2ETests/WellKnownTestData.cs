@@ -13,6 +13,9 @@ internal static class WellKnownTestData
         public const string AlicePassword = "Password123!";
         public const string AliceName = "Alice Admin";
 
+        // Product Admin users (ProductManager and CopyWriter roles)
+        public static readonly Guid Bob = Guid.Parse("88888888-8888-8888-8888-888888888888");
+
         public static readonly Guid BobExecutive = Guid.Parse("22222222-2222-2222-2222-222222222222");
         public const string BobEmail = "bob.exec@crittersupply.com";
         public const string BobPassword = "Password123!";
