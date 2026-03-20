@@ -1,0 +1,152 @@
+@page "/users"
+@using System.Net
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@attribute [Authorize(Policy = "SystemAdmin")]
+@inject IHttpClientFactory HttpFactory
+@inject BackofficeAuthState AuthState
+@inject SessionExpiredService SessionExpiredService
+@inject NavigationManager Navigation
+
+<PageTitle>User Management - Backoffice</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" GutterBottom="true">User Management</MudText>
+    <MudText Typo="Typo.body2" Class="mb-4">Manage backoffice administrative users and roles</MudText>
+
+    <MudPaper Class="pa-4">
+        <div class="d-flex justify-space-between align-center mb-4">
+            <MudTextField @bind-Value="_searchText"
+                          Placeholder="Search by email or name..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Style="max-width: 400px;"
+                          data-testid="user-search" />
+
+            <MudButton Href="/users/create"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       data-testid="create-user-button">
+                Create User
+            </MudButton>
+        </div>
+
+        @if (_isLoading)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" />
+            </div>
+        }
+        else if (_users.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">No users found.</MudAlert>
+        }
+        else
+        {
+            <MudTable Items="@FilteredUsers"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      OnRowClick="@((TableRowClickEventArgs<BackofficeUserSummaryDto> args) => Navigation.NavigateTo($"/users/{args.Item.Id}/edit"))"
+                      data-testid="user-table">
+                <HeaderContent>
+                    <MudTh>Email</MudTh>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Role</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Created</MudTh>
+                    <MudTh>Last Login</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Email" data-testid="@($"user-row-{context.Email}")">@context.Email</MudTd>
+                    <MudTd DataLabel="Name">@context.FirstName @context.LastName</MudTd>
+                    <MudTd DataLabel="Role">
+                        <MudChip T="string" Size="Size.Small" data-testid="@($"user-role-{context.Email}")">
+                            @context.Role
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Color="@(context.Status == "Active" ? Color.Success : Color.Error)"
+                                 data-testid="@($"user-status-{context.Email}")">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Created">@context.CreatedAt.ToString("yyyy-MM-dd")</MudTd>
+                    <MudTd DataLabel="Last Login">
+                        @(context.LastLoginAt?.ToString("yyyy-MM-dd HH:mm") ?? "Never")
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    // Local DTO - WASM cannot reference server-side Backoffice.Clients
+    private sealed record BackofficeUserSummaryDto(
+        Guid Id,
+        string Email,
+        string FirstName,
+        string LastName,
+        string Role,
+        string Status,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset? LastLoginAt,
+        DateTimeOffset? DeactivatedAt);
+
+    private List<BackofficeUserSummaryDto> _users = new();
+    private string _searchText = string.Empty;
+    private bool _isLoading = true;
+
+    private IEnumerable<BackofficeUserSummaryDto> FilteredUsers
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_searchText))
+            {
+                return _users;
+            }
+
+            var search = _searchText.ToLowerInvariant();
+            return _users.Where(u =>
+                u.Email.ToLowerInvariant().Contains(search) ||
+                u.FirstName.ToLowerInvariant().Contains(search) ||
+                u.LastName.ToLowerInvariant().Contains(search));
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        _isLoading = true;
+
+        var httpClient = HttpFactory.CreateClient("BackofficeIdentityApi");
+        httpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+        var response = await httpClient.GetAsync("/api/backoffice-identity/users");
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            SessionExpiredService.TriggerSessionExpired();
+            return;
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        _users = await response.Content.ReadFromJsonAsync<List<BackofficeUserSummaryDto>>() ?? new();
+        _isLoading = false;
+    }
+}

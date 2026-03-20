@@ -58,14 +58,14 @@
         </AuthorizeView>
 
         <AuthorizeView Policy="SystemAdmin">
-            <MudListItem T="string" Icon="@Icons.Material.Filled.AdminPanelSettings">
-                User Management (Coming in future sessions)
+            <MudListItem T="string" Icon="@Icons.Material.Filled.AdminPanelSettings" Href="/users">
+                User Management (Admin Users)
             </MudListItem>
         </AuthorizeView>
     </MudList>
 </MudPaper>
 
 <MudAlert Severity="Severity.Info" Class="mt-4">
-    <strong>M32.3 Session 4:</strong> Warehouse Admin now available.
-    WarehouseClerk role can browse inventory, adjust stock levels, and receive inbound shipments.
+    <strong>M32.3 Session 7:</strong> User Management now available.
+    SystemAdmin role can create users, change roles, reset passwords, and deactivate accounts.
 </MudAlert>

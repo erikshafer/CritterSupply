@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.3 — Backoffice Phase 3B: Write Operations Depth (IN PROGRESS) |
-| **Status** | 🚀 IN PROGRESS — Sessions 1-6 complete (Product Admin + Pricing Admin + Warehouse Admin write UI + Pricing & Warehouse Admin E2E tests) |
-| **Deliverables** | Product/Pricing/Warehouse Admin write UI + E2E tests (16 scenarios) — Build: 0 errors, 34 warnings |
+| **Status** | 🚀 IN PROGRESS — Sessions 1-7 complete (Product Admin + Pricing Admin + Warehouse Admin + User Management write UI + E2E tests) |
+| **Deliverables** | Product/Pricing/Warehouse/User Management Admin write UI + E2E tests (16 scenarios) — Build: 0 errors, 22 warnings |
 | **Recent Completion** | M32.2 — Backoffice Phase 3A (2026-03-19), M32.1 — Backoffice Phase 2 (2026-03-18) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-20 (M32.3 Session 6 complete)*
+*Last Updated: 2026-03-20 (M32.3 Session 7 complete)*
 
 ---
 
@@ -182,8 +182,29 @@
 - ✅ Updated SessionExpirySteps to include StubPricingClient in session expiry simulation
 - ✅ Build: 0 errors (both E2E and integration test projects)
 
+**Session 7 Progress (2026-03-20):**
+- ✅ Created M32.3 Session 7 planning document (`m32-3-session-7-plan.md`)
+- ✅ Discovered BackofficeIdentity BC already had 4 of 5 needed endpoints (from M29.0)
+- ✅ Implemented missing password reset endpoint in BackofficeIdentity BC:
+  - ResetBackofficeUserPassword command, validator, handler
+  - ResetBackofficeUserPasswordEndpoint.cs (POST /api/backoffice-identity/users/{userId}/reset-password)
+  - Refresh token invalidation on password reset (security-first design)
+- ✅ Created IBackofficeIdentityClient interface (5 methods) in Backoffice/Backoffice/Clients/
+- ✅ Implemented BackofficeIdentityClient HTTP client in Backoffice.Api/Clients/
+- ✅ Created 3 Blazor WASM pages:
+  - UserList.razor at `/users` route (search, MudTable, status chips, row click navigation)
+  - UserCreate.razor at `/users/create` route (form with role dropdown, validation, duplicate email handling)
+  - UserEdit.razor at `/users/{userId:guid}/edit` route (3 independent sections: change role, reset password, deactivate)
+- ✅ Updated Index.razor navigation: SystemAdmin now links to `/users`
+- ✅ Fixed critical WASM SDK constraint: DTOs defined locally in @code blocks (cannot reference server-side projects)
+- ✅ Updated stub clients (integration + E2E tests) with IBackofficeIdentityClient implementations
+- ✅ Build succeeds with 0 errors, 22 pre-existing warnings
+- **Retrospective:** `docs/planning/milestones/m32-3-session-7-retrospective.md`
+- **Key Pattern:** Local DTO pattern for Blazor WASM (essential — WASM cannot reference server-side projects)
+- **Deferred:** PricingAdmin.feature step definition alignment (moved to Session 9 due to time prioritization)
+
 **Next Session Goals:**
-- User Management write UI (Session 7)
+- CSV/Excel exports (Session 8) — or skip to Session 9 bulk operations if not needed
 
 **Planned Sessions:**
 1. ✅ Session 1: Product Admin write UI (COMPLETE)
@@ -192,15 +213,15 @@
 4. ✅ Session 4: Warehouse Admin write UI (COMPLETE)
 5. ✅ Session 5: Pricing Admin E2E tests (COMPLETE)
 6. ✅ Session 6: Warehouse Admin E2E tests (COMPLETE)
-7. Session 7: User Management write UI
-8. Session 8: CSV/Excel exports
-9. Session 9: Bulk operations pattern
-10. Session 10: E2E test coverage (comprehensive) + documentation
+7. ✅ Session 7: User Management write UI (COMPLETE)
+8. Session 8: CSV/Excel exports (optional — may skip)
+9. Session 9: Bulk operations pattern + E2E stabilization
+10. Session 10: Comprehensive E2E coverage + documentation
 
 **References:**
-- Planning: `docs/planning/milestones/m32-3-session-1-plan.md`, `docs/planning/milestones/m32-3-session-2-plan.md`, `docs/planning/milestones/m32-3-session-4-plan.md`
-- Retrospective: `docs/planning/milestones/m32-3-session-1-retrospective.md`, `docs/planning/milestones/m32-3-session-2-retrospective.md`, `docs/planning/milestones/m32-3-session-4-retrospective.md`
-- Skills: `docs/skills/blazor-wasm-jwt.md`, `docs/skills/wolverine-message-handlers.md`
+- Planning: `docs/planning/milestones/m32-3-session-1-plan.md`, `docs/planning/milestones/m32-3-session-2-plan.md`, `docs/planning/milestones/m32-3-session-4-plan.md`, `docs/planning/milestones/m32-3-session-7-plan.md`
+- Retrospective: `docs/planning/milestones/m32-3-session-1-retrospective.md`, `docs/planning/milestones/m32-3-session-2-retrospective.md`, `docs/planning/milestones/m32-3-session-4-retrospective.md`, `docs/planning/milestones/m32-3-session-7-retrospective.md`
+- Skills: `docs/skills/blazor-wasm-jwt.md`, `docs/skills/wolverine-message-handlers.md`, `docs/skills/efcore-wolverine-integration.md`
 
 ---
 
