@@ -1,0 +1,189 @@
+@page "/users/create"
+@using System.Net
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@attribute [Authorize(Policy = "SystemAdmin")]
+@inject IHttpClientFactory HttpFactory
+@inject BackofficeAuthState AuthState
+@inject SessionExpiredService SessionExpiredService
+@inject NavigationManager Navigation
+
+<PageTitle>Create User - Backoffice</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudText Typo="Typo.h4" GutterBottom="true" Class="mt-4">Create New User</MudText>
+    <MudText Typo="Typo.body2" Class="mb-4">Add a new backoffice administrative user</MudText>
+
+    <MudPaper Class="pa-4">
+        @if (_showSuccessMessage)
+        {
+            <MudAlert Severity="Severity.Success" Class="mb-4" data-testid="success-message">
+                User created successfully! Redirecting...
+            </MudAlert>
+        }
+
+        @if (_errorMessage is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4" data-testid="error-message">
+                @_errorMessage
+            </MudAlert>
+        }
+
+        <MudForm @ref="_form" data-testid="create-user-form">
+            <MudTextField @bind-Value="_email"
+                          Label="Email"
+                          Required="true"
+                          RequiredError="Email is required"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          data-testid="email-input" />
+
+            <MudTextField @bind-Value="_password"
+                          Label="Password"
+                          InputType="InputType.Password"
+                          Required="true"
+                          RequiredError="Password is required (minimum 8 characters)"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Class="mt-3"
+                          data-testid="password-input" />
+
+            <MudTextField @bind-Value="_firstName"
+                          Label="First Name"
+                          Required="true"
+                          RequiredError="First name is required"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Class="mt-3"
+                          data-testid="first-name-input" />
+
+            <MudTextField @bind-Value="_lastName"
+                          Label="Last Name"
+                          Required="true"
+                          RequiredError="Last name is required"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Class="mt-3"
+                          data-testid="last-name-input" />
+
+            <MudSelect @bind-Value="_selectedRole"
+                       T="string"
+                       Label="Role"
+                       Required="true"
+                       RequiredError="Role is required"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Class="mt-3"
+                       data-testid="role-select">
+                <MudSelectItem T="string" Value="@("CopyWriter")">Copy Writer</MudSelectItem>
+                <MudSelectItem T="string" Value="@("PricingManager")">Pricing Manager</MudSelectItem>
+                <MudSelectItem T="string" Value="@("WarehouseClerk")">Warehouse Clerk</MudSelectItem>
+                <MudSelectItem T="string" Value="@("CustomerService")">Customer Service</MudSelectItem>
+                <MudSelectItem T="string" Value="@("OperationsManager")">Operations Manager</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Executive")">Executive</MudSelectItem>
+                <MudSelectItem T="string" Value="@("SystemAdmin")">System Admin</MudSelectItem>
+            </MudSelect>
+
+            <div class="d-flex justify-space-between mt-6">
+                <MudButton Variant="Variant.Outlined"
+                           OnClick="Cancel"
+                           data-testid="cancel-button">
+                    Cancel
+                </MudButton>
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="CreateUserAsync"
+                           Disabled="@(_isSubmitting || !IsFormValid())"
+                           data-testid="submit-button">
+                    @(_isSubmitting ? "Creating..." : "Create User")
+                </MudButton>
+            </div>
+        </MudForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private MudForm? _form;
+    private string _email = string.Empty;
+    private string _password = string.Empty;
+    private string _firstName = string.Empty;
+    private string _lastName = string.Empty;
+    private string _selectedRole = "CopyWriter";
+    private bool _isSubmitting;
+    private bool _showSuccessMessage;
+    private string? _errorMessage;
+
+    private readonly List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Users", href: "/users"),
+        new BreadcrumbItem("Create", href: null, disabled: true)
+    };
+
+    private bool IsFormValid()
+    {
+        return !string.IsNullOrWhiteSpace(_email) &&
+               !string.IsNullOrWhiteSpace(_password) &&
+               _password.Length >= 8 &&
+               !string.IsNullOrWhiteSpace(_firstName) &&
+               !string.IsNullOrWhiteSpace(_lastName) &&
+               !string.IsNullOrWhiteSpace(_selectedRole);
+    }
+
+    private async Task CreateUserAsync()
+    {
+        if (!IsFormValid())
+        {
+            return;
+        }
+
+        _isSubmitting = true;
+        _errorMessage = null;
+        _showSuccessMessage = false;
+
+        var httpClient = HttpFactory.CreateClient("BackofficeIdentityApi");
+        httpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+        var request = new
+        {
+            Email = _email,
+            Password = _password,
+            FirstName = _firstName,
+            LastName = _lastName,
+            Role = _selectedRole
+        };
+
+        var response = await httpClient.PostAsJsonAsync("/api/backoffice-identity/users", request);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            SessionExpiredService.TriggerSessionExpired();
+            return;
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _errorMessage = errorContent.Contains("already exists")
+                ? "A user with this email already exists."
+                : "Failed to create user. Please try again.";
+            _isSubmitting = false;
+            return;
+        }
+
+        _showSuccessMessage = true;
+        StateHasChanged();
+
+        // Redirect to user list after 1.5 seconds
+        await Task.Delay(1500);
+        Navigation.NavigateTo("/users");
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/users");
+    }
+}

@@ -1,0 +1,388 @@
+@page "/users/{userId:guid}/edit"
+@using System.Net
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@attribute [Authorize(Policy = "SystemAdmin")]
+@inject IHttpClientFactory HttpFactory
+@inject BackofficeAuthState AuthState
+@inject SessionExpiredService SessionExpiredService
+@inject NavigationManager Navigation
+
+<PageTitle>Edit User - Backoffice</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    @if (_isLoading)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" />
+        </div>
+    }
+    else if (_user is null)
+    {
+        <MudAlert Severity="Severity.Error">User not found.</MudAlert>
+    }
+    else
+    {
+        <MudText Typo="Typo.h4" GutterBottom="true" Class="mt-4" data-testid="page-title">
+            Edit User: @_user.Email
+        </MudText>
+
+        <!-- User Details Card -->
+        <MudPaper Class="pa-4 mb-4" data-testid="user-details-card">
+            <MudText Typo="Typo.h6" GutterBottom="true">User Details</MudText>
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.body2"><strong>Email:</strong> @_user.Email</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.body2"><strong>Name:</strong> @_user.FirstName @_user.LastName</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.body2"><strong>Role:</strong> @_user.Role</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.body2">
+                        <strong>Status:</strong>
+                        <MudChip T="string" Size="Size.Small" Color="@(_user.Status == "Active" ? Color.Success : Color.Error)">
+                            @_user.Status
+                        </MudChip>
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.body2"><strong>Created:</strong> @_user.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.body2">
+                        <strong>Last Login:</strong> @(_user.LastLoginAt?.ToString("yyyy-MM-dd HH:mm") ?? "Never")
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <!-- Change Role Section -->
+        <MudPaper Class="pa-4 mb-4" data-testid="change-role-section">
+            <MudText Typo="Typo.h6" GutterBottom="true">Change Role</MudText>
+
+            @if (_roleSuccessMessage)
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-4" data-testid="role-success-message">
+                    Role changed successfully.
+                </MudAlert>
+            }
+
+            <MudSelect @bind-Value="_selectedRole"
+                       T="string"
+                       Label="Role"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       data-testid="role-select">
+                <MudSelectItem T="string" Value="@("CopyWriter")">Copy Writer</MudSelectItem>
+                <MudSelectItem T="string" Value="@("PricingManager")">Pricing Manager</MudSelectItem>
+                <MudSelectItem T="string" Value="@("WarehouseClerk")">Warehouse Clerk</MudSelectItem>
+                <MudSelectItem T="string" Value="@("CustomerService")">Customer Service</MudSelectItem>
+                <MudSelectItem T="string" Value="@("OperationsManager")">Operations Manager</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Executive")">Executive</MudSelectItem>
+                <MudSelectItem T="string" Value="@("SystemAdmin")">System Admin</MudSelectItem>
+            </MudSelect>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="ChangeRoleAsync"
+                       Disabled="@(_isSubmittingRole || _selectedRole == _user.Role)"
+                       Class="mt-3"
+                       data-testid="change-role-button">
+                @(_isSubmittingRole ? "Changing..." : "Change Role")
+            </MudButton>
+        </MudPaper>
+
+        <!-- Reset Password Section -->
+        <MudPaper Class="pa-4 mb-4" data-testid="reset-password-section">
+            <MudText Typo="Typo.h6" GutterBottom="true">Reset Password</MudText>
+
+            <MudAlert Severity="Severity.Warning" Class="mb-4">
+                <strong>Warning:</strong> User will be logged out immediately after password reset and must log in with the new password.
+            </MudAlert>
+
+            @if (_passwordSuccessMessage)
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-4" data-testid="password-success-message">
+                    Password reset successfully. User must log in with new password.
+                </MudAlert>
+            }
+
+            <MudTextField @bind-Value="_newPassword"
+                          Label="New Password"
+                          InputType="InputType.Password"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          HelperText="Minimum 8 characters"
+                          data-testid="new-password-input" />
+
+            <MudTextField @bind-Value="_confirmPassword"
+                          Label="Confirm Password"
+                          InputType="InputType.Password"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Class="mt-3"
+                          data-testid="confirm-password-input" />
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="ResetPasswordAsync"
+                       Disabled="@(!IsPasswordValid() || _isSubmittingPassword)"
+                       Class="mt-3"
+                       data-testid="reset-password-button">
+                @(_isSubmittingPassword ? "Resetting..." : "Reset Password")
+            </MudButton>
+        </MudPaper>
+
+        <!-- Deactivate User Section (only if Active) -->
+        @if (_user.Status == "Active")
+        {
+            <MudPaper Class="pa-4" data-testid="deactivate-section">
+                <MudText Typo="Typo.h6" GutterBottom="true" Color="Color.Error">Deactivate User</MudText>
+
+                <MudAlert Severity="Severity.Warning" Class="mb-4">
+                    <strong>Warning:</strong> User will lose access immediately and cannot be reactivated through this interface.
+                </MudAlert>
+
+                @if (_deactivateSuccessMessage)
+                {
+                    <MudAlert Severity="Severity.Success" Class="mb-4" data-testid="deactivate-success-message">
+                        User deactivated successfully.
+                    </MudAlert>
+                }
+
+                <MudTextField @bind-Value="_deactivationReason"
+                              Label="Deactivation Reason"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Lines="3"
+                              data-testid="deactivation-reason-input" />
+
+                @if (!_deactivationConfirmed)
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Error"
+                               OnClick="() => _deactivationConfirmed = true"
+                               Disabled="@(string.IsNullOrWhiteSpace(_deactivationReason))"
+                               Class="mt-3"
+                               data-testid="deactivate-button">
+                        Deactivate User
+                    </MudButton>
+                }
+                else
+                {
+                    <div class="d-flex gap-2 mt-3">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Error"
+                                   OnClick="DeactivateUserAsync"
+                                   Disabled="@_isSubmittingDeactivate"
+                                   data-testid="confirm-deactivate-button">
+                            @(_isSubmittingDeactivate ? "Deactivating..." : "Confirm Deactivation")
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                   OnClick="() => _deactivationConfirmed = false"
+                                   data-testid="cancel-deactivate-button">
+                            Cancel
+                        </MudButton>
+                    </div>
+                }
+            </MudPaper>
+        }
+    }
+</MudContainer>
+
+@code {
+    // Local DTO - WASM cannot reference server-side Backoffice.Clients
+    private sealed record BackofficeUserSummaryDto(
+        Guid Id,
+        string Email,
+        string FirstName,
+        string LastName,
+        string Role,
+        string Status,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset? LastLoginAt,
+        DateTimeOffset? DeactivatedAt);
+
+    [Parameter]
+    public Guid UserId { get; set; }
+
+    private BackofficeUserSummaryDto? _user;
+    private bool _isLoading = true;
+
+    // Change Role
+    private string _selectedRole = string.Empty;
+    private bool _isSubmittingRole;
+    private bool _roleSuccessMessage;
+
+    // Reset Password
+    private string _newPassword = string.Empty;
+    private string _confirmPassword = string.Empty;
+    private bool _isSubmittingPassword;
+    private bool _passwordSuccessMessage;
+
+    // Deactivate User
+    private string _deactivationReason = string.Empty;
+    private bool _deactivationConfirmed;
+    private bool _isSubmittingDeactivate;
+    private bool _deactivateSuccessMessage;
+
+    private readonly List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Users", href: "/users"),
+        new BreadcrumbItem("Edit", href: null, disabled: true)
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserAsync();
+    }
+
+    private async Task LoadUserAsync()
+    {
+        _isLoading = true;
+
+        var httpClient = HttpFactory.CreateClient("BackofficeIdentityApi");
+        httpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+        var response = await httpClient.GetAsync("/api/backoffice-identity/users");
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            SessionExpiredService.TriggerSessionExpired();
+            return;
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        var users = await response.Content.ReadFromJsonAsync<List<BackofficeUserSummaryDto>>();
+        _user = users?.FirstOrDefault(u => u.Id == UserId);
+
+        if (_user is not null)
+        {
+            _selectedRole = _user.Role;
+        }
+
+        _isLoading = false;
+    }
+
+    private bool IsPasswordValid()
+    {
+        return !string.IsNullOrWhiteSpace(_newPassword) &&
+               _newPassword.Length >= 8 &&
+               _newPassword == _confirmPassword;
+    }
+
+    private async Task ChangeRoleAsync()
+    {
+        if (_user is null || _selectedRole == _user.Role)
+        {
+            return;
+        }
+
+        _isSubmittingRole = true;
+        _roleSuccessMessage = false;
+
+        var httpClient = HttpFactory.CreateClient("BackofficeIdentityApi");
+        httpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+        var request = new { NewRole = _selectedRole };
+        var response = await httpClient.PutAsJsonAsync(
+            $"/api/backoffice-identity/users/{UserId}/role",
+            request);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            SessionExpiredService.TriggerSessionExpired();
+            return;
+        }
+
+        if (response.IsSuccessStatusCode)
+        {
+            _user = _user with { Role = _selectedRole };
+            _roleSuccessMessage = true;
+        }
+
+        _isSubmittingRole = false;
+    }
+
+    private async Task ResetPasswordAsync()
+    {
+        if (!IsPasswordValid())
+        {
+            return;
+        }
+
+        _isSubmittingPassword = true;
+        _passwordSuccessMessage = false;
+
+        var httpClient = HttpFactory.CreateClient("BackofficeIdentityApi");
+        httpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+        var request = new { NewPassword = _newPassword };
+        var response = await httpClient.PostAsJsonAsync(
+            $"/api/backoffice-identity/users/{UserId}/reset-password",
+            request);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            SessionExpiredService.TriggerSessionExpired();
+            return;
+        }
+
+        if (response.IsSuccessStatusCode)
+        {
+            _passwordSuccessMessage = true;
+            _newPassword = string.Empty;
+            _confirmPassword = string.Empty;
+        }
+
+        _isSubmittingPassword = false;
+    }
+
+    private async Task DeactivateUserAsync()
+    {
+        if (_user is null || string.IsNullOrWhiteSpace(_deactivationReason))
+        {
+            return;
+        }
+
+        _isSubmittingDeactivate = true;
+        _deactivateSuccessMessage = false;
+
+        var httpClient = HttpFactory.CreateClient("BackofficeIdentityApi");
+        httpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+        var request = new { Reason = _deactivationReason };
+        var response = await httpClient.PostAsJsonAsync(
+            $"/api/backoffice-identity/users/{UserId}/deactivate",
+            request);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            SessionExpiredService.TriggerSessionExpired();
+            return;
+        }
+
+        if (response.IsSuccessStatusCode)
+        {
+            _user = _user with { Status = "Deactivated", DeactivatedAt = DateTimeOffset.UtcNow };
+            _deactivateSuccessMessage = true;
+            _deactivationConfirmed = false;
+        }
+
+        _isSubmittingDeactivate = false;
+    }
+}
