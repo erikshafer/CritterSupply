@@ -173,6 +173,15 @@
 - ✅ Build succeeds with 0 errors, 34 pre-existing warnings
 - **Retrospective:** `docs/planning/milestones/m32-3-session-6-retrospective.md`
 
+**Session 6 Test Audit (2026-03-20):**
+- ✅ Fixed PricingAdmin.feature: 3 unbound step definitions resolved (Background step, catalog stub, user creation pattern)
+- ✅ Fixed ClearAllStubs() to include StubPricingClient.Clear() — pricing stub state was leaking between scenarios
+- ✅ Fixed SimulateSessionExpired not reset in ClearAllStubs() — added explicit reset for all 4 stubs
+- ✅ Fixed WarehouseClerkDashboardTests integration test URL: `/api/backoffice/inventory/{sku}` → `/api/inventory/{sku}`
+- ✅ Added SimulateSessionExpired support to StubPricingClient (was missing — pricing session-expiry scenario couldn't work)
+- ✅ Updated SessionExpirySteps to include StubPricingClient in session expiry simulation
+- ✅ Build: 0 errors (both E2E and integration test projects)
+
 **Next Session Goals:**
 - User Management write UI (Session 7)
 
