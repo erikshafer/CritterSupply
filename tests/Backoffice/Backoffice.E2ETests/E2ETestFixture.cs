@@ -66,6 +66,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
     public StubFulfillmentClient StubFulfillmentClient { get; } = new();
     public StubCorrespondenceClient StubCorrespondenceClient { get; } = new();
     public StubPricingClient StubPricingClient { get; } = new();
+    public StubBackofficeIdentityClient StubBackofficeIdentityClient { get; } = new();
 
     /// <summary>Base URL of Backoffice.Web WASM host — what Playwright navigates to.</summary>
     public string WasmBaseUrl { get; private set; } = string.Empty;
@@ -101,7 +102,8 @@ public sealed class E2ETestFixture : IAsyncLifetime
             StubCatalogClient,
             StubFulfillmentClient,
             StubCorrespondenceClient,
-            StubPricingClient);
+            StubPricingClient,
+            StubBackofficeIdentityClient);
         _backofficeApiFactory.StartKestrel();
         BackofficeApiBaseUrl = _backofficeApiFactory.ServerAddress;
         BackofficeApiHost = _backofficeApiFactory.Services.GetRequiredService<IHost>();
@@ -391,7 +393,8 @@ internal sealed class BackofficeApiKestrelFactory(
     StubCatalogClient stubCatalogClient,
     StubFulfillmentClient stubFulfillmentClient,
     StubCorrespondenceClient stubCorrespondenceClient,
-    StubPricingClient stubPricingClient)
+    StubPricingClient stubPricingClient,
+    StubBackofficeIdentityClient stubBackofficeIdentityClient)
     : WebApplicationFactory<Backoffice.Api.BackofficeHub>
 {
     public string ServerAddress { get; private set; } = string.Empty;
@@ -421,6 +424,7 @@ internal sealed class BackofficeApiKestrelFactory(
             services.RemoveAndReplaceClient<IFulfillmentClient>(stubFulfillmentClient);
             services.RemoveAndReplaceClient<ICorrespondenceClient>(stubCorrespondenceClient);
             services.RemoveAndReplaceClient<IPricingClient>(stubPricingClient);
+            services.RemoveAndReplaceClient<IBackofficeIdentityClient>(stubBackofficeIdentityClient);
 
             // Disable external Wolverine transports (RabbitMQ)
             services.DisableAllExternalWolverineTransports();

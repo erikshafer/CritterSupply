@@ -151,13 +151,14 @@ public sealed class UserManagementSteps
         if (url.Contains("{userId}"))
         {
             // Get the userId from scenario context (stored by Given step)
-            var userId = _scenarioContext.Values
-                .Where(kv => kv.Key.ToString().StartsWith("UserId-"))
-                .Select(kv => kv.Value)
-                .Cast<Guid>()
+            var userIdEntry = _scenarioContext
+                .Where(kv => kv.Key.StartsWith("UserId-"))
                 .FirstOrDefault();
 
-            url = url.Replace("{userId}", userId.ToString());
+            if (userIdEntry.Value is Guid userId)
+            {
+                url = url.Replace("{userId}", userId.ToString());
+            }
         }
 
         await Page.GotoAsync($"{Fixture.WasmBaseUrl}{url}");
@@ -293,11 +294,14 @@ public sealed class UserManagementSteps
         await Page.WaitForTimeoutAsync(1000);
 
         // Verify role changed in stub
-        var userId = _scenarioContext.Values
-            .Where(kv => kv.Key.ToString().StartsWith("UserId-"))
-            .Select(kv => kv.Value)
-            .Cast<Guid>()
+        var userIdEntry = _scenarioContext
+            .Where(kv => kv.Key.StartsWith("UserId-"))
             .FirstOrDefault();
+
+        if (userIdEntry.Value is not Guid userId)
+        {
+            throw new InvalidOperationException("UserId not found in scenario context");
+        }
 
         var users = await Fixture.StubBackofficeIdentityClient.ListUsersAsync();
         var user = users.FirstOrDefault(u => u.Id == userId);
@@ -312,11 +316,14 @@ public sealed class UserManagementSteps
         await Page.WaitForTimeoutAsync(1000);
 
         // Verify status changed in stub
-        var userId = _scenarioContext.Values
-            .Where(kv => kv.Key.ToString().StartsWith("UserId-"))
-            .Select(kv => kv.Value)
-            .Cast<Guid>()
+        var userIdEntry = _scenarioContext
+            .Where(kv => kv.Key.StartsWith("UserId-"))
             .FirstOrDefault();
+
+        if (userIdEntry.Value is not Guid userId)
+        {
+            throw new InvalidOperationException("UserId not found in scenario context");
+        }
 
         var users = await Fixture.StubBackofficeIdentityClient.ListUsersAsync();
         var user = users.FirstOrDefault(u => u.Id == userId);
