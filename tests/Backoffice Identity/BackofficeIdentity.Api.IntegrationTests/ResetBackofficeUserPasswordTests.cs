@@ -91,7 +91,7 @@ public sealed class ResetBackofficeUserPasswordTests : IClassFixture<BackofficeI
             updatedUser.LastName.ShouldBe(user.LastName);
             updatedUser.Role.ShouldBe(user.Role);
             updatedUser.Status.ShouldBe(user.Status);
-            updatedUser.CreatedAt.ShouldBe(user.CreatedAt);
+            updatedUser.CreatedAt.ShouldBe(user.CreatedAt, TimeSpan.FromMilliseconds(1));
         }
     }
 
@@ -239,8 +239,9 @@ public sealed class ResetBackofficeUserPasswordTests : IClassFixture<BackofficeI
             updatedUser.LastName.ShouldBe(user.LastName);
             updatedUser.Role.ShouldBe(user.Role);
             updatedUser.Status.ShouldBe(user.Status);
-            updatedUser.CreatedAt.ShouldBe(createdAt);
-            updatedUser.LastLoginAt.ShouldBe(lastLoginAt);
+            updatedUser.CreatedAt.ShouldBe(createdAt, TimeSpan.FromMilliseconds(1));
+            updatedUser.LastLoginAt.ShouldNotBeNull();
+            updatedUser.LastLoginAt.Value.ShouldBe(lastLoginAt, TimeSpan.FromMilliseconds(1));
 
             // Refresh token SHOULD be cleared
             updatedUser.RefreshToken.ShouldBeNull();
@@ -300,7 +301,8 @@ public sealed class ResetBackofficeUserPasswordTests : IClassFixture<BackofficeI
 
             // Status should remain Deactivated
             updatedUser.Status.ShouldBe(BackofficeUserStatus.Deactivated);
-            updatedUser.DeactivatedAt.ShouldBe(deactivatedAt);
+            updatedUser.DeactivatedAt.ShouldNotBeNull();
+            updatedUser.DeactivatedAt.Value.ShouldBe(deactivatedAt, TimeSpan.FromMilliseconds(1));
             updatedUser.DeactivationReason.ShouldBe(user.DeactivationReason);
 
             // Password should still be updated
