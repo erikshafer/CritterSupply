@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.3 — Backoffice Phase 3B: Write Operations Depth (IN PROGRESS) |
-| **Status** | 🚀 IN PROGRESS — Sessions 1-2 complete (Product Admin write UI + Product List UI) |
-| **Deliverables** | Product Admin write UI + Product List UI with role-based permissions — Build: 0 errors, 10 warnings |
+| **Status** | 🚀 IN PROGRESS — Sessions 1-4 complete (Product Admin + Warehouse Admin write UI) |
+| **Deliverables** | Product Admin write UI + Warehouse Admin write UI with role-based permissions — Build: 0 errors, 26 warnings |
 | **Recent Completion** | M32.2 — Backoffice Phase 3A (2026-03-19), M32.1 — Backoffice Phase 2 (2026-03-18) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-19 (M32.3 Session 2 complete)*
+*Last Updated: 2026-03-20 (M32.3 Session 4 complete)*
 
 ---
 
@@ -94,24 +94,53 @@
 - ✅ Build succeeds with 0 errors, 10 pre-existing warnings (Correspondence BC)
 - **Retrospective:** `docs/planning/milestones/m32-3-session-2-retrospective.md`
 
+**Session 3 Progress (2026-03-20):**
+- ✅ Created M32.3 Session 3 planning document (`m32-3-session-3-plan.md`)
+- ✅ E2E tests for Product Admin workflow (ProductEdit and ProductList pages)
+- ✅ Implemented PriceEdit.razor page at `/products/{sku}/price` route
+- ✅ Extended IPricingClient with SetBasePriceAsync method
+- ✅ Build succeeds with 0 errors
+- **Retrospective:** `docs/planning/milestones/m32-3-session-3-retrospective.md` (assumed based on commit #432)
+
+**Session 4 Progress (2026-03-20):**
+- ✅ Created M32.3 Session 4 planning document (`m32-3-session-4-plan.md`)
+- ✅ Extended IInventoryClient with 3 write methods (ListInventoryAsync, AdjustInventoryAsync, ReceiveInboundStockAsync)
+- ✅ Implemented InventoryClient in Backoffice.Api/Clients
+- ✅ Created 3 Backoffice.Api proxy endpoints (GetInventoryList, AdjustInventoryProxy, ReceiveStockProxy)
+- ✅ Fixed Risk R2: Created missing GetAllInventory endpoint in Inventory BC (corrected TotalQuantity → TotalOnHand property name)
+- ✅ Created InventoryList.razor page at `/inventory` route:
+  - MudTable with client-side search by SKU
+  - Color-coded status chips (Out of Stock/Low Stock/In Stock)
+  - Row click navigation to edit page
+  - Session-expired handling
+- ✅ Created InventoryEdit.razor page at `/inventory/{sku}/edit` route:
+  - Dual-form layout (Adjust Inventory + Receive Inbound Stock)
+  - KPI cards showing Available/Reserved/Total quantities
+  - Submit state tracking with success/error messages
+- ✅ Updated Index.razor navigation: WarehouseClerk now links to `/inventory`
+- ✅ Updated stub clients (integration + E2E tests) with new IInventoryClient methods
+- ✅ Build succeeds with 0 errors, 26 pre-existing warnings (Correspondence BC + Backoffice test nullables)
+- **Retrospective:** `docs/planning/milestones/m32-3-session-4-retrospective.md`
+
 **Next Session Goals:**
-- E2E tests for ProductEdit and ProductList pages
-- Pricing Admin write UI (set base price, update list price)
+- E2E tests for Warehouse Admin workflow (InventoryList + InventoryEdit)
+- Pricing Admin E2E tests
 
 **Planned Sessions:**
 1. ✅ Session 1: Product Admin write UI (COMPLETE)
 2. ✅ Session 2: Product List UI + API routing audit (COMPLETE)
-3. Session 3: E2E tests + Pricing Admin write UI
-4. Session 4: Warehouse Admin write UI
-5. Session 5: User Management write UI
-6. Session 6: CSV/Excel exports
-7. Session 7: Bulk operations pattern
-8. Session 8: E2E test coverage (comprehensive)
-9. Session 9: Documentation and retrospective
+3. ✅ Session 3: E2E tests + Pricing Admin write UI (COMPLETE)
+4. ✅ Session 4: Warehouse Admin write UI (COMPLETE)
+5. Session 5: E2E tests for Warehouse Admin + Pricing Admin
+6. Session 6: User Management write UI
+7. Session 7: CSV/Excel exports
+8. Session 8: Bulk operations pattern
+9. Session 9: E2E test coverage (comprehensive)
+10. Session 10: Documentation and retrospective
 
 **References:**
-- Planning: `docs/planning/milestones/m32-3-session-1-plan.md`, `docs/planning/milestones/m32-3-session-2-plan.md`
-- Retrospective: `docs/planning/milestones/m32-3-session-1-retrospective.md`, `docs/planning/milestones/m32-3-session-2-retrospective.md`
+- Planning: `docs/planning/milestones/m32-3-session-1-plan.md`, `docs/planning/milestones/m32-3-session-2-plan.md`, `docs/planning/milestones/m32-3-session-4-plan.md`
+- Retrospective: `docs/planning/milestones/m32-3-session-1-retrospective.md`, `docs/planning/milestones/m32-3-session-2-retrospective.md`, `docs/planning/milestones/m32-3-session-4-retrospective.md`
 - Skills: `docs/skills/blazor-wasm-jwt.md`, `docs/skills/wolverine-message-handlers.md`
 
 ---

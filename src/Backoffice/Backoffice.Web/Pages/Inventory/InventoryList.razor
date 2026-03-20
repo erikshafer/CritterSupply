@@ -1,0 +1,117 @@
+@page "/inventory"
+@using System.Net
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager NavigationManager
+@inject SessionExpiredService SessionExpiredService
+@attribute [Authorize(Roles = "warehouse-clerk,system-admin")]
+
+<PageTitle>Inventory Management</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Inventory Management</MudText>
+
+<MudPaper Class="pa-4">
+    <MudTextField @bind-Value="_searchTerm"
+                  Label="Search by SKU"
+                  Variant="Variant.Outlined"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Search"
+                  Class="mb-4" />
+
+    @if (_isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+    }
+    else
+    {
+        <MudTable T="InventoryItemDto" Items="@FilteredInventory" Hover="true">
+            <HeaderContent>
+                <MudTh>SKU</MudTh>
+                <MudTh>Product Name</MudTh>
+                <MudTh>Available</MudTh>
+                <MudTh>Reserved</MudTh>
+                <MudTh>Total</MudTh>
+                <MudTh>Status</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTr @onclick="@(() => NavigationManager.NavigateTo($"/inventory/{context.Sku}/edit"))" Style="cursor: pointer">
+                    <MudTd DataLabel="SKU">@context.Sku</MudTd>
+                    <MudTd DataLabel="Product Name">@context.ProductName</MudTd>
+                    <MudTd DataLabel="Available">@context.AvailableQuantity</MudTd>
+                    <MudTd DataLabel="Reserved">@context.ReservedQuantity</MudTd>
+                    <MudTd DataLabel="Total">@context.TotalQuantity</MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.AvailableQuantity)">
+                            @GetStatusText(context.AvailableQuantity)
+                        </MudChip>
+                    </MudTd>
+                </MudTr>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private List<InventoryItemDto> _inventory = new();
+    private bool _isLoading = false;
+    private string _searchTerm = string.Empty;
+    private string? _errorMessage;
+
+    private IEnumerable<InventoryItemDto> FilteredInventory =>
+        string.IsNullOrWhiteSpace(_searchTerm)
+            ? _inventory
+            : _inventory.Where(i => i.Sku.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInventoryAsync();
+    }
+
+    private async Task LoadInventoryAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            var response = await client.GetAsync("/api/inventory");
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            response.EnsureSuccessStatusCode();
+            _inventory = await response.Content.ReadFromJsonAsync<List<InventoryItemDto>>() ?? new();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load inventory: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private Color GetStatusColor(int available) =>
+        available == 0 ? Color.Error :
+        available < 10 ? Color.Warning :
+        Color.Success;
+
+    private string GetStatusText(int available) =>
+        available == 0 ? "Out of Stock" :
+        available < 10 ? "Low Stock" :
+        "In Stock";
+
+    private sealed record InventoryItemDto(
+        string Sku,
+        string ProductName,
+        int AvailableQuantity,
+        int ReservedQuantity,
+        int TotalQuantity);
+}
