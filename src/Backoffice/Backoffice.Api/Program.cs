@@ -156,6 +156,12 @@ builder.Services.AddHttpClient("CatalogClient", client =>
     client.BaseAddress = new Uri(url);
 });
 
+builder.Services.AddHttpClient("PricingClient", client =>
+{
+    var url = builder.Configuration["ApiClients:PricingApiUrl"] ?? "http://localhost:5242";
+    client.BaseAddress = new Uri(url);
+});
+
 // Register HTTP client implementations
 builder.Services.AddScoped<Backoffice.Clients.ICustomerIdentityClient, Backoffice.Api.Clients.CustomerIdentityClient>();
 builder.Services.AddScoped<Backoffice.Clients.IOrdersClient, Backoffice.Api.Clients.OrdersClient>();
@@ -164,6 +170,7 @@ builder.Services.AddScoped<Backoffice.Clients.ICorrespondenceClient, Backoffice.
 builder.Services.AddScoped<Backoffice.Clients.IInventoryClient, Backoffice.Api.Clients.InventoryClient>();
 builder.Services.AddScoped<Backoffice.Clients.IFulfillmentClient, Backoffice.Api.Clients.FulfillmentClient>();
 builder.Services.AddScoped<Backoffice.Clients.ICatalogClient, Backoffice.Api.Clients.CatalogClient>();
+builder.Services.AddScoped<Backoffice.Clients.IPricingClient, Backoffice.Api.Clients.PricingClient>();
 
 // SignalR
 builder.Services.AddSignalR();

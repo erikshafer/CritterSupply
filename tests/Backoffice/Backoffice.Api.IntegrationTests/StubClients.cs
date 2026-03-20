@@ -236,3 +236,58 @@ public class StubCatalogClient : ICatalogClient
     public Task<ProductListResult?> ListProductsAsync(int page = 1, int pageSize = 20, string? category = null, string? status = null, CancellationToken ct = default)
         => Task.FromResult<ProductListResult?>(new ProductListResult(Array.Empty<ProductDto>(), page, pageSize, 0));
 }
+
+public class StubPricingClient : IPricingClient
+{
+    private readonly Dictionary<string, (decimal Amount, string Currency)> _basePrices = new();
+    private readonly Dictionary<string, (Guid ScheduleId, decimal Amount, string Currency, DateTimeOffset ScheduledFor)> _scheduledPrices = new();
+
+    public Task<SetBasePriceResult?> SetBasePriceAsync(string sku, decimal amount, string currency = "USD", CancellationToken ct = default)
+    {
+        _basePrices[sku] = (amount, currency);
+        var result = new SetBasePriceResult(
+            Sku: sku,
+            Amount: amount,
+            Currency: currency,
+            Status: "Published",
+            Message: "Base price set successfully");
+        return Task.FromResult<SetBasePriceResult?>(result);
+    }
+
+    public Task<SchedulePriceChangeResult?> SchedulePriceChangeAsync(string sku, decimal newAmount, string currency, DateTimeOffset scheduledFor, CancellationToken ct = default)
+    {
+        var scheduleId = Guid.NewGuid();
+        _scheduledPrices[sku] = (scheduleId, newAmount, currency, scheduledFor);
+        var result = new SchedulePriceChangeResult(
+            Sku: sku,
+            ScheduleId: scheduleId,
+            Amount: newAmount,
+            Currency: currency,
+            ScheduledFor: scheduledFor,
+            Message: "Price change scheduled successfully");
+        return Task.FromResult<SchedulePriceChangeResult?>(result);
+    }
+
+    public Task<ProductPriceDto?> GetProductPriceAsync(string sku, CancellationToken ct = default)
+    {
+        if (_basePrices.TryGetValue(sku, out var price))
+        {
+            var dto = new ProductPriceDto(
+                Sku: sku,
+                BasePrice: price.Amount,
+                Currency: price.Currency,
+                Status: "Published",
+                LastChangedAt: DateTimeOffset.UtcNow);
+            return Task.FromResult<ProductPriceDto?>(dto);
+        }
+
+        return Task.FromResult<ProductPriceDto?>(null);
+    }
+
+    public void Clear()
+    {
+        _basePrices.Clear();
+        _scheduledPrices.Clear();
+    }
+}
+

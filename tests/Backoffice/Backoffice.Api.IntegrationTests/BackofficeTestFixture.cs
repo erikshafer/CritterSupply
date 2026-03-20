@@ -96,6 +96,7 @@ public class BackofficeTestFixture : IAsyncLifetime
                 services.AddScoped<IInventoryClient>(_ => new StubInventoryClient());
                 services.AddScoped<IFulfillmentClient>(_ => new StubFulfillmentClient());
                 services.AddScoped<ICatalogClient>(_ => new StubCatalogClient());
+                services.AddScoped<IPricingClient>(_ => new StubPricingClient());
 
                 // Replace authentication with test authentication
                 var authServices = services.Where(s =>
