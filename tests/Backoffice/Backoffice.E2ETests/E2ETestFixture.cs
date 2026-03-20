@@ -65,6 +65,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
     public StubCatalogClient StubCatalogClient { get; } = new();
     public StubFulfillmentClient StubFulfillmentClient { get; } = new();
     public StubCorrespondenceClient StubCorrespondenceClient { get; } = new();
+    public StubPricingClient StubPricingClient { get; } = new();
 
     /// <summary>Base URL of Backoffice.Web WASM host — what Playwright navigates to.</summary>
     public string WasmBaseUrl { get; private set; } = string.Empty;
@@ -99,7 +100,8 @@ public sealed class E2ETestFixture : IAsyncLifetime
             StubCustomerIdentityClient,
             StubCatalogClient,
             StubFulfillmentClient,
-            StubCorrespondenceClient);
+            StubCorrespondenceClient,
+            StubPricingClient);
         _backofficeApiFactory.StartKestrel();
         BackofficeApiBaseUrl = _backofficeApiFactory.ServerAddress;
         BackofficeApiHost = _backofficeApiFactory.Services.GetRequiredService<IHost>();
@@ -381,7 +383,8 @@ internal sealed class BackofficeApiKestrelFactory(
     StubCustomerIdentityClient stubCustomerIdentityClient,
     StubCatalogClient stubCatalogClient,
     StubFulfillmentClient stubFulfillmentClient,
-    StubCorrespondenceClient stubCorrespondenceClient)
+    StubCorrespondenceClient stubCorrespondenceClient,
+    StubPricingClient stubPricingClient)
     : WebApplicationFactory<Backoffice.Api.BackofficeHub>
 {
     public string ServerAddress { get; private set; } = string.Empty;
@@ -410,6 +413,7 @@ internal sealed class BackofficeApiKestrelFactory(
             services.RemoveAndReplaceClient<ICatalogClient>(stubCatalogClient);
             services.RemoveAndReplaceClient<IFulfillmentClient>(stubFulfillmentClient);
             services.RemoveAndReplaceClient<ICorrespondenceClient>(stubCorrespondenceClient);
+            services.RemoveAndReplaceClient<IPricingClient>(stubPricingClient);
 
             // Disable external Wolverine transports (RabbitMQ)
             services.DisableAllExternalWolverineTransports();
