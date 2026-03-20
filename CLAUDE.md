@@ -1107,6 +1107,41 @@ Covers:
 - CritterSupply mini example (Returns BC)
 - Reference: `docs/skills/references/scenarios.md` for Given/When/Then patterns
 
+### When Wrapping Up an Implementation Session
+
+For any session that includes implementation work — including **implementation-only** sessions and **planning + implementation** sessions that move from design into repository changes:
+
+**Read:** `docs/skills/final-qa-ux-review.md`
+
+This review is **required before finalizing the session** whenever the agent has produced or modified implementation artifacts such as code, tests, configuration, workflows, or implementation-facing documentation.
+
+**Do not skip this review just because the session also included planning.** If the session ended with implementation work or implementation-ready deliverables, the final QA/UX review still applies.
+
+**Default review flow:**
+1. Finish implementation and run the appropriate validation already required by this guide
+2. Invoke both CritterSupply personas:
+   - `@qa-engineer` for test coverage, failure modes, regression risk, and release readiness
+   - `@ux-engineer` for workflow clarity, accessibility, consistency, cognitive load, and user-facing risk
+3. Ask both reviewers to inspect the actual changed files and any relevant tests, not just the summary
+4. Synthesize their feedback into one concise final review section
+5. Clearly separate:
+   - **Blocking / must-fix before merge**
+   - **Should-fix soon / next session**
+   - **Deferred polish / acceptable follow-up**
+6. If either reviewer identifies a localized issue that should obviously be fixed now, fix it before finalizing
+7. If findings are intentionally deferred, record them as explicit follow-up work rather than leaving them implied
+
+**Expected final review output sections:**
+- `QA Verdict`
+- `UX Verdict`
+- `Blocking Issues`
+- `Should-Fix Soon`
+- `Deferred / Polish`
+- `Recommended Next Actions`
+- `Release Readiness`
+
+**Planning-only exception:** If a session is strictly exploratory or planning-only and does **not** produce implementation changes, this end-of-session QA/UX review is optional rather than required.
+
 ---
 
 ## Testing Strategy

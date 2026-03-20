@@ -9,6 +9,7 @@ This directory contains implementation patterns and best practices for building 
 **Starting from Scratch:**
 - 🏗️ [Adding a New Bounded Context](./adding-new-bounded-context.md) - Complete checklist: projects, Docker, Postgres database, Aspire, CONTEXTS.md, tests
 - 🎨 [Event Modeling Workshop](./event-modeling-workshop.md) - Collaborative design technique: brain dump, storytelling, slicing, scenarios, multi-persona facilitation
+- ✅ [Final QA/UX Review](./final-qa-ux-review.md) - End-of-session sign-off using the QA Engineer and UX Engineer personas
 
 **Creating Commands & Handlers:**
 - 🎯 [Wolverine Message Handlers](./wolverine-message-handlers.md) - Command/query handlers, HTTP endpoints, compound handlers, return patterns
@@ -104,6 +105,9 @@ This directory contains implementation patterns and best practices for building 
 2. Set up TestContainers → [TestContainers Integration Tests](./testcontainers-integration-tests.md)
 3. Implement BDD scenarios → [Reqnroll BDD Testing](./reqnroll-bdd-testing.md)
 4. Write browser E2E tests → [E2E Testing with Playwright](./e2e-playwright-testing.md)
+
+### Session Wrap-up Phase
+1. Run final QA/UX sign-off → [Final QA/UX Review](./final-qa-ux-review.md)
 
 ---
 
