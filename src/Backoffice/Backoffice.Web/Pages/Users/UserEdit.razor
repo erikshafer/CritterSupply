@@ -128,14 +128,34 @@
                           Class="mt-3"
                           data-testid="confirm-password-input" />
 
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       OnClick="ResetPasswordAsync"
-                       Disabled="@(!IsPasswordValid() || _isSubmittingPassword)"
-                       Class="mt-3"
-                       data-testid="reset-password-button">
-                @(_isSubmittingPassword ? "Resetting..." : "Reset Password")
-            </MudButton>
+            @if (!_passwordResetConfirmed)
+            {
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           OnClick="() => _passwordResetConfirmed = true"
+                           Disabled="@(!IsPasswordValid())"
+                           Class="mt-3"
+                           data-testid="reset-password-button">
+                    Reset Password
+                </MudButton>
+            }
+            else
+            {
+                <div class="d-flex gap-2 mt-3">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="ResetPasswordAsync"
+                               Disabled="@_isSubmittingPassword"
+                               data-testid="confirm-reset-password-button">
+                        @(_isSubmittingPassword ? "Resetting..." : "Confirm Reset (User will be logged out)")
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               OnClick="() => _passwordResetConfirmed = false"
+                               data-testid="cancel-reset-button">
+                        Cancel
+                    </MudButton>
+                </div>
+            }
         </MudPaper>
 
         <!-- Deactivate User Section (only if Active) -->
@@ -222,6 +242,7 @@
     // Reset Password
     private string _newPassword = string.Empty;
     private string _confirmPassword = string.Empty;
+    private bool _passwordResetConfirmed;
     private bool _isSubmittingPassword;
     private bool _passwordSuccessMessage;
 
@@ -346,6 +367,7 @@
             _passwordSuccessMessage = true;
             _newPassword = string.Empty;
             _confirmPassword = string.Empty;
+            _passwordResetConfirmed = false;
         }
 
         _isSubmittingPassword = false;
