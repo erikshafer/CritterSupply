@@ -32,6 +32,7 @@ else if (_product is null)
 }
 else
 {
+    <div data-testid="price-edit-form">
     <MudGrid>
         <MudItem xs="12" md="8">
             <MudPaper Elevation="2" Class="pa-4 mb-4">
@@ -60,12 +61,12 @@ else
                 @if (_productPrice is not null && _productPrice.BasePrice.HasValue)
                 {
                     <MudTextField Label="Current Base Price"
-                                  Value="@($"{_productPrice.BasePrice:F2} {_productPrice.Currency}")"
+                                  Value="@($"${_productPrice.BasePrice:F2}")"
                                   Variant="Variant.Outlined"
                                   Margin="Margin.Dense"
                                   ReadOnly="true"
                                   Class="mb-3"
-                                  data-testid="current-base-price" />
+                                  data-testid="current-price" />
 
                     <MudTextField Label="Price Status"
                                   Value="@_productPrice.Status"
@@ -107,7 +108,7 @@ else
                                  Class="mb-3"
                                  Disabled="_isSaving"
                                  HelperText="Enter new price amount (min 0.01)"
-                                 data-testid="price-amount-input" />
+                                 data-testid="price-input" />
 
                 <MudTextField Label="Currency"
                               @bind-Value="_currency"
@@ -124,7 +125,7 @@ else
                                Color="Color.Primary"
                                OnClick="SetBasePriceAsync"
                                Disabled="@(_isSaving || !_canSetBasePrice)"
-                               data-testid="set-base-price-btn">
+                               data-testid="submit-price-button">
                         @if (_isSaving && _currentAction == "SetBasePrice")
                         {
                             <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
@@ -232,6 +233,17 @@ else
             </MudPaper>
         </MudItem>
     </MudGrid>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_successMessage))
+{
+    <div data-testid="success-message" style="display: none;">@_successMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div data-testid="error-message" style="display: none;">@_errorMessage</div>
 }
 
 @code {
@@ -242,6 +254,8 @@ else
     private bool _isLoading = true;
     private bool _isSaving = false;
     private string _currentAction = string.Empty;
+    private string _successMessage = string.Empty;
+    private string _errorMessage = string.Empty;
 
     private decimal _newAmount = 0;
     private string _currency = "USD";
@@ -376,7 +390,7 @@ else
 
             if (response.IsSuccessStatusCode)
             {
-                Snackbar.Add("Base price set successfully", Severity.Success);
+                ShowSuccessMessage("Price updated successfully");
                 await LoadDataAsync(); // Refresh to get latest state
             }
             else
@@ -384,13 +398,18 @@ else
                 var errorContent = await response.Content.ReadAsStringAsync();
                 Logger.LogWarning("Failed to set base price for {Sku}: {StatusCode} - {Error}",
                     SanitizeForLog(Sku), response.StatusCode, SanitizeForLog(errorContent));
-                Snackbar.Add($"Failed to set base price: {response.StatusCode}", Severity.Error);
+
+                // Try to extract error message from response
+                var errorMessage = errorContent.Contains("floor") || errorContent.Contains("ceiling")
+                    ? errorContent
+                    : $"Failed to set base price: {response.StatusCode}";
+                ShowErrorMessage(errorMessage);
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error setting base price for {Sku}", SanitizeForLog(Sku));
-            Snackbar.Add("Failed to set base price", Severity.Error);
+            ShowErrorMessage("Failed to set base price");
         }
         finally
         {
@@ -475,5 +494,27 @@ else
 
         return value.Replace("\r", string.Empty)
                     .Replace("\n", string.Empty);
+    }
+
+    /// <summary>
+    /// Show success message with data-testid for E2E tests
+    /// </summary>
+    private void ShowSuccessMessage(string message)
+    {
+        _successMessage = message;
+        _errorMessage = string.Empty;
+        Snackbar.Add(message, Severity.Success);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Show error message with data-testid for E2E tests
+    /// </summary>
+    private void ShowErrorMessage(string message)
+    {
+        _errorMessage = message;
+        _successMessage = string.Empty;
+        Snackbar.Add(message, Severity.Error);
+        StateHasChanged();
     }
 }
