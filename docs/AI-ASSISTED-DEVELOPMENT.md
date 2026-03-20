@@ -170,11 +170,16 @@ Tag agents when planning new features or discussing architectural decisions:
 - Engage `@principal-architect` for technical design
 - Involve `@qa-engineer` for test strategy
 - Consult `@ux-engineer` for UI/UX design
+- End implementation sessions with `@qa-engineer` + `@ux-engineer` sign-off using `docs/skills/final-qa-ux-review.md`
 
 **Quality & Testing:**
 - Primary: `@qa-engineer` for test coverage and strategy
 - Secondary: `@principal-architect` for test architecture
 - Tertiary: `@ux-engineer` for E2E user journey tests
+
+**End-of-Session Review:**
+- For any implementation session — including planning + implementation sessions that resulted in repository changes — run a final combined QA/UX review
+- Use `docs/skills/final-qa-ux-review.md` for the standard review flow and output format
 
 **Deployment & Operations:**
 - Primary: `@devops-engineer` for CI/CD and infrastructure
