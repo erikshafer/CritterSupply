@@ -27,21 +27,6 @@ public sealed class ProductAdminSteps
         stubClient.ShouldNotBeNull();
     }
 
-    [Given(@"admin user ""(.*)"" exists with email ""(.*)"" and role ""(.*)""")]
-    public void GivenAdminUserExistsWithEmailAndRole(string userName, string email, string role)
-    {
-        var userId = userName switch
-        {
-            "Alice" => WellKnownTestData.AdminUsers.Alice,
-            "Bob" => WellKnownTestData.AdminUsers.Bob,
-            _ => Guid.NewGuid()
-        };
-
-        // Seed admin user via BackofficeIdentity EF Core context with specific role
-        Fixture.SeedAdminUserWithRole(userId, email, userName, "Password123!", role);
-        _scenarioContext[ScenarioContextKeys.AdminUserId] = userId;
-    }
-
     [Given(@"I am on the product list page")]
     [When(@"I navigate to the products list")]
     public async Task WhenINavigateToTheProductsList()
@@ -107,13 +92,6 @@ public sealed class ProductAdminSteps
     {
         // Second click (confirmation)
         await WhenIClickTheDiscontinueProductButton();
-    }
-
-    [When(@"my session expires")]
-    public async Task WhenMySessionExpires()
-    {
-        // Clear auth state by executing JS in browser context
-        await Page.EvaluateAsync("() => { localStorage.clear(); sessionStorage.clear(); }");
     }
 
     [When(@"I try to save product changes")]
@@ -235,14 +213,6 @@ public sealed class ProductAdminSteps
     public async Task ThenIShouldSeeProductInTheFilteredResults(string sku)
     {
         await ThenIShouldSeeProductInTheList(sku);
-    }
-
-    [Then(@"I should be redirected to the login page")]
-    public async Task ThenIShouldBeRedirectedToTheLoginPage()
-    {
-        await Page.WaitForURLAsync(url => url.Contains("/login"), new() { Timeout = 10_000 });
-        var currentUrl = Page.Url;
-        currentUrl.ShouldContain("/login");
     }
 
     [Then(@"the return URL should be captured for post-auth redirect")]

@@ -34,7 +34,7 @@ public sealed class AuthenticationSteps
         await loginPage.NavigateAsync();
     }
 
-    [Given(@"admin user ""(.*)"" exists with email ""(.*)""")]
+    [Given(@"admin user ""(.*)"" exists with email ""(.*)""(?! and role)")]
     public void GivenAdminUserExistsWithEmail(string userName, string email)
     {
         // Seed admin user via BackofficeIdentity EF Core context
