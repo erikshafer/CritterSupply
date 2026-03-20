@@ -148,6 +148,7 @@
   <Folder Name="/Backoffice Identity/">
     <Project Path="src/Backoffice Identity/BackofficeIdentity.Api/BackofficeIdentity.Api.csproj" />
     <Project Path="src/Backoffice Identity/BackofficeIdentity/BackofficeIdentity.csproj" />
+    <Project Path="tests/Backoffice Identity/BackofficeIdentity.Api.IntegrationTests/BackofficeIdentity.Api.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Backoffice/">
     <Project Path="src/Backoffice/Backoffice.Api/Backoffice.Api.csproj" />
@@ -183,13 +184,6 @@
   <Folder Name="/Aspire/">
     <Project Path="src/CritterSupply.AppHost/CritterSupply.AppHost.csproj" />
     <Project Path="src/CritterSupply.ServiceDefaults/CritterSupply.ServiceDefaults.csproj" />
-  </Folder>
-  <Folder Name="/src/" />
-  <Folder Name="/src/Backoffice Identity/" />
-  <Folder Name="/src/Shared/" />
-  <Folder Name="/tests/" />
-  <Folder Name="/tests/Backoffice Identity/">
-    <Project Path="tests/Backoffice Identity/BackofficeIdentity.Api.IntegrationTests/BackofficeIdentity.Api.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Vendor Identity/">
     <Project Path="src/Vendor Identity/VendorIdentity.Api/VendorIdentity.Api.csproj" />
