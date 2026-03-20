@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.3 — Backoffice Phase 3B: Write Operations Depth (IN PROGRESS) |
-| **Status** | 🚀 IN PROGRESS — Sessions 1-5 complete (Product Admin + Pricing Admin + Warehouse Admin write UI + Pricing Admin E2E tests) |
-| **Deliverables** | Product/Pricing/Warehouse Admin write UI + Pricing E2E tests — Build: 0 errors, 26 warnings |
+| **Status** | 🚀 IN PROGRESS — Sessions 1-6 complete (Product Admin + Pricing Admin + Warehouse Admin write UI + Pricing & Warehouse Admin E2E tests) |
+| **Deliverables** | Product/Pricing/Warehouse Admin write UI + E2E tests (16 scenarios) — Build: 0 errors, 34 warnings |
 | **Recent Completion** | M32.2 — Backoffice Phase 3A (2026-03-19), M32.1 — Backoffice Phase 2 (2026-03-18) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-20 (M32.3 Session 5 complete)*
+*Last Updated: 2026-03-20 (M32.3 Session 6 complete)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 🚀 M32.3: Backoffice Phase 3B — Write Operations Depth
 
-**Status:** 🚀 **IN PROGRESS** — Sessions 1-5 complete (Product Admin + Pricing Admin + Warehouse Admin write UI + Pricing Admin E2E tests)
+**Status:** 🚀 **IN PROGRESS** — Sessions 1-6 complete (Product Admin + Pricing Admin + Warehouse Admin write UI + Pricing & Warehouse Admin E2E tests)
 **Goal:** Implement write-operations UI depth (Product Admin, Pricing Admin, Warehouse Admin, User Management)
 
 **Session 1 Progress (2026-03-19):**
@@ -146,20 +146,56 @@
 - **Retrospective:** `docs/planning/milestones/m32-3-session-5-retrospective.md`
 - **Deferred:** Warehouse Admin E2E tests moved to Session 6 to maintain quality focus
 
+**Session 6 Progress (2026-03-20):**
+- ✅ Created M32.3 Session 6 planning document (`m32-3-session-6-plan.md`)
+- ✅ Fixed URL mismatch bug: GetStockLevel route changed from `/api/backoffice/inventory/{sku}` to `/api/inventory/{sku}`
+  - Aligns with Session 4 inventory endpoint naming convention (`/api/inventory/*`)
+  - InventoryEdit.razor was calling wrong URL (would have caused 404 in E2E tests)
+- ✅ Added data-testid attributes to InventoryList.razor:
+  - Search input, table wrapper, row per SKU, available quantity cell, status chip
+- ✅ Added data-testid attributes to InventoryEdit.razor:
+  - Page title, KPI cards (available/reserved/total), form sections, inputs, buttons
+  - Hidden success/error message divs (Session 5 W3 pattern for Playwright assertions)
+- ✅ Created WarehouseAdmin.feature with 10 Gherkin scenarios:
+  - Browse inventory list (3 SKUs)
+  - Filter inventory by SKU
+  - Navigate to edit page (verify KPI values)
+  - Adjust inventory: cycle count (positive)
+  - Adjust inventory: damage (negative)
+  - Receive inbound stock
+  - Validation: adjust button disabled when quantity=0
+  - Validation: receive button disabled when quantity=0
+  - Session expired redirect to login
+  - SystemAdmin RBAC override
+- ✅ Created InventoryListPage.cs Page Object Model (navigate, search, click, assertions)
+- ✅ Created InventoryEditPage.cs Page Object Model (KPI, adjust, receive, feedback assertions)
+- ✅ Created WarehouseAdminSteps.cs step definitions (22 methods binding Gherkin to Page Objects)
+- ✅ Build succeeds with 0 errors, 34 pre-existing warnings
+- **Retrospective:** `docs/planning/milestones/m32-3-session-6-retrospective.md`
+
+**Session 6 Test Audit (2026-03-20):**
+- ✅ Fixed PricingAdmin.feature: 3 unbound step definitions resolved (Background step, catalog stub, user creation pattern)
+- ✅ Fixed ClearAllStubs() to include StubPricingClient.Clear() — pricing stub state was leaking between scenarios
+- ✅ Fixed SimulateSessionExpired not reset in ClearAllStubs() — added explicit reset for all 4 stubs
+- ✅ Fixed WarehouseClerkDashboardTests integration test URL: `/api/backoffice/inventory/{sku}` → `/api/inventory/{sku}`
+- ✅ Added SimulateSessionExpired support to StubPricingClient (was missing — pricing session-expiry scenario couldn't work)
+- ✅ Updated SessionExpirySteps to include StubPricingClient in session expiry simulation
+- ✅ Build: 0 errors (both E2E and integration test projects)
+
 **Next Session Goals:**
-- Warehouse Admin E2E tests (10 scenarios: browse, filter, adjust, receive, validation, session expiry, RBAC)
+- User Management write UI (Session 7)
 
 **Planned Sessions:**
 1. ✅ Session 1: Product Admin write UI (COMPLETE)
 2. ✅ Session 2: Product List UI + API routing audit (COMPLETE)
 3. ✅ Session 3: E2E tests + Pricing Admin write UI (COMPLETE)
 4. ✅ Session 4: Warehouse Admin write UI (COMPLETE)
-5. Session 5: E2E tests for Warehouse Admin + Pricing Admin
-6. Session 6: User Management write UI
-7. Session 7: CSV/Excel exports
-8. Session 8: Bulk operations pattern
-9. Session 9: E2E test coverage (comprehensive)
-10. Session 10: Documentation and retrospective
+5. ✅ Session 5: Pricing Admin E2E tests (COMPLETE)
+6. ✅ Session 6: Warehouse Admin E2E tests (COMPLETE)
+7. Session 7: User Management write UI
+8. Session 8: CSV/Excel exports
+9. Session 9: Bulk operations pattern
+10. Session 10: E2E test coverage (comprehensive) + documentation
 
 **References:**
 - Planning: `docs/planning/milestones/m32-3-session-1-plan.md`, `docs/planning/milestones/m32-3-session-2-plan.md`, `docs/planning/milestones/m32-3-session-4-plan.md`

@@ -11,6 +11,7 @@
 
 <MudPaper Class="pa-4">
     <MudTextField @bind-Value="_searchTerm"
+                  data-testid="inventory-search"
                   Label="Search by SKU"
                   Variant="Variant.Outlined"
                   Adornment="Adornment.Start"
@@ -27,7 +28,7 @@
     }
     else
     {
-        <MudTable T="InventoryItemDto" Items="@FilteredInventory" Hover="true">
+        <MudTable T="InventoryItemDto" Items="@FilteredInventory" Hover="true" data-testid="inventory-table">
             <HeaderContent>
                 <MudTh>SKU</MudTh>
                 <MudTh>Product Name</MudTh>
@@ -37,14 +38,14 @@
                 <MudTh>Status</MudTh>
             </HeaderContent>
             <RowTemplate>
-                <MudTr @onclick="@(() => NavigationManager.NavigateTo($"/inventory/{context.Sku}/edit"))" Style="cursor: pointer">
+                <MudTr data-testid="@($"inventory-row-{context.Sku}")" @onclick="@(() => NavigationManager.NavigateTo($"/inventory/{context.Sku}/edit"))" Style="cursor: pointer">
                     <MudTd DataLabel="SKU">@context.Sku</MudTd>
                     <MudTd DataLabel="Product Name">@context.ProductName</MudTd>
-                    <MudTd DataLabel="Available">@context.AvailableQuantity</MudTd>
+                    <MudTd DataLabel="Available" data-testid="@($"inventory-available-{context.Sku}")">@context.AvailableQuantity</MudTd>
                     <MudTd DataLabel="Reserved">@context.ReservedQuantity</MudTd>
                     <MudTd DataLabel="Total">@context.TotalQuantity</MudTd>
                     <MudTd DataLabel="Status">
-                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.AvailableQuantity)">
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.AvailableQuantity)" data-testid="@($"inventory-status-{context.Sku}")">
                             @GetStatusText(context.AvailableQuantity)
                         </MudChip>
                     </MudTd>

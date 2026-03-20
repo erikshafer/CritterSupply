@@ -1,3 +1,4 @@
+using System.Net;
 using Backoffice.Clients;
 
 namespace Backoffice.E2ETests.Stubs;
@@ -11,6 +12,12 @@ public sealed class StubPricingClient : IPricingClient
     private readonly Dictionary<string, ProductPriceDto> _prices = new();
     private readonly Dictionary<string, decimal> _floorPrices = new();
     private readonly Dictionary<string, decimal> _ceilingPrices = new();
+
+    /// <summary>
+    /// When true, all API methods will throw HttpRequestException with 401 Unauthorized.
+    /// Used by SessionExpirySteps to simulate session expiry.
+    /// </summary>
+    public bool SimulateSessionExpired { get; set; }
 
     /// <summary>
     /// Setup helper: Set current price for a product
@@ -43,6 +50,9 @@ public sealed class StubPricingClient : IPricingClient
 
     public Task<SetBasePriceResult?> SetBasePriceAsync(string sku, decimal amount, string currency = "USD", CancellationToken ct = default)
     {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
         // Enforce floor price constraint
         if (_floorPrices.TryGetValue(sku, out var floor) && amount < floor)
         {
@@ -78,12 +88,18 @@ public sealed class StubPricingClient : IPricingClient
 
     public Task<SchedulePriceChangeResult?> SchedulePriceChangeAsync(string sku, decimal newAmount, string currency, DateTimeOffset scheduledFor, CancellationToken ct = default)
     {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
         // Not used in current scenarios
         return Task.FromResult<SchedulePriceChangeResult?>(null);
     }
 
     public Task<ProductPriceDto?> GetProductPriceAsync(string sku, CancellationToken ct = default)
     {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
         return Task.FromResult(_prices.GetValueOrDefault(sku));
     }
 

@@ -18,6 +18,12 @@ public sealed class PricingAdminSteps
     private E2ETestFixture Fixture => _scenarioContext.Get<E2ETestFixture>(ScenarioContextKeys.Fixture);
     private IPage Page => _scenarioContext.Get<IPage>(ScenarioContextKeys.Page);
 
+    [Given(@"stub catalog has product ""(.*)"" with name ""(.*)""")]
+    public void GivenStubCatalogHasProductWithName(string sku, string name)
+    {
+        Fixture.StubCatalogClient.AddProduct(sku, name, $"{name} description", 0m);
+    }
+
     [Given(@"stub pricing client has product ""(.*)"" with current price ""(.*)""")]
     public void GivenStubPricingClientHasProductWithCurrentPrice(string sku, string price)
     {
