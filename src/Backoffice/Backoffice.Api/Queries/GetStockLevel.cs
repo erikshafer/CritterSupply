@@ -15,7 +15,7 @@ public static class GetStockLevel
     /// GET /api/backoffice/inventory/{sku}
     /// Returns stock level details for a SKU (available, reserved, total quantities).
     /// </summary>
-    [WolverineGet("/api/backoffice/inventory/{sku}")]
+    [WolverineGet("/api/inventory/{sku}")]
     [Authorize(Policy = "WarehouseClerk")]
     public static async Task<Results<Ok<StockLevelDto>, NotFound>> Get(
         string sku,
