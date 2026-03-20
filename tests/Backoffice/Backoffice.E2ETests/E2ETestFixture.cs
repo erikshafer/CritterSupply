@@ -147,6 +147,13 @@ public sealed class E2ETestFixture : IAsyncLifetime
         StubCatalogClient.Clear();
         StubFulfillmentClient.Clear();
         StubCorrespondenceClient.Clear();
+        StubPricingClient.Clear();
+
+        // Reset session-expired simulation flags
+        StubInventoryClient.SimulateSessionExpired = false;
+        StubOrdersClient.SimulateSessionExpired = false;
+        StubCustomerIdentityClient.SimulateSessionExpired = false;
+        StubPricingClient.SimulateSessionExpired = false;
     }
 
     /// <summary>

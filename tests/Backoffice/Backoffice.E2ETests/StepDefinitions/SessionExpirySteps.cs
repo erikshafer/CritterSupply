@@ -21,10 +21,11 @@ public sealed class SessionExpirySteps
     [When(@"my session expires")]
     public void WhenMySessionExpires()
     {
-        // Mark session as expired — stub will return 401 for next API call
+        // Mark session as expired — stubs will return 401 for next API call
         Fixture.StubInventoryClient.SimulateSessionExpired = true;
         Fixture.StubOrdersClient.SimulateSessionExpired = true;
         Fixture.StubCustomerIdentityClient.SimulateSessionExpired = true;
+        Fixture.StubPricingClient.SimulateSessionExpired = true;
     }
 
     [When(@"I trigger a data refresh")]

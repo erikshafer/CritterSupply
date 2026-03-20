@@ -12,7 +12,7 @@ namespace Backoffice.Api.Queries;
 public static class GetStockLevel
 {
     /// <summary>
-    /// GET /api/backoffice/inventory/{sku}
+    /// GET /api/inventory/{sku}
     /// Returns stock level details for a SKU (available, reserved, total quantities).
     /// </summary>
     [WolverineGet("/api/inventory/{sku}")]

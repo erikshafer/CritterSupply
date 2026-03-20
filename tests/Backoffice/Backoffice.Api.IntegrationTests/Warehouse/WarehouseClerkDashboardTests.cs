@@ -31,7 +31,7 @@ public class WarehouseClerkDashboardTests
         var result = await _fixture.Host
             .Scenario(s =>
             {
-                s.Get.Url($"/api/backoffice/inventory/{sku}");
+                s.Get.Url($"/api/inventory/{sku}");
                 s.StatusCodeShouldBe(200);
             });
 
