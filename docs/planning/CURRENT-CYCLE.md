@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.3 — Backoffice Phase 3B: Write Operations Depth (IN PROGRESS) |
-| **Status** | 🚀 IN PROGRESS — Sessions 1-4 complete (Product Admin + Warehouse Admin write UI) |
-| **Deliverables** | Product Admin write UI + Warehouse Admin write UI with role-based permissions — Build: 0 errors, 26 warnings |
+| **Status** | 🚀 IN PROGRESS — Sessions 1-5 complete (Product Admin + Pricing Admin + Warehouse Admin write UI + Pricing Admin E2E tests) |
+| **Deliverables** | Product/Pricing/Warehouse Admin write UI + Pricing E2E tests — Build: 0 errors, 26 warnings |
 | **Recent Completion** | M32.2 — Backoffice Phase 3A (2026-03-19), M32.1 — Backoffice Phase 2 (2026-03-18) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-20 (M32.3 Session 4 complete)*
+*Last Updated: 2026-03-20 (M32.3 Session 5 complete)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 🚀 M32.3: Backoffice Phase 3B — Write Operations Depth
 
-**Status:** 🚀 **IN PROGRESS** — Sessions 1-2 complete (Product Admin write + Product List UI)
+**Status:** 🚀 **IN PROGRESS** — Sessions 1-5 complete (Product Admin + Pricing Admin + Warehouse Admin write UI + Pricing Admin E2E tests)
 **Goal:** Implement write-operations UI depth (Product Admin, Pricing Admin, Warehouse Admin, User Management)
 
 **Session 1 Progress (2026-03-19):**
@@ -122,9 +122,32 @@
 - ✅ Build succeeds with 0 errors, 26 pre-existing warnings (Correspondence BC + Backoffice test nullables)
 - **Retrospective:** `docs/planning/milestones/m32-3-session-4-retrospective.md`
 
+**Session 5 Progress (2026-03-20):**
+- ✅ Created M32.3 Session 5 planning document (`m32-3-session-5-plan.md`)
+- ✅ Created PricingAdmin.feature with 6 Gherkin scenarios:
+  - Set base price (happy path)
+  - Price validation (must be > $0.00)
+  - Floor price constraint enforcement
+  - Ceiling price constraint enforcement
+  - Session-expired redirect to login
+  - SystemAdmin RBAC verification
+- ✅ Created PriceEditPage.cs Page Object Model with locators and action methods
+- ✅ Created PricingAdminSteps.cs step definitions binding Gherkin to Page Object
+- ✅ Created StubPricingClient.cs with floor/ceiling constraint enforcement:
+  - SetCurrentPrice/SetFloorPrice/SetCeilingPrice setup helpers
+  - SetBasePriceAsync enforces constraints and returns error messages
+  - Integrated into E2ETestFixture and BackofficeApiKestrelFactory
+- ✅ Updated PriceEdit.razor with E2E test data-testid attributes:
+  - Form wrapper div with `data-testid="price-edit-form"`
+  - Standardized test IDs matching Page Object Model
+  - Hidden success/error message divs for Playwright assertions
+  - ShowSuccessMessage/ShowErrorMessage helper methods
+- ✅ Build succeeds with 0 errors, 26 pre-existing warnings (Correspondence BC)
+- **Retrospective:** `docs/planning/milestones/m32-3-session-5-retrospective.md`
+- **Deferred:** Warehouse Admin E2E tests moved to Session 6 to maintain quality focus
+
 **Next Session Goals:**
-- E2E tests for Warehouse Admin workflow (InventoryList + InventoryEdit)
-- Pricing Admin E2E tests
+- Warehouse Admin E2E tests (10 scenarios: browse, filter, adjust, receive, validation, session expiry, RBAC)
 
 **Planned Sessions:**
 1. ✅ Session 1: Product Admin write UI (COMPLETE)
