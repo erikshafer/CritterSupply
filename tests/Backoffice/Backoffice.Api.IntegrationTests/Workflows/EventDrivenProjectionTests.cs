@@ -644,4 +644,111 @@ public class EventDrivenProjectionTests
             metrics.FailedEmailCount.ShouldBeGreaterThanOrEqualTo(1);
         }
     }
+
+    // ====================================================================================
+    // FulfillmentPipelineView Projection Tests (M33.0 Session 2)
+    // ====================================================================================
+
+    [Fact]
+    public async Task ShipmentDispatchedEvent_IncrementsInTransitCount_InPipelineView()
+    {
+        // Arrange
+        await _fixture.CleanAllDocumentsAsync();
+
+        var orderId = Guid.NewGuid();
+        var shipmentId = Guid.NewGuid();
+        var dispatchedAt = new DateTimeOffset(2026, 3, 21, 14, 0, 0, TimeSpan.Zero);
+
+        var shipmentDispatched = new ShipmentDispatched(
+            orderId,
+            shipmentId,
+            "FedEx",
+            "1234567890",
+            dispatchedAt);
+
+        // Act: Append event to Marten (simulates RabbitMQ handler)
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), shipmentDispatched);
+            await session.SaveChangesAsync();
+        }
+
+        // Assert: Query FulfillmentPipelineView projection
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var pipeline = await session.LoadAsync<FulfillmentPipelineView>("current");
+            pipeline.ShouldNotBeNull();
+            pipeline.ShipmentsInTransit.ShouldBeGreaterThanOrEqualTo(1);
+            pipeline.ShipmentsDelivered.ShouldBe(0);
+            pipeline.DeliveryFailures.ShouldBe(0);
+        }
+    }
+
+    /// <summary>
+    /// Test full shipment lifecycle: dispatched → delivered (success path) and dispatched → failed (failure path)
+    /// </summary>
+    [Fact]
+    public async Task ShipmentLifecycle_UpdatesPipelineCorrectly_ForSuccessAndFailurePaths()
+    {
+        // Arrange
+        await _fixture.CleanAllDocumentsAsync();
+
+        var successOrderId = Guid.NewGuid();
+        var successShipmentId = Guid.NewGuid();
+        var failureOrderId = Guid.NewGuid();
+        var failureShipmentId = Guid.NewGuid();
+        var baseTime = new DateTimeOffset(2026, 3, 21, 14, 0, 0, TimeSpan.Zero);
+
+        var dispatchedSuccess = new ShipmentDispatched(successOrderId, successShipmentId, "FedEx", "1111111111", baseTime);
+        var dispatchedFailure = new ShipmentDispatched(failureOrderId, failureShipmentId, "UPS", "2222222222", baseTime.AddMinutes(5));
+        var delivered = new ShipmentDelivered(successOrderId, successShipmentId, baseTime.AddDays(2), "John Doe");
+        var failed = new ShipmentDeliveryFailed(failureOrderId, failureShipmentId, "Address not found", baseTime.AddDays(3));
+
+        // Act: Dispatch two shipments
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), dispatchedSuccess);
+            session.Events.Append(Guid.NewGuid(), dispatchedFailure);
+            await session.SaveChangesAsync();
+        }
+
+        // After dispatching: in-transit=2
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var pipeline = await session.LoadAsync<FulfillmentPipelineView>("current");
+            pipeline.ShouldNotBeNull();
+            pipeline.ShipmentsInTransit.ShouldBeGreaterThanOrEqualTo(2);
+        }
+
+        // Deliver first shipment (success path)
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), delivered);
+            await session.SaveChangesAsync();
+        }
+
+        // After delivery: in-transit decreased, delivered increased
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var pipeline = await session.LoadAsync<FulfillmentPipelineView>("current");
+            pipeline.ShouldNotBeNull();
+            pipeline.ShipmentsDelivered.ShouldBeGreaterThanOrEqualTo(1);
+        }
+
+        // Fail second shipment (failure path)
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), failed);
+            await session.SaveChangesAsync();
+        }
+
+        // After failure: in-transit decreased again, delivery failures increased
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var pipeline = await session.LoadAsync<FulfillmentPipelineView>("current");
+            pipeline.ShouldNotBeNull();
+            pipeline.ShipmentsDelivered.ShouldBeGreaterThanOrEqualTo(1);
+            pipeline.DeliveryFailures.ShouldBeGreaterThanOrEqualTo(1);
+        }
+    }
 }
