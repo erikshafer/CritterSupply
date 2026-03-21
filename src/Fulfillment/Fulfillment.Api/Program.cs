@@ -111,6 +111,14 @@ builder.Host.UseWolverine(opts =>
     // Publish to Returns BC for return eligibility window establishment
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
         .ToRabbitQueue("returns-fulfillment-events");
+
+    // Publish to Backoffice BC for fulfillment pipeline metrics (M33.0 Session 2)
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDispatched>()
+        .ToRabbitQueue("backoffice-shipment-dispatched");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
+        .ToRabbitQueue("backoffice-shipment-delivered");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDeliveryFailed>()
+        .ToRabbitQueue("backoffice-shipment-delivery-failed");
 });
 
 builder.Services.AddEndpointsApiExplorer();
