@@ -2125,6 +2125,134 @@ public static (CreationResponse, IStartStream) Handle(InitializeCart cmd)
 
 **Reference:** [M32.0 Session 5 Retrospective - Investigation Findings](../../retrospectives/m32.0-session5-retrospective.md)
 
+### 10. ❌ Using Compound Handler Pattern with Mixed Parameter Sources ⚠️ **IMPORTANT**
+
+**Problem:** Wolverine's compound handler pattern (with `Before()`, `Validate()`, `Load()` lifecycle) cannot handle mixed parameter sources where some parameters come from route and others from JSON body. The `Before()` method cannot construct the command because it doesn't have access to the deserialized body.
+
+**When this occurs:**
+- HTTP endpoints with route parameters (e.g., `{userId}`) AND a JSON body
+- Compound handler expects to construct command in `Before()` method
+- Result: 500 Internal Server Error during request handling
+
+**❌ ANTI-PATTERN — Mixed Parameters in Compound Handler:**
+
+```csharp
+// ❌ This pattern fails
+[WolverinePost("/api/users/{userId}/reset-password")]
+public static class ResetPasswordHandler
+{
+    // Before() cannot be called - newPassword is from JSON body, not available at this stage
+    public static Before(Guid userId, string newPassword)
+    {
+        return new ResetPassword(userId, newPassword);
+    }
+
+    public static async Task<IResult> Handle(
+        ResetPasswordResponse? response,
+        ProblemDetails? problem)
+    {
+        // Never reached - Before() construction fails
+        return response is not null
+            ? Results.Ok(response)
+            : Results.Problem(problem);
+    }
+}
+```
+
+**✅ CORRECT — Use Direct Implementation Pattern:**
+
+```csharp
+// ✅ This pattern works
+public sealed record ResetPasswordRequest(string NewPassword);
+
+public sealed class ResetPasswordRequestValidator : AbstractValidator<ResetPasswordRequest>
+{
+    public ResetPasswordRequestValidator()
+    {
+        RuleFor(x => x.NewPassword).NotEmpty().MinimumLength(8);
+    }
+}
+
+[WolverinePost("/api/users/{userId}/reset-password")]
+public static async Task<IResult> Handle(
+    Guid userId,                        // Route parameter - injected by Wolverine
+    ResetPasswordRequest request,       // JSON body - auto-deserialized by Wolverine
+    BackofficeIdentityDbContext db,     // DI service
+    CancellationToken ct)
+{
+    // Direct implementation - no compound handler lifecycle
+    var user = await db.AdminUsers.FindAsync([userId], ct);
+    if (user is null)
+        return Results.NotFound();
+
+    user.PasswordHash = HashPassword(request.NewPassword);
+    user.RefreshToken = null; // Security: invalidate existing sessions
+    await db.SaveChangesAsync(ct);
+
+    return Results.Ok(new { Success = true });
+}
+```
+
+**Why Direct Implementation Works:**
+- Wolverine auto-deserializes JSON body to the `ResetPasswordRequest` type
+- Route parameters are injected separately (standard ASP.NET Core behavior)
+- No compound handler lifecycle - Wolverine treats this as a simple endpoint
+- FluentValidation still works (via `ResetPasswordRequestValidator`)
+- Less magic, more explicit - easier to understand and debug
+
+**When to Use Each Pattern:**
+
+| Scenario | Pattern | Rationale |
+|----------|---------|-----------|
+| All parameters from JSON body | ✅ Compound Handler | Can use `Before()` to construct command |
+| Route parameters only (no body) | ✅ Compound Handler | Route params available to `Before()` |
+| Mixed route + JSON body | ❌ Compound Handler, ✅ Direct | `Before()` can't access deserialized body |
+| Complex validation/loading logic | ✅ Compound Handler | Benefit from lifecycle stages |
+| Simple CRUD endpoint | ✅ Direct Implementation | Less ceremony, more direct |
+
+**Real Example from CritterSupply:**
+
+```csharp
+// ✅ BackofficeIdentity BC: ResetBackofficeUserPasswordEndpoint.cs (M32.3 Session 10)
+// Direct implementation after compound handler failed with 500 errors
+[WolverinePost("/api/backoffice-identity/users/{userId}/reset-password")]
+public static async Task<IResult> Handle(
+    Guid userId,
+    ResetPasswordRequest request,
+    BackofficeIdentityDbContext db,
+    CancellationToken ct)
+{
+    var user = await db.AdminUsers.FindAsync([userId], ct);
+    // ... implementation
+}
+
+// ✅ Pricing BC: SetBasePriceEndpoint.cs (established pattern)
+// Direct implementation for route + body scenario
+[WolverinePost("/api/pricing/{sku}/base-price")]
+public static async Task<IResult> Handle(
+    string sku,
+    SetBasePriceRequest request,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    // ... implementation
+}
+```
+
+**Key Lessons (M32.3 Session 10):**
+1. This anti-pattern caused 6/6 integration tests to fail with 500 errors
+2. Error was silent during compilation - only failed at runtime
+3. Direct implementation pattern is a **valid alternative**, not a workaround
+4. When in doubt, check Pricing BC or BackofficeIdentity BC for reference patterns
+
+**When Compound Handler Is Still Preferred:**
+- All parameters from JSON body: `CreateUser(email, firstName, lastName, role)`
+- Complex validation logic that benefits from separate `Validate()` stage
+- Multi-step loading: `Load()` fetches aggregate, `Handle()` applies business logic
+- Railway programming with async validation (see anti-pattern #4)
+
+**Reference:** [M32.3 Session 10 Retrospective - Wolverine Pattern Limitations](../../planning/milestones/m32-3-session-10-retrospective.md)
+
 ---
 
 ## File Organization and Naming

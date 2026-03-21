@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M32.4 — Backoffice Phase 4: E2E Stabilization (PLANNED) |
-| **Status** | 📋 PLANNED — M32.3 complete, M32.4 planning in progress |
+| **Status** | 📋 PLANNED — Session 11 transitioned M32.3 → M32.4 |
 | **Deliverables** | E2E fixture investigation, test stabilization, documentation updates |
-| **Recent Completion** | M32.3 — Backoffice Phase 3B (2026-03-20), M32.2 — Backoffice Phase 3A (2026-03-19) |
+| **Recent Completion** | M32.3 — Backoffice Phase 3B (2026-03-21), M32.2 — Backoffice Phase 3A (2026-03-19) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-20 (M32.3 complete — 10 sessions)*
+*Last Updated: 2026-03-21 (M32.3 Session 11 complete — transition to M32.4)*
 
 ---
 
@@ -55,164 +55,25 @@
 
 ### 📋 M32.4: Backoffice Phase 4 — E2E Stabilization + UX Polish
 
-**Status:** 📋 **PLANNED** — M32.3 complete, M32.4 scope definition in progress
+**Status:** 📋 **PLANNED** — M32.3 complete, M32.4 kickoff pending
 **Goal:** Fix E2E test fixture issue, stabilize test suite, document patterns, address UX polish items
 
-**Session 1 Progress (2026-03-19):**
-- ✅ Created M32.3 Session 1 planning document (`m32-3-session-1-plan.md`)
-- ✅ Extended ICatalogClient with 3 write methods (UpdateProductDescription, UpdateProductDisplayName, DiscontinueProduct)
-- ✅ Implemented CatalogClient methods calling Product Catalog BC endpoints
-- ✅ Fixed stub clients in integration and E2E tests (StubClients.cs, StubCatalogClient.cs)
-- ✅ Created ProductEdit.razor page at `/products/{sku}/edit`:
-  - Role-based permissions (copy-writer, product-manager, system-admin)
-  - Edit display name and description with character limits
-  - Change tracking sidebar
-  - Session-expired handling
-  - Two-click discontinuation workflow
-  - MudBlazor v9 components with explicit type parameters
-  - WASM pattern: HttpClient direct calls, local ProductDto record
-- ✅ Added navigation links from Index.razor (ProductManager and CopyWriter roles)
-- ✅ Build succeeds with 0 errors, 0 warnings
-- **Retrospective:** `docs/planning/milestones/m32-3-session-1-retrospective.md`
-
-**Session 2 Progress (2026-03-19):**
-- ✅ Created M32.3 Session 2 planning document (`m32-3-session-2-plan.md`)
-- ✅ API routing audit: confirmed Product Catalog BC uses `/api/products`, Backoffice.Api proxies via `/api/catalog/products` (intentional BFF pattern)
-- ✅ Extended ICatalogClient with `ListProductsAsync` method (pagination + filtering)
-- ✅ Implemented CatalogClient HTTP client calling `/api/products` with query parameters
-- ✅ Created GetProductList.cs query handler in Backoffice.Api (BFF proxy endpoint at `/api/catalog/products`)
-- ✅ Added 3 missing authorization policies to Backoffice.Api Program.cs (ProductManager, CopyWriter, PricingManager)
-- ✅ Created ProductList.razor page at `/products` route:
-  - MudTable with pagination (25 items/page)
-  - Client-side search filtering by SKU/name
-  - Role-based authorization (product-manager, copy-writer, system-admin)
-  - Session-expired handling
-  - MudChip status badges with T="string" type parameter
-  - WASM pattern: HttpClient direct calls, local DTO records
-- ✅ Updated Index.razor navigation: ProductManager and CopyWriter now link to `/products` (removed DEMO-001 hardcoded SKU)
-- ✅ Fixed stub clients (integration + E2E tests) with ListProductsAsync implementation
-- ✅ Build succeeds with 0 errors, 10 pre-existing warnings (Correspondence BC)
-- **Retrospective:** `docs/planning/milestones/m32-3-session-2-retrospective.md`
-
-**Session 3 Progress (2026-03-20):**
-- ✅ Created M32.3 Session 3 planning document (`m32-3-session-3-plan.md`)
-- ✅ E2E tests for Product Admin workflow (ProductEdit and ProductList pages)
-- ✅ Implemented PriceEdit.razor page at `/products/{sku}/price` route
-- ✅ Extended IPricingClient with SetBasePriceAsync method
-- ✅ Build succeeds with 0 errors
-- **Retrospective:** `docs/planning/milestones/m32-3-session-3-retrospective.md` (assumed based on commit #432)
-
-**Session 4 Progress (2026-03-20):**
-- ✅ Created M32.3 Session 4 planning document (`m32-3-session-4-plan.md`)
-- ✅ Extended IInventoryClient with 3 write methods (ListInventoryAsync, AdjustInventoryAsync, ReceiveInboundStockAsync)
-- ✅ Implemented InventoryClient in Backoffice.Api/Clients
-- ✅ Created 3 Backoffice.Api proxy endpoints (GetInventoryList, AdjustInventoryProxy, ReceiveStockProxy)
-- ✅ Fixed Risk R2: Created missing GetAllInventory endpoint in Inventory BC (corrected TotalQuantity → TotalOnHand property name)
-- ✅ Created InventoryList.razor page at `/inventory` route:
-  - MudTable with client-side search by SKU
-  - Color-coded status chips (Out of Stock/Low Stock/In Stock)
-  - Row click navigation to edit page
-  - Session-expired handling
-- ✅ Created InventoryEdit.razor page at `/inventory/{sku}/edit` route:
-  - Dual-form layout (Adjust Inventory + Receive Inbound Stock)
-  - KPI cards showing Available/Reserved/Total quantities
-  - Submit state tracking with success/error messages
-- ✅ Updated Index.razor navigation: WarehouseClerk now links to `/inventory`
-- ✅ Updated stub clients (integration + E2E tests) with new IInventoryClient methods
-- ✅ Build succeeds with 0 errors, 26 pre-existing warnings (Correspondence BC + Backoffice test nullables)
-- **Retrospective:** `docs/planning/milestones/m32-3-session-4-retrospective.md`
-
-**Session 5 Progress (2026-03-20):**
-- ✅ Created M32.3 Session 5 planning document (`m32-3-session-5-plan.md`)
-- ✅ Created PricingAdmin.feature with 6 Gherkin scenarios:
-  - Set base price (happy path)
-  - Price validation (must be > $0.00)
-  - Floor price constraint enforcement
-  - Ceiling price constraint enforcement
-  - Session-expired redirect to login
-  - SystemAdmin RBAC verification
-- ✅ Created PriceEditPage.cs Page Object Model with locators and action methods
-- ✅ Created PricingAdminSteps.cs step definitions binding Gherkin to Page Object
-- ✅ Created StubPricingClient.cs with floor/ceiling constraint enforcement:
-  - SetCurrentPrice/SetFloorPrice/SetCeilingPrice setup helpers
-  - SetBasePriceAsync enforces constraints and returns error messages
-  - Integrated into E2ETestFixture and BackofficeApiKestrelFactory
-- ✅ Updated PriceEdit.razor with E2E test data-testid attributes:
-  - Form wrapper div with `data-testid="price-edit-form"`
-  - Standardized test IDs matching Page Object Model
-  - Hidden success/error message divs for Playwright assertions
-  - ShowSuccessMessage/ShowErrorMessage helper methods
-- ✅ Build succeeds with 0 errors, 26 pre-existing warnings (Correspondence BC)
-- **Retrospective:** `docs/planning/milestones/m32-3-session-5-retrospective.md`
-- **Deferred:** Warehouse Admin E2E tests moved to Session 6 to maintain quality focus
-
-**Session 6 Progress (2026-03-20):**
-- ✅ Created M32.3 Session 6 planning document (`m32-3-session-6-plan.md`)
-- ✅ Fixed URL mismatch bug: GetStockLevel route changed from `/api/backoffice/inventory/{sku}` to `/api/inventory/{sku}`
-  - Aligns with Session 4 inventory endpoint naming convention (`/api/inventory/*`)
-  - InventoryEdit.razor was calling wrong URL (would have caused 404 in E2E tests)
-- ✅ Added data-testid attributes to InventoryList.razor:
-  - Search input, table wrapper, row per SKU, available quantity cell, status chip
-- ✅ Added data-testid attributes to InventoryEdit.razor:
-  - Page title, KPI cards (available/reserved/total), form sections, inputs, buttons
-  - Hidden success/error message divs (Session 5 W3 pattern for Playwright assertions)
-- ✅ Created WarehouseAdmin.feature with 10 Gherkin scenarios:
-  - Browse inventory list (3 SKUs)
-  - Filter inventory by SKU
-  - Navigate to edit page (verify KPI values)
-  - Adjust inventory: cycle count (positive)
-  - Adjust inventory: damage (negative)
-  - Receive inbound stock
-  - Validation: adjust button disabled when quantity=0
-  - Validation: receive button disabled when quantity=0
-  - Session expired redirect to login
-  - SystemAdmin RBAC override
-- ✅ Created InventoryListPage.cs Page Object Model (navigate, search, click, assertions)
-- ✅ Created InventoryEditPage.cs Page Object Model (KPI, adjust, receive, feedback assertions)
-- ✅ Created WarehouseAdminSteps.cs step definitions (22 methods binding Gherkin to Page Objects)
-- ✅ Build succeeds with 0 errors, 34 pre-existing warnings
-- **Retrospective:** `docs/planning/milestones/m32-3-session-6-retrospective.md`
-
-**Session 6 Test Audit (2026-03-20):**
-- ✅ Fixed PricingAdmin.feature: 3 unbound step definitions resolved (Background step, catalog stub, user creation pattern)
-- ✅ Fixed ClearAllStubs() to include StubPricingClient.Clear() — pricing stub state was leaking between scenarios
-- ✅ Fixed SimulateSessionExpired not reset in ClearAllStubs() — added explicit reset for all 4 stubs
-- ✅ Fixed WarehouseClerkDashboardTests integration test URL: `/api/backoffice/inventory/{sku}` → `/api/inventory/{sku}`
-- ✅ Added SimulateSessionExpired support to StubPricingClient (was missing — pricing session-expiry scenario couldn't work)
-- ✅ Updated SessionExpirySteps to include StubPricingClient in session expiry simulation
-- ✅ Build: 0 errors (both E2E and integration test projects)
-
-**Session 7 Progress (2026-03-20):**
-- ✅ Created M32.3 Session 7 planning document (`m32-3-session-7-plan.md`)
-- ✅ Discovered BackofficeIdentity BC already had 4 of 5 needed endpoints (from M29.0)
-- ✅ Implemented missing password reset endpoint in BackofficeIdentity BC:
-  - ResetBackofficeUserPassword command, validator, handler
-  - ResetBackofficeUserPasswordEndpoint.cs (POST /api/backoffice-identity/users/{userId}/reset-password)
-  - Refresh token invalidation on password reset (security-first design)
-- ✅ Created IBackofficeIdentityClient interface (5 methods) in Backoffice/Backoffice/Clients/
-- ✅ Implemented BackofficeIdentityClient HTTP client in Backoffice.Api/Clients/
-- ✅ Created 3 Blazor WASM pages:
-  - UserList.razor at `/users` route (search, MudTable, status chips, row click navigation)
-  - UserCreate.razor at `/users/create` route (form with role dropdown, validation, duplicate email handling)
-  - UserEdit.razor at `/users/{userId:guid}/edit` route (3 independent sections: change role, reset password, deactivate)
-- ✅ Updated Index.razor navigation: SystemAdmin now links to `/users`
-- ✅ Fixed critical WASM SDK constraint: DTOs defined locally in @code blocks (cannot reference server-side projects)
-- ✅ Updated stub clients (integration + E2E tests) with IBackofficeIdentityClient implementations
-- ✅ Build succeeds with 0 errors, 22 pre-existing warnings
-- **Retrospective:** `docs/planning/milestones/m32-3-session-7-retrospective.md`
-- **Key Pattern:** Local DTO pattern for Blazor WASM (essential — WASM cannot reference server-side projects)
-- **Deferred:** PricingAdmin.feature step definition alignment (moved to Session 9 due to time prioritization)
+**Session 11 Progress (2026-03-21 — M32.3 Wrap-up):**
+- ✅ Created M32.3 Session 11 planning document (`m32-3-session-11-plan.md`)
+- ✅ Verified M32.3 retrospective completeness (985 lines, no changes needed)
+- ✅ Documented Wolverine mixed parameter sources limitation (anti-pattern #10 added to `wolverine-message-handlers.md`)
+- ✅ Created M32.4 milestone plan document (`m32-4-plan.md` — 3-session plan, E2E stabilization focus)
+- **Retrospective:** `docs/planning/milestones/m32-3-session-11-retrospective.md` (pending)
 
 **Planned Priorities (M32.4):**
 1. 🚨 **Priority 1 (CRITICAL):** Fix E2E test fixture issue (Blazor WASM app not loading, 4-6 hours)
-2. 📋 **Priority 2 (HIGH):** Document Wolverine mixed parameter pattern in skill files (1 hour)
+2. 📋 **Priority 2 (MEDIUM):** Automate Blazor WASM publish in E2E tests (30 minutes)
 3. 📋 **Priority 3 (MEDIUM):** Audit EF Core DateTimeOffset tests (2-3 hours)
-4. 📋 **Priority 4 (MEDIUM):** Automate Blazor WASM publish in E2E tests (30 minutes)
-5. 🔵 **Priority 5 (LOW):** GET /api/backoffice-identity/users/{userId} endpoint (2 hours)
-6. 🔵 **Priority 6 (LOW):** Table sorting in UserList.razor (1 hour)
+4. 🔵 **Priority 4 (LOW):** GET /api/backoffice-identity/users/{userId} endpoint (2 hours)
+5. 🔵 **Priority 5 (LOW):** Table sorting in UserList.razor (1 hour)
 
 **References:**
-- Milestone Plan: TBD
+- Milestone Plan: `docs/planning/milestones/m32-4-plan.md`
 - M32.3 Retrospective: `docs/planning/milestones/m32-3-retrospective.md`
 
 ---
@@ -258,13 +119,13 @@
 5. ✅ Session 5: Pricing Admin E2E tests
 6. ✅ Session 6: Warehouse Admin E2E tests
 7. ✅ Session 7: User Management write UI
-8. ❌ Session 8: SKIPPED (Easter break)
+8. ❌ Session 8: SKIPPED (no CSV/Excel exports needed)
 9. ✅ Session 9: User Management E2E tests + integration tests
 10. ✅ Session 10: Integration test stabilization + E2E investigation
+11. ✅ Session 11: Milestone wrap-up + M32.4 planning + Wolverine pattern documentation
 
 **Deferred to M32.4:**
 - E2E fixture investigation (Blazor WASM app not loading in test context, 4-6 hours)
-- Wolverine mixed parameter pattern documentation
 - DateTimeOffset precision audit across all EF Core tests
 - GET /api/backoffice-identity/users/{userId} endpoint (performance optimization)
 - Table sorting in UserList.razor (UX enhancement)
@@ -280,8 +141,10 @@
 - [Session 7 Retrospective](./milestones/m32-3-session-7-retrospective.md)
 - [Session 9 Retrospective](./milestones/m32-3-session-9-retrospective.md)
 - [Session 10 Retrospective](./milestones/m32-3-session-10-retrospective.md)
+- [Session 11 Plan](./milestones/m32-3-session-11-plan.md)
+- [Session 11 Retrospective](./milestones/m32-3-session-11-retrospective.md) (pending)
 
-*Completed: 2026-03-20*
+*Completed: 2026-03-21*
 
 ---
 
