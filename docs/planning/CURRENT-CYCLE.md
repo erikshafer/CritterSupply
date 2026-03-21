@@ -41,44 +41,77 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M32.4 — Backoffice Phase 4: E2E Stabilization (PLANNED) |
-| **Status** | 📋 PLANNED — Session 11 transitioned M32.3 → M32.4 |
-| **Deliverables** | E2E fixture investigation, test stabilization, documentation updates |
-| **Recent Completion** | M32.3 — Backoffice Phase 3B (2026-03-21), M32.2 — Backoffice Phase 3A (2026-03-19) |
+| **Current Milestone** | M33.0 — Code Correction + Broken Feedback Loop Repair (PLANNED) |
+| **Status** | 🚀 NEXT — M32.4 complete, M33 pending kickoff |
+| **Deliverables** | INV-3 fix, Marten projections, structural refactors, canonical validator ADR |
+| **Recent Completion** | M32.4 — Backoffice Phase 4 (2026-03-21), M32.3 — Backoffice Phase 3B (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-21 (M32.3 Session 11 complete — transition to M32.4)*
+*Last Updated: 2026-03-21 (M32.4 complete — all critical and medium priorities)*
 
 ---
 
 ## Active Milestone
 
-### 📋 M32.4: Backoffice Phase 4 — E2E Stabilization + UX Polish
+### 📋 M33.0: Code Correction + Broken Feedback Loop Repair
 
-**Status:** 📋 **PLANNED** — M32.3 complete, M32.4 kickoff pending
-**Goal:** Fix E2E test fixture issue, stabilize test suite, document patterns, address UX polish items
+**Status:** 🚀 **NEXT** — M32.4 complete, M33 planning pending user confirmation
+**Goal:** Fix broken tests, build missing projections, execute structural refactors, document canonical patterns
 
-**Session 11 Progress (2026-03-21 — M32.3 Wrap-up):**
-- ✅ Created M32.3 Session 11 planning document (`m32-3-session-11-plan.md`)
-- ✅ Verified M32.3 retrospective completeness (985 lines, no changes needed)
-- ✅ Documented Wolverine mixed parameter sources limitation (anti-pattern #10 added to `wolverine-message-handlers.md`)
-- ✅ Created M32.4 milestone plan document (`m32-4-plan.md` — 3-session plan, E2E stabilization focus)
-- **Retrospective:** `docs/planning/milestones/m32-3-session-11-retrospective.md` (pending)
-
-**Planned Priorities (M32.4):**
-1. 🚨 **Priority 1 (CRITICAL):** Fix E2E test fixture issue (Blazor WASM app not loading, 4-6 hours)
-2. 📋 **Priority 2 (MEDIUM):** Automate Blazor WASM publish in E2E tests (30 minutes)
-3. 📋 **Priority 3 (MEDIUM):** Audit EF Core DateTimeOffset tests (2-3 hours)
-4. 🔵 **Priority 4 (LOW):** GET /api/backoffice-identity/users/{userId} endpoint (2 hours)
-5. 🔵 **Priority 5 (LOW):** Table sorting in UserList.razor (1 hour)
+**Planned Priorities (from M33-M34 proposal):**
+1. 🚨 **Priority 1:** Fix INV-3 (AdjustInventoryEndpoint bypass) + F-8 (BackofficeTestFixture instrumentation)
+2. 📋 **Priority 2:** Build 3 missing Marten projections (FulfillmentPipelineView, ReturnMetricsView, CorrespondenceMetricsView)
+3. 📋 **Priority 3:** Add Order Search + Return Management pages to Backoffice
+4. 📋 **Priority 4:** Returns BC structural refactor (R-1 through R-7)
+5. 📋 **Priority 5:** Vendor Portal structural refactor (VP-1 through VP-6)
+6. 📋 **Priority 6:** Backoffice folder restructure + XC-3 (AcknowledgeAlert transaction fix)
+7. 📋 **Priority 7:** ADR for canonical validator placement (XC-1)
+8. 📋 **Priority 8:** CheckoutCompleted dual-payload collision fix
+9. 🔵 **Priority 9:** Quick wins (INV-1/2, PR-1, CO-1, PAY-1/FUL-1/ORD-1, F-9)
 
 **References:**
-- Milestone Plan: `docs/planning/milestones/m32-4-plan.md`
-- M32.3 Retrospective: `docs/planning/milestones/m32-3-retrospective.md`
+- M33-M34 Proposal: `docs/planning/milestones/m33-m34-engineering-proposal-2026-03-21.md`
+- M32.4 Retrospective: `docs/planning/milestones/m32-4-session-1-retrospective.md`
 
 ---
 
 ## Recent Completions
+
+### M32.4: Backoffice Phase 4 — E2E Stabilization + UX Polish
+
+**Status:** ✅ **COMPLETE** — All critical and medium priorities finished in single session (2026-03-21)
+**Goal:** Fix E2E test fixture issue, stabilize test suite, audit DateTimeOffset precision
+
+**What Shipped:**
+- ✅ **Priority 1 (CRITICAL):** Fixed E2E test fixture issue — Blazor WASM now publishes automatically before tests
+- ✅ **Priority 2 (MEDIUM):** Automated Blazor WASM publish — MSBuild target runs before VSTest execution
+- ✅ **Priority 3 (MEDIUM):** DateTimeOffset precision audit — all EF Core tests already use correct tolerance patterns
+- 📄 **Documentation:** Comprehensive audit document (192 lines) documenting findings and patterns
+
+**Key Technical Win:**
+- Single MSBuild target solution addressed both Priority 1 (blocking issue) AND Priority 2 (automation), collapsing 2 planned sessions into 1
+
+**Audit Results:**
+- BackofficeIdentity (EF Core): ✅ Uses `TimeSpan.FromMilliseconds(1)` tolerance correctly
+- VendorIdentity (EF Core): ✅ Uses `ShouldBeInRange()` (built-in tolerance)
+- Customer Identity (EF Core): ✅ No DateTimeOffset assertions
+- All Marten BCs: ✅ Not affected (Marten preserves full precision)
+- **Conclusion:** No code fixes required
+
+**Session Efficiency:** Completed 3 priorities in ~2.5 hours (planned 4-6 hours for Priority 1 alone)
+
+**Deferred (Optional):**
+- Priority 4 (LOW): GET /api/backoffice-identity/users/{userId} endpoint
+- Priority 5 (LOW): Table sorting in UserList.razor
+
+**References:**
+- [M32.4 Plan](./milestones/m32-4-plan.md)
+- [Session 1 Retrospective](./milestones/m32-4-session-1-retrospective.md)
+- [DateTimeOffset Audit](./milestones/m32-4-datetime-offset-audit.md)
+
+*Completed: 2026-03-21*
+
+---
 
 ### M32.3: Backoffice Phase 3B — Write Operations Depth
 
