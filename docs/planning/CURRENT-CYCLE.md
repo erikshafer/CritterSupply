@@ -929,25 +929,45 @@
 
 ### Next 3-4 Milestones
 
-- **M32.2 (planned):** Backoffice Phase 3A — E2E/CI stabilization + UX hardening
-  - Finish E2E stability work and CI integration
-  - Execute P0/P1 UX hardening backlog from UX audit issue drafts
-  - Keep scope intentionally narrow; avoid large cross-BC dependencies
+> ⚠️ **Updated 2026-03-21:** Following the post-audit discussion, the owner directed that M33 and M34 be **engineering-led milestones** — not product expansion. Product Catalog Evolution and other future BCs are pushed to M35+. See full proposal: [`docs/planning/milestones/m33-m34-engineering-proposal-2026-03-21.md`](milestones/m33-m34-engineering-proposal-2026-03-21.md).
 
-- **M32.3 (planned):** Backoffice Phase 3B — write-ops depth + cross-BC UX
-  - Product/pricing/warehouse/user-management UI depth
-  - Product history significance filtering (event-sourcing dependent)
-  - Discontinuation pre-flight impact + grouped notifications (Listings/Marketplaces dependency)
-  - Deeper operator tooling (bulk operations, exports, audit/analytics views)
+- **M32.4 (active):** Backoffice Phase 4 — E2E fixture stabilization + UX polish
+  - Resolve Blazor WASM app-loading timeout blocking 12/34 E2E scenarios
+  - Address remaining UX polish items from audit
+  - Close out the Backoffice series
 
-### Future BCs (Priority Roadmap)
+- **M33 (planned — engineering-led):** Code Correction + Broken Feedback Loop Repair
+  - **10–13 sessions** (PSA + UXE + QAE joint effort)
+  - Fix INV-3 (`AdjustInventoryEndpoint` bypass) + instrument `BackofficeTestFixture` (F-8) — first
+  - Build three missing Marten projections (`FulfillmentPipelineView`, `ReturnMetricsView`, `CorrespondenceMetricsView`) — after INV-3+F-8
+  - Add Order Search (`/orders/search`) and Return Management (`/returns`) pages to Backoffice
+  - Returns BC full structural refactor (R-1 through R-7) + UXE event renames in same PR
+  - Vendor Portal structural refactor (VP-1 through VP-6) + E2E `@ignore` Phase A removal
+  - Backoffice folder restructure (BO-1/BO-2/BO-3) + `AcknowledgeAlert` transaction fix (XC-3)
+  - ADR for canonical validator placement (XC-1)
+  - `CheckoutCompleted` dual-payload collision fix (🔴)
+  - Quick wins: INV-1/2, PR-1, CO-1, PAY-1/FUL-1/ORD-1, F-9
+  - See full scope + sequencing diagram in proposal document
 
-**High Priority (Active Development or Near-Term):**
-- 🟢 **Backoffice (M32.0+)** — Internal operations portal
+- **M34 (planned — engineering-led):** Architecture Completion + Vocabulary Alignment
+  - **8–12 sessions** (PSA + UXE + QAE)
+  - Untapped value: `Returns → Correspondence` integration, customer order status timeline, live return count in SignalR hub, `LowStockDetected` → Correspondence notification
+  - Test pyramid completion: Vendor Portal bUnit, Vendor Portal E2E Phase B (step definitions), Customer Experience E2E (`cart-real-time-updates`, `product-browsing`), Promotions unit tests + `ICollectionFixture`
+  - Vocabulary alignment: `PriceChanged`/`PriceUpdated`, `CheckoutStarted`/`CheckoutReceived`, Correspondence contract alignment, VP transient command-masquerade renames
+  - Shopping dual-handler ADR (SH-1)
+  - Persisted event rename investigation + migration ADR
+  - XC-2 `.Api` folder naming normalization pass
+  - See full scope + untapped value items in proposal document
 
-**Medium Priority (Customer-Facing Features):**
+### Future BCs (Priority Roadmap — Post M34)
+
+> Product expansion milestones are deferred until M33 and M34 close the engineering health gap.
+
+**High Priority (Next after M34):**
 - 🟡 **Exchange v2** — Cross-product exchanges, upcharge payment collection
-- 🟡 **Product Catalog Evolution** — Variants, Listings, Marketplaces ([plan](catalog-listings-marketplaces-cycle-plan.md) approved — M33–M39 estimated)
+- 🟡 **Product Catalog Evolution** — Variants, Listings, Marketplaces ([plan](catalog-listings-marketplaces-cycle-plan.md) — M35+ estimated, re-numbered from former M33 estimate)
+
+**Medium Priority:**
 - 🟡 **Search BC** — Full-text product search, faceted navigation
 - 🟡 **Recommendations BC** — Personalized product recommendations
 
@@ -959,7 +979,7 @@
 
 See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specifications.
 
-*Roadmap Last Updated: 2026-03-15*
+*Roadmap Last Updated: 2026-03-21 (M33+M34 engineering milestones inserted; product BCs shifted to M35+)*
 
 ---
 
