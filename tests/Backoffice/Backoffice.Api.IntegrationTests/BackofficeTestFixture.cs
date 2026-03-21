@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
 using Wolverine;
+using Wolverine.Tracking;
 
 namespace Backoffice.Api.IntegrationTests;
 
@@ -153,6 +154,41 @@ public class BackofficeTestFixture : IAsyncLifetime
     {
         var store = Host.Services.GetRequiredService<IDocumentStore>();
         await store.Advanced.Clean.DeleteAllDocumentsAsync();
+    }
+
+    /// <summary>
+    /// Executes a message through Wolverine and waits for all cascading messages to complete.
+    /// This ensures all side effects are persisted before assertions.
+    /// Messages with no routes (like integration messages to other contexts) are allowed.
+    /// </summary>
+    public async Task<ITrackedSession> ExecuteAndWaitAsync<T>(T message, int timeoutSeconds = 15)
+        where T : class
+    {
+        return await Host.TrackActivity(TimeSpan.FromSeconds(timeoutSeconds))
+            .DoNotAssertOnExceptionsDetected()
+            .AlsoTrack(Host)
+            .ExecuteAndWaitAsync((Func<IMessageContext, Task>)(async ctx =>
+            {
+                await ctx.InvokeAsync(message);
+            }));
+    }
+
+    /// <summary>
+    /// This method allows us to make HTTP calls into our system in memory with Alba while
+    /// leveraging Wolverine's test support for message tracking to both record outgoing messages.
+    /// This ensures that any cascaded work spawned by the initial command is completed before
+    /// passing control back to the calling test.
+    /// </summary>
+    protected async Task<(ITrackedSession, IScenarioResult)> TrackedHttpCall(Action<Scenario> configuration)
+    {
+        IScenarioResult result = null!;
+
+        var tracked = await Host.ExecuteAndWaitAsync(async () =>
+        {
+            result = await Host.Scenario(configuration);
+        });
+
+        return (tracked, result);
     }
 }
 

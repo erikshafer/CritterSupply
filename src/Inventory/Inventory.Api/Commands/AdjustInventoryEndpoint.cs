@@ -1,6 +1,8 @@
 using Inventory.Management;
 using Marten;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Wolverine;
 using Wolverine.Http;
 
 namespace Inventory.Api.Commands;
@@ -13,12 +15,14 @@ public static class AdjustInventoryEndpoint
 {
     /// <summary>
     /// Adjusts inventory quantity (positive or negative).
+    /// Dispatches through Wolverine handler to ensure proper event publication.
     /// </summary>
     [WolverinePost("/api/inventory/{sku}/adjust")]
     [Authorize(Policy = "WarehouseClerk")]
     public static async Task<IResult> Handle(
         string sku,
         AdjustInventoryRequest request,
+        IMessageBus bus,
         IDocumentSession session,
         CancellationToken ct)
     {
@@ -27,42 +31,33 @@ public static class AdjustInventoryEndpoint
         var warehouseId = "main";
         var inventoryId = ProductInventory.CombinedGuid(sku, warehouseId);
 
-        // Load the aggregate
+        // Dispatch command through Wolverine to ensure transactional outbox and integration events
+        var result = await bus.InvokeAsync<object>(
+            new AdjustInventory(
+                inventoryId,
+                request.AdjustmentQuantity,
+                request.Reason,
+                request.AdjustedBy),
+            ct);
+
+        // Wolverine handler returns ProblemDetails for validation failures
+        if (result is ProblemDetails problem)
+        {
+            return problem.Status == 404
+                ? Results.NotFound(new { Error = problem.Detail })
+                : Results.BadRequest(new { Error = problem.Detail });
+        }
+
+        // On success, reload the aggregate to get fresh state
         var inventory = await session.LoadAsync<ProductInventory>(inventoryId, ct);
 
         if (inventory is null)
         {
-            return Results.NotFound(new
-            {
-                Error = $"Inventory for SKU '{sku}' not found"
-            });
+            return Results.Problem("Inventory not found after successful adjustment");
         }
-
-        // Validate negative adjustment doesn't result in negative quantity
-        if (request.AdjustmentQuantity < 0 &&
-            inventory.AvailableQuantity + request.AdjustmentQuantity < 0)
-        {
-            return Results.BadRequest(new
-            {
-                Error = $"Cannot adjust by {request.AdjustmentQuantity}. Available quantity is {inventory.AvailableQuantity}"
-            });
-        }
-
-        // Append event
-        var domainEvent = new InventoryAdjusted(
-            request.AdjustmentQuantity,
-            request.Reason,
-            request.AdjustedBy,
-            DateTimeOffset.UtcNow);
-
-        session.Events.Append(inventoryId, domainEvent);
-        await session.SaveChangesAsync(ct);
-
-        // Reload to get updated state
-        inventory = await session.LoadAsync<ProductInventory>(inventoryId, ct);
 
         return Results.Ok(new AdjustInventoryResult(
-            inventory!.Id,
+            inventory.Id,
             inventory.Sku,
             inventory.WarehouseId,
             inventory.AvailableQuantity));
