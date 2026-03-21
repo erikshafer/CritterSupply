@@ -4,12 +4,12 @@ using Messages.Contracts.Fulfillment;
 namespace Backoffice.Notifications;
 
 /// <summary>
-/// Handler for ShipmentDeliveryFailed integration message from Fulfillment BC.
+/// Handler for ShipmentDispatched integration message from Fulfillment BC.
 /// Appends message to Backoffice event store for FulfillmentPipelineView projection.
 /// </summary>
-public static class ShipmentDeliveryFailedHandler
+public static class ShipmentDispatchedHandler
 {
-    public static void Handle(ShipmentDeliveryFailed message, IDocumentSession session)
+    public static void Handle(ShipmentDispatched message, IDocumentSession session)
     {
         session.Events.Append(Guid.NewGuid(), message);
     }
