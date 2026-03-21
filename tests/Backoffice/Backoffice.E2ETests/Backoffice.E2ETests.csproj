@@ -45,6 +45,16 @@
         </None>
     </ItemGroup>
 
+    <!-- Publish Blazor WASM before running E2E tests (creates wwwroot with index.html + _framework).
+         This target ensures the E2ETestFixture can locate the complete publish output. -->
+    <Target Name="PublishBlazorWasmForE2E" BeforeTargets="VSTest">
+        <Message Text="Publishing Backoffice.Web for E2E tests..." Importance="high" />
+        <MSBuild Projects="..\..\..\src\Backoffice\Backoffice.Web\Backoffice.Web.csproj"
+                 Targets="Publish"
+                 Properties="Configuration=$(Configuration);PublishDir=$(MSBuildThisFileDirectory)../../../src/Backoffice/Backoffice.Web/bin/$(Configuration)/net10.0/publish/" />
+        <Message Text="✅ Backoffice.Web published successfully" Importance="high" />
+    </Target>
+
     <!-- Playwright browser installation target (run once after build).
          Use pwsh on Windows and the bundled Node.js CLI on Unix-like systems so builds
          are cross-platform (macOS/Linux don't necessarily have pwsh installed).
