@@ -33,7 +33,7 @@ public sealed record AdjustInventory(
 public static class AdjustInventoryHandler
 {
     // Hardcoded low stock threshold (Phase 1 - matches GetLowStock query default)
-    private const int LowStockThreshold = 10;
+    public const int LowStockThreshold = 10;
 
     public static async Task<ProductInventory?> Load(
         AdjustInventory command,
@@ -68,7 +68,7 @@ public static class AdjustInventoryHandler
         return WolverineContinue.NoProblems;
     }
 
-    public static OutgoingMessages Handle(
+    public static void Handle(
         AdjustInventory command,
         ProductInventory inventory,
         IDocumentSession session)
@@ -82,35 +82,16 @@ public static class AdjustInventoryHandler
             adjustedAt);
 
         session.Events.Append(inventory.Id, domainEvent);
+    }
 
-        var outgoing = new OutgoingMessages();
-
-        // Calculate new quantity after adjustment
-        var newQuantity = inventory.AvailableQuantity + command.AdjustmentQuantity;
-
-        // Publish InventoryAdjusted integration message
-        outgoing.Add(new IntegrationMessages.InventoryAdjusted(
-            inventory.Sku,
-            inventory.WarehouseId,
-            command.AdjustmentQuantity,
-            newQuantity,
-            adjustedAt));
-
-        // Check if low stock threshold crossed
-        var wasAboveThreshold = inventory.AvailableQuantity >= LowStockThreshold;
+    /// <summary>
+    /// Helper to determine if low stock threshold was crossed downward.
+    /// Used by endpoint to conditionally publish LowStockDetected integration message.
+    /// </summary>
+    public static bool CrossedLowStockThreshold(int previousQuantity, int newQuantity)
+    {
+        var wasAboveThreshold = previousQuantity >= LowStockThreshold;
         var isNowBelowThreshold = newQuantity < LowStockThreshold;
-
-        if (wasAboveThreshold && isNowBelowThreshold)
-        {
-            // Crossed threshold downward - publish LowStockDetected
-            outgoing.Add(new IntegrationMessages.LowStockDetected(
-                inventory.Sku,
-                inventory.WarehouseId,
-                newQuantity,
-                LowStockThreshold,
-                adjustedAt));
-        }
-
-        return outgoing;
+        return wasAboveThreshold && isNowBelowThreshold;
     }
 }

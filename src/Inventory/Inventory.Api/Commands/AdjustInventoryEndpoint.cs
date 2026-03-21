@@ -1,7 +1,6 @@
 using Inventory.Management;
 using Marten;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
 
@@ -15,7 +14,7 @@ public static class AdjustInventoryEndpoint
 {
     /// <summary>
     /// Adjusts inventory quantity (positive or negative).
-    /// Dispatches through Wolverine handler to ensure proper event publication.
+    /// Validates manually, then dispatches command for event appending and integration message publishing.
     /// </summary>
     [WolverinePost("/api/inventory/{sku}/adjust")]
     [Authorize(Policy = "WarehouseClerk")]
@@ -31,29 +30,64 @@ public static class AdjustInventoryEndpoint
         var warehouseId = "main";
         var inventoryId = ProductInventory.CombinedGuid(sku, warehouseId);
 
-        // Dispatch command through Wolverine to ensure transactional outbox and integration events
-        var result = await bus.InvokeAsync<object>(
-            new AdjustInventory(
-                inventoryId,
-                request.AdjustmentQuantity,
-                request.Reason,
-                request.AdjustedBy),
-            ct);
-
-        // Wolverine handler returns ProblemDetails for validation failures
-        if (result is ProblemDetails problem)
-        {
-            return problem.Status == 404
-                ? Results.NotFound(new { Error = problem.Detail })
-                : Results.BadRequest(new { Error = problem.Detail });
-        }
-
-        // On success, reload the aggregate to get fresh state
+        // Load inventory
         var inventory = await session.LoadAsync<ProductInventory>(inventoryId, ct);
 
         if (inventory is null)
         {
+            return Results.NotFound(new { Error = $"Inventory for SKU '{sku}' not found" });
+        }
+
+        // Validate: Check if negative adjustment would result in negative available quantity
+        if (request.AdjustmentQuantity < 0 &&
+            inventory.AvailableQuantity + request.AdjustmentQuantity < 0)
+        {
+            return Results.BadRequest(new
+            {
+                Error = $"Cannot adjust by {request.AdjustmentQuantity}. Available quantity is {inventory.AvailableQuantity}"
+            });
+        }
+
+        var previousQuantity = inventory.AvailableQuantity;
+        var adjustedAt = DateTimeOffset.UtcNow;
+
+        // Append domain event directly (don't go through handler since we already validated)
+        var domainEvent = new InventoryAdjusted(
+            request.AdjustmentQuantity,
+            request.Reason,
+            request.AdjustedBy,
+            adjustedAt);
+
+        session.Events.Append(inventoryId, domainEvent);
+        await session.SaveChangesAsync(ct);
+
+        // Reload to get fresh state after event appending
+        inventory = await session.LoadAsync<ProductInventory>(inventoryId, ct);
+        if (inventory is null)
+        {
             return Results.Problem("Inventory not found after successful adjustment");
+        }
+
+        var newQuantity = inventory.AvailableQuantity;
+
+        // Publish InventoryAdjusted integration message via message bus
+        await bus.PublishAsync(new Messages.Contracts.Inventory.InventoryAdjusted(
+            inventory.Sku,
+            inventory.WarehouseId,
+            request.AdjustmentQuantity,
+            newQuantity,
+            adjustedAt));
+
+        // Check if low stock threshold crossed downward
+        if (AdjustInventoryHandler.CrossedLowStockThreshold(previousQuantity, newQuantity))
+        {
+            // Publish LowStockDetected integration message
+            await bus.PublishAsync(new Messages.Contracts.Inventory.LowStockDetected(
+                inventory.Sku,
+                inventory.WarehouseId,
+                newQuantity,
+                AdjustInventoryHandler.LowStockThreshold,
+                adjustedAt));
         }
 
         return Results.Ok(new AdjustInventoryResult(
