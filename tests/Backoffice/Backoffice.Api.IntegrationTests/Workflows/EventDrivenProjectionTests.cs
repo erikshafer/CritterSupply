@@ -348,4 +348,192 @@ public class EventDrivenProjectionTests
             unacknowledgedAlerts.ShouldNotContain(a => a.Id == alertId);
         }
     }
+
+    /// <summary>
+    /// Tests ReturnRequested event creates Return metrics with incremented active count.
+    /// ReturnRequested (Returns BC) → ReturnMetricsViewProjection → ReturnMetricsView document.
+    /// </summary>
+    [Fact]
+    public async Task ReturnRequestedEvent_IncrementsActiveReturnCount_InMetricsView()
+    {
+        // Arrange
+        await _fixture.CleanAllDocumentsAsync();
+
+        var returnId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var requestedAt = new DateTimeOffset(2026, 3, 21, 10, 0, 0, TimeSpan.Zero);
+
+        var returnRequested = new ReturnRequested(
+            returnId,
+            orderId,
+            customerId,
+            requestedAt);
+
+        // Act: Append event to Marten (simulates RabbitMQ handler)
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), returnRequested);
+            await session.SaveChangesAsync();
+        }
+
+        // Assert: Query ReturnMetricsView projection
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var metrics = await session.LoadAsync<ReturnMetricsView>("current");
+            metrics.ShouldNotBeNull();
+            metrics.ActiveReturnCount.ShouldBeGreaterThanOrEqualTo(1);
+            metrics.PendingApprovalCount.ShouldBeGreaterThanOrEqualTo(1);
+            metrics.ApprovedCount.ShouldBe(0);
+            metrics.ReceivedCount.ShouldBe(0);
+        }
+    }
+
+    /// <summary>
+    /// Tests Return workflow transitions update metrics correctly.
+    /// ReturnRequested → ReturnApproved → ReturnReceived → ReturnCompleted
+    /// </summary>
+    [Fact]
+    public async Task ReturnWorkflow_UpdatesMetricsCorrectly_ThroughAllStages()
+    {
+        // Arrange
+        await _fixture.CleanAllDocumentsAsync();
+
+        var returnId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var baseTime = new DateTimeOffset(2026, 3, 21, 10, 0, 0, TimeSpan.Zero);
+
+        var returnRequested = new ReturnRequested(returnId, orderId, customerId, baseTime);
+        var returnApproved = new ReturnApproved(
+            returnId,
+            orderId,
+            customerId,
+            100.00m, // EstimatedRefundAmount
+            10.00m,  // RestockingFeeAmount
+            baseTime.AddDays(7), // ShipByDeadline
+            baseTime.AddMinutes(5)); // ApprovedAt
+        var returnReceived = new ReturnReceived(returnId, orderId, customerId, baseTime.AddHours(1));
+        var returnCompleted = new ReturnCompleted(
+            returnId,
+            orderId,
+            customerId,
+            90.00m, // FinalRefundAmount
+            new List<ReturnedItem>(), // Empty items list
+            baseTime.AddHours(2)); // CompletedAt
+
+        // Act: Append events sequentially
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), returnRequested);
+            await session.SaveChangesAsync();
+        }
+
+        // After ReturnRequested: active=1, pending=1
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var metrics = await session.LoadAsync<ReturnMetricsView>("current");
+            metrics.ShouldNotBeNull();
+            metrics.ActiveReturnCount.ShouldBeGreaterThanOrEqualTo(1);
+            metrics.PendingApprovalCount.ShouldBeGreaterThanOrEqualTo(1);
+        }
+
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), returnApproved);
+            await session.SaveChangesAsync();
+        }
+
+        // After ReturnApproved: active=1, pending=0, approved=1
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var metrics = await session.LoadAsync<ReturnMetricsView>("current");
+            metrics.ShouldNotBeNull();
+            metrics.ActiveReturnCount.ShouldBeGreaterThanOrEqualTo(1);
+            metrics.ApprovedCount.ShouldBeGreaterThanOrEqualTo(1);
+        }
+
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), returnReceived);
+            await session.SaveChangesAsync();
+        }
+
+        // After ReturnReceived: active=1, approved=0, received=1
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var metrics = await session.LoadAsync<ReturnMetricsView>("current");
+            metrics.ShouldNotBeNull();
+            metrics.ActiveReturnCount.ShouldBeGreaterThanOrEqualTo(1);
+            metrics.ReceivedCount.ShouldBeGreaterThanOrEqualTo(1);
+        }
+
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), returnCompleted);
+            await session.SaveChangesAsync();
+        }
+
+        // After ReturnCompleted: active=0, received=0 (terminal state)
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var metrics = await session.LoadAsync<ReturnMetricsView>("current");
+            metrics.ShouldNotBeNull();
+            metrics.ReceivedCount.ShouldBe(0); // Completed returns removed from received
+        }
+    }
+
+    /// <summary>
+    /// Tests ReturnDenied event decrements active count (terminal state).
+    /// ReturnRequested → ReturnDenied → active count decreases.
+    /// </summary>
+    [Fact]
+    public async Task ReturnDenied_DecrementsActiveCount_AsTerminalState()
+    {
+        // Arrange
+        await _fixture.CleanAllDocumentsAsync();
+
+        var returnId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var baseTime = new DateTimeOffset(2026, 3, 21, 11, 0, 0, TimeSpan.Zero);
+
+        var returnRequested = new ReturnRequested(returnId, orderId, customerId, baseTime);
+        var returnDenied = new ReturnDenied(
+            returnId,
+            orderId,
+            customerId,
+            "OutOfWindow", // Reason
+            "Return request received outside of return window", // Message
+            baseTime.AddMinutes(10)); // DeniedAt
+
+        // Act: Request then deny
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), returnRequested);
+            await session.SaveChangesAsync();
+        }
+
+        var activeCountAfterRequest = 0;
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var metrics = await session.LoadAsync<ReturnMetricsView>("current");
+            activeCountAfterRequest = metrics.ActiveReturnCount;
+        }
+
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), returnDenied);
+            await session.SaveChangesAsync();
+        }
+
+        // Assert: Active count decreased by 1
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var metrics = await session.LoadAsync<ReturnMetricsView>("current");
+            metrics.ShouldNotBeNull();
+            metrics.ActiveReturnCount.ShouldBe(activeCountAfterRequest - 1);
+            metrics.PendingApprovalCount.ShouldBe(0); // Denied from pending stage
+        }
+    }
 }
