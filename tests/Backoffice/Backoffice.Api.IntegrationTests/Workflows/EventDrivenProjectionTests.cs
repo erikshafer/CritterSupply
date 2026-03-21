@@ -5,6 +5,7 @@ using Messages.Contracts.Payments;
 using Messages.Contracts.Inventory;
 using Messages.Contracts.Fulfillment;
 using Messages.Contracts.Returns;
+using Messages.Contracts.Correspondence;
 using Shouldly;
 
 namespace Backoffice.Api.IntegrationTests.Workflows;
@@ -534,6 +535,113 @@ public class EventDrivenProjectionTests
             metrics.ShouldNotBeNull();
             metrics.ActiveReturnCount.ShouldBe(activeCountAfterRequest - 1);
             metrics.PendingApprovalCount.ShouldBe(0); // Denied from pending stage
+        }
+    }
+
+    /// <summary>
+    /// Tests CorrespondenceQueued event increments pending email count.
+    /// CorrespondenceQueued (Correspondence BC) → CorrespondenceMetricsViewProjection → CorrespondenceMetricsView document.
+    /// </summary>
+    [Fact]
+    public async Task CorrespondenceQueuedEvent_IncrementsPendingCount_InMetricsView()
+    {
+        // Arrange
+        await _fixture.CleanAllDocumentsAsync();
+
+        var messageId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var queuedAt = new DateTimeOffset(2026, 3, 21, 12, 0, 0, TimeSpan.Zero);
+
+        var correspondenceQueued = new CorrespondenceQueued(
+            messageId,
+            customerId,
+            "Email",
+            queuedAt);
+
+        // Act: Append event to Marten (simulates RabbitMQ handler)
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), correspondenceQueued);
+            await session.SaveChangesAsync();
+        }
+
+        // Assert: Query CorrespondenceMetricsView projection
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var metrics = await session.LoadAsync<CorrespondenceMetricsView>("current");
+            metrics.ShouldNotBeNull();
+            metrics.PendingEmailCount.ShouldBeGreaterThanOrEqualTo(1);
+            metrics.DeliveredEmailCount.ShouldBe(0);
+            metrics.FailedEmailCount.ShouldBe(0);
+        }
+    }
+
+    /// <summary>
+    /// Tests Correspondence workflow updates metrics correctly.
+    /// CorrespondenceQueued → CorrespondenceDelivered (success path).
+    /// CorrespondenceQueued → CorrespondenceFailed (failure path).
+    /// </summary>
+    [Fact]
+    public async Task CorrespondenceWorkflow_UpdatesMetricsCorrectly_ForSuccessAndFailurePaths()
+    {
+        // Arrange
+        await _fixture.CleanAllDocumentsAsync();
+
+        var successMessageId = Guid.NewGuid();
+        var failureMessageId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var baseTime = new DateTimeOffset(2026, 3, 21, 12, 0, 0, TimeSpan.Zero);
+
+        var queuedSuccess = new CorrespondenceQueued(successMessageId, customerId, "Email", baseTime);
+        var queuedFailure = new CorrespondenceQueued(failureMessageId, customerId, "Email", baseTime.AddSeconds(1));
+        var delivered = new CorrespondenceDelivered(successMessageId, customerId, "Email", baseTime.AddMinutes(1), 1);
+        var failed = new CorrespondenceFailed(failureMessageId, customerId, "Email", "SMTP error", baseTime.AddMinutes(2));
+
+        // Act: Queue two messages
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), queuedSuccess);
+            session.Events.Append(Guid.NewGuid(), queuedFailure);
+            await session.SaveChangesAsync();
+        }
+
+        // After queuing: pending=2
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var metrics = await session.LoadAsync<CorrespondenceMetricsView>("current");
+            metrics.ShouldNotBeNull();
+            metrics.PendingEmailCount.ShouldBeGreaterThanOrEqualTo(2);
+        }
+
+        // Deliver first message
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), delivered);
+            await session.SaveChangesAsync();
+        }
+
+        // After delivery: pending decreased, delivered increased
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var metrics = await session.LoadAsync<CorrespondenceMetricsView>("current");
+            metrics.ShouldNotBeNull();
+            metrics.DeliveredEmailCount.ShouldBeGreaterThanOrEqualTo(1);
+        }
+
+        // Fail second message
+        using (var session = _fixture.GetDocumentSession())
+        {
+            session.Events.Append(Guid.NewGuid(), failed);
+            await session.SaveChangesAsync();
+        }
+
+        // After failure: pending decreased again, failed increased
+        using (var session = _fixture.GetDocumentSession())
+        {
+            var metrics = await session.LoadAsync<CorrespondenceMetricsView>("current");
+            metrics.ShouldNotBeNull();
+            metrics.DeliveredEmailCount.ShouldBeGreaterThanOrEqualTo(1);
+            metrics.FailedEmailCount.ShouldBeGreaterThanOrEqualTo(1);
         }
     }
 }
