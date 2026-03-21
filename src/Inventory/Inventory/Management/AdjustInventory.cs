@@ -1,7 +1,9 @@
 using FluentValidation;
 using Marten;
 using Microsoft.AspNetCore.Mvc;
+using Wolverine;
 using Wolverine.Http;
+using IntegrationMessages = Messages.Contracts.Inventory;
 
 namespace Inventory.Management;
 
@@ -30,6 +32,9 @@ public sealed record AdjustInventory(
 
 public static class AdjustInventoryHandler
 {
+    // Hardcoded low stock threshold (Phase 1 - matches GetLowStock query default)
+    private const int LowStockThreshold = 10;
+
     public static async Task<ProductInventory?> Load(
         AdjustInventory command,
         IDocumentSession session,
@@ -63,7 +68,7 @@ public static class AdjustInventoryHandler
         return WolverineContinue.NoProblems;
     }
 
-    public static void Handle(
+    public static OutgoingMessages Handle(
         AdjustInventory command,
         ProductInventory inventory,
         IDocumentSession session)
@@ -77,5 +82,35 @@ public static class AdjustInventoryHandler
             adjustedAt);
 
         session.Events.Append(inventory.Id, domainEvent);
+
+        var outgoing = new OutgoingMessages();
+
+        // Calculate new quantity after adjustment
+        var newQuantity = inventory.AvailableQuantity + command.AdjustmentQuantity;
+
+        // Publish InventoryAdjusted integration message
+        outgoing.Add(new IntegrationMessages.InventoryAdjusted(
+            inventory.Sku,
+            inventory.WarehouseId,
+            command.AdjustmentQuantity,
+            newQuantity,
+            adjustedAt));
+
+        // Check if low stock threshold crossed
+        var wasAboveThreshold = inventory.AvailableQuantity >= LowStockThreshold;
+        var isNowBelowThreshold = newQuantity < LowStockThreshold;
+
+        if (wasAboveThreshold && isNowBelowThreshold)
+        {
+            // Crossed threshold downward - publish LowStockDetected
+            outgoing.Add(new IntegrationMessages.LowStockDetected(
+                inventory.Sku,
+                inventory.WarehouseId,
+                newQuantity,
+                LowStockThreshold,
+                adjustedAt));
+        }
+
+        return outgoing;
     }
 }
