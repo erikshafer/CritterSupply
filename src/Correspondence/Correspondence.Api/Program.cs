@@ -110,6 +110,15 @@ builder.Host.UseWolverine(opts =>
 
     opts.PublishMessage<Messages.Contracts.Correspondence.CorrespondenceFailed>()
         .ToRabbitQueue("admin-correspondence-failures");
+
+    // === Outbound: Backoffice BC (M33.0 Session 2) ===
+    // Email queue health metrics for operations dashboard
+    opts.PublishMessage<Messages.Contracts.Correspondence.CorrespondenceQueued>()
+        .ToRabbitQueue("backoffice-correspondence-queued");
+    opts.PublishMessage<Messages.Contracts.Correspondence.CorrespondenceDelivered>()
+        .ToRabbitQueue("backoffice-correspondence-delivered");
+    opts.PublishMessage<Messages.Contracts.Correspondence.CorrespondenceFailed>()
+        .ToRabbitQueue("backoffice-correspondence-failed");
 });
 
 builder.Services.AddEndpointsApiExplorer();

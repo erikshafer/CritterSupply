@@ -99,6 +99,9 @@ builder.Services.AddMarten(opts =>
 
     // ReturnMetricsView: Active returns pipeline metrics (M33.0 Session 2)
     opts.Projections.Add<Backoffice.Projections.ReturnMetricsViewProjection>(ProjectionLifecycle.Inline);
+
+    // CorrespondenceMetricsView: Email queue health metrics (M33.0 Session 2)
+    opts.Projections.Add<Backoffice.Projections.CorrespondenceMetricsViewProjection>(ProjectionLifecycle.Inline);
 })
 .AddAsyncDaemon(JasperFx.Events.Daemon.DaemonMode.Solo)
 .UseLightweightSessions()
@@ -240,10 +243,10 @@ builder.Host.UseWolverine(opts =>
     // opts.ListenToRabbitQueue("backoffice-shipment-dispatched").ProcessInline();
     // opts.ListenToRabbitQueue("backoffice-stock-replenished").ProcessInline();
 
-    // Subscribe to Correspondence BC events
-    // opts.ListenToRabbitQueue("backoffice-correspondence-queued").ProcessInline();
-    // opts.ListenToRabbitQueue("backoffice-correspondence-delivered").ProcessInline();
-    // opts.ListenToRabbitQueue("backoffice-correspondence-failed").ProcessInline();
+    // Subscribe to Correspondence BC events for email queue metrics (M33.0 Session 2)
+    opts.ListenToRabbitQueue("backoffice-correspondence-queued").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-correspondence-delivered").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-correspondence-failed").ProcessInline();
 });
 
 builder.Services.AddEndpointsApiExplorer();
