@@ -89,6 +89,40 @@ Set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` if browsers are pre-installed (e.g., ca
   run: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 || pwsh ./bin/Debug/net10.0/playwright.ps1 install chromium
 ```
 
+### Blazor WASM Publish Automation (Critical for WASM E2E Tests)
+
+**Problem:** Blazor WebAssembly (WASM) E2E tests require **publish output** (wwwroot with index.html + _framework directory), not just build output. The test fixture's `FindWasmRoot()` method looks for publish directory first.
+
+**Symptom:** E2E tests fail with 404 errors or app loading timeouts because `index.html` is missing from `bin/.../wwwroot` (only present in `bin/.../publish/wwwroot`).
+
+**Solution:** Add an MSBuild target to the E2E test project that automatically publishes the Blazor WASM project before running tests:
+
+```xml
+<!-- Publish Blazor WASM before running E2E tests (creates wwwroot with index.html + _framework).
+     This target ensures the E2ETestFixture can locate the complete publish output. -->
+<Target Name="PublishBlazorWasmForE2E" BeforeTargets="VSTest">
+    <Message Text="Publishing Backoffice.Web for E2E tests..." Importance="high" />
+    <MSBuild Projects="../../../src/Backoffice/Backoffice.Web/Backoffice.Web.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(MSBuildThisFileDirectory)../../../src/Backoffice/Backoffice.Web/bin/$(Configuration)/net10.0/publish/" />
+    <Message Text="✅ Backoffice.Web published successfully" Importance="high" />
+</Target>
+```
+
+**Why This Works:**
+- `BeforeTargets="VSTest"` hooks into the `dotnet test` pipeline, ensuring publish runs before test execution
+- `$(Configuration)` passes through Debug/Release configuration from the test run
+- `PublishDir` explicitly sets the standard publish output path that `E2ETestFixture.FindWasmRoot()` checks first
+- Works identically across Windows, macOS, Linux (standard MSBuild constructs)
+
+**Developer Workflow:**
+- **Before:** `dotnet publish src/Backoffice/Backoffice.Web && dotnet test tests/Backoffice/Backoffice.E2ETests` (error-prone, easy to forget)
+- **After:** `dotnet test tests/Backoffice/Backoffice.E2ETests` (publish happens automatically)
+
+**References:**
+- M32.4 Session 1 Retrospective — Pattern discovery and implementation
+- `tests/Backoffice/Backoffice.E2ETests/Backoffice.E2ETests.csproj` — Canonical example
+
 ### Project References
 
 The E2E test project references all three Customer Experience projects so it can use their `Program.cs` as the `WebApplicationFactory` entry point:
