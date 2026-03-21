@@ -96,6 +96,9 @@ builder.Services.AddMarten(opts =>
 
     // AlertFeedView: Operations alert feed (Session 7)
     opts.Projections.Add<Backoffice.Projections.AlertFeedViewProjection>(ProjectionLifecycle.Inline);
+
+    // ReturnMetricsView: Active returns pipeline metrics (M33.0 Session 2)
+    opts.Projections.Add<Backoffice.Projections.ReturnMetricsViewProjection>(ProjectionLifecycle.Inline);
 })
 .AddAsyncDaemon(JasperFx.Events.Daemon.DaemonMode.Solo)
 .UseLightweightSessions()
@@ -224,15 +227,22 @@ builder.Host.UseWolverine(opts =>
     // Subscribe to Fulfillment BC events for alerts
     opts.ListenToRabbitQueue("backoffice-shipment-delivery-failed").ProcessInline();
 
-    // Subscribe to Returns BC events for alerts
+    // Subscribe to Returns BC events for alerts and metrics
     opts.ListenToRabbitQueue("backoffice-return-expired").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-return-requested").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-return-approved").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-return-denied").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-return-rejected").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-return-received").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-return-completed").ProcessInline();
 
     // Future subscriptions (Sessions 8-9):
     // opts.ListenToRabbitQueue("backoffice-shipment-dispatched").ProcessInline();
     // opts.ListenToRabbitQueue("backoffice-stock-replenished").ProcessInline();
-    // opts.ListenToRabbitQueue("backoffice-return-requested").ProcessInline();
 
     // Subscribe to Correspondence BC events
+    // opts.ListenToRabbitQueue("backoffice-correspondence-queued").ProcessInline();
+    // opts.ListenToRabbitQueue("backoffice-correspondence-delivered").ProcessInline();
     // opts.ListenToRabbitQueue("backoffice-correspondence-failed").ProcessInline();
 });
 

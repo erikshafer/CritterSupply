@@ -132,6 +132,23 @@ builder.Host.UseWolverine(opts =>
         .ToRabbitQueue("storefront-returns-events");
     opts.PublishMessage<Messages.Contracts.Returns.ReturnReceived>()
         .ToRabbitQueue("storefront-returns-events");
+
+    // === Outbound: Backoffice BC (M33.0 Session 2) ===
+    // Dashboard metrics and operations alerts
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnRequested>()
+        .ToRabbitQueue("backoffice-return-requested");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnApproved>()
+        .ToRabbitQueue("backoffice-return-approved");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnDenied>()
+        .ToRabbitQueue("backoffice-return-denied");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnRejected>()
+        .ToRabbitQueue("backoffice-return-rejected");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnExpired>()
+        .ToRabbitQueue("backoffice-return-expired");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnCompleted>()
+        .ToRabbitQueue("backoffice-return-completed");
+    opts.PublishMessage<Messages.Contracts.Returns.ReturnReceived>()
+        .ToRabbitQueue("backoffice-return-received");
 });
 
 builder.Services.AddEndpointsApiExplorer();
