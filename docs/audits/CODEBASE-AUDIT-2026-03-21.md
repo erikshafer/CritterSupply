@@ -942,3 +942,77 @@ UXE identified six integration messages that use "Requested" suffix but semantic
 ---
 
 *Audit conducted by PSA · QAE · UXE on 2026-03-21.*
+
+---
+
+## UXE Cross-Review
+
+### 1. What surprised me in the PSA findings
+
+**INV-3 is worse for the dashboard than my section conveyed.** I framed the stub KPIs as a build gap: three projections are missing, ergo two tiles show `0`. That implies a straightforward fix: build the projections. INV-3 breaks that assumption. `LowStockDetected` is published by the domain handler that `AdjustInventoryEndpoint` bypasses entirely. So even after the Backoffice team builds the missing projections in M32.4, the `LowStockAlerts` tile will *still* read zero — suppressed by a correctness bug a floor below. A product manager scoping M32.4 will write "build the three projections — done." INV-3 must ship first, or one KPI remains broken for reasons no one will immediately trace. That dependency is absent from the priority list.
+
+**XC-3 (`AcknowledgeAlert` manual transaction) has a present-tense UX failure mode.** If the handler fails mid-transaction, the CS agent's acknowledgment silently disappears — the alert stays active on screen, the write never committed, no error surfaced. PSA frames this as future ordering risk. It is also an immediate feedback integrity risk.
+
+---
+
+### 2. What surprised me in the QAE findings
+
+**F-2 confirms the Vendor Portal workflow is untestable by design, not accident.** Feature-level `@ignore` tags are a deliberate suppression decision. The change request submission flow — the primary job vendors come to the portal to do — has no browser-level verification, no bUnit component coverage (F-4), and no validator on the command payload (VP-6). I flagged `DescriptionChangeRequested` and `DataCorrectionRequested` as command-masquerades with traceability problems. What I underweighted is that the workflow behind those events is dark end-to-end: if the submission UI silently fails, nothing automated detects it.
+
+**Missing E2E coverage compounds the SignalR gap more than the Order Search or Return Management absences.** Those are Backoffice pages — F-2 doesn't directly touch them. But F-5's missing `cart-real-time-updates.feature` is the sharper concern: real-time cart state is the highest-value Storefront interaction, and a SignalR regression is precisely the class of failure that is invisible to unit and integration tests and immediately obvious to the first shopper who adds an item and watches the count freeze.
+
+---
+
+### 3. Priority list re-ranking from a user-facing lens
+
+**Item #11 (missing projections + stub KPIs, 🟡) should carry a user-visibility callout.** Executives looking at the dashboard today see two tiles permanently displaying `0`. That is not future risk — it is a currently-broken screen. The 🟡 colour communicates "can wait," but the user experience is already degraded.
+
+**Item #12 (no Order Search or Return Management page, 🟡) should be elevated to 🔴.** CS agents cannot directly look up an order — every order access requires navigating through Customer Search first. In a high-volume CS environment, that is not a UX inconvenience; it is a measurable increase in average handle time on every call. Returns-related calls are highest-stakes and most time-sensitive. I would re-rank this above the structural refactor items that have no user-facing symptom until a merge conflict materialises.
+
+---
+
+### 4. The one cross-agent observation
+
+The Backoffice executive dashboard's two broken KPI tiles look like one problem from the outside. They are actually three independent failure modes converging on the same screen:
+
+1. **Three projections were never built** (UXE — structural gap)
+2. **INV-3 suppresses the upstream events those projections would consume** (PSA — correctness bug)
+3. **`BackofficeTestFixture` has no cascade-aware message tracking helpers**, so even after #1 and #2 are fixed, no test in the suite can verify the full event → projection → dashboard pipeline is working (QAE/F-8)
+
+You only see all three when you read across sections. The danger is that M32.4 ships the projection fixes (#1), closes the milestone, and the dashboard still shows partial zeroes because #2 and #3 were scoped as separate concerns. An executive sees broken KPIs and draws conclusions about system reliability. INV-3 must ship before projection work begins; F-8 must ship before that work is considered verified. The priority list treats these as independent items. They are a sequenced dependency chain.
+
+---
+
+## QAE Cross-Review
+
+### 1. What surprised me in the PSA findings
+
+**INV-3 exposed a blind spot in my own coverage assessment.** Inventory showed green in my coverage matrix — both unit and integration tests present. But if `Inventory.Api.IntegrationTests` drives `AdjustInventoryEndpoint` directly, those tests are verifying a code path that silently suppresses `InventoryAdjusted` and `LowStockDetected`. Passing tests. Wrong behavior. That's worse than a test gap: it's false confidence. I was evaluating test *presence*, not test *fidelity to the production path*. INV-3 is the first fix on this list for exactly that reason.
+
+**XC-3 and F-8 together describe the same future failure from opposite ends.** PSA flagged that `AcknowledgeAlert`'s manual `session.SaveChangesAsync()` will cause ordering issues the moment it needs to publish an outbox message. I flagged F-8 — `BackofficeTestFixture` has no `ExecuteAndWaitAsync()` or `TrackedHttpCall()`. The handler has a transaction anti-pattern that hasn't triggered yet; the test fixture has no ability to detect the cascade when it does. Each finding is medium severity alone. Together they are a silent failure waiting for a single new integration event.
+
+---
+
+### 2. What surprised me in the UXE findings
+
+**The `ReturnDenied`/`ReturnRejected` and `ExchangeDenied`/`ExchangeRejected` pairs are a concrete test assertion problem, not just a readability issue.** When I assert on `mt_events` after a return inspection failure, I need to know whether to expect `ReturnRejected` or `ReturnDenied`. If a developer asserts the wrong one, the test can pass against a broken handler or fail against a correct one, with no type-system guard to catch the mistake. These names live in `ReturnEvents.cs` — already an omnibus 140-line file (R-2). The UXE rename and PSA's R-2 refactor need to ship as one changeset.
+
+**`CheckoutCompleted` with two different payloads in `Messages.Contracts`** should be pulled out of `⚠️` and treated as a correctness risk. Two records with the same name and divergent shapes is a deserialization bug waiting to fire when a consumer binds the wrong one. That is not a cosmetic rename.
+
+---
+
+### 3. Priority list items I'd re-rank
+
+**F-8 (item #26, 🟢 LOW) needs to be 🟡 MEDIUM.** The Convergence Summary notes the missing Backoffice projections are partly unbuilt because there's no test harness to verify them. Green-low signals it can wait until *after* the projections are written. It needs to come *before* them — that's the whole point.
+
+**XC-1 (item #23, ADR only)** is under-weighted from a test-writing perspective. Four validator placement conventions means four different locations a developer might search when writing a sad-path test. The resolution should explicitly include normalization in Returns and Vendor Portal, not just an ADR.
+
+**Item #18 (`CheckoutCompleted` duplicate payload) should be 🔴**, not 🟡. See above.
+
+---
+
+### 4. The one cross-agent observation
+
+Reading all three sections together, the Vendor Portal's failure mode is more complete than any section alone shows. PSA: structurally fragmented, no validators on any command. QAE: all E2E tests globally `@ignore`, no bUnit project. UXE: all three outbound integration events are command-masquerades.
+
+The result: `SubmitChangeRequest` accepts user-supplied payload with zero validation, flows through a fragmented handler, emits a command-named integration event into Product Catalog, and **not a single automated test at any layer — unit, integration, bUnit, or E2E — would fail if the entire flow broke silently**. VP-6 is listed as a correctness risk in the PSA section. But without F-2 and F-4 resolved, no test exists to surface it until a vendor submits a malformed payload in production. That compounding is invisible unless you read all three sections together.
