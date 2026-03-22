@@ -1,7 +1,9 @@
 using FluentValidation;
 using Marten;
 using Microsoft.AspNetCore.Mvc;
+using Wolverine;
 using Wolverine.Http;
+using IntegrationMessages = Messages.Contracts.Inventory;
 
 namespace Inventory.Management;
 
@@ -30,6 +32,9 @@ public sealed record AdjustInventory(
 
 public static class AdjustInventoryHandler
 {
+    // Hardcoded low stock threshold (Phase 1 - matches GetLowStock query default)
+    public const int LowStockThreshold = 10;
+
     public static async Task<ProductInventory?> Load(
         AdjustInventory command,
         IDocumentSession session,
@@ -77,5 +82,16 @@ public static class AdjustInventoryHandler
             adjustedAt);
 
         session.Events.Append(inventory.Id, domainEvent);
+    }
+
+    /// <summary>
+    /// Helper to determine if low stock threshold was crossed downward.
+    /// Used by endpoint to conditionally publish LowStockDetected integration message.
+    /// </summary>
+    public static bool CrossedLowStockThreshold(int previousQuantity, int newQuantity)
+    {
+        var wasAboveThreshold = previousQuantity >= LowStockThreshold;
+        var isNowBelowThreshold = newQuantity < LowStockThreshold;
+        return wasAboveThreshold && isNowBelowThreshold;
     }
 }

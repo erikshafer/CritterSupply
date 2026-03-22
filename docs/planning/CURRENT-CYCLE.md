@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M33.0 — Code Correction + Broken Feedback Loop Repair (PLANNED) |
-| **Status** | 🚀 NEXT — M32.4 complete, M33 pending kickoff |
-| **Deliverables** | INV-3 fix, Marten projections, structural refactors, canonical validator ADR |
+| **Current Milestone** | M33.0 — Code Correction + Broken Feedback Loop Repair (ACTIVE) |
+| **Status** | 🚀 IN PROGRESS — Phase 1 Complete (INV-3 + F-8) |
+| **Deliverables** | INV-3 fix ✅, F-8 verification ✅, Marten projections (pending), structural refactors (pending) |
 | **Recent Completion** | M32.4 — Backoffice Phase 4 (2026-03-21), M32.3 — Backoffice Phase 3B (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-21 (M32.4 complete — all critical and medium priorities)*
+*Last Updated: 2026-03-21 (M33.0 Phase 1 complete — INV-3 fixed, all Inventory tests passing)*
 
 ---
 
@@ -55,11 +55,17 @@
 
 ### 📋 M33.0: Code Correction + Broken Feedback Loop Repair
 
-**Status:** 🚀 **NEXT** — M32.4 complete, M33 planning pending user confirmation
+**Status:** 🚀 **IN PROGRESS** — Phase 1 Complete (INV-3 + F-8 verified working)
 **Goal:** Fix broken tests, build missing projections, execute structural refactors, document canonical patterns
 
-**Planned Priorities (from M33-M34 proposal):**
-1. 🚨 **Priority 1:** Fix INV-3 (AdjustInventoryEndpoint bypass) + F-8 (BackofficeTestFixture instrumentation)
+**Session 1 Completion (2026-03-21):**
+- ✅ INV-3 Fixed: `AdjustInventoryEndpoint` reverted to manual validation + explicit integration message publishing
+- ✅ All 48 Inventory.Api.IntegrationTests passing
+- ✅ F-8 Verified: `BackofficeTestFixture.ExecuteAndWaitAsync()` working (75 Backoffice tests passing)
+- ✅ Retrospective documenting Wolverine compound handler learnings created
+- **Key Learning:** Mixing `IMessageBus.InvokeAsync()` with manual event appending doesn't respect `Before()` validation
+
+**Remaining Planned Priorities:**
 2. 📋 **Priority 2:** Build 3 missing Marten projections (FulfillmentPipelineView, ReturnMetricsView, CorrespondenceMetricsView)
 3. 📋 **Priority 3:** Add Order Search + Return Management pages to Backoffice
 4. 📋 **Priority 4:** Returns BC structural refactor (R-1 through R-7)
@@ -71,6 +77,8 @@
 
 **References:**
 - M33-M34 Proposal: `docs/planning/milestones/m33-m34-engineering-proposal-2026-03-21.md`
+- Session 1 Plan: `docs/planning/milestones/m33-0-session-1-plan.md`
+- Session 1 Retrospective: `docs/planning/milestones/m33-0-session-1-retrospective.md`
 - M32.4 Retrospective: `docs/planning/milestones/m32-4-session-1-retrospective.md`
 
 ---
