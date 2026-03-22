@@ -21,11 +21,19 @@ public static class GetDashboardSummary
 
         var dailyMetrics = await session.LoadAsync<Backoffice.Projections.AdminDailyMetrics>(dateKey, ct);
 
+        // Query active returns count from ReturnMetricsView projection (M33.0 Session 2)
+        var returnMetrics = await session.LoadAsync<Backoffice.Projections.ReturnMetricsView>("current", ct);
+
+        // Query low stock alerts from AlertFeedView projection
+        var alerts = await session.Query<Backoffice.Projections.AlertFeedView>()
+            .Where(a => !a.AcknowledgedAt.HasValue && a.AlertType == Backoffice.Projections.AlertType.LowStock)
+            .CountAsync(ct);
+
         // Map projection to DTO (use zero values if no data exists for today)
         var metrics = new DashboardMetrics(
             ActiveOrders: dailyMetrics?.OrderCount ?? 0,
-            PendingReturns: 0, // STUB: Will be populated from Returns projection in Phase 3
-            LowStockAlerts: 0, // STUB: Will be populated from Inventory projection in Phase 3
+            PendingReturns: returnMetrics?.ActiveReturnCount ?? 0,
+            LowStockAlerts: alerts,
             TodaysRevenue: dailyMetrics?.TotalRevenue ?? 0m,
             GeneratedAt: DateTimeOffset.UtcNow);
 

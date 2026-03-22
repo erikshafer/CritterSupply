@@ -28,11 +28,18 @@ public static class OrderPlacedHandler
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var metrics = await session.LoadAsync<Backoffice.Projections.AdminDailyMetrics>(today.ToString("yyyy-MM-dd"));
 
+        // Query active returns count from ReturnMetricsView projection (M33.0 Session 2)
+        var returnMetrics = await session.LoadAsync<Backoffice.Projections.ReturnMetricsView>("current");
+
+        // Query low stock alerts from AlertFeedView projection
+        var lowStockAlerts = await session.Query<Backoffice.Projections.AlertFeedView>()
+            .CountAsync(a => !a.AcknowledgedAt.HasValue && a.AlertType == Backoffice.Projections.AlertType.LowStock);
+
         // Publish LiveMetricUpdated for executive dashboard (SignalR to role:executive group)
         return new LiveMetricUpdated(
             ActiveOrders: metrics?.OrderCount ?? 0,
-            PendingReturns: 0, // STUB: Will be populated from Returns projection in Phase 3
-            LowStockAlerts: 0, // STUB: Will be populated from Inventory projection in Phase 3
+            PendingReturns: returnMetrics?.ActiveReturnCount ?? 0,
+            LowStockAlerts: lowStockAlerts,
             TodaysRevenue: metrics?.TotalRevenue ?? 0m,
             OccurredAt: DateTimeOffset.UtcNow);
     }
