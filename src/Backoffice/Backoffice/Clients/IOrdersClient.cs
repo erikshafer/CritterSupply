@@ -6,6 +6,14 @@ namespace Backoffice.Clients;
 public interface IOrdersClient
 {
     /// <summary>
+    /// Search orders by order ID (GUID format).
+    /// CS workflow: Order search page — search by order number.
+    /// </summary>
+    Task<SearchOrdersResultDto> SearchOrdersAsync(
+        string query,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// List orders for a customer (CS workflow: order history lookup)
     /// </summary>
     Task<IReadOnlyList<OrderSummaryDto>> GetOrdersAsync(
@@ -72,3 +80,11 @@ public sealed record ReturnableItemDto(
     DateTime DeliveredAt,
     bool IsReturnable,
     string? IneligibilityReason);
+
+/// <summary>
+/// Order search result DTO from Orders BC
+/// </summary>
+public sealed record SearchOrdersResultDto(
+    string Query,
+    int TotalCount,
+    IReadOnlyList<OrderSummaryDto> Orders);
