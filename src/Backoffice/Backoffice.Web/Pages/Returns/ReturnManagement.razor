@@ -1,0 +1,246 @@
+@page "/returns"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.SignalR.Client
+@using Backoffice.Web.Auth
+@using Backoffice.Web.Hub
+@attribute [Authorize(Roles = "customer-service,operations-manager,system-admin")]
+@inject BackofficeAuthState AuthState
+@inject BackofficeHubService HubService
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject ILogger<ReturnManagement> Logger
+@inject SessionExpiredService SessionExpiredService
+
+<PageTitle>Return Management — Backoffice</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">
+    Return Management
+</MudText>
+<MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+    Active return queue — filter by status
+</MudText>
+
+@* Status filter bar *@
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudSelect @bind-Value="_selectedStatus"
+                       Label="Filter by Status"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       FullWidth="true"
+                       data-testid="status-filter">
+                <MudSelectItem Value="@("Pending")">Pending</MudSelectItem>
+                <MudSelectItem Value="@("Requested")">Requested</MudSelectItem>
+                <MudSelectItem Value="@("Approved")">Approved</MudSelectItem>
+                <MudSelectItem Value="@("Denied")">Denied</MudSelectItem>
+                <MudSelectItem Value="@("InTransit")">In Transit</MudSelectItem>
+                <MudSelectItem Value="@("Received")">Received</MudSelectItem>
+                <MudSelectItem Value="@("Completed")">Completed</MudSelectItem>
+                <MudSelectItem Value="@("Expired")">Expired</MudSelectItem>
+                <MudSelectItem Value="@((string?)null)">All</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="6" Class="d-flex align-center">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="LoadReturnsAsync"
+                       Disabled="_isLoading"
+                       FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       data-testid="load-returns-btn">
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
+                    <span>Loading...</span>
+                }
+                else
+                {
+                    <span>Refresh</span>
+                }
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4"
+                       aria-label="Loading returns" />
+}
+
+@if (_returns is not null)
+{
+    <MudPaper Elevation="2" Class="pa-4">
+        <div class="d-flex justify-space-between align-center mb-3">
+            <div>
+                <MudText Typo="Typo.h6">
+                    Returns (@_returns.Count)
+                    @if (!string.IsNullOrEmpty(_selectedStatus))
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text" Class="ml-2" data-testid="return-count-badge">
+                            @_selectedStatus
+                        </MudChip>
+                    }
+                </MudText>
+            </div>
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Primary"
+                       Size="Size.Small"
+                       OnClick="LoadReturnsAsync"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       data-testid="refresh-returns-btn">
+                Refresh
+            </MudButton>
+        </div>
+
+        @if (_returns.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" data-testid="no-returns-alert">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-1" aria-hidden="true" />
+                No returns found
+                @if (!string.IsNullOrEmpty(_selectedStatus))
+                {
+                    <span> with status "@_selectedStatus"</span>
+                }
+                .
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="_returns"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Dense="true"
+                      Striped="true"
+                      FixedHeader="true"
+                      Height="500px"
+                      aria-label="Return management table"
+                      data-testid="returns-table">
+                <HeaderContent>
+                    <MudTh>Return ID</MudTh>
+                    <MudTh>Order ID</MudTh>
+                    <MudTh>Requested At</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Return Type</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Return ID">
+                        <code style="font-size:0.75rem;">@context.ReturnId.ToString("N")[..8]</code>
+                    </MudTd>
+                    <MudTd DataLabel="Order ID">
+                        <code style="font-size:0.75rem;">@context.OrderId.ToString("N")[..8]</code>
+                    </MudTd>
+                    <MudTd DataLabel="Requested At">
+                        @context.RequestedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@GetStatusColor(context.Status)"
+                                 Variant="Variant.Text">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Return Type">
+                        @context.ReturnType
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudTooltip Text="Return detail page coming soon">
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Secondary"
+                                       Size="Size.Small"
+                                       Disabled="true"
+                                       data-testid="@($"view-return-{context.ReturnId}")">
+                                View Details
+                            </MudButton>
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+}
+
+@code {
+    private string? _selectedStatus = "Pending"; // Default to Pending
+    private bool _isLoading = true;
+    private IReadOnlyList<ReturnSummaryDto>? _returns;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Connect to hub for real-time return updates (if not already connected)
+        if (HubService.State != HubConnectionState.Connected)
+        {
+            await HubService.ConnectAsync();
+        }
+
+        // Load returns with default filter (Pending)
+        await LoadReturnsAsync();
+    }
+
+    private async Task LoadReturnsAsync()
+    {
+        _isLoading = true;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var url = "/api/returns";
+            if (!string.IsNullOrEmpty(_selectedStatus))
+            {
+                url += $"?status={Uri.EscapeDataString(_selectedStatus)}";
+            }
+
+            var response = await client.GetAsync(url);
+
+            // Check 401 BEFORE IsSuccessStatusCode (session-expired pattern)
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                _returns = await response.Content.ReadFromJsonAsync<List<ReturnSummaryDto>>();
+            }
+            else
+            {
+                Snackbar.Add("Failed to load returns. Please try again.", Severity.Error);
+                Logger.LogWarning("Load returns failed with status {StatusCode}", response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception loading returns with status filter: {Status}", _selectedStatus);
+            Snackbar.Add("Failed to load returns. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private Color GetStatusColor(string status) => status.ToLowerInvariant() switch
+    {
+        "pending" or "requested" => Color.Warning,
+        "approved" or "received" => Color.Info,
+        "intransit" => Color.Primary,
+        "completed" => Color.Success,
+        "denied" or "expired" => Color.Error,
+        _ => Color.Default
+    };
+
+    // Local DTOs (Blazor WASM pattern: cannot reference domain projects directly)
+    private sealed record ReturnSummaryDto(
+        Guid ReturnId,
+        Guid OrderId,
+        DateTime RequestedAt,
+        string Status,
+        string ReturnType);
+}

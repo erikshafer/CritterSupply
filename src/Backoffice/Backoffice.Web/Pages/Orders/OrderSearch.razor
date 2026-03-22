@@ -1,0 +1,216 @@
+@page "/orders/search"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.SignalR.Client
+@using Backoffice.Web.Auth
+@using Backoffice.Web.Hub
+@attribute [Authorize(Roles = "customer-service,operations-manager,system-admin")]
+@inject BackofficeAuthState AuthState
+@inject BackofficeHubService HubService
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject ILogger<OrderSearch> Logger
+@inject SessionExpiredService SessionExpiredService
+
+<PageTitle>Order Search — Backoffice</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">
+    Order Search
+</MudText>
+<MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+    Search orders by order ID (GUID format)
+</MudText>
+
+@* Search bar *@
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudTextField @bind-Value="_searchQuery"
+                          Label="Order ID (GUID)"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Placeholder="e.g., 123e4567-e89b-12d3-a456-426614174000"
+                          FullWidth="true"
+                          aria-label="Order search input"
+                          data-testid="order-search-input" />
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-center">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="SearchOrdersAsync"
+                       Disabled="_isSearching"
+                       FullWidth="true"
+                       data-testid="search-order-btn">
+                @if (_isSearching)
+                {
+                    <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
+                    <span>Searching...</span>
+                }
+                else
+                {
+                    <span>Search</span>
+                }
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_isSearching)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4"
+                       aria-label="Searching for orders" />
+}
+
+@if (_searchResults is not null)
+{
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+        Found @_searchResults.TotalCount order(s)
+    </MudText>
+
+    @if (_searchResults.TotalCount == 0)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3" data-testid="no-results-alert">
+            No orders found matching "@_searchQuery". Please verify the order ID.
+        </MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="2">
+            <MudTable Items="_searchResults.Orders"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Dense="true"
+                      Striped="true"
+                      FixedHeader="true"
+                      Height="500px"
+                      aria-label="Order search results"
+                      data-testid="order-results-table">
+                <HeaderContent>
+                    <MudTh>Order ID</MudTh>
+                    <MudTh>Customer ID</MudTh>
+                    <MudTh>Placed At</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Total Amount</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Order ID">
+                        <code style="font-size:0.75rem;">@context.Id.ToString("N")[..8]</code>
+                    </MudTd>
+                    <MudTd DataLabel="Customer ID">
+                        <code style="font-size:0.75rem;">@context.CustomerId.ToString("N")[..8]</code>
+                    </MudTd>
+                    <MudTd DataLabel="Placed At">
+                        @context.PlacedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@GetStatusColor(context.Status)"
+                                 Variant="Variant.Text">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Total Amount">
+                        @context.TotalAmount.ToString("C")
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudTooltip Text="Order detail page coming soon">
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Secondary"
+                                       Size="Size.Small"
+                                       Disabled="true"
+                                       data-testid="@($"view-order-{context.Id}")">
+                                View Details
+                            </MudButton>
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    }
+}
+
+@code {
+    private string _searchQuery = string.Empty;
+    private bool _isSearching;
+    private OrderSearchResponse? _searchResults;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Connect to hub for real-time order updates (if not already connected)
+        if (HubService.State != HubConnectionState.Connected)
+        {
+            await HubService.ConnectAsync();
+        }
+    }
+
+    private async Task SearchOrdersAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            _searchResults = null;
+            return;
+        }
+
+        _isSearching = true;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var encodedQuery = Uri.EscapeDataString(_searchQuery);
+            var response = await client.GetAsync($"/api/orders/search?query={encodedQuery}");
+
+            // Check 401 BEFORE IsSuccessStatusCode (session-expired pattern)
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                _searchResults = await response.Content.ReadFromJsonAsync<OrderSearchResponse>();
+            }
+            else
+            {
+                Snackbar.Add("Order search failed. Please try again.", Severity.Error);
+                Logger.LogWarning("Order search failed with status {StatusCode}", response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception searching orders with query: {Query}", _searchQuery);
+            Snackbar.Add("Order search failed. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _isSearching = false;
+        }
+    }
+
+    private Color GetStatusColor(string status) => status.ToLowerInvariant() switch
+    {
+        "pending" => Color.Warning,
+        "confirmed" => Color.Info,
+        "shipped" => Color.Primary,
+        "delivered" => Color.Success,
+        "cancelled" => Color.Error,
+        _ => Color.Default
+    };
+
+    // Local DTOs (Blazor WASM pattern: cannot reference domain projects directly)
+    private sealed record OrderSearchResponse(
+        string Query,
+        int TotalCount,
+        IReadOnlyList<OrderSummaryDto> Orders);
+
+    private sealed record OrderSummaryDto(
+        Guid Id,
+        Guid CustomerId,
+        DateTime PlacedAt,
+        string Status,
+        decimal TotalAmount);
+}
