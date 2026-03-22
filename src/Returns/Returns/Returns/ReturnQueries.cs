@@ -73,12 +73,12 @@ public static class GetReturnsForOrderHandler
     {
         // Query inline snapshots — Marten persists the full Return aggregate
         // as a document after every event append via Snapshot<Return>(Inline)
-        var query = session.Query<Return>();
+        var queryable = session.Query<Return>().AsQueryable();
 
         // Filter by orderId if provided
         if (orderId.HasValue)
         {
-            query = query.Where(r => r.OrderId == orderId.Value);
+            queryable = queryable.Where(r => r.OrderId == orderId.Value);
         }
 
         // Filter by status if provided
@@ -87,11 +87,11 @@ public static class GetReturnsForOrderHandler
             // Parse status string to ReturnStatus enum
             if (Enum.TryParse<ReturnStatus>(status, ignoreCase: true, out var parsedStatus))
             {
-                query = query.Where(r => r.Status == parsedStatus);
+                queryable = queryable.Where(r => r.Status == parsedStatus);
             }
         }
 
-        var returns = await query
+        var returns = await queryable
             .OrderByDescending(r => r.RequestedAt)
             .Take(100) // Limit to 100 results for performance
             .ToListAsync(ct);
