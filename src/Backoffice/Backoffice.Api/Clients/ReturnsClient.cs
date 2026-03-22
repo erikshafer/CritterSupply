@@ -14,6 +14,7 @@ public sealed class ReturnsClient : IReturnsClient
 
     public async Task<IReadOnlyList<ReturnSummaryDto>> GetReturnsAsync(
         Guid? orderId = null,
+        string? status = null,
         int? limit = null,
         CancellationToken ct = default)
     {
@@ -22,6 +23,8 @@ public sealed class ReturnsClient : IReturnsClient
 
         if (orderId.HasValue)
             queryParams.Add($"orderId={orderId.Value}");
+        if (!string.IsNullOrWhiteSpace(status))
+            queryParams.Add($"status={Uri.EscapeDataString(status)}");
         if (limit.HasValue)
             queryParams.Add($"limit={limit.Value}");
 

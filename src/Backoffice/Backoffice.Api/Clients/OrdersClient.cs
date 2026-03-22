@@ -12,6 +12,22 @@ public sealed class OrdersClient : IOrdersClient
         _httpClient = httpClientFactory.CreateClient("OrdersClient");
     }
 
+    public async Task<SearchOrdersResultDto> SearchOrdersAsync(
+        string query,
+        CancellationToken ct = default)
+    {
+        var response = await _httpClient.GetAsync($"/api/orders/search?query={Uri.EscapeDataString(query)}", ct);
+        response.EnsureSuccessStatusCode();
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        var result = JsonSerializer.Deserialize<SearchOrdersResultDto>(content, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        return result ?? new SearchOrdersResultDto(query, 0, Array.Empty<OrderSummaryDto>());
+    }
+
     public async Task<IReadOnlyList<OrderSummaryDto>> GetOrdersAsync(
         Guid customerId,
         int? limit = null,

@@ -53,6 +53,27 @@ public sealed class StubOrdersClient : IOrdersClient
         }
     }
 
+    public Task<SearchOrdersResultDto> SearchOrdersAsync(
+        string query,
+        CancellationToken ct = default)
+    {
+        if (SimulateSessionExpired)
+            throw new HttpRequestException("Session expired", null, HttpStatusCode.Unauthorized);
+
+        // Simple stub: try to parse as Guid and find exact match
+        var orders = new List<OrderSummaryDto>();
+
+        if (Guid.TryParse(query, out var orderId))
+        {
+            if (_orders.TryGetValue(orderId, out var order))
+            {
+                orders.Add(new OrderSummaryDto(order.Id, order.CustomerId, order.PlacedAt, order.Status, order.TotalAmount));
+            }
+        }
+
+        return Task.FromResult(new SearchOrdersResultDto(query, orders.Count, orders));
+    }
+
     public Task<IReadOnlyList<OrderSummaryDto>> GetOrdersAsync(
         Guid customerId,
         int? limit = null,

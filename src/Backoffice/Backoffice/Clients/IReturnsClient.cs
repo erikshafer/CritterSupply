@@ -6,10 +6,13 @@ namespace Backoffice.Clients;
 public interface IReturnsClient
 {
     /// <summary>
-    /// List returns (CS workflow: return search with optional orderId filter)
+    /// List returns (CS workflow: return search with optional orderId and status filter).
+    /// Status values: "Requested", "Approved", "Denied", "Rejected", "Received", "InspectionStarted",
+    /// "InspectionPassed", "InspectionFailed", "InspectionMixed", "Completed", "Expired".
     /// </summary>
     Task<IReadOnlyList<ReturnSummaryDto>> GetReturnsAsync(
         Guid? orderId = null,
+        string? status = null,
         int? limit = null,
         CancellationToken ct = default);
 

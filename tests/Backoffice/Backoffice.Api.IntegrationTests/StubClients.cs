@@ -50,6 +50,23 @@ public class StubOrdersClient : IOrdersClient
     private readonly List<ReturnableItemDto> _returnableItems = new();
     private readonly HashSet<Guid> _cancelledOrders = new();
 
+    public Task<SearchOrdersResultDto> SearchOrdersAsync(
+        string query,
+        CancellationToken ct = default)
+    {
+        // Simple stub: try to parse as Guid and find exact match
+        var orders = new List<OrderSummaryDto>();
+
+        if (Guid.TryParse(query, out var orderId))
+        {
+            var order = _orders.FirstOrDefault(o => o.Id == orderId);
+            if (order is not null)
+                orders.Add(order);
+        }
+
+        return Task.FromResult(new SearchOrdersResultDto(query, orders.Count, orders));
+    }
+
     public Task<IReadOnlyList<OrderSummaryDto>> GetOrdersAsync(
         Guid customerId,
         int? limit = null,
@@ -106,11 +123,19 @@ public class StubReturnsClient : IReturnsClient
 
     public Task<IReadOnlyList<ReturnSummaryDto>> GetReturnsAsync(
         Guid? orderId = null,
+        string? status = null,
         int? limit = null,
         CancellationToken ct = default)
     {
-        var returns = _returns
-            .Where(r => orderId == null || r.OrderId == orderId)
+        var query = _returns.Where(r => orderId == null || r.OrderId == orderId);
+
+        // Filter by status if provided
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query = query.Where(r => r.Status.Equals(status, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var returns = query
             .Select(r => new ReturnSummaryDto(r.Id, r.OrderId, r.RequestedAt, r.Status, r.ReturnType))
             .Take(limit ?? int.MaxValue)
             .ToList();

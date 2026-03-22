@@ -49,11 +49,19 @@ public sealed class StubReturnsClient : IReturnsClient
 
     public Task<IReadOnlyList<ReturnSummaryDto>> GetReturnsAsync(
         Guid? orderId = null,
+        string? status = null,
         int? limit = null,
         CancellationToken ct = default)
     {
-        var returns = _returns.Values
-            .Where(r => orderId == null || r.OrderId == orderId)
+        var query = _returns.Values.Where(r => orderId == null || r.OrderId == orderId);
+
+        // Filter by status if provided
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query = query.Where(r => r.Status.Equals(status, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var returns = query
             .OrderByDescending(r => r.RequestedAt)
             .Take(limit ?? int.MaxValue)
             .Select(r => new ReturnSummaryDto(r.Id, r.OrderId, r.RequestedAt, r.Status, r.ReturnType))
