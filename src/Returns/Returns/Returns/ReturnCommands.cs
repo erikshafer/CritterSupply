@@ -1,7 +1,5 @@
 namespace Returns.Returns;
 
-public sealed record ApproveReturn(Guid ReturnId);
-
 public sealed record ReceiveReturn(Guid ReturnId);
 
 public sealed record StartInspection(Guid ReturnId, string InspectorId);
