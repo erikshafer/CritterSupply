@@ -20,6 +20,14 @@ DCB is appropriate when:
 
 Do **not** reach for DCB when a single aggregate stream is sufficient. It adds more moving parts and should earn its place.
 
+## Quick Decision Guide
+
+Use the simplest option that matches the business problem:
+
+- **Single aggregate stream, single invariant boundary** → use a normal event-sourced aggregate handler
+- **Multiple event streams inside one bounded context, but still one immediate decision** → consider DCB
+- **Long-running workflow, cross-BC coordination, retries, external side effects, or delayed completion** → use a saga/process manager
+
 ## How Wolverine Implements DCB
 
 Wolverine's DCB support (available with Marten, and coming to Polecat/SQL Server) builds on top of the existing aggregate handler workflow. The key additions are:
@@ -139,9 +147,118 @@ var result = SubscriptionHandler.Handle(new SubscribeStudentToCourse(studentId, 
 result.ShouldBeOfType<StudentSubscribedToCourse>();
 ```
 
+That said, unit tests are only part of the story. A real DCB implementation should also have integration tests that verify:
+
+- event tag selection loads the intended decision boundary
+- concurrent matching writes trigger optimistic concurrency failures
+- duplicate or conflicting commands behave correctly under retry/race conditions
+
 ## CritterSupply Usage
 
-> 🚧 **Coming soon.** A concrete CritterSupply example will be added here once a good domain fit is identified. Likely candidates involve cross-entity invariants in the **Promotions**, **Inventory**, or **Orders** bounded contexts — for instance, applying a promotion requires checking both eligibility rules and current redemption counts across multiple streams.
+After reviewing the DCB specification/examples and the current CritterSupply codebase, the current **best-first spike guidance** is:
+
+- DCB is a good fit for **one immediate business decision inside one bounded context** when the invariant spans multiple event streams
+- DCB is **not** a replacement for CritterSupply's long-running orchestration sagas (for example, the Orders saga coordinating Payments, Inventory, and Fulfillment)
+- The best first DCB candidate is **Promotions**, where one redemption decision currently spans both `Coupon` and `Promotion`
+
+### Why DCB Matters in CritterSupply
+
+In CritterSupply terms, DCB matters when the traditional event-sourced approach would otherwise force you to:
+
+- split one business fact across two aggregate streams
+- coordinate those writes with a saga or multi-step handler flow
+- emit compensating events to repair an artificial partial success
+
+That is valuable for cases like **"can this redemption happen now?"** or **"can this approval still be applied right now?"** It is not the right tool for workflows that are naturally long-running, cross-BC, or side-effect heavy.
+
+### Recommended DCB Candidates
+
+#### 1. Promotions — coupon redemption + promotion cap boundary
+
+**Best first candidate.**
+
+Why it fits:
+
+- `Coupon` and `Promotion` are separate event-sourced concepts
+- a successful redemption is logically **one fact**, but today's design splits validation between both models
+- the DCB boundary can enforce coupon validity, promotion activity, redemption caps, and future per-customer limits in one decision
+
+Relevant repository areas:
+
+- `src/Promotions/Promotions/Coupon/`
+- `src/Promotions/Promotions/Promotion/`
+- `src/Promotions/Promotions/OrderIntegration/`
+- `docs/planning/promotions-event-modeling.md`
+
+Why DCB is better than the likely alternative:
+
+- avoids a mini-saga or dual-write flow for redemption bookkeeping
+- reduces "coupon was valid, then later lost the race" behavior under concurrency
+- maps closely to the DCB creators' `opt-in-token` and `course-subscriptions` examples
+
+#### 2. Pricing — approve a vendor price suggestion against current price rules
+
+**Strong second candidate.**
+
+Why it fits:
+
+- the business decision spans a pending `VendorPriceSuggestion` and the authoritative `ProductPrice` stream
+- operators care about one immediate truth: **can this suggestion still be approved right now?**
+- DCB can prevent split outcomes like "suggestion approved but price change rejected"
+
+Relevant repository areas:
+
+- `docs/planning/pricing-event-modeling.md`
+- `docs/features/pricing/vendor-price-suggestions.feature`
+- `src/Pricing/Pricing/Products/`
+- `src/Shared/Messages.Contracts/Pricing/VendorPriceSuggestionSubmitted.cs`
+
+#### 3. Inventory — reserve all order lines or reserve none
+
+**Viable, but only after durability/idempotency hardening.**
+
+Why it fits:
+
+- one order-level reservation decision may span multiple inventory streams
+- DCB could model **reserve-all-or-fail** without partial reservations and compensating releases
+
+Why it is not the first move:
+
+- the current inventory pain is still more about message durability, idempotency, and reservation lifecycle hardening than DCB specifically
+- the Orders saga remains the correct pattern for the broader payment/inventory/fulfillment workflow
+
+Relevant repository areas:
+
+- `src/Inventory/Inventory/Management/`
+- `src/Orders/Orders/Placement/`
+- `docs/workflows/inventory-workflows.md`
+- `docs/decisions/0029-order-saga-design-decisions.md`
+
+#### 4. Product Catalog — family/variant membership after the event-sourcing migration
+
+**Possible future candidate, but not a priority.**
+
+Why it fits:
+
+- once Product Catalog is event-sourced, some family/variant membership rules may span a family boundary plus one or more variant/product streams
+
+Why it is lower priority:
+
+- Product Catalog is still a Marten document store today
+- the immediate value is getting the event-sourced migration and variant model in place first
+- some family/variant workflows may still be adequately handled without DCB
+
+Relevant repository areas:
+
+- `src/Product Catalog/ProductCatalog/Products/Product.cs`
+- `docs/planning/catalog-listings-marketplaces-evolution-plan.md`
+- `docs/planning/catalog-variant-model.md`
+
+### Non-Candidates / Guardrails
+
+- **Orders overall** should stay saga-driven; it coordinates long-running cross-BC work and is not a single synchronous decision boundary
+- **single-stream aggregate decisions** should remain normal event-sourced handlers — DCB should earn its complexity
+- **BFF/query-only contexts** like Customer Experience are not natural DCB targets because they do not own the underlying invariants
 
 ## Reference
 
