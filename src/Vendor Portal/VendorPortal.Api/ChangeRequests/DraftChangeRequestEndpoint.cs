@@ -2,7 +2,6 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using VendorPortal.ChangeRequests;
-using VendorPortal.ChangeRequests.Commands;
 using Wolverine;
 using Wolverine.Http;
 

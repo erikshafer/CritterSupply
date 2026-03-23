@@ -3,7 +3,6 @@ using Marten;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using VendorPortal.VendorAccount;
-using VendorPortal.VendorAccount.Commands;
 using Wolverine;
 using Wolverine.Http;
 

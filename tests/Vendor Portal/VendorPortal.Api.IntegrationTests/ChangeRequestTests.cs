@@ -2,7 +2,7 @@ using Marten;
 using Messages.Contracts.ProductCatalog;
 using Shouldly;
 using VendorPortal.ChangeRequests;
-using VendorPortal.ChangeRequests.Commands;
+
 using VendorPortal.RealTime;
 using VendorPortal.VendorProductCatalog;
 using Wolverine.Tracking;
@@ -386,11 +386,11 @@ public sealed class ChangeRequestTests : IAsyncLifetime
     }
 
     // ───────────────────────────────────────────────
-    // MoreInfoRequested handler
+    // AdditionalInfoRequested handler
     // ───────────────────────────────────────────────
 
     [Fact]
-    public async Task MoreInfoRequestedForChangeRequest_TransitionsToNeedsMoreInfo()
+    public async Task AdditionalInfoRequested_TransitionsToNeedsMoreInfo()
     {
         // Arrange
         var tenantId = Guid.NewGuid();
@@ -403,7 +403,7 @@ public sealed class ChangeRequestTests : IAsyncLifetime
 
         // Act
         var session = await _fixture.TrackMessageAsync(
-            new MoreInfoRequestedForChangeRequest(
+            new AdditionalInfoRequested(
                 requestId, "DOG-FOOD-001", tenantId,
                 "Can you provide a source for this claim?",
                 DateTimeOffset.UtcNow));
@@ -437,7 +437,7 @@ public sealed class ChangeRequestTests : IAsyncLifetime
         await _fixture.ExecuteMessageAsync(
             new SubmitChangeRequest(RequestId: requestId, VendorTenantId: tenantId));
         await _fixture.ExecuteMessageAsync(
-            new MoreInfoRequestedForChangeRequest(
+            new AdditionalInfoRequested(
                 requestId, "DOG-FOOD-001", tenantId,
                 "What is the protein source?",
                 DateTimeOffset.UtcNow));
@@ -592,7 +592,7 @@ public sealed class ChangeRequestTests : IAsyncLifetime
         await _fixture.ExecuteMessageAsync(
             new SubmitChangeRequest(RequestId: requestId, VendorTenantId: tenantAId));
         await _fixture.ExecuteMessageAsync(
-            new MoreInfoRequestedForChangeRequest(
+            new AdditionalInfoRequested(
                 requestId, "DOG-FOOD-001", tenantAId, "What is the protein source?", DateTimeOffset.UtcNow));
 
         // Act — tenant B attempts to provide info for tenant A's request

@@ -3,7 +3,7 @@ using Marten;
 using Messages.Contracts.VendorIdentity;
 using Shouldly;
 using VendorPortal.VendorAccount;
-using VendorPortal.VendorAccount.Commands;
+
 
 namespace VendorPortal.Api.IntegrationTests;
 

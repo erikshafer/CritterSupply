@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using VendorPortal.VendorAccount.Commands;
+using VendorPortal.VendorAccount;
 using Wolverine;
 using Wolverine.Http;
 

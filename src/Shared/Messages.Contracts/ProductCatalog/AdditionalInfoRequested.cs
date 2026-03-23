@@ -5,7 +5,7 @@ namespace Messages.Contracts.ProductCatalog;
 /// before a change request can be processed.
 /// Received by Vendor Portal to update the change request status and prompt the vendor.
 /// </summary>
-public sealed record MoreInfoRequestedForChangeRequest(
+public sealed record AdditionalInfoRequested(
     Guid RequestId,
     string Sku,
     Guid VendorTenantId,
