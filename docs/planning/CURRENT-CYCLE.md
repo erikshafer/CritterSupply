@@ -146,10 +146,20 @@
 - ✅ Session plan + retrospective documenting pattern variations and learnings created
 - **See:** `docs/planning/milestones/m33-0-session-11-plan.md`, `docs/planning/milestones/m33-0-session-11-retrospective.md`
 
+**Session 12 Completion (2026-03-23):**
+- ✅ **Phase 4 COMPLETE (VP-5 + VP-6 + verification):** All Vendor Portal structural refactoring finished
+- ✅ VP-5: VendorHubMessages.cs split into individual message files
+- ✅ VP-6: FluentValidation validators added to all 7 VP commands
+- ✅ VP-1/VP-2/VP-3/VP-4: Verified complete from prior sessions (folder flattening, handler explosion)
+- ✅ F-2 Phase A: No feature-level @ignore tags in E2E files
+- ✅ Build: 0 errors, 36 pre-existing warnings (unchanged)
+- ✅ All 86 VendorPortal.Api.IntegrationTests passing (0% regression rate)
+- ✅ Session retrospective documenting Phase 4 completion + timeout recovery pattern
+- **See:** `docs/planning/milestones/m33-0-session-12-retrospective.md`
+
 **Remaining Planned Priorities:**
-3. 📋 **Phase 3:** Returns BC structural refactor (R-5 through R-8 remaining) — NEXT
-4. 📋 **Phase 4:** Vendor Portal structural refactor (VP-1 through VP-6)
-5. 📋 **Phase 5:** Backoffice folder restructure (BO-1/BO-2/BO-3) + XC-3 (AcknowledgeAlert transaction fix)
+3. 📋 **Phase 5:** Backoffice folder restructure (BO-1/BO-2/BO-3) + XC-3 (AcknowledgeAlert transaction fix) — NEXT
+4. 📋 **Phase 6:** Backoffice completion (missing projections + missing pages)
 
 **References:**
 - M33-M34 Proposal: `docs/planning/milestones/m33-m34-engineering-proposal-2026-03-21.md`
