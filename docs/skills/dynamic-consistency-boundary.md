@@ -20,6 +20,14 @@ DCB is appropriate when:
 
 Do **not** reach for DCB when a single aggregate stream is sufficient. It adds more moving parts and should earn its place.
 
+## Quick Decision Guide
+
+Use the simplest option that matches the business problem:
+
+- **Single aggregate stream, single invariant boundary** → use a normal event-sourced aggregate handler
+- **Multiple event streams inside one bounded context, but still one immediate decision** → consider DCB
+- **Long-running workflow, cross-BC coordination, retries, external side effects, or delayed completion** → use a saga/process manager
+
 ## How Wolverine Implements DCB
 
 Wolverine's DCB support (available with Marten, and coming to Polecat/SQL Server) builds on top of the existing aggregate handler workflow. The key additions are:
@@ -139,15 +147,21 @@ var result = SubscriptionHandler.Handle(new SubscribeStudentToCourse(studentId, 
 result.ShouldBeOfType<StudentSubscribedToCourse>();
 ```
 
+That said, unit tests are only part of the story. A real DCB implementation should also have integration tests that verify:
+
+- event tag selection loads the intended decision boundary
+- concurrent matching writes trigger optimistic concurrency failures
+- duplicate or conflicting commands behave correctly under retry/race conditions
+
 ## CritterSupply Usage
 
-After reviewing the DCB specification/examples and the current CritterSupply codebase, the strongest repository-specific guidance is:
+After reviewing the DCB specification/examples and the current CritterSupply codebase, the current **best-first spike guidance** is:
 
 - DCB is a good fit for **one immediate business decision inside one bounded context** when the invariant spans multiple event streams
 - DCB is **not** a replacement for CritterSupply's long-running orchestration sagas (for example, the Orders saga coordinating Payments, Inventory, and Fulfillment)
 - The best first DCB candidate is **Promotions**, where one redemption decision currently spans both `Coupon` and `Promotion`
 
-### Why DCB Is a Thing Here
+### Why DCB Matters in CritterSupply
 
 In CritterSupply terms, DCB matters when the traditional event-sourced approach would otherwise force you to:
 
