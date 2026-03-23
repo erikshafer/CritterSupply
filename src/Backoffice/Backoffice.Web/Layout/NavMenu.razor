@@ -9,6 +9,9 @@
         <MudNavLink Href="/customers/search" Icon="@Icons.Material.Filled.Search">
             Customer Search
         </MudNavLink>
+    </AuthorizeView>
+
+    <AuthorizeView Roles="customer-service,operations-manager,system-admin">
         <MudNavLink Href="/orders/search" Icon="@Icons.Material.Filled.ShoppingCart">
             Order Search
         </MudNavLink>
@@ -56,7 +59,7 @@
     <MudDivider Class="my-2" />
 
     <MudText Typo="Typo.caption" Class="px-4 text-muted">
-        Session 7-8: Add real pages
+        Session 7: BFF routes fixed, NavMenu aligned
     </MudText>
 </MudNavMenu>
 

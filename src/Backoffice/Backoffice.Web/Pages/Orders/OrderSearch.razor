@@ -161,7 +161,7 @@
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
 
             var encodedQuery = Uri.EscapeDataString(_searchQuery);
-            var response = await client.GetAsync($"/api/orders/search?query={encodedQuery}");
+            var response = await client.GetAsync($"/api/backoffice/orders/search?query={encodedQuery}");
 
             // Check 401 BEFORE IsSuccessStatusCode (session-expired pattern)
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)

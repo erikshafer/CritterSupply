@@ -18,7 +18,7 @@
     Return Management
 </MudText>
 <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
-    Active return queue — filter by status
+    Active return queue — defaults to Requested (awaiting approval)
 </MudText>
 
 @* Status filter bar *@
@@ -31,7 +31,6 @@
                        Margin="Margin.Dense"
                        FullWidth="true"
                        data-testid="status-filter">
-                <MudSelectItem Value="@("Pending")">Pending</MudSelectItem>
                 <MudSelectItem Value="@("Requested")">Requested</MudSelectItem>
                 <MudSelectItem Value="@("Approved")">Approved</MudSelectItem>
                 <MudSelectItem Value="@("Denied")">Denied</MudSelectItem>
@@ -164,7 +163,7 @@
 }
 
 @code {
-    private string? _selectedStatus = "Pending"; // Default to Pending
+    private string? _selectedStatus = "Requested"; // Default to Requested (awaiting approval)
     private bool _isLoading = true;
     private IReadOnlyList<ReturnSummaryDto>? _returns;
 
@@ -190,7 +189,7 @@
             client.DefaultRequestHeaders.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
 
-            var url = "/api/returns";
+            var url = "/api/backoffice/returns";
             if (!string.IsNullOrEmpty(_selectedStatus))
             {
                 url += $"?status={Uri.EscapeDataString(_selectedStatus)}";
