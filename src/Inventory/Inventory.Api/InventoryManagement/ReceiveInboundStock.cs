@@ -1,9 +1,46 @@
+using FluentValidation;
 using Inventory.Management;
 using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Wolverine.Http;
 
-namespace Inventory.Api.Commands;
+namespace Inventory.Api.InventoryManagement;
+
+/// <summary>
+/// Request DTO for receiving inbound stock shipments.
+/// </summary>
+public sealed record ReceiveInboundStockRequest(
+    int Quantity,
+    string Source);
+
+/// <summary>
+/// Response DTO for inbound stock receipt operations.
+/// </summary>
+public sealed record ReceiveInboundStockResult(
+    Guid InventoryId,
+    string Sku,
+    string WarehouseId,
+    int NewAvailableQuantity);
+
+/// <summary>
+/// Validator for ReceiveInboundStockRequest.
+/// Ensures positive quantities and non-empty source field.
+/// </summary>
+public sealed class ReceiveInboundStockRequestValidator : AbstractValidator<ReceiveInboundStockRequest>
+{
+    public ReceiveInboundStockRequestValidator()
+    {
+        RuleFor(x => x.Quantity)
+            .GreaterThan(0)
+            .WithMessage("Quantity must be greater than zero");
+
+        RuleFor(x => x.Source)
+            .NotEmpty()
+            .WithMessage("Source is required")
+            .MaximumLength(200)
+            .WithMessage("Source cannot exceed 200 characters");
+    }
+}
 
 /// <summary>
 /// HTTP endpoint for receiving inbound stock shipments.

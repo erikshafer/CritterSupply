@@ -1,10 +1,54 @@
+using FluentValidation;
 using Inventory.Management;
 using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Wolverine;
 using Wolverine.Http;
 
-namespace Inventory.Api.Commands;
+namespace Inventory.Api.InventoryManagement;
+
+/// <summary>
+/// Request DTO for adjusting inventory quantities.
+/// </summary>
+public sealed record AdjustInventoryRequest(
+    int AdjustmentQuantity,
+    string Reason,
+    string AdjustedBy);
+
+/// <summary>
+/// Response DTO for inventory adjustment operations.
+/// </summary>
+public sealed record AdjustInventoryResult(
+    Guid InventoryId,
+    string Sku,
+    string WarehouseId,
+    int NewAvailableQuantity);
+
+/// <summary>
+/// Validator for AdjustInventoryRequest.
+/// Ensures non-zero adjustment quantities and non-empty audit trail fields.
+/// </summary>
+public sealed class AdjustInventoryRequestValidator : AbstractValidator<AdjustInventoryRequest>
+{
+    public AdjustInventoryRequestValidator()
+    {
+        RuleFor(x => x.AdjustmentQuantity)
+            .NotEqual(0)
+            .WithMessage("Adjustment quantity must be non-zero");
+
+        RuleFor(x => x.Reason)
+            .NotEmpty()
+            .WithMessage("Reason is required")
+            .MaximumLength(500)
+            .WithMessage("Reason cannot exceed 500 characters");
+
+        RuleFor(x => x.AdjustedBy)
+            .NotEmpty()
+            .WithMessage("AdjustedBy is required")
+            .MaximumLength(100)
+            .WithMessage("AdjustedBy cannot exceed 100 characters");
+    }
+}
 
 /// <summary>
 /// HTTP endpoint for manually adjusting inventory quantities.

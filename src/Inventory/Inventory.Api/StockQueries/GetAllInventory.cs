@@ -4,7 +4,7 @@ using Marten.Pagination;
 using Microsoft.AspNetCore.Authorization;
 using Wolverine.Http;
 
-namespace Inventory.Api.Queries;
+namespace Inventory.Api.StockQueries;
 
 /// <summary>
 /// HTTP endpoint for listing all inventory.
