@@ -5,7 +5,7 @@ using Wolverine.Http;
 using Wolverine.Http.Marten;
 using Wolverine.Marten;
 
-namespace Returns.Returns;
+namespace Returns.ReturnProcessing;
 
 /// <summary>
 /// CS agent denies an exchange request (out of stock, outside window, or replacement too expensive).

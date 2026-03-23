@@ -5,7 +5,7 @@ using Wolverine.Http;
 using Wolverine.Http.Marten;
 using Wolverine.Marten;
 
-namespace Returns.Returns;
+namespace Returns.ReturnProcessing;
 
 /// <summary>
 /// Warehouse ships the replacement item after original item passes inspection.

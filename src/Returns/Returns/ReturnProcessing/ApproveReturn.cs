@@ -6,7 +6,7 @@ using Wolverine.Http;
 using Wolverine.Http.Marten;
 using Wolverine.Marten;
 
-namespace Returns.Returns;
+namespace Returns.ReturnProcessing;
 
 /// <summary>
 /// CS agent approves a return that is in Requested state (manual review required).

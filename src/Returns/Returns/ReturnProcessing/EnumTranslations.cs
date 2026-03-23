@@ -1,4 +1,4 @@
-namespace Returns.Returns;
+namespace Returns.ReturnProcessing;
 
 /// <summary>
 /// Provides customer-friendly text translations for internal enum values.

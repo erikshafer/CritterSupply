@@ -5,25 +5,25 @@ using Wolverine.Http;
 using Wolverine.Http.Marten;
 using Wolverine.Marten;
 
-namespace Returns.Returns;
+namespace Returns.ReturnProcessing;
 
 /// <summary>
-/// Warehouse receives the physical return shipment and logs it in the system.
-/// Return moves from Approved → ReceivedAwaitingInspection state.
+/// Scheduled message handler for expiring returns that exceed the ship-by deadline.
+/// Return moves from Approved → Expired state.
 /// </summary>
-public sealed record ReceiveReturn(Guid ReturnId);
+public sealed record ExpireReturn(Guid ReturnId);
 
-public sealed class ReceiveReturnValidator : AbstractValidator<ReceiveReturn>
+public sealed class ExpireReturnValidator : AbstractValidator<ExpireReturn>
 {
-    public ReceiveReturnValidator()
+    public ExpireReturnValidator()
     {
         RuleFor(x => x.ReturnId).NotEmpty().WithMessage("ReturnId is required.");
     }
 }
 
-public static class ReceiveReturnHandler
+public static class ExpireReturnHandler
 {
-    public static ProblemDetails Before(ReceiveReturn command, Return? aggregate)
+    public static ProblemDetails Before(ExpireReturn command, Return? aggregate)
     {
         if (aggregate is null)
             return new ProblemDetails { Detail = "Return not found.", Status = 404 };
@@ -31,29 +31,28 @@ public static class ReceiveReturnHandler
         if (aggregate.Status != ReturnStatus.Approved)
             return new ProblemDetails
             {
-                Detail = $"Return is in '{aggregate.Status}' state and cannot be received. Only returns in 'Approved' state can be received.",
+                Detail = $"Return must be in 'Approved' state to expire. Current state: '{aggregate.Status}'.",
                 Status = 409
             };
 
         return WolverineContinue.NoProblems;
     }
 
-    [WolverinePost("/api/returns/{returnId}/receive")]
-    public static (ReturnReceived, OutgoingMessages) Handle(
-        ReceiveReturn command,
+    public static (ReturnExpired, OutgoingMessages) Handle(
+        ExpireReturn command,
         [WriteAggregate] Return aggregate)
     {
         var now = DateTimeOffset.UtcNow;
-        var domainEvent = new ReturnReceived(
+        var domainEvent = new ReturnExpired(
             ReturnId: command.ReturnId,
-            ReceivedAt: now);
+            ExpiredAt: now);
 
         var outgoing = new OutgoingMessages();
-        outgoing.Add(new Messages.Contracts.Returns.ReturnReceived(
+        outgoing.Add(new Messages.Contracts.Returns.ReturnExpired(
             ReturnId: command.ReturnId,
             OrderId: aggregate.OrderId,
             CustomerId: aggregate.CustomerId,
-            ReceivedAt: now));
+            ExpiredAt: now));
 
         return (domainEvent, outgoing);
     }

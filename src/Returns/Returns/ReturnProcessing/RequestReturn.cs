@@ -3,7 +3,7 @@ using Marten;
 using Wolverine;
 using Wolverine.Http;
 
-namespace Returns.Returns;
+namespace Returns.ReturnProcessing;
 
 // ---------------------------------------------------------------------------
 // Command + Nested Types
@@ -258,8 +258,8 @@ public sealed record ReturnLineItemResponse(
 
     public static ReturnLineItemResponse From(ReturnLineItem item)
     {
-        var isFeeExempt = item.Reason is Returns.ReturnReason.Defective
-            or Returns.ReturnReason.WrongItem or Returns.ReturnReason.DamagedInTransit;
+        var isFeeExempt = item.Reason is Returns.ReturnProcessing.ReturnReason.Defective
+            or Returns.ReturnProcessing.ReturnReason.WrongItem or Returns.ReturnProcessing.ReturnReason.DamagedInTransit;
         var feeRate = isFeeExempt ? 0m : FeeRate;
         var feeAmount = Math.Round(item.LineTotal * feeRate, 2);
 

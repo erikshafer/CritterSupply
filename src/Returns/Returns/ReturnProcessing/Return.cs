@@ -1,4 +1,4 @@
-namespace Returns.Returns;
+namespace Returns.ReturnProcessing;
 
 /// <summary>
 /// Event-sourced aggregate representing a customer return request.

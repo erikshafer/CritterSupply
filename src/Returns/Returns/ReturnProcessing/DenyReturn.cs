@@ -5,7 +5,7 @@ using Wolverine.Http;
 using Wolverine.Http.Marten;
 using Wolverine.Marten;
 
-namespace Returns.Returns;
+namespace Returns.ReturnProcessing;
 
 /// <summary>
 /// CS agent denies a return that is in Requested state.

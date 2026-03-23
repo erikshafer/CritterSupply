@@ -1,6 +1,7 @@
 using Marten;
+using Returns.ReturnProcessing;
 
-namespace Returns.Returns;
+namespace Returns.Integration;
 
 /// <summary>
 /// Handles Fulfillment.ShipmentDelivered integration event.
