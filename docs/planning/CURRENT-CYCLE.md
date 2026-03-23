@@ -66,15 +66,15 @@
 - **Key Learning:** Mixing `IMessageBus.InvokeAsync()` with manual event appending doesn't respect `Before()` validation
 
 **Sessions 5+6 Completion (2026-03-22 to 2026-03-23):**
-- ✅ **Priority 3 COMPLETE:** Order Search + Return Management pages added to Backoffice.Web
+- ⚠️ **Priority 3 PARTIALLY DELIVERED:** Order Search + Return Management pages were added to Backoffice.Web, but post-mortem review found unresolved recovery work
 - ✅ Created 2 new Blazor WASM pages (`/orders/search`, `/returns`)
 - ✅ Updated NavMenu with role-based navigation items
 - ❌ Created Backoffice.Web.UnitTests bUnit project — **all tests removed after 7 failed fix attempts**
-- ❌ bUnit authorization testing NOT FEASIBLE (policy-based auth + sealed services)
-- ✅ All 51 Backoffice.Api.IntegrationTests passing (no regressions)
+- ❌ No replacement E2E coverage was added, leaving the new pages with **ZERO automated UI coverage**
+- ⚠️ Post-mortem review found route-shape/BFF mismatch and status/discoverability inconsistencies that should be addressed before treating Priority 3 as closed
+- ✅ All 51 Backoffice.Api.IntegrationTests passing (no regressions in that suite)
 - ✅ Retrospective documenting bUnit limitations and Blazor WASM local DTOs created
-- ⚠️ **HIGH PRIORITY FOLLOW-UP:** E2E tests required (pages have ZERO test coverage)
-- **Key Learning:** bUnit v2 cannot test policy-based `<AuthorizeView Policy=>` (requires cascading parameter). Use E2E tests for Backoffice.Web instead.
+- **See:** `docs/planning/milestones/m33-0-post-mortem-recovery-review.md`
 
 **Remaining Planned Priorities:**
 2. 📋 **Priority 2:** Build 3 missing Marten projections (FulfillmentPipelineView, ReturnMetricsView, CorrespondenceMetricsView)
