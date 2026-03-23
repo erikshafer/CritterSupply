@@ -315,31 +315,63 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
 
     /// <summary>
     /// Locates the VendorPortal.Web wwwroot directory containing compiled WASM files.
-    /// Walks up from the test output directory to find the source project.
+    /// Walks up from the test output directory to find the bin build output.
+    /// IMPORTANT: Must use bin/Debug/net10.0/publish/wwwroot (not src/*/wwwroot) to get compiled _framework files.
     /// </summary>
     private static string FindWasmRoot()
     {
-        // Strategy: find the VendorPortal.Web project's wwwroot from the repo root
-        var current = AppContext.BaseDirectory;
+        // Strategy: Start from test output directory (bin/Debug/net10.0) and look for sibling VendorPortal.Web publish output
+        var current = AppContext.BaseDirectory; // e.g., tests/Vendor Portal/VendorPortal.E2ETests/bin/Debug/net10.0
+
+        // Walk up directory tree to find repo root (has .git or src/ directory)
         while (current != null)
         {
-            var candidate = Path.Combine(current, "src", "Vendor Portal", "VendorPortal.Web", "wwwroot");
-            if (Directory.Exists(candidate))
-                return candidate;
+            // Check if we're at repo root (has src/ directory)
+            var srcDir = Path.Combine(current, "src");
+            if (Directory.Exists(srcDir))
+            {
+                // PRIORITY 1: Check publish output directory (has index.html + _framework)
+                var publishWwwroot = Path.Combine(current, "src", "Vendor Portal", "VendorPortal.Web", "bin", "Debug", "net10.0", "publish", "wwwroot");
+                if (Directory.Exists(publishWwwroot) && Directory.Exists(Path.Combine(publishWwwroot, "_framework")) && File.Exists(Path.Combine(publishWwwroot, "index.html")))
+                {
+                    Console.WriteLine($"✅ [FindWasmRoot] Found publish wwwroot with _framework and index.html: {publishWwwroot}");
+                    return publishWwwroot;
+                }
 
-            // Also check for the published output (bin/Debug or bin/Release)
-            var binCandidate = Directory.GetDirectories(current, "VendorPortal.Web", SearchOption.AllDirectories)
-                .Select(d => Path.Combine(d, "wwwroot"))
-                .FirstOrDefault(Directory.Exists);
+                // PRIORITY 2: Check bin output directory (has _framework but may be missing index.html)
+                var binWwwroot = Path.Combine(current, "src", "Vendor Portal", "VendorPortal.Web", "bin", "Debug", "net10.0", "wwwroot");
+                if (Directory.Exists(binWwwroot) && Directory.Exists(Path.Combine(binWwwroot, "_framework")) && File.Exists(Path.Combine(binWwwroot, "index.html")))
+                {
+                    Console.WriteLine($"✅ [FindWasmRoot] Found compiled wwwroot with _framework and index.html: {binWwwroot}");
+                    return binWwwroot;
+                }
 
-            if (binCandidate != null)
-                return binCandidate;
+                // PRIORITY 3: Check source directory as fallback (only if it has _framework compiled into it)
+                var srcWwwroot = Path.Combine(current, "src", "Vendor Portal", "VendorPortal.Web", "wwwroot");
+                if (Directory.Exists(srcWwwroot))
+                {
+                    var hasFramework = Directory.Exists(Path.Combine(srcWwwroot, "_framework"));
+                    var hasIndexHtml = File.Exists(Path.Combine(srcWwwroot, "index.html"));
+                    Console.WriteLine($"⚠️  [FindWasmRoot] Found source wwwroot (has _framework: {hasFramework}, has index.html: {hasIndexHtml}): {srcWwwroot}");
+                    if (hasFramework && hasIndexHtml)
+                        return srcWwwroot;
+                }
+
+                // None of the locations have all required files
+                throw new InvalidOperationException(
+                    $"Could not locate VendorPortal.Web/wwwroot directory with both _framework/ and index.html. " +
+                    $"Searched:\n" +
+                    $"  1. {publishWwwroot} (publish output)\n" +
+                    $"  2. {binWwwroot} (bin output)\n" +
+                    $"  3. {srcWwwroot} (source directory)\n\n" +
+                    $"Ensure the VendorPortal.Web Blazor WASM project is published before running E2E tests. " +
+                    $"The PublishBlazorWasmForE2E MSBuild target in VendorPortal.E2ETests.csproj handles this automatically.");
+            }
 
             current = Directory.GetParent(current)?.FullName;
         }
 
         throw new InvalidOperationException(
-            "Could not locate VendorPortal.Web/wwwroot directory. " +
-            "Ensure the VendorPortal.Web project is built before running E2E tests.");
+            "Could not locate repository root directory (expected to contain 'src/' folder).");
     }
 }
