@@ -10,12 +10,12 @@ public sealed class VendorLoginPage(IPage page)
 
     public async Task FillEmailAsync(string email)
     {
-        // Wait for WASM hydration to complete (NetworkIdle ensures Blazor runtime is loaded)
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        // IMPORTANT: Do NOT wait for NetworkIdle here - caller has already verified WASM hydration
+        // by waiting for login-btn. NetworkIdle may never complete in TestContainers environment
+        // due to background Marten/Wolverine/SignalR network activity.
 
-        // Wait for email field to be visible and ready (MudBlazor takes time to render nested inputs)
-        // Use 60s timeout for CI environments where WASM cold start + TestContainers overhead
-        // can push login page hydration beyond 30s (observed 31.2s in local tests)
+        // Wait for email field's nested input to be visible and ready (MudBlazor renders container first, then input)
+        // Use 60s timeout for CI environments where MudBlazor component initialization can be slow
         var emailField = page.GetByTestId("email-field").Locator("input");
         await emailField.WaitForAsync(new LocatorWaitForOptions { Timeout = 60000 });
         await emailField.FillAsync(email);
@@ -23,8 +23,8 @@ public sealed class VendorLoginPage(IPage page)
 
     public async Task FillPasswordAsync(string password)
     {
-        // Wait for password field to be visible and ready
-        // Use 60s timeout for CI environments where WASM cold start can be slow
+        // Wait for password field's nested input to be visible and ready
+        // (No NetworkIdle wait needed - form is already hydrated)
         var passwordField = page.GetByTestId("password-field").Locator("input");
         await passwordField.WaitForAsync(new LocatorWaitForOptions { Timeout = 60000 });
         await passwordField.FillAsync(password);
