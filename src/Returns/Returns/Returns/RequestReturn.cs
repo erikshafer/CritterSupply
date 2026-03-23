@@ -1,8 +1,67 @@
+using FluentValidation;
 using Marten;
 using Wolverine;
 using Wolverine.Http;
 
 namespace Returns.Returns;
+
+// ---------------------------------------------------------------------------
+// Command + Nested Types
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// Request from the command to capture the exchange request details
+/// </summary>
+public sealed record RequestReturnExchangeRequest(
+    string ReplacementSku,
+    int ReplacementQuantity,
+    decimal ReplacementUnitPrice);
+
+public sealed record RequestReturn(
+    Guid OrderId,
+    Guid CustomerId,
+    IReadOnlyList<RequestReturnItem> Items,
+    RequestReturnExchangeRequest? ExchangeRequest = null);
+
+public sealed record RequestReturnItem(
+    string Sku,
+    string ProductName,
+    int Quantity,
+    decimal UnitPrice,
+    ReturnReason Reason,
+    string? Explanation = null);
+
+// ---------------------------------------------------------------------------
+// Validator + Nested Validators
+// ---------------------------------------------------------------------------
+
+public sealed class RequestReturnValidator : AbstractValidator<RequestReturn>
+{
+    public RequestReturnValidator()
+    {
+        RuleFor(x => x.OrderId).NotEmpty().WithMessage("OrderId is required.");
+        RuleFor(x => x.CustomerId).NotEmpty().WithMessage("CustomerId is required.");
+        RuleFor(x => x.Items).NotEmpty().WithMessage("At least one item must be included in the return request.");
+
+        RuleForEach(x => x.Items).SetValidator(new RequestReturnItemValidator());
+    }
+}
+
+public sealed class RequestReturnItemValidator : AbstractValidator<RequestReturnItem>
+{
+    public RequestReturnItemValidator()
+    {
+        RuleFor(x => x.Sku).NotEmpty().WithMessage("SKU is required.");
+        RuleFor(x => x.ProductName).NotEmpty().WithMessage("Product name is required.");
+        RuleFor(x => x.Quantity).GreaterThan(0).WithMessage("Quantity must be greater than zero.");
+        RuleFor(x => x.UnitPrice).GreaterThan(0).WithMessage("Unit price must be greater than zero.");
+        RuleFor(x => x.Reason).IsInEnum().WithMessage("Return reason is invalid.");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Handler
+// ---------------------------------------------------------------------------
 
 /// <summary>
 /// Handles RequestReturn command — creates a new Return aggregate stream.
@@ -147,6 +206,10 @@ public static class RequestReturnHandler
             returnId, command.OrderId, items, estimatedRefund, restockingFee, now);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Response Types
+// ---------------------------------------------------------------------------
 
 public sealed record RequestReturnResponse(
     Guid? ReturnId,

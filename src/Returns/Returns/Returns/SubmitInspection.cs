@@ -1,4 +1,4 @@
-using Marten;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -7,150 +7,38 @@ using Wolverine.Marten;
 
 namespace Returns.Returns;
 
-/// <summary>
-/// CS agent approves a return that is in Requested state (manual review required).
-/// Publishes ReturnApproved integration event for Customer Experience BC and Notifications BC.
-/// </summary>
-public static class ApproveReturnHandler
+// ---------------------------------------------------------------------------
+// Command
+// ---------------------------------------------------------------------------
+
+public sealed record SubmitInspection(
+    Guid ReturnId,
+    IReadOnlyList<InspectionLineResult> Results);
+
+// ---------------------------------------------------------------------------
+// Validator
+// ---------------------------------------------------------------------------
+
+public sealed class SubmitInspectionValidator : AbstractValidator<SubmitInspection>
 {
-    public static ProblemDetails Before(ApproveReturn command, Return? aggregate)
+    public SubmitInspectionValidator()
     {
-        if (aggregate is null)
-            return new ProblemDetails { Detail = "Return not found.", Status = 404 };
+        RuleFor(x => x.ReturnId).NotEmpty().WithMessage("ReturnId is required.");
+        RuleFor(x => x.Results).NotEmpty().WithMessage("At least one inspection result is required.");
 
-        if (aggregate.Status != ReturnStatus.Requested)
-            return new ProblemDetails
-            {
-                Detail = $"Return is in '{aggregate.Status}' state and cannot be approved. Only returns in 'Requested' state can be approved.",
-                Status = 409
-            };
-
-        return WolverineContinue.NoProblems;
-    }
-
-    [WolverinePost("/api/returns/{returnId}/approve")]
-    public static async Task<(ReturnApproved, OutgoingMessages)> Handle(
-        ApproveReturn command,
-        [WriteAggregate] Return aggregate,
-        IMessageBus bus)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var shipByDeadline = now.AddDays(ReturnEligibilityWindow.ReturnWindowDays);
-
-        var (estimatedRefund, restockingFee) = Return.CalculateEstimatedRefund(aggregate.Items);
-
-        // Schedule expiration
-        await bus.ScheduleAsync(new ExpireReturn(command.ReturnId), shipByDeadline);
-
-        var domainEvent = new ReturnApproved(
-            ReturnId: command.ReturnId,
-            EstimatedRefundAmount: estimatedRefund,
-            RestockingFeeAmount: restockingFee,
-            ShipByDeadline: shipByDeadline,
-            ApprovedAt: now);
-
-        var outgoing = new OutgoingMessages();
-        outgoing.Add(new Messages.Contracts.Returns.ReturnApproved(
-            ReturnId: command.ReturnId,
-            OrderId: aggregate.OrderId,
-            CustomerId: aggregate.CustomerId,
-            EstimatedRefundAmount: estimatedRefund,
-            RestockingFeeAmount: restockingFee,
-            ShipByDeadline: shipByDeadline,
-            ApprovedAt: now));
-
-        return (domainEvent, outgoing);
+        RuleForEach(x => x.Results).ChildRules(result =>
+        {
+            result.RuleFor(r => r.Sku).NotEmpty().WithMessage("SKU is required.");
+            result.RuleFor(r => r.Quantity).GreaterThan(0).WithMessage("Quantity must be greater than zero.");
+            result.RuleFor(r => r.Condition).IsInEnum().WithMessage("Item condition is invalid.");
+            result.RuleFor(r => r.Disposition).IsInEnum().WithMessage("Disposition decision is invalid.");
+        });
     }
 }
 
-/// <summary>
-/// CS agent denies a return that is in Requested state.
-/// Publishes ReturnDenied integration event with customer-facing message.
-/// </summary>
-public static class DenyReturnHandler
-{
-    public static ProblemDetails Before(DenyReturn command, Return? aggregate)
-    {
-        if (aggregate is null)
-            return new ProblemDetails { Detail = "Return not found.", Status = 404 };
-
-        if (aggregate.Status != ReturnStatus.Requested)
-            return new ProblemDetails
-            {
-                Detail = $"Return is in '{aggregate.Status}' state and cannot be denied. Only returns in 'Requested' state can be denied.",
-                Status = 409
-            };
-
-        return WolverineContinue.NoProblems;
-    }
-
-    [WolverinePost("/api/returns/{returnId}/deny")]
-    public static (ReturnDenied, OutgoingMessages) Handle(
-        DenyReturn command,
-        [WriteAggregate] Return aggregate)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var denied = new ReturnDenied(
-            ReturnId: command.ReturnId,
-            Reason: command.Reason,
-            Message: command.Message,
-            DeniedAt: now);
-
-        var outgoing = new OutgoingMessages();
-        outgoing.Add(new Messages.Contracts.Returns.ReturnDenied(
-            ReturnId: command.ReturnId,
-            OrderId: aggregate.OrderId,
-            CustomerId: aggregate.CustomerId,
-            Reason: command.Reason,
-            Message: command.Message,
-            DeniedAt: now));
-
-        return (denied, outgoing);
-    }
-}
-
-/// <summary>
-/// Warehouse records physical receipt of a return shipment.
-/// Publishes ReturnReceived integration event so Customer Experience BC
-/// can show "We received your package" — the #1 anxiety-reducer in return flows.
-/// </summary>
-public static class ReceiveReturnHandler
-{
-    public static ProblemDetails Before(ReceiveReturn command, Return? aggregate)
-    {
-        if (aggregate is null)
-            return new ProblemDetails { Detail = "Return not found.", Status = 404 };
-
-        if (aggregate.Status != ReturnStatus.Approved)
-            return new ProblemDetails
-            {
-                Detail = $"Return must be in 'Approved' state to be received. Current state: '{aggregate.Status}'.",
-                Status = 409
-            };
-
-        return WolverineContinue.NoProblems;
-    }
-
-    [WolverinePost("/api/returns/{returnId}/receive")]
-    public static (ReturnReceived, OutgoingMessages) Handle(
-        ReceiveReturn command,
-        [WriteAggregate] Return aggregate)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var domainEvent = new ReturnReceived(
-            ReturnId: command.ReturnId,
-            ReceivedAt: now);
-
-        var outgoing = new OutgoingMessages();
-        outgoing.Add(new Messages.Contracts.Returns.ReturnReceived(
-            ReturnId: command.ReturnId,
-            OrderId: aggregate.OrderId,
-            CustomerId: aggregate.CustomerId,
-            ReceivedAt: now));
-
-        return (domainEvent, outgoing);
-    }
-}
+// ---------------------------------------------------------------------------
+// Handler
+// ---------------------------------------------------------------------------
 
 /// <summary>
 /// Inspector submits inspection results for a received return.
@@ -349,39 +237,5 @@ public static class SubmitInspectionHandler
             or ReturnReason.WrongItem or ReturnReason.DamagedInTransit;
         var fee = isFeeExempt ? 0m : Math.Round(item.LineTotal * restockingFeeRate, 2);
         return item.LineTotal - fee;
-    }
-}
-
-/// <summary>
-/// Scheduled command that fires when an approved return is never shipped.
-/// Only expires if the return is still in Approved state (no-op if already transitioned).
-/// Publishes ReturnExpired integration event for Notifications BC and Orders saga.
-/// </summary>
-public static class ExpireReturnHandler
-{
-    public static async Task Handle(
-        ExpireReturn command,
-        IDocumentSession session,
-        IMessageBus bus,
-        CancellationToken ct)
-    {
-        var aggregate = await session.Events.AggregateStreamAsync<Return>(command.ReturnId, token: ct);
-
-        // No-op if already past Approved state (customer shipped, or CS intervened)
-        if (aggregate is null || aggregate.Status != ReturnStatus.Approved)
-            return;
-
-        var expired = new ReturnExpired(
-            ReturnId: command.ReturnId,
-            ExpiredAt: DateTimeOffset.UtcNow);
-
-        session.Events.Append(command.ReturnId, expired);
-
-        // Publish integration event for Notifications BC and Orders saga
-        await bus.PublishAsync(new Messages.Contracts.Returns.ReturnExpired(
-            ReturnId: command.ReturnId,
-            OrderId: aggregate.OrderId,
-            CustomerId: aggregate.CustomerId,
-            ExpiredAt: expired.ExpiredAt));
     }
 }

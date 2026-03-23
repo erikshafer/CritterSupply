@@ -1,38 +1,10 @@
 namespace Returns.Returns;
 
-/// <summary>
-/// Request from the command to capture the exchange request details
-/// </summary>
-public sealed record RequestReturnExchangeRequest(
-    string ReplacementSku,
-    int ReplacementQuantity,
-    decimal ReplacementUnitPrice);
-
-public sealed record RequestReturn(
-    Guid OrderId,
-    Guid CustomerId,
-    IReadOnlyList<RequestReturnItem> Items,
-    RequestReturnExchangeRequest? ExchangeRequest = null);
-
-public sealed record RequestReturnItem(
-    string Sku,
-    string ProductName,
-    int Quantity,
-    decimal UnitPrice,
-    ReturnReason Reason,
-    string? Explanation = null);
-
 public sealed record ApproveReturn(Guid ReturnId);
-
-public sealed record DenyReturn(Guid ReturnId, string Reason, string Message);
 
 public sealed record ReceiveReturn(Guid ReturnId);
 
 public sealed record StartInspection(Guid ReturnId, string InspectorId);
-
-public sealed record SubmitInspection(
-    Guid ReturnId,
-    IReadOnlyList<InspectionLineResult> Results);
 
 public sealed record ExpireReturn(Guid ReturnId);
 

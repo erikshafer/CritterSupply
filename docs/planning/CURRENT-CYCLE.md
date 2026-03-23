@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M33.0 — Code Correction + Broken Feedback Loop Repair (ACTIVE) |
-| **Status** | 🚀 IN PROGRESS — Phase 1 COMPLETE, Phase 2 COMPLETE (9/9 items), Priority 3 RECOVERY DONE |
-| **Deliverables** | Phase 1 (XC-1 + CheckoutCompleted) ✅, Phase 2 (Quick Wins) ✅, structural refactors (in progress) |
+| **Status** | 🚀 IN PROGRESS — Phase 1 COMPLETE, Phase 2 COMPLETE (9/9 items), Phase 3 IN PROGRESS (2/8 items complete) |
+| **Deliverables** | Phase 1 ✅, Phase 2 ✅, Phase 3 partial (R-4 ✅, R-1 27% complete) |
 | **Recent Completion** | M32.4 — Backoffice Phase 4 (2026-03-21), M32.3 — Backoffice Phase 3B (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-23 (M33.0 Session 9 complete — Phase 2 delivered: All 9 Quick Wins items)*
+*Last Updated: 2026-03-23 (M33.0 Session 10 complete — Phase 3 started: R-4 delivered, R-1 3/11 commands)*
 
 ---
 
@@ -124,6 +124,17 @@
 - ✅ Retrospective documenting Phase 2 completion created
 - **See:** `docs/planning/milestones/m33-0-session-9-retrospective.md`
 
+**Session 10 Completion (2026-03-23):**
+- ✅ **Phase 3 STARTED:** R-4 fully delivered, R-1 partial (3/11 commands) — 27% complete
+- ✅ R-4: Exploded `ReturnCommandHandlers.cs` (387 lines) → 5 individual handler files
+- ✅ R-1 (3/11): Created vertical slices for DenyReturn, SubmitInspection, RequestReturn
+- ✅ ReturnValidators.cs now empty (all validators moved to vertical slice files)
+- ✅ Build: 0 errors, 36 pre-existing warnings (unchanged)
+- ⚠️ Pre-existing test failures (14 failures, 30 passed — auth issues, not refactoring-related)
+- ✅ Session plan documenting Phase 3 scope and sequencing created
+- ✅ Session retrospective documenting learnings and shared type dependencies created
+- **See:** `docs/planning/milestones/m33-0-session-10-plan.md`, `docs/planning/milestones/m33-0-session-10-retrospective.md`
+
 **Remaining Planned Priorities:**
 3. 📋 **Phase 3:** Returns BC structural refactor (R-1 through R-7 + F-7) — NEXT
 4. 📋 **Phase 4:** Vendor Portal structural refactor (VP-1 through VP-6)
@@ -144,6 +155,8 @@
 - Session 8 Retrospective: `docs/planning/milestones/m33-0-session-8-retrospective.md`
 - Session 9 Plan: `docs/planning/milestones/m33-0-session-9-plan.md`
 - Session 9 Retrospective: `docs/planning/milestones/m33-0-session-9-retrospective.md`
+- Session 10 Plan: `docs/planning/milestones/m33-0-session-10-plan.md`
+- Session 10 Retrospective: `docs/planning/milestones/m33-0-session-10-retrospective.md`
 - ADR 0039: `docs/decisions/0039-canonical-validator-placement.md`
 - M32.4 Retrospective: `docs/planning/milestones/m32-4-session-1-retrospective.md`
 
