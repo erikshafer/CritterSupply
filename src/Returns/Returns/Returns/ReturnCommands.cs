@@ -1,7 +1,5 @@
 namespace Returns.Returns;
 
-public sealed record ExpireReturn(Guid ReturnId);
-
 // ---------------------------------------------------------------------------
 // Exchange-specific commands
 // ---------------------------------------------------------------------------
