@@ -8,11 +8,21 @@ public sealed class VendorLoginPage(IPage page)
 {
     public async Task NavigateAsync() => await page.GotoAsync("/login");
 
-    public async Task FillEmailAsync(string email) =>
-        await page.GetByTestId("email-field").Locator("input").FillAsync(email);
+    public async Task FillEmailAsync(string email)
+    {
+        // Wait for email field to be visible and ready (MudBlazor takes time to render nested inputs)
+        var emailField = page.GetByTestId("email-field").Locator("input");
+        await emailField.WaitForAsync(new LocatorWaitForOptions { Timeout = 10000 });
+        await emailField.FillAsync(email);
+    }
 
-    public async Task FillPasswordAsync(string password) =>
-        await page.GetByTestId("password-field").Locator("input").FillAsync(password);
+    public async Task FillPasswordAsync(string password)
+    {
+        // Wait for password field to be visible and ready
+        var passwordField = page.GetByTestId("password-field").Locator("input");
+        await passwordField.WaitForAsync(new LocatorWaitForOptions { Timeout = 10000 });
+        await passwordField.FillAsync(password);
+    }
 
     public async Task ClickSignInAsync() =>
         await page.GetByTestId("login-btn").ClickAsync();
