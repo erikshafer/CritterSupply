@@ -1,3 +1,4 @@
+using FluentValidation;
 using Marten;
 using Messages.Contracts.VendorPortal;
 using VendorPortal.RealTime;
@@ -17,6 +18,24 @@ namespace VendorPortal.ChangeRequests;
 public sealed record SubmitChangeRequest(
     Guid RequestId,
     Guid VendorTenantId);
+
+/// <summary>
+/// Validates <see cref="SubmitChangeRequest"/> command.
+/// Enforces that both RequestId and VendorTenantId are non-empty GUIDs.
+/// </summary>
+public sealed class SubmitChangeRequestValidator : AbstractValidator<SubmitChangeRequest>
+{
+    public SubmitChangeRequestValidator()
+    {
+        RuleFor(x => x.RequestId)
+            .NotEmpty()
+            .WithMessage("RequestId is required");
+
+        RuleFor(x => x.VendorTenantId)
+            .NotEmpty()
+            .WithMessage("VendorTenantId is required");
+    }
+}
 
 /// <summary>
 /// Handles <see cref="SubmitChangeRequest"/> commands.

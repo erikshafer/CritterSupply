@@ -1,3 +1,4 @@
+using FluentValidation;
 using Marten;
 using Microsoft.Extensions.Logging;
 
@@ -9,6 +10,24 @@ namespace VendorPortal.VendorAccount;
 public sealed record DeleteDashboardViewCommand(
     Guid VendorTenantId,
     Guid ViewId);
+
+/// <summary>
+/// Validates <see cref="DeleteDashboardViewCommand"/>.
+/// Enforces that both VendorTenantId and ViewId are non-empty GUIDs.
+/// </summary>
+public sealed class DeleteDashboardViewCommandValidator : AbstractValidator<DeleteDashboardViewCommand>
+{
+    public DeleteDashboardViewCommandValidator()
+    {
+        RuleFor(x => x.VendorTenantId)
+            .NotEmpty()
+            .WithMessage("VendorTenantId is required");
+
+        RuleFor(x => x.ViewId)
+            .NotEmpty()
+            .WithMessage("ViewId is required");
+    }
+}
 
 /// <summary>
 /// Deletes a saved dashboard view from the vendor's account.

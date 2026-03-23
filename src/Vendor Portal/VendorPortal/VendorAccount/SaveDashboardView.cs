@@ -1,3 +1,4 @@
+using FluentValidation;
 using Marten;
 using Microsoft.Extensions.Logging;
 
@@ -11,6 +12,26 @@ public sealed record SaveDashboardViewCommand(
     Guid VendorTenantId,
     string ViewName,
     DashboardFilterCriteria FilterCriteria);
+
+/// <summary>
+/// Validates <see cref="SaveDashboardViewCommand"/>.
+/// Enforces that VendorTenantId is non-empty and ViewName is valid.
+/// </summary>
+public sealed class SaveDashboardViewCommandValidator : AbstractValidator<SaveDashboardViewCommand>
+{
+    public SaveDashboardViewCommandValidator()
+    {
+        RuleFor(x => x.VendorTenantId)
+            .NotEmpty()
+            .WithMessage("VendorTenantId is required");
+
+        RuleFor(x => x.ViewName)
+            .NotEmpty()
+            .WithMessage("View name is required")
+            .MaximumLength(100)
+            .WithMessage("View name cannot exceed 100 characters");
+    }
+}
 
 /// <summary>
 /// Saves a named dashboard view to the vendor's account.

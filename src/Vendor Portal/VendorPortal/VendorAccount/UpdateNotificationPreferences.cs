@@ -1,3 +1,4 @@
+using FluentValidation;
 using Marten;
 using Microsoft.Extensions.Logging;
 
@@ -14,6 +15,21 @@ public sealed record UpdateNotificationPreferencesCommand(
     bool ChangeRequestDecisions,
     bool InventoryUpdates,
     bool SalesMetrics);
+
+/// <summary>
+/// Validates <see cref="UpdateNotificationPreferencesCommand"/>.
+/// Enforces that VendorTenantId is non-empty.
+/// Boolean preferences do not require validation (default false is acceptable).
+/// </summary>
+public sealed class UpdateNotificationPreferencesCommandValidator : AbstractValidator<UpdateNotificationPreferencesCommand>
+{
+    public UpdateNotificationPreferencesCommandValidator()
+    {
+        RuleFor(x => x.VendorTenantId)
+            .NotEmpty()
+            .WithMessage("VendorTenantId is required");
+    }
+}
 
 /// <summary>
 /// Updates notification preference toggles on the vendor's account.

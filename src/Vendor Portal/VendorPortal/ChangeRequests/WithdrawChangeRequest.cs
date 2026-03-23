@@ -1,3 +1,4 @@
+using FluentValidation;
 using Marten;
 using VendorPortal.RealTime;
 
@@ -12,6 +13,24 @@ namespace VendorPortal.ChangeRequests;
 public sealed record WithdrawChangeRequest(
     Guid RequestId,
     Guid VendorTenantId);
+
+/// <summary>
+/// Validates <see cref="WithdrawChangeRequest"/> command.
+/// Enforces that both RequestId and VendorTenantId are non-empty GUIDs.
+/// </summary>
+public sealed class WithdrawChangeRequestValidator : AbstractValidator<WithdrawChangeRequest>
+{
+    public WithdrawChangeRequestValidator()
+    {
+        RuleFor(x => x.RequestId)
+            .NotEmpty()
+            .WithMessage("RequestId is required");
+
+        RuleFor(x => x.VendorTenantId)
+            .NotEmpty()
+            .WithMessage("VendorTenantId is required");
+    }
+}
 
 /// <summary>
 /// Handles <see cref="WithdrawChangeRequest"/> commands.

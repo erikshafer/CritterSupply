@@ -1,3 +1,4 @@
+using FluentValidation;
 using Marten;
 using Messages.Contracts.VendorPortal;
 using VendorPortal.RealTime;
@@ -16,6 +17,30 @@ public sealed record ProvideAdditionalInfo(
     Guid RequestId,
     Guid VendorTenantId,
     string Response);
+
+/// <summary>
+/// Validates <see cref="ProvideAdditionalInfo"/> command.
+/// Enforces required fields and length constraints on the vendor's response.
+/// </summary>
+public sealed class ProvideAdditionalInfoValidator : AbstractValidator<ProvideAdditionalInfo>
+{
+    public ProvideAdditionalInfoValidator()
+    {
+        RuleFor(x => x.RequestId)
+            .NotEmpty()
+            .WithMessage("RequestId is required");
+
+        RuleFor(x => x.VendorTenantId)
+            .NotEmpty()
+            .WithMessage("VendorTenantId is required");
+
+        RuleFor(x => x.Response)
+            .NotEmpty()
+            .WithMessage("Response is required")
+            .MaximumLength(2000)
+            .WithMessage("Response cannot exceed 2000 characters");
+    }
+}
 
 /// <summary>
 /// Handles <see cref="ProvideAdditionalInfo"/> commands.

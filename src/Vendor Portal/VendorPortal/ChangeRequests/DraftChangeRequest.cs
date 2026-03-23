@@ -1,3 +1,4 @@
+using FluentValidation;
 using Marten;
 
 namespace VendorPortal.ChangeRequests;
@@ -25,6 +26,56 @@ public sealed record DraftChangeRequest(
     string Details,
     string? AdditionalNotes = null,
     IReadOnlyList<string>? ImageStorageKeys = null);
+
+/// <summary>
+/// Validates <see cref="DraftChangeRequest"/> command.
+/// Enforces required fields, string length constraints, and Image type-specific rules.
+/// </summary>
+public sealed class DraftChangeRequestValidator : AbstractValidator<DraftChangeRequest>
+{
+    public DraftChangeRequestValidator()
+    {
+        RuleFor(x => x.RequestId)
+            .NotEmpty()
+            .WithMessage("RequestId is required");
+
+        RuleFor(x => x.VendorTenantId)
+            .NotEmpty()
+            .WithMessage("VendorTenantId is required");
+
+        RuleFor(x => x.SubmittedByUserId)
+            .NotEmpty()
+            .WithMessage("SubmittedByUserId is required");
+
+        RuleFor(x => x.Sku)
+            .NotEmpty()
+            .WithMessage("SKU is required")
+            .MaximumLength(50)
+            .WithMessage("SKU cannot exceed 50 characters");
+
+        RuleFor(x => x.Title)
+            .NotEmpty()
+            .WithMessage("Title is required")
+            .MaximumLength(200)
+            .WithMessage("Title cannot exceed 200 characters");
+
+        RuleFor(x => x.Details)
+            .NotEmpty()
+            .WithMessage("Details are required")
+            .MaximumLength(2000)
+            .WithMessage("Details cannot exceed 2000 characters");
+
+        RuleFor(x => x.AdditionalNotes)
+            .MaximumLength(500)
+            .When(x => !string.IsNullOrWhiteSpace(x.AdditionalNotes))
+            .WithMessage("Additional notes cannot exceed 500 characters");
+
+        RuleFor(x => x.ImageStorageKeys)
+            .NotEmpty()
+            .When(x => x.Type == ChangeRequestType.Image)
+            .WithMessage("Image storage keys are required for Image type change requests");
+    }
+}
 
 /// <summary>
 /// Handles <see cref="DraftChangeRequest"/> commands.
