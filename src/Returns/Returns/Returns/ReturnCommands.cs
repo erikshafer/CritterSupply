@@ -5,11 +5,6 @@ namespace Returns.Returns;
 // ---------------------------------------------------------------------------
 
 /// <summary>
-/// CS agent approves an exchange request after verifying stock availability.
-/// </summary>
-public sealed record ApproveExchange(Guid ReturnId);
-
-/// <summary>
 /// CS agent denies an exchange request (out of stock, outside window, or replacement too expensive).
 /// </summary>
 public sealed record DenyExchange(Guid ReturnId, string Reason, string Message);
