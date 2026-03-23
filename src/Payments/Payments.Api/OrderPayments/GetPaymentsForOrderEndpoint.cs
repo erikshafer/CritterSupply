@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Payments.Processing;
 using Wolverine.Http;
 
-namespace Payments.Api.Queries;
+namespace Payments.Api.OrderPayments;
 
 /// <summary>
 /// Wolverine HTTP endpoint for querying payments by order ID.
