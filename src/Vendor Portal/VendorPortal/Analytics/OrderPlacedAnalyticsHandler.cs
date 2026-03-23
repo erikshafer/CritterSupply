@@ -3,7 +3,7 @@ using Messages.Contracts.Orders;
 using VendorPortal.RealTime;
 using VendorPortal.VendorProductCatalog;
 
-namespace VendorPortal.Analytics.Handlers;
+namespace VendorPortal.Analytics;
 
 /// <summary>
 /// Handles <see cref="OrderPlaced"/> integration messages from the Orders BC.

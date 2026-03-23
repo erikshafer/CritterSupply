@@ -3,7 +3,7 @@ using Messages.Contracts.Inventory;
 using VendorPortal.RealTime;
 using VendorPortal.VendorProductCatalog;
 
-namespace VendorPortal.Analytics.Handlers;
+namespace VendorPortal.Analytics;
 
 /// <summary>
 /// Handles <see cref="LowStockDetected"/> integration messages from the Inventory BC.

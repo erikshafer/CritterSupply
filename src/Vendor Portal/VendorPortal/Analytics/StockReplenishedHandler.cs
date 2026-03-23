@@ -2,7 +2,7 @@ using Marten;
 using Messages.Contracts.Inventory;
 using VendorPortal.VendorProductCatalog;
 
-namespace VendorPortal.Analytics.Handlers;
+namespace VendorPortal.Analytics;
 
 /// <summary>
 /// Handles <see cref="StockReplenished"/> integration messages from the Inventory BC.
