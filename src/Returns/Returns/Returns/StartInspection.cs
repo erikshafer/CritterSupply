@@ -1,4 +1,4 @@
-using Marten;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -8,9 +8,20 @@ using Wolverine.Marten;
 namespace Returns.Returns;
 
 /// <summary>
-/// Inspector starts manual inspection of a received return.
-/// Publishes InspectionStarted domain event.
+/// Inspector starts inspection of a received return.
+/// Return moves from ReceivedAwaitingInspection → InspectionInProgress state.
 /// </summary>
+public sealed record StartInspection(Guid ReturnId, string InspectorId);
+
+public sealed class StartInspectionValidator : AbstractValidator<StartInspection>
+{
+    public StartInspectionValidator()
+    {
+        RuleFor(x => x.ReturnId).NotEmpty().WithMessage("ReturnId is required.");
+        RuleFor(x => x.InspectorId).NotEmpty().WithMessage("InspectorId is required.");
+    }
+}
+
 public static class StartInspectionHandler
 {
     public static ProblemDetails Before(StartInspection command, Return? aggregate)
@@ -33,9 +44,11 @@ public static class StartInspectionHandler
         StartInspection command,
         [WriteAggregate] Return aggregate)
     {
+        var now = DateTimeOffset.UtcNow;
+
         return new InspectionStarted(
             ReturnId: command.ReturnId,
             InspectorId: command.InspectorId,
-            StartedAt: DateTimeOffset.UtcNow);
+            StartedAt: now);
     }
 }
