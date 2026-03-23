@@ -1,6 +1,6 @@
 using Marten;
 
-namespace Returns.Returns;
+namespace Returns.Integration;
 
 /// <summary>
 /// Handles Fulfillment.ShipmentDelivered integration event.
@@ -15,14 +15,14 @@ public static class ShipmentDeliveredHandler
         CancellationToken ct)
     {
         // Idempotency: check if eligibility window already exists
-        var existing = await session.LoadAsync<ReturnEligibilityWindow>(message.OrderId, ct);
+        var existing = await session.LoadAsync<Returns.ReturnEligibilityWindow>(message.OrderId, ct);
         if (existing is not null)
             return;
 
         var deliveredAt = message.DeliveredAt;
-        var windowExpiresAt = deliveredAt.AddDays(ReturnEligibilityWindow.ReturnWindowDays);
+        var windowExpiresAt = deliveredAt.AddDays(Returns.ReturnEligibilityWindow.ReturnWindowDays);
 
-        var eligibilityWindow = new ReturnEligibilityWindow
+        var eligibilityWindow = new Returns.ReturnEligibilityWindow
         {
             Id = message.OrderId,
             OrderId = message.OrderId,
