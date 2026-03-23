@@ -30,13 +30,16 @@ public sealed class VendorDashboardStepDefinitions
         var loginPage = new VendorLoginPage(Page);
         await loginPage.NavigateAsync();
 
-        // Wait for WASM hydration
+        // Wait for WASM hydration and login form to be ready
         await Page.WaitForSelectorAsync("[data-testid='login-btn']", new PageWaitForSelectorOptions
         {
             Timeout = 30000
         });
 
-        await loginPage.LoginAsync(email, password);
+        // Fill credentials and submit (without re-navigating)
+        await loginPage.FillEmailAsync(email);
+        await loginPage.FillPasswordAsync(password);
+        await loginPage.ClickSignInAsync();
 
         // Wait for dashboard redirect
         await Page.WaitForURLAsync("**/dashboard", new PageWaitForURLOptions { Timeout = 15000 });
