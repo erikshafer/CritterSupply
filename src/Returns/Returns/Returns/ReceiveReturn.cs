@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -7,10 +8,19 @@ using Wolverine.Marten;
 namespace Returns.Returns;
 
 /// <summary>
-/// Warehouse records physical receipt of a return shipment.
-/// Publishes ReturnReceived integration event so Customer Experience BC
-/// can show "We received your package" — the #1 anxiety-reducer in return flows.
+/// Warehouse receives the physical return shipment and logs it in the system.
+/// Return moves from Approved → ReceivedAwaitingInspection state.
 /// </summary>
+public sealed record ReceiveReturn(Guid ReturnId);
+
+public sealed class ReceiveReturnValidator : AbstractValidator<ReceiveReturn>
+{
+    public ReceiveReturnValidator()
+    {
+        RuleFor(x => x.ReturnId).NotEmpty().WithMessage("ReturnId is required.");
+    }
+}
+
 public static class ReceiveReturnHandler
 {
     public static ProblemDetails Before(ReceiveReturn command, Return? aggregate)
@@ -21,7 +31,7 @@ public static class ReceiveReturnHandler
         if (aggregate.Status != ReturnStatus.Approved)
             return new ProblemDetails
             {
-                Detail = $"Return must be in 'Approved' state to be received. Current state: '{aggregate.Status}'.",
+                Detail = $"Return is in '{aggregate.Status}' state and cannot be received. Only returns in 'Approved' state can be received.",
                 Status = 409
             };
 
