@@ -49,7 +49,7 @@ public sealed record Checkout(
     public Checkout Apply(PaymentMethodProvided @event) =>
         this with { PaymentMethodToken = @event.PaymentMethodToken };
 
-    public Checkout Apply(CheckoutCompleted @event) =>
+    public Checkout Apply(OrderCreated @event) =>
         this with { IsCompleted = true };
 
     public decimal Subtotal => Items.Sum(i => i.Quantity * i.UnitPrice);

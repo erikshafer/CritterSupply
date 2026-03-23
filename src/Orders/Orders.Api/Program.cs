@@ -108,9 +108,9 @@ builder.Host.UseWolverine(opts =>
     opts.ListenToRabbitQueue("orders-checkout-initiated")
         .ProcessInline();
 
-    // Route CheckoutCompleted internally to start Order saga
+    // Route CartCheckoutCompleted internally to start Order saga
     // (CompleteCheckout handler publishes this after checkout finalization)
-    opts.PublishMessage<Messages.Contracts.Shopping.CheckoutCompleted>()
+    opts.PublishMessage<Messages.Contracts.Shopping.CartCheckoutCompleted>()
         .ToLocalQueue("order-placement")
         .UseDurableInbox();
 

@@ -46,7 +46,7 @@ public class ShoppingIntegrationTests : IAsyncLifetime
             "98101",
             "USA");
 
-        var checkoutCompleted = new Messages.Contracts.Shopping.CheckoutCompleted(
+        var checkoutCompleted = new Messages.Contracts.Shopping.CartCheckoutCompleted(
             orderId,
             checkoutId,
             customerId,
@@ -98,7 +98,7 @@ public class ShoppingIntegrationTests : IAsyncLifetime
             "80202",
             "USA");
 
-        var checkoutCompleted = new Messages.Contracts.Shopping.CheckoutCompleted(
+        var checkoutCompleted = new Messages.Contracts.Shopping.CartCheckoutCompleted(
             orderId,
             checkoutId,
             customerId,

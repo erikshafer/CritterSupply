@@ -60,7 +60,7 @@ public static class CompleteCheckoutHandler
     }
 
     [WolverinePost("/api/checkouts/{checkoutId}/complete")]
-    public static (CheckoutCompleted, ShoppingContracts.CheckoutCompleted) Handle(
+    public static (OrderCreated, ShoppingContracts.CartCheckoutCompleted) Handle(
         CompleteCheckout command,
         [WriteAggregate] Checkout checkout)
     {
@@ -68,11 +68,11 @@ public static class CompleteCheckoutHandler
         var now = DateTimeOffset.UtcNow;
 
         // Terminal event for Checkout stream
-        var checkoutEvent = new CheckoutCompleted(orderId, now);
+        var checkoutEvent = new OrderCreated(orderId, now);
 
         // Prepare integration message to start Order saga
         // Wolverine will automatically cascade this message (no OutgoingMessages wrapper needed)
-        var integrationMessage = new ShoppingContracts.CheckoutCompleted(
+        var integrationMessage = new ShoppingContracts.CartCheckoutCompleted(
             orderId,
             checkout.Id,
             checkout.CustomerId,

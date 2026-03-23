@@ -2,7 +2,7 @@ using Messages.Contracts.CustomerIdentity;
 
 namespace Messages.Contracts.Shopping;
 
-public sealed record CheckoutCompleted(
+public sealed record CartCheckoutCompleted(
     Guid OrderId,
     Guid CheckoutId,
     Guid? CustomerId,

@@ -22,7 +22,7 @@ public static class OrderDecider
     /// Decides to create a new Order saga from PlaceOrder command.
     /// Pure function - accepts time as parameter for true purity.
     /// </summary>
-    /// <param name="command">The place order command (mapped from Shopping BC's CheckoutCompleted).</param>
+    /// <param name="command">The place order command (mapped from Shopping BC's CartCheckoutCompleted).</param>
     /// <param name="timestamp">Current timestamp for event timestamping.</param>
     /// <returns>A tuple of the new Order saga and the OrderPlaced event to publish.</returns>
     public static (Order, IntegrationMessages.OrderPlaced) Start(

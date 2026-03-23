@@ -140,7 +140,7 @@ public class TestFixture : IAsyncLifetime
     /// This is the ONLY way to start an Order saga in tests.
     /// Maps from Orders domain types to Shopping integration contract types.
     /// </summary>
-    public static Messages.Contracts.Shopping.CheckoutCompleted CreateCheckoutCompletedMessage(
+    public static Messages.Contracts.Shopping.CartCheckoutCompleted CreateCheckoutCompletedMessage(
         Guid orderId,
         Guid checkoutId,
         Guid? customerId,
@@ -164,7 +164,7 @@ public class TestFixture : IAsyncLifetime
             shippingAddress.PostalCode,
             shippingAddress.Country);
 
-        return new Messages.Contracts.Shopping.CheckoutCompleted(
+        return new Messages.Contracts.Shopping.CartCheckoutCompleted(
             orderId,
             checkoutId,
             customerId,
@@ -180,7 +180,7 @@ public class TestFixture : IAsyncLifetime
     /// Simplified helper to create a CheckoutCompleted message with test defaults.
     /// Use this for tests that just need to create an order without caring about specific details.
     /// </summary>
-    public static Messages.Contracts.Shopping.CheckoutCompleted CreateCheckoutCompletedMessage(
+    public static Messages.Contracts.Shopping.CartCheckoutCompleted CreateCheckoutCompletedMessage(
         Guid? customerId = null)
     {
         var orderId = Guid.CreateVersion7();
@@ -205,7 +205,7 @@ public class TestFixture : IAsyncLifetime
             "62701",
             "USA");
 
-        return new Messages.Contracts.Shopping.CheckoutCompleted(
+        return new Messages.Contracts.Shopping.CartCheckoutCompleted(
             orderId,
             checkoutId,
             actualCustomerId,
