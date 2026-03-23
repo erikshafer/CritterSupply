@@ -177,7 +177,7 @@ public class ReturnsToOrdersPipelineTests(CrossBcTestFixture fixture)
     // Helper Methods
     // ---------------------------------------------------------------------------
 
-    private static Messages.Contracts.Shopping.CheckoutCompleted CreateCheckoutCompletedMessage(
+    private static Messages.Contracts.Shopping.CartCheckoutCompleted CreateCheckoutCompletedMessage(
         Guid orderId,
         Guid customerId)
     {
@@ -195,7 +195,7 @@ public class ReturnsToOrdersPipelineTests(CrossBcTestFixture fixture)
             "62701",
             "USA");
 
-        return new Messages.Contracts.Shopping.CheckoutCompleted(
+        return new Messages.Contracts.Shopping.CartCheckoutCompleted(
             orderId,
             Guid.CreateVersion7(),
             customerId,

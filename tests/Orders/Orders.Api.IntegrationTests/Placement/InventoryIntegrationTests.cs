@@ -8,7 +8,7 @@ namespace Orders.Api.IntegrationTests.Placement;
 /// Integration tests for inventory-related saga handlers in Orders.
 /// Tests the integration between Inventory BC and Orders BC.
 /// </summary>
-[Collection("orders-integration")]
+[Collection(IntegrationTestCollection.Name)]
 public class InventoryIntegrationTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;

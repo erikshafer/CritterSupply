@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Orders.Placement;
 using Wolverine.Http;
 
-namespace Orders.Api.Queries;
+namespace Orders.Api.Returns;
 
 public sealed record ReturnableItemsResponse(
     Guid OrderId,

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Wolverine.Http;
 
-namespace Inventory.Api.Queries;
+namespace Inventory.Api.StockQueries;
 
 /// <summary>
 /// Response DTO for stock level queries.

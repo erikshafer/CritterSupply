@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Wolverine.Http;
 
-namespace Fulfillment.Api.Queries;
+namespace Fulfillment.Api.OrderFulfillment;
 
 /// <summary>
 /// Response DTO for shipment queries.

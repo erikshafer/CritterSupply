@@ -1,4 +1,4 @@
-using Inventory.Api.Commands;
+using Inventory.Api.InventoryManagement;
 using Inventory.Management;
 using Marten;
 using Shouldly;

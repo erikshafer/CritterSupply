@@ -295,7 +295,7 @@ public class CrossBcTestFixture : IAsyncLifetime
     public async Task<Guid> CreateOrderSagaAsync(
         Guid orderId,
         Guid customerId,
-        Messages.Contracts.Shopping.CheckoutCompleted checkoutCompleted)
+        Messages.Contracts.Shopping.CartCheckoutCompleted checkoutCompleted)
     {
         // Invoke CheckoutCompleted directly on Orders host WITHOUT tracking
         // This triggers PlaceOrderHandler which returns (Order saga, OrderPlaced event)

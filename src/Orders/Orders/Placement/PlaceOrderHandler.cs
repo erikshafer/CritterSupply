@@ -3,20 +3,20 @@ using IntegrationMessages = Messages.Contracts.Orders;
 namespace Orders.Placement;
 
 /// <summary>
-/// Message handler that receives CheckoutCompleted integration message and starts the Order saga.
+/// Message handler that receives CartCheckoutCompleted integration message and starts the Order saga.
 /// Separated from the Order saga class to keep state-transition handlers focused.
 /// The return type of (Order, ...) is recognized by Wolverine as a saga start handler.
 /// </summary>
 public static class PlaceOrderHandler
 {
     /// <summary>
-    /// Handles CheckoutCompleted integration message by starting a new Order saga.
+    /// Handles CartCheckoutCompleted integration message by starting a new Order saga.
     /// This is the ONLY way to create Order sagas in production.
     /// </summary>
-    /// <param name="message">The checkout completed integration message from Shopping BC.</param>
+    /// <param name="message">The cart checkout completed integration message from Shopping BC.</param>
     /// <returns>The new Order saga instance + OrderPlaced cascading message.</returns>
     public static (Order, IntegrationMessages.OrderPlaced) Handle(
-        Messages.Contracts.Shopping.CheckoutCompleted message)
+        Messages.Contracts.Shopping.CartCheckoutCompleted message)
     {
         // Map integration message to domain command
         var command = new PlaceOrder(

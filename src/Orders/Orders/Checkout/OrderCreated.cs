@@ -1,5 +1,5 @@
 namespace Orders.Checkout;
 
-public sealed record CheckoutCompleted(
+public sealed record OrderCreated(
     Guid OrderId,
     DateTimeOffset CompletedAt);

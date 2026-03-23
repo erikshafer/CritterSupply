@@ -48,7 +48,7 @@ public class InventoryQueryTests : IAsyncLifetime
         });
 
         // Assert: Verify response structure and values
-        var response = result.ReadAsJson<Api.Queries.StockLevelResponse>();
+        var response = result.ReadAsJson<Api.StockQueries.StockLevelResponse>();
         response.ShouldNotBeNull();
         response.Sku.ShouldBe(sku);
         response.WarehouseId.ShouldBe(warehouseId);
@@ -94,7 +94,7 @@ public class InventoryQueryTests : IAsyncLifetime
         });
 
         // Assert: Verify warehouse matches
-        var response = result.ReadAsJson<Api.Queries.StockLevelResponse>();
+        var response = result.ReadAsJson<Api.StockQueries.StockLevelResponse>();
         response.ShouldNotBeNull();
         response.WarehouseId.ShouldBe(warehouseId);
         response.AvailableQuantity.ShouldBe(initialQuantity);
@@ -127,7 +127,7 @@ public class InventoryQueryTests : IAsyncLifetime
         });
 
         // Assert: Verify only low stock items returned
-        var response = result.ReadAsJson<Api.Queries.LowStockResponse>();
+        var response = result.ReadAsJson<Api.StockQueries.LowStockResponse>();
         response.ShouldNotBeNull();
         response.TotalLowStockItems.ShouldBe(2);
         response.Items.Count.ShouldBe(2);
@@ -166,7 +166,7 @@ public class InventoryQueryTests : IAsyncLifetime
         });
 
         // Assert: Only items < 20 returned
-        var response = result.ReadAsJson<Api.Queries.LowStockResponse>();
+        var response = result.ReadAsJson<Api.StockQueries.LowStockResponse>();
         response.ShouldNotBeNull();
         response.TotalLowStockItems.ShouldBe(1);
         response.Items.Count.ShouldBe(1);
@@ -194,7 +194,7 @@ public class InventoryQueryTests : IAsyncLifetime
         });
 
         // Assert: Empty list
-        var response = result.ReadAsJson<Api.Queries.LowStockResponse>();
+        var response = result.ReadAsJson<Api.StockQueries.LowStockResponse>();
         response.ShouldNotBeNull();
         response.TotalLowStockItems.ShouldBe(0);
         response.Items.Count.ShouldBe(0);

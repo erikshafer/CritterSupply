@@ -8,7 +8,7 @@ namespace Orders.Api.IntegrationTests.Placement;
 /// Integration tests for payment-related saga handlers in Orders.
 /// Tests the integration between Payments BC and Orders BC.
 /// </summary>
-[Collection("orders-integration")]
+[Collection(IntegrationTestCollection.Name)]
 public class PaymentIntegrationTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;

@@ -7,7 +7,7 @@ namespace Orders.Api.IntegrationTests.Placement;
 /// Integration tests for Shopping-related saga handlers in Orders.
 /// Tests the integration between Shopping BC and Orders BC.
 /// </summary>
-[Collection("orders-integration")]
+[Collection(IntegrationTestCollection.Name)]
 public class ShoppingIntegrationTests : IAsyncLifetime
 {
     private readonly TestFixture _fixture;
@@ -46,7 +46,7 @@ public class ShoppingIntegrationTests : IAsyncLifetime
             "98101",
             "USA");
 
-        var checkoutCompleted = new Messages.Contracts.Shopping.CheckoutCompleted(
+        var checkoutCompleted = new Messages.Contracts.Shopping.CartCheckoutCompleted(
             orderId,
             checkoutId,
             customerId,
@@ -98,7 +98,7 @@ public class ShoppingIntegrationTests : IAsyncLifetime
             "80202",
             "USA");
 
-        var checkoutCompleted = new Messages.Contracts.Shopping.CheckoutCompleted(
+        var checkoutCompleted = new Messages.Contracts.Shopping.CartCheckoutCompleted(
             orderId,
             checkoutId,
             customerId,
