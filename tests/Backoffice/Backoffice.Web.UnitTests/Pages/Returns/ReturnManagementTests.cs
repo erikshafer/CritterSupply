@@ -1,10 +1,8 @@
-using System.Net;
-using System.Net.Http.Json;
+using System.Security.Claims;
 using Backoffice.Web.Auth;
 using Backoffice.Web.Hub;
 using Backoffice.Web.Pages.Returns;
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Authorization;
+using Bunit.TestDoubles;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -20,7 +18,7 @@ namespace Backoffice.Web.Tests.Pages.Returns;
 /// </summary>
 public sealed class ReturnManagementTests : BunitTestBase
 {
-    private readonly Mock<IHttpClientFactory> _httpClientFactoryMock;
+    private readonly MockHttpMessageHandler _mockHandler = new();
     private readonly Mock<ISnackbar> _snackbarMock;
     private readonly Mock<ILogger<ReturnManagement>> _loggerMock;
     private readonly Mock<ILogger<BackofficeHubService>> _hubServiceLoggerMock;
@@ -31,7 +29,17 @@ public sealed class ReturnManagementTests : BunitTestBase
 
     public ReturnManagementTests()
     {
-        _httpClientFactoryMock = new Mock<IHttpClientFactory>();
+        // Setup bUnit authorization
+        var authContext = this.AddAuthorization();
+        authContext.SetAuthorized("test@backoffice.test");
+        authContext.SetClaims(
+            new Claim(ClaimTypes.Role, "customer-service"),
+            new Claim(ClaimTypes.Email, "test@backoffice.test"),
+            new Claim(ClaimTypes.Name, "Test User")
+        );
+        authContext.SetPolicies("CustomerService");
+
+        // Mock services
         _snackbarMock = new Mock<ISnackbar>();
         _loggerMock = new Mock<ILogger<ReturnManagement>>();
         _hubServiceLoggerMock = new Mock<ILogger<BackofficeHubService>>();
@@ -52,12 +60,7 @@ public sealed class ReturnManagementTests : BunitTestBase
         _configurationMock.Setup(c => c["BackofficeApiUrl"]).Returns("https://localhost:5243");
 
         // Setup HTTP mock to return empty array (for initial load)
-        var httpClient = new HttpClient(new MockHttpMessageHandler(_ =>
-            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = JsonContent.Create(Array.Empty<object>())
-            })));
-        _httpClientFactoryMock.Setup(f => f.CreateClient("BackofficeApi")).Returns(httpClient);
+        _mockHandler.SetResponse("/api/returns", Array.Empty<object>());
 
         // Create real hub service with mocked dependencies
         _hubService = new BackofficeHubService(_authState, _configurationMock.Object, _hubServiceLoggerMock.Object);
@@ -66,15 +69,12 @@ public sealed class ReturnManagementTests : BunitTestBase
         _sessionExpiredService = new SessionExpiredService();
 
         // Register services
-        Services.AddSingleton(_httpClientFactoryMock.Object);
+        Services.AddSingleton<IHttpClientFactory>(new MockHttpClientFactory(_mockHandler));
         Services.AddSingleton(_snackbarMock.Object);
         Services.AddSingleton(_loggerMock.Object);
         Services.AddSingleton(_authState);
         Services.AddSingleton(_hubService);
         Services.AddSingleton(_sessionExpiredService);
-        Services.AddSingleton<NavigationManager>(new MockNavigationManager());
-        Services.AddAuthorizationCore();
-        Services.AddSingleton<AuthenticationStateProvider>(new MockAuthenticationStateProvider("customer-service"));
     }
 
     [Fact]
@@ -100,12 +100,13 @@ public sealed class ReturnManagementTests : BunitTestBase
     {
         var cut = RenderWithMud<ReturnManagement>();
 
-        // Wait for loading to complete
-        cut.WaitForState(() => !cut.Markup.Contains("Loading returns"), timeout: TimeSpan.FromSeconds(5));
-
-        var alert = cut.Find("[data-testid='no-returns-alert']");
-        alert.ShouldNotBeNull();
-        alert.TextContent.ShouldContain("No returns found");
+        // Wait for async loading to complete using WaitForAssertion (bUnit pattern)
+        cut.WaitForAssertion(() =>
+        {
+            var alert = cut.Find("[data-testid='no-returns-alert']");
+            alert.ShouldNotBeNull();
+            alert.TextContent.ShouldContain("No returns found");
+        });
     }
 
     [Fact]
@@ -121,11 +122,12 @@ public sealed class ReturnManagementTests : BunitTestBase
     {
         var cut = RenderWithMud<ReturnManagement>();
 
-        // Wait for loading to complete
-        cut.WaitForState(() => !cut.Markup.Contains("Loading returns"), timeout: TimeSpan.FromSeconds(5));
-
-        var refreshButton = cut.Find("[data-testid='refresh-returns-btn']");
-        refreshButton.ShouldNotBeNull();
+        // Wait for async loading to complete using WaitForAssertion
+        cut.WaitForAssertion(() =>
+        {
+            var refreshButton = cut.Find("[data-testid='refresh-returns-btn']");
+            refreshButton.ShouldNotBeNull();
+        });
     }
 
     [Fact]

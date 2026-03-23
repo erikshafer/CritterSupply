@@ -1,6 +1,9 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
-using System.Security.Claims;
 
 namespace Backoffice.Web.Tests;
 
@@ -48,19 +51,67 @@ public sealed class MockAuthenticationStateProvider : AuthenticationStateProvide
 }
 
 /// <summary>
-/// Mock HttpMessageHandler for testing HTTP requests.
+/// A simple mock HttpMessageHandler for bUnit tests that returns preconfigured responses.
 /// </summary>
 public sealed class MockHttpMessageHandler : HttpMessageHandler
 {
-    private readonly Func<HttpRequestMessage, Task<HttpResponseMessage>> _sendAsync;
+    private readonly Dictionary<string, Func<HttpResponseMessage>> _responses = new();
+    private readonly HashSet<string> _pendingRequests = [];
 
-    public MockHttpMessageHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync)
+    public void SetResponse<T>(string pathPrefix, T content)
     {
-        _sendAsync = sendAsync;
+        _responses[pathPrefix] = () => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(content, options: new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            })
+        };
     }
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    public void SetPendingResponse(string pathPrefix)
     {
-        return _sendAsync(request);
+        _pendingRequests.Add(pathPrefix);
+    }
+
+    public void SetErrorResponse(string pathPrefix, HttpStatusCode statusCode)
+    {
+        _responses[pathPrefix] = () => new HttpResponseMessage(statusCode);
+    }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var path = request.RequestUri?.PathAndQuery ?? "";
+
+        if (_pendingRequests.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+        {
+            // Simulate never-completing request for loading state tests
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+
+        foreach (var (prefix, responseFactory) in _responses)
+        {
+            if (path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return responseFactory();
+            }
+        }
+
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+    }
+}
+
+/// <summary>
+/// Mock IHttpClientFactory that creates HttpClient instances backed by a shared mock handler.
+/// </summary>
+public sealed class MockHttpClientFactory(MockHttpMessageHandler handler) : IHttpClientFactory
+{
+    public HttpClient CreateClient(string name)
+    {
+        return new HttpClient(handler)
+        {
+            BaseAddress = new Uri("http://localhost:5243") // Backoffice API URL
+        };
     }
 }

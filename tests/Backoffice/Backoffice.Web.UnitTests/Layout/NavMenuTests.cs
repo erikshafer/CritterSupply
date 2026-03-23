@@ -1,6 +1,6 @@
+using System.Security.Claims;
 using Backoffice.Web.Layout;
-using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.Extensions.DependencyInjection;
+using Bunit.TestDoubles;
 
 namespace Backoffice.Web.Tests.Layout;
 
@@ -10,34 +10,24 @@ namespace Backoffice.Web.Tests.Layout;
 /// </summary>
 public sealed class NavMenuTests : BunitTestBase
 {
-    public NavMenuTests()
+    private BunitAuthorizationContext SetupCustomerServiceRole()
     {
-        Services.AddAuthorizationCore(options =>
-        {
-            // Register policies matching Backoffice authorization policies
-            options.AddPolicy("CustomerService", policy =>
-                policy.RequireRole("customer-service", "operations-manager", "system-admin"));
-            options.AddPolicy("Executive", policy =>
-                policy.RequireRole("executive"));
-            options.AddPolicy("OperationsManager", policy =>
-                policy.RequireRole("operations-manager", "system-admin"));
-            options.AddPolicy("WarehouseClerk", policy =>
-                policy.RequireRole("warehouse-clerk"));
-            options.AddPolicy("PricingManager", policy =>
-                policy.RequireRole("pricing-manager"));
-            options.AddPolicy("CopyWriter", policy =>
-                policy.RequireRole("copy-writer"));
-            options.AddPolicy("SystemAdmin", policy =>
-                policy.RequireRole("system-admin"));
-        });
-
-        Services.AddSingleton<AuthenticationStateProvider>(
-            new MockAuthenticationStateProvider("customer-service"));
+        var authContext = this.AddAuthorization();
+        authContext.SetAuthorized("test@backoffice.test");
+        authContext.SetClaims(
+            new Claim(ClaimTypes.Role, "customer-service"),
+            new Claim(ClaimTypes.Email, "test@backoffice.test"),
+            new Claim(ClaimTypes.Name, "Test User")
+        );
+        authContext.SetPolicies("CustomerService");
+        return authContext;
     }
 
     [Fact]
     public void NavMenu_CustomerServiceRole_ShowsOrderSearchLink()
     {
+        SetupCustomerServiceRole();
+
         var cut = RenderWithMud<NavMenu>();
 
         // Wait for authorization to resolve
@@ -51,6 +41,8 @@ public sealed class NavMenuTests : BunitTestBase
     [Fact]
     public void NavMenu_CustomerServiceRole_ShowsReturnManagementLink()
     {
+        SetupCustomerServiceRole();
+
         var cut = RenderWithMud<NavMenu>();
 
         // Wait for authorization to resolve

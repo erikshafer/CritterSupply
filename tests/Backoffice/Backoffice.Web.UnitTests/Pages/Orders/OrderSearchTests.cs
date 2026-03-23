@@ -1,8 +1,8 @@
+using System.Security.Claims;
 using Backoffice.Web.Auth;
 using Backoffice.Web.Hub;
 using Backoffice.Web.Pages.Orders;
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Authorization;
+using Bunit.TestDoubles;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -29,6 +29,17 @@ public sealed class OrderSearchTests : BunitTestBase
 
     public OrderSearchTests()
     {
+        // Setup bUnit authorization
+        var authContext = this.AddAuthorization();
+        authContext.SetAuthorized("test@backoffice.test");
+        authContext.SetClaims(
+            new Claim(ClaimTypes.Role, "customer-service"),
+            new Claim(ClaimTypes.Email, "test@backoffice.test"),
+            new Claim(ClaimTypes.Name, "Test User")
+        );
+        authContext.SetPolicies("CustomerService");
+
+        // Mock HTTP client factory
         _httpClientFactoryMock = new Mock<IHttpClientFactory>();
         _snackbarMock = new Mock<ISnackbar>();
         _loggerMock = new Mock<ILogger<OrderSearch>>();
@@ -62,9 +73,6 @@ public sealed class OrderSearchTests : BunitTestBase
         Services.AddSingleton(_authState);
         Services.AddSingleton(_hubService);
         Services.AddSingleton(_sessionExpiredService);
-        Services.AddSingleton<NavigationManager>(new MockNavigationManager());
-        Services.AddAuthorizationCore();
-        Services.AddSingleton<AuthenticationStateProvider>(new MockAuthenticationStateProvider("customer-service"));
     }
 
     [Fact]
@@ -81,7 +89,7 @@ public sealed class OrderSearchTests : BunitTestBase
     {
         var cut = RenderWithMud<OrderSearch>();
 
-        var searchButton = cut.Find("[data-testid='search-btn']");
+        var searchButton = cut.Find("[data-testid='search-order-btn']");
         searchButton.ShouldNotBeNull();
         searchButton.TextContent.ShouldContain("Search");
     }
@@ -110,6 +118,6 @@ public sealed class OrderSearchTests : BunitTestBase
 
         // Verify key data-testid attributes exist for E2E testing
         cut.Find("[data-testid='order-search-input']").ShouldNotBeNull();
-        cut.Find("[data-testid='search-btn']").ShouldNotBeNull();
+        cut.Find("[data-testid='search-order-btn']").ShouldNotBeNull();
     }
 }
