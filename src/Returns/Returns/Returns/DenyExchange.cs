@@ -1,18 +1,27 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
+using Wolverine.Http.Marten;
 using Wolverine.Marten;
 
 namespace Returns.Returns;
 
 /// <summary>
-/// CS agent denies an exchange request with customer-facing reason and message.
-/// Common denial reasons:
-/// - OutOfStock: Replacement item not available
-/// - OutsideReturnWindow: Beyond 30-day eligibility
-/// - ReplacementTooExpensive: Replacement costs more (no upcharge collection in v1)
-/// - PolicyViolation: Same-SKU constraint violated or other policy issues
+/// CS agent denies an exchange request (out of stock, outside window, or replacement too expensive).
 /// </summary>
+public sealed record DenyExchange(Guid ReturnId, string Reason, string Message);
+
+public sealed class DenyExchangeValidator : AbstractValidator<DenyExchange>
+{
+    public DenyExchangeValidator()
+    {
+        RuleFor(x => x.ReturnId).NotEmpty().WithMessage("ReturnId is required.");
+        RuleFor(x => x.Reason).NotEmpty().WithMessage("Denial reason is required.");
+        RuleFor(x => x.Message).NotEmpty().WithMessage("Denial message is required.");
+    }
+}
+
 public static class DenyExchangeHandler
 {
     public static ProblemDetails Before(DenyExchange command, Return? aggregate)
@@ -23,7 +32,7 @@ public static class DenyExchangeHandler
         if (aggregate.Type != ReturnType.Exchange)
             return new ProblemDetails
             {
-                Detail = "This return is not an exchange request. Use /api/returns/{id}/deny for refund denials.",
+                Detail = "This return is not an exchange request.",
                 Status = 409
             };
 
@@ -43,7 +52,8 @@ public static class DenyExchangeHandler
         [WriteAggregate] Return aggregate)
     {
         var now = DateTimeOffset.UtcNow;
-        var denied = new ExchangeDenied(
+
+        var domainEvent = new ExchangeDenied(
             ReturnId: command.ReturnId,
             Reason: command.Reason,
             Message: command.Message,
@@ -58,6 +68,6 @@ public static class DenyExchangeHandler
             Message: command.Message,
             DeniedAt: now));
 
-        return (denied, outgoing);
+        return (domainEvent, outgoing);
     }
 }

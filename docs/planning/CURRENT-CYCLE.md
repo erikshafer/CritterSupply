@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M33.0 — Code Correction + Broken Feedback Loop Repair (ACTIVE) |
-| **Status** | 🚀 IN PROGRESS — Phase 1 COMPLETE, Phase 2 COMPLETE (9/9 items), Phase 3 IN PROGRESS (2/8 items complete) |
-| **Deliverables** | Phase 1 ✅, Phase 2 ✅, Phase 3 partial (R-4 ✅, R-1 27% complete) |
+| **Status** | 🚀 IN PROGRESS — Phase 1 COMPLETE, Phase 2 COMPLETE (9/9 items), Phase 3 COMPLETE (3/8 items delivered) |
+| **Deliverables** | Phase 1 ✅, Phase 2 ✅, Phase 3 complete (R-1 ✅, R-3 ✅, R-4 ✅) |
 | **Recent Completion** | M32.4 — Backoffice Phase 4 (2026-03-21), M32.3 — Backoffice Phase 3B (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-23 (M33.0 Session 10 complete — Phase 3 started: R-4 delivered, R-1 3/11 commands)*
+*Last Updated: 2026-03-23 (M33.0 Session 11 complete — Phase 3 delivered: R-1 ✅ 11/11 commands, R-3 ✅ bulk files deleted)*
 
 ---
 
@@ -135,8 +135,19 @@
 - ✅ Session retrospective documenting learnings and shared type dependencies created
 - **See:** `docs/planning/milestones/m33-0-session-10-plan.md`, `docs/planning/milestones/m33-0-session-10-retrospective.md`
 
+**Session 11 Completion (2026-03-23):**
+- ✅ **Phase 3 COMPLETE (R-1 + R-3 delivered):** All 11 command handlers migrated to vertical slices
+- ✅ R-1: Created 7 remaining vertical slices (ApproveReturn, ReceiveReturn, StartInspection, ExpireReturn, ApproveExchange, DenyExchange, ShipReplacementItem)
+- ✅ R-3: Deleted `ReturnCommands.cs` and `ReturnValidators.cs` bulk files
+- ✅ All handlers follow ADR 0039 canonical validator placement convention
+- ✅ Build: 0 errors, 36 pre-existing warnings (unchanged from Session 10)
+- ✅ Preserved all business logic exactly (price validation, scheduled messages, multi-event handlers)
+- ✅ 8 commits total (7 vertical slices + 1 bulk file deletion)
+- ✅ Session plan + retrospective documenting pattern variations and learnings created
+- **See:** `docs/planning/milestones/m33-0-session-11-plan.md`, `docs/planning/milestones/m33-0-session-11-retrospective.md`
+
 **Remaining Planned Priorities:**
-3. 📋 **Phase 3:** Returns BC structural refactor (R-1 through R-7 + F-7) — NEXT
+3. 📋 **Phase 3:** Returns BC structural refactor (R-5 through R-8 remaining) — NEXT
 4. 📋 **Phase 4:** Vendor Portal structural refactor (VP-1 through VP-6)
 5. 📋 **Phase 5:** Backoffice folder restructure (BO-1/BO-2/BO-3) + XC-3 (AcknowledgeAlert transaction fix)
 
@@ -157,6 +168,8 @@
 - Session 9 Retrospective: `docs/planning/milestones/m33-0-session-9-retrospective.md`
 - Session 10 Plan: `docs/planning/milestones/m33-0-session-10-plan.md`
 - Session 10 Retrospective: `docs/planning/milestones/m33-0-session-10-retrospective.md`
+- Session 11 Plan: `docs/planning/milestones/m33-0-session-11-plan.md`
+- Session 11 Retrospective: `docs/planning/milestones/m33-0-session-11-retrospective.md`
 - ADR 0039: `docs/decisions/0039-canonical-validator-placement.md`
 - M32.4 Retrospective: `docs/planning/milestones/m32-4-session-1-retrospective.md`
 

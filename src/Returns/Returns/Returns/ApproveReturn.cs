@@ -1,3 +1,4 @@
+using FluentValidation;
 using Marten;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
@@ -11,6 +12,16 @@ namespace Returns.Returns;
 /// CS agent approves a return that is in Requested state (manual review required).
 /// Publishes ReturnApproved integration event for Customer Experience BC and Notifications BC.
 /// </summary>
+public sealed record ApproveReturn(Guid ReturnId);
+
+public sealed class ApproveReturnValidator : AbstractValidator<ApproveReturn>
+{
+    public ApproveReturnValidator()
+    {
+        RuleFor(x => x.ReturnId).NotEmpty().WithMessage("ReturnId is required.");
+    }
+}
+
 public static class ApproveReturnHandler
 {
     public static ProblemDetails Before(ApproveReturn command, Return? aggregate)

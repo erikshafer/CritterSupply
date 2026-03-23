@@ -1,6 +1,8 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
+using Wolverine.Http.Marten;
 using Wolverine.Marten;
 
 namespace Returns.Returns;
@@ -15,6 +17,16 @@ namespace Returns.Returns;
 /// Stock availability check is handled by publishing ExchangeStockCheckRequested
 /// to Inventory BC, which responds asynchronously.
 /// </summary>
+public sealed record ApproveExchange(Guid ReturnId);
+
+public sealed class ApproveExchangeValidator : AbstractValidator<ApproveExchange>
+{
+    public ApproveExchangeValidator()
+    {
+        RuleFor(x => x.ReturnId).NotEmpty().WithMessage("ReturnId is required.");
+    }
+}
+
 public static class ApproveExchangeHandler
 {
     public static ProblemDetails Before(ApproveExchange command, Return? aggregate)

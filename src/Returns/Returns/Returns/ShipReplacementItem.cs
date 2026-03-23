@@ -1,6 +1,8 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
+using Wolverine.Http.Marten;
 using Wolverine.Marten;
 
 namespace Returns.Returns;
@@ -14,6 +16,21 @@ namespace Returns.Returns;
 /// - Customer Experience BC (update UI with tracking number)
 /// - Notifications BC (send shipment notification email)
 /// </summary>
+public sealed record ShipReplacementItem(
+    Guid ReturnId,
+    string ShipmentId,
+    string TrackingNumber);
+
+public sealed class ShipReplacementItemValidator : AbstractValidator<ShipReplacementItem>
+{
+    public ShipReplacementItemValidator()
+    {
+        RuleFor(x => x.ReturnId).NotEmpty().WithMessage("ReturnId is required.");
+        RuleFor(x => x.ShipmentId).NotEmpty().WithMessage("ShipmentId is required.");
+        RuleFor(x => x.TrackingNumber).NotEmpty().WithMessage("TrackingNumber is required.");
+    }
+}
+
 public static class ShipReplacementItemHandler
 {
     public static ProblemDetails Before(ShipReplacementItem command, Return? aggregate)
