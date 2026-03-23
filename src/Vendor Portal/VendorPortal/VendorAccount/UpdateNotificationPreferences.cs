@@ -1,8 +1,19 @@
 using Marten;
 using Microsoft.Extensions.Logging;
-using VendorPortal.VendorAccount.Commands;
 
-namespace VendorPortal.VendorAccount.Handlers;
+namespace VendorPortal.VendorAccount;
+
+/// <summary>
+/// Updates notification preference toggles for a vendor account.
+/// Opt-out model: all notifications are enabled by default.
+/// Vendors can explicitly disable individual notification types.
+/// </summary>
+public sealed record UpdateNotificationPreferencesCommand(
+    Guid VendorTenantId,
+    bool LowStockAlerts,
+    bool ChangeRequestDecisions,
+    bool InventoryUpdates,
+    bool SalesMetrics);
 
 /// <summary>
 /// Updates notification preference toggles on the vendor's account.

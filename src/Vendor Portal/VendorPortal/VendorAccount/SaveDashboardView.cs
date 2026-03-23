@@ -1,8 +1,16 @@
 using Marten;
 using Microsoft.Extensions.Logging;
-using VendorPortal.VendorAccount.Commands;
 
-namespace VendorPortal.VendorAccount.Handlers;
+namespace VendorPortal.VendorAccount;
+
+/// <summary>
+/// Saves a named dashboard view with filter criteria for a vendor tenant.
+/// The saved view enables quick-load of frequently-used dashboard configurations.
+/// </summary>
+public sealed record SaveDashboardViewCommand(
+    Guid VendorTenantId,
+    string ViewName,
+    DashboardFilterCriteria FilterCriteria);
 
 /// <summary>
 /// Saves a named dashboard view to the vendor's account.

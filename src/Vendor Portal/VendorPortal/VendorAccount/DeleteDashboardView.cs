@@ -1,8 +1,14 @@
 using Marten;
 using Microsoft.Extensions.Logging;
-using VendorPortal.VendorAccount.Commands;
 
-namespace VendorPortal.VendorAccount.Handlers;
+namespace VendorPortal.VendorAccount;
+
+/// <summary>
+/// Deletes a saved dashboard view by its ViewId from the vendor's account.
+/// </summary>
+public sealed record DeleteDashboardViewCommand(
+    Guid VendorTenantId,
+    Guid ViewId);
 
 /// <summary>
 /// Deletes a saved dashboard view from the vendor's account.
