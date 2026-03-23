@@ -55,7 +55,7 @@ public class ShipmentQueryTests : IAsyncLifetime
         });
 
         // Assert: Verify response structure and values
-        var response = result.ReadAsJson<List<Api.Queries.ShipmentResponse>>();
+        var response = result.ReadAsJson<List<Api.OrderFulfillment.ShipmentResponse>>();
         response.ShouldNotBeNull();
         response.Count.ShouldBe(1);
 
@@ -85,7 +85,7 @@ public class ShipmentQueryTests : IAsyncLifetime
         });
 
         // Assert: Empty list
-        var response = result.ReadAsJson<List<Api.Queries.ShipmentResponse>>();
+        var response = result.ReadAsJson<List<Api.OrderFulfillment.ShipmentResponse>>();
         response.ShouldNotBeNull();
         response.Count.ShouldBe(0);
     }
@@ -134,7 +134,7 @@ public class ShipmentQueryTests : IAsyncLifetime
         });
 
         // Assert: Verify dispatched shipment details
-        var response = result.ReadAsJson<List<Api.Queries.ShipmentResponse>>();
+        var response = result.ReadAsJson<List<Api.OrderFulfillment.ShipmentResponse>>();
         response.ShouldNotBeNull();
         response.Count.ShouldBe(1);
 
