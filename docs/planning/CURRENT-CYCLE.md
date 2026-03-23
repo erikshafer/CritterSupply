@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M33.0 — Code Correction + Broken Feedback Loop Repair (ACTIVE) |
-| **Status** | 🚀 IN PROGRESS — Sessions 1 + 5 + 6 + 7 Complete (INV-3 + F-8 + Priority 3 RECOVERY DONE) |
-| **Deliverables** | INV-3 fix ✅, F-8 verification ✅, Order Search + Return Management ✅, Priority 3 Recovery ✅, Marten projections (pending), structural refactors (pending) |
+| **Status** | 🚀 IN PROGRESS — Phase 1 COMPLETE (Sessions 1+2+7+8), Priority 3 RECOVERY DONE |
+| **Deliverables** | INV-3 + F-8 ✅, Priority 2 (Projections) ✅, Priority 3 Recovery ✅, Phase 1 (XC-1 + CheckoutCompleted) ✅, structural refactors (pending) |
 | **Recent Completion** | M32.4 — Backoffice Phase 4 (2026-03-21), M32.3 — Backoffice Phase 3B (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-23 (M33.0 Sessions 1+5+6+7 complete — Priority 3 recovery delivered, all blocking issues fixed, 91 tests passing)*
+*Last Updated: 2026-03-23 (M33.0 Session 8 complete — Phase 1 delivered: XC-1 ADR + CheckoutCompleted fix)*
 
 ---
 
@@ -88,25 +88,48 @@
 - ✅ Retrospective documenting recovery patterns and lessons learned created
 - **See:** `docs/planning/milestones/m33-0-session-7-retrospective.md`
 
+**Session 2 Completion (PREVIOUSLY UNDOCUMENTED):**
+- ✅ **Priority 2 COMPLETE:** All three Marten projections built and tested
+- ✅ ReturnMetricsView projection (inline, singleton, active return counts)
+- ✅ CorrespondenceMetricsView projection (inline, singleton, email queue health)
+- ✅ FulfillmentPipelineView projection (inline, singleton, active shipments pipeline)
+- ✅ All projections registered in Program.cs with `ProjectionLifecycle.Inline`
+- ✅ 14 projection integration tests passing (EventDrivenProjectionTests)
+- ✅ Dashboard uses ReturnMetricsView for PendingReturns KPI
+- **See:** `docs/planning/milestones/m33-0-session-2-retrospective.md`
+
+**Session 8 Completion (2026-03-23):**
+- ✅ **Phase 1 COMPLETE:** XC-1 ADR + CheckoutCompleted fix delivered
+- ✅ ADR 0039 published (canonical validator placement convention)
+- ✅ Shopping's `CheckoutCompleted` renamed to `CartCheckoutCompleted`
+- ✅ Orders' internal `CheckoutCompleted` renamed to `OrderCreated`
+- ✅ All consumers updated (zero `CheckoutCompleted` references remain)
+- ✅ Build succeeds (0 errors, 36 pre-existing warnings)
+- ✅ All tests passing (971+ tests across all BCs)
+- ✅ Live 🔴 risk eliminated (dual-payload collision at checkout)
+- ✅ Retrospective documenting Phase 1 completion created
+- **See:** `docs/planning/milestones/m33-0-session-8-retrospective.md`
+
 **Remaining Planned Priorities:**
-2. 📋 **Priority 2:** Build 3 missing Marten projections (FulfillmentPipelineView, ReturnMetricsView, CorrespondenceMetricsView)
 4. 📋 **Priority 4:** Returns BC structural refactor (R-1 through R-7)
 5. 📋 **Priority 5:** Vendor Portal structural refactor (VP-1 through VP-6)
 6. 📋 **Priority 6:** Backoffice folder restructure + XC-3 (AcknowledgeAlert transaction fix)
-7. 📋 **Priority 7:** ADR for canonical validator placement (XC-1)
-8. 📋 **Priority 8:** CheckoutCompleted dual-payload collision fix
 9. 🔵 **Priority 9:** Quick wins (INV-1/2, PR-1, CO-1, PAY-1/FUL-1/ORD-1, F-9)
 
 **References:**
 - M33-M34 Proposal: `docs/planning/milestones/m33-m34-engineering-proposal-2026-03-21.md`
 - Session 1 Plan: `docs/planning/milestones/m33-0-session-1-plan.md`
 - Session 1 Retrospective: `docs/planning/milestones/m33-0-session-1-retrospective.md`
+- Session 2 Retrospective: `docs/planning/milestones/m33-0-session-2-retrospective.md`
 - Session 5 Status: `docs/planning/milestones/m33-0-session-5-status.md`
 - Session 6 Status: `docs/planning/milestones/m33-0-session-6-status.md`
 - Sessions 5+6 Retrospective: `docs/planning/milestones/m33-0-session-5-retrospective.md` (combined)
 - Post-Mortem Recovery Review: `docs/planning/milestones/m33-0-post-mortem-recovery-review.md`
 - Session 7 Plan: `docs/planning/milestones/m33-0-session-7-plan.md`
 - Session 7 Retrospective: `docs/planning/milestones/m33-0-session-7-retrospective.md`
+- Session 8 Plan: `docs/planning/milestones/m33-0-session-8-plan.md`
+- Session 8 Retrospective: `docs/planning/milestones/m33-0-session-8-retrospective.md`
+- ADR 0039: `docs/decisions/0039-canonical-validator-placement.md`
 - M32.4 Retrospective: `docs/planning/milestones/m32-4-session-1-retrospective.md`
 
 ---
