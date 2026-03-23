@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M33.0 — Code Correction + Broken Feedback Loop Repair (ACTIVE) |
-| **Status** | 🚀 IN PROGRESS — Phase 1 COMPLETE (Sessions 1+2+7+8), Priority 3 RECOVERY DONE |
-| **Deliverables** | INV-3 + F-8 ✅, Priority 2 (Projections) ✅, Priority 3 Recovery ✅, Phase 1 (XC-1 + CheckoutCompleted) ✅, structural refactors (pending) |
+| **Status** | 🚀 IN PROGRESS — Phase 1 COMPLETE, Phase 2 COMPLETE (9/9 items), Priority 3 RECOVERY DONE |
+| **Deliverables** | Phase 1 (XC-1 + CheckoutCompleted) ✅, Phase 2 (Quick Wins) ✅, structural refactors (in progress) |
 | **Recent Completion** | M32.4 — Backoffice Phase 4 (2026-03-21), M32.3 — Backoffice Phase 3B (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-23 (M33.0 Session 8 complete — Phase 1 delivered: XC-1 ADR + CheckoutCompleted fix)*
+*Last Updated: 2026-03-23 (M33.0 Session 9 complete — Phase 2 delivered: All 9 Quick Wins items)*
 
 ---
 
@@ -110,11 +110,24 @@
 - ✅ Retrospective documenting Phase 1 completion created
 - **See:** `docs/planning/milestones/m33-0-session-8-retrospective.md`
 
+**Session 9 Completion (2026-03-23):**
+- ✅ **Phase 2 COMPLETE:** All 9 Quick Wins items delivered in single session
+- ✅ INV-1: Consolidated AdjustInventory* 4-file shatter → AdjustInventory.cs
+- ✅ INV-2: Consolidated ReceiveInboundStock* split → ReceiveInboundStock.cs
+- ✅ INV-3: Renamed Inventory folders (Commands/ → InventoryManagement/, Queries/ → StockQueries/)
+- ✅ PR-1: Merged Pricing validator splits (SetInitialPrice + ChangePrice)
+- ✅ CO-1: Exploded MessageEvents.cs → 4 individual event files
+- ✅ PAY-1/FUL-1/ORD-1: Moved isolated Queries to feature-named folders
+- ✅ F-9: Fixed Orders test collection attributes (3 raw string literals)
+- ✅ Build: 0 errors, 36 pre-existing warnings (unchanged)
+- ✅ All tests passing (no regressions)
+- ✅ Retrospective documenting Phase 2 completion created
+- **See:** `docs/planning/milestones/m33-0-session-9-retrospective.md`
+
 **Remaining Planned Priorities:**
-4. 📋 **Priority 4:** Returns BC structural refactor (R-1 through R-7)
-5. 📋 **Priority 5:** Vendor Portal structural refactor (VP-1 through VP-6)
-6. 📋 **Priority 6:** Backoffice folder restructure + XC-3 (AcknowledgeAlert transaction fix)
-9. 🔵 **Priority 9:** Quick wins (INV-1/2, PR-1, CO-1, PAY-1/FUL-1/ORD-1, F-9)
+3. 📋 **Phase 3:** Returns BC structural refactor (R-1 through R-7 + F-7) — NEXT
+4. 📋 **Phase 4:** Vendor Portal structural refactor (VP-1 through VP-6)
+5. 📋 **Phase 5:** Backoffice folder restructure (BO-1/BO-2/BO-3) + XC-3 (AcknowledgeAlert transaction fix)
 
 **References:**
 - M33-M34 Proposal: `docs/planning/milestones/m33-m34-engineering-proposal-2026-03-21.md`
@@ -129,6 +142,8 @@
 - Session 7 Retrospective: `docs/planning/milestones/m33-0-session-7-retrospective.md`
 - Session 8 Plan: `docs/planning/milestones/m33-0-session-8-plan.md`
 - Session 8 Retrospective: `docs/planning/milestones/m33-0-session-8-retrospective.md`
+- Session 9 Plan: `docs/planning/milestones/m33-0-session-9-plan.md`
+- Session 9 Retrospective: `docs/planning/milestones/m33-0-session-9-retrospective.md`
 - ADR 0039: `docs/decisions/0039-canonical-validator-placement.md`
 - M32.4 Retrospective: `docs/planning/milestones/m32-4-session-1-retrospective.md`
 
