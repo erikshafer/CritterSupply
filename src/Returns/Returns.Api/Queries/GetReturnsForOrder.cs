@@ -1,7 +1,7 @@
 using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Wolverine.Http;
-using Returns.Returns;
+using Returns.ReturnProcessing;
 
 namespace Returns.Api.Queries;
 

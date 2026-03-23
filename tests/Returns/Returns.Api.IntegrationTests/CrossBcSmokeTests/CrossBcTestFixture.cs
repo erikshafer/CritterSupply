@@ -87,7 +87,7 @@ public class CrossBcTestFixture : IAsyncLifetime
                     opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
 
                     // IMPORTANT: Include Returns domain assembly for handler discovery
-                    opts.Discovery.IncludeAssembly(typeof(Returns.Return).Assembly);
+                    opts.Discovery.IncludeAssembly(typeof(Returns.ReturnProcessing.Return).Assembly);
                 });
             });
         });

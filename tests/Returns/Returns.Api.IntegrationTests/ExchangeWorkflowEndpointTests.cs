@@ -1,6 +1,6 @@
 using System.Net;
 using Marten;
-using Returns.Returns;
+using Returns.ReturnProcessing;
 
 namespace Returns.Api.IntegrationTests;
 

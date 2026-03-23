@@ -1,4 +1,4 @@
-namespace Returns.Returns;
+namespace Returns.ReturnProcessing;
 
 public sealed record ReturnLineItem(
     string Sku,

@@ -1,4 +1,4 @@
-namespace Returns.Returns;
+namespace Returns.ReturnProcessing;
 
 /// <summary>
 /// Discriminates between refund (cash back) and exchange (replacement item) returns.
