@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -5,6 +6,39 @@ using Wolverine.Http.Marten;
 using Wolverine.Marten;
 
 namespace Returns.Returns;
+
+// ---------------------------------------------------------------------------
+// Command
+// ---------------------------------------------------------------------------
+
+public sealed record SubmitInspection(
+    Guid ReturnId,
+    IReadOnlyList<InspectionLineResult> Results);
+
+// ---------------------------------------------------------------------------
+// Validator
+// ---------------------------------------------------------------------------
+
+public sealed class SubmitInspectionValidator : AbstractValidator<SubmitInspection>
+{
+    public SubmitInspectionValidator()
+    {
+        RuleFor(x => x.ReturnId).NotEmpty().WithMessage("ReturnId is required.");
+        RuleFor(x => x.Results).NotEmpty().WithMessage("At least one inspection result is required.");
+
+        RuleForEach(x => x.Results).ChildRules(result =>
+        {
+            result.RuleFor(r => r.Sku).NotEmpty().WithMessage("SKU is required.");
+            result.RuleFor(r => r.Quantity).GreaterThan(0).WithMessage("Quantity must be greater than zero.");
+            result.RuleFor(r => r.Condition).IsInEnum().WithMessage("Item condition is invalid.");
+            result.RuleFor(r => r.Disposition).IsInEnum().WithMessage("Disposition decision is invalid.");
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Handler
+// ---------------------------------------------------------------------------
 
 /// <summary>
 /// Inspector submits inspection results for a received return.

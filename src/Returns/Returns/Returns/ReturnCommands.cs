@@ -28,10 +28,6 @@ public sealed record ReceiveReturn(Guid ReturnId);
 
 public sealed record StartInspection(Guid ReturnId, string InspectorId);
 
-public sealed record SubmitInspection(
-    Guid ReturnId,
-    IReadOnlyList<InspectionLineResult> Results);
-
 public sealed record ExpireReturn(Guid ReturnId);
 
 // ---------------------------------------------------------------------------
