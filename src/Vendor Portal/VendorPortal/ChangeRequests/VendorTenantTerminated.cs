@@ -2,7 +2,7 @@ using Marten;
 using Messages.Contracts.VendorIdentity;
 using Microsoft.Extensions.Logging;
 
-namespace VendorPortal.ChangeRequests.Handlers;
+namespace VendorPortal.ChangeRequests;
 
 /// <summary>
 /// Handles VendorTenantTerminated integration event from Vendor Identity BC.
