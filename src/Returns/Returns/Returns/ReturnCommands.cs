@@ -24,8 +24,6 @@ public sealed record RequestReturnItem(
 
 public sealed record ApproveReturn(Guid ReturnId);
 
-public sealed record DenyReturn(Guid ReturnId, string Reason, string Message);
-
 public sealed record ReceiveReturn(Guid ReturnId);
 
 public sealed record StartInspection(Guid ReturnId, string InspectorId);

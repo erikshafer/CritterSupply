@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -10,6 +11,18 @@ namespace Returns.Returns;
 /// CS agent denies a return that is in Requested state.
 /// Publishes ReturnDenied integration event with customer-facing message.
 /// </summary>
+public sealed record DenyReturn(Guid ReturnId, string Reason, string Message);
+
+public sealed class DenyReturnValidator : AbstractValidator<DenyReturn>
+{
+    public DenyReturnValidator()
+    {
+        RuleFor(x => x.ReturnId).NotEmpty().WithMessage("ReturnId is required.");
+        RuleFor(x => x.Reason).NotEmpty().WithMessage("Denial reason is required.");
+        RuleFor(x => x.Message).NotEmpty().WithMessage("Denial message is required.");
+    }
+}
+
 public static class DenyReturnHandler
 {
     public static ProblemDetails Before(DenyReturn command, Return? aggregate)

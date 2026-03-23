@@ -42,13 +42,3 @@ public sealed class SubmitInspectionValidator : AbstractValidator<SubmitInspecti
         });
     }
 }
-
-public sealed class DenyReturnValidator : AbstractValidator<DenyReturn>
-{
-    public DenyReturnValidator()
-    {
-        RuleFor(x => x.ReturnId).NotEmpty().WithMessage("ReturnId is required.");
-        RuleFor(x => x.Reason).NotEmpty().WithMessage("Denial reason is required.");
-        RuleFor(x => x.Message).NotEmpty().WithMessage("Denial message is required.");
-    }
-}
