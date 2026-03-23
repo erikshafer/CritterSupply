@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M33.0 — Code Correction + Broken Feedback Loop Repair (ACTIVE) |
-| **Status** | 🚀 IN PROGRESS — Phase 1 Complete (INV-3 + F-8) |
-| **Deliverables** | INV-3 fix ✅, F-8 verification ✅, Marten projections (pending), structural refactors (pending) |
+| **Status** | 🚀 IN PROGRESS — Sessions 1 + 5 + 6 Complete (INV-3 + F-8 + Priority 3, E2E tests pending) |
+| **Deliverables** | INV-3 fix ✅, F-8 verification ✅, Order Search + Return Management ✅, Marten projections (pending), structural refactors (pending) |
 | **Recent Completion** | M32.4 — Backoffice Phase 4 (2026-03-21), M32.3 — Backoffice Phase 3B (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-21 (M33.0 Phase 1 complete — INV-3 fixed, all Inventory tests passing)*
+*Last Updated: 2026-03-23 (M33.0 Sessions 1+5+6 complete — INV-3 fixed, Order Search + Return Management delivered, bUnit tests removed)*
 
 ---
 
@@ -65,9 +65,19 @@
 - ✅ Retrospective documenting Wolverine compound handler learnings created
 - **Key Learning:** Mixing `IMessageBus.InvokeAsync()` with manual event appending doesn't respect `Before()` validation
 
+**Sessions 5+6 Completion (2026-03-22 to 2026-03-23):**
+- ✅ **Priority 3 COMPLETE:** Order Search + Return Management pages added to Backoffice.Web
+- ✅ Created 2 new Blazor WASM pages (`/orders/search`, `/returns`)
+- ✅ Updated NavMenu with role-based navigation items
+- ❌ Created Backoffice.Web.UnitTests bUnit project — **all tests removed after 7 failed fix attempts**
+- ❌ bUnit authorization testing NOT FEASIBLE (policy-based auth + sealed services)
+- ✅ All 51 Backoffice.Api.IntegrationTests passing (no regressions)
+- ✅ Retrospective documenting bUnit limitations and Blazor WASM local DTOs created
+- ⚠️ **HIGH PRIORITY FOLLOW-UP:** E2E tests required (pages have ZERO test coverage)
+- **Key Learning:** bUnit v2 cannot test policy-based `<AuthorizeView Policy=>` (requires cascading parameter). Use E2E tests for Backoffice.Web instead.
+
 **Remaining Planned Priorities:**
 2. 📋 **Priority 2:** Build 3 missing Marten projections (FulfillmentPipelineView, ReturnMetricsView, CorrespondenceMetricsView)
-3. 📋 **Priority 3:** Add Order Search + Return Management pages to Backoffice
 4. 📋 **Priority 4:** Returns BC structural refactor (R-1 through R-7)
 5. 📋 **Priority 5:** Vendor Portal structural refactor (VP-1 through VP-6)
 6. 📋 **Priority 6:** Backoffice folder restructure + XC-3 (AcknowledgeAlert transaction fix)
@@ -79,6 +89,9 @@
 - M33-M34 Proposal: `docs/planning/milestones/m33-m34-engineering-proposal-2026-03-21.md`
 - Session 1 Plan: `docs/planning/milestones/m33-0-session-1-plan.md`
 - Session 1 Retrospective: `docs/planning/milestones/m33-0-session-1-retrospective.md`
+- Session 5 Status: `docs/planning/milestones/m33-0-session-5-status.md`
+- Session 6 Status: `docs/planning/milestones/m33-0-session-6-status.md`
+- Sessions 5+6 Retrospective: `docs/planning/milestones/m33-0-session-5-retrospective.md` (combined)
 - M32.4 Retrospective: `docs/planning/milestones/m32-4-session-1-retrospective.md`
 
 ---
