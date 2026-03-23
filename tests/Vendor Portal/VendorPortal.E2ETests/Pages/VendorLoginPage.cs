@@ -14,18 +14,19 @@ public sealed class VendorLoginPage(IPage page)
         await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
         // Wait for email field to be visible and ready (MudBlazor takes time to render nested inputs)
-        // Use 30s timeout for CI environments where WASM startup can be slower
+        // Use 60s timeout for CI environments where WASM cold start + TestContainers overhead
+        // can push login page hydration beyond 30s (observed 31.2s in local tests)
         var emailField = page.GetByTestId("email-field").Locator("input");
-        await emailField.WaitForAsync(new LocatorWaitForOptions { Timeout = 30000 });
+        await emailField.WaitForAsync(new LocatorWaitForOptions { Timeout = 60000 });
         await emailField.FillAsync(email);
     }
 
     public async Task FillPasswordAsync(string password)
     {
         // Wait for password field to be visible and ready
-        // Use 30s timeout for CI environments where WASM startup can be slower
+        // Use 60s timeout for CI environments where WASM cold start can be slow
         var passwordField = page.GetByTestId("password-field").Locator("input");
-        await passwordField.WaitForAsync(new LocatorWaitForOptions { Timeout = 30000 });
+        await passwordField.WaitForAsync(new LocatorWaitForOptions { Timeout = 60000 });
         await passwordField.FillAsync(password);
     }
 
