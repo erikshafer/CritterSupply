@@ -178,7 +178,13 @@ internal sealed class VendorIdentityApiKestrelFactory(string connectionString)
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:postgres"] = connectionString
+                ["ConnectionStrings:postgres"] = connectionString,
+                // JWT configuration for token issuance (must match VendorPortal.Api expectation)
+                ["Jwt:SigningKey"] = "dev-only-signing-key-change-in-production-must-be-at-least-32-chars",
+                ["Jwt:Issuer"] = "vendor-identity",
+                ["Jwt:Audience"] = "vendor-portal",
+                ["Jwt:AccessTokenExpiryMinutes"] = "15",
+                ["Jwt:RefreshTokenExpiryDays"] = "7"
             });
         });
 
@@ -241,7 +247,11 @@ internal sealed class VendorPortalApiKestrelFactory(string connectionString, str
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:postgres"] = connectionString,
-                ["ApiClients:VendorIdentityApiUrl"] = identityApiUrl
+                ["ApiClients:VendorIdentityApiUrl"] = identityApiUrl,
+                // JWT configuration for token validation (must match VendorIdentity.Api issuance)
+                ["Jwt:SigningKey"] = "dev-only-signing-key-change-in-production-must-be-at-least-32-chars",
+                ["Jwt:Issuer"] = "vendor-identity",
+                ["Jwt:Audience"] = "vendor-portal"
             });
         });
 

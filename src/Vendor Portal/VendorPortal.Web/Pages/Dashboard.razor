@@ -179,6 +179,7 @@
     {
         HubService.OnStateChanged += OnHubStateChanged;
         await LoadDashboardAsync();
+        await HubService.ConnectAsync();  // Initiate SignalR connection to VendorPortalHub
         RegisterHubListeners();
     }
 
