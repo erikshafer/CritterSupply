@@ -87,11 +87,33 @@ Screenshots: debug-before-nav-*.png, debug-after-nav-*.png
     public async Task WhenIFillInTheForm(string sku, string title, string details)
     {
         var submitPage = new SubmitChangeRequestPage(Page);
+
+        // Check error UI before filling
+        var errorUIBefore = await Page.Locator("#blazor-error-ui").IsVisibleAsync();
+        await File.WriteAllTextAsync($"debug-error-before-fill-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt",
+            $"Error UI visible before filling: {errorUIBefore}");
+
         await submitPage.FillSkuAsync(sku);
+        await Page.WaitForTimeoutAsync(100);
+
+        var errorUIAfterSku = await Page.Locator("#blazor-error-ui").IsVisibleAsync();
+        await File.WriteAllTextAsync($"debug-error-after-sku-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt",
+            $"Error UI visible after SKU fill: {errorUIAfterSku}");
+
         await submitPage.FillTitleAsync(title);
+        await Page.WaitForTimeoutAsync(100);
+
+        var errorUIAfterTitle = await Page.Locator("#blazor-error-ui").IsVisibleAsync();
+        await File.WriteAllTextAsync($"debug-error-after-title-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt",
+            $"Error UI visible after title fill: {errorUIAfterTitle}");
+
         await submitPage.FillDetailsAsync(details);
         // Brief pause for Blazor form binding
         await Page.WaitForTimeoutAsync(300);
+
+        var errorUIAfterDetails = await Page.Locator("#blazor-error-ui").IsVisibleAsync();
+        await File.WriteAllTextAsync($"debug-error-after-details-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt",
+            $"Error UI visible after details fill: {errorUIAfterDetails}");
     }
 
     [When("I click the submit button")]
