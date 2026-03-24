@@ -31,9 +31,10 @@ public sealed class VendorDashboardStepDefinitions
         await loginPage.NavigateAsync();
 
         // Wait for WASM hydration and login form to be ready
+        // CI environments require 60s timeout due to slower network and cold WASM runtime
         await Page.WaitForSelectorAsync("[data-testid='login-btn']", new PageWaitForSelectorOptions
         {
-            Timeout = 30000
+            Timeout = 60000 // WASM cold start can take up to 60s in CI (30-40s observed)
         });
 
         // Fill credentials and submit (without re-navigating)
