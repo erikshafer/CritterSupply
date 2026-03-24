@@ -1,7 +1,7 @@
 using Backoffice.Projections;
 using Marten;
 
-namespace Backoffice.Commands;
+namespace Backoffice.AlertManagement;
 
 /// <summary>
 /// Command to acknowledge an alert in the operations alert feed.
@@ -15,6 +15,7 @@ public sealed record AcknowledgeAlert(
 /// <summary>
 /// Handler for AcknowledgeAlert command.
 /// Loads AlertFeedView projection document and updates acknowledgment fields.
+/// Wolverine handles transaction management automatically - no manual SaveChangesAsync needed.
 /// </summary>
 public static class AcknowledgeAlertHandler
 {
@@ -40,6 +41,6 @@ public static class AcknowledgeAlertHandler
         };
 
         session.Store(acknowledged);
-        await session.SaveChangesAsync(ct);
+        // Wolverine auto-transaction: SaveChangesAsync() called automatically at handler completion
     }
 }
