@@ -188,10 +188,11 @@ internal sealed class VendorIdentityApiKestrelFactory(string connectionString)
             services.DisableAllExternalWolverineTransports();
 
             // Open CORS for test (random ports)
-            // IMPORTANT: Override BOTH default and named policies - VendorIdentity uses default, but test needs both
+            // IMPORTANT: VendorIdentity.Api uses a NAMED policy "VendorPortalWeb" (not default policy)
+            // Must override the named policy that the API actually uses in app.UseCors("VendorPortalWeb")
             services.AddCors(opts =>
             {
-                opts.AddDefaultPolicy(policy => policy
+                opts.AddPolicy("VendorPortalWeb", policy => policy
                     .SetIsOriginAllowed(_ => true)
                     .AllowAnyHeader()
                     .AllowAnyMethod()
