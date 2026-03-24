@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Marten;
 using Testcontainers.PostgreSql;
 using VendorIdentity.Api.Auth;
+using VendorIdentity.Identity;
 using Wolverine;
 
 // VendorLoginEndpoint: used as WebApplicationFactory anchor for VendorIdentity.Api
@@ -80,11 +81,22 @@ public sealed class E2ETestFixture : IAsyncLifetime
         _identityFactory.StartKestrel();
         IdentityApiBaseUrl = _identityFactory.ServerAddress;
 
+        // Step 2a: Manually invoke VendorIdentitySeedData (WebApplicationFactory doesn't execute startup code)
+        using (var scope = _identityFactory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<VendorIdentityDbContext>();
+            await dbContext.Database.MigrateAsync();
+            await VendorIdentitySeedData.SeedAsync(dbContext);
+        }
+
         // Step 3: Start VendorPortal.Api (Marten — analytics, change requests, SignalR)
         _portalApiFactory = new VendorPortalApiKestrelFactory(connectionString, IdentityApiBaseUrl);
         _portalApiFactory.StartKestrel();
         PortalApiBaseUrl = _portalApiFactory.ServerAddress;
         PortalApiHost = _portalApiFactory.Services.GetRequiredService<IHost>();
+
+        // Step 3a: Manually invoke VendorPortalSeedData (WebApplicationFactory doesn't execute startup code)
+        await VendorPortalSeedData.SeedAsync(_portalApiFactory.Services.GetRequiredService<IDocumentStore>());
 
         // Step 4: Start WASM static file host serving VendorPortal.Web with test API URLs
         _wasmHost = new WasmStaticFileHost(IdentityApiBaseUrl, PortalApiBaseUrl);
