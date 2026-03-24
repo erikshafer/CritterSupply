@@ -152,17 +152,33 @@ Screenshots: debug-before-nav-*.png, debug-after-nav-*.png
     [Given("I have submitted a change request for SKU {string} with title {string}")]
     public async Task GivenIHaveSubmittedAChangeRequest(string sku, string title)
     {
-        // Seed a change request via the submit form (browser-driven, not API)
-        // Navigate to submit, fill, and submit
-        await WhenINavigateToTheSubmitChangeRequestPage();
-        await WhenIFillInTheForm(sku, title, "E2E test change request details");
-        await WhenIClickTheSubmitButton();
-        // Wait for redirect back to list — Blazor WASM client-side routing
-        await Page.WaitForURLAsync("**/change-requests", new PageWaitForURLOptions
+        // OPTIMIZATION: Seed change request via direct API call instead of browser automation.
+        // This bypasses UI navigation issues (Blazor error UI, SignalR connection timing)
+        // and makes tests faster and more reliable.
+
+        // Get JWT token for the catalog@acmepets.test user
+        var accessToken = await Fixture.GetAccessTokenAsync("catalog@acmepets.test", "password");
+        using var client = Fixture.CreateAuthenticatedPortalApiClient(accessToken);
+
+        var requestId = Guid.NewGuid();
+
+        // Step 1: Create draft
+        var draftPayload = new
         {
-            Timeout = 15000,
-            WaitUntil = WaitUntilState.Commit
-        });
+            RequestId = requestId,
+            Sku = sku,
+            Type = "Description",
+            Title = title,
+            Details = "E2E test change request details",
+            AdditionalNotes = (string?)null
+        };
+
+        var draftResponse = await client.PostAsJsonAsync("/api/vendor-portal/change-requests/draft", draftPayload);
+        draftResponse.EnsureSuccessStatusCode();
+
+        // Step 2: Submit immediately
+        var submitResponse = await client.PostAsync($"/api/vendor-portal/change-requests/{requestId}/submit", null);
+        submitResponse.EnsureSuccessStatusCode();
     }
 
     // ─── Then: Assertions ───

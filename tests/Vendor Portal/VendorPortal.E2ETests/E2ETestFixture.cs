@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -155,6 +156,41 @@ public sealed class E2ETestFixture : IAsyncLifetime
             await store.Advanced.Clean.DeleteAllEventDataAsync();
         }
     }
+
+    /// <summary>
+    /// Gets a JWT access token for the specified user by calling the VendorIdentity login endpoint.
+    /// Use this to seed data via direct API calls without going through the UI.
+    /// </summary>
+    public async Task<string> GetAccessTokenAsync(string email, string password)
+    {
+        using var client = new HttpClient { BaseAddress = new Uri(IdentityApiBaseUrl) };
+        var loginRequest = new { Email = email, Password = password };
+        var response = await client.PostAsJsonAsync("/api/vendor-identity/auth/login", loginRequest);
+        response.EnsureSuccessStatusCode();
+
+        var loginResponse = await response.Content.ReadFromJsonAsync<VendorLoginResponse>();
+        return loginResponse?.AccessToken ?? throw new InvalidOperationException("Login failed to return access token");
+    }
+
+    /// <summary>
+    /// Creates an HttpClient configured to call VendorPortal.Api with JWT authentication.
+    /// Use this to seed data via direct API calls, bypassing UI navigation issues.
+    /// </summary>
+    public HttpClient CreateAuthenticatedPortalApiClient(string accessToken)
+    {
+        var client = new HttpClient { BaseAddress = new Uri(PortalApiBaseUrl) };
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        return client;
+    }
+
+    private sealed record VendorLoginResponse(
+        string AccessToken,
+        string Email,
+        string FirstName,
+        string LastName,
+        string Role,
+        string TenantName);
 }
 
 

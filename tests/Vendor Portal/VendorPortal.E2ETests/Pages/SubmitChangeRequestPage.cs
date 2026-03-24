@@ -7,6 +7,19 @@ public sealed class SubmitChangeRequestPage(IPage page)
 {
     public async Task NavigateAsync()
     {
+        // CRITICAL: Ensure no Blazor error UI is present before navigation.
+        // Error UI appears when SignalR hub connection fails during Dashboard initialization.
+        // This check prevents navigation attempts while the error overlay is blocking interactions.
+        var errorUI = page.Locator("#blazor-error-ui");
+        var isErrorVisible = await errorUI.IsVisibleAsync();
+        if (isErrorVisible)
+        {
+            throw new InvalidOperationException(
+                "Blazor error UI is visible before navigation to submit page. " +
+                "This indicates an unhandled exception (likely SignalR hub connection failure) " +
+                "occurred during Dashboard initialization. Check browser console logs.");
+        }
+
         // Verify we're on the dashboard before attempting navigation
         var currentUrl = page.Url;
         Console.WriteLine($"DEBUG NavigateAsync: Current URL before click: {currentUrl}");
@@ -43,6 +56,16 @@ public sealed class SubmitChangeRequestPage(IPage page)
         });
 
         Console.WriteLine("DEBUG NavigateAsync: NetworkIdle reached");
+
+        // CRITICAL: Wait for the SKU field to be ready before completing navigation.
+        // This ensures the form is fully rendered and interactive.
+        await page.GetByTestId("sku-field").WaitForAsync(new LocatorWaitForOptions
+        {
+            Timeout = 15000,
+            State = WaitForSelectorState.Visible
+        });
+
+        Console.WriteLine("DEBUG NavigateAsync: SKU field is visible and ready");
     }
 
     public async Task FillSkuAsync(string sku)
