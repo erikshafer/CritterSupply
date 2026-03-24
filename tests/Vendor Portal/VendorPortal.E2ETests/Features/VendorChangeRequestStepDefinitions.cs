@@ -26,7 +26,46 @@ public sealed class VendorChangeRequestStepDefinitions
     public async Task WhenINavigateToTheSubmitChangeRequestPage()
     {
         var submitPage = new SubmitChangeRequestPage(Page);
+
+        // DEBUG: Capture state before navigation
+        await Page.ScreenshotAsync(new PageScreenshotOptions
+        {
+            Path = $"debug-before-nav-{DateTime.UtcNow:yyyyMMdd-HHmmss}.png",
+            FullPage = true
+        });
+
         await submitPage.NavigateAsync();
+
+        // DEBUG: Capture state after navigation
+        await Page.ScreenshotAsync(new PageScreenshotOptions
+        {
+            Path = $"debug-after-nav-{DateTime.UtcNow:yyyyMMdd-HHmmss}.png",
+            FullPage = true
+        });
+
+        // DEBUG: Log HTML content to see what's actually rendered
+        var pageContent = await Page.ContentAsync();
+        var testOutputPath = $"debug-page-content-{DateTime.UtcNow:yyyyMMdd-HHmmss}.html";
+        await File.WriteAllTextAsync(testOutputPath, pageContent);
+
+        // DEBUG: Check for specific elements
+        var hasSkuField = await Page.GetByTestId("sku-field").CountAsync() > 0;
+        var hasPermissionWarning = pageContent.Contains("You do not have permission");
+        var hasSignInPrompt = pageContent.Contains("Sign In");
+
+        // Write debug info to a text file since Console.WriteLine isn't working
+        var debugInfo = $@"
+=== DEBUG INFO ===
+Time: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}
+Current URL: {Page.Url}
+sku-field exists: {hasSkuField}
+Permission warning present: {hasPermissionWarning}
+Sign-in prompt present: {hasSignInPrompt}
+HTML content written to: {testOutputPath}
+Screenshots: debug-before-nav-*.png, debug-after-nav-*.png
+";
+        await File.WriteAllTextAsync($"debug-info-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt", debugInfo);
+
         await Page.WaitForSelectorAsync("[data-testid='sku-field']", new PageWaitForSelectorOptions
         {
             Timeout = 15000
@@ -65,6 +104,23 @@ public sealed class VendorChangeRequestStepDefinitions
     [When("I click the save draft button")]
     public async Task WhenIClickTheSaveDraftButton()
     {
+        // DEBUG: Capture state before clicking to see if error UI is visible
+        await Page.ScreenshotAsync(new PageScreenshotOptions
+        {
+            Path = $"debug-before-save-draft-{DateTime.UtcNow:yyyyMMdd-HHmmss}.png",
+            FullPage = true
+        });
+
+        // Check for Blazor error UI
+        var blazorErrorUI = Page.Locator("#blazor-error-ui");
+        var isErrorVisible = await blazorErrorUI.IsVisibleAsync();
+
+        if (isErrorVisible)
+        {
+            var errorHtml = await Page.ContentAsync();
+            await File.WriteAllTextAsync($"debug-blazor-error-{DateTime.UtcNow:yyyyMMdd-HHmmss}.html", errorHtml);
+        }
+
         var submitPage = new SubmitChangeRequestPage(Page);
         await submitPage.ClickSaveDraftAsync();
     }

@@ -47,34 +47,26 @@ public sealed class SubmitChangeRequestPage(IPage page)
 
     public async Task FillSkuAsync(string sku)
     {
-        // DEBUG: Log page content if sku-field is missing
-        var skuFieldExists = await page.GetByTestId("sku-field").CountAsync() > 0;
-        if (!skuFieldExists)
-        {
-            var content = await page.ContentAsync();
-            Console.WriteLine($"DEBUG: sku-field not found. Page URL: {page.Url}");
-            Console.WriteLine($"DEBUG: Page contains 'Submit Change Request': {content.Contains("Submit Change Request")}");
-            Console.WriteLine($"DEBUG: Page contains 'permission': {content.Contains("permission")}");
-            Console.WriteLine($"DEBUG: Page contains 'Sign In': {content.Contains("Sign In")}");
-        }
-
-        var input = page.GetByTestId("sku-field").Locator("input");
+        // data-testid is on the input element itself, not a container
+        var input = page.GetByTestId("sku-field");
         await input.WaitForAsync(new LocatorWaitForOptions { Timeout = 15000 });
         await input.FillAsync(sku);
     }
 
     public async Task FillTitleAsync(string title)
     {
-        var input = page.GetByTestId("title-field").Locator("input");
+        // data-testid is on the input element itself, not a container
+        var input = page.GetByTestId("title-field");
         await input.WaitForAsync(new LocatorWaitForOptions { Timeout = 15000 });
         await input.FillAsync(title);
     }
 
     public async Task FillDetailsAsync(string details)
     {
-        var textarea = page.GetByTestId("details-field").Locator("textarea").First;
-        await textarea.WaitForAsync(new LocatorWaitForOptions { Timeout = 15000 });
-        await textarea.FillAsync(details);
+        // data-testid is on the input element itself (MudBlazor renders textarea as input)
+        var input = page.GetByTestId("details-field");
+        await input.WaitForAsync(new LocatorWaitForOptions { Timeout = 15000 });
+        await input.FillAsync(details);
     }
 
     public async Task ClickSaveDraftAsync() =>
