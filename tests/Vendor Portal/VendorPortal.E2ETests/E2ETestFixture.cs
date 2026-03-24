@@ -72,36 +72,65 @@ public sealed class E2ETestFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        Console.WriteLine("[E2ETestFixture] 🚀 Starting E2E test infrastructure...");
+
         // Step 1: Start TestContainers PostgreSQL
+        Console.WriteLine("[E2ETestFixture] Starting PostgreSQL TestContainer...");
         await _postgres.StartAsync();
         var connectionString = _postgres.GetConnectionString();
+        Console.WriteLine($"[E2ETestFixture] ✅ PostgreSQL started: {connectionString}");
 
         // Step 2: Start VendorIdentity.Api (EF Core — JWT issuer)
+        Console.WriteLine("[E2ETestFixture] Starting VendorIdentity.Api...");
         _identityFactory = new VendorIdentityApiKestrelFactory(connectionString);
         _identityFactory.StartKestrel();
         IdentityApiBaseUrl = _identityFactory.ServerAddress;
+        Console.WriteLine($"[E2ETestFixture] ✅ VendorIdentity.Api listening: {IdentityApiBaseUrl}");
 
         // Step 2a: Manually invoke VendorIdentitySeedData (WebApplicationFactory doesn't execute startup code)
         using (var scope = _identityFactory.Services.CreateScope())
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<VendorIdentityDbContext>();
             await dbContext.Database.MigrateAsync();
+
+            Console.WriteLine("[E2ETestFixture] Seeding VendorIdentity test data...");
             await VendorIdentitySeedData.SeedAsync(dbContext);
+
+            // Verify seed data was created
+            var tenantCount = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(dbContext.Tenants);
+            var userCount = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(dbContext.Users);
+            Console.WriteLine($"[E2ETestFixture] ✅ VendorIdentity seed data: {tenantCount} tenants, {userCount} users");
         }
 
         // Step 3: Start VendorPortal.Api (Marten — analytics, change requests, SignalR)
+        Console.WriteLine("[E2ETestFixture] Starting VendorPortal.Api...");
         _portalApiFactory = new VendorPortalApiKestrelFactory(connectionString, IdentityApiBaseUrl);
         _portalApiFactory.StartKestrel();
         PortalApiBaseUrl = _portalApiFactory.ServerAddress;
         PortalApiHost = _portalApiFactory.Services.GetRequiredService<IHost>();
+        Console.WriteLine($"[E2ETestFixture] ✅ VendorPortal.Api listening: {PortalApiBaseUrl}");
 
         // Step 3a: Manually invoke VendorPortalSeedData (WebApplicationFactory doesn't execute startup code)
+        Console.WriteLine("[E2ETestFixture] Seeding VendorPortal test data...");
         await VendorPortalSeedData.SeedAsync(_portalApiFactory.Services.GetRequiredService<IDocumentStore>());
 
+        // Verify seed data was created
+        var store = _portalApiFactory.Services.GetRequiredService<IDocumentStore>();
+        await using var session = store.LightweightSession();
+        var account = await session.LoadAsync<VendorPortal.VendorAccount.VendorAccount>(
+            Guid.Parse("00000000-0000-0000-0000-000000000001"));
+        Console.WriteLine($"[E2ETestFixture] ✅ VendorPortal seed data: VendorAccount exists = {account != null}");
+        if (account != null)
+            Console.WriteLine($"[E2ETestFixture]    Organization: {account.OrganizationName}, Contact: {account.ContactEmail}");
+
         // Step 4: Start WASM static file host serving VendorPortal.Web with test API URLs
+        Console.WriteLine("[E2ETestFixture] Starting WASM static file host...");
         _wasmHost = new WasmStaticFileHost(IdentityApiBaseUrl, PortalApiBaseUrl);
         await _wasmHost.StartAsync();
         WasmBaseUrl = _wasmHost.BaseUrl;
+        Console.WriteLine($"[E2ETestFixture] ✅ WASM host listening: {WasmBaseUrl}");
+
+        Console.WriteLine("[E2ETestFixture] 🎉 E2E test infrastructure ready!");
     }
 
     public async Task DisposeAsync()

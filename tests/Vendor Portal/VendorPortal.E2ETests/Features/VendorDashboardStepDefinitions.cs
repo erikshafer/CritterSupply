@@ -41,11 +41,23 @@ public sealed class VendorDashboardStepDefinitions
         await loginPage.FillPasswordAsync(password);
         await loginPage.ClickSignInAsync();
 
-        // Wait for dashboard redirect — Blazor WASM client-side routing
+        // CRITICAL: Wait for BOTH URL change AND dashboard element to be visible
+        // CI environments need more time than local development (network latency, container startup)
+        // Increased timeout from 15s → 30s for CI stability
+
+        // Step 1: Wait for URL to change to /dashboard (Blazor client-side routing)
         await Page.WaitForURLAsync("**/dashboard", new PageWaitForURLOptions
         {
-            Timeout = 15000,
+            Timeout = 30000,
             WaitUntil = WaitUntilState.Commit
+        });
+
+        // Step 2: Wait for a dashboard element to be visible (ensures WASM components are rendered)
+        // Use KPI card as smoke test — if this is visible, dashboard is fully loaded
+        await Page.WaitForSelectorAsync("[data-testid='kpi-low-stock-alerts']", new PageWaitForSelectorOptions
+        {
+            Timeout = 30000,
+            State = WaitForSelectorState.Visible
         });
     }
 
