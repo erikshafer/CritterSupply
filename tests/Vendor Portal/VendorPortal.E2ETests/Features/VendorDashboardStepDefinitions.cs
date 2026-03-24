@@ -90,7 +90,20 @@ public sealed class VendorDashboardStepDefinitions
 
         // Additional wait to ensure hub is fully initialized and stable
         // This prevents race conditions where hub appears "Live" but isn't fully ready
-        await Page.WaitForTimeoutAsync(2000);
+        // CRITICAL: We need to wait long enough for any async hub connection errors to surface
+        // If errors occur, they trigger Blazor error UI which blocks all navigation
+        await Page.WaitForTimeoutAsync(5000);
+
+        // VERIFICATION: Check that no Blazor error UI appeared during hub connection
+        var errorUI = Page.Locator("#blazor-error-ui");
+        var isErrorVisible = await errorUI.IsVisibleAsync();
+        if (isErrorVisible)
+        {
+            throw new InvalidOperationException(
+                "Blazor error UI appeared after SignalR hub connection. " +
+                "Hub connection may have failed after reporting 'Live' status. " +
+                "Check browser console logs and trace files for connection errors.");
+        }
     }
 
     [Given("I am on the dashboard")]
