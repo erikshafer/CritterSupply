@@ -1,3 +1,5 @@
+using Backoffice.AlertManagement;
+using Backoffice.DashboardReporting;
 using Backoffice.RealTime;
 using Marten;
 using Messages.Contracts.Orders;
@@ -26,14 +28,14 @@ public static class OrderPlacedHandler
 
         // Query updated metrics from AdminDailyMetrics projection
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var metrics = await session.LoadAsync<Backoffice.Projections.AdminDailyMetrics>(today.ToString("yyyy-MM-dd"));
+        var metrics = await session.LoadAsync<AdminDailyMetrics>(today.ToString("yyyy-MM-dd"));
 
         // Query active returns count from ReturnMetricsView projection (M33.0 Session 2)
-        var returnMetrics = await session.LoadAsync<Backoffice.Projections.ReturnMetricsView>("current");
+        var returnMetrics = await session.LoadAsync<ReturnMetricsView>("current");
 
         // Query low stock alerts from AlertFeedView projection
-        var lowStockAlerts = await session.Query<Backoffice.Projections.AlertFeedView>()
-            .CountAsync(a => !a.AcknowledgedAt.HasValue && a.AlertType == Backoffice.Projections.AlertType.LowStock);
+        var lowStockAlerts = await session.Query<AlertFeedView>()
+            .CountAsync(a => !a.AcknowledgedAt.HasValue && a.AlertType == AlertType.LowStock);
 
         // Publish LiveMetricUpdated for executive dashboard (SignalR to role:executive group)
         return new LiveMetricUpdated(

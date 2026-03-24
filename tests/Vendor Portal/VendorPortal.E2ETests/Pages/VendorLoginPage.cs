@@ -8,11 +8,27 @@ public sealed class VendorLoginPage(IPage page)
 {
     public async Task NavigateAsync() => await page.GotoAsync("/login");
 
-    public async Task FillEmailAsync(string email) =>
-        await page.GetByTestId("email-field").Locator("input").FillAsync(email);
+    public async Task FillEmailAsync(string email)
+    {
+        // IMPORTANT: Do NOT wait for NetworkIdle here - caller has already verified WASM hydration
+        // by waiting for login-btn. NetworkIdle may never complete in TestContainers environment
+        // due to background Marten/Wolverine/SignalR network activity.
 
-    public async Task FillPasswordAsync(string password) =>
-        await page.GetByTestId("password-field").Locator("input").FillAsync(password);
+        // MudBlazor renders data-testid directly on the <input> element (not on a wrapper)
+        // Use 60s timeout for CI environments where MudBlazor component initialization can be slow
+        var emailField = page.GetByTestId("email-field");
+        await emailField.WaitForAsync(new LocatorWaitForOptions { Timeout = 60000 });
+        await emailField.FillAsync(email);
+    }
+
+    public async Task FillPasswordAsync(string password)
+    {
+        // MudBlazor renders data-testid directly on the <input> element (not on a wrapper)
+        // (No NetworkIdle wait needed - form is already hydrated)
+        var passwordField = page.GetByTestId("password-field");
+        await passwordField.WaitForAsync(new LocatorWaitForOptions { Timeout = 60000 });
+        await passwordField.FillAsync(password);
+    }
 
     public async Task ClickSignInAsync() =>
         await page.GetByTestId("login-btn").ClickAsync();

@@ -1,4 +1,4 @@
-@vendor-portal @dashboard @ignore
+@vendor-portal @dashboard
 Feature: Vendor Portal Dashboard
   As a vendor user
   I want to see my dashboard with KPI cards and live updates

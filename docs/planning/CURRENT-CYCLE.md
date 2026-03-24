@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M33.0 — Code Correction + Broken Feedback Loop Repair (ACTIVE) |
-| **Status** | 🚀 IN PROGRESS — Phase 1 COMPLETE, Phase 2 COMPLETE (9/9 items), Phase 3 COMPLETE (6/8 items delivered: R-1, R-3, R-4, R-5, R-7, R-8) |
-| **Deliverables** | Phase 1 ✅, Phase 2 ✅, Phase 3 ✅ (R-1, R-3, R-4, R-5, R-7, R-8 complete; R-6 completed in Session 11) |
-| **Recent Completion** | M32.4 — Backoffice Phase 4 (2026-03-21), M32.3 — Backoffice Phase 3B (2026-03-21) |
+| **Status** | 🚀 IN PROGRESS — Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅, Phase 5 ✅ (all delivered) |
+| **Deliverables** | Phase 5 Complete: XC-3, BO-1, BO-2, BO-3 (Backoffice restructure + transaction fix) |
+| **Recent Completion** | M33.0 Phase 5 (2026-03-24), M32.4 — Backoffice Phase 4 (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-23 (M33.0 Session 12 complete — Phase 3 delivered: R-1 ✅, R-3 ✅, R-4 ✅, R-5 ✅, R-7 ✅, R-8 ✅)*
+*Last Updated: 2026-03-24 (M33.0 Session 13 complete — Phase 5 delivered: XC-3 ✅, BO-1 ✅, BO-2 ✅, BO-3 ✅)*
 
 ---
 
@@ -146,10 +146,32 @@
 - ✅ Session plan + retrospective documenting pattern variations and learnings created
 - **See:** `docs/planning/milestones/m33-0-session-11-plan.md`, `docs/planning/milestones/m33-0-session-11-retrospective.md`
 
+**Session 12 Completion (2026-03-23):**
+- ✅ **Phase 4 COMPLETE (VP-5 + VP-6 + verification):** All Vendor Portal structural refactoring finished
+- ✅ VP-5: VendorHubMessages.cs split into individual message files
+- ✅ VP-6: FluentValidation validators added to all 7 VP commands
+- ✅ VP-1/VP-2/VP-3/VP-4: Verified complete from prior sessions (folder flattening, handler explosion)
+- ✅ F-2 Phase A: No feature-level @ignore tags in E2E files
+- ✅ Build: 0 errors, 36 pre-existing warnings (unchanged)
+- ✅ All 86 VendorPortal.Api.IntegrationTests passing (0% regression rate)
+- ✅ Session retrospective documenting Phase 4 completion + timeout recovery pattern
+- **See:** `docs/planning/milestones/m33-0-session-12-retrospective.md`
+
+**Session 13 Completion (2026-03-24):**
+- ✅ **Phase 5 COMPLETE (BO-1 + BO-2 + BO-3 + XC-3):** All Backoffice folder restructure + transaction fix delivered
+- ✅ XC-3 + BO-2: AcknowledgeAlert transaction fix (removed manual `SaveChangesAsync()` — Wolverine auto-transaction)
+- ✅ BO-1: Restructured Backoffice.Api folders (23 endpoint files → 8 feature-named folders)
+- ✅ BO-3: Colocated projections with features (10 projection files → 2 feature folders)
+- ✅ Namespace migration: All `Backoffice.Projections.*` → `Backoffice.DashboardReporting.*` or `Backoffice.AlertManagement.*`
+- ✅ Test fixes: Updated 3 integration tests to manually commit after calling handler directly
+- ✅ Build: 0 errors, 36 pre-existing warnings (unchanged)
+- ✅ All 91 Backoffice.Api.IntegrationTests passing (0% regression rate)
+- ✅ Session retrospective documenting transaction pattern learnings + namespace migration strategy
+- **See:** `docs/planning/milestones/m33-0-session-13-retrospective.md`
+
 **Remaining Planned Priorities:**
-3. 📋 **Phase 3:** Returns BC structural refactor (R-5 through R-8 remaining) — NEXT
-4. 📋 **Phase 4:** Vendor Portal structural refactor (VP-1 through VP-6)
-5. 📋 **Phase 5:** Backoffice folder restructure (BO-1/BO-2/BO-3) + XC-3 (AcknowledgeAlert transaction fix)
+4. 📋 **Phase 6:** Backoffice completion (missing projections + missing pages) — NEXT
+5. 📋 **Phase 7:** Returns E2E coverage + Blazor WASM routing patterns
 
 **References:**
 - M33-M34 Proposal: `docs/planning/milestones/m33-m34-engineering-proposal-2026-03-21.md`
@@ -170,6 +192,9 @@
 - Session 10 Retrospective: `docs/planning/milestones/m33-0-session-10-retrospective.md`
 - Session 11 Plan: `docs/planning/milestones/m33-0-session-11-plan.md`
 - Session 11 Retrospective: `docs/planning/milestones/m33-0-session-11-retrospective.md`
+- Session 12 Retrospective: `docs/planning/milestones/m33-0-session-12-retrospective.md`
+- Session 13 Plan: `docs/planning/milestones/m33-0-session-13-phase-5-plan.md`
+- Session 13 Retrospective: `docs/planning/milestones/m33-0-session-13-retrospective.md`
 - ADR 0039: `docs/decisions/0039-canonical-validator-placement.md`
 - M32.4 Retrospective: `docs/planning/milestones/m32-4-session-1-retrospective.md`
 

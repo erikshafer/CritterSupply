@@ -82,7 +82,7 @@ public class SignalRNotificationTests
         using (var session = _fixture.GetDocumentSession())
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd");
-            var metrics = await session.LoadAsync<Backoffice.Projections.AdminDailyMetrics>(today);
+            var metrics = await session.LoadAsync<Backoffice.DashboardReporting.AdminDailyMetrics>(today);
 
             metrics.ShouldNotBeNull();
             metrics!.OrderCount.ShouldBe(1);

@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Marten;
 using Testcontainers.PostgreSql;
 using VendorIdentity.Api.Auth;
+using VendorIdentity.Identity;
 using Wolverine;
 
 // VendorLoginEndpoint: used as WebApplicationFactory anchor for VendorIdentity.Api
@@ -71,25 +73,65 @@ public sealed class E2ETestFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        Console.WriteLine("[E2ETestFixture] 🚀 Starting E2E test infrastructure...");
+
         // Step 1: Start TestContainers PostgreSQL
+        Console.WriteLine("[E2ETestFixture] Starting PostgreSQL TestContainer...");
         await _postgres.StartAsync();
         var connectionString = _postgres.GetConnectionString();
+        Console.WriteLine($"[E2ETestFixture] ✅ PostgreSQL started: {connectionString}");
 
         // Step 2: Start VendorIdentity.Api (EF Core — JWT issuer)
+        Console.WriteLine("[E2ETestFixture] Starting VendorIdentity.Api...");
         _identityFactory = new VendorIdentityApiKestrelFactory(connectionString);
         _identityFactory.StartKestrel();
         IdentityApiBaseUrl = _identityFactory.ServerAddress;
+        Console.WriteLine($"[E2ETestFixture] ✅ VendorIdentity.Api listening: {IdentityApiBaseUrl}");
+
+        // Step 2a: Manually invoke VendorIdentitySeedData (WebApplicationFactory doesn't execute startup code)
+        using (var scope = _identityFactory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<VendorIdentityDbContext>();
+            await dbContext.Database.MigrateAsync();
+
+            Console.WriteLine("[E2ETestFixture] Seeding VendorIdentity test data...");
+            await VendorIdentitySeedData.SeedAsync(dbContext);
+
+            // Verify seed data was created
+            var tenantCount = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(dbContext.Tenants);
+            var userCount = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(dbContext.Users);
+            Console.WriteLine($"[E2ETestFixture] ✅ VendorIdentity seed data: {tenantCount} tenants, {userCount} users");
+        }
 
         // Step 3: Start VendorPortal.Api (Marten — analytics, change requests, SignalR)
+        Console.WriteLine("[E2ETestFixture] Starting VendorPortal.Api...");
         _portalApiFactory = new VendorPortalApiKestrelFactory(connectionString, IdentityApiBaseUrl);
         _portalApiFactory.StartKestrel();
         PortalApiBaseUrl = _portalApiFactory.ServerAddress;
         PortalApiHost = _portalApiFactory.Services.GetRequiredService<IHost>();
+        Console.WriteLine($"[E2ETestFixture] ✅ VendorPortal.Api listening: {PortalApiBaseUrl}");
+
+        // Step 3a: Manually invoke VendorPortalSeedData (WebApplicationFactory doesn't execute startup code)
+        Console.WriteLine("[E2ETestFixture] Seeding VendorPortal test data...");
+        await VendorPortalSeedData.SeedAsync(_portalApiFactory.Services.GetRequiredService<IDocumentStore>());
+
+        // Verify seed data was created
+        var store = _portalApiFactory.Services.GetRequiredService<IDocumentStore>();
+        await using var session = store.LightweightSession();
+        var account = await session.LoadAsync<VendorPortal.VendorAccount.VendorAccount>(
+            Guid.Parse("00000000-0000-0000-0000-000000000001"));
+        Console.WriteLine($"[E2ETestFixture] ✅ VendorPortal seed data: VendorAccount exists = {account != null}");
+        if (account != null)
+            Console.WriteLine($"[E2ETestFixture]    Organization: {account.OrganizationName}, Contact: {account.ContactEmail}");
 
         // Step 4: Start WASM static file host serving VendorPortal.Web with test API URLs
+        Console.WriteLine("[E2ETestFixture] Starting WASM static file host...");
         _wasmHost = new WasmStaticFileHost(IdentityApiBaseUrl, PortalApiBaseUrl);
         await _wasmHost.StartAsync();
         WasmBaseUrl = _wasmHost.BaseUrl;
+        Console.WriteLine($"[E2ETestFixture] ✅ WASM host listening: {WasmBaseUrl}");
+
+        Console.WriteLine("[E2ETestFixture] 🎉 E2E test infrastructure ready!");
     }
 
     public async Task DisposeAsync()
@@ -114,6 +156,41 @@ public sealed class E2ETestFixture : IAsyncLifetime
             await store.Advanced.Clean.DeleteAllEventDataAsync();
         }
     }
+
+    /// <summary>
+    /// Gets a JWT access token for the specified user by calling the VendorIdentity login endpoint.
+    /// Use this to seed data via direct API calls without going through the UI.
+    /// </summary>
+    public async Task<string> GetAccessTokenAsync(string email, string password)
+    {
+        using var client = new HttpClient { BaseAddress = new Uri(IdentityApiBaseUrl) };
+        var loginRequest = new { Email = email, Password = password };
+        var response = await client.PostAsJsonAsync("/api/vendor-identity/auth/login", loginRequest);
+        response.EnsureSuccessStatusCode();
+
+        var loginResponse = await response.Content.ReadFromJsonAsync<VendorLoginResponse>();
+        return loginResponse?.AccessToken ?? throw new InvalidOperationException("Login failed to return access token");
+    }
+
+    /// <summary>
+    /// Creates an HttpClient configured to call VendorPortal.Api with JWT authentication.
+    /// Use this to seed data via direct API calls, bypassing UI navigation issues.
+    /// </summary>
+    public HttpClient CreateAuthenticatedPortalApiClient(string accessToken)
+    {
+        var client = new HttpClient { BaseAddress = new Uri(PortalApiBaseUrl) };
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        return client;
+    }
+
+    private sealed record VendorLoginResponse(
+        string AccessToken,
+        string Email,
+        string FirstName,
+        string LastName,
+        string Role,
+        string TenantName);
 }
 
 
@@ -129,11 +206,21 @@ internal sealed class VendorIdentityApiKestrelFactory(string connectionString)
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // CRITICAL: Set environment to Development so VendorIdentitySeedData.SeedAsync runs
+        // (Program.cs lines 86-92 only seed data in Development environment)
+        builder.UseEnvironment("Development");
+
         builder.ConfigureAppConfiguration(config =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:postgres"] = connectionString
+                ["ConnectionStrings:postgres"] = connectionString,
+                // JWT configuration for token issuance (must match VendorPortal.Api expectation)
+                ["Jwt:SigningKey"] = "dev-only-signing-key-change-in-production-must-be-at-least-32-chars",
+                ["Jwt:Issuer"] = "vendor-identity",
+                ["Jwt:Audience"] = "vendor-portal",
+                ["Jwt:AccessTokenExpiryMinutes"] = "15",
+                ["Jwt:RefreshTokenExpiryDays"] = "7"
             });
         });
 
@@ -143,9 +230,11 @@ internal sealed class VendorIdentityApiKestrelFactory(string connectionString)
             services.DisableAllExternalWolverineTransports();
 
             // Open CORS for test (random ports)
+            // IMPORTANT: VendorIdentity.Api uses a NAMED policy "VendorPortalWeb" (not default policy)
+            // Must override the named policy that the API actually uses in app.UseCors("VendorPortalWeb")
             services.AddCors(opts =>
             {
-                opts.AddDefaultPolicy(policy => policy
+                opts.AddPolicy("VendorPortalWeb", policy => policy
                     .SetIsOriginAllowed(_ => true)
                     .AllowAnyHeader()
                     .AllowAnyMethod()
@@ -185,12 +274,20 @@ internal sealed class VendorPortalApiKestrelFactory(string connectionString, str
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // CRITICAL: Set environment to Development so VendorPortalSeedData.SeedAsync runs
+        // (Program.cs line 195 only seeds data in Development environment)
+        builder.UseEnvironment("Development");
+
         builder.ConfigureAppConfiguration(config =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:postgres"] = connectionString,
-                ["ApiClients:VendorIdentityApiUrl"] = identityApiUrl
+                ["ApiClients:VendorIdentityApiUrl"] = identityApiUrl,
+                // JWT configuration for token validation (must match VendorIdentity.Api issuance)
+                ["Jwt:SigningKey"] = "dev-only-signing-key-change-in-production-must-be-at-least-32-chars",
+                ["Jwt:Issuer"] = "vendor-identity",
+                ["Jwt:Audience"] = "vendor-portal"
             });
         });
 
@@ -203,9 +300,11 @@ internal sealed class VendorPortalApiKestrelFactory(string connectionString, str
             services.DisableAllExternalWolverineTransports();
 
             // Open CORS for test (random ports)
+            // IMPORTANT: VendorPortal.Api uses a NAMED policy "VendorPortalWeb" (not default policy)
+            // Must override the named policy that the API actually uses in app.UseCors("VendorPortalWeb")
             services.AddCors(opts =>
             {
-                opts.AddDefaultPolicy(policy => policy
+                opts.AddPolicy("VendorPortalWeb", policy => policy
                     .SetIsOriginAllowed(_ => true)
                     .AllowAnyHeader()
                     .AllowAnyMethod()
@@ -315,31 +414,68 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
 
     /// <summary>
     /// Locates the VendorPortal.Web wwwroot directory containing compiled WASM files.
-    /// Walks up from the test output directory to find the source project.
+    /// Walks up from the test output directory to find the bin build output.
+    /// IMPORTANT: Must use bin/{Configuration}/net10.0/publish/wwwroot (not src/*/wwwroot) to get compiled _framework files.
+    /// Supports both Release (CI) and Debug (local development) configurations.
     /// </summary>
     private static string FindWasmRoot()
     {
-        // Strategy: find the VendorPortal.Web project's wwwroot from the repo root
+        // Strategy: Start from test output directory and look for sibling VendorPortal.Web publish output
         var current = AppContext.BaseDirectory;
+
+        // Prefer Release in CI, but support local Debug too.
+        // Check Release first so CI uses the correct build artifacts.
+        var configurations = new[] { "Release", "Debug" };
+
+        // Walk up directory tree to find repo root (has src/ directory)
         while (current != null)
         {
-            var candidate = Path.Combine(current, "src", "Vendor Portal", "VendorPortal.Web", "wwwroot");
-            if (Directory.Exists(candidate))
-                return candidate;
+            var srcDir = Path.Combine(current, "src");
+            if (Directory.Exists(srcDir))
+            {
+                // Try each configuration in priority order
+                foreach (var config in configurations)
+                {
+                    // PRIORITY 1: Check publish output directory (has index.html + _framework)
+                    var publishWwwroot = Path.Combine(current, "src", "Vendor Portal", "VendorPortal.Web", "bin", config, "net10.0", "publish", "wwwroot");
+                    if (Directory.Exists(publishWwwroot) && Directory.Exists(Path.Combine(publishWwwroot, "_framework")) && File.Exists(Path.Combine(publishWwwroot, "index.html")))
+                    {
+                        Console.WriteLine($"✅ [FindWasmRoot] Found publish wwwroot ({config}): {publishWwwroot}");
+                        return publishWwwroot;
+                    }
 
-            // Also check for the published output (bin/Debug or bin/Release)
-            var binCandidate = Directory.GetDirectories(current, "VendorPortal.Web", SearchOption.AllDirectories)
-                .Select(d => Path.Combine(d, "wwwroot"))
-                .FirstOrDefault(Directory.Exists);
+                    // PRIORITY 2: Check bin output directory (has _framework but may be missing index.html)
+                    var binWwwroot = Path.Combine(current, "src", "Vendor Portal", "VendorPortal.Web", "bin", config, "net10.0", "wwwroot");
+                    if (Directory.Exists(binWwwroot) && Directory.Exists(Path.Combine(binWwwroot, "_framework")) && File.Exists(Path.Combine(binWwwroot, "index.html")))
+                    {
+                        Console.WriteLine($"✅ [FindWasmRoot] Found compiled wwwroot ({config}): {binWwwroot}");
+                        return binWwwroot;
+                    }
+                }
 
-            if (binCandidate != null)
-                return binCandidate;
+                // PRIORITY 3: Check source directory as fallback (only if it has _framework compiled into it)
+                var srcWwwroot = Path.Combine(current, "src", "Vendor Portal", "VendorPortal.Web", "wwwroot");
+                if (Directory.Exists(srcWwwroot))
+                {
+                    var hasFramework = Directory.Exists(Path.Combine(srcWwwroot, "_framework"));
+                    var hasIndexHtml = File.Exists(Path.Combine(srcWwwroot, "index.html"));
+                    Console.WriteLine($"⚠️  [FindWasmRoot] Found source wwwroot (has _framework: {hasFramework}, has index.html: {hasIndexHtml}): {srcWwwroot}");
+                    if (hasFramework && hasIndexHtml)
+                        return srcWwwroot;
+                }
+
+                // None of the locations have all required files
+                throw new InvalidOperationException(
+                    $"Could not locate VendorPortal.Web/wwwroot directory with both _framework/ and index.html. " +
+                    $"Tried configurations: {string.Join(", ", configurations)}. " +
+                    $"Ensure the VendorPortal.Web Blazor WASM project is published before running E2E tests. " +
+                    $"The PublishBlazorWasmForE2E MSBuild target in VendorPortal.E2ETests.csproj handles this automatically.");
+            }
 
             current = Directory.GetParent(current)?.FullName;
         }
 
         throw new InvalidOperationException(
-            "Could not locate VendorPortal.Web/wwwroot directory. " +
-            "Ensure the VendorPortal.Web project is built before running E2E tests.");
+            "Could not locate repository root directory (expected to contain 'src/' folder).");
     }
 }

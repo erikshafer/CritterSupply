@@ -15,7 +15,7 @@ using Marten;
 ///
 /// Only runs in the Development environment.
 /// </summary>
-internal static class VendorPortalSeedData
+public static class VendorPortalSeedData
 {
     // Must match the tenant ID in VendorIdentitySeedData
     private static readonly Guid AcmeTenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");

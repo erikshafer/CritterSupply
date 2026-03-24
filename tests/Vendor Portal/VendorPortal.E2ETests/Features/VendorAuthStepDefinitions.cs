@@ -49,8 +49,13 @@ public sealed class VendorAuthStepDefinitions
     [Then("I should be redirected to the dashboard")]
     public async Task ThenIShouldBeRedirectedToTheDashboard()
     {
-        // Wait for navigation to dashboard — WASM auth + redirect can take time
-        await Page.WaitForURLAsync("**/dashboard", new PageWaitForURLOptions { Timeout = 15000 });
+        // Wait for navigation to dashboard — Blazor WASM client-side routing (no full page load)
+        // Use WaitUntil.Commit to wait for URL change only, not page Load event
+        await Page.WaitForURLAsync("**/dashboard", new PageWaitForURLOptions
+        {
+            Timeout = 15000,
+            WaitUntil = WaitUntilState.Commit // Client-side routing doesn't trigger Load event
+        });
         Page.Url.ShouldContain("/dashboard");
     }
 
@@ -91,7 +96,12 @@ public sealed class VendorAuthStepDefinitions
     [Then("I should be on the login page")]
     public async Task ThenIShouldBeOnTheLoginPage()
     {
-        await Page.WaitForURLAsync("**/login**", new PageWaitForURLOptions { Timeout = 15000 });
+        // Blazor WASM client-side routing — wait for URL commit, not full page load
+        await Page.WaitForURLAsync("**/login**", new PageWaitForURLOptions
+        {
+            Timeout = 15000,
+            WaitUntil = WaitUntilState.Commit
+        });
         Page.Url.ShouldContain("/login");
     }
 }

@@ -26,7 +26,46 @@ public sealed class VendorChangeRequestStepDefinitions
     public async Task WhenINavigateToTheSubmitChangeRequestPage()
     {
         var submitPage = new SubmitChangeRequestPage(Page);
+
+        // DEBUG: Capture state before navigation
+        await Page.ScreenshotAsync(new PageScreenshotOptions
+        {
+            Path = $"debug-before-nav-{DateTime.UtcNow:yyyyMMdd-HHmmss}.png",
+            FullPage = true
+        });
+
         await submitPage.NavigateAsync();
+
+        // DEBUG: Capture state after navigation
+        await Page.ScreenshotAsync(new PageScreenshotOptions
+        {
+            Path = $"debug-after-nav-{DateTime.UtcNow:yyyyMMdd-HHmmss}.png",
+            FullPage = true
+        });
+
+        // DEBUG: Log HTML content to see what's actually rendered
+        var pageContent = await Page.ContentAsync();
+        var testOutputPath = $"debug-page-content-{DateTime.UtcNow:yyyyMMdd-HHmmss}.html";
+        await File.WriteAllTextAsync(testOutputPath, pageContent);
+
+        // DEBUG: Check for specific elements
+        var hasSkuField = await Page.GetByTestId("sku-field").CountAsync() > 0;
+        var hasPermissionWarning = pageContent.Contains("You do not have permission");
+        var hasSignInPrompt = pageContent.Contains("Sign In");
+
+        // Write debug info to a text file since Console.WriteLine isn't working
+        var debugInfo = $@"
+=== DEBUG INFO ===
+Time: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}
+Current URL: {Page.Url}
+sku-field exists: {hasSkuField}
+Permission warning present: {hasPermissionWarning}
+Sign-in prompt present: {hasSignInPrompt}
+HTML content written to: {testOutputPath}
+Screenshots: debug-before-nav-*.png, debug-after-nav-*.png
+";
+        await File.WriteAllTextAsync($"debug-info-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt", debugInfo);
+
         await Page.WaitForSelectorAsync("[data-testid='sku-field']", new PageWaitForSelectorOptions
         {
             Timeout = 15000
@@ -48,11 +87,33 @@ public sealed class VendorChangeRequestStepDefinitions
     public async Task WhenIFillInTheForm(string sku, string title, string details)
     {
         var submitPage = new SubmitChangeRequestPage(Page);
+
+        // Check error UI before filling
+        var errorUIBefore = await Page.Locator("#blazor-error-ui").IsVisibleAsync();
+        await File.WriteAllTextAsync($"debug-error-before-fill-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt",
+            $"Error UI visible before filling: {errorUIBefore}");
+
         await submitPage.FillSkuAsync(sku);
+        await Page.WaitForTimeoutAsync(100);
+
+        var errorUIAfterSku = await Page.Locator("#blazor-error-ui").IsVisibleAsync();
+        await File.WriteAllTextAsync($"debug-error-after-sku-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt",
+            $"Error UI visible after SKU fill: {errorUIAfterSku}");
+
         await submitPage.FillTitleAsync(title);
+        await Page.WaitForTimeoutAsync(100);
+
+        var errorUIAfterTitle = await Page.Locator("#blazor-error-ui").IsVisibleAsync();
+        await File.WriteAllTextAsync($"debug-error-after-title-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt",
+            $"Error UI visible after title fill: {errorUIAfterTitle}");
+
         await submitPage.FillDetailsAsync(details);
         // Brief pause for Blazor form binding
         await Page.WaitForTimeoutAsync(300);
+
+        var errorUIAfterDetails = await Page.Locator("#blazor-error-ui").IsVisibleAsync();
+        await File.WriteAllTextAsync($"debug-error-after-details-{DateTime.UtcNow:yyyyMMdd-HHmmss}.txt",
+            $"Error UI visible after details fill: {errorUIAfterDetails}");
     }
 
     [When("I click the submit button")]
@@ -65,6 +126,23 @@ public sealed class VendorChangeRequestStepDefinitions
     [When("I click the save draft button")]
     public async Task WhenIClickTheSaveDraftButton()
     {
+        // DEBUG: Capture state before clicking to see if error UI is visible
+        await Page.ScreenshotAsync(new PageScreenshotOptions
+        {
+            Path = $"debug-before-save-draft-{DateTime.UtcNow:yyyyMMdd-HHmmss}.png",
+            FullPage = true
+        });
+
+        // Check for Blazor error UI
+        var blazorErrorUI = Page.Locator("#blazor-error-ui");
+        var isErrorVisible = await blazorErrorUI.IsVisibleAsync();
+
+        if (isErrorVisible)
+        {
+            var errorHtml = await Page.ContentAsync();
+            await File.WriteAllTextAsync($"debug-blazor-error-{DateTime.UtcNow:yyyyMMdd-HHmmss}.html", errorHtml);
+        }
+
         var submitPage = new SubmitChangeRequestPage(Page);
         await submitPage.ClickSaveDraftAsync();
     }
@@ -74,13 +152,33 @@ public sealed class VendorChangeRequestStepDefinitions
     [Given("I have submitted a change request for SKU {string} with title {string}")]
     public async Task GivenIHaveSubmittedAChangeRequest(string sku, string title)
     {
-        // Seed a change request via the submit form (browser-driven, not API)
-        // Navigate to submit, fill, and submit
-        await WhenINavigateToTheSubmitChangeRequestPage();
-        await WhenIFillInTheForm(sku, title, "E2E test change request details");
-        await WhenIClickTheSubmitButton();
-        // Wait for redirect back to list
-        await Page.WaitForURLAsync("**/change-requests", new PageWaitForURLOptions { Timeout = 15000 });
+        // OPTIMIZATION: Seed change request via direct API call instead of browser automation.
+        // This bypasses UI navigation issues (Blazor error UI, SignalR connection timing)
+        // and makes tests faster and more reliable.
+
+        // Get JWT token for the catalog@acmepets.test user
+        var accessToken = await Fixture.GetAccessTokenAsync("catalog@acmepets.test", "password");
+        using var client = Fixture.CreateAuthenticatedPortalApiClient(accessToken);
+
+        var requestId = Guid.NewGuid();
+
+        // Step 1: Create draft
+        var draftPayload = new
+        {
+            RequestId = requestId,
+            Sku = sku,
+            Type = "Description",
+            Title = title,
+            Details = "E2E test change request details",
+            AdditionalNotes = (string?)null
+        };
+
+        var draftResponse = await client.PostAsJsonAsync("/api/vendor-portal/change-requests/draft", draftPayload);
+        draftResponse.EnsureSuccessStatusCode();
+
+        // Step 2: Submit immediately
+        var submitResponse = await client.PostAsync($"/api/vendor-portal/change-requests/{requestId}/submit", null);
+        submitResponse.EnsureSuccessStatusCode();
     }
 
     // ─── Then: Assertions ───
@@ -88,7 +186,12 @@ public sealed class VendorChangeRequestStepDefinitions
     [Then("I should be redirected to the change requests list")]
     public async Task ThenIShouldBeRedirectedToTheChangeRequestsList()
     {
-        await Page.WaitForURLAsync("**/change-requests", new PageWaitForURLOptions { Timeout = 15000 });
+        // Blazor WASM client-side routing — wait for URL commit, not full page load
+        await Page.WaitForURLAsync("**/change-requests", new PageWaitForURLOptions
+        {
+            Timeout = 15000,
+            WaitUntil = WaitUntilState.Commit
+        });
         Page.Url.ShouldContain("/change-requests");
     }
 

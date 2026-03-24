@@ -1,4 +1,4 @@
-@vendor-portal @auth @ignore
+@vendor-portal @auth
 Feature: Vendor Portal Authentication
   As a vendor user
   I want to log in with my credentials

@@ -41,6 +41,34 @@ public sealed class PlaywrightHooks
 
         var page = await _browserContext.NewPageAsync();
 
+        // Capture console messages and page errors for debugging
+        page.Console += (_, msg) =>
+        {
+            var level = msg.Type;
+            var text = msg.Text;
+            Console.WriteLine($"[Browser Console {level}] {text}");
+        };
+
+        page.PageError += (_, error) =>
+        {
+            Console.WriteLine($"[Browser Error] {error}");
+        };
+
+        // Log failed HTTP requests
+        page.RequestFailed += (_, request) =>
+        {
+            Console.WriteLine($"[HTTP Failed] {request.Method} {request.Url} - {request.Failure}");
+        };
+
+        // Log HTTP responses for debugging (only log 4xx/5xx)
+        page.Response += (_, response) =>
+        {
+            if (response.Status >= 400)
+            {
+                Console.WriteLine($"[HTTP {response.Status}] {response.Request.Method} {response.Url}");
+            }
+        };
+
         _scenarioContext.Set(page, ScenarioContextKeys.Page);
     }
 

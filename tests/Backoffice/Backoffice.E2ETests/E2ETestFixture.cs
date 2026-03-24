@@ -578,34 +578,42 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
     /// <summary>
     /// Locates the Backoffice.Web wwwroot directory containing compiled WASM files.
     /// Walks up from the test output directory to find the bin build output.
-    /// IMPORTANT: Must use bin/Debug/net10.0/wwwroot (not src/*/wwwroot) to get compiled _framework files.
+    /// IMPORTANT: Must use bin/{Configuration}/net10.0/wwwroot (not src/*/wwwroot) to get compiled _framework files.
+    /// Supports both Release (CI) and Debug (local development) configurations.
     /// </summary>
     private static string FindWasmRoot()
     {
-        // Strategy: Start from test output directory (bin/Debug/net10.0) and look for sibling Backoffice.Web publish output
-        var current = AppContext.BaseDirectory; // e.g., tests/Backoffice/Backoffice.E2ETests/bin/Debug/net10.0
+        // Strategy: Start from test output directory and look for sibling Backoffice.Web publish output
+        var current = AppContext.BaseDirectory;
 
-        // Walk up directory tree to find repo root (has .git or src/ directory)
+        // Prefer Release in CI, but support local Debug too.
+        // Check Release first so CI uses the correct build artifacts.
+        var configurations = new[] { "Release", "Debug" };
+
+        // Walk up directory tree to find repo root (has src/ directory)
         while (current != null)
         {
-            // Check if we're at repo root (has src/ directory)
             var srcDir = Path.Combine(current, "src");
             if (Directory.Exists(srcDir))
             {
-                // PRIORITY 1: Check publish output directory (has index.html + _framework)
-                var publishWwwroot = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "bin", "Debug", "net10.0", "publish", "wwwroot");
-                if (Directory.Exists(publishWwwroot) && Directory.Exists(Path.Combine(publishWwwroot, "_framework")) && File.Exists(Path.Combine(publishWwwroot, "index.html")))
+                // Try each configuration in priority order
+                foreach (var config in configurations)
                 {
-                    Console.WriteLine($"✅ [FindWasmRoot] Found publish wwwroot with _framework and index.html: {publishWwwroot}");
-                    return publishWwwroot;
-                }
+                    // PRIORITY 1: Check publish output directory (has index.html + _framework)
+                    var publishWwwroot = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "bin", config, "net10.0", "publish", "wwwroot");
+                    if (Directory.Exists(publishWwwroot) && Directory.Exists(Path.Combine(publishWwwroot, "_framework")) && File.Exists(Path.Combine(publishWwwroot, "index.html")))
+                    {
+                        Console.WriteLine($"✅ [FindWasmRoot] Found publish wwwroot ({config}): {publishWwwroot}");
+                        return publishWwwroot;
+                    }
 
-                // PRIORITY 2: Check bin output directory (has _framework but may be missing index.html)
-                var binWwwroot = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "bin", "Debug", "net10.0", "wwwroot");
-                if (Directory.Exists(binWwwroot) && Directory.Exists(Path.Combine(binWwwroot, "_framework")) && File.Exists(Path.Combine(binWwwroot, "index.html")))
-                {
-                    Console.WriteLine($"✅ [FindWasmRoot] Found compiled wwwroot with _framework and index.html: {binWwwroot}");
-                    return binWwwroot;
+                    // PRIORITY 2: Check bin output directory (has _framework but may be missing index.html)
+                    var binWwwroot = Path.Combine(current, "src", "Backoffice", "Backoffice.Web", "bin", config, "net10.0", "wwwroot");
+                    if (Directory.Exists(binWwwroot) && Directory.Exists(Path.Combine(binWwwroot, "_framework")) && File.Exists(Path.Combine(binWwwroot, "index.html")))
+                    {
+                        Console.WriteLine($"✅ [FindWasmRoot] Found compiled wwwroot ({config}): {binWwwroot}");
+                        return binWwwroot;
+                    }
                 }
 
                 // PRIORITY 3: Check source directory as fallback (only if it has _framework compiled into it)
@@ -622,7 +630,7 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
                 // None of the locations have all required files
                 throw new InvalidOperationException(
                     $"Could not locate Backoffice.Web/wwwroot directory with compiled _framework files AND index.html. " +
-                    $"Checked (in order): {publishWwwroot}, {binWwwroot}, {srcWwwroot}. " +
+                    $"Tried configurations: {string.Join(", ", configurations)}. " +
                     $"Ensure the Backoffice.Web project is published before running E2E tests (run: dotnet publish src/Backoffice/Backoffice.Web).");
             }
 

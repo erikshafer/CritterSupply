@@ -1,6 +1,6 @@
 using Alba;
-using Backoffice.Commands;
-using Backoffice.Projections;
+using Backoffice.DashboardReporting;
+using Backoffice.AlertManagement;
 using Marten;
 using Messages.Contracts.Inventory;
 using Shouldly;
@@ -94,6 +94,7 @@ public class WarehouseClerkDashboardTests
         using (var session = _fixture.GetDocumentSession())
         {
             await AcknowledgeAlertHandler.Handle(cmd, session, CancellationToken.None);
+            await session.SaveChangesAsync(); // Manual commit required when calling handler directly
         }
 
         // Assert: Verify alert was acknowledged
@@ -156,6 +157,7 @@ public class WarehouseClerkDashboardTests
         {
             var cmd1 = new AcknowledgeAlert(alertDocId, firstAdminUserId);
             await AcknowledgeAlertHandler.Handle(cmd1, session, CancellationToken.None);
+            await session.SaveChangesAsync(); // Manual commit required when calling handler directly
         }
 
         // Act & Assert: Attempt second acknowledgment
@@ -201,6 +203,7 @@ public class WarehouseClerkDashboardTests
         {
             var cmd = new AcknowledgeAlert(alert1Id, Guid.NewGuid());
             await AcknowledgeAlertHandler.Handle(cmd, session, CancellationToken.None);
+            await session.SaveChangesAsync(); // Manual commit required when calling handler directly
         }
 
         // Act: Query unacknowledged alerts

@@ -30,16 +30,65 @@ public sealed class VendorDashboardStepDefinitions
         var loginPage = new VendorLoginPage(Page);
         await loginPage.NavigateAsync();
 
-        // Wait for WASM hydration
+        // Wait for WASM hydration and login form to be ready
         await Page.WaitForSelectorAsync("[data-testid='login-btn']", new PageWaitForSelectorOptions
         {
             Timeout = 30000
         });
 
-        await loginPage.LoginAsync(email, password);
+        // Fill credentials and submit (without re-navigating)
+        await loginPage.FillEmailAsync(email);
+        await loginPage.FillPasswordAsync(password);
+        await loginPage.ClickSignInAsync();
 
-        // Wait for dashboard redirect
-        await Page.WaitForURLAsync("**/dashboard", new PageWaitForURLOptions { Timeout = 15000 });
+        // CRITICAL: Wait for BOTH URL change AND dashboard element to be visible
+        // CI environments need more time than local development (network latency, container startup)
+        // Increased timeout from 15s → 30s for CI stability
+
+        // Step 1: Wait for URL to change to /dashboard (Blazor client-side routing)
+        await Page.WaitForURLAsync("**/dashboard", new PageWaitForURLOptions
+        {
+            Timeout = 30000,
+            WaitUntil = WaitUntilState.Commit
+        });
+
+        // Step 2: Wait for a dashboard element to be visible (ensures WASM components are rendered)
+        // Use KPI card as smoke test — if this is visible, dashboard is fully loaded
+        await Page.WaitForSelectorAsync("[data-testid='kpi-low-stock-alerts']", new PageWaitForSelectorOptions
+        {
+            Timeout = 30000,
+            State = WaitForSelectorState.Visible
+        });
+
+        // Step 3: Wait for SignalR hub connection to establish before navigating away from dashboard
+        // Dashboard.OnInitializedAsync() calls HubService.ConnectAsync() asynchronously.
+        // The hub status indicator aria-label changes to "Live" once connected.
+        // Without this wait, tests that immediately navigate to other pages encounter unhandled
+        // exceptions during hub connection, causing Blazor error UI to appear and block interactions.
+        // Use a generous timeout since test infrastructure (TestContainers + WASM) is slower than production.
+        var hubIndicator = Page.GetByTestId("hub-status-indicator");
+        await hubIndicator.WaitForAsync(new LocatorWaitForOptions { Timeout = 10000 });
+
+        // Poll until aria-label is "Live" (hub is connected)
+        var maxAttempts = 30; // 30 attempts * 500ms = 15 seconds max
+        for (int i = 0; i < maxAttempts; i++)
+        {
+            var ariaLabel = await hubIndicator.GetAttributeAsync("aria-label");
+            if (ariaLabel == "Live")
+            {
+                break;
+            }
+
+            if (i == maxAttempts - 1)
+            {
+                throw new TimeoutException($"Hub connection did not reach 'Live' state within {maxAttempts * 500}ms. Last state: {ariaLabel}");
+            }
+
+            await Page.WaitForTimeoutAsync(500);
+        }
+
+        // Additional small wait to ensure hub is fully initialized
+        await Page.WaitForTimeoutAsync(500);
     }
 
     [Given("I am on the dashboard")]
