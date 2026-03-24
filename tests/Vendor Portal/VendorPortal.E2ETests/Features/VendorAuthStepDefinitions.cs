@@ -25,9 +25,10 @@ public sealed class VendorAuthStepDefinitions
         var loginPage = new VendorLoginPage(Page);
         await loginPage.NavigateAsync();
         // Wait for WASM to hydrate — Blazor WASM needs .NET runtime loaded
+        // CI environments require 60s timeout due to slower network and cold WASM runtime
         await Page.WaitForSelectorAsync("[data-testid='login-btn']", new PageWaitForSelectorOptions
         {
-            Timeout = 30000 // WASM cold start can take up to 30s
+            Timeout = 60000 // WASM cold start can take up to 60s in CI (30-40s observed)
         });
     }
 
