@@ -2,7 +2,7 @@ using Marten.Events.Aggregation;
 using Marten.Events.Projections;
 using Messages.Contracts.Fulfillment;
 
-namespace Backoffice.Projections;
+namespace Backoffice.DashboardReporting;
 
 /// <summary>
 /// Inline projection that builds FulfillmentPipelineView from Fulfillment BC integration messages.

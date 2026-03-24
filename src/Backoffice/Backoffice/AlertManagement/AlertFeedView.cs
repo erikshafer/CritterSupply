@@ -1,4 +1,4 @@
-namespace Backoffice.Projections;
+namespace Backoffice.AlertManagement;
 
 /// <summary>
 /// BFF-owned projection for operations alert feed.

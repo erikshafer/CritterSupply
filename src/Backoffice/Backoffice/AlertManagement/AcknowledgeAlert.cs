@@ -1,4 +1,3 @@
-using Backoffice.Projections;
 using Marten;
 
 namespace Backoffice.AlertManagement;

@@ -2,7 +2,7 @@ using Marten.Events.Aggregation;
 using Marten.Events.Projections;
 using Messages.Contracts.Returns;
 
-namespace Backoffice.Projections;
+namespace Backoffice.DashboardReporting;
 
 /// <summary>
 /// Inline Marten projection for ReturnMetricsView using MultiStreamProjection.

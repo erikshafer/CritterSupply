@@ -1,4 +1,4 @@
-namespace Backoffice.Projections;
+namespace Backoffice.DashboardReporting;
 
 /// <summary>
 /// Active fulfillment pipeline metrics for the Backoffice dashboard.

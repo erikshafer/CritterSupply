@@ -1,4 +1,4 @@
-namespace Backoffice.Projections;
+namespace Backoffice.DashboardReporting;
 
 /// <summary>
 /// Email queue health metrics for the Backoffice dashboard.

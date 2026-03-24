@@ -1,5 +1,6 @@
 using Alba;
-using Backoffice.Projections;
+using Backoffice.DashboardReporting;
+using Backoffice.AlertManagement;
 using Marten;
 using Messages.Contracts.Orders;
 using Messages.Contracts.Payments;

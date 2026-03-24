@@ -3,7 +3,7 @@ using Marten.Events.Projections;
 using Messages.Contracts.Orders;
 using Messages.Contracts.Payments;
 
-namespace Backoffice.Projections;
+namespace Backoffice.DashboardReporting;
 
 /// <summary>
 /// Inline Marten projection for AdminDailyMetrics using MultiStreamProjection.

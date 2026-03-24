@@ -1,6 +1,6 @@
 using Alba;
-using Backoffice.Commands;
-using Backoffice.Projections;
+using Backoffice.DashboardReporting;
+using Backoffice.AlertManagement;
 using Marten;
 using Messages.Contracts.Inventory;
 using Shouldly;

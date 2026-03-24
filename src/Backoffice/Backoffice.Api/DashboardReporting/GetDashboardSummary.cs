@@ -19,14 +19,14 @@ public static class GetDashboardSummary
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var dateKey = today.ToString("yyyy-MM-dd");
 
-        var dailyMetrics = await session.LoadAsync<Backoffice.Projections.AdminDailyMetrics>(dateKey, ct);
+        var dailyMetrics = await session.LoadAsync<Backoffice.DashboardReporting.AdminDailyMetrics>(dateKey, ct);
 
         // Query active returns count from ReturnMetricsView projection (M33.0 Session 2)
-        var returnMetrics = await session.LoadAsync<Backoffice.Projections.ReturnMetricsView>("current", ct);
+        var returnMetrics = await session.LoadAsync<Backoffice.DashboardReporting.ReturnMetricsView>("current", ct);
 
         // Query low stock alerts from AlertFeedView projection
-        var alerts = await session.Query<Backoffice.Projections.AlertFeedView>()
-            .Where(a => !a.AcknowledgedAt.HasValue && a.AlertType == Backoffice.Projections.AlertType.LowStock)
+        var alerts = await session.Query<Backoffice.AlertManagement.AlertFeedView>()
+            .Where(a => !a.AcknowledgedAt.HasValue && a.AlertType == Backoffice.AlertManagement.AlertType.LowStock)
             .CountAsync(ct);
 
         // Map projection to DTO (use zero values if no data exists for today)

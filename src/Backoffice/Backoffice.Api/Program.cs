@@ -92,19 +92,19 @@ builder.Services.AddMarten(opts =>
 
     // BFF-owned projections (inline lifecycle: zero lag)
     // AdminDailyMetrics: Executive dashboard KPIs (Session 6)
-    opts.Projections.Add<Backoffice.Projections.AdminDailyMetricsProjection>(ProjectionLifecycle.Inline);
+    opts.Projections.Add<Backoffice.DashboardReporting.AdminDailyMetricsProjection>(ProjectionLifecycle.Inline);
 
     // AlertFeedView: Operations alert feed (Session 7)
-    opts.Projections.Add<Backoffice.Projections.AlertFeedViewProjection>(ProjectionLifecycle.Inline);
+    opts.Projections.Add<Backoffice.AlertManagement.AlertFeedViewProjection>(ProjectionLifecycle.Inline);
 
     // ReturnMetricsView: Active returns pipeline metrics (M33.0 Session 2)
-    opts.Projections.Add<Backoffice.Projections.ReturnMetricsViewProjection>(ProjectionLifecycle.Inline);
+    opts.Projections.Add<Backoffice.DashboardReporting.ReturnMetricsViewProjection>(ProjectionLifecycle.Inline);
 
     // CorrespondenceMetricsView: Email queue health metrics (M33.0 Session 2)
-    opts.Projections.Add<Backoffice.Projections.CorrespondenceMetricsViewProjection>(ProjectionLifecycle.Inline);
+    opts.Projections.Add<Backoffice.DashboardReporting.CorrespondenceMetricsViewProjection>(ProjectionLifecycle.Inline);
 
     // FulfillmentPipelineView: Active shipments pipeline metrics (M33.0 Session 2)
-    opts.Projections.Add<Backoffice.Projections.FulfillmentPipelineViewProjection>(ProjectionLifecycle.Inline);
+    opts.Projections.Add<Backoffice.DashboardReporting.FulfillmentPipelineViewProjection>(ProjectionLifecycle.Inline);
 })
 .AddAsyncDaemon(JasperFx.Events.Daemon.DaemonMode.Solo)
 .UseLightweightSessions()

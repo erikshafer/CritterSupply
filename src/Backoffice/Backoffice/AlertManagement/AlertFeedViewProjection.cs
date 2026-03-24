@@ -5,7 +5,7 @@ using Messages.Contracts.Inventory;
 using Messages.Contracts.Payments;
 using Messages.Contracts.Returns;
 
-namespace Backoffice.Projections;
+namespace Backoffice.AlertManagement;
 
 /// <summary>
 /// Multi-stream projection aggregating alert events from multiple BCs.

@@ -2,7 +2,7 @@ using Marten.Events.Aggregation;
 using Marten.Events.Projections;
 using Messages.Contracts.Correspondence;
 
-namespace Backoffice.Projections;
+namespace Backoffice.DashboardReporting;
 
 /// <summary>
 /// Inline Marten projection for CorrespondenceMetricsView using MultiStreamProjection.

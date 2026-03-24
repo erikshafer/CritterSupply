@@ -24,7 +24,7 @@ public static class GetDashboardMetrics
             : date;
 
         // Query the AdminDailyMetrics projection
-        var metrics = await session.LoadAsync<Backoffice.Projections.AdminDailyMetrics>(targetDate, ct);
+        var metrics = await session.LoadAsync<Backoffice.DashboardReporting.AdminDailyMetrics>(targetDate, ct);
 
         if (metrics is null)
         {

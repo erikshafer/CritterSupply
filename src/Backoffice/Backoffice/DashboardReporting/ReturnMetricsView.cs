@@ -1,4 +1,4 @@
-namespace Backoffice.Projections;
+namespace Backoffice.DashboardReporting;
 
 /// <summary>
 /// BFF-owned projection for active returns metrics.

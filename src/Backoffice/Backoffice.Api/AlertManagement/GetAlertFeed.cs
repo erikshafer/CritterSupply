@@ -1,4 +1,4 @@
-using Backoffice.Projections;
+using Backoffice.AlertManagement;
 using Marten;
 using Marten.Pagination;
 using Microsoft.AspNetCore.Authorization;
