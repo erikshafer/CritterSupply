@@ -59,6 +59,21 @@ public sealed class VendorDashboardStepDefinitions
             Timeout = 30000,
             State = WaitForSelectorState.Visible
         });
+
+        // Step 3: Wait for SignalR hub connection to establish before navigating away from dashboard
+        // Dashboard.OnInitializedAsync() calls HubService.ConnectAsync() asynchronously.
+        // The hub status indicator changes to "Live" once connected.
+        // Without this wait, tests that immediately navigate to other pages encounter unhandled
+        // exceptions during hub connection, causing Blazor error UI to appear and block interactions.
+        // Use a generous timeout since test infrastructure (TestContainers + WASM) is slower than production.
+        await Page.GetByTestId("hub-status-indicator").WaitForAsync(new LocatorWaitForOptions
+        {
+            Timeout = 10000,
+            State = WaitForSelectorState.Visible
+        });
+
+        // Additional small wait to ensure hub is fully initialized
+        await Page.WaitForTimeoutAsync(500);
     }
 
     [Given("I am on the dashboard")]
