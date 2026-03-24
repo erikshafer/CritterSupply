@@ -41,8 +41,12 @@ public sealed class VendorDashboardStepDefinitions
         await loginPage.FillPasswordAsync(password);
         await loginPage.ClickSignInAsync();
 
-        // Wait for dashboard redirect
-        await Page.WaitForURLAsync("**/dashboard", new PageWaitForURLOptions { Timeout = 15000 });
+        // Wait for dashboard redirect — Blazor WASM client-side routing
+        await Page.WaitForURLAsync("**/dashboard", new PageWaitForURLOptions
+        {
+            Timeout = 15000,
+            WaitUntil = WaitUntilState.Commit
+        });
     }
 
     [Given("I am on the dashboard")]

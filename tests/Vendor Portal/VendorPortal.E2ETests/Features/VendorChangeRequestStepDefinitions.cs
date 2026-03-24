@@ -79,8 +79,12 @@ public sealed class VendorChangeRequestStepDefinitions
         await WhenINavigateToTheSubmitChangeRequestPage();
         await WhenIFillInTheForm(sku, title, "E2E test change request details");
         await WhenIClickTheSubmitButton();
-        // Wait for redirect back to list
-        await Page.WaitForURLAsync("**/change-requests", new PageWaitForURLOptions { Timeout = 15000 });
+        // Wait for redirect back to list — Blazor WASM client-side routing
+        await Page.WaitForURLAsync("**/change-requests", new PageWaitForURLOptions
+        {
+            Timeout = 15000,
+            WaitUntil = WaitUntilState.Commit
+        });
     }
 
     // ─── Then: Assertions ───
@@ -88,7 +92,12 @@ public sealed class VendorChangeRequestStepDefinitions
     [Then("I should be redirected to the change requests list")]
     public async Task ThenIShouldBeRedirectedToTheChangeRequestsList()
     {
-        await Page.WaitForURLAsync("**/change-requests", new PageWaitForURLOptions { Timeout = 15000 });
+        // Blazor WASM client-side routing — wait for URL commit, not full page load
+        await Page.WaitForURLAsync("**/change-requests", new PageWaitForURLOptions
+        {
+            Timeout = 15000,
+            WaitUntil = WaitUntilState.Commit
+        });
         Page.Url.ShouldContain("/change-requests");
     }
 
