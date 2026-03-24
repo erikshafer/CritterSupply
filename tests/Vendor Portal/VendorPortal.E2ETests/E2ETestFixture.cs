@@ -129,6 +129,10 @@ internal sealed class VendorIdentityApiKestrelFactory(string connectionString)
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // CRITICAL: Set environment to Development so VendorIdentitySeedData.SeedAsync runs
+        // (Program.cs lines 86-92 only seed data in Development environment)
+        builder.UseEnvironment("Development");
+
         builder.ConfigureAppConfiguration(config =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
@@ -186,6 +190,10 @@ internal sealed class VendorPortalApiKestrelFactory(string connectionString, str
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // CRITICAL: Set environment to Development so VendorPortalSeedData.SeedAsync runs
+        // (Program.cs line 195 only seeds data in Development environment)
+        builder.UseEnvironment("Development");
+
         builder.ConfigureAppConfiguration(config =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
