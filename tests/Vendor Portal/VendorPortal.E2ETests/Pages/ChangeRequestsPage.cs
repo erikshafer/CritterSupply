@@ -9,6 +9,13 @@ public sealed class ChangeRequestsPage(IPage page)
     {
         // Use Blazor SPA navigation by clicking the dashboard link
         // (GotoAsync would reload the app and lose in-memory auth state)
+        // First wait for the button to be present (60s for CI environments)
+        await page.GetByTestId("view-change-requests-btn").WaitForAsync(new LocatorWaitForOptions
+        {
+            Timeout = 60000,
+            State = WaitForSelectorState.Visible
+        });
+
         await page.GetByTestId("view-change-requests-btn").ClickAsync();
 
         // Wait for client-side navigation to complete

@@ -24,11 +24,18 @@ public sealed class SubmitChangeRequestPage(IPage page)
         var currentUrl = page.Url;
         Console.WriteLine($"DEBUG NavigateAsync: Current URL before click: {currentUrl}");
 
-        // Check if the button exists
-        var buttonExists = await page.GetByTestId("submit-change-request-btn").CountAsync() > 0;
-        Console.WriteLine($"DEBUG NavigateAsync: submit-change-request-btn exists: {buttonExists}");
+        // Check if the button exists (with 60s timeout for CI environments)
+        var button = page.GetByTestId("submit-change-request-btn");
+        await button.WaitForAsync(new LocatorWaitForOptions
+        {
+            Timeout = 60000,
+            State = WaitForSelectorState.Visible
+        });
 
-        if (!buttonExists)
+        var buttonCount = await button.CountAsync();
+        Console.WriteLine($"DEBUG NavigateAsync: submit-change-request-btn count: {buttonCount}");
+
+        if (buttonCount == 0)
         {
             throw new InvalidOperationException(
                 "submit-change-request-btn not found on page. User may not have permission or not on Dashboard.");

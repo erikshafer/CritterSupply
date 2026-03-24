@@ -68,10 +68,10 @@ public sealed class VendorDashboardStepDefinitions
         // exceptions during hub connection, causing Blazor error UI to appear and block interactions.
         // Use a generous timeout since test infrastructure (TestContainers + WASM) is slower than production.
         var hubIndicator = Page.GetByTestId("hub-status-indicator");
-        await hubIndicator.WaitForAsync(new LocatorWaitForOptions { Timeout = 10000 });
+        await hubIndicator.WaitForAsync(new LocatorWaitForOptions { Timeout = 15000 });
 
         // Poll until aria-label is "Live" (hub is connected)
-        var maxAttempts = 30; // 30 attempts * 500ms = 15 seconds max
+        var maxAttempts = 60; // 60 attempts * 500ms = 30 seconds max (increased from 15s)
         for (int i = 0; i < maxAttempts; i++)
         {
             var ariaLabel = await hubIndicator.GetAttributeAsync("aria-label");
@@ -88,8 +88,9 @@ public sealed class VendorDashboardStepDefinitions
             await Page.WaitForTimeoutAsync(500);
         }
 
-        // Additional small wait to ensure hub is fully initialized
-        await Page.WaitForTimeoutAsync(500);
+        // Additional wait to ensure hub is fully initialized and stable
+        // This prevents race conditions where hub appears "Live" but isn't fully ready
+        await Page.WaitForTimeoutAsync(2000);
     }
 
     [Given("I am on the dashboard")]
@@ -214,9 +215,35 @@ public sealed class VendorDashboardStepDefinitions
     public async Task ThenIShouldSeeASnackbarContaining(string expectedText)
     {
         // MudBlazor snackbar renders inside .mud-snackbar
+        // IMPORTANT: Multiple snackbars can be present (e.g., "Welcome back" from login + new message)
+        // We need to find the snackbar that contains our expected text
         var snackbar = Page.Locator(".mud-snackbar");
+
+        // Wait for at least one snackbar to be visible
         await snackbar.First.WaitForAsync(new LocatorWaitForOptions { Timeout = 10000 });
-        var text = await snackbar.First.InnerTextAsync();
-        text.ToLowerInvariant().ShouldContain(expectedText.ToLowerInvariant());
+
+        // Check all visible snackbars until we find one with the expected text
+        var count = await snackbar.CountAsync();
+        var found = false;
+
+        for (int i = 0; i < count; i++)
+        {
+            try
+            {
+                var text = await snackbar.Nth(i).InnerTextAsync();
+                if (text.ToLowerInvariant().Contains(expectedText.ToLowerInvariant()))
+                {
+                    found = true;
+                    break;
+                }
+            }
+            catch
+            {
+                // Snackbar may have disappeared, continue to next
+                continue;
+            }
+        }
+
+        found.ShouldBeTrue($"Expected to find snackbar containing '{expectedText}' but checked {count} snackbars and didn't find it");
     }
 }
