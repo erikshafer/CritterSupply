@@ -230,7 +230,7 @@ tests/Customer Experience/Storefront.E2ETests/
 
 ### New GitHub Actions Workflow
 
-`.github/workflows/e2e.yml` — triggers on `main` push and nightly schedule. NOT triggered on every PR. Uploads Playwright traces as artifacts on failure.
+`.github/workflows/e2e.yml` — triggers on `main` push, qualifying pull requests, and the nightly schedule. Uploads Playwright trace artifacts from the .NET Playwright hooks on failure.
 
 ### Package Additions
 

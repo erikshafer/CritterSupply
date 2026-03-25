@@ -347,6 +347,8 @@ public sealed class AccountTests : BunitTestBase
 
 > **Note:** In bUnit v2, use `this.AddAuthorization()` (not `AddTestAuthorization()` from v1).
 
+> **Important caveat:** `AddAuthorization()` is a good fit for simple `[Authorize]` or role-based rendering checks. For pages that depend on `AuthorizeView Policy=...`, redirects, auth state propagation, or MudBlazor-heavy interaction after login, prefer Playwright E2E tests. M33.0 showed that policy-gated Backoffice pages were much more stable and representative at the browser level than in bUnit.
+
 ### Mocking HttpClient / IHttpClientFactory
 
 Components that call APIs via `IHttpClientFactory` need a mock. Create a reusable `MockHttpMessageHandler`:
@@ -464,6 +466,8 @@ These components/behaviors are better tested with Playwright E2E:
 | **Navigation flows**       | Full-page navigation with `forceLoad: true`          |
 
 **Rule:** If a component's critical behavior flows through `IJSRuntime`, test it with Playwright.
+
+**Additional rule:** If a page is policy-gated, redirect-heavy, or depends on browser-auth state over multiple renders, start with Playwright unless you only need to verify a tiny isolated rendering branch.
 
 ## Test Organization
 

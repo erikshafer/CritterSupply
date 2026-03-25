@@ -22,7 +22,7 @@ M33.0 was an engineer-focused milestone dedicated to fixing structural issues, i
 ⚠️ **Remaining Issues:**
 - **4 Vendor Portal E2E tests failing in CI** (passing locally)
 - Root cause identified but not fixed: WASM bootstrap timeout in CI environment
-- Playwright tracing not enabled (cannot diagnose CI failures visually)
+- Playwright tracing exists in the .NET hooks, but the durable workflow guidance did not clearly direct engineers to use traces and CI artifacts first
 - No E2E tests exist for Backoffice.Web pages (Order Search, Return Management)
 
 📋 **Test Status:**
@@ -327,25 +327,16 @@ public static async Task StopInfrastructure()
 
 **Effort Estimate**: M (1-2 sessions) - Backoffice E2E fixture exists, need page objects and step definitions
 
-### 2. ❌ Playwright Tracing in CI
+### 2. ✅ Playwright Trace Capture Existed, But the Workflow Was Underdocumented
 
-**Problem**: No visual diagnostics for CI failures
-**Status**: Not implemented (proposed in E2E retrospective)
-**Impact**: Cannot see what's happening when tests timeout (is button visible? CSS issue? Network delay?)
+**Problem**: Trace capture existed, but the milestone guidance did not clearly point engineers to the hook-based .NET Playwright workflow
+**Status**: Implemented via `Hooks/PlaywrightHooks.cs` plus `.github/workflows/e2e.yml` artifact upload
+**Impact**: The remaining gap is discoverability and a trace-first triage workflow, not missing trace infrastructure
 
-**Proposed Solution**:
-```typescript
-// playwright.config.ts
-export default {
-  use: {
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure'
-  }
-};
-```
-
-**Effort**: S (30 minutes) - create config file, update CI workflow to upload traces
+**Needed Follow-Up**:
+- Treat Playwright trace zips as the first diagnostic artifact for CI failures
+- Document the existing .NET Playwright hook pattern in `docs/skills/e2e-playwright-testing.md`
+- Avoid adding a Node-only `playwright.config.ts` when the suite runs through `dotnet test`
 
 ### 3. ❌ WASM Bootstrap Timeout Increase
 
@@ -443,6 +434,16 @@ public async Task WaitForMudBlazorAsync()
 
 ## Remaining Work & Recommendations
 
+### Review Follow-Up: Extract These Lessons into Durable Docs
+
+The PSA, UXE, and QAE review of this report concluded that the highest-value follow-up is to move the reusable lessons into durable skills and workflow documents:
+
+1. **`docs/skills/e2e-playwright-testing.md`** should be the canonical source for Blazor WASM readiness ladders, CI-vs-local timeout budgets, and the .NET Playwright trace-first triage workflow.
+2. **`docs/skills/bunit-component-testing.md`** should explicitly steer policy-gated, redirect-heavy MudBlazor pages toward Playwright when bUnit setup becomes more complex than the behavior under test.
+3. **`docs/skills/README.md`** should route Vendor Portal / Blazor WASM work to both the Playwright and Blazor WASM + JWT skills so contributors read the auth and browser guidance together.
+
+These updates were prioritized over creating more retrospective prose because the core problem was not missing history — it was missing discoverable, trustworthy operational guidance.
+
 ### Immediate Priority (Next Session)
 
 #### 1. Fix 4 Failing Vendor Portal E2E Tests
@@ -450,15 +451,14 @@ public async Task WaitForMudBlazorAsync()
 **Effort**: S-M (1 session)
 
 **Tasks**:
-1. Enable Playwright tracing (`playwright.config.ts` with `trace: "on-first-retry"`)
-2. Update `.github/workflows/e2e.yml` to upload traces as artifacts
-3. Increase WASM bootstrap timeout from 30s → 60s in `VendorLoginPage.cs`
-4. Add explicit wait for MudBlazor CSS classes
-5. Run tests in CI and examine trace files
+1. Use the existing Playwright traces and CI artifacts as the first diagnostic step
+2. Increase WASM bootstrap timeout from 30s → 60s in `VendorLoginPage.cs`
+3. Add explicit wait for MudBlazor CSS classes / readiness markers
+4. Run tests in CI and examine trace files
 
 **Success Criteria**:
 - ✅ All 12 Vendor Portal scenarios pass in CI
-- ✅ Playwright traces available for failure analysis
+- ✅ Playwright traces reviewed during failure analysis
 - ✅ At least 3 consecutive green CI runs (no flakiness)
 
 #### 2. Add E2E Tests for Backoffice.Web Pages

@@ -28,6 +28,7 @@ This directory contains implementation patterns and best practices for building 
 
 **Building BFFs:**
 - 🎁 [BFF Real-time Patterns](./bff-realtime-patterns.md) - View composition, HTTP clients, SignalR/SSE updates, Blazor integration, MudBlazor
+- 🌐 [Blazor WASM + JWT](./blazor-wasm-jwt.md) - Vendor Portal patterns: JWT auth, named HttpClients, SignalR access tokens, cross-origin WASM gotchas
 - 📡 [Wolverine + SignalR](./wolverine-signalr.md) - Wolverine's native SignalR transport: hub setup, authentication (session & JWT), group routing, client integration, Marten side-effect pipeline
 
 **Testing Your Code:**
@@ -72,6 +73,7 @@ This directory contains implementation patterns and best practices for building 
 - [E2E Testing with Playwright](./e2e-playwright-testing.md) - Browser E2E with real Kestrel servers
 
 ### UI Frameworks
+- [Blazor WASM + JWT](./blazor-wasm-jwt.md) - Vendor Portal-style WASM auth, SignalR reconnect, cross-origin HTTP clients
 - [BFF Real-time Patterns](./bff-realtime-patterns.md) - Blazor Server, MudBlazor, SSE/SignalR
 - [Wolverine + SignalR](./wolverine-signalr.md) - Wolverine's native SignalR transport, real-time hub patterns
 
@@ -105,6 +107,7 @@ This directory contains implementation patterns and best practices for building 
 2. Set up TestContainers → [TestContainers Integration Tests](./testcontainers-integration-tests.md)
 3. Implement BDD scenarios → [Reqnroll BDD Testing](./reqnroll-bdd-testing.md)
 4. Write browser E2E tests → [E2E Testing with Playwright](./e2e-playwright-testing.md)
+5. Stabilizing a Blazor WASM UI test suite? Read [E2E Testing with Playwright](./e2e-playwright-testing.md) together with [Blazor WASM + JWT](./blazor-wasm-jwt.md)
 
 ### Session Wrap-up Phase
 1. Run final QA/UX sign-off → [Final QA/UX Review](./final-qa-ux-review.md)
