@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M34.0 — Experience Completion + Vocabulary Alignment |
-| **Status** | 🟡 **IN PROGRESS** — S1-S4 + B1 complete; MudPopoverProvider fix applied; S5 gate pending CI |
+| **Status** | 🟡 **IN PROGRESS** — S1-S4 + B1 complete; trace filename fix + MudSelect validation fix applied; S5 gate pending CI |
 | **Recent Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
 | **Previous Completion** | M32.4 — Backoffice Phase 4 E2E Stabilization (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-25 (M34.0 Session 1 complete: S1-S4 + B1 + MudPopoverProvider fix; S5 pending CI)*
+*Last Updated: 2026-03-25 (M34.0 Session 1: trace filename sanitization + VP submit button fix; targeting VP 12/12)*
 
 ---
 
@@ -65,14 +65,16 @@
 - ✅ **S4 (Vocabulary):** Mapped stale `finance-clerk` role to `Executive` in E2E fixture (role not in BackofficeRole enum).
 - ✅ **B1 (Issue #460):** Moved "View Change Requests" outside `CanSubmitChangeRequests` gate in Dashboard.razor. ReadOnly users can now view change requests.
 - ✅ **Pre-existing fix:** Added missing `MudPopoverProvider` to `VendorPortal.Web/App.razor`. The Submit Change Request page uses `MudSelect` which requires this provider — without it, the `blazor-error-ui` overlay blocks all button clicks. This was a pre-existing bug (same 2 tests failed on main run #302).
-- ⏳ **S5 (Gate):** CI verification pending — targeting 12/12 Vendor Portal E2E, Backoffice E2E must reach real scenario execution.
+- ✅ **CI fix (Run #307):** Sanitized Playwright trace filenames across all 3 E2E suites — removes `"`, `:`, `<`, `>`, `|`, `*`, `?` characters that cause GitHub Actions artifact upload failures.
+- ✅ **CI fix (Run #307):** Removed `Required="true"` from `MudSelect` in SubmitChangeRequest.razor — field always has a default value ("Description"), so `Required` validation prevented `MudForm.IsValid` from becoming `true`, keeping the submit button permanently disabled.
+- ⏳ **S5 (Gate):** CI verification pending — targeting 12/12 Vendor Portal E2E, Backoffice E2E trace upload working.
 
 **CI Comparison (main → Session 1):**
-| Suite | Run #302 (main) | Run #306 (Session 1, pre-MudPopover) | Expected (post-MudPopover) |
-|-------|-----------------|--------------------------------------|----------------------------|
+| Suite | Run #302 (main) | Run #307 (post-MudPopover) | Expected (post all fixes) |
+|-------|-----------------|----------------------------|---------------------------|
 | Storefront E2E | ✅ 7/7 | ✅ 7/7 | ✅ 7/7 |
-| Vendor Portal E2E | ⚠️ 9/12 | ⚠️ 10/12 (+1 from #460 fix) | 🎯 12/12 |
-| Backoffice E2E | ❌ 0/111 (bootstrap) | ⏳ pending | 🎯 reaching scenarios |
+| Vendor Portal E2E | ⚠️ 9/12 | ⚠️ 11/12 | 🎯 12/12 |
+| Backoffice E2E | ❌ 0/111 (bootstrap) | ❌ trace upload failure | 🎯 trace upload working |
 
 **Planned Tracks (sequenced):**
 - **Track A:** Stabilization (1-2 sessions) — Backoffice E2E bootstrap, inventory, selector/route cleanup, false-positive audit

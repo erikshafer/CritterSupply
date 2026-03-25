@@ -80,9 +80,7 @@ public sealed class PlaywrightHooks
         var testFailed = _scenarioContext.TestError != null;
         if (testFailed)
         {
-            var scenarioTitle = _scenarioContext.ScenarioInfo.Title
-                .Replace(" ", "_")
-                .Replace("/", "_");
+            var scenarioTitle = SanitizeFileName(_scenarioContext.ScenarioInfo.Title);
             var traceDir = Path.Combine(
                 Directory.GetCurrentDirectory(),
                 "playwright-traces",
@@ -103,4 +101,21 @@ public sealed class PlaywrightHooks
         await _browserContext.CloseAsync();
         _browserContext = null;
     }
+
+    /// <summary>
+    /// Sanitize a scenario title for use as a file name.
+    /// Removes characters that are invalid on Windows/Linux file systems and
+    /// GitHub Actions artifact uploads (double quotes, colons, angle brackets, etc.).
+    /// </summary>
+    private static string SanitizeFileName(string title) =>
+        title
+            .Replace(" ", "_")
+            .Replace("/", "_")
+            .Replace("\"", "")
+            .Replace(":", "-")
+            .Replace("<", "")
+            .Replace(">", "")
+            .Replace("|", "-")
+            .Replace("*", "")
+            .Replace("?", "");
 }

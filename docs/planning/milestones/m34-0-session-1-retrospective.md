@@ -1,9 +1,9 @@
 # M34.0 Session 1 Retrospective — Stabilization + Issue #460 RBAC Fix
 
 **Date:** 2026-03-25
-**Session Type:** Stabilization (S1–S4) + bug fix (B1) + pre-existing fix discovery
-**Items Completed:** S1 (bootstrap fix), S2 (test baseline), S3 (route drift), S4 (vocabulary), B1 (Issue #460)
-**CI Status:** CI build ✅ passing, Storefront E2E ✅ 7/7, Vendor Portal E2E ⚠️ 10/12 (2 pre-existing failures), Backoffice E2E ⏳ pending
+**Session Type:** Stabilization (S1–S4) + bug fix (B1) + pre-existing fix discovery + CI follow-up
+**Items Completed:** S1 (bootstrap fix), S2 (test baseline), S3 (route drift), S4 (vocabulary), B1 (Issue #460), MudPopoverProvider fix, trace filename sanitization, MudSelect form validation fix
+**CI Status:** CI build ✅ passing, Storefront E2E ✅ 7/7, Vendor Portal E2E ⚠️ 11/12 → targeting 12/12, Backoffice E2E ⚠️ trace upload fix applied
 
 ---
 
@@ -118,19 +118,27 @@ These routes had drifted as the Backoffice.Web page structure evolved in M32–M
 
 ## S5: Trustworthy Suite Gate — Status
 
-**Pending:** The CI run with all Session 1 changes (including the MudPopoverProvider fix) has not yet completed. The gate requires:
+**CI Run #307 Results (post-MudPopoverProvider fix):**
 
-- Backoffice E2E reaching real scenario execution (no more bootstrap failures)
-- No known false-positive E2E tests
-- Vendor Portal E2E at 12/12
+| Suite | Run #302 (main) | Run #306 (pre-fix) | Run #307 (post-MudPopover) |
+|-------|-----------------|--------------------|-----------------------------|
+| Storefront E2E | ✅ 7/7 | ✅ 7/7 | ✅ 7/7 |
+| Vendor Portal E2E | ⚠️ 9/12 | ⚠️ 10/12 | ⚠️ 11/12 |
+| Backoffice E2E | ❌ 0/111 (bootstrap) | ⏳ pending | ❌ trace upload failure |
 
-**Current state before MudPopoverProvider fix:**
-- Backoffice E2E: in progress (bootstrap fix applied, awaiting results)
-- Vendor Portal E2E: 10/12 (2 failures from missing MudPopoverProvider)
-- Storefront E2E: 7/7 ✅
+**MudPopoverProvider fix improved VP from 10/12 → 11/12** — the save-draft test now passes (the `blazor-error-ui` overlay no longer blocks clicks). However, the submit end-to-end test still fails.
 
-**Expected state after MudPopoverProvider fix:**
-- Vendor Portal E2E: targeting 12/12
+### Remaining VP E2E Failure: `CatalogManager submits a change request end-to-end`
+
+**Root Cause:** The submit button (`data-testid="submit-btn"`) remains `disabled` because `MudForm`'s `@bind-IsValid` never becomes `true`. The form contains a `MudSelect` with `Required="true"` and a programmatic default value (`_type = "Description"`). MudBlazor's form validation does not consider a programmatically-set default as "validated" — the user must explicitly interact with the component. Since the button is disabled by `!_isFormValid`, Playwright times out waiting for a clickable button.
+
+**Fix Applied:** Removed `Required="true"` from the `MudSelect`. The type field always has a valid selection (initialized to "Description") and can never be empty — `Required` validation is unnecessary and counterproductive for a field with a sensible default.
+
+### Remaining Backoffice E2E Failure: Trace Filename with Double Quotes
+
+**Root Cause:** Backoffice E2E scenarios like `P1-2 - Data freshness indicator shows "Last updated" timestamp` generate trace filenames containing double quotes. GitHub Actions `upload-artifact@v4` rejects filenames with `"`, `:`, `<`, `>`, `|`, `*`, `?`.
+
+**Fix Applied:** Added `SanitizeFileName()` helper to all 3 E2E suites (Backoffice, Vendor Portal, Storefront) that strips these invalid characters from scenario titles before using them in trace paths.
 
 ---
 
@@ -186,6 +194,31 @@ On `main`, the Vendor Portal E2E had 3 failures. The Issue #460 fix resolved 1 o
 
 **Lesson:** Always compare against the baseline when evaluating CI results. Our branch improved VP E2E from 9/12 → 10/12 before the MudPopoverProvider fix.
 
+### 5. MudForm Validation with Default Values
+
+**What We Learned (CI Run #307):**
+`MudSelect` with `Required="true"` and a programmatic default value (`_type = "Description"`) is not considered "validated" by `MudForm`'s `@bind-IsValid` until the user explicitly interacts with the component. This means the submit button (gated by `!_isFormValid`) remains disabled even though the form is semantically valid.
+
+**Fix Applied:**
+Removed `Required="true"` from the `MudSelect` for the change type field, since it always has a valid default value and can never be empty. The other required fields (SKU, Title, Details) remain `Required="true"` because they start empty and need user input.
+
+**Pattern to Follow:**
+```razor
+@* ❌ Don't use Required on MudSelect with a default value — MudForm won't validate it *@
+<MudSelect @bind-Value="_type" Required="true" ...>
+
+@* ✅ Skip Required when the field always has a valid selection *@
+<MudSelect @bind-Value="_type" ...>
+```
+
+### 6. Playwright Trace Filenames Must Be Sanitized
+
+**What We Learned (CI Run #307):**
+GitHub Actions `upload-artifact@v4` rejects filenames containing `"`, `:`, `<`, `>`, `|`, `*`, `?`. Scenario titles like `P1-2 - Data freshness indicator shows "Last updated" timestamp` produce trace filenames with double quotes, causing the artifact upload step to fail.
+
+**Fix Applied:**
+Added `SanitizeFileName()` helper to all 3 E2E suites. This strips/replaces invalid characters from scenario titles before using them in trace paths.
+
 ---
 
 ## What Went Well
@@ -238,11 +271,12 @@ On `main`, the Vendor Portal E2E had 3 failures. The Issue #460 fix resolved 1 o
 |-----|--------|----------------|-------------------|----------------|
 | #302 | `main` | ❌ 111 bootstrap failures | ⚠️ 9/12 (3 failures) | ✅ 7/7 |
 | #306 | `copilot/m34-0-implementation` (pre-MudPopover fix) | ⏳ pending | ⚠️ 10/12 (2 failures) | ✅ 7/7 |
-| Next | `copilot/m34-0-implementation` (with MudPopover fix) | ⏳ pending | 🎯 targeting 12/12 | ✅ 7/7 |
+| #307 | `copilot/m34-0-implementation` (with MudPopover fix) | ❌ trace upload failure | ⚠️ 11/12 (1 failure: submit btn disabled) | ✅ 7/7 |
+| Next | `copilot/m34-0-implementation` (with all fixes) | 🎯 trace upload working | 🎯 targeting 12/12 | ✅ 7/7 |
 
 **Net improvement from Session 1:**
-- Backoffice E2E: 0/111 → should reach real scenario execution
-- Vendor Portal E2E: 9/12 → targeting 12/12 (+3 tests fixed)
+- Backoffice E2E: 0/111 (bootstrap failure) → reaching real scenario execution + trace upload fixed
+- Vendor Portal E2E: 9/12 → targeting 12/12 (+3 tests fixed: Issue #460, MudPopoverProvider, MudSelect validation)
 - Storefront E2E: 7/7 → 7/7 (no change, already stable)
 
 ---
@@ -255,11 +289,15 @@ On `main`, the Vendor Portal E2E had 3 failures. The Issue #460 fix resolved 1 o
 | `src/Backoffice Identity/BackofficeIdentity.Api/Program.cs` | Lazy connection string resolution | S1 |
 | `src/Vendor Portal/VendorPortal.Web/Pages/Dashboard.razor` | Moved "View" button outside RBAC gate | B1 |
 | `src/Vendor Portal/VendorPortal.Web/App.razor` | Added `MudPopoverProvider` | Bonus |
+| `src/Vendor Portal/VendorPortal.Web/Pages/SubmitChangeRequest.razor` | Removed `Required` from MudSelect (always has default) | CI fix |
 
 ### Test Infrastructure
 | File | Change | Item |
 |------|--------|------|
 | `tests/Backoffice/Backoffice.E2ETests/E2ETestFixture.cs` | `UseEnvironment("Development")` + `finance-clerk` mapping | S1, S4 |
+| `tests/Backoffice/Backoffice.E2ETests/Hooks/TestHooks.cs` | `SanitizeFileName()` for trace paths | CI fix |
+| `tests/Vendor Portal/VendorPortal.E2ETests/Hooks/PlaywrightHooks.cs` | `SanitizeFileName()` for trace paths | CI fix |
+| `tests/Customer Experience/Storefront.E2ETests/Hooks/PlaywrightHooks.cs` | `SanitizeFileName()` for trace paths | CI fix |
 
 ### Route/Selector Fixes (Backoffice E2E)
 | File | Change | Item |
@@ -293,4 +331,6 @@ On `main`, the Vendor Portal E2E had 3 failures. The Issue #460 fix resolved 1 o
 - ✅ Vocabulary drift fixed (finance-clerk mapping)
 - ✅ Issue #460 RBAC fix applied (Option A)
 - ✅ MudPopoverProvider pre-existing bug identified and fixed
-- ⏳ S5 gate CI verification — pending next CI run
+- ✅ Playwright trace filename sanitization applied (all 3 E2E suites)
+- ✅ VP submit button disabled state fixed (MudSelect Required removal)
+- ⏳ S5 gate CI verification — pending next CI run (targeting 12/12 VP, trace upload working)
