@@ -802,6 +802,127 @@ await EmailInput.WaitForAsync(new() { Timeout = 15_000 });
 - It's a stable, non-user-visible element that signals "MudBlazor JS interop is ready"
 - Alternative markers: `.mud-popover-provider`, `.mud-theme-provider` (all work)
 
+### Blazor WASM Client-Side Navigation Patterns (M33.0 Phase 7)
+
+Blazor WASM uses client-side routing via Blazor Router, which does **not** trigger browser-level navigation events. This requires different patterns than full-page navigations.
+
+**Key Difference:**
+- **Full Page Navigation** (`page.GotoAsync()`) → Entire DOM clears, new HTML loads, `WaitForLoadStateAsync(LoadState.NetworkIdle)` waits for HTTP resources
+- **Client-Side Navigation** (clicking `<NavLink>`) → DOM updates via JavaScript, no new HTML loaded, `NetworkIdle` already complete
+
+#### ReturnManagementPage Example (Backoffice.E2ETests)
+
+```csharp
+public async Task NavigateFromDashboardAsync()
+{
+    await ReturnManagementNavLink.ClickAsync();
+
+    // Wait for WASM client-side navigation to complete
+    // Blazor WASM routing doesn't trigger full page load events
+    await _page.WaitForURLAsync(
+        url => url.Contains("/returns"),
+        new() { Timeout = 5_000 });  // ← Reduced timeout — no HTTP involved
+
+    await WaitForPageLoadedAsync();
+}
+
+public async Task WaitForPageLoadedAsync()
+{
+    // Wait for MudBlazor framework to hydrate (WASM pattern)
+    await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+    // Wait for MudBlazor provider (CSS framework initialization)
+    await _page.WaitForSelectorAsync(".mud-dialog-provider",
+        new() { State = WaitForSelectorState.Attached, Timeout = WasmHydrationTimeoutMs });
+
+    // Wait for Return Management page-specific elements
+    // Either the status filter (success) OR an error message (failure) should appear
+    try
+    {
+        await _page.WaitForSelectorAsync(
+            "[data-testid='status-filter'], [data-testid='authorization-error'], [data-testid='session-expired']",
+            new() { Timeout = ApiCallTimeoutMs });
+    }
+    catch (TimeoutException)
+    {
+        // Page may have loaded but no returns data yet — this is acceptable
+        // Assertions in step definitions will catch actual failures
+    }
+}
+```
+
+**Pattern Breakdown:**
+
+1. **Click NavLink** — Triggers Blazor Router's client-side navigation (no HTTP request)
+2. **`WaitForURLAsync(predicate)`** — Polls `page.Url` until the predicate returns true (no `WaitUntil.Commit` needed for WASM)
+3. **Reduced Timeout (5s)** — Client-side navigation is fast; no network delay
+4. **Post-Navigation Hydration Check** — Still need to wait for MudBlazor + component mount
+5. **Multiple Selector Fallback** — Wait for any of: success state, error state, or session expiry (graceful failure handling)
+
+#### Why `WaitForURLAsync` Instead of `WaitForNavigationAsync`
+
+```csharp
+// ❌ WRONG — WaitForNavigationAsync expects browser-level navigation (full page reload)
+await ReturnManagementNavLink.ClickAsync();
+await _page.WaitForNavigationAsync(new() { UrlString = "**/returns" });  // ← Hangs forever
+
+// ✅ CORRECT — WaitForURLAsync polls the URL without expecting navigation events
+await ReturnManagementNavLink.ClickAsync();
+await _page.WaitForURLAsync(url => url.Contains("/returns"), new() { Timeout = 5_000 });
+```
+
+**Why:**
+- `WaitForNavigationAsync()` listens for the `Page.FrameNavigated` event (browser signals "I loaded a new document")
+- Blazor WASM client-side routing **never fires this event** because the DOM updates in-place via JavaScript
+- `WaitForURLAsync(predicate)` actively polls `page.Url` every 100ms, which works for both full-page and client-side navigations
+
+#### Timeout Constants for Backoffice WASM Navigation
+
+```csharp
+// Timeout constants for WASM hydration and MudBlazor interactions
+private const int WasmHydrationTimeoutMs = 30_000;  // WASM bootstrap + MudBlazor provider
+private const int MudSelectListboxTimeoutMs = 15_000;  // MudSelect popover open + animation
+private const int ApiCallTimeoutMs = 15_000;  // Network call + response processing
+```
+
+**Rationale:**
+- **30s for WASM Hydration** — Cold start includes .NET runtime download + Blazor boot + MudBlazor JS interop (5-30s in CI)
+- **15s for MudSelect Listbox** — Popover portal renders at `document.body` level; MudBlazor animation + DOM update (1-3s typical, allow CI headroom)
+- **15s for API Calls** — Network round-trip + JSON deserialization + component re-render (1-5s typical, allow CI headroom)
+
+#### MudSelect Force-Click Pattern (Transparent Input Mask)
+
+```csharp
+public async Task SelectStatusFilterAsync(string status)
+{
+    await StatusFilter.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ApiCallTimeoutMs });
+
+    // Force-click inner trigger (MudBlazor pattern from M32 E2E sessions)
+    // MudBlazor's transparent .mud-input-mask blocks normal click hit-test
+    await StatusFilter.Locator(".mud-select-input")
+        .ClickAsync(new LocatorClickOptions { Force = true });
+
+    // Wait for MudBlazor listbox portal to render (at document.body level, not inside StatusFilter)
+    await _page.WaitForSelectorAsync("[role='listbox']",
+        new() { Timeout = MudSelectListboxTimeoutMs });
+
+    // Click the option by value text
+    var optionLocator = _page.Locator($"[role='option']:has-text('{status}')");
+    await optionLocator.ClickAsync(new LocatorClickOptions { Timeout = 10_000 });
+}
+```
+
+**Why Force-Click:**
+- MudBlazor v9+ uses a transparent `.mud-input-mask` overlay to handle browser autocomplete prevention
+- Playwright's hit-test verification sees the mask as "covering" the input, failing the click
+- `Force = true` bypasses hit-test verification and dispatches the click event directly to the target element
+- This is **safe** because we've already verified the element is visible and in the viewport
+
+**References:**
+- M32.1 Session 5 — Initial MudSelect force-click discovery (Vendor Portal Change Requests filter)
+- M32.3 Session 9 — Generalized MudSelect pattern (Customer Search filters)
+- M33.0 Session 15 (Phase 7) — Applied to Return Management status filter
+
 ### CI-Specific Considerations
 
 **Problem:** Tests pass locally (fast desktop CPU) but timeout in GitHub Actions (shared runners, slower CPUs).

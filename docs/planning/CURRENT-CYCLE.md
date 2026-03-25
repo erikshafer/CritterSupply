@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M33.0 — Code Correction + Broken Feedback Loop Repair (ACTIVE) |
-| **Status** | 🚀 IN PROGRESS — Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅, Phase 5 ✅ (all delivered) |
-| **Deliverables** | Phase 5 Complete: XC-3, BO-1, BO-2, BO-3 (Backoffice restructure + transaction fix) |
-| **Recent Completion** | M33.0 Phase 5 (2026-03-24), M32.4 — Backoffice Phase 4 (2026-03-21) |
+| **Current Milestone** | M34.0 — Experience Completion + Vocabulary Alignment (PENDING) |
+| **Status** | 📋 **READY TO START** — M33.0 complete, awaiting M34.0 kickoff |
+| **Recent Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
+| **Previous Completion** | M32.4 — Backoffice Phase 4 E2E Stabilization (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-24 (M33.0 Session 13 complete — Phase 5 delivered: XC-3 ✅, BO-1 ✅, BO-2 ✅, BO-3 ✅)*
+*Last Updated: 2026-03-25 (M33.0 Milestone Closure Retrospective complete — All 12 exit criteria met)*
 
 ---
 
@@ -169,9 +169,35 @@
 - ✅ Session retrospective documenting transaction pattern learnings + namespace migration strategy
 - **See:** `docs/planning/milestones/m33-0-session-13-retrospective.md`
 
+**Session 14 Completion (2026-03-25):**
+- ✅ **Phase 6 COMPLETE (VERIFICATION ONLY):** All deliverables already existed from previous sessions
+- ✅ 3 Marten projections: ReturnMetricsView, CorrespondenceMetricsView, FulfillmentPipelineView (Session 2)
+- ✅ 2 pages: Order Search (`/orders/search`), Return Management (`/returns`) (Sessions 5+6)
+- ✅ 2 BFF endpoints: SearchOrders, GetReturns at `/api/backoffice/*` (Session 7)
+- ✅ NavMenu authorization aligned with page access (Session 7)
+- ✅ Return status vocabulary fixed (Requested, not Pending) (Session 7)
+- ✅ 10 integration tests (4 OrderSearch + 6 ReturnList) (Session 7)
+- ✅ All 91 Backoffice.Api.IntegrationTests passing (unchanged)
+- ⚠️ bUnit infrastructure exists but no actual tests (deferred per Session 5 Option A)
+- ❌ Detail navigation deferred (not blocking CS workflows)
+- ❌ Broader search deferred (GUID search sufficient for MVP)
+- **See:** `docs/planning/milestones/m33-0-session-14-phase-6-retrospective.md`
+
+**Session 15 Completion (2026-03-25):**
+- ✅ **Phase 7 COMPLETE (OPTIONAL HARDENING):** Returns E2E coverage + Blazor WASM routing patterns documented
+- ✅ 12 Gherkin scenarios in ReturnManagement.feature (navigation, filtering, authorization, session expiry)
+- ✅ ReturnManagementPage POM with semantic timeout constants (WasmHydrationTimeoutMs, MudSelectListboxTimeoutMs, ApiCallTimeoutMs)
+- ✅ ReturnManagementSteps binding Gherkin to POM (Given/When/Then for all 12 scenarios)
+- ✅ Added 4 missing data-testid attributes to ReturnManagement.razor (page-heading, return-row-{id}, return-status, returns-loading)
+- ✅ 121-line section added to e2e-playwright-testing.md documenting Blazor WASM client-side navigation patterns
+- ✅ Zero build errors (Backoffice.Web + Backoffice.E2ETests compile successfully)
+- ⚠️ E2E tests require Docker for execution (TestContainers dependency — deferred to CI workflow)
+- 📋 **Follow-Up:** Add backoffice-e2e job to `.github/workflows/e2e.yml` (not blocking M33.0 closure)
+- **See:** `docs/planning/milestones/m33-0-session-15-phase-7-retrospective.md`
+
 **Remaining Planned Priorities:**
-4. 📋 **Phase 6:** Backoffice completion (missing projections + missing pages) — NEXT
-5. 📋 **Phase 7:** Returns E2E coverage + Blazor WASM routing patterns
+- ✅ **Phase 7:** Returns E2E coverage + Blazor WASM routing patterns (COMPLETE)
+- 📋 **Milestone Closure:** Review all phases, ensure all exit criteria met (next session)
 
 **References:**
 - M33-M34 Proposal: `docs/planning/milestones/m33-m34-engineering-proposal-2026-03-21.md`
@@ -195,6 +221,8 @@
 - Session 12 Retrospective: `docs/planning/milestones/m33-0-session-12-retrospective.md`
 - Session 13 Plan: `docs/planning/milestones/m33-0-session-13-phase-5-plan.md`
 - Session 13 Retrospective: `docs/planning/milestones/m33-0-session-13-retrospective.md`
+- Session 14 Retrospective: `docs/planning/milestones/m33-0-session-14-phase-6-retrospective.md`
+- Session 15 Retrospective: `docs/planning/milestones/m33-0-session-15-phase-7-retrospective.md`
 - ADR 0039: `docs/decisions/0039-canonical-validator-placement.md`
 - M32.4 Retrospective: `docs/planning/milestones/m32-4-session-1-retrospective.md`
 
