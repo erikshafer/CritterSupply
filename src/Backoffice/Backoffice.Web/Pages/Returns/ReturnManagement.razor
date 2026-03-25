@@ -14,7 +14,7 @@
 
 <PageTitle>Return Management — Backoffice</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">
+<MudText Typo="Typo.h4" GutterBottom="true" data-testid="page-heading">
     Return Management
 </MudText>
 <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
@@ -66,7 +66,8 @@
 @if (_isLoading)
 {
     <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4"
-                       aria-label="Loading returns" />
+                       aria-label="Loading returns"
+                       data-testid="returns-loading" />
 }
 
 @if (_returns is not null)
@@ -126,36 +127,38 @@
                     <MudTh>Actions</MudTh>
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd DataLabel="Return ID">
-                        <code style="font-size:0.75rem;">@context.ReturnId.ToString("N")[..8]</code>
-                    </MudTd>
-                    <MudTd DataLabel="Order ID">
-                        <code style="font-size:0.75rem;">@context.OrderId.ToString("N")[..8]</code>
-                    </MudTd>
-                    <MudTd DataLabel="Requested At">
-                        @context.RequestedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
-                    </MudTd>
-                    <MudTd DataLabel="Status">
-                        <MudChip T="string" Size="Size.Small"
-                                 Color="@GetStatusColor(context.Status)"
-                                 Variant="Variant.Text">
-                            @context.Status
-                        </MudChip>
-                    </MudTd>
-                    <MudTd DataLabel="Return Type">
-                        @context.ReturnType
-                    </MudTd>
-                    <MudTd DataLabel="Actions">
-                        <MudTooltip Text="Return detail page coming soon">
-                            <MudButton Variant="Variant.Text"
-                                       Color="Color.Secondary"
-                                       Size="Size.Small"
-                                       Disabled="true"
-                                       data-testid="@($"view-return-{context.ReturnId}")">
-                                View Details
-                            </MudButton>
-                        </MudTooltip>
-                    </MudTd>
+                    <MudTr data-testid="@($"return-row-{context.ReturnId}")">
+                        <MudTd DataLabel="Return ID">
+                            <code style="font-size:0.75rem;">@context.ReturnId.ToString("N")[..8]</code>
+                        </MudTd>
+                        <MudTd DataLabel="Order ID">
+                            <code style="font-size:0.75rem;">@context.OrderId.ToString("N")[..8]</code>
+                        </MudTd>
+                        <MudTd DataLabel="Requested At">
+                            @context.RequestedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                        </MudTd>
+                        <MudTd DataLabel="Status" data-testid="return-status">
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@GetStatusColor(context.Status)"
+                                     Variant="Variant.Text">
+                                @context.Status
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Return Type">
+                            @context.ReturnType
+                        </MudTd>
+                        <MudTd DataLabel="Actions">
+                            <MudTooltip Text="Return detail page coming soon">
+                                <MudButton Variant="Variant.Text"
+                                           Color="Color.Secondary"
+                                           Size="Size.Small"
+                                           Disabled="true"
+                                           data-testid="@($"view-return-{context.ReturnId}")">
+                                    View Details
+                                </MudButton>
+                            </MudTooltip>
+                        </MudTd>
+                    </MudTr>
                 </RowTemplate>
             </MudTable>
         }

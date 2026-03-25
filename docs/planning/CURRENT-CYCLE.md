@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M33.0 — Code Correction + Broken Feedback Loop Repair (ACTIVE) |
-| **Status** | 🚀 IN PROGRESS — Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅, Phase 5 ✅, Phase 6 ✅ (all delivered) |
-| **Deliverables** | Phase 6 Complete: 3 projections, 2 pages, 2 BFF endpoints, 10 integration tests — ALL VERIFIED ✅ |
-| **Recent Completion** | M33.0 Phase 6 (2026-03-25), M33.0 Phase 5 (2026-03-24) |
+| **Current Milestone** | M33.0 — Code Correction + Broken Feedback Loop Repair (READY FOR CLOSURE) |
+| **Status** | ✅ **COMPLETE** — All 7 Phases Delivered (Phase 7 optional hardening complete) |
+| **Deliverables** | Phase 7 Complete: 12 E2E scenarios, ReturnManagementPage POM, Blazor WASM routing patterns documented ✅ |
+| **Recent Completion** | M33.0 Phase 7 (2026-03-25), M33.0 Phase 6 (2026-03-25) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-25 (M33.0 Session 14 complete — Phase 6 verified: All deliverables already complete from Sessions 2, 5, 6, 7)*
+*Last Updated: 2026-03-25 (M33.0 Session 15 complete — Phase 7 delivered: Returns E2E coverage + Blazor WASM routing patterns hardened)*
 
 ---
 
@@ -183,9 +183,21 @@
 - ❌ Broader search deferred (GUID search sufficient for MVP)
 - **See:** `docs/planning/milestones/m33-0-session-14-phase-6-retrospective.md`
 
+**Session 15 Completion (2026-03-25):**
+- ✅ **Phase 7 COMPLETE (OPTIONAL HARDENING):** Returns E2E coverage + Blazor WASM routing patterns documented
+- ✅ 12 Gherkin scenarios in ReturnManagement.feature (navigation, filtering, authorization, session expiry)
+- ✅ ReturnManagementPage POM with semantic timeout constants (WasmHydrationTimeoutMs, MudSelectListboxTimeoutMs, ApiCallTimeoutMs)
+- ✅ ReturnManagementSteps binding Gherkin to POM (Given/When/Then for all 12 scenarios)
+- ✅ Added 4 missing data-testid attributes to ReturnManagement.razor (page-heading, return-row-{id}, return-status, returns-loading)
+- ✅ 121-line section added to e2e-playwright-testing.md documenting Blazor WASM client-side navigation patterns
+- ✅ Zero build errors (Backoffice.Web + Backoffice.E2ETests compile successfully)
+- ⚠️ E2E tests require Docker for execution (TestContainers dependency — deferred to CI workflow)
+- 📋 **Follow-Up:** Add backoffice-e2e job to `.github/workflows/e2e.yml` (not blocking M33.0 closure)
+- **See:** `docs/planning/milestones/m33-0-session-15-phase-7-retrospective.md`
+
 **Remaining Planned Priorities:**
-5. 📋 **Phase 7:** Returns E2E coverage + Blazor WASM routing patterns (optional)
-6. 📋 **Milestone Closure:** Review all phases, ensure all exit criteria met
+- ✅ **Phase 7:** Returns E2E coverage + Blazor WASM routing patterns (COMPLETE)
+- 📋 **Milestone Closure:** Review all phases, ensure all exit criteria met (next session)
 
 **References:**
 - M33-M34 Proposal: `docs/planning/milestones/m33-m34-engineering-proposal-2026-03-21.md`
@@ -209,6 +221,8 @@
 - Session 12 Retrospective: `docs/planning/milestones/m33-0-session-12-retrospective.md`
 - Session 13 Plan: `docs/planning/milestones/m33-0-session-13-phase-5-plan.md`
 - Session 13 Retrospective: `docs/planning/milestones/m33-0-session-13-retrospective.md`
+- Session 14 Retrospective: `docs/planning/milestones/m33-0-session-14-phase-6-retrospective.md`
+- Session 15 Retrospective: `docs/planning/milestones/m33-0-session-15-phase-7-retrospective.md`
 - ADR 0039: `docs/decisions/0039-canonical-validator-placement.md`
 - M32.4 Retrospective: `docs/planning/milestones/m32-4-session-1-retrospective.md`
 
