@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M33.0 — Code Correction + Broken Feedback Loop Repair (ACTIVE) |
-| **Status** | 🚀 IN PROGRESS — Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅, Phase 5 ✅ (all delivered) |
-| **Deliverables** | Phase 5 Complete: XC-3, BO-1, BO-2, BO-3 (Backoffice restructure + transaction fix) |
-| **Recent Completion** | M33.0 Phase 5 (2026-03-24), M32.4 — Backoffice Phase 4 (2026-03-21) |
+| **Status** | 🚀 IN PROGRESS — Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅, Phase 5 ✅, Phase 6 ✅ (all delivered) |
+| **Deliverables** | Phase 6 Complete: 3 projections, 2 pages, 2 BFF endpoints, 10 integration tests — ALL VERIFIED ✅ |
+| **Recent Completion** | M33.0 Phase 6 (2026-03-25), M33.0 Phase 5 (2026-03-24) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-24 (M33.0 Session 13 complete — Phase 5 delivered: XC-3 ✅, BO-1 ✅, BO-2 ✅, BO-3 ✅)*
+*Last Updated: 2026-03-25 (M33.0 Session 14 complete — Phase 6 verified: All deliverables already complete from Sessions 2, 5, 6, 7)*
 
 ---
 
@@ -169,9 +169,23 @@
 - ✅ Session retrospective documenting transaction pattern learnings + namespace migration strategy
 - **See:** `docs/planning/milestones/m33-0-session-13-retrospective.md`
 
+**Session 14 Completion (2026-03-25):**
+- ✅ **Phase 6 COMPLETE (VERIFICATION ONLY):** All deliverables already existed from previous sessions
+- ✅ 3 Marten projections: ReturnMetricsView, CorrespondenceMetricsView, FulfillmentPipelineView (Session 2)
+- ✅ 2 pages: Order Search (`/orders/search`), Return Management (`/returns`) (Sessions 5+6)
+- ✅ 2 BFF endpoints: SearchOrders, GetReturns at `/api/backoffice/*` (Session 7)
+- ✅ NavMenu authorization aligned with page access (Session 7)
+- ✅ Return status vocabulary fixed (Requested, not Pending) (Session 7)
+- ✅ 10 integration tests (4 OrderSearch + 6 ReturnList) (Session 7)
+- ✅ All 91 Backoffice.Api.IntegrationTests passing (unchanged)
+- ⚠️ bUnit infrastructure exists but no actual tests (deferred per Session 5 Option A)
+- ❌ Detail navigation deferred (not blocking CS workflows)
+- ❌ Broader search deferred (GUID search sufficient for MVP)
+- **See:** `docs/planning/milestones/m33-0-session-14-phase-6-retrospective.md`
+
 **Remaining Planned Priorities:**
-4. 📋 **Phase 6:** Backoffice completion (missing projections + missing pages) — NEXT
-5. 📋 **Phase 7:** Returns E2E coverage + Blazor WASM routing patterns
+5. 📋 **Phase 7:** Returns E2E coverage + Blazor WASM routing patterns (optional)
+6. 📋 **Milestone Closure:** Review all phases, ensure all exit criteria met
 
 **References:**
 - M33-M34 Proposal: `docs/planning/milestones/m33-m34-engineering-proposal-2026-03-21.md`
