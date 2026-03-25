@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M34.0 — Experience Completion + Vocabulary Alignment |
-| **Status** | 🟡 **IN PROGRESS** — S1-S4 + B1 complete; S5 gate pending CI verification |
+| **Status** | 🟡 **IN PROGRESS** — S1-S4 + B1 complete; MudPopoverProvider fix applied; S5 gate pending CI |
 | **Recent Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
 | **Previous Completion** | M32.4 — Backoffice Phase 4 E2E Stabilization (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-25 (M34.0 Session 1: S1-S4 + B1 complete)*
+*Last Updated: 2026-03-25 (M34.0 Session 1 complete: S1-S4 + B1 + MudPopoverProvider fix; S5 pending CI)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 📋 M34.0: Experience Completion + Vocabulary Alignment
 
-**Status:** 🟡 **IN PROGRESS** — S1/S2/S3/B1 complete; S4 vocabulary fix applied
+**Status:** 🟡 **IN PROGRESS** — S1-S4 + B1 complete; S5 gate pending CI verification
 **Goal:** Restore trustworthy test signal first, then complete already-supported user experiences and align vocabulary across BC boundaries
 
 **Session 1 Progress (2026-03-25):**
@@ -64,13 +64,23 @@
 - ✅ **S3 (Route drift):** Fixed `/customer-service` → `/customers/search`, `/operations/alerts` → `/alerts` across page objects and feature files.
 - ✅ **S4 (Vocabulary):** Mapped stale `finance-clerk` role to `Executive` in E2E fixture (role not in BackofficeRole enum).
 - ✅ **B1 (Issue #460):** Moved "View Change Requests" outside `CanSubmitChangeRequests` gate in Dashboard.razor. ReadOnly users can now view change requests.
-- ⏳ **S5 (Gate):** CI verification pending — Backoffice E2E must reach real scenario execution.
+- ✅ **Pre-existing fix:** Added missing `MudPopoverProvider` to `VendorPortal.Web/App.razor`. The Submit Change Request page uses `MudSelect` which requires this provider — without it, the `blazor-error-ui` overlay blocks all button clicks. This was a pre-existing bug (same 2 tests failed on main run #302).
+- ⏳ **S5 (Gate):** CI verification pending — targeting 12/12 Vendor Portal E2E, Backoffice E2E must reach real scenario execution.
+
+**CI Comparison (main → Session 1):**
+| Suite | Run #302 (main) | Run #306 (Session 1, pre-MudPopover) | Expected (post-MudPopover) |
+|-------|-----------------|--------------------------------------|----------------------------|
+| Storefront E2E | ✅ 7/7 | ✅ 7/7 | ✅ 7/7 |
+| Vendor Portal E2E | ⚠️ 9/12 | ⚠️ 10/12 (+1 from #460 fix) | 🎯 12/12 |
+| Backoffice E2E | ❌ 0/111 (bootstrap) | ⏳ pending | 🎯 reaching scenarios |
 
 **Planned Tracks (sequenced):**
 - **Track A:** Stabilization (1-2 sessions) — Backoffice E2E bootstrap, inventory, selector/route cleanup, false-positive audit
 - **Track B:** High-value bug fix (1 session) — Vendor Portal RBAC issue #460
 - **Track C:** Experience completion (3-4 sessions) — finish already-supported experiences still blocked by drift or missing access
 - **Track D:** Vocabulary alignment (2-3 sessions) — event/UI naming consistency after test signal is trustworthy
+
+**Session 1 Retrospective:** [m34-0-session-1-retrospective.md](./milestones/m34-0-session-1-retrospective.md)
 
 **References:**
 - [M33-M34 Proposal](./milestones/m33-m34-engineering-proposal-2026-03-21.md)
