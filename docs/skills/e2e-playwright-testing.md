@@ -1182,6 +1182,30 @@ Playwright traces for failed scenarios are saved to `playwright-traces/` relativ
 pwsh playwright.ps1 show-trace playwright-traces/<scenario-name>.zip
 ```
 
+## CI Diagnostics Workflow for .NET Playwright
+
+CritterSupply's E2E suites use **Microsoft.Playwright for .NET** with Reqnroll hooks. The canonical tracing pattern lives in each suite's `Hooks/PlaywrightHooks.cs`, not in a Node `playwright.config.ts` file.
+
+**What the hooks already capture on failure:**
+- Playwright trace zips (`IBrowserContext.Tracing.StartAsync()` / `StopAsync()`)
+- Browser console messages
+- Page errors
+- Failed HTTP requests
+- HTTP 4xx/5xx responses
+
+**What CI already does:**
+- `.github/workflows/e2e.yml` uploads `**/playwright-traces/**/*.zip` as artifacts on failure
+- TRX files are uploaded on every run
+
+**Triage order for flaky or timing-sensitive failures:**
+1. Open the saved trace first
+2. Check browser console and page-error output from the test logs
+3. Check failed requests / 4xx / 5xx responses
+4. Verify the page-specific readiness marker actually rendered
+5. Only then adjust a timeout or selector
+
+> **Do not** add a Node-style `playwright.config.ts` just to enable tracing for the existing `dotnet test` suites. The repo standard is C# hook-based tracing and CI artifact upload.
+
 ## Common Pitfalls
 
 ### 1. Calling `CreateDefaultClient()` Before `UseKestrel()`
@@ -1425,7 +1449,7 @@ public async Task<bool> IsEmptyCartMessageVisibleAsync()
 
 **CI-specific considerations:**
 - CI runners often have slower CPUs and higher latency
-- Default Playwright timeouts (30s) are usually sufficient, but individual element waits need explicit `WaitForAsync()` calls
+- Default Playwright timeouts (30s) are usually sufficient **after bootstrap**, but initial WASM cold start may need a 45-60 second readiness window in CI
 - Use `PLAYWRIGHT_HEADLESS=false` locally to debug timing issues — if the element appears *after* the error message, you have a wait strategy problem
 
 ## Checklist for New E2E Scenarios
@@ -1444,7 +1468,7 @@ Use this checklist when adding a new Gherkin scenario to `checkout-flow.feature`
 
 - [ ] Tag with `@checkout` if it needs the standard seed data
 - [ ] Tag with `@signalr` if it requires real-time hub delivery
-- [ ] Tag with `@wip` if not yet implemented (so it runs but is skipped)
+- [ ] Tag with `@ignore` if not yet implemented and must be skipped by Reqnroll
 - [ ] Steps are user-centric, not implementation-centric
 
 ### Step Definitions
@@ -1578,9 +1602,11 @@ Blazor WASM requires downloading the .NET runtime and all assemblies before any 
 // Wait for WASM to hydrate — must wait for a real Blazor element, not just NetworkIdle
 await page.WaitForSelectorAsync("[data-testid='login-btn']", new PageWaitForSelectorOptions
 {
-    Timeout = 30000 // WASM cold start can take up to 30s
+    Timeout = 60000 // CI cold start + MudBlazor initialization can exceed 30s
 });
 ```
+
+Vendor Portal page objects deliberately avoid calling `WaitForLoadStateAsync(NetworkIdle)` inside per-field helpers once the caller has already verified hydration. In the real fixture, background Marten/Wolverine/SignalR activity can keep `NetworkIdle` noisy even after the form is ready for use.
 
 ### SignalR Hub Message Injection
 
@@ -1621,11 +1647,13 @@ Blazor WASM E2E tests require different timing strategies than Blazor Server tes
 
 | Operation | Timeout | Rationale |
 |-----------|---------|-----------|
-| **Initial page load** | 15s + hydration check | WASM download + .NET runtime + app assemblies |
+| **Initial page load** | 45-60s + hydration check | CI cold start, WASM download, .NET runtime, app assemblies, MudBlazor initialization |
 | **Authenticated navigation** | 15s | Auth state propagation (1-3s) + component re-render |
 | **SignalR connection** | 15s | JWT must complete first + retry attempts |
 | **Element visibility** | 10s | Standard Playwright wait (sufficient after hydration) |
 | **State checks** | 5s | DOM polling for real-time indicators |
+
+Use the 45-60 second ceiling only for **first-load bootstrap**. Keep the faster waits short so real regressions still fail quickly.
 
 **Pattern:**
 
@@ -1642,7 +1670,7 @@ public async Task NavigateAsync()
     await _page.WaitForSelectorAsync(".mud-dialog-provider", new() { Timeout = 15_000 });
 
     // Step 3: Wait for specific form element
-    await EmailInput.WaitForAsync(new() { Timeout = 15_000 });
+    await EmailInput.WaitForAsync(new() { Timeout = 60_000 });
 }
 
 // LoginPage.cs — Post-login navigation with auth state propagation
@@ -1695,6 +1723,15 @@ await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 **Problem:** `NetworkIdle` doesn't guarantee MudBlazor components are ready. Tests were clicking elements before MudBlazor event handlers attached, causing flaky failures.
 
 **Solution:** Check for framework-specific markers (MudBlazor provider classes, SignalR connection state, auth state) in addition to `NetworkIdle`.
+
+**Readiness ladder for Blazor WASM + MudBlazor pages:**
+1. Serve the published WASM output (`index.html` + `_framework`)
+2. Navigate to the page
+3. Wait for network / document load to settle
+4. Wait for MudBlazor provider markers
+5. Wait for the first page-specific interactive control
+6. After login, wait for auth/navigation to complete
+7. On real-time pages, wait for SignalR connected state before asserting business UI
 
 **MudBlazor Hydration Check:**
 
