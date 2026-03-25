@@ -333,6 +333,9 @@ internal sealed class BackofficeIdentityApiKestrelFactory(string connectionStrin
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Set environment to Development so EF Core migrations and demo seed data run
+        builder.UseEnvironment("Development");
+
         builder.ConfigureAppConfiguration(config =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
