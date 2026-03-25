@@ -53,12 +53,73 @@
 
 ## Active Milestone
 
-### 📋 M33.0: Code Correction + Broken Feedback Loop Repair
+### 📋 M34.0: Experience Completion + Vocabulary Alignment
 
-**Status:** 🚀 **IN PROGRESS** — Phase 1 Complete (INV-3 + F-8 verified working)
+**Status:** 📋 **READY TO START** — M33.0 complete, awaiting M34.0 kickoff
+**Goal:** Complete every experience the architecture already supports but users cannot yet access; align the event vocabulary across BC boundaries
+
+**HIGH PRIORITY — Address First (Session 1):**
+- 🔴 **Vendor Portal RBAC Bug:** Dashboard.razor gates both "Submit" AND "View Change Requests" buttons behind `CanSubmitChangeRequests`, blocking ReadOnly users from viewing change requests entirely
+  - **Impact:** Blocking 3/12 Vendor Portal E2E tests (25% of suite)
+  - **Fix:** Split button gating logic (View = all users, Submit = CanSubmitChangeRequests only)
+  - **Location:** `src/Vendor Portal/VendorPortal.Web/Pages/Dashboard.razor` lines 111-126
+  - **Issue Draft:** `docs/planning/milestones/m34-0-rbac-issue-draft.md`
+  - **Effort:** Small (< 30 minutes)
+  - **Why First:** Quick win, unblocks E2E suite to 100%, discovered during M33.0 E2E stabilization work
+
+**Planned Tracks (8-12 sessions):**
+- **Track A:** Untapped Architectural Value (3 sessions) — Returns→Correspondence integration, live order tracking, SignalR hub updates
+- **Track B:** Test Infrastructure Completion (4 sessions) — Vendor Portal bUnit, Promotions unit tests, Customer Experience E2E
+- **Track C:** Vocabulary Alignment (3 sessions) — Event naming consistency, Shopping dual-handler ADR, persisted event migration research
+- **Track D:** Customer Experience E2E (2 sessions) — cart-real-time-updates, product-browsing step definitions
+
+**References:**
+- [M33-M34 Proposal](./milestones/m33-m34-engineering-proposal-2026-03-21.md)
+- [M34 RBAC Issue Draft](./milestones/m34-0-rbac-issue-draft.md)
+
+---
+
+## Recent Completions
+
+### M33.0: Code Correction + Broken Feedback Loop Repair
+
+**Status:** ✅ **COMPLETE** — All 15 sessions finished, all 12 exit criteria met (2026-03-25)
 **Goal:** Fix broken tests, build missing projections, execute structural refactors, document canonical patterns
 
-**Session 1 Completion (2026-03-21):**
+**What Shipped:**
+- ✅ INV-3 fix: `AdjustInventoryEndpoint` pattern correction + integration message publishing
+- ✅ F-8: `BackofficeTestFixture.ExecuteAndWaitAsync()` instrumentation (75 tests passing)
+- ✅ 3 Marten projections: ReturnMetricsView, CorrespondenceMetricsView, FulfillmentPipelineView
+- ✅ 2 Backoffice pages: Order Search, Return Management (with 10 integration tests)
+- ✅ Returns BC structural refactor: R-1 through R-7 (11 command vertical slices)
+- ✅ Vendor Portal structural refactor: VP-1 through VP-6 (folder flattening, handler explosion, validators)
+- ✅ Backoffice folder restructure: BO-1/BO-2/BO-3 (8 feature folders, transaction fix)
+- ✅ ADR 0039: Canonical validator placement convention
+- ✅ CheckoutCompleted dual-payload collision fix (🔴 live risk eliminated)
+- ✅ 9 Quick Wins: INV-1/2, PR-1, CO-1, PAY-1/FUL-1/ORD-1, F-9
+- ✅ Backoffice Returns E2E coverage (12 Gherkin scenarios, POM, step definitions)
+- ✅ Build: 0 errors, 36 pre-existing warnings (unchanged)
+- ✅ All 91 Backoffice.Api.IntegrationTests passing, all 86 VendorPortal.Api.IntegrationTests passing
+
+**Key Learnings:**
+- Mixing `IMessageBus.InvokeAsync()` with manual event appending doesn't respect `Before()` validation
+- Wolverine auto-transaction removes need for manual `SaveChangesAsync()` in handlers
+- Vertical slice organization: Command + Handler + Validator + Events in single file (ADR 0039)
+- M33.0 E2E stabilization patterns: Remove aggressive error UI checks, rely on natural timeouts
+
+**References:**
+- [M33.0 Milestone Closure Retrospective](./milestones/m33-0-milestone-closure-retrospective.md)
+- [M33.0 E2E Test Efforts Retrospective](./milestones/m33-0-e2e-test-efforts-retrospective.md)
+- [ADR 0039: Canonical Validator Placement](../decisions/0039-canonical-validator-placement.md)
+- [All Session Retrospectives](./milestones/) (m33-0-session-*-retrospective.md files)
+
+*Completed: 2026-03-25*
+
+---
+
+### M32.4: Backoffice Phase 4 — E2E Stabilization + UX Polish
+
+**Status:** ✅ **COMPLETE** — All critical and medium priorities finished in single session (2026-03-21)
 - ✅ INV-3 Fixed: `AdjustInventoryEndpoint` reverted to manual validation + explicit integration message publishing
 - ✅ All 48 Inventory.Api.IntegrationTests passing
 - ✅ F-8 Verified: `BackofficeTestFixture.ExecuteAndWaitAsync()` working (75 Backoffice tests passing)

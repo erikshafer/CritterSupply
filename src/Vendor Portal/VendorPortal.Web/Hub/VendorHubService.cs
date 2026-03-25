@@ -61,6 +61,9 @@ public sealed class VendorHubService : IAsyncDisposable
             var apiUrl = _configuration["ApiClients:VendorPortalApiUrl"] ?? "http://localhost:5239";
             var hubUrl = $"{apiUrl}/hub/vendor-portal";
 
+            // M34.0: Increase server timeout from 30s (default) to 60s for WASM E2E environments.
+            // CI environments experience cold start delays (WASM bootstrap, SignalR negotiation).
+            // Longer timeout prevents premature disconnects that trigger Blazor error UI.
             _connection = new HubConnectionBuilder()
                 .WithUrl(hubUrl, options =>
                 {
@@ -70,6 +73,8 @@ public sealed class VendorHubService : IAsyncDisposable
                         Task.FromResult<string?>(_authState.AccessToken);
                 })
                 .WithAutomaticReconnect([TimeSpan.Zero, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(10)])
+                .WithServerTimeout(TimeSpan.FromSeconds(60))
+                .WithKeepAliveInterval(TimeSpan.FromSeconds(15))
                 .Build();
 
             _connection.Reconnecting += _ =>
