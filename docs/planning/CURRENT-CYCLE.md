@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M34.0 — Experience Completion + Vocabulary Alignment |
-| **Status** | ✅ **PLANNED** — stabilization-first plan committed; ready to begin |
+| **Status** | 🟡 **IN PROGRESS** — S1-S4 + B1 complete; S5 gate pending CI verification |
 | **Recent Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
 | **Previous Completion** | M32.4 — Backoffice Phase 4 E2E Stabilization (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-25 (M34.0 planning complete — stabilization-first plan committed)*
+*Last Updated: 2026-03-25 (M34.0 Session 1: S1-S4 + B1 complete)*
 
 ---
 
@@ -55,21 +55,16 @@
 
 ### 📋 M34.0: Experience Completion + Vocabulary Alignment
 
-**Status:** ✅ **PLANNED** — M34.0 planning complete; ready to begin
+**Status:** 🟡 **IN PROGRESS** — S1/S2/S3/B1 complete; S4 vocabulary fix applied
 **Goal:** Restore trustworthy test signal first, then complete already-supported user experiences and align vocabulary across BC boundaries
 
-**Mandatory First Act (Session 1):**
-- 🔴 **Backoffice E2E stabilization:** restore trustworthy Backoffice E2E signal before feature work begins
-  - **Current blocker:** latest CI run failed all 111 Backoffice E2E tests during bootstrap when `BackofficeIdentity.Api` tried to connect to `127.0.0.1:5433`
-  - **Why first:** until bootstrap is fixed, Backoffice E2E cannot distinguish product defects from environment/configuration failures
-  - **Follow-on work:** route/selector drift audit, false-positive audit, vocabulary/contract alignment
-
-**Early Cycle Bug Fix:**
-- 🔴 **Vendor Portal RBAC Bug (#460):** Dashboard.razor gates both "Submit" AND "View Change Requests" behind `CanSubmitChangeRequests`, blocking ReadOnly users from viewing change requests entirely
-  - **Decision:** use Option A from the issue draft (ungate View, keep Submit gated)
-  - **Location:** `src/Vendor Portal/VendorPortal.Web/Pages/Dashboard.razor` lines 111-126
-  - **Issue Draft:** `docs/planning/milestones/m34-0-rbac-issue-draft.md`
-  - **Why early:** high-value, well-understood fix that should land immediately after stabilization starts
+**Session 1 Progress (2026-03-25):**
+- ✅ **S1 (Bootstrap fix):** BackofficeIdentity.Api EF Core connection string resolved lazily inside `AddDbContext` delegate (matching VendorIdentity.Api pattern). `UseEnvironment("Development")` added to test fixture. Root cause: eager capture of connection string before `ConfigureAppConfiguration` overrides.
+- ✅ **S2 (Baseline):** Backoffice.UnitTests 21/21, Backoffice.Api.IntegrationTests 91/91, BackofficeIdentity.Api.IntegrationTests 6/6 — all pass. Backoffice.Web.UnitTests has 0 tests (empty project).
+- ✅ **S3 (Route drift):** Fixed `/customer-service` → `/customers/search`, `/operations/alerts` → `/alerts` across page objects and feature files.
+- ✅ **S4 (Vocabulary):** Mapped stale `finance-clerk` role to `Executive` in E2E fixture (role not in BackofficeRole enum).
+- ✅ **B1 (Issue #460):** Moved "View Change Requests" outside `CanSubmitChangeRequests` gate in Dashboard.razor. ReadOnly users can now view change requests.
+- ⏳ **S5 (Gate):** CI verification pending — Backoffice E2E must reach real scenario execution.
 
 **Planned Tracks (sequenced):**
 - **Track A:** Stabilization (1-2 sessions) — Backoffice E2E bootstrap, inventory, selector/route cleanup, false-positive audit

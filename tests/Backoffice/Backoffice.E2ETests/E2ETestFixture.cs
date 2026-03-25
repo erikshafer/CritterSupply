@@ -235,6 +235,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
             "pricing-manager" => BackofficeIdentity.Identity.BackofficeRole.PricingManager,
             "product-manager" => BackofficeIdentity.Identity.BackofficeRole.SystemAdmin, // TEMP: ProductManager not in enum yet, map to SystemAdmin
             "executive" => BackofficeIdentity.Identity.BackofficeRole.Executive,
+            "finance-clerk" => BackofficeIdentity.Identity.BackofficeRole.Executive, // finance-clerk not in enum; Executive has similar limited access
             // PascalCase aliases for convenience in Gherkin scenarios
             "ProductManager" => BackofficeIdentity.Identity.BackofficeRole.SystemAdmin, // TEMP: map to SystemAdmin
             "CopyWriter" => BackofficeIdentity.Identity.BackofficeRole.CopyWriter,
