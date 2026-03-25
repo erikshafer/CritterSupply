@@ -41,7 +41,7 @@ public sealed class CustomerSearchPage
     // Actions
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/customer-service");
+        await _page.GotoAsync($"{_baseUrl}/customers/search");
 
         // Wait for customer service page to be fully loaded
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
@@ -267,7 +267,7 @@ public sealed class CustomerSearchPage
 
     public async Task<bool> IsOnCustomerServicePageAsync()
     {
-        return _page.Url.Contains("/customer-service");
+        return _page.Url.Contains("/customers/search");
     }
 
     // SessionExpirySteps support methods

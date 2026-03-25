@@ -57,7 +57,7 @@ public sealed class DashboardPage
     public async Task NavigateToCustomerServiceAsync()
     {
         await CustomerServiceLink.ClickAsync();
-        await _page.WaitForURLAsync(url => url.Contains("/customer-service"), new() { Timeout = 5_000 });
+        await _page.WaitForURLAsync(url => url.Contains("/customers/search"), new() { Timeout = 5_000 });
     }
 
     public async Task NavigateToOperationsAsync()

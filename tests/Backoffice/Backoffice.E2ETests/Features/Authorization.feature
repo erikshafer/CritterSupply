@@ -47,7 +47,7 @@ Feature: Role-Based Access Control
   Scenario: Customer Service cannot access Operations Alerts (403 Forbidden or redirect)
     Given admin user "CSRep" exists with email "support@crittersupply.com" and role "customer-service"
     And I am logged in as "support@crittersupply.com"
-    When I attempt to navigate directly to "/operations/alerts"
+    When I attempt to navigate directly to "/alerts"
     Then I should see an "Access Denied" message or be redirected to a default page
 
   Scenario: Warehouse Clerk acknowledges alert successfully (P0-1 regression test)
@@ -90,7 +90,7 @@ Feature: Role-Based Access Control
   Scenario: Finance Clerk has limited access (no operations alerts)
     Given admin user "FinanceClerk" exists with email "finance@crittersupply.com" and role "finance-clerk"
     And I am logged in as "finance@crittersupply.com"
-    When I attempt to navigate directly to "/operations/alerts"
+    When I attempt to navigate directly to "/alerts"
     Then I should see an "Access Denied" message or be redirected to a default page
 
   Scenario: Copy Writer has limited access (no customer search)
