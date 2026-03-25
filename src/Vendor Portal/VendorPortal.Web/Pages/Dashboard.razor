@@ -116,14 +116,14 @@
                        data-testid="submit-change-request-btn">
                 Submit Change Request
             </MudButton>
-
-            <MudButton Variant="Variant.Outlined" Color="Color.Default"
-                       StartIcon="@Icons.Material.Filled.List" Class="mr-2"
-                       Href="/change-requests"
-                       data-testid="view-change-requests-btn">
-                View Change Requests
-            </MudButton>
         }
+
+        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                   StartIcon="@Icons.Material.Filled.List" Class="mr-2"
+                   Href="/change-requests"
+                   data-testid="view-change-requests-btn">
+            View Change Requests
+        </MudButton>
 
         @if (AuthState.IsAdmin)
         {
