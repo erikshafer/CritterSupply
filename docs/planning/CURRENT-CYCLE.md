@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M34.0 — Experience Completion + Vocabulary Alignment (PENDING) |
-| **Status** | 📋 **READY TO START** — M33.0 complete, awaiting M34.0 kickoff |
+| **Current Milestone** | M34.0 — Experience Completion + Vocabulary Alignment |
+| **Status** | ✅ **PLANNED** — stabilization-first plan committed; ready to begin |
 | **Recent Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
 | **Previous Completion** | M32.4 — Backoffice Phase 4 E2E Stabilization (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-25 (M33.0 Milestone Closure Retrospective complete — All 12 exit criteria met)*
+*Last Updated: 2026-03-25 (M34.0 planning complete — stabilization-first plan committed)*
 
 ---
 
@@ -55,26 +55,31 @@
 
 ### 📋 M34.0: Experience Completion + Vocabulary Alignment
 
-**Status:** 📋 **READY TO START** — M33.0 complete, awaiting M34.0 kickoff
-**Goal:** Complete every experience the architecture already supports but users cannot yet access; align the event vocabulary across BC boundaries
+**Status:** ✅ **PLANNED** — M34.0 planning complete; ready to begin
+**Goal:** Restore trustworthy test signal first, then complete already-supported user experiences and align vocabulary across BC boundaries
 
-**HIGH PRIORITY — Address First (Session 1):**
-- 🔴 **Vendor Portal RBAC Bug:** Dashboard.razor gates both "Submit" AND "View Change Requests" buttons behind `CanSubmitChangeRequests`, blocking ReadOnly users from viewing change requests entirely
-  - **Impact:** Blocking 3/12 Vendor Portal E2E tests (25% of suite)
-  - **Fix:** Split button gating logic (View = all users, Submit = CanSubmitChangeRequests only)
+**Mandatory First Act (Session 1):**
+- 🔴 **Backoffice E2E stabilization:** restore trustworthy Backoffice E2E signal before feature work begins
+  - **Current blocker:** latest CI run failed all 111 Backoffice E2E tests during bootstrap when `BackofficeIdentity.Api` tried to connect to `127.0.0.1:5433`
+  - **Why first:** until bootstrap is fixed, Backoffice E2E cannot distinguish product defects from environment/configuration failures
+  - **Follow-on work:** route/selector drift audit, false-positive audit, vocabulary/contract alignment
+
+**Early Cycle Bug Fix:**
+- 🔴 **Vendor Portal RBAC Bug (#460):** Dashboard.razor gates both "Submit" AND "View Change Requests" behind `CanSubmitChangeRequests`, blocking ReadOnly users from viewing change requests entirely
+  - **Decision:** use Option A from the issue draft (ungate View, keep Submit gated)
   - **Location:** `src/Vendor Portal/VendorPortal.Web/Pages/Dashboard.razor` lines 111-126
   - **Issue Draft:** `docs/planning/milestones/m34-0-rbac-issue-draft.md`
-  - **Effort:** Small (< 30 minutes)
-  - **Why First:** Quick win, unblocks E2E suite to 100%, discovered during M33.0 E2E stabilization work
+  - **Why early:** high-value, well-understood fix that should land immediately after stabilization starts
 
-**Planned Tracks (8-12 sessions):**
-- **Track A:** Untapped Architectural Value (3 sessions) — Returns→Correspondence integration, live order tracking, SignalR hub updates
-- **Track B:** Test Infrastructure Completion (4 sessions) — Vendor Portal bUnit, Promotions unit tests, Customer Experience E2E
-- **Track C:** Vocabulary Alignment (3 sessions) — Event naming consistency, Shopping dual-handler ADR, persisted event migration research
-- **Track D:** Customer Experience E2E (2 sessions) — cart-real-time-updates, product-browsing step definitions
+**Planned Tracks (sequenced):**
+- **Track A:** Stabilization (1-2 sessions) — Backoffice E2E bootstrap, inventory, selector/route cleanup, false-positive audit
+- **Track B:** High-value bug fix (1 session) — Vendor Portal RBAC issue #460
+- **Track C:** Experience completion (3-4 sessions) — finish already-supported experiences still blocked by drift or missing access
+- **Track D:** Vocabulary alignment (2-3 sessions) — event/UI naming consistency after test signal is trustworthy
 
 **References:**
 - [M33-M34 Proposal](./milestones/m33-m34-engineering-proposal-2026-03-21.md)
+- [M34.0 Plan](./milestones/m34-0-plan.md)
 - [M34 RBAC Issue Draft](./milestones/m34-0-rbac-issue-draft.md)
 
 ---
