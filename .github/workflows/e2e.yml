@@ -2,10 +2,10 @@ name: E2E Tests
 
 # E2E tests run on every PR, main push, and nightly.
 #
-# Each E2E test suite (Storefront, Vendor Portal) runs in its own parallel job so
-# they execute concurrently with each other — and concurrently with the unit-test
+# Each E2E test suite (Storefront, Vendor Portal, Backoffice) runs in its own parallel job
+# so they execute concurrently with each other — and concurrently with the unit-test
 # and integration-test jobs in dotnet.yml.  This keeps PR feedback fast even as the
-# E2E suite grows (e.g. Backoffice BC).
+# E2E suite grows.
 #
 # Playwright requires a real Chromium browser, real Kestrel servers, and
 # TestContainers Postgres — heavier than integration tests but isolated per job.
@@ -245,5 +245,103 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vendor-portal-playwright-traces-${{ github.run_number }}
+          path: '**/playwright-traces/**/*.zip'
+          retention-days: 7
+
+  # ─── Backoffice E2E Tests ──────────────────────────────────────────────────
+  # Blazor WASM: Customer service workflows, order search, return management, pricing admin.
+  # Uses real Kestrel (Backoffice.Web + Backoffice.Api + BackofficeIdentity.Api)
+  # with TestContainers PostgreSQL.
+  backoffice-e2e:
+    name: Backoffice E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-e2e-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-e2e-
+            ${{ runner.os }}-nuget-
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --no-restore --configuration Release
+        # Prevent project-level Playwright install Exec from running in CI.
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      # Cache Playwright browser binaries between runs to speed up CI
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-ms-playwright-backoffice-${{ hashFiles('tests/Backoffice/Backoffice.E2ETests/Backoffice.E2ETests.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-ms-playwright-backoffice-
+            ${{ runner.os }}-ms-playwright-
+
+      - name: Install Playwright browsers
+        run: |
+          # Use the Node.js CLI bundled inside the Microsoft.Playwright NuGet package
+          # so we don't need pwsh or the outdated Microsoft.Playwright.CLI dotnet tool.
+          E2E_BIN="tests/Backoffice/Backoffice.E2ETests/bin/Release/net10.0"
+          "$E2E_BIN/.playwright/node/linux-x64/node" \
+            "$E2E_BIN/.playwright/package/cli.js" \
+            install chromium --with-deps
+
+      # Pre-pull the PostgreSQL image used by TestContainers E2E fixtures.
+      # This avoids flaky timeouts on slow Docker Hub responses.
+      - name: Pre-pull TestContainers PostgreSQL image
+        run: docker pull postgres:18-alpine
+
+      # Verify Docker service is healthy before running tests
+      - name: Verify Docker service
+        run: |
+          docker ps
+          docker info
+
+      - name: Run Backoffice E2E Tests
+        run: |
+          dotnet test "tests/Backoffice/Backoffice.E2ETests/Backoffice.E2ETests.csproj" \
+            --no-build \
+            --configuration Release \
+            --logger "console;verbosity=normal" \
+            --logger "trx;LogFileName=backoffice-e2e-results.trx" \
+            -- -parallel none
+        env:
+          PLAYWRIGHT_HEADLESS: ${{ github.event.inputs.headless || 'true' }}
+          DOCKER_HOST: unix:///var/run/docker.sock
+          TESTCONTAINERS_RYUK_DISABLED: false
+
+      - name: Upload Backoffice test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backoffice-e2e-results-${{ github.run_number }}
+          path: '**/TestResults/**/*.trx'
+          retention-days: 14
+
+      - name: Upload Playwright traces (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backoffice-playwright-traces-${{ github.run_number }}
           path: '**/playwright-traces/**/*.zip'
           retention-days: 7
