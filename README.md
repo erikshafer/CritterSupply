@@ -59,7 +59,7 @@ This project is built with Claude as a collaborative coding partner. Beyond just
 
 See [CLAUDE.md](./CLAUDE.md) for AI development guidelines and [docs/README.md](./docs/README.md) for comprehensive documentation structure.
 
-**🤖 Custom Agents:** CritterSupply includes specialized GitHub Copilot agents (Principal Architect, Product Owner, DevOps Engineer, QA Engineer, UX Engineer) to provide expert feedback on PRs and issues. See [docs/AI-ASSISTED-DEVELOPMENT.md](./docs/AI-ASSISTED-DEVELOPMENT.md) for details on how to use them.
+**🤖 Custom Agents:** CritterSupply includes specialized GitHub Copilot agents (Principal Architect, Product Owner, DevOps Engineer, QA Engineer, UX Engineer, Application Security & Identity Engineer, Event Modeling Facilitator, Frontend Platform Engineer) to provide expert feedback on PRs and issues. See [docs/AI-ASSISTED-DEVELOPMENT.md](./docs/AI-ASSISTED-DEVELOPMENT.md) for details on how to use them.
 
 **📋 Architectural Review:** See [docs/ARCHITECTURAL-REVIEW.md](./docs/ARCHITECTURAL-REVIEW.md) for an independent review of bounded context design, service communication patterns, and recommendations from an experienced software architect perspective.
 

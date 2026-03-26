@@ -57,6 +57,8 @@ To keep the roster focused, add **no more than six** new agents:
 5. **Integration Contract Steward**
 6. **Commerce Operations Specialist**
 
+> **Status (2026-03-26):** The first three agents in this proposal are now implemented in `.github/agents/`. The remaining three are still candidates for future expansion.
+
 ### Why these six
 
 These six additions complement the existing roster without simply duplicating it:

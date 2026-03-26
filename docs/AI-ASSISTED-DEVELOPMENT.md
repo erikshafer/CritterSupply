@@ -128,6 +128,59 @@ CritterSupply includes specialized GitHub Copilot agents with domain expertise t
 
 ---
 
+#### 🔐 Application Security & Identity Engineer
+
+**File:** [`.github/agents/application-security-identity-engineer.md`](../.github/agents/application-security-identity-engineer.md)
+
+**Expertise:** Authentication, authorization, tenant isolation, session management, JWT flows, and secure application design
+
+**Focus Areas:**
+- Authentication and authorization design
+- Session cookie vs JWT tradeoffs
+- Role and permission modeling
+- Tenant isolation and boundary enforcement
+- SignalR authentication propagation and connection safety
+- Secure token handling in Blazor applications
+- Sensitive data exposure and least-privilege design
+- Threat modeling for admin, operator, and self-service flows
+
+---
+
+#### 🧭 Event Modeling Facilitator
+
+**File:** [`.github/agents/event-modeling-facilitator.md`](../.github/agents/event-modeling-facilitator.md)
+
+**Expertise:** Event Modeling workshop facilitation, event-driven domain discovery, slice definition, and converting workshop output into delivery artifacts
+
+**Focus Areas:**
+- Brain-dump and storytelling facilitation
+- Event naming and command-intent clarity
+- Timeline construction and missing-event discovery
+- Vertical slice identification and refinement
+- Given/When/Then scenario derivation
+- Distinguishing aggregates, projections, policies, and sagas
+- Turning workshop output into issues, feature files, and implementation-ready slices
+
+---
+
+#### 🖥️ Frontend Platform Engineer
+
+**File:** [`.github/agents/frontend-platform-engineer.md`](../.github/agents/frontend-platform-engineer.md)
+
+**Expertise:** Blazor Server and WebAssembly architecture, component systems, shared UI patterns, BFF-facing view models, and frontend testability
+
+**Focus Areas:**
+- Blazor component architecture and page composition
+- Shared UI patterns across multiple web applications
+- BFF contract shape and view-model ergonomics
+- Real-time UI updates with SignalR and Wolverine
+- Authentication-aware UI flows for session- and JWT-based applications
+- MudBlazor usage patterns, consistency, and maintainability
+- Frontend testability with bUnit and Playwright
+- Hosting-model tradeoffs between Blazor Server and Blazor WebAssembly
+
+---
+
 ## How to Use Custom Agents
 
 ### In Pull Requests
@@ -144,6 +197,12 @@ Tag the agent in a PR comment to get specialized feedback:
 @qa-engineer What integration tests should we add to cover the new checkout flow?
 
 @ux-engineer Does this checkout page layout follow good UX principles?
+
+@application-security-identity-engineer Does this vendor approval flow create any tenant-isolation or privilege-escalation risks?
+
+@event-modeling-facilitator Can you help us slice this returns workflow into Event Modeling artifacts and Given/When/Then scenarios?
+
+@frontend-platform-engineer Should this dashboard composition live in the Backoffice BFF or in the Blazor app?
 ```
 
 ### In Issues
@@ -158,6 +217,12 @@ Tag agents when planning new features or discussing architectural decisions:
 @qa-engineer Is the BDD coverage sufficient for the Order saga happy path?
 
 @ux-engineer How should we handle mobile responsive design for the vendor dashboard?
+
+@application-security-identity-engineer Are these new backoffice role boundaries too broad for the actions exposed by this screen?
+
+@event-modeling-facilitator Can you facilitate the first pass of Event Modeling for this pricing workflow?
+
+@frontend-platform-engineer What frontend architecture patterns should we standardize before we expand this UI module?
 ```
 
 ### When to Use Which Agent
@@ -165,11 +230,17 @@ Tag agents when planning new features or discussing architectural decisions:
 **Architecture & Design Decisions:**
 - Start with `@principal-architect` for technical architecture
 - Follow up with `@product-owner` for business alignment
+- Involve `@event-modeling-facilitator` when the work starts with domain discovery or workshop output
+- Bring in `@application-security-identity-engineer` for auth- or identity-sensitive design
+- Consult `@frontend-platform-engineer` for multi-UI or Blazor architecture concerns
 - Consult `@devops-engineer` for deployment implications
 
 **Feature Development:**
 - Begin with `@product-owner` for business requirements
+- Use `@event-modeling-facilitator` when shaping slices, scenarios, or workshop outputs
 - Engage `@principal-architect` for technical design
+- Engage `@frontend-platform-engineer` for Blazor, BFF, component, or shared UI architecture
+- Engage `@application-security-identity-engineer` when the feature touches auth, permissions, sessions, or tenancy
 - Involve `@qa-engineer` for test strategy
 - Consult `@ux-engineer` for UI/UX design
 - End implementation sessions with `@qa-engineer` + `@ux-engineer` sign-off using `docs/skills/final-qa-ux-review.md`
@@ -187,6 +258,11 @@ Tag agents when planning new features or discussing architectural decisions:
 - Primary: `@devops-engineer` for CI/CD and infrastructure
 - Secondary: `@principal-architect` for deployment architecture
 - Consider `@qa-engineer` for smoke testing strategy
+
+**Specialized Reviews:**
+- Primary: `@application-security-identity-engineer` for authentication, authorization, and tenant isolation
+- Primary: `@event-modeling-facilitator` for Event Modeling workshops, slices, and scenario derivation
+- Primary: `@frontend-platform-engineer` for Blazor architecture, shared UI patterns, and BFF-facing frontend composition
 
 ---
 
