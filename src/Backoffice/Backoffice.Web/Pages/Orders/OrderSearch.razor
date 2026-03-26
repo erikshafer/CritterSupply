@@ -114,15 +114,13 @@
                         @context.TotalAmount.ToString("C")
                     </MudTd>
                     <MudTd DataLabel="Actions">
-                        <MudTooltip Text="Order detail page coming soon">
-                            <MudButton Variant="Variant.Text"
-                                       Color="Color.Secondary"
-                                       Size="Size.Small"
-                                       Disabled="true"
-                                       data-testid="@($"view-order-{context.Id}")">
-                                View Details
-                            </MudButton>
-                        </MudTooltip>
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Secondary"
+                                   Size="Size.Small"
+                                   Href="@($"/orders/{context.Id}")"
+                                   data-testid="@($"view-order-{context.Id}")">
+                            View Details
+                        </MudButton>
                     </MudTd>
                 </RowTemplate>
             </MudTable>

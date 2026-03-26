@@ -33,34 +33,28 @@
     </AuthorizeView>
 
     <AuthorizeView Policy="WarehouseClerk">
-        <MudNavLink Href="/warehouse" Icon="@Icons.Material.Filled.Warehouse" Disabled="true">
+        <MudNavLink Href="/inventory" Icon="@Icons.Material.Filled.Warehouse">
             Warehouse Tools
         </MudNavLink>
     </AuthorizeView>
 
     <AuthorizeView Policy="PricingManager">
-        <MudNavLink Href="/pricing" Icon="@Icons.Material.Filled.AttachMoney" Disabled="true">
+        <MudNavLink Href="/products" Icon="@Icons.Material.Filled.AttachMoney">
             Pricing Admin
         </MudNavLink>
     </AuthorizeView>
 
     <AuthorizeView Policy="CopyWriter">
-        <MudNavLink Href="/products" Icon="@Icons.Material.Filled.Edit" Disabled="true">
+        <MudNavLink Href="/products" Icon="@Icons.Material.Filled.Edit">
             Product Catalog
         </MudNavLink>
     </AuthorizeView>
 
     <AuthorizeView Policy="SystemAdmin">
-        <MudNavLink Href="/admin/users" Icon="@Icons.Material.Filled.AdminPanelSettings" Disabled="true">
+        <MudNavLink Href="/users" Icon="@Icons.Material.Filled.AdminPanelSettings">
             User Management
         </MudNavLink>
     </AuthorizeView>
-
-    <MudDivider Class="my-2" />
-
-    <MudText Typo="Typo.caption" Class="px-4 text-muted">
-        Session 7: BFF routes fixed, NavMenu aligned
-    </MudText>
 </MudNavMenu>
 
 @code {
