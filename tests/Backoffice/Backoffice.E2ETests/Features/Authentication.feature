@@ -1,3 +1,4 @@
+@shard-1
 Feature: Backoffice Authentication
   As a Backoffice administrator
   I want to log in with my credentials

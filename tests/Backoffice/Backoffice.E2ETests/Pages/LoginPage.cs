@@ -27,16 +27,10 @@ public sealed class LoginPage
     // Actions
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/login");
+        await _page.GotoAsync($"{_baseUrl}/login", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
-        // Wait for WASM hydration (5-15s typical, can be up to 30s on first load)
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-
-        // Wait for MudBlazor initialization (check for MudBlazor provider classes)
-        await _page.WaitForSelectorAsync(".mud-dialog-provider", new() { State = WaitForSelectorState.Attached, Timeout = 15_000 });
-
-        // Wait for login form to be interactive
-        await EmailInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        // Wait for login form to be interactive (60s timeout for CI where WASM hydration can take 30s+)
+        await EmailInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60_000 });
     }
 
     public async Task LoginAsync(string email, string password)
@@ -46,9 +40,10 @@ public sealed class LoginPage
         await LoginButton.ClickAsync();
 
         // Wait for either success navigation (dashboard) or error message
+        // Use WaitUntil.Commit — Blazor WASM client-side routing doesn't trigger Load events
         await _page.WaitForURLAsync(
             url => url.Contains("/dashboard") || url.Contains("/login"),
-            new() { Timeout = 10_000 }
+            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit }
         );
     }
 
@@ -58,11 +53,9 @@ public sealed class LoginPage
         await PasswordInput.FillAsync(password);
         await LoginButton.ClickAsync();
 
-        // Wait for successful navigation to dashboard (increased timeout for auth state propagation)
-        await _page.WaitForURLAsync(url => url.Contains("/dashboard"), new() { Timeout = 15_000 });
-
-        // Wait for dashboard to be fully loaded (MudBlazor hydration)
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        // Wait for successful navigation to dashboard (60s timeout for CI WASM bootstrap)
+        // Use WaitUntil.Commit — Blazor WASM client-side routing doesn't trigger Load events
+        await _page.WaitForURLAsync(url => url.Contains("/dashboard"), new() { Timeout = 60_000, WaitUntil = WaitUntilState.Commit });
     }
 
     // Assertions

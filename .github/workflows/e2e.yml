@@ -2,10 +2,15 @@ name: E2E Tests
 
 # E2E tests run on every PR, main push, and nightly.
 #
-# Each E2E test suite (Storefront, Vendor Portal, Backoffice) runs in its own parallel job
-# so they execute concurrently with each other — and concurrently with the unit-test
-# and integration-test jobs in dotnet.yml.  This keeps PR feedback fast even as the
-# E2E suite grows.
+# Structure:
+#   build             — restore, build, and publish Blazor WASM once (shared artifact)
+#   storefront-e2e    — Blazor Server browser tests (Playwright + TestContainers)
+#   vendor-portal-e2e — Blazor WASM browser tests (Playwright + TestContainers)
+#   backoffice-e2e    — Blazor WASM browser tests, sharded across 3 parallel runners
+#
+# The build job compiles the solution and publishes WASM projects once.  All five
+# downstream E2E jobs download the artifact and skip restore + build, saving ~2 min
+# of duplicated work per runner.
 #
 # Playwright requires a real Chromium browser, real Kestrel servers, and
 # TestContainers Postgres — heavier than integration tests but isolated per job.
@@ -52,14 +57,15 @@ concurrency:
 
 jobs:
 
-  # ─── Storefront E2E Tests ──────────────────────────────────────────────────
-  # Blazor Server: Checkout wizard, SignalR real-time updates, protected routes.
-  # Uses real Kestrel (Storefront.Web + Storefront.Api) with stub downstream clients
-  # and TestContainers PostgreSQL for Marten event sourcing.
-  storefront-e2e:
-    name: Storefront E2E
+  # ─── Build ──────────────────────────────────────────────────────────────────
+  # Restores NuGet packages, builds the entire solution once, and publishes
+  # Blazor WASM projects (Backoffice.Web, VendorPortal.Web).  Downstream E2E
+  # jobs (storefront, vendor-portal, 3 backoffice shards = 5 runners) download
+  # the artifact and skip restore + build, saving ~2 minutes per runner.
+  build:
+    name: Build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: read
 
@@ -86,9 +92,67 @@ jobs:
 
       - name: Build solution
         run: dotnet build --no-restore --configuration Release
-        # Prevent project-level Playwright install Exec from running in CI.
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      # Publish Blazor WASM apps so E2E fixtures can serve them as static files.
+      # The PublishBlazorWasmForE2E MSBuild target in each E2E .csproj skips
+      # automatically when publish output already exists (see Condition attribute).
+      - name: Publish Backoffice Blazor WASM
+        run: |
+          dotnet publish src/Backoffice/Backoffice.Web/Backoffice.Web.csproj \
+            --no-build \
+            --configuration Release \
+            --output src/Backoffice/Backoffice.Web/bin/Release/net10.0/publish
+
+      - name: Publish Vendor Portal Blazor WASM
+        run: |
+          dotnet publish "src/Vendor Portal/VendorPortal.Web/VendorPortal.Web.csproj" \
+            --no-build \
+            --configuration Release \
+            --output "src/Vendor Portal/VendorPortal.Web/bin/Release/net10.0/publish"
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-build-output-${{ github.run_number }}
+          path: |
+            **/bin/Release/
+          retention-days: 1
+          compression-level: 6
+          include-hidden-files: true
+
+  # ─── Storefront E2E Tests ──────────────────────────────────────────────────
+  # Blazor Server: Checkout wizard, SignalR real-time updates, protected routes.
+  # Uses real Kestrel (Storefront.Web + Storefront.Api) with stub downstream clients
+  # and TestContainers PostgreSQL for Marten event sourcing.
+  storefront-e2e:
+    name: Storefront E2E
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build output
+        uses: actions/download-artifact@v4
+        with:
+          name: e2e-build-output-${{ github.run_number }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Artifact upload/download doesn't preserve Unix execute permissions.
+      # Restore them for the Playwright Node.js CLI binary used by the install step.
+      - name: Fix Playwright binary permissions
+        run: |
+          chmod +x "tests/Customer Experience/Storefront.E2ETests/bin/Release/net10.0/.playwright/node/linux-x64/node"
 
       # Cache Playwright browser binaries between runs to speed up CI
       - name: Cache Playwright browsers
@@ -156,6 +220,7 @@ jobs:
   # with TestContainers PostgreSQL.
   vendor-portal-e2e:
     name: Vendor Portal E2E
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -165,28 +230,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
+      - name: Download build output
+        uses: actions/download-artifact@v4
         with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-e2e-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-e2e-
-            ${{ runner.os }}-nuget-
+          name: e2e-build-output-${{ github.run_number }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore dependencies
-        run: dotnet restore
-
-      - name: Build solution
-        run: dotnet build --no-restore --configuration Release
-        # Prevent project-level Playwright install Exec from running in CI.
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+      # Artifact upload/download doesn't preserve Unix execute permissions.
+      # Restore them for the Playwright Node.js CLI binary used by the install step.
+      - name: Fix Playwright binary permissions
+        run: |
+          chmod +x "tests/Vendor Portal/VendorPortal.E2ETests/bin/Release/net10.0/.playwright/node/linux-x64/node"
 
       # Cache Playwright browser binaries between runs to speed up CI
       - name: Cache Playwright browsers
@@ -248,43 +306,53 @@ jobs:
           path: '**/playwright-traces/**/*.zip'
           retention-days: 7
 
-  # ─── Backoffice E2E Tests ──────────────────────────────────────────────────
+  # ─── Backoffice E2E Tests (sharded) ────────────────────────────────────────
   # Blazor WASM: Customer service workflows, order search, return management, pricing admin.
   # Uses real Kestrel (Backoffice.Web + Backoffice.Api + BackofficeIdentity.Api)
   # with TestContainers PostgreSQL.
+  #
+  # 111 scenarios split across 3 parallel shards to keep each under 15 minutes.
+  # Shards are defined by @shard-N Reqnroll tags on feature files:
+  #   shard-1 (auth-session):  Authentication, Authorization, SessionExpiry  (32 scenarios)
+  #   shard-2 (operations):    OperationsAlerts, ReturnManagement, WarehouseAdmin  (43 scenarios)
+  #   shard-3 (admin):         CustomerService, UserManagement, ProductAdmin, PricingAdmin  (36 scenarios)
   backoffice-e2e:
-    name: Backoffice E2E
+    name: Backoffice E2E (${{ matrix.shard-name }})
+    needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard-name: auth-session
+            filter: "Category=shard-1"
+          - shard-name: operations
+            filter: "Category=shard-2"
+          - shard-name: admin
+            filter: "Category=shard-3"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
+      - name: Download build output
+        uses: actions/download-artifact@v4
         with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-e2e-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-e2e-
-            ${{ runner.os }}-nuget-
+          name: e2e-build-output-${{ github.run_number }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore dependencies
-        run: dotnet restore
-
-      - name: Build solution
-        run: dotnet build --no-restore --configuration Release
-        # Prevent project-level Playwright install Exec from running in CI.
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+      # Artifact upload/download doesn't preserve Unix execute permissions.
+      # Restore them for the Playwright Node.js CLI binary used by the install step.
+      - name: Fix Playwright binary permissions
+        run: |
+          chmod +x tests/Backoffice/Backoffice.E2ETests/bin/Release/net10.0/.playwright/node/linux-x64/node
 
       # Cache Playwright browser binaries between runs to speed up CI
       - name: Cache Playwright browsers
@@ -317,13 +385,14 @@ jobs:
           docker ps
           docker info
 
-      - name: Run Backoffice E2E Tests
+      - name: Run Backoffice E2E Tests (${{ matrix.shard-name }})
         run: |
           dotnet test "tests/Backoffice/Backoffice.E2ETests/Backoffice.E2ETests.csproj" \
             --no-build \
             --configuration Release \
+            --filter "${{ matrix.filter }}" \
             --logger "console;verbosity=normal" \
-            --logger "trx;LogFileName=backoffice-e2e-results.trx" \
+            --logger "trx;LogFileName=backoffice-e2e-${{ matrix.shard-name }}-results.trx" \
             -- -parallel none
         env:
           PLAYWRIGHT_HEADLESS: ${{ github.event.inputs.headless || 'true' }}
@@ -334,7 +403,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: backoffice-e2e-results-${{ github.run_number }}
+          name: backoffice-e2e-${{ matrix.shard-name }}-results-${{ github.run_number }}
           path: '**/TestResults/**/*.trx'
           retention-days: 14
 
@@ -342,6 +411,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: backoffice-playwright-traces-${{ github.run_number }}
+          name: backoffice-playwright-traces-${{ matrix.shard-name }}-${{ github.run_number }}
           path: '**/playwright-traces/**/*.zip'
           retention-days: 7

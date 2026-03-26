@@ -37,8 +37,6 @@
         <MudSelect @bind-Value="_type"
                    Label="Change Type"
                    Variant="Variant.Outlined"
-                   Required="true"
-                   RequiredError="Change type is required"
                    Class="mb-4"
                    data-testid="type-select">
             <MudSelectItem Value="@("Description")">Description — Update product description text</MudSelectItem>
@@ -101,7 +99,7 @@
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
                        OnClick="SubmitNow"
-                       Disabled="_isSubmitting || !_isFormValid"
+                       Disabled="_isSubmitting"
                        data-testid="submit-btn">
                 @if (_isSubmitting)
                 {

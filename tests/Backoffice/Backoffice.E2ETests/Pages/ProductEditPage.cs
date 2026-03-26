@@ -37,7 +37,7 @@ public sealed class ProductEditPage
     // Actions
     public async Task NavigateAsync(string sku)
     {
-        await _page.GotoAsync($"{_baseUrl}/products/{sku}/edit");
+        await _page.GotoAsync($"{_baseUrl}/products/{sku}/edit", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
         // Wait for page to be fully loaded
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);

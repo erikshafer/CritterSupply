@@ -19,15 +19,6 @@ public sealed class ReturnManagementSteps
     private E2ETestFixture Fixture => _scenarioContext.Get<E2ETestFixture>(ScenarioContextKeys.Fixture);
     private IPage Page => _scenarioContext.Get<IPage>(ScenarioContextKeys.Page);
 
-    // Background Steps (shared with other features)
-    [Given(@"I am logged in as a customer service admin")]
-    public async Task GivenIAmLoggedInAsACustomerServiceAdmin()
-    {
-        var loginPage = new LoginPage(Page, Fixture.WasmBaseUrl);
-        await loginPage.NavigateAsync();
-        await loginPage.LoginAndWaitForDashboardAsync("cs-admin@critterSupply.com", "Password123!");
-    }
-
     [Given(@"I am on the dashboard page")]
     public async Task GivenIAmOnTheDashboardPage()
     {
@@ -84,7 +75,7 @@ public sealed class ReturnManagementSteps
         }
         else
         {
-            await Page.GotoAsync($"{Fixture.WasmBaseUrl}{pagePath}");
+            await Page.GotoAsync($"{Fixture.WasmBaseUrl}{pagePath}", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
             await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         }
     }
@@ -116,14 +107,6 @@ public sealed class ReturnManagementSteps
     {
         var returnManagementPage = new ReturnManagementPage(Page, Fixture.WasmBaseUrl);
         await returnManagementPage.ClickLoadReturnsButtonAsync();
-    }
-
-    // When Steps - Session Expiry
-    [When(@"my session expires")]
-    public void WhenMySessionExpires()
-    {
-        // Simulate session expiry by clearing stub users (forces 401 on next API call)
-        Fixture.ClearAllStubs();
     }
 
     // Then Steps - Page State
@@ -290,15 +273,6 @@ public sealed class ReturnManagementSteps
         var returnManagementPage = new ReturnManagementPage(Page, Fixture.WasmBaseUrl);
         var hasAuthError = await returnManagementPage.IsAuthorizationErrorVisibleAsync();
         hasAuthError.ShouldBeFalse();
-    }
-
-    // Then Steps - Session Expiry
-    [Then(@"I should see the session expired modal")]
-    public async Task ThenIShouldSeeTheSessionExpiredModal()
-    {
-        var returnManagementPage = new ReturnManagementPage(Page, Fixture.WasmBaseUrl);
-        var isVisible = await returnManagementPage.IsSessionExpiredModalVisibleAsync();
-        isVisible.ShouldBeTrue();
     }
 
     [Then(@"I should not see updated return data")]

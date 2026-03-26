@@ -1,3 +1,4 @@
+@shard-2
 Feature: Return Management
   As a Backoffice customer service or operations manager
   I want to view and filter the active return queue

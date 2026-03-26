@@ -26,7 +26,7 @@ public sealed class UserListPage
     // Actions
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/users");
+        await _page.GotoAsync($"{_baseUrl}/users", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
         // Wait for page to be fully loaded
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
@@ -44,7 +44,7 @@ public sealed class UserListPage
     {
         await CreateUserButton.ClickAsync();
         // Wait for navigation to create page
-        await _page.WaitForURLAsync(url => url.Contains("/users/create"), new() { Timeout = 10_000 });
+        await _page.WaitForURLAsync(url => url.Contains("/users/create"), new() { Timeout = 10_000, WaitUntil = WaitUntilState.Commit });
     }
 
     public async Task ClickEditForUserAsync(string email)
@@ -52,7 +52,7 @@ public sealed class UserListPage
         var editButton = _page.GetByTestId($"edit-user-{email}");
         await editButton.ClickAsync();
         // Wait for navigation to edit page
-        await _page.WaitForURLAsync(url => url.Contains("/users/") && url.Contains("/edit"), new() { Timeout = 10_000 });
+        await _page.WaitForURLAsync(url => url.Contains("/users/") && url.Contains("/edit"), new() { Timeout = 10_000, WaitUntil = WaitUntilState.Commit });
     }
 
     // Assertions

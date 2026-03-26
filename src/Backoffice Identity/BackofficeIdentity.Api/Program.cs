@@ -21,11 +21,12 @@ builder.AddServiceDefaults();
 builder.Host.ApplyJasperFxExtensions();
 
 // Configure EF Core with Postgres
-var connectionString = builder.Configuration.GetConnectionString("postgres")
-                       ?? throw new Exception("The connection string for the PostgreSQL database was not found");
-
 builder.Services.AddDbContext<BackofficeIdentityDbContext>(options =>
-    options.UseNpgsql(connectionString));
+{
+    var connectionString = builder.Configuration.GetConnectionString("postgres")
+                           ?? throw new Exception("The connection string for the PostgreSQL database was not found");
+    options.UseNpgsql(connectionString);
+});
 
 builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(opts =>
 {

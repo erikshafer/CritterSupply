@@ -1,3 +1,4 @@
+@shard-3
 Feature: Product Administration
   As a ProductManager or CopyWriter
   I want to manage product details via the Backoffice

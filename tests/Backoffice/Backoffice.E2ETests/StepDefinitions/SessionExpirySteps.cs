@@ -179,15 +179,6 @@ public sealed class SessionExpirySteps
         alertCount.ShouldBeGreaterThan(0);
     }
 
-    [Then(@"the acknowledge button should return to normal state")]
-    public async Task ThenTheAcknowledgeButtonShouldReturnToNormalState()
-    {
-        // Verify button is enabled again and shows "Acknowledge"
-        var acknowledgeButton = Page.GetByTestId("alert-acknowledge-button");
-        var isEnabled = await acknowledgeButton.IsEnabledAsync();
-        isEnabled.ShouldBeTrue();
-    }
-
     [Then(@"the session expired modal should still be visible")]
     public async Task ThenTheSessionExpiredModalShouldStillBeVisible()
     {
@@ -209,6 +200,7 @@ public sealed class SessionExpirySteps
         await sessionExpiredPage.CloseModalAsync();
     }
 
+    [Scope(Feature = "Session Expiry and Recovery")]
     [Then(@"the modal should be hidden")]
     public async Task ThenTheModalShouldBeHidden()
     {
@@ -230,13 +222,6 @@ public sealed class SessionExpirySteps
     {
         var url = Page.Url;
         url.ShouldContain("returnUrl=");
-    }
-
-    [When(@"I navigate to the operations alerts page")]
-    public async Task WhenINavigateToTheOperationsAlertsPage()
-    {
-        var alertsPage = new OperationsAlertsPage(Page, Fixture.WasmBaseUrl);
-        await alertsPage.NavigateAsync();
     }
 
     [Then(@"I should see exactly 1 session expired modal")]

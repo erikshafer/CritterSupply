@@ -44,7 +44,7 @@ public sealed class InventoryEditPage
     // Actions - Navigation
     public async Task NavigateAsync(string sku)
     {
-        await _page.GotoAsync($"{_baseUrl}/inventory/{sku}/edit");
+        await _page.GotoAsync($"{_baseUrl}/inventory/{sku}/edit", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await PageTitle.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }

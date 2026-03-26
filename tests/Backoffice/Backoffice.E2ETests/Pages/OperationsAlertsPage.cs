@@ -44,7 +44,7 @@ public sealed class OperationsAlertsPage
     // Actions - Navigation
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/operations/alerts");
+        await _page.GotoAsync($"{_baseUrl}/alerts", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
         // Wait for alerts feed to be fully loaded
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
@@ -292,7 +292,7 @@ public sealed class OperationsAlertsPage
 
     public async Task<bool> IsOnOperationsAlertsPageAsync()
     {
-        return _page.Url.Contains("/operations/alerts");
+        return _page.Url.Contains("/alerts");
     }
 
     // Wait for new alert to appear (for real-time SignalR push scenarios)

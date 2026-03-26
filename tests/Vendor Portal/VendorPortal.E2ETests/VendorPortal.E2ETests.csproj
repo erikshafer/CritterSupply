@@ -44,8 +44,11 @@
     </ItemGroup>
 
     <!-- Publish Blazor WASM before running E2E tests (creates wwwroot with index.html + _framework).
-         This target ensures the E2ETestFixture can locate the complete publish output. -->
-    <Target Name="PublishBlazorWasmForE2E" BeforeTargets="VSTest">
+         This target ensures the E2ETestFixture can locate the complete publish output.
+         The Condition skips re-publishing when the build job (CI) already published the WASM output.
+         Locally, the first test run publishes; subsequent runs reuse the existing output. -->
+    <Target Name="PublishBlazorWasmForE2E" BeforeTargets="VSTest"
+            Condition="!Exists('$(MSBuildThisFileDirectory)../../../src/Vendor Portal/VendorPortal.Web/bin/$(Configuration)/net10.0/publish/wwwroot/index.html')">
         <Message Text="Publishing VendorPortal.Web for E2E tests..." Importance="high" />
         <MSBuild Projects="..\..\..\src\Vendor Portal\VendorPortal.Web\VendorPortal.Web.csproj"
                  Targets="Publish"

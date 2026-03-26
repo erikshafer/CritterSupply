@@ -37,7 +37,7 @@ public sealed class UserCreatePage
     // Actions
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/users/create");
+        await _page.GotoAsync($"{_baseUrl}/users/create", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
         // Wait for page to be fully loaded
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
@@ -91,7 +91,7 @@ public sealed class UserCreatePage
     {
         await CancelButton.ClickAsync();
         // Wait for navigation back to list
-        await _page.WaitForURLAsync(url => url.Contains("/users") && !url.Contains("/create"), new() { Timeout = 10_000 });
+        await _page.WaitForURLAsync(url => url.Contains("/users") && !url.Contains("/create"), new() { Timeout = 10_000, WaitUntil = WaitUntilState.Commit });
     }
 
     // Assertions - Form State

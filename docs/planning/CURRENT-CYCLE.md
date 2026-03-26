@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M34.0 — Experience Completion + Vocabulary Alignment |
-| **Status** | ✅ **PLANNED** — stabilization-first plan committed; ready to begin |
+| **Status** | 🟡 **IN PROGRESS** — S1-S4 + B1 complete; trace filename fix + MudSelect validation fix applied; S5 gate pending CI |
 | **Recent Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
 | **Previous Completion** | M32.4 — Backoffice Phase 4 E2E Stabilization (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-25 (M34.0 planning complete — stabilization-first plan committed)*
+*Last Updated: 2026-03-25 (M34.0 Session 1: trace filename sanitization + VP submit button fix; targeting VP 12/12)*
 
 ---
 
@@ -55,27 +55,34 @@
 
 ### 📋 M34.0: Experience Completion + Vocabulary Alignment
 
-**Status:** ✅ **PLANNED** — M34.0 planning complete; ready to begin
+**Status:** 🟡 **IN PROGRESS** — S1-S4 + B1 complete; S5 gate pending CI verification
 **Goal:** Restore trustworthy test signal first, then complete already-supported user experiences and align vocabulary across BC boundaries
 
-**Mandatory First Act (Session 1):**
-- 🔴 **Backoffice E2E stabilization:** restore trustworthy Backoffice E2E signal before feature work begins
-  - **Current blocker:** latest CI run failed all 111 Backoffice E2E tests during bootstrap when `BackofficeIdentity.Api` tried to connect to `127.0.0.1:5433`
-  - **Why first:** until bootstrap is fixed, Backoffice E2E cannot distinguish product defects from environment/configuration failures
-  - **Follow-on work:** route/selector drift audit, false-positive audit, vocabulary/contract alignment
+**Session 1 Progress (2026-03-25):**
+- ✅ **S1 (Bootstrap fix):** BackofficeIdentity.Api EF Core connection string resolved lazily inside `AddDbContext` delegate (matching VendorIdentity.Api pattern). `UseEnvironment("Development")` added to test fixture. Root cause: eager capture of connection string before `ConfigureAppConfiguration` overrides.
+- ✅ **S2 (Baseline):** Backoffice.UnitTests 21/21, Backoffice.Api.IntegrationTests 91/91, BackofficeIdentity.Api.IntegrationTests 6/6 — all pass. Backoffice.Web.UnitTests has 0 tests (empty project).
+- ✅ **S3 (Route drift):** Fixed `/customer-service` → `/customers/search`, `/operations/alerts` → `/alerts` across page objects and feature files.
+- ✅ **S4 (Vocabulary):** Mapped stale `finance-clerk` role to `Executive` in E2E fixture (role not in BackofficeRole enum).
+- ✅ **B1 (Issue #460):** Moved "View Change Requests" outside `CanSubmitChangeRequests` gate in Dashboard.razor. ReadOnly users can now view change requests.
+- ✅ **Pre-existing fix:** Added missing `MudPopoverProvider` to `VendorPortal.Web/App.razor`. The Submit Change Request page uses `MudSelect` which requires this provider — without it, the `blazor-error-ui` overlay blocks all button clicks. This was a pre-existing bug (same 2 tests failed on main run #302).
+- ✅ **CI fix (Run #307):** Sanitized Playwright trace filenames across all 3 E2E suites — removes `"`, `:`, `<`, `>`, `|`, `*`, `?` characters that cause GitHub Actions artifact upload failures.
+- ✅ **CI fix (Run #307):** Removed `Required="true"` from `MudSelect` in SubmitChangeRequest.razor — field always has a default value ("Description"), so `Required` validation prevented `MudForm.IsValid` from becoming `true`, keeping the submit button permanently disabled.
+- ⏳ **S5 (Gate):** CI verification pending — targeting 12/12 Vendor Portal E2E, Backoffice E2E trace upload working.
 
-**Early Cycle Bug Fix:**
-- 🔴 **Vendor Portal RBAC Bug (#460):** Dashboard.razor gates both "Submit" AND "View Change Requests" behind `CanSubmitChangeRequests`, blocking ReadOnly users from viewing change requests entirely
-  - **Decision:** use Option A from the issue draft (ungate View, keep Submit gated)
-  - **Location:** `src/Vendor Portal/VendorPortal.Web/Pages/Dashboard.razor` lines 111-126
-  - **Issue Draft:** `docs/planning/milestones/m34-0-rbac-issue-draft.md`
-  - **Why early:** high-value, well-understood fix that should land immediately after stabilization starts
+**CI Comparison (main → Session 1):**
+| Suite | Run #302 (main) | Run #307 (post-MudPopover) | Expected (post all fixes) |
+|-------|-----------------|----------------------------|---------------------------|
+| Storefront E2E | ✅ 7/7 | ✅ 7/7 | ✅ 7/7 |
+| Vendor Portal E2E | ⚠️ 9/12 | ⚠️ 11/12 | 🎯 12/12 |
+| Backoffice E2E | ❌ 0/111 (bootstrap) | ❌ trace upload failure | 🎯 trace upload working |
 
 **Planned Tracks (sequenced):**
 - **Track A:** Stabilization (1-2 sessions) — Backoffice E2E bootstrap, inventory, selector/route cleanup, false-positive audit
 - **Track B:** High-value bug fix (1 session) — Vendor Portal RBAC issue #460
 - **Track C:** Experience completion (3-4 sessions) — finish already-supported experiences still blocked by drift or missing access
 - **Track D:** Vocabulary alignment (2-3 sessions) — event/UI naming consistency after test signal is trustworthy
+
+**Session 1 Retrospective:** [m34-0-session-1-retrospective.md](./milestones/m34-0-session-1-retrospective.md)
 
 **References:**
 - [M33-M34 Proposal](./milestones/m33-m34-engineering-proposal-2026-03-21.md)

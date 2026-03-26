@@ -1,3 +1,4 @@
+@shard-1
 Feature: Session Expiry and Recovery
   As a Backoffice administrator
   I want to be notified when my session expires
@@ -48,7 +49,7 @@ Feature: Session Expiry and Recovery
     And the session expired modal appears
     When I click "Log In Again"
     Then I should be redirected to the login page
-    And the returnUrl query parameter should be "/operations/alerts"
+    And the returnUrl query parameter should be "/alerts"
 
   Scenario: Complete re-authentication flow — returns to original page
     Given I am on the dashboard

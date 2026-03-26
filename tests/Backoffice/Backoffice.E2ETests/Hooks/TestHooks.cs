@@ -115,10 +115,7 @@ public sealed class TestHooks
         {
             if (scenarioContext.ScenarioExecutionStatus == ScenarioExecutionStatus.TestError)
             {
-                var scenarioTitle = scenarioContext.ScenarioInfo.Title
-                    .Replace(" ", "_")
-                    .Replace("/", "-")
-                    .Replace("\\", "-");
+                var scenarioTitle = SanitizeFileName(scenarioContext.ScenarioInfo.Title);
                 var tracePath = $"playwright-traces/{scenarioTitle}-{DateTime.UtcNow:yyyyMMddHHmmss}.zip";
                 Directory.CreateDirectory("playwright-traces");
 
@@ -169,4 +166,22 @@ public sealed class TestHooks
 
         _playwright?.Dispose();
     }
+
+    /// <summary>
+    /// Sanitize a scenario title for use as a file name.
+    /// Removes characters that are invalid on Windows/Linux file systems and
+    /// GitHub Actions artifact uploads (double quotes, colons, angle brackets, etc.).
+    /// </summary>
+    private static string SanitizeFileName(string title) =>
+        title
+            .Replace(" ", "_")
+            .Replace("/", "-")
+            .Replace("\\", "-")
+            .Replace("\"", "")
+            .Replace(":", "-")
+            .Replace("<", "")
+            .Replace(">", "")
+            .Replace("|", "-")
+            .Replace("*", "")
+            .Replace("?", "");
 }

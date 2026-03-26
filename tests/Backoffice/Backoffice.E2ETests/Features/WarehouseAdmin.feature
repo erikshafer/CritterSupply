@@ -1,3 +1,4 @@
+@shard-2
 Feature: Warehouse Admin
   As a Warehouse Clerk
   I want to manage inventory through the Backoffice

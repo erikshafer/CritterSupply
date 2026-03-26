@@ -24,7 +24,7 @@ public sealed class InventoryListPage
     // Actions
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/inventory");
+        await _page.GotoAsync($"{_baseUrl}/inventory", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await InventoryTable.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
@@ -43,7 +43,7 @@ public sealed class InventoryListPage
         var row = _page.GetByTestId($"inventory-row-{sku}");
         await row.ClickAsync();
         // Wait for navigation to edit page
-        await _page.WaitForURLAsync(url => url.Contains($"/inventory/{sku}/edit"), new() { Timeout = 10_000 });
+        await _page.WaitForURLAsync(url => url.Contains($"/inventory/{sku}/edit"), new() { Timeout = 10_000, WaitUntil = WaitUntilState.Commit });
     }
 
     // Assertions

@@ -25,7 +25,7 @@ public sealed class ProductListPage
     // Actions
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/products");
+        await _page.GotoAsync($"{_baseUrl}/products", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
         // Wait for page to be fully loaded
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
@@ -44,7 +44,7 @@ public sealed class ProductListPage
         var editButton = _page.GetByTestId($"edit-product-{sku}");
         await editButton.ClickAsync();
         // Wait for navigation to edit page
-        await _page.WaitForURLAsync(url => url.Contains($"/products/{sku}/edit"), new() { Timeout = 10_000 });
+        await _page.WaitForURLAsync(url => url.Contains($"/products/{sku}/edit"), new() { Timeout = 10_000, WaitUntil = WaitUntilState.Commit });
     }
 
     // Assertions

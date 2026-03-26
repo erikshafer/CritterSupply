@@ -40,7 +40,7 @@ public sealed class ReturnManagementPage
     // Actions - Navigation
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/returns");
+        await _page.GotoAsync($"{_baseUrl}/returns", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
         await WaitForPageLoadedAsync();
     }
 
@@ -52,7 +52,7 @@ public sealed class ReturnManagementPage
         // Blazor WASM routing doesn't trigger full page load events
         await _page.WaitForURLAsync(
             url => url.Contains("/returns"),
-            new() { Timeout = 5_000 });
+            new() { Timeout = 5_000, WaitUntil = WaitUntilState.Commit });
 
         await WaitForPageLoadedAsync();
     }
