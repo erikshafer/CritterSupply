@@ -60,8 +60,8 @@ jobs:
   # ─── Build ──────────────────────────────────────────────────────────────────
   # Restores NuGet packages, builds the entire solution once, and publishes
   # Blazor WASM projects (Backoffice.Web, VendorPortal.Web).  Downstream E2E
-  # jobs download the artifact and skip restore + build, saving ~2 minutes of
-  # duplicated work per runner (5 jobs × 2 min = 10 runner-minutes per run).
+  # jobs (storefront, vendor-portal, 3 backoffice shards = 5 runners) download
+  # the artifact and skip restore + build, saving ~2 minutes per runner.
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -151,7 +151,7 @@ jobs:
       # Restore them for the Playwright Node.js CLI binary used by the install step.
       - name: Fix Playwright binary permissions
         run: |
-          find . -path "*/.playwright/node/linux-x64/node" -exec chmod +x {} \;
+          chmod +x "tests/Customer Experience/Storefront.E2ETests/bin/Release/net10.0/.playwright/node/linux-x64/node"
 
       # Cache Playwright browser binaries between runs to speed up CI
       - name: Cache Playwright browsers
@@ -243,7 +243,7 @@ jobs:
       # Restore them for the Playwright Node.js CLI binary used by the install step.
       - name: Fix Playwright binary permissions
         run: |
-          find . -path "*/.playwright/node/linux-x64/node" -exec chmod +x {} \;
+          chmod +x "tests/Vendor Portal/VendorPortal.E2ETests/bin/Release/net10.0/.playwright/node/linux-x64/node"
 
       # Cache Playwright browser binaries between runs to speed up CI
       - name: Cache Playwright browsers
@@ -351,7 +351,7 @@ jobs:
       # Restore them for the Playwright Node.js CLI binary used by the install step.
       - name: Fix Playwright binary permissions
         run: |
-          find . -path "*/.playwright/node/linux-x64/node" -exec chmod +x {} \;
+          chmod +x tests/Backoffice/Backoffice.E2ETests/bin/Release/net10.0/.playwright/node/linux-x64/node
 
       # Cache Playwright browser binaries between runs to speed up CI
       - name: Cache Playwright browsers
