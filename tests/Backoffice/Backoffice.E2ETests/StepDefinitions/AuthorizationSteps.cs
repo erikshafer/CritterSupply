@@ -110,52 +110,6 @@ public sealed class AuthorizationSteps
         isSearchFormVisible.ShouldBeTrue();
     }
 
-    [When(@"I click on the alert for SKU ""(.*)""")]
-    public async Task WhenIClickOnTheAlertForSku(string sku)
-    {
-        var alertsPage = new OperationsAlertsPage(Page, Fixture.WasmBaseUrl);
-        await alertsPage.ClickAlertBySku(sku);
-    }
-
-    [When(@"I acknowledge the alert")]
-    public async Task WhenIAcknowledgeTheAlert()
-    {
-        var alertsPage = new OperationsAlertsPage(Page, Fixture.WasmBaseUrl);
-        await alertsPage.AcknowledgeAlertAsync();
-    }
-
-    [Then(@"the alert status should change to ""(.*)""")]
-    public async Task ThenTheAlertStatusShouldChangeTo(string expectedStatus)
-    {
-        // Wait for alert to be acknowledged (removed from unacknowledged filter)
-        await Task.Delay(1000); // Allow SignalR update or optimistic UI update
-
-        if (expectedStatus == "Acknowledged")
-        {
-            // Verify alert is no longer in the feed (removed optimistically)
-            var alertsPage = new OperationsAlertsPage(Page, Fixture.WasmBaseUrl);
-            var alertCount = await alertsPage.GetAlertCountAsync();
-
-            // After acknowledgment, alert should be removed from default unacknowledged view
-            // OR we should verify via filter
-            var noAlertsVisible = await alertsPage.IsNoAlertsMessageVisibleAsync();
-            noAlertsVisible.ShouldBeTrue();
-        }
-    }
-
-    [Then(@"the alert should no longer appear in the unacknowledged filter")]
-    public async Task ThenTheAlertShouldNoLongerAppearInTheUnacknowledgedFilter()
-    {
-        var alertsPage = new OperationsAlertsPage(Page, Fixture.WasmBaseUrl);
-
-        // Apply unacknowledged filter
-        await alertsPage.FilterByStatus("Unacknowledged");
-
-        // Should see no alerts (or one less alert if there were multiple)
-        var alertCount = await alertsPage.GetAlertCountAsync();
-        alertCount.ShouldBe(0); // Assuming we acknowledged the only alert
-    }
-
     [Then(@"I should see the ""(.*)"" KPI")]
     public async Task ThenIShouldSeeTheKPI(string kpiName)
     {

@@ -170,8 +170,8 @@ public sealed class E2ETestFixture : IAsyncLifetime
         using var scope = _identityFactory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BackofficeIdentity.Identity.BackofficeIdentityDbContext>();
 
-        // Check if user already exists
-        if (dbContext.Users.Any(u => u.Id == userId))
+        // Check if user already exists (by ID or email — demo seed data may use different IDs)
+        if (dbContext.Users.Any(u => u.Id == userId || u.Email == email))
             return; // Already seeded
 
         // Split full name into first and last name
@@ -211,8 +211,8 @@ public sealed class E2ETestFixture : IAsyncLifetime
         using var scope = _identityFactory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BackofficeIdentity.Identity.BackofficeIdentityDbContext>();
 
-        // Check if user already exists
-        if (dbContext.Users.Any(u => u.Id == userId))
+        // Check if user already exists (by ID or email — demo seed data may use different IDs)
+        if (dbContext.Users.Any(u => u.Id == userId || u.Email == email))
             return; // Already seeded
 
         // Split full name into first and last name

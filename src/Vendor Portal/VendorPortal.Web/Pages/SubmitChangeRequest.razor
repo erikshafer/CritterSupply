@@ -99,7 +99,7 @@
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
                        OnClick="SubmitNow"
-                       Disabled="_isSubmitting || !_isFormValid"
+                       Disabled="_isSubmitting"
                        data-testid="submit-btn">
                 @if (_isSubmitting)
                 {

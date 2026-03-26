@@ -416,6 +416,7 @@ public sealed class OperationsAlertsSteps
         isVisible.ShouldBeTrue();
     }
 
+    [Scope(Feature = "Operations Alert Feed with Real-Time Updates")]
     [Then(@"the modal should be hidden")]
     public async Task ThenTheModalShouldBeHidden()
     {
