@@ -127,17 +127,18 @@ domain understanding than a single voice would produce.
 
 ### CritterSupply Agent Personas
 
-CritterSupply has four custom agents that map naturally to Event Modeling workshop roles.
+CritterSupply now has five custom agents that map naturally to Event Modeling workshop roles.
 Each agent has a detailed behavioral profile in `.github/agents/`.
 
 | Persona | Agent | Role | Asks questions like... |
 |---|---|---|---|
+| **Facilitator** | **Event Modeling Facilitator** (`@event-modeling-facilitator`) | Leads the workshop, maintains flow, keeps slices small, and turns discussions into usable artifacts | *"What's the next event on the timeline, and what command or screen triggered it?"* |
 | **Domain Expert** | **Product Owner** (`@product-owner`) | Owns the business language; corrects event names, validates workflows against real e-commerce practices, challenges assumptions | *"That's not how returns work — the customer chooses refund vs. exchange before we inspect."* |
 | **Technical Voice** | **Principal Architect** (`@principal-architect`) | Thinks in implementation; flags BC boundaries, aggregate design, query feasibility, technical debt | *"How would we query that view? We'd need a multi-stream projection across Orders and Fulfillment."* |
 | **User Advocate** | **UX Engineer** (`@ux-engineer`) | Grounds the model in the user's experience; asks what the user sees, feels, and needs at each step | *"But why would a customer care about this screen? What decision does it help them make?"* |
 | **Skeptic** | **QA Engineer** (`@qa-engineer`) | Stress-tests the model; asks about failures, edge cases, race conditions, missing compensation | *"What if payment succeeds but inventory reservation fails? Where's the compensation event?"* |
 
-> **Agent definition files:** `.github/agents/principal-architect.md`, `.github/agents/product-owner.md`, `.github/agents/ux-engineer.md`, `.github/agents/qa-engineer.md`
+> **Agent definition files:** `.github/agents/event-modeling-facilitator.md`, `.github/agents/principal-architect.md`, `.github/agents/product-owner.md`, `.github/agents/ux-engineer.md`, `.github/agents/qa-engineer.md`
 
 ### How to Run Multi-Persona Mode
 
@@ -162,11 +163,11 @@ The goal is productive tension — not consensus for its own sake.
 
 | Phase | Primary Voices | Why |
 |---|---|---|
-| **Phase 1 (Brain Dump)** | Product Owner + Principal Architect | PO knows the business events; PSA knows the technical events |
-| **Phase 2 (Storytelling)** | All four — QA Engineer earns their keep here | QA finds gaps in the narrative; UXE maps events to user moments |
+| **Phase 1 (Brain Dump)** | Event Modeling Facilitator + Product Owner + Principal Architect | The facilitator keeps pace and flow; PO knows the business events; PSA knows the technical events |
+| **Phase 2 (Storytelling)** | All five — QA Engineer earns their keep here | The facilitator maintains sequence; QA finds gaps in the narrative; UXE maps events to user moments |
 | **Phase 3 (Storyboarding)** | UX Engineer + Product Owner | UXE designs what users see; PO validates business workflows |
-| **Phase 4 (Slicing)** | Principal Architect + Product Owner | PSA drives technical decomposition; PO prioritizes business value |
-| **Phase 5 (Scenarios)** | QA Engineer + Principal Architect | QAE writes edge cases; PSA validates implementation feasibility |
+| **Phase 4 (Slicing)** | Event Modeling Facilitator + Principal Architect + Product Owner | The facilitator keeps slices crisp; PSA drives technical decomposition; PO prioritizes business value |
+| **Phase 5 (Scenarios)** | Event Modeling Facilitator + QA Engineer + Principal Architect | The facilitator keeps scenarios structured; QAE writes edge cases; PSA validates implementation feasibility |
 
 ---
 
