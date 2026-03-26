@@ -28,8 +28,9 @@ public sealed class GetReturnDetails
         }
 
         // Determine if CS agent can approve/deny based on return status
-        var canApprove = returnDto.Status == "Pending" || returnDto.Status == "AwaitingApproval";
-        var canDeny = returnDto.Status == "Pending" || returnDto.Status == "AwaitingApproval";
+        // Returns BC uses "Requested" (not "Pending" or "AwaitingApproval")
+        var canApprove = returnDto.Status == "Requested";
+        var canDeny = returnDto.Status == "Requested";
 
         // Build composition view
         var view = new ReturnDetailView(

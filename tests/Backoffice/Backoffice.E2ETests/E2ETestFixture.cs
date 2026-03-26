@@ -300,7 +300,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
             WellKnownTestData.Returns.TestReturn,
             WellKnownTestData.Orders.TestOrder,
             WellKnownTestData.Customers.TestCustomer,
-            "Pending",
+            "Requested",
             DateTimeOffset.UtcNow.AddDays(-1));
 
         // Seed low-stock alert

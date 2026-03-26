@@ -148,15 +148,13 @@
                             @context.ReturnType
                         </MudTd>
                         <MudTd DataLabel="Actions">
-                            <MudTooltip Text="Return detail page coming soon">
-                                <MudButton Variant="Variant.Text"
-                                           Color="Color.Secondary"
-                                           Size="Size.Small"
-                                           Disabled="true"
-                                           data-testid="@($"view-return-{context.ReturnId}")">
-                                    View Details
-                                </MudButton>
-                            </MudTooltip>
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Secondary"
+                                       Size="Size.Small"
+                                       Href="@($"/returns/{context.ReturnId}")"
+                                       data-testid="@($"view-return-{context.ReturnId}")">
+                                View Details
+                            </MudButton>
                         </MudTd>
                     </MudTr>
                 </RowTemplate>

@@ -1,0 +1,258 @@
+@page "/orders/{OrderId:guid}"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.SignalR.Client
+@using Backoffice.Web.Auth
+@using Backoffice.Web.Hub
+@attribute [Authorize(Roles = "customer-service,operations-manager,system-admin")]
+@inject BackofficeAuthState AuthState
+@inject BackofficeHubService HubService
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject ILogger<OrderDetail> Logger
+@inject SessionExpiredService SessionExpiredService
+
+<PageTitle>Order Detail — Backoffice</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true" data-testid="page-heading">
+    Order Detail
+</MudText>
+
+<MudButton Variant="Variant.Text"
+           Color="Color.Primary"
+           StartIcon="@Icons.Material.Filled.ArrowBack"
+           Href="/orders/search"
+           Class="mb-4"
+           data-testid="back-to-search-btn">
+    Back to Order Search
+</MudButton>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4"
+                       aria-label="Loading order details"
+                       data-testid="order-loading" />
+}
+
+@if (_notFound)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" data-testid="order-not-found">
+        Order not found. The order ID may be invalid or the order may have been removed.
+    </MudAlert>
+}
+
+@if (_order is not null)
+{
+    @* Order header *@
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Order ID</MudText>
+                <MudText Typo="Typo.body1" data-testid="order-id">
+                    <code>@_order.OrderId.ToString("N")[..8]</code>
+                </MudText>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Customer</MudText>
+                <MudText Typo="Typo.body1" data-testid="customer-email">@_order.CustomerEmail</MudText>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Status</MudText>
+                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_order.Status)"
+                         Variant="Variant.Text" data-testid="order-status">
+                    @_order.Status
+                </MudChip>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Placed At</MudText>
+                <MudText Typo="Typo.body1" data-testid="order-placed-at">
+                    @_order.PlacedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                </MudText>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Total Amount</MudText>
+                <MudText Typo="Typo.body1" data-testid="order-total">
+                    @_order.TotalAmount.ToString("C")
+                </MudText>
+            </MudItem>
+            @if (!string.IsNullOrEmpty(_order.CancellationReason))
+            {
+                <MudItem xs="12">
+                    <MudAlert Severity="Severity.Error" Dense="true" data-testid="cancellation-reason">
+                        <strong>Cancellation Reason:</strong> @_order.CancellationReason
+                    </MudAlert>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudPaper>
+
+    @* Line items *@
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <MudText Typo="Typo.h6" GutterBottom="true">Line Items (@_order.Items.Count)</MudText>
+        <MudTable Items="_order.Items"
+                  Hover="true"
+                  Dense="true"
+                  Striped="true"
+                  Breakpoint="Breakpoint.Sm"
+                  aria-label="Order line items"
+                  data-testid="line-items-table">
+            <HeaderContent>
+                <MudTh>SKU</MudTh>
+                <MudTh>Product</MudTh>
+                <MudTh>Qty</MudTh>
+                <MudTh>Unit Price</MudTh>
+                <MudTh>Line Total</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="SKU"><code>@context.Sku</code></MudTd>
+                <MudTd DataLabel="Product">@context.ProductName</MudTd>
+                <MudTd DataLabel="Qty">@context.Quantity</MudTd>
+                <MudTd DataLabel="Unit Price">@context.UnitPrice.ToString("C")</MudTd>
+                <MudTd DataLabel="Line Total">@context.LineTotal.ToString("C")</MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+
+    @* Returnable items *@
+    @if (_order.IsReturnable && _order.ReturnableItems.Count > 0)
+    {
+        <MudPaper Elevation="2" Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" GutterBottom="true">Returnable Items</MudText>
+            <MudTable Items="_order.ReturnableItems"
+                      Hover="true"
+                      Dense="true"
+                      Striped="true"
+                      Breakpoint="Breakpoint.Sm"
+                      aria-label="Returnable items"
+                      data-testid="returnable-items-table">
+                <HeaderContent>
+                    <MudTh>SKU</MudTh>
+                    <MudTh>Product</MudTh>
+                    <MudTh>Qty</MudTh>
+                    <MudTh>Delivered At</MudTh>
+                    <MudTh>Returnable</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="SKU"><code>@context.Sku</code></MudTd>
+                    <MudTd DataLabel="Product">@context.ProductName</MudTd>
+                    <MudTd DataLabel="Qty">@context.Quantity</MudTd>
+                    <MudTd DataLabel="Delivered At">@context.DeliveredAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
+                    <MudTd DataLabel="Returnable">
+                        @if (context.IsReturnable)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text">Yes</MudChip>
+                        }
+                        else
+                        {
+                            <MudTooltip Text="@(context.IneligibilityReason ?? "Not eligible")">
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Text">No</MudChip>
+                            </MudTooltip>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    }
+}
+
+@code {
+    [Parameter] public Guid OrderId { get; set; }
+
+    private bool _isLoading = true;
+    private bool _notFound;
+    private OrderDetailDto? _order;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HubService.State != HubConnectionState.Connected)
+        {
+            await HubService.ConnectAsync();
+        }
+
+        await LoadOrderAsync();
+    }
+
+    private async Task LoadOrderAsync()
+    {
+        _isLoading = true;
+        _notFound = false;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.GetAsync($"/api/backoffice/orders/{OrderId}");
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _notFound = true;
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                _order = await response.Content.ReadFromJsonAsync<OrderDetailDto>();
+            }
+            else
+            {
+                Snackbar.Add("Failed to load order details. Please try again.", Severity.Error);
+                Logger.LogWarning("Load order detail failed with status {StatusCode}", response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception loading order detail for {OrderId}", OrderId);
+            Snackbar.Add("Failed to load order details. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private Color GetStatusColor(string status) => status.ToLowerInvariant() switch
+    {
+        "pending" => Color.Warning,
+        "confirmed" => Color.Info,
+        "shipped" => Color.Primary,
+        "delivered" => Color.Success,
+        "cancelled" => Color.Error,
+        _ => Color.Default
+    };
+
+    // Local DTOs (Blazor WASM pattern: cannot reference domain projects directly)
+    private sealed record OrderDetailDto(
+        Guid OrderId,
+        Guid CustomerId,
+        string CustomerEmail,
+        DateTime PlacedAt,
+        string Status,
+        decimal TotalAmount,
+        IReadOnlyList<OrderLineItemDto> Items,
+        string? CancellationReason,
+        bool IsReturnable,
+        IReadOnlyList<ReturnableItemDto> ReturnableItems);
+
+    private sealed record OrderLineItemDto(
+        string Sku,
+        string ProductName,
+        int Quantity,
+        decimal UnitPrice,
+        decimal LineTotal);
+
+    private sealed record ReturnableItemDto(
+        string Sku,
+        string ProductName,
+        int Quantity,
+        DateTime DeliveredAt,
+        bool IsReturnable,
+        string? IneligibilityReason);
+}

@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M34.0 — Experience Completion + Vocabulary Alignment |
-| **Status** | 🟡 **IN PROGRESS** — S1-S4 + B1 complete; trace filename fix + MudSelect validation fix applied; S5 gate pending CI |
+| **Status** | 🟡 **IN PROGRESS** — S1-S5 + B1 + F1 + F2 complete; CI verification pending |
 | **Recent Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
 | **Previous Completion** | M32.4 — Backoffice Phase 4 E2E Stabilization (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-25 (M34.0 Session 1: trace filename sanitization + VP submit button fix; targeting VP 12/12)*
+*Last Updated: 2026-03-26 (M34.0 Session 2: F1 experience completion + F2 vocabulary alignment)*
 
 ---
 
@@ -55,8 +55,21 @@
 
 ### 📋 M34.0: Experience Completion + Vocabulary Alignment
 
-**Status:** 🟡 **IN PROGRESS** — S1-S4 + B1 complete; S5 gate pending CI verification
+**Status:** 🟡 **IN PROGRESS** — S1-S5 complete, B1+F1+F2 complete; CI verification pending
 **Goal:** Restore trustworthy test signal first, then complete already-supported user experiences and align vocabulary across BC boundaries
+
+**Session 2 Progress (2026-03-26):**
+- ✅ **S5 (Gate):** Confirmed all E2E tests green on main (Run #313): all 6 CI jobs passed.
+- ✅ **F1 (NavMenu):** Enabled 4 disabled nav items with correct routes: `/warehouse`→`/inventory`, `/pricing`→`/products`, `/products` enabled, `/admin/users`→`/users`.
+- ✅ **F1 (OrderDetail):** Created OrderDetail.razor at `/orders/{orderId}` wired to existing `GetOrderDetailView` API endpoint. Displays order header, line items, returnable items, cancellation reason. Back-navigation to Order Search.
+- ✅ **F1 (ReturnDetail):** Created ReturnDetail.razor at `/returns/{returnId}` with full approve/deny workflow wired to existing `ApproveReturn`/`DenyReturn` API endpoints. Deny requires reason input via dialog.
+- ✅ **F1 (View Details buttons):** Enabled "View Details" buttons in OrderSearch and ReturnManagement that were previously disabled with "coming soon" tooltips.
+- ✅ **F1 (E2E tests):** Created ReturnDetailPage and OrderDetailPage page objects. Added 3 new ReturnManagement.feature scenarios: detail navigation, approve, deny.
+- ✅ **F1 (Finding — not architecturally supported):** CustomerSearch "View Details" button requires a GET-by-ID endpoint that doesn't exist (only email search). Flagged as deferred — needs new backend surface area.
+- ✅ **F2 (Critical bug fix):** GetReturnDetails.cs `canApprove`/`canDeny` checked for "Pending"/"AwaitingApproval" but domain model uses "Requested". Approve/deny buttons would never display. Fixed to check "Requested".
+- ✅ **F2 (NavMenu vocabulary):** "Warehouse Tools" → "Inventory Management" to match InventoryList.razor page heading.
+- ✅ **F2 (Test vocabulary):** Fixed "Pending" → "Requested" in 3 integration tests, 2 E2E feature scenarios, 1 step definition, and 1 E2E test fixture seed method.
+- ✅ **Suite health:** Backoffice.UnitTests 21/21, Backoffice.Api.IntegrationTests 91/91 — all pass.
 
 **Session 1 Progress (2026-03-25):**
 - ✅ **S1 (Bootstrap fix):** BackofficeIdentity.Api EF Core connection string resolved lazily inside `AddDbContext` delegate (matching VendorIdentity.Api pattern). `UseEnvironment("Development")` added to test fixture. Root cause: eager capture of connection string before `ConfigureAppConfiguration` overrides.

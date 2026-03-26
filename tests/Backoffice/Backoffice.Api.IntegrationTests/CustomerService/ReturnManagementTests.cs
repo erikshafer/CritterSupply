@@ -30,7 +30,7 @@ public class ReturnManagementTests
             Id: returnId,
             OrderId: orderId,
             RequestedAt: DateTime.UtcNow.AddDays(-2),
-            Status: "Pending",
+            Status: "Requested",
             ReturnType: "Refund",
             Reason: "Product damaged",
             Items: new List<ReturnItemDto>
@@ -50,7 +50,7 @@ public class ReturnManagementTests
         result.ShouldNotBeNull();
         result.ReturnId.ShouldBe(returnId);
         result.OrderId.ShouldBe(orderId);
-        result.Status.ShouldBe("Pending");
+        result.Status.ShouldBe("Requested");
         result.ReturnType.ShouldBe("Refund");
         result.Reason.ShouldBe("Product damaged");
         result.Items.Count.ShouldBe(1);
@@ -117,7 +117,7 @@ public class ReturnManagementTests
             Id: returnId,
             OrderId: Guid.NewGuid(),
             RequestedAt: DateTime.UtcNow.AddDays(-1),
-            Status: "Pending",
+            Status: "Requested",
             ReturnType: "Refund",
             Reason: "Defective product",
             Items: new List<ReturnItemDto> { new("SKU789", "Dog Toy", 1, "Damaged") },
@@ -147,7 +147,7 @@ public class ReturnManagementTests
             Id: returnId,
             OrderId: Guid.NewGuid(),
             RequestedAt: DateTime.UtcNow.AddDays(-35),
-            Status: "Pending",
+            Status: "Requested",
             ReturnType: "Refund",
             Reason: "Too late",
             Items: new List<ReturnItemDto> { new("SKU999", "Bird Seed", 3, "Unused") },

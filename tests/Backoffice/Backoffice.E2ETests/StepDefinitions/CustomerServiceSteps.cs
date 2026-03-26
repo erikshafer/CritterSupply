@@ -128,7 +128,7 @@ public sealed class CustomerServiceSteps
                 returnId,
                 orderId,
                 Guid.NewGuid(), // customerId
-                "Pending",
+                "Requested",
                 DateTimeOffset.UtcNow.AddDays(-(i + 1)));
         }
     }

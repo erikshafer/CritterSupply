@@ -98,3 +98,26 @@ Feature: Return Management
     And I click the "Refresh" button
     Then I should see the session expired modal
     And I should not see updated return data
+
+  Scenario: Navigate to return detail page from return list
+    Given 1 return exists with status "Requested" and ID stored as "ReturnId"
+    When I navigate to the "/returns" page
+    And I click View Details on the stored return
+    Then I should be on the return detail page
+    And I should see the page heading "Return Detail"
+    And the return status should be "Requested"
+    And the return reason should be visible
+
+  Scenario: Approve a return from the detail page
+    Given 1 return exists with status "Requested" and ID stored as "ReturnId"
+    When I navigate to the return detail page for the stored return
+    Then I should see the approve button
+    And I should see the deny button
+    When I click the approve button
+    Then the return status should be "Approved"
+
+  Scenario: Deny a return with reason from the detail page
+    Given 1 return exists with status "Requested" and ID stored as "ReturnId"
+    When I navigate to the return detail page for the stored return
+    And I deny the return with reason "Item was used beyond return policy"
+    Then the return status should be "Denied"
