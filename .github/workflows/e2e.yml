@@ -120,6 +120,7 @@ jobs:
             **/bin/Release/
           retention-days: 1
           compression-level: 6
+          include-hidden-files: true
 
   # ─── Storefront E2E Tests ──────────────────────────────────────────────────
   # Blazor Server: Checkout wizard, SignalR real-time updates, protected routes.
