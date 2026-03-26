@@ -284,4 +284,105 @@ public sealed class ReturnManagementSteps
         var isModalVisible = await returnManagementPage.IsSessionExpiredModalVisibleAsync();
         isModalVisible.ShouldBeTrue();
     }
+
+    // --- Return Detail Page Steps ---
+
+    [Given(@"(\d+) return exists with status ""(.*)"" and ID stored as ""(.*)""")]
+    public void GivenReturnExistsWithStatusAndIdStored(int count, string status, string contextKey)
+    {
+        var returnId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+
+        Fixture.StubReturnsClient.AddReturn(
+            returnId,
+            orderId,
+            customerId,
+            status,
+            DateTimeOffset.UtcNow.AddDays(-1),
+            new ReturnItemDto("SKU-001", "Organic Dog Treats", 2, "New"));
+
+        _scenarioContext[ScenarioContextKeys.ReturnId] = returnId;
+    }
+
+    [When(@"I click View Details on the stored return")]
+    public async Task WhenIClickViewDetailsOnTheStoredReturn()
+    {
+        var returnId = _scenarioContext.Get<Guid>(ScenarioContextKeys.ReturnId);
+        var viewDetailsButton = Page.GetByTestId($"view-return-{returnId}");
+
+        await viewDetailsButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        await viewDetailsButton.ClickAsync();
+
+        // Wait for WASM client-side navigation
+        await Page.WaitForURLAsync(
+            url => url.Contains($"/returns/{returnId}"),
+            new() { Timeout = 5_000, WaitUntil = WaitUntilState.Commit });
+
+        var returnDetailPage = new ReturnDetailPage(Page, Fixture.WasmBaseUrl);
+        await returnDetailPage.WaitForPageLoadedAsync();
+    }
+
+    [When(@"I navigate to the return detail page for the stored return")]
+    public async Task WhenINavigateToTheReturnDetailPageForTheStoredReturn()
+    {
+        var returnId = _scenarioContext.Get<Guid>(ScenarioContextKeys.ReturnId);
+        var returnDetailPage = new ReturnDetailPage(Page, Fixture.WasmBaseUrl);
+        await returnDetailPage.NavigateAsync(returnId);
+    }
+
+    [Then(@"I should be on the return detail page")]
+    public async Task ThenIShouldBeOnTheReturnDetailPage()
+    {
+        var returnDetailPage = new ReturnDetailPage(Page, Fixture.WasmBaseUrl);
+        var isOnPage = await returnDetailPage.IsOnReturnDetailPageAsync();
+        isOnPage.ShouldBeTrue($"Expected to be on a return detail page, but URL is: {Page.Url}");
+    }
+
+    [Then(@"the return status should be ""(.*)""")]
+    public async Task ThenTheReturnStatusShouldBe(string expectedStatus)
+    {
+        var returnDetailPage = new ReturnDetailPage(Page, Fixture.WasmBaseUrl);
+        var actualStatus = await returnDetailPage.GetReturnStatusAsync();
+        actualStatus.ShouldNotBeNull();
+        actualStatus.ShouldContain(expectedStatus);
+    }
+
+    [Then(@"the return reason should be visible")]
+    public async Task ThenTheReturnReasonShouldBeVisible()
+    {
+        var returnReason = Page.GetByTestId("return-reason");
+        var isVisible = await returnReason.IsVisibleAsync();
+        isVisible.ShouldBeTrue();
+    }
+
+    [Then(@"I should see the approve button")]
+    public async Task ThenIShouldSeeTheApproveButton()
+    {
+        var returnDetailPage = new ReturnDetailPage(Page, Fixture.WasmBaseUrl);
+        var isVisible = await returnDetailPage.IsApproveButtonVisibleAsync();
+        isVisible.ShouldBeTrue();
+    }
+
+    [Then(@"I should see the deny button")]
+    public async Task ThenIShouldSeeTheDenyButton()
+    {
+        var returnDetailPage = new ReturnDetailPage(Page, Fixture.WasmBaseUrl);
+        var isVisible = await returnDetailPage.IsDenyButtonVisibleAsync();
+        isVisible.ShouldBeTrue();
+    }
+
+    [When(@"I click the approve button")]
+    public async Task WhenIClickTheApproveButton()
+    {
+        var returnDetailPage = new ReturnDetailPage(Page, Fixture.WasmBaseUrl);
+        await returnDetailPage.ClickApproveAsync();
+    }
+
+    [When(@"I deny the return with reason ""(.*)""")]
+    public async Task WhenIDenyTheReturnWithReason(string reason)
+    {
+        var returnDetailPage = new ReturnDetailPage(Page, Fixture.WasmBaseUrl);
+        await returnDetailPage.ClickDenyAsync(reason);
+    }
 }
