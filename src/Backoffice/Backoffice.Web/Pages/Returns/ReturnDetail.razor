@@ -1,0 +1,372 @@
+@page "/returns/{ReturnId:guid}"
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.SignalR.Client
+@using Backoffice.Web.Auth
+@using Backoffice.Web.Hub
+@attribute [Authorize(Roles = "customer-service,operations-manager,system-admin")]
+@inject BackofficeAuthState AuthState
+@inject BackofficeHubService HubService
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject ILogger<ReturnDetail> Logger
+@inject SessionExpiredService SessionExpiredService
+
+<PageTitle>Return Detail — Backoffice</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true" data-testid="page-heading">
+    Return Detail
+</MudText>
+
+<MudButton Variant="Variant.Text"
+           Color="Color.Primary"
+           StartIcon="@Icons.Material.Filled.ArrowBack"
+           Href="/returns"
+           Class="mb-4"
+           data-testid="back-to-returns-btn">
+    Back to Return Management
+</MudButton>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4"
+                       aria-label="Loading return details"
+                       data-testid="return-loading" />
+}
+
+@if (_notFound)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" data-testid="return-not-found">
+        Return not found. The return ID may be invalid or the return may have been removed.
+    </MudAlert>
+}
+
+@if (_returnDetail is not null)
+{
+    @* Return header *@
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Return ID</MudText>
+                <MudText Typo="Typo.body1" data-testid="return-id">
+                    <code>@_returnDetail.ReturnId.ToString("N")[..8]</code>
+                </MudText>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Order ID</MudText>
+                <MudText Typo="Typo.body1" data-testid="return-order-id">
+                    <MudLink Href="@($"/orders/{_returnDetail.OrderId}")">
+                        <code>@_returnDetail.OrderId.ToString("N")[..8]</code>
+                    </MudLink>
+                </MudText>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Status</MudText>
+                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(_returnDetail.Status)"
+                         Variant="Variant.Text" data-testid="return-status">
+                    @_returnDetail.Status
+                </MudChip>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Requested At</MudText>
+                <MudText Typo="Typo.body1" data-testid="return-requested-at">
+                    @_returnDetail.RequestedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                </MudText>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Return Type</MudText>
+                <MudText Typo="Typo.body1" data-testid="return-type">@_returnDetail.ReturnType</MudText>
+            </MudItem>
+            <MudItem xs="12">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Reason</MudText>
+                <MudText Typo="Typo.body1" data-testid="return-reason">@_returnDetail.Reason</MudText>
+            </MudItem>
+            @if (!string.IsNullOrEmpty(_returnDetail.InspectionResult))
+            {
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Inspection Result</MudText>
+                    <MudText Typo="Typo.body1" data-testid="inspection-result">@_returnDetail.InspectionResult</MudText>
+                </MudItem>
+            }
+            @if (!string.IsNullOrEmpty(_returnDetail.DenialReason))
+            {
+                <MudItem xs="12">
+                    <MudAlert Severity="Severity.Error" Dense="true" data-testid="denial-reason">
+                        <strong>Denial Reason:</strong> @_returnDetail.DenialReason
+                    </MudAlert>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudPaper>
+
+    @* Return items *@
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <MudText Typo="Typo.h6" GutterBottom="true">Return Items (@_returnDetail.Items.Count)</MudText>
+        <MudTable Items="_returnDetail.Items"
+                  Hover="true"
+                  Dense="true"
+                  Striped="true"
+                  Breakpoint="Breakpoint.Sm"
+                  aria-label="Return items"
+                  data-testid="return-items-table">
+            <HeaderContent>
+                <MudTh>SKU</MudTh>
+                <MudTh>Product</MudTh>
+                <MudTh>Qty</MudTh>
+                <MudTh>Condition</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="SKU"><code>@context.Sku</code></MudTd>
+                <MudTd DataLabel="Product">@context.ProductName</MudTd>
+                <MudTd DataLabel="Qty">@context.Quantity</MudTd>
+                <MudTd DataLabel="Condition">@context.Condition</MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+
+    @* Approve/Deny actions *@
+    @if (_returnDetail.CanApprove || _returnDetail.CanDeny)
+    {
+        <MudPaper Elevation="2" Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" GutterBottom="true">Actions</MudText>
+
+            <div class="d-flex gap-2 align-center flex-wrap">
+                @if (_returnDetail.CanApprove)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               StartIcon="@Icons.Material.Filled.CheckCircle"
+                               OnClick="ApproveReturnAsync"
+                               Disabled="_isProcessing"
+                               data-testid="approve-return-btn">
+                        @if (_isProcessing)
+                        {
+                            <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
+                        }
+                        Approve Return
+                    </MudButton>
+                }
+
+                @if (_returnDetail.CanDeny)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Error"
+                               StartIcon="@Icons.Material.Filled.Cancel"
+                               OnClick="() => _showDenyDialog = true"
+                               Disabled="_isProcessing"
+                               data-testid="deny-return-btn">
+                        Deny Return
+                    </MudButton>
+                }
+            </div>
+        </MudPaper>
+    }
+}
+
+@* Deny dialog *@
+<MudDialog @bind-Visible="_showDenyDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Deny Return</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_denyReason"
+                      Label="Denial Reason"
+                      Variant="Variant.Outlined"
+                      Lines="3"
+                      MaxLength="500"
+                      HelperText="Required — provide the reason for denying this return (max 500 characters)"
+                      data-testid="deny-reason-input" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showDenyDialog = false" data-testid="cancel-deny-btn">Cancel</MudButton>
+        <MudButton Color="Color.Error"
+                   Variant="Variant.Filled"
+                   OnClick="DenyReturnAsync"
+                   Disabled="@(string.IsNullOrWhiteSpace(_denyReason) || _isProcessing)"
+                   data-testid="confirm-deny-btn">
+            Confirm Deny
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid ReturnId { get; set; }
+
+    private bool _isLoading = true;
+    private bool _notFound;
+    private bool _isProcessing;
+    private bool _showDenyDialog;
+    private string _denyReason = string.Empty;
+    private ReturnDetailDto? _returnDetail;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HubService.State != HubConnectionState.Connected)
+        {
+            await HubService.ConnectAsync();
+        }
+
+        await LoadReturnAsync();
+    }
+
+    private async Task LoadReturnAsync()
+    {
+        _isLoading = true;
+        _notFound = false;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.GetAsync($"/api/backoffice/returns/{ReturnId}");
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _notFound = true;
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                _returnDetail = await response.Content.ReadFromJsonAsync<ReturnDetailDto>();
+            }
+            else
+            {
+                Snackbar.Add("Failed to load return details. Please try again.", Severity.Error);
+                Logger.LogWarning("Load return detail failed with status {StatusCode}", response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception loading return detail for {ReturnId}", ReturnId);
+            Snackbar.Add("Failed to load return details. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ApproveReturnAsync()
+    {
+        _isProcessing = true;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.PostAsync($"/api/backoffice/returns/{ReturnId}/approve", null);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Return approved successfully.", Severity.Success);
+                await LoadReturnAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to approve return. Please try again.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception approving return {ReturnId}", ReturnId);
+            Snackbar.Add("Failed to approve return. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task DenyReturnAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_denyReason))
+            return;
+
+        _isProcessing = true;
+        _showDenyDialog = false;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var content = JsonContent.Create(new { Reason = _denyReason });
+            var response = await client.PostAsync($"/api/backoffice/returns/{ReturnId}/deny", content);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Return denied.", Severity.Info);
+                _denyReason = string.Empty;
+                await LoadReturnAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to deny return. Please try again.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception denying return {ReturnId}", ReturnId);
+            Snackbar.Add("Failed to deny return. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private Color GetStatusColor(string status) => status.ToLowerInvariant() switch
+    {
+        "pending" or "requested" => Color.Warning,
+        "approved" or "received" => Color.Info,
+        "intransit" => Color.Primary,
+        "completed" => Color.Success,
+        "denied" or "expired" => Color.Error,
+        _ => Color.Default
+    };
+
+    // Local DTOs (Blazor WASM pattern: cannot reference domain projects directly)
+    private sealed record ReturnDetailDto(
+        Guid ReturnId,
+        Guid OrderId,
+        Guid CustomerId,
+        DateTime RequestedAt,
+        string Status,
+        string ReturnType,
+        string Reason,
+        IReadOnlyList<ReturnItemDto> Items,
+        string? InspectionResult,
+        string? DenialReason,
+        bool CanApprove,
+        bool CanDeny);
+
+    private sealed record ReturnItemDto(
+        string Sku,
+        string ProductName,
+        int Quantity,
+        string Condition);
+}
