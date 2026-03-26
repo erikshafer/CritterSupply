@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M34.0 — Experience Completion + Vocabulary Alignment |
-| **Status** | 🟡 **IN PROGRESS** — S1-S5 + B1 + F1 + F2 complete; CI verification pending |
+| **Status** | ✅ **COMPLETE** — All tracks delivered; CI verified green (Run #320) |
 | **Recent Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
 | **Previous Completion** | M32.4 — Backoffice Phase 4 E2E Stabilization (2026-03-21) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-26 (M34.0 Session 2: F1 experience completion + F2 vocabulary alignment)*
+*Last Updated: 2026-03-26 (M34.0 Session 3: CI verification, homepage completion, label drift resolution)*
 
 ---
 
@@ -55,8 +55,16 @@
 
 ### 📋 M34.0: Experience Completion + Vocabulary Alignment
 
-**Status:** 🟡 **IN PROGRESS** — S1-S5 complete, B1+F1+F2 complete; CI verification pending
+**Status:** ✅ **COMPLETE** — All tracks delivered; CI verified green (Run #320)
 **Goal:** Restore trustworthy test signal first, then complete already-supported user experiences and align vocabulary across BC boundaries
+
+**Session 3 Progress (2026-03-26):**
+- ✅ **CI verification:** E2E Run #320 green (all 6 jobs), CI Run #750 green, CodeQL Run #323 green. Full suite baseline confirmed.
+- ✅ **F1 (Homepage completion):** Fixed Index.razor — added `Href` links to Customer Search (`/customers/search`), Executive Dashboard (`/dashboard`), and Operations Alerts (`/alerts`). Removed stale "(Coming in Session 7)" text. Removed stale M32.3 alert banner.
+- ✅ **F2 (Homepage vocabulary):** Renamed "Warehouse Admin (Manage Inventory)" → "Inventory Management" on Index.razor to match NavMenu vocabulary.
+- ✅ **Label drift resolution:** Reviewed all 9 open `⚠️ Label Drift Detected` issues (#239, #241-244, #250-253). Root cause: `bc:admin-portal` label exists in repo but not in `01-labels.sh`. Four other reported labels (`bc:notifications`, `bc:pricing`, `bc:promotions`, `bc:vendor-identity`) were already defined — issues are workflow artifacts. Added `bc:admin-portal` as documented legacy alias and `bc:correspondence` (ADR 0030 rename) and `bc:backoffice-identity` to `01-labels.sh`.
+- ✅ **Workflow fix:** Removed `issues` event trigger from `validate-labels.yml` — label drift detection is a repo-level concern that should only run on schedule/dispatch, not per-issue (prevented duplicate issue creation feedback loop).
+- ✅ **F1 findings (deferred):** CustomerSearch "View Details" still disabled — requires new `GET /api/backoffice/customers/{customerId}` endpoint (new backend surface area, deferred per guard rails). Vendor Portal "Team management" button still disabled — not architecturally supported.
 
 **Session 2 Progress (2026-03-26):**
 - ✅ **S5 (Gate):** Confirmed all E2E tests green on main (Run #313): all 6 CI jobs passed.
@@ -80,14 +88,14 @@
 - ✅ **Pre-existing fix:** Added missing `MudPopoverProvider` to `VendorPortal.Web/App.razor`. The Submit Change Request page uses `MudSelect` which requires this provider — without it, the `blazor-error-ui` overlay blocks all button clicks. This was a pre-existing bug (same 2 tests failed on main run #302).
 - ✅ **CI fix (Run #307):** Sanitized Playwright trace filenames across all 3 E2E suites — removes `"`, `:`, `<`, `>`, `|`, `*`, `?` characters that cause GitHub Actions artifact upload failures.
 - ✅ **CI fix (Run #307):** Removed `Required="true"` from `MudSelect` in SubmitChangeRequest.razor — field always has a default value ("Description"), so `Required` validation prevented `MudForm.IsValid` from becoming `true`, keeping the submit button permanently disabled.
-- ⏳ **S5 (Gate):** CI verification pending — targeting 12/12 Vendor Portal E2E, Backoffice E2E trace upload working.
+- ✅ **S5 (Gate):** CI verified green — Run #320 (E2E all 6 jobs passed), Run #750 (CI), Run #323 (CodeQL).
 
-**CI Comparison (main → Session 1):**
-| Suite | Run #302 (main) | Run #307 (post-MudPopover) | Expected (post all fixes) |
-|-------|-----------------|----------------------------|---------------------------|
+**CI Comparison (main → Session 1 → Session 3 final):**
+| Suite | Run #302 (main) | Run #307 (post-MudPopover) | Run #320 (final) |
+|-------|-----------------|----------------------------|-------------------|
 | Storefront E2E | ✅ 7/7 | ✅ 7/7 | ✅ 7/7 |
-| Vendor Portal E2E | ⚠️ 9/12 | ⚠️ 11/12 | 🎯 12/12 |
-| Backoffice E2E | ❌ 0/111 (bootstrap) | ❌ trace upload failure | 🎯 trace upload working |
+| Vendor Portal E2E | ⚠️ 9/12 | ⚠️ 11/12 | ✅ 12/12 |
+| Backoffice E2E | ❌ 0/111 (bootstrap) | ❌ trace upload failure | ✅ All passing |
 
 **Planned Tracks (sequenced):**
 - **Track A:** Stabilization (1-2 sessions) — Backoffice E2E bootstrap, inventory, selector/route cleanup, false-positive audit
