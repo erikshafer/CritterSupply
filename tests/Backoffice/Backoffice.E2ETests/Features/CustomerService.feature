@@ -40,7 +40,7 @@ Feature: Customer Service Workflows
   Scenario: Approve a pending return request
     Given customer "John Doe" exists with email "john.doe@example.com"
     And customer has order "{OrderId1}" with status "Delivered"
-    And customer has return request "{ReturnId1}" for order "{OrderId1}" with status "Pending"
+    And customer has return request "{ReturnId1}" for order "{OrderId1}" with status "Requested"
     When I search for customer by email "john.doe@example.com"
     And I view return request "{ReturnId1}"
     And I approve the return request
@@ -50,7 +50,7 @@ Feature: Customer Service Workflows
   Scenario: Deny a return request with reason
     Given customer "John Doe" exists with email "john.doe@example.com"
     And customer has order "{OrderId1}" with status "Delivered"
-    And customer has return request "{ReturnId1}" for order "{OrderId1}" with status "Pending"
+    And customer has return request "{ReturnId1}" for order "{OrderId1}" with status "Requested"
     When I search for customer by email "john.doe@example.com"
     And I view return request "{ReturnId1}"
     And I deny the return request with reason "Product was damaged by customer"
