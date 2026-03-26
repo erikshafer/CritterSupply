@@ -8,9 +8,6 @@ on:
     # Run daily at 8 AM UTC
     - cron: '0 8 * * *'
   
-  issues:
-    types: [opened, labeled, unlabeled]
-  
   workflow_dispatch:
 
 jobs:

@@ -16,26 +16,26 @@
 
     <MudList T="string">
         <AuthorizeView Policy="CustomerService">
-            <MudListItem T="string" Icon="@Icons.Material.Filled.Search">
-                Customer Search (Coming in Session 7)
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Search" Href="/customers/search">
+                Customer Search
             </MudListItem>
         </AuthorizeView>
 
         <AuthorizeView Policy="Executive">
-            <MudListItem T="string" Icon="@Icons.Material.Filled.Dashboard">
-                Executive Dashboard (Coming in Session 7)
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Dashboard" Href="/dashboard">
+                Executive Dashboard
             </MudListItem>
         </AuthorizeView>
 
         <AuthorizeView Policy="OperationsManager">
-            <MudListItem T="string" Icon="@Icons.Material.Filled.Notifications">
-                Operations Alerts (Coming in Session 7)
+            <MudListItem T="string" Icon="@Icons.Material.Filled.Notifications" Href="/alerts">
+                Operations Alerts
             </MudListItem>
         </AuthorizeView>
 
         <AuthorizeView Policy="WarehouseClerk">
             <MudListItem T="string" Icon="@Icons.Material.Filled.Warehouse" Href="/inventory">
-                Warehouse Admin (Manage Inventory)
+                Inventory Management
             </MudListItem>
         </AuthorizeView>
 
@@ -65,7 +65,3 @@
     </MudList>
 </MudPaper>
 
-<MudAlert Severity="Severity.Info" Class="mt-4">
-    <strong>M32.3 Session 7:</strong> User Management now available.
-    SystemAdmin role can create users, change roles, reset passwords, and deactivate accounts.
-</MudAlert>
