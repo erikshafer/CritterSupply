@@ -29,6 +29,8 @@ See [docs/ARCHITECTURAL-REVIEW.md](./ARCHITECTURAL-REVIEW.md) for an independent
 
 CritterSupply includes specialized GitHub Copilot agents with domain expertise to assist with development. These agents provide focused feedback from different perspectives to improve code quality, architecture, and business alignment.
 
+> **Considering additional agents?** See [AGENT-EXPANSION-PROPOSAL.md](./AGENT-EXPANSION-PROPOSAL.md) for a gap analysis of the current roster plus six draft agent documents written in GitHub's custom-agent markdown style.
+
 ### Available Agents
 
 #### 👨‍💼 Principal Software Architect
@@ -210,4 +212,4 @@ The agents are designed to help maintain consistency with established patterns w
 
 ---
 
-**Last Updated:** 2026-03-17
+**Last Updated:** 2026-03-26
