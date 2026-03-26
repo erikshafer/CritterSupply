@@ -43,7 +43,7 @@ public sealed class InventoryListPage
         var row = _page.GetByTestId($"inventory-row-{sku}");
         await row.ClickAsync();
         // Wait for navigation to edit page
-        await _page.WaitForURLAsync(url => url.Contains($"/inventory/{sku}/edit"), new() { Timeout = 10_000 });
+        await _page.WaitForURLAsync(url => url.Contains($"/inventory/{sku}/edit"), new() { Timeout = 10_000, WaitUntil = WaitUntilState.Commit });
     }
 
     // Assertions

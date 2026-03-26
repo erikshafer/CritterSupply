@@ -49,7 +49,8 @@ public sealed class AuthenticationSteps
         await logoutButton.ClickAsync();
 
         // Wait for redirect to login page
-        await Page.WaitForURLAsync(url => url.Contains("/login"), new() { Timeout = 5_000 });
+        // Use WaitUntil.Commit — Blazor WASM client-side routing doesn't trigger Load events
+        await Page.WaitForURLAsync(url => url.Contains("/login"), new() { Timeout = 5_000, WaitUntil = WaitUntilState.Commit });
     }
 
     [When(@"I refresh the page")]

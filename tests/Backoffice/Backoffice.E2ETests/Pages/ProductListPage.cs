@@ -44,7 +44,7 @@ public sealed class ProductListPage
         var editButton = _page.GetByTestId($"edit-product-{sku}");
         await editButton.ClickAsync();
         // Wait for navigation to edit page
-        await _page.WaitForURLAsync(url => url.Contains($"/products/{sku}/edit"), new() { Timeout = 10_000 });
+        await _page.WaitForURLAsync(url => url.Contains($"/products/{sku}/edit"), new() { Timeout = 10_000, WaitUntil = WaitUntilState.Commit });
     }
 
     // Assertions

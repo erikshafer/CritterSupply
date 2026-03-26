@@ -74,7 +74,7 @@ public sealed class SessionExpiredPage
         await LogInAgainButton.ClickAsync();
 
         // Wait for navigation to login page
-        await _page.WaitForURLAsync(url => url.Contains("/login"), new() { Timeout = 5_000 });
+        await _page.WaitForURLAsync(url => url.Contains("/login"), new() { Timeout = 5_000, WaitUntil = WaitUntilState.Commit });
     }
 
     public async Task CloseModalAsync()

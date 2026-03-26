@@ -91,7 +91,7 @@ public sealed class UserCreatePage
     {
         await CancelButton.ClickAsync();
         // Wait for navigation back to list
-        await _page.WaitForURLAsync(url => url.Contains("/users") && !url.Contains("/create"), new() { Timeout = 10_000 });
+        await _page.WaitForURLAsync(url => url.Contains("/users") && !url.Contains("/create"), new() { Timeout = 10_000, WaitUntil = WaitUntilState.Commit });
     }
 
     // Assertions - Form State

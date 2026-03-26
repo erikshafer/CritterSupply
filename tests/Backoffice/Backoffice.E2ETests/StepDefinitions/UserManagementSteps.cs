@@ -180,7 +180,7 @@ public sealed class UserManagementSteps
         var createUserButton = Page.GetByTestId("create-user-button");
         await createUserButton.ClickAsync();
         // Wait for navigation
-        await Page.WaitForURLAsync(url => url.Contains("/users/create"), new() { Timeout = 10_000 });
+        await Page.WaitForURLAsync(url => url.Contains("/users/create"), new() { Timeout = 10_000, WaitUntil = WaitUntilState.Commit });
     }
 
     // --- When Steps: User Create Form ---
@@ -249,7 +249,7 @@ public sealed class UserManagementSteps
     {
         await Page.WaitForURLAsync(
             url => url.Contains(expectedUrl),
-            new() { Timeout = timeoutSeconds * 1000 });
+            new() { Timeout = timeoutSeconds * 1000, WaitUntil = WaitUntilState.Commit });
     }
 
     [Then(@"I should be redirected to ""(.*)""")]
@@ -257,7 +257,7 @@ public sealed class UserManagementSteps
     {
         await Page.WaitForURLAsync(
             url => url.Contains(expectedUrl),
-            new() { Timeout = 10_000 });
+            new() { Timeout = 10_000, WaitUntil = WaitUntilState.Commit });
     }
 
     [Then(@"I should still be on ""(.*)""")]
