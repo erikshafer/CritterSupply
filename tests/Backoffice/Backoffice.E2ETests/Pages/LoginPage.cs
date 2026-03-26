@@ -27,7 +27,7 @@ public sealed class LoginPage
     // Actions
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/login");
+        await _page.GotoAsync($"{_baseUrl}/login", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
         // Wait for login form to be interactive (60s timeout for CI where WASM hydration can take 30s+)
         await EmailInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60_000 });

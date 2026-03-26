@@ -1,3 +1,4 @@
+@shard-1
 Feature: Session Expiry and Recovery
   As a Backoffice administrator
   I want to be notified when my session expires

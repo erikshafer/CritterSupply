@@ -1,3 +1,4 @@
+@shard-3
 Feature: Customer Service Workflows
   As a Backoffice customer service representative
   I want to search for customers and manage their orders and returns

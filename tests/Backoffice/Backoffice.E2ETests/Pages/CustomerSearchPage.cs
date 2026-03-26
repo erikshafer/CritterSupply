@@ -41,7 +41,7 @@ public sealed class CustomerSearchPage
     // Actions
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/customers/search");
+        await _page.GotoAsync($"{_baseUrl}/customers/search", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
         // Wait for customer service page to be fully loaded
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);

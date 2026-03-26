@@ -161,7 +161,7 @@ public sealed class UserManagementSteps
             }
         }
 
-        await Page.GotoAsync($"{Fixture.WasmBaseUrl}{url}");
+        await Page.GotoAsync($"{Fixture.WasmBaseUrl}{url}", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
     }
 

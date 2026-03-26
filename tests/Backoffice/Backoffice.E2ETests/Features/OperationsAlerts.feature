@@ -1,3 +1,4 @@
+@shard-2
 Feature: Operations Alert Feed with Real-Time Updates
   As a Backoffice operations manager
   I want to monitor low-stock alerts and acknowledge them

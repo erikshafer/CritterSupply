@@ -25,7 +25,7 @@ public sealed class ProductListPage
     // Actions
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/products");
+        await _page.GotoAsync($"{_baseUrl}/products", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
         // Wait for page to be fully loaded
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);

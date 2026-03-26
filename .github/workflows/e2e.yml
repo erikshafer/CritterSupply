@@ -248,16 +248,32 @@ jobs:
           path: '**/playwright-traces/**/*.zip'
           retention-days: 7
 
-  # ─── Backoffice E2E Tests ──────────────────────────────────────────────────
+  # ─── Backoffice E2E Tests (sharded) ────────────────────────────────────────
   # Blazor WASM: Customer service workflows, order search, return management, pricing admin.
   # Uses real Kestrel (Backoffice.Web + Backoffice.Api + BackofficeIdentity.Api)
   # with TestContainers PostgreSQL.
+  #
+  # 111 scenarios split across 3 parallel shards to keep each under 15 minutes.
+  # Shards are defined by @shard-N Reqnroll tags on feature files:
+  #   shard-1 (auth-session):  Authentication, Authorization, SessionExpiry  (32 scenarios)
+  #   shard-2 (operations):    OperationsAlerts, ReturnManagement, WarehouseAdmin  (43 scenarios)
+  #   shard-3 (admin):         CustomerService, UserManagement, ProductAdmin, PricingAdmin  (36 scenarios)
   backoffice-e2e:
-    name: Backoffice E2E
+    name: Backoffice E2E (${{ matrix.shard-name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard-name: auth-session
+            filter: "Category=shard-1"
+          - shard-name: operations
+            filter: "Category=shard-2"
+          - shard-name: admin
+            filter: "Category=shard-3"
 
     steps:
       - name: Checkout repository
@@ -317,13 +333,14 @@ jobs:
           docker ps
           docker info
 
-      - name: Run Backoffice E2E Tests
+      - name: Run Backoffice E2E Tests (${{ matrix.shard-name }})
         run: |
           dotnet test "tests/Backoffice/Backoffice.E2ETests/Backoffice.E2ETests.csproj" \
             --no-build \
             --configuration Release \
+            --filter "${{ matrix.filter }}" \
             --logger "console;verbosity=normal" \
-            --logger "trx;LogFileName=backoffice-e2e-results.trx" \
+            --logger "trx;LogFileName=backoffice-e2e-${{ matrix.shard-name }}-results.trx" \
             -- -parallel none
         env:
           PLAYWRIGHT_HEADLESS: ${{ github.event.inputs.headless || 'true' }}
@@ -334,7 +351,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: backoffice-e2e-results-${{ github.run_number }}
+          name: backoffice-e2e-${{ matrix.shard-name }}-results-${{ github.run_number }}
           path: '**/TestResults/**/*.trx'
           retention-days: 14
 
@@ -342,6 +359,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: backoffice-playwright-traces-${{ github.run_number }}
+          name: backoffice-playwright-traces-${{ matrix.shard-name }}-${{ github.run_number }}
           path: '**/playwright-traces/**/*.zip'
           retention-days: 7

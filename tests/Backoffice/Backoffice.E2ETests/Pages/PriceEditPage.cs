@@ -37,7 +37,7 @@ public sealed class PriceEditPage
     // Actions
     public async Task NavigateAsync(string sku)
     {
-        await _page.GotoAsync($"{_baseUrl}/products/{sku}/price");
+        await _page.GotoAsync($"{_baseUrl}/products/{sku}/price", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await SkuField.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }

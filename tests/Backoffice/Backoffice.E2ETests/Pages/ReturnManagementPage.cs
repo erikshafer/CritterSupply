@@ -40,7 +40,7 @@ public sealed class ReturnManagementPage
     // Actions - Navigation
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/returns");
+        await _page.GotoAsync($"{_baseUrl}/returns", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
         await WaitForPageLoadedAsync();
     }
 

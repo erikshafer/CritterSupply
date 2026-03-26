@@ -37,7 +37,7 @@ public sealed class UserCreatePage
     // Actions
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/users/create");
+        await _page.GotoAsync($"{_baseUrl}/users/create", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
         // Wait for page to be fully loaded
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);

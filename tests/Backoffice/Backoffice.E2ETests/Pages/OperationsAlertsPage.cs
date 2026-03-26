@@ -44,7 +44,7 @@ public sealed class OperationsAlertsPage
     // Actions - Navigation
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/alerts");
+        await _page.GotoAsync($"{_baseUrl}/alerts", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
         // Wait for alerts feed to be fully loaded
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);

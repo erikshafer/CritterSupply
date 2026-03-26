@@ -46,7 +46,7 @@ public sealed class UserEditPage
     // Actions - Navigation
     public async Task NavigateAsync(Guid userId)
     {
-        await _page.GotoAsync($"{_baseUrl}/users/{userId}/edit");
+        await _page.GotoAsync($"{_baseUrl}/users/{userId}/edit", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
         // Wait for page to be fully loaded
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);

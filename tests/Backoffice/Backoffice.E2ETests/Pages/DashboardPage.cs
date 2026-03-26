@@ -40,7 +40,7 @@ public sealed class DashboardPage
     // Actions
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/dashboard");
+        await _page.GotoAsync($"{_baseUrl}/dashboard", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
         // Wait for dashboard to be fully loaded (MudBlazor hydration + KPI cards rendered)
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);

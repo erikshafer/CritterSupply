@@ -75,7 +75,7 @@ public sealed class ReturnManagementSteps
         }
         else
         {
-            await Page.GotoAsync($"{Fixture.WasmBaseUrl}{pagePath}");
+            await Page.GotoAsync($"{Fixture.WasmBaseUrl}{pagePath}", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
             await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         }
     }

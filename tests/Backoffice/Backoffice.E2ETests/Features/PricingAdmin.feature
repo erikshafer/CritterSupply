@@ -1,3 +1,4 @@
+@shard-3
 Feature: Pricing Admin
   As a Pricing Manager
   I want to manage product prices

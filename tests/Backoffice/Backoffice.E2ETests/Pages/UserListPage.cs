@@ -26,7 +26,7 @@ public sealed class UserListPage
     // Actions
     public async Task NavigateAsync()
     {
-        await _page.GotoAsync($"{_baseUrl}/users");
+        await _page.GotoAsync($"{_baseUrl}/users", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
 
         // Wait for page to be fully loaded
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);

@@ -66,7 +66,7 @@ public sealed class AuthorizationSteps
     [When(@"I attempt to navigate directly to ""(.*)""")]
     public async Task WhenIAttemptToNavigateDirectlyTo(string path)
     {
-        await Page.GotoAsync($"{Fixture.WasmBaseUrl}{path}");
+        await Page.GotoAsync($"{Fixture.WasmBaseUrl}{path}", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
     }
 
