@@ -21,7 +21,7 @@ public sealed class AddProductTests : IAsyncLifetime
     public async Task CanAddNewProduct()
     {
         // Arrange
-        var command = new AddProduct(
+        var command = new CreateProduct(
             "TEST-SKU-001",
             "Test Product Name",
             "This is a test product description",
@@ -52,7 +52,7 @@ public sealed class AddProductTests : IAsyncLifetime
     public async Task AddProduct_RejectsInvalidSku()
     {
         // Arrange - lowercase SKU (violates uppercase constraint)
-        var command = new AddProduct(
+        var command = new CreateProduct(
             "lowercase-sku",
             "Test Product",
             "Description",
@@ -70,7 +70,7 @@ public sealed class AddProductTests : IAsyncLifetime
     public async Task AddProduct_RejectsEmptyName()
     {
         // Arrange
-        var command = new AddProduct(
+        var command = new CreateProduct(
             "VALID-SKU",
             "",
             "Description",
@@ -88,7 +88,7 @@ public sealed class AddProductTests : IAsyncLifetime
     public async Task AddProduct_RejectsNameTooLong()
     {
         // Arrange - 101 characters (exceeds 100 char limit)
-        var command = new AddProduct(
+        var command = new CreateProduct(
             "VALID-SKU",
             new string('A', 101),
             "Description",
@@ -106,7 +106,7 @@ public sealed class AddProductTests : IAsyncLifetime
     public async Task AddProduct_RejectsInvalidCharactersInName()
     {
         // Arrange - @ symbol not allowed
-        var command = new AddProduct(
+        var command = new CreateProduct(
             "VALID-SKU",
             "Product @ Discount",
             "Description",

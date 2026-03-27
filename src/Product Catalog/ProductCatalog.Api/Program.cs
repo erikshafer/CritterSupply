@@ -30,12 +30,18 @@ builder.Services.AddMarten(opts =>
     opts.Connection(connectionString);
     opts.DatabaseSchemaName = "productcatalog"; // Use dedicated schema in shared database
 
-    // Product document configuration
+    // Keep existing Product document for migration reads
     opts.Schema.For<Product>()
         .Index(x => x.Sku)         // Index SKU for queries
         .Index(x => x.Category)    // Index for category queries
         .Index(x => x.Status)      // Index for status filtering
         .SoftDeleted();            // Built-in soft delete support
+
+    // Event-sourced product catalog — CatalogProduct is the write-side aggregate
+    opts.Projections.Snapshot<CatalogProduct>(Marten.Events.Projections.SnapshotLifecycle.Inline);
+
+    // ProductCatalogView is the read model, kept in sync inline with event appends
+    opts.Projections.Add<ProductCatalogViewProjection>(JasperFx.Events.Projections.ProjectionLifecycle.Inline);
 })
     .UseLightweightSessions()
     .IntegrateWithWolverine();
@@ -127,6 +133,12 @@ builder.Host.UseWolverine(opts =>
     // Publish VendorProductAssociated events to the Vendor Portal exchange
     opts.PublishMessage<VendorProductAssociated>()
         .ToRabbitExchange("vendor-portal-product-associated");
+
+    // Publish product lifecycle integration events
+    opts.PublishMessage<ProductAdded>()
+        .ToRabbitExchange("product-catalog-product-added");
+    opts.PublishMessage<ProductDiscontinued>()
+        .ToRabbitExchange("product-catalog-product-discontinued");
 });
 
 // Wolverine HTTP

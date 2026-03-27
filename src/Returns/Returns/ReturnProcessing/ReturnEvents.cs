@@ -10,8 +10,8 @@ public sealed record ReturnLineItem(
     string? Explanation = null);
 
 /// <summary>
-/// Exchange request details for same-SKU returns.
-/// Phase 1: Replacement must cost same or less (no upcharge payment collection).
+/// Exchange request details for replacement items.
+/// Phase 1: Same-SKU, no upcharge. Phase 2: Cross-product with price difference handling.
 /// </summary>
 public sealed record ExchangeRequest(
     string ReplacementSku,
@@ -102,7 +102,7 @@ public sealed record ExchangeApproved(
     DateTimeOffset ApprovedAt);
 
 /// <summary>
-/// Exchange denied (out of stock, outside window, or replacement too expensive).
+/// Exchange denied (out of stock, outside window, etc.).
 /// </summary>
 public sealed record ExchangeDenied(
     Guid ReturnId,
@@ -135,3 +135,57 @@ public sealed record ExchangeRejected(
     Guid ReturnId,
     string FailureReason,
     DateTimeOffset RejectedAt);
+
+// ---------------------------------------------------------------------------
+// Cross-product exchange domain events (Phase 2)
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// Cross-product exchange requested — different SKU replacement.
+/// Extends the standard exchange flow with cross-product capability.
+/// </summary>
+public sealed record CrossProductExchangeRequested(
+    Guid ReturnId,
+    string OriginalSku,
+    string ReplacementSku,
+    decimal OriginalUnitPrice,
+    decimal ReplacementUnitPrice,
+    int Quantity,
+    DateTimeOffset RequestedAt);
+
+/// <summary>
+/// Price difference calculated between original and replacement items.
+/// Positive difference = customer gets refund, negative = customer owes additional payment.
+/// </summary>
+public sealed record ExchangePriceDifferenceCalculated(
+    Guid ReturnId,
+    decimal OriginalTotal,
+    decimal ReplacementTotal,
+    decimal PriceDifference,
+    DateTimeOffset CalculatedAt);
+
+/// <summary>
+/// Additional payment required because replacement costs more than original.
+/// </summary>
+public sealed record ExchangeAdditionalPaymentRequired(
+    Guid ReturnId,
+    decimal AmountDue,
+    DateTimeOffset RequiredAt);
+
+/// <summary>
+/// Customer paid the additional amount for a more expensive replacement.
+/// </summary>
+public sealed record ExchangeAdditionalPaymentCaptured(
+    Guid ReturnId,
+    decimal AmountCaptured,
+    string PaymentReference,
+    DateTimeOffset CapturedAt);
+
+/// <summary>
+/// Partial refund issued because replacement costs less than original.
+/// Issued upon exchange completion (after inspection passes).
+/// </summary>
+public sealed record ExchangePartialRefundIssued(
+    Guid ReturnId,
+    decimal RefundAmount,
+    DateTimeOffset IssuedAt);

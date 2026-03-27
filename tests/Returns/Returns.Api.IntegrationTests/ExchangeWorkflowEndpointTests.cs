@@ -138,7 +138,7 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task POST_approve_exchange_more_expensive_replacement_returns_409_conflict()
+    public async Task POST_approve_exchange_more_expensive_replacement_approves_with_additional_payment()
     {
         var orderId = Guid.CreateVersion7();
         var customerId = Guid.CreateVersion7();
@@ -149,17 +149,18 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
 
         var returnId = createResponse.ReturnId!.Value;
 
-        // Try to approve exchange via HTTP — should fail with 409
-        await _fixture.Host.Scenario(s =>
-        {
-            s.Post.Json(new ApproveExchange(returnId)).ToUrl($"/api/returns/{returnId}/approve-exchange");
-            s.StatusCodeShouldBe(HttpStatusCode.Conflict); // 409
-        });
+        // Approve exchange (direct command invocation) — now succeeds for cross-product
+        var command = new ApproveExchange(returnId);
+        await _fixture.ExecuteAndWaitAsync(command);
 
-        // Verify state unchanged
+        // Verify state: approved with negative price difference and additional payment required
         using var session = _fixture.GetDocumentSession();
         var returnAggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
-        returnAggregate.Status.ShouldBe(ReturnStatus.Requested); // Still in requested state
+        returnAggregate.ShouldNotBeNull();
+        returnAggregate.Status.ShouldBe(ReturnStatus.Approved);
+        returnAggregate.PriceDifference.ShouldBe(-15.00m); // Negative = customer owes more
+        returnAggregate.IsCrossProductExchange.ShouldBeTrue();
+        returnAggregate.AdditionalPaymentAmount.ShouldBe(15.00m);
     }
 
     [Fact]

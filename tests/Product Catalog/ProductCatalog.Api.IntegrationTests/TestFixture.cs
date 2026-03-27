@@ -116,12 +116,13 @@ public class TestFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// Cleans all document data from the database. Use between tests that need isolation.
+    /// Cleans all document and event data from the database. Use between tests that need isolation.
     /// </summary>
     public async Task CleanAllDocumentsAsync()
     {
         var store = GetDocumentStore();
         await store.Advanced.Clean.DeleteAllDocumentsAsync();
+        await store.Advanced.Clean.DeleteAllEventDataAsync();
     }
 
     /// <summary>
