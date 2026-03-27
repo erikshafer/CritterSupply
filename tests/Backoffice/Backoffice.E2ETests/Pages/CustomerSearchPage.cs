@@ -289,4 +289,91 @@ public sealed class CustomerSearchPage
             return false;
         }
     }
+
+    // ─── Customer Detail Flow (Session 2) ─────────────────────────────────
+    // New locators matching actual CustomerSearch.razor data-testid attributes.
+    // Existing locators above are preserved for backward compatibility with
+    // pre-Session-2 step definitions.
+
+    private ILocator SearchInput => _page.GetByTestId("customer-search-input");
+    private ILocator SearchSubmitBtn => _page.GetByTestId("search-btn");
+    private ILocator ResultsTable => _page.GetByTestId("customer-results-table");
+    private ILocator NoSearchResultsAlert => _page.GetByTestId("customer-search-no-results");
+
+    /// <summary>
+    /// Navigates to /customers/search using correct locators (Session 2+).
+    /// </summary>
+    public async Task NavigateToSearchPageAsync()
+    {
+        await _page.GotoAsync($"{_baseUrl}/customers/search", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await SearchInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+    }
+
+    /// <summary>
+    /// Performs a customer search using the correct input/button locators (Session 2+).
+    /// </summary>
+    public async Task PerformSearchAsync(string query)
+    {
+        await SearchInput.FillAsync(query);
+        await SearchSubmitBtn.ClickAsync();
+
+        // Wait for results table or "no results" alert
+        await _page.WaitForSelectorAsync(
+            "[data-testid='customer-results-table'], [data-testid='customer-search-no-results']",
+            new() { Timeout = 10_000 });
+    }
+
+    /// <summary>
+    /// Clicks the "View Details" button for a specific customer in the search results.
+    /// Navigates to the customer detail page.
+    /// </summary>
+    public async Task ClickViewDetailsAsync(Guid customerId)
+    {
+        var viewButton = _page.GetByTestId($"view-customer-{customerId}");
+        await viewButton.ClickAsync();
+
+        await _page.WaitForURLAsync(
+            url => url.Contains($"/customers/{customerId}"),
+            new() { Timeout = 5_000, WaitUntil = WaitUntilState.Commit });
+    }
+
+    /// <summary>
+    /// Checks whether the search results table contains a row with the given name.
+    /// </summary>
+    public async Task<bool> HasSearchResultForNameAsync(string name)
+    {
+        try
+        {
+            await ResultsTable.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            var content = await ResultsTable.TextContentAsync();
+            return content?.Contains(name, StringComparison.OrdinalIgnoreCase) ?? false;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Checks whether the "no search results" alert is visible (Session 2+).
+    /// Uses the data-testid="customer-search-no-results" added in Session 2.
+    /// </summary>
+    public async Task<bool> IsNoSearchResultsFoundAsync()
+    {
+        try
+        {
+            await NoSearchResultsAlert.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public bool IsOnCustomerSearchPage()
+    {
+        return _page.Url.Contains("/customers/search");
+    }
 }

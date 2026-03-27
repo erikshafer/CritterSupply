@@ -74,7 +74,8 @@
 
     @if (_searchResults.TotalCount == 0)
     {
-        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3"
+                  data-testid="customer-search-no-results">
             No customers found matching "@_searchQuery". Try a different search term.
         </MudAlert>
     }

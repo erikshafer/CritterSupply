@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M35.0 — Product Expansion Begins |
-| **Status** | 🚀 **IN PROGRESS** — Session 1 |
+| **Status** | 🚀 **IN PROGRESS** — Session 2 |
 | **Recent Completion** | M34.0 — Experience Completion + Vocabulary Alignment (2026-03-26) |
 | **Previous Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-27 (M35.0 Session 1: CURRENT-CYCLE.md update, CustomerSearch detail page implementation)*
+*Last Updated: 2026-03-27 (M35.0 Session 2: E2E coverage for CustomerDetail page)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 📋 M35.0: Product Expansion Begins
 
-**Status:** 🚀 **IN PROGRESS** — Session 1
+**Status:** 🚀 **IN PROGRESS** — Session 2
 **Goal:** Deliver deferred M34.0 product items (CustomerSearch detail page), then begin product expansion
 
 **Session 1 Progress (2026-03-27):**
@@ -65,12 +65,23 @@
 - ✅ **View Details button:** Enabled previously-disabled button in `CustomerSearch.razor` with navigation to detail page
 - ✅ **Integration tests:** 4 new tests (happy path, not-found, no-orders, with-addresses) — 95/95 Backoffice.Api.IntegrationTests pass
 
+**Session 2 Progress (2026-03-27):**
+- ✅ **E2E page object:** Created `CustomerDetailPage.cs` POM matching actual `data-testid` attributes
+- ✅ **E2E scenarios:** Created `CustomerDetail.feature` with 8 scenarios covering search→detail navigation, customer info display, order history, addresses, back-navigation, order detail navigation, not-found, and empty search results
+- ✅ **Step definitions:** Created `CustomerDetailSteps.cs` with steps for the two-page customer service flow
+- ✅ **POM extension:** Extended `CustomerSearchPage.cs` with new methods using corrected locators (existing methods preserved)
+- ✅ **data-testid fix:** Added `customer-search-no-results` to CustomerSearch.razor empty-results alert
+- ✅ **Test bug classification:** Identified stale POM locators in existing `CustomerSearchPage.cs` (test bug — locators written for aspirational page architecture, not actual implementation)
+- ✅ **Build:** 0 errors, pre-existing warnings unchanged
+- ✅ **Integration tests:** 95/95 Backoffice.Api.IntegrationTests still passing
+
 **Planned Tracks (sequenced):**
 - **Track 1:** Housekeeping — CURRENT-CYCLE.md update, M35.0 plan creation
 - **Track 2:** CustomerSearch detail page (deferred from M34.0) — BFF endpoint, Blazor page, integration tests
 - **Track 3 (future sessions):** Product expansion — Exchange v2, Product Catalog Evolution
 
 **Session 1 Retrospective:** [m35-0-session-1-retrospective.md](./milestones/m35-0-session-1-retrospective.md)
+**Session 2 Retrospective:** [m35-0-session-2-retrospective.md](./milestones/m35-0-session-2-retrospective.md)
 
 **References:**
 - [M35.0 Plan](./milestones/m35-0-plan.md)
