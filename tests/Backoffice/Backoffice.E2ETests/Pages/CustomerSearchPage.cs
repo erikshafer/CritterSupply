@@ -3,8 +3,15 @@ using Microsoft.Playwright;
 namespace Backoffice.E2ETests.Pages;
 
 /// <summary>
-/// Page Object Model for the Backoffice Customer Service view.
-/// Covers customer lookup by email, order history table, return request details.
+/// Page Object Model for the Backoffice Customer Search page.
+/// Covers customer search by name/email/ID and navigation to the customer detail page.
+/// Route: /customers/search
+///
+/// Session 3 fix: Consolidated stale locators (customer-search-email, customer-search-submit,
+/// customer-details-card, order-history-table, return-requests-section) to match actual
+/// CustomerSearch.razor data-testid attributes. Removed methods for inline details, order
+/// history, and return requests — those live on CustomerDetail and ReturnManagement pages.
+/// Classification: test bug (aspirational locators written before pages were implemented).
 /// </summary>
 public sealed class CustomerSearchPage
 {
@@ -17,68 +24,64 @@ public sealed class CustomerSearchPage
         _baseUrl = baseUrl;
     }
 
-    // Locators - Search Form
-    private ILocator EmailSearchInput => _page.GetByTestId("customer-search-email");
-    private ILocator SearchButton => _page.GetByTestId("customer-search-submit");
-    private ILocator SearchLoading => _page.GetByTestId("customer-search-loading");
+    // Locators — match actual CustomerSearch.razor data-testid attributes
+    private ILocator SearchInput => _page.GetByTestId("customer-search-input");
+    private ILocator SearchButton => _page.GetByTestId("search-btn");
     private ILocator NoResultsMessage => _page.GetByTestId("customer-search-no-results");
+    private ILocator ResultsTable => _page.GetByTestId("customer-results-table");
 
-    // Locators - Customer Details
-    private ILocator CustomerCard => _page.GetByTestId("customer-details-card");
-    private ILocator CustomerName => _page.GetByTestId("customer-name");
-    private ILocator CustomerEmail => _page.GetByTestId("customer-email");
-    private ILocator CustomerPhone => _page.GetByTestId("customer-phone");
+    // ─── Navigation ────────────────────────────────────────────────────────
 
-    // Locators - Order History Table
-    private ILocator OrderHistoryTable => _page.GetByTestId("order-history-table");
-    private ILocator OrderHistoryRows => OrderHistoryTable.Locator("tbody tr");
-    private ILocator OrderHistoryEmpty => _page.GetByTestId("order-history-empty");
-
-    // Locators - Return Requests
-    private ILocator ReturnRequestsSection => _page.GetByTestId("return-requests-section");
-    private ILocator ReturnRequestRows => ReturnRequestsSection.Locator("[data-testid^='return-']");
-
-    // Actions
     public async Task NavigateAsync()
     {
         await _page.GotoAsync($"{_baseUrl}/customers/search", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
-
-        // Wait for customer service page to be fully loaded
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await EmailSearchInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await SearchInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
+
+    /// <summary>Alias for <see cref="NavigateAsync"/>.</summary>
+    public Task NavigateToSearchPageAsync() => NavigateAsync();
+
+    // ─── Search ────────────────────────────────────────────────────────────
 
     public async Task SearchByEmailAsync(string email)
     {
-        await EmailSearchInput.FillAsync(email);
+        await SearchInput.FillAsync(email);
         await SearchButton.ClickAsync();
 
-        // Wait for either results or "no results" message
+        // Wait for either results table or "no results" message
         await _page.WaitForSelectorAsync(
-            "[data-testid='customer-details-card'], [data-testid='customer-search-no-results']",
-            new() { Timeout = 10_000 }
-        );
+            "[data-testid='customer-results-table'], [data-testid='customer-search-no-results']",
+            new() { Timeout = 10_000 });
     }
 
-    public async Task SearchByEmailAndWaitForResultsAsync(string email)
+    /// <summary>Alias for <see cref="SearchByEmailAsync"/>.</summary>
+    public Task PerformSearchAsync(string query) => SearchByEmailAsync(query);
+
+    /// <summary>Alias for <see cref="SearchByEmailAsync"/> (used by SessionExpirySteps).</summary>
+    public Task SearchAsync(string email) => SearchByEmailAsync(email);
+
+    // ─── View Details ──────────────────────────────────────────────────────
+
+    public async Task ClickViewDetailsAsync(Guid customerId)
     {
-        await EmailSearchInput.FillAsync(email);
-        await SearchButton.ClickAsync();
+        var viewButton = _page.GetByTestId($"view-customer-{customerId}");
+        await viewButton.ClickAsync();
 
-        // Wait for customer details card to appear
-        await CustomerCard.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
-
-        // Wait for order history table to finish loading (may be empty, but section should be visible)
-        await OrderHistoryTable.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+        await _page.WaitForURLAsync(
+            url => url.Contains($"/customers/{customerId}"),
+            new() { Timeout = 5_000, WaitUntil = WaitUntilState.Commit });
     }
 
-    // Assertions - Customer Details
-    public async Task<bool> IsCustomerFoundAsync()
+    // ─── Assertions ────────────────────────────────────────────────────────
+
+    public async Task<bool> HasSearchResultForNameAsync(string name)
     {
         try
         {
-            await CustomerCard.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
-            return true;
+            await ResultsTable.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            var content = await ResultsTable.TextContentAsync();
+            return content?.Contains(name, StringComparison.OrdinalIgnoreCase) ?? false;
         }
         catch (TimeoutException)
         {
@@ -99,52 +102,11 @@ public sealed class CustomerSearchPage
         }
     }
 
-    public async Task<string?> GetCustomerNameAsync()
-    {
-        if (await IsCustomerFoundAsync())
-        {
-            return await CustomerName.TextContentAsync();
-        }
-        return null;
-    }
-
-    public async Task<string?> GetCustomerEmailAsync()
-    {
-        if (await IsCustomerFoundAsync())
-        {
-            return await CustomerEmail.TextContentAsync();
-        }
-        return null;
-    }
-
-    public async Task<string?> GetCustomerPhoneAsync()
-    {
-        if (await IsCustomerFoundAsync())
-        {
-            return await CustomerPhone.TextContentAsync();
-        }
-        return null;
-    }
-
-    // Assertions - Order History
-    public async Task<int> GetOrderHistoryCountAsync()
+    public async Task<bool> IsNoSearchResultsFoundAsync()
     {
         try
         {
-            await OrderHistoryTable.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
-            return await OrderHistoryRows.CountAsync();
-        }
-        catch (TimeoutException)
-        {
-            return 0;
-        }
-    }
-
-    public async Task<bool> IsOrderHistoryEmptyAsync()
-    {
-        try
-        {
-            await OrderHistoryEmpty.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
+            await NoResultsMessage.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
             return true;
         }
         catch (TimeoutException)
@@ -153,134 +115,23 @@ public sealed class CustomerSearchPage
         }
     }
 
-    public async Task<IReadOnlyList<string>> GetOrderIdsAsync()
-    {
-        var orderIds = new List<string>();
-        var count = await GetOrderHistoryCountAsync();
-
-        for (int i = 0; i < count; i++)
-        {
-            var row = OrderHistoryRows.Nth(i);
-            var orderIdCell = row.Locator("[data-testid='order-id']");
-            var orderId = await orderIdCell.TextContentAsync();
-            if (!string.IsNullOrWhiteSpace(orderId))
-            {
-                orderIds.Add(orderId.Trim());
-            }
-        }
-
-        return orderIds;
-    }
-
-    public async Task ClickOrderAsync(string orderId)
-    {
-        var row = _page.GetByTestId($"order-{orderId}");
-        await row.ClickAsync();
-
-        // Wait for order details modal or navigation
-        await _page.WaitForSelectorAsync(
-            "[data-testid='order-details-modal'], [data-testid='order-details-page']",
-            new() { Timeout = 5_000 }
-        );
-    }
-
-    // Assertions - Return Requests
-    public async Task<int> GetReturnRequestCountAsync()
-    {
-        try
-        {
-            await ReturnRequestsSection.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
-            return await ReturnRequestRows.CountAsync();
-        }
-        catch (TimeoutException)
-        {
-            return 0;
-        }
-    }
-
-    public async Task<IReadOnlyList<string>> GetReturnRequestStatusesAsync()
-    {
-        var statuses = new List<string>();
-        var count = await GetReturnRequestCountAsync();
-
-        for (int i = 0; i < count; i++)
-        {
-            var row = ReturnRequestRows.Nth(i);
-            var statusCell = row.Locator("[data-testid='return-status']");
-            var status = await statusCell.TextContentAsync();
-            if (!string.IsNullOrWhiteSpace(status))
-            {
-                statuses.Add(status.Trim());
-            }
-        }
-
-        return statuses;
-    }
-
-    public async Task ClickReturnRequestAsync(string returnId)
-    {
-        var returnRow = _page.GetByTestId($"return-{returnId}");
-        await returnRow.ClickAsync();
-
-        // Wait for return details modal or navigation
-        await _page.WaitForSelectorAsync(
-            "[data-testid='return-details-modal'], [data-testid='return-details-page']",
-            new() { Timeout = 5_000 }
-        );
-    }
-
-    public async Task ApproveReturnAsync(string returnId)
-    {
-        // Click return to open details
-        await ClickReturnRequestAsync(returnId);
-
-        // Click approve button
-        var approveButton = _page.GetByTestId("return-approve-button");
-        await approveButton.ClickAsync();
-
-        // Wait for confirmation or status change
-        await _page.WaitForSelectorAsync(
-            "[data-testid='return-approved-confirmation'], [data-testid='return-status'][text='Approved']",
-            new() { Timeout = 5_000 }
-        );
-    }
-
-    public async Task DenyReturnAsync(string returnId, string reason)
-    {
-        // Click return to open details
-        await ClickReturnRequestAsync(returnId);
-
-        // Fill denial reason
-        var reasonInput = _page.GetByTestId("return-denial-reason");
-        await reasonInput.FillAsync(reason);
-
-        // Click deny button
-        var denyButton = _page.GetByTestId("return-deny-button");
-        await denyButton.ClickAsync();
-
-        // Wait for confirmation or status change
-        await _page.WaitForSelectorAsync(
-            "[data-testid='return-denied-confirmation'], [data-testid='return-status'][text='Denied']",
-            new() { Timeout = 5_000 }
-        );
-    }
+    // ─── Page State ────────────────────────────────────────────────────────
 
     public async Task<bool> IsOnCustomerServicePageAsync()
     {
         return _page.Url.Contains("/customers/search");
     }
 
-    // SessionExpirySteps support methods
-    public async Task SearchAsync(string email)
+    public bool IsOnCustomerSearchPage()
     {
-        await SearchByEmailAsync(email);
+        return _page.Url.Contains("/customers/search");
     }
 
     public async Task<bool> IsSearchFormVisibleAsync()
     {
         try
         {
-            await EmailSearchInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
+            await SearchInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
             await SearchButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 2_000 });
             return true;
         }
@@ -288,92 +139,5 @@ public sealed class CustomerSearchPage
         {
             return false;
         }
-    }
-
-    // ─── Customer Detail Flow (Session 2) ─────────────────────────────────
-    // New locators matching actual CustomerSearch.razor data-testid attributes.
-    // Existing locators above are preserved for backward compatibility with
-    // pre-Session-2 step definitions.
-
-    private ILocator SearchInput => _page.GetByTestId("customer-search-input");
-    private ILocator SearchSubmitBtn => _page.GetByTestId("search-btn");
-    private ILocator ResultsTable => _page.GetByTestId("customer-results-table");
-    private ILocator NoSearchResultsAlert => _page.GetByTestId("customer-search-no-results");
-
-    /// <summary>
-    /// Navigates to /customers/search using correct locators (Session 2+).
-    /// </summary>
-    public async Task NavigateToSearchPageAsync()
-    {
-        await _page.GotoAsync($"{_baseUrl}/customers/search", new PageGotoOptions { WaitUntil = WaitUntilState.Commit });
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await SearchInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
-    }
-
-    /// <summary>
-    /// Performs a customer search using the correct input/button locators (Session 2+).
-    /// </summary>
-    public async Task PerformSearchAsync(string query)
-    {
-        await SearchInput.FillAsync(query);
-        await SearchSubmitBtn.ClickAsync();
-
-        // Wait for results table or "no results" alert
-        await _page.WaitForSelectorAsync(
-            "[data-testid='customer-results-table'], [data-testid='customer-search-no-results']",
-            new() { Timeout = 10_000 });
-    }
-
-    /// <summary>
-    /// Clicks the "View Details" button for a specific customer in the search results.
-    /// Navigates to the customer detail page.
-    /// </summary>
-    public async Task ClickViewDetailsAsync(Guid customerId)
-    {
-        var viewButton = _page.GetByTestId($"view-customer-{customerId}");
-        await viewButton.ClickAsync();
-
-        await _page.WaitForURLAsync(
-            url => url.Contains($"/customers/{customerId}"),
-            new() { Timeout = 5_000, WaitUntil = WaitUntilState.Commit });
-    }
-
-    /// <summary>
-    /// Checks whether the search results table contains a row with the given name.
-    /// </summary>
-    public async Task<bool> HasSearchResultForNameAsync(string name)
-    {
-        try
-        {
-            await ResultsTable.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
-            var content = await ResultsTable.TextContentAsync();
-            return content?.Contains(name, StringComparison.OrdinalIgnoreCase) ?? false;
-        }
-        catch (TimeoutException)
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Checks whether the "no search results" alert is visible (Session 2+).
-    /// Uses the data-testid="customer-search-no-results" added in Session 2.
-    /// </summary>
-    public async Task<bool> IsNoSearchResultsFoundAsync()
-    {
-        try
-        {
-            await NoSearchResultsAlert.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
-            return true;
-        }
-        catch (TimeoutException)
-        {
-            return false;
-        }
-    }
-
-    public bool IsOnCustomerSearchPage()
-    {
-        return _page.Url.Contains("/customers/search");
     }
 }

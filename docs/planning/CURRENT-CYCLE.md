@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M35.0 — Product Expansion Begins |
-| **Status** | 🚀 **IN PROGRESS** — Session 2 |
+| **Status** | 🚀 **IN PROGRESS** — Session 3 |
 | **Recent Completion** | M34.0 — Experience Completion + Vocabulary Alignment (2026-03-26) |
 | **Previous Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-27 (M35.0 Session 2: E2E coverage for CustomerDetail page)*
+*Last Updated: 2026-03-27 (M35.0 Session 3: Stale locator fix + CustomerService.feature rewrite)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 📋 M35.0: Product Expansion Begins
 
-**Status:** 🚀 **IN PROGRESS** — Session 2
+**Status:** 🚀 **IN PROGRESS** — Session 3
 **Goal:** Deliver deferred M34.0 product items (CustomerSearch detail page), then begin product expansion
 
 **Session 1 Progress (2026-03-27):**
@@ -75,13 +75,23 @@
 - ✅ **Build:** 0 errors, pre-existing warnings unchanged
 - ✅ **Integration tests:** 95/95 Backoffice.Api.IntegrationTests still passing
 
+**Session 3 Progress (2026-03-27):**
+- ✅ **Stale locator fix:** Consolidated `CustomerSearchPage.cs` — replaced stale locators (`customer-search-email`, `customer-search-submit`, `customer-details-card`, `order-history-table`, `return-requests-section`) with correct data-testid values. Removed 15 methods for non-existent inline-details UI.
+- ✅ **CustomerService.feature rewrite:** Rewrote 10 stale scenarios → 6 matching the two-page flow (CustomerSearch → CustomerDetail). Removed 4 scenarios testing non-existent UI (return request approval/denial, inline return requests, pagination).
+- ✅ **CustomerServiceSteps.cs cleanup:** Removed 26 dead step definitions targeting non-existent UI. Kept 3 shared Given steps used by both CustomerService.feature and CustomerDetail.feature.
+- ✅ **Track 3 assessment:** All items remain deferred — require event modeling or Vendor Identity architectural work before implementation.
+- ✅ **Build:** 0 errors, warnings reduced from 36 to 10
+- ✅ **Integration tests:** 95/95 Backoffice.Api.IntegrationTests still passing
+- ✅ **CI:** E2E Run #331, CI Run #760 (action_required — awaiting environment approval for PR). Main baseline: E2E Run #330 (green).
+
 **Planned Tracks (sequenced):**
-- **Track 1:** Housekeeping — CURRENT-CYCLE.md update, M35.0 plan creation
-- **Track 2:** CustomerSearch detail page (deferred from M34.0) — BFF endpoint, Blazor page, integration tests
-- **Track 3 (future sessions):** Product expansion — Exchange v2, Product Catalog Evolution
+- **Track 1:** Housekeeping — CURRENT-CYCLE.md update, M35.0 plan creation ✅
+- **Track 2:** CustomerSearch detail page (deferred from M34.0) — BFF endpoint, Blazor page, integration tests ✅
+- **Track 3 (future sessions):** Product expansion — Exchange v2, Product Catalog Evolution (all items deferred)
 
 **Session 1 Retrospective:** [m35-0-session-1-retrospective.md](./milestones/m35-0-session-1-retrospective.md)
 **Session 2 Retrospective:** [m35-0-session-2-retrospective.md](./milestones/m35-0-session-2-retrospective.md)
+**Session 3 Retrospective:** [m35-0-session-3-retrospective.md](./milestones/m35-0-session-3-retrospective.md)
 
 **References:**
 - [M35.0 Plan](./milestones/m35-0-plan.md)
