@@ -127,4 +127,12 @@ public sealed class ProductCatalogViewProjection : SingleStreamProjection<Produc
         view.IsDeleted = false;
         view.UpdatedAt = e.RestoredAt;
     }
+
+    public void Apply(ProductVendorAssigned e, ProductCatalogView view)
+    {
+        view.VendorTenantId = e.VendorTenantId;
+        view.AssignedBy = e.AssignedBy;
+        view.AssignedAt = e.AssignedAt;
+        view.UpdatedAt = e.AssignedAt;
+    }
 }

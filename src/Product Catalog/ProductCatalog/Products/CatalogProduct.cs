@@ -120,4 +120,12 @@ public sealed class CatalogProduct
         IsDeleted = false;
         UpdatedAt = e.RestoredAt;
     }
+
+    public void Apply(ProductVendorAssigned e)
+    {
+        VendorTenantId = e.VendorTenantId;
+        AssignedBy = e.AssignedBy;
+        AssignedAt = e.AssignedAt;
+        UpdatedAt = e.AssignedAt;
+    }
 }

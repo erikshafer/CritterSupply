@@ -91,3 +91,11 @@ public sealed record ProductSoftDeleted(
 public sealed record ProductRestored(
     Guid ProductId,
     DateTimeOffset RestoredAt);
+
+public sealed record ProductVendorAssigned(
+    Guid ProductId,
+    Guid VendorTenantId,
+    Guid? PreviousVendorTenantId,
+    string AssignedBy,
+    DateTimeOffset AssignedAt,
+    string? ReassignmentNote = null);
