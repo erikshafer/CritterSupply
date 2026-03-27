@@ -57,6 +57,13 @@ public static class ApproveExchangeHandler
                 Status = 500
             };
 
+        if (aggregate.Items.Count == 0)
+            return new ProblemDetails
+            {
+                Detail = "Return has no items.",
+                Status = 500
+            };
+
         return WolverineContinue.NoProblems;
     }
 
