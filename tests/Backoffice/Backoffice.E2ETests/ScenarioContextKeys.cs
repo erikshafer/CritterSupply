@@ -15,4 +15,5 @@ internal static class ScenarioContextKeys
     public const string OrderId = "OrderId";
     public const string ReturnId = "ReturnId";
     public const string AlertId = "AlertId";
+    public const string CustomerId = "CustomerId";
 }
