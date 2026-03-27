@@ -71,6 +71,40 @@ builder.Host.UseWolverine(opts =>
     })
     .AutoProvision()
     .AutoPurgeOnStartup();
+
+    // Publish user lifecycle events to Vendor Portal for team management read models
+    opts.PublishMessage<Messages.Contracts.VendorIdentity.VendorTenantCreated>()
+        .ToRabbitQueue("vendor-portal-tenant-created");
+
+    opts.PublishMessage<Messages.Contracts.VendorIdentity.VendorUserInvited>()
+        .ToRabbitQueue("vendor-portal-user-invited");
+
+    opts.PublishMessage<Messages.Contracts.VendorIdentity.VendorUserActivated>()
+        .ToRabbitQueue("vendor-portal-user-activated");
+
+    opts.PublishMessage<Messages.Contracts.VendorIdentity.VendorUserDeactivated>()
+        .ToRabbitQueue("vendor-portal-user-deactivated");
+
+    opts.PublishMessage<Messages.Contracts.VendorIdentity.VendorUserReactivated>()
+        .ToRabbitQueue("vendor-portal-user-reactivated");
+
+    opts.PublishMessage<Messages.Contracts.VendorIdentity.VendorUserRoleChanged>()
+        .ToRabbitQueue("vendor-portal-user-role-changed");
+
+    opts.PublishMessage<Messages.Contracts.VendorIdentity.VendorUserInvitationResent>()
+        .ToRabbitQueue("vendor-portal-invitation-resent");
+
+    opts.PublishMessage<Messages.Contracts.VendorIdentity.VendorUserInvitationRevoked>()
+        .ToRabbitQueue("vendor-portal-invitation-revoked");
+
+    opts.PublishMessage<Messages.Contracts.VendorIdentity.VendorTenantSuspended>()
+        .ToRabbitQueue("vendor-portal-tenant-suspended");
+
+    opts.PublishMessage<Messages.Contracts.VendorIdentity.VendorTenantTerminated>()
+        .ToRabbitQueue("vendor-portal-tenant-terminated");
+
+    opts.PublishMessage<Messages.Contracts.VendorIdentity.VendorTenantReinstated>()
+        .ToRabbitQueue("vendor-portal-tenant-reinstated");
 });
 
 builder.Services.AddEndpointsApiExplorer();

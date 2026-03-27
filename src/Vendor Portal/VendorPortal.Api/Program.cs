@@ -170,6 +170,28 @@ builder.Host.UseWolverine(opts =>
     // Subscribe to VendorTenantTerminated events for compensation (auto-reject in-flight change requests).
     opts.ListenToRabbitQueue("vendor-portal-tenant-terminated")
         .ProcessInline();
+
+    // Subscribe to Vendor Identity user lifecycle events for team management read models.
+    opts.ListenToRabbitQueue("vendor-portal-user-invited")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-user-activated")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-user-deactivated")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-user-reactivated")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-user-role-changed")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-invitation-resent")
+        .ProcessInline();
+
+    opts.ListenToRabbitQueue("vendor-portal-invitation-revoked")
+        .ProcessInline();
 });
 
 builder.Services.AddEndpointsApiExplorer();
