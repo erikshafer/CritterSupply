@@ -23,6 +23,21 @@ public sealed class CustomerDetailSteps
     private E2ETestFixture Fixture => _scenarioContext.Get<E2ETestFixture>(ScenarioContextKeys.Fixture);
     private IPage Page => _scenarioContext.Get<IPage>(ScenarioContextKeys.Page);
 
+    /// <summary>
+    /// Retrieves the customer ID stored by the "customer {name} exists with email {email}" step.
+    /// Throws a descriptive error if the Given step was not called for this email.
+    /// </summary>
+    private Guid GetCustomerIdForEmail(string email)
+    {
+        var key = $"CustomerId_{email}";
+        if (!_scenarioContext.ContainsKey(key))
+            throw new InvalidOperationException(
+                $"No customer ID found for email '{email}'. " +
+                $"Ensure the Given step 'customer \"...\" exists with email \"{email}\"' was called first.");
+
+        return (Guid)_scenarioContext[key];
+    }
+
     // ─── Navigation Steps ──────────────────────────────────────────────
 
     [When(@"I navigate to the customer search page")]
@@ -42,7 +57,7 @@ public sealed class CustomerDetailSteps
     [When(@"I click view details for customer ""(.*)""")]
     public async Task WhenIClickViewDetailsForCustomer(string email)
     {
-        var customerId = (Guid)_scenarioContext[$"CustomerId_{email}"];
+        var customerId = GetCustomerIdForEmail(email);
         var searchPage = new CustomerSearchPage(Page, Fixture.WasmBaseUrl);
         await searchPage.ClickViewDetailsAsync(customerId);
     }
@@ -74,14 +89,14 @@ public sealed class CustomerDetailSteps
     [Given(@"customer ""(.*)"" has address ""(.*)"" as default")]
     public void GivenCustomerHasAddressAsDefault(string email, string nickname)
     {
-        var customerId = (Guid)_scenarioContext[$"CustomerId_{email}"];
+        var customerId = GetCustomerIdForEmail(email);
         Fixture.StubCustomerIdentityClient.AddAddress(customerId, Guid.NewGuid(), nickname, isDefault: true);
     }
 
     [Given(@"customer ""(.*)"" has address ""(.*)""")]
     public void GivenCustomerHasAddress(string email, string nickname)
     {
-        var customerId = (Guid)_scenarioContext[$"CustomerId_{email}"];
+        var customerId = GetCustomerIdForEmail(email);
         Fixture.StubCustomerIdentityClient.AddAddress(customerId, Guid.NewGuid(), nickname, isDefault: false);
     }
 
