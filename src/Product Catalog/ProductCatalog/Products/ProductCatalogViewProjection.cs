@@ -37,6 +37,7 @@ public sealed class ProductCatalogViewProjection : SingleStreamProjection<Produc
 {
     public ProductCatalogView Create(ProductMigrated e) => new()
     {
+        Id = e.ProductId,
         Sku = e.Sku,
         Name = e.Name,
         Description = e.Description,
@@ -57,6 +58,7 @@ public sealed class ProductCatalogViewProjection : SingleStreamProjection<Produc
 
     public ProductCatalogView Create(ProductCreated e) => new()
     {
+        Id = e.ProductId,
         Sku = e.Sku,
         Name = e.Name,
         Description = e.Description,

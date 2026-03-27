@@ -5,8 +5,9 @@ using Shouldly;
 namespace ProductCatalog.Api.IntegrationTests;
 
 /// <summary>
-/// Local DTO for deserializing the list products response.
-/// Matches the anonymous type returned by ListProductsESHandler.
+/// Test-only DTO for deserializing the list products response.
+/// Mirrors the anonymous type shape returned by ListProductsESHandler.
+/// Must be kept in sync if the handler response shape changes.
 /// </summary>
 public sealed record ProductListResponse(
     IReadOnlyList<ProductCatalogView> Items,
