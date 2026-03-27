@@ -20,16 +20,15 @@ public sealed class GetProductTests : IAsyncLifetime
     [Fact]
     public async Task CanGetProductBySku()
     {
-        // Arrange - Seed test product first
-        var createProduct = Product.Create(
-            "DOG-BOWL-001",
-            "Premium Stainless Steel Dog Bowl",
-            "Stainless steel dog bowl, dishwasher safe",
-            "Dogs");
-
+        // Arrange - Seed via event sourcing so ProductCatalogView is populated
         using (var session = _fixture.GetDocumentSession())
         {
-            session.Store(createProduct);
+            var productId = Guid.NewGuid();
+            session.Events.StartStream<CatalogProduct>(productId, new ProductCreated(
+                ProductId: productId, Sku: "DOG-BOWL-001",
+                Name: "Premium Stainless Steel Dog Bowl",
+                Description: "Stainless steel dog bowl, dishwasher safe",
+                Category: "Dogs", CreatedAt: DateTimeOffset.UtcNow));
             await session.SaveChangesAsync();
         }
 
@@ -41,10 +40,10 @@ public sealed class GetProductTests : IAsyncLifetime
         });
 
         // Assert
-        var result = product.ReadAsJson<Product>();
+        var result = product.ReadAsJson<ProductCatalogView>();
         result.ShouldNotBeNull();
-        result.Sku.Value.ShouldBe("DOG-BOWL-001");
-        result.Name.Value.ShouldBe("Premium Stainless Steel Dog Bowl");
+        result!.Sku.ShouldBe("DOG-BOWL-001");
+        result.Name.ShouldBe("Premium Stainless Steel Dog Bowl");
         result.Status.ShouldBe(ProductStatus.Active);
     }
 
@@ -62,20 +61,20 @@ public sealed class GetProductTests : IAsyncLifetime
     [Fact]
     public async Task GetProduct_ReturnsProductWithImages()
     {
-        // Arrange - Seed test product with images
-        var createProduct = Product.Create(
-            "DOG-BOWL-001",
-            "Premium Stainless Steel Dog Bowl",
-            "Stainless steel dog bowl, dishwasher safe",
-            "Dogs",
-            images: new[]
-            {
-                ProductImage.Create("https://placeholder.com/dog-bowl-001.jpg", "Premium dog bowl image", 0)
-            }.ToList().AsReadOnly());
-
+        // Arrange - Seed via event sourcing with images
         using (var session = _fixture.GetDocumentSession())
         {
-            session.Store(createProduct);
+            var productId = Guid.NewGuid();
+            session.Events.StartStream<CatalogProduct>(productId, new ProductCreated(
+                ProductId: productId, Sku: "DOG-BOWL-001",
+                Name: "Premium Stainless Steel Dog Bowl",
+                Description: "Stainless steel dog bowl, dishwasher safe",
+                Category: "Dogs",
+                Images: new[]
+                {
+                    ProductImage.Create("https://placeholder.com/dog-bowl-001.jpg", "Premium dog bowl image", 0)
+                }.ToList().AsReadOnly(),
+                CreatedAt: DateTimeOffset.UtcNow));
             await session.SaveChangesAsync();
         }
 
@@ -87,8 +86,9 @@ public sealed class GetProductTests : IAsyncLifetime
         });
 
         // Assert
-        var result = product.ReadAsJson<Product>();
-        result.Images.ShouldNotBeEmpty();
+        var result = product.ReadAsJson<ProductCatalogView>();
+        result.ShouldNotBeNull();
+        result!.Images.ShouldNotBeEmpty();
         result.Images[0].Url.ShouldContain("placeholder");
         result.Images[0].AltText.ShouldNotBeNullOrWhiteSpace();
     }
@@ -96,17 +96,17 @@ public sealed class GetProductTests : IAsyncLifetime
     [Fact]
     public async Task GetProduct_ReturnsProductWithDimensions()
     {
-        // Arrange - Seed test product with dimensions
-        var createProduct = Product.Create(
-            "DOG-BOWL-001",
-            "Premium Stainless Steel Dog Bowl",
-            "Stainless steel dog bowl, dishwasher safe",
-            "Dogs",
-            dimensions: ProductDimensions.Create(8.5m, 8.5m, 3.0m, 1.2m));
-
+        // Arrange - Seed via event sourcing with dimensions
         using (var session = _fixture.GetDocumentSession())
         {
-            session.Store(createProduct);
+            var productId = Guid.NewGuid();
+            session.Events.StartStream<CatalogProduct>(productId, new ProductCreated(
+                ProductId: productId, Sku: "DOG-BOWL-001",
+                Name: "Premium Stainless Steel Dog Bowl",
+                Description: "Stainless steel dog bowl, dishwasher safe",
+                Category: "Dogs",
+                Dimensions: ProductDimensions.Create(8.5m, 8.5m, 3.0m, 1.2m),
+                CreatedAt: DateTimeOffset.UtcNow));
             await session.SaveChangesAsync();
         }
 
@@ -118,9 +118,10 @@ public sealed class GetProductTests : IAsyncLifetime
         });
 
         // Assert
-        var result = product.ReadAsJson<Product>();
-        result.Dimensions.ShouldNotBeNull();
-        result.Dimensions.Length.ShouldBeGreaterThan(0);
+        var result = product.ReadAsJson<ProductCatalogView>();
+        result.ShouldNotBeNull();
+        result!.Dimensions.ShouldNotBeNull();
+        result.Dimensions!.Length.ShouldBeGreaterThan(0);
         result.Dimensions.Weight.ShouldBeGreaterThan(0);
     }
 }

@@ -4,6 +4,16 @@ using Shouldly;
 
 namespace ProductCatalog.Api.IntegrationTests;
 
+/// <summary>
+/// Local DTO for deserializing the list products response.
+/// Matches the anonymous type returned by ListProductsESHandler.
+/// </summary>
+public sealed record ProductListResponse(
+    IReadOnlyList<ProductCatalogView> Items,
+    int TotalCount,
+    int Page,
+    int PageSize);
+
 [Collection(IntegrationTestCollection.Name)]
 public sealed class ListProductsTests : IAsyncLifetime
 {
@@ -18,21 +28,25 @@ public sealed class ListProductsTests : IAsyncLifetime
     {
         await _fixture.CleanAllDocumentsAsync();
 
-        // Seed multiple test products for list/filter scenarios
+        // Seed multiple test products via event sourcing so ProductCatalogView is populated
         var products = new[]
         {
-            Product.Create("DOG-BOWL-001", "Premium Stainless Steel Dog Bowl", "Durable dog bowl", "Dogs"),
-            Product.Create("DOG-TOY-ROPE", "Rope Tug Toy", "Interactive rope toy", "Dogs"),
-            Product.Create("CAT-TREE-5FT", "5ft Cat Tree", "Multi-level cat tree", "Cats"),
-            Product.Create("CAT-TOY-MOUSE", "Toy Mouse", "Catnip mouse toy", "Cats"),
-            Product.Create("BIRD-CAGE-LG", "Large Bird Cage", "Spacious bird habitat", "Birds"),
-            Product.Create("FISH-TANK-10G", "10 Gallon Fish Tank", "Glass aquarium", "Fish")
+            ("DOG-BOWL-001", "Premium Stainless Steel Dog Bowl", "Durable dog bowl", "Dogs"),
+            ("DOG-TOY-ROPE", "Rope Tug Toy", "Interactive rope toy", "Dogs"),
+            ("CAT-TREE-5FT", "5ft Cat Tree", "Multi-level cat tree", "Cats"),
+            ("CAT-TOY-MOUSE", "Toy Mouse", "Catnip mouse toy", "Cats"),
+            ("BIRD-CAGE-LG", "Large Bird Cage", "Spacious bird habitat", "Birds"),
+            ("FISH-TANK-10G", "10 Gallon Fish Tank", "Glass aquarium", "Fish")
         };
 
         using var session = _fixture.GetDocumentSession();
-        foreach (var product in products)
+        foreach (var (sku, name, description, category) in products)
         {
-            session.Store(product);
+            var productId = Guid.NewGuid();
+            session.Events.StartStream<CatalogProduct>(productId, new ProductCreated(
+                ProductId: productId, Sku: sku, Name: name,
+                Description: description, Category: category,
+                CreatedAt: DateTimeOffset.UtcNow));
         }
         await session.SaveChangesAsync();
     }
@@ -50,10 +64,10 @@ public sealed class ListProductsTests : IAsyncLifetime
         });
 
         // Assert
-        var result = response.ReadAsJson<ProductListResult>();
+        var result = response.ReadAsJson<ProductListResponse>();
         result.ShouldNotBeNull();
-        result.Products.ShouldNotBeEmpty();
-        result.TotalCount.ShouldBeGreaterThanOrEqualTo(6); // At least the 6 we seeded
+        result!.Items.ShouldNotBeEmpty();
+        result.TotalCount.ShouldBeGreaterThanOrEqualTo(6);
         result.Page.ShouldBe(1);
         result.PageSize.ShouldBe(20);
     }
@@ -69,11 +83,12 @@ public sealed class ListProductsTests : IAsyncLifetime
         });
 
         // Assert
-        var result = response.ReadAsJson<ProductListResult>();
-        result.Page.ShouldBe(1);
+        var result = response.ReadAsJson<ProductListResponse>();
+        result.ShouldNotBeNull();
+        result!.Page.ShouldBe(1);
         result.PageSize.ShouldBe(3);
-        result.Products.Count.ShouldBeLessThanOrEqualTo(3);
-        result.TotalCount.ShouldBeGreaterThanOrEqualTo(6); // Total products seeded
+        result.Items.Count.ShouldBeLessThanOrEqualTo(3);
+        result.TotalCount.ShouldBeGreaterThanOrEqualTo(6);
     }
 
     [Fact]
@@ -87,9 +102,10 @@ public sealed class ListProductsTests : IAsyncLifetime
         });
 
         // Assert
-        var result = response.ReadAsJson<ProductListResult>();
-        result.Products.ShouldNotBeEmpty();
-        result.Products.ShouldAllBe(p => p.Category == "Dogs");
+        var result = response.ReadAsJson<ProductListResponse>();
+        result.ShouldNotBeNull();
+        result!.Items.ShouldNotBeEmpty();
+        result.Items.ShouldAllBe(p => p.Category == "Dogs");
     }
 
     [Fact]
@@ -103,9 +119,10 @@ public sealed class ListProductsTests : IAsyncLifetime
         });
 
         // Assert
-        var result = response.ReadAsJson<ProductListResult>();
-        result.Products.ShouldNotBeEmpty();
-        result.Products.ShouldAllBe(p => p.Status == ProductStatus.Active);
+        var result = response.ReadAsJson<ProductListResponse>();
+        result.ShouldNotBeNull();
+        result!.Items.ShouldNotBeEmpty();
+        result.Items.ShouldAllBe(p => p.Status == ProductStatus.Active);
     }
 
     [Fact]
@@ -119,9 +136,10 @@ public sealed class ListProductsTests : IAsyncLifetime
         });
 
         // Assert
-        var result = response.ReadAsJson<ProductListResult>();
-        result.Products.ShouldNotBeEmpty();
-        result.Products.ShouldAllBe(p => p.Category == "Cats" && p.Status == ProductStatus.Active);
+        var result = response.ReadAsJson<ProductListResponse>();
+        result.ShouldNotBeNull();
+        result!.Items.ShouldNotBeEmpty();
+        result.Items.ShouldAllBe(p => p.Category == "Cats" && p.Status == ProductStatus.Active);
     }
 
     [Fact]
@@ -135,8 +153,9 @@ public sealed class ListProductsTests : IAsyncLifetime
         });
 
         // Assert
-        var result = response.ReadAsJson<ProductListResult>();
-        result.Products.ShouldBeEmpty();
+        var result = response.ReadAsJson<ProductListResponse>();
+        result.ShouldNotBeNull();
+        result!.Items.ShouldBeEmpty();
         result.TotalCount.ShouldBe(0);
     }
 }
