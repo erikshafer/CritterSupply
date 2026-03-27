@@ -26,11 +26,26 @@ public sealed class AssignProductToVendorTests : IAsyncLifetime
     private async Task SeedProductAsync(string sku, ProductStatus status = ProductStatus.Active)
     {
         using var session = _fixture.GetDocumentSession();
-        var product = Product.Create(sku, "Test Product", "A test product description", "Dogs");
-        if (status != ProductStatus.Active)
-            product = product.ChangeStatus(status);
-        session.Store(product);
+        var productId = Guid.NewGuid();
+        session.Events.StartStream<CatalogProduct>(productId, new ProductCreated(
+            ProductId: productId,
+            Sku: sku,
+            Name: "Test Product",
+            Description: "A test product description",
+            Category: "Dogs",
+            CreatedAt: DateTimeOffset.UtcNow));
         await session.SaveChangesAsync();
+
+        if (status != ProductStatus.Active)
+        {
+            session.Events.Append(productId, new ProductStatusChanged(
+                ProductId: productId,
+                PreviousStatus: ProductStatus.Active,
+                NewStatus: status,
+                Reason: null,
+                ChangedAt: DateTimeOffset.UtcNow));
+            await session.SaveChangesAsync();
+        }
     }
 
     // ── GET vendor assignment ──────────────────────────────────────────────
@@ -158,10 +173,12 @@ public sealed class AssignProductToVendorTests : IAsyncLifetime
         response.VendorTenantId.ShouldBe(vendorId);
         response.PreviousVendorTenantId.ShouldBeNull(); // first-time assignment
 
-        // Verify the assignment is also persisted on the Product document
+        // Verify the assignment is persisted via the projection
         using var session = _fixture.GetDocumentSession();
-        var product = await session.LoadAsync<Product>("ASSIGN-SUCCESS-001");
-        product!.VendorTenantId.ShouldBe(vendorId);
+        var view = await session.Query<ProductCatalogView>()
+            .Where(p => p.Sku == "ASSIGN-SUCCESS-001")
+            .FirstOrDefaultAsync();
+        view!.VendorTenantId.ShouldBe(vendorId);
     }
 
     [Fact]
@@ -191,14 +208,16 @@ public sealed class AssignProductToVendorTests : IAsyncLifetime
         response.IsAssigned.ShouldBeTrue();
         response.VendorTenantId.ShouldBe(vendorId);
 
-        // Verify product document still shows original vendor (not a duplicate write)
+        // Verify projection still shows original vendor
         using var session = _fixture.GetDocumentSession();
-        var product = await session.LoadAsync<Product>("IDEMPOTENT-001");
-        product!.VendorTenantId.ShouldBe(vendorId);
+        var view = await session.Query<ProductCatalogView>()
+            .Where(p => p.Sku == "IDEMPOTENT-001")
+            .FirstOrDefaultAsync();
+        view!.VendorTenantId.ShouldBe(vendorId);
     }
 
     [Fact]
-    public async Task AssignProduct_PersistsAssignmentOnProductDocument()
+    public async Task AssignProduct_PersistsAssignmentViaProjection()
     {
         await SeedProductAsync("PERSIST-001");
         var vendorId = Guid.NewGuid();
@@ -210,13 +229,15 @@ public sealed class AssignProductToVendorTests : IAsyncLifetime
             s.StatusCodeShouldBe(200);
         });
 
-        // Verify assignment was stored on the Product document
+        // Verify assignment was stored on the ProductCatalogView projection
         using var session = _fixture.GetDocumentSession();
-        var product = await session.LoadAsync<Product>("PERSIST-001");
-        product.ShouldNotBeNull();
-        product.VendorTenantId.ShouldBe(vendorId);
-        product.AssignedBy.ShouldBe("system");
-        product.AssignedAt.ShouldNotBeNull();
+        var view = await session.Query<ProductCatalogView>()
+            .Where(p => p.Sku == "PERSIST-001")
+            .FirstOrDefaultAsync();
+        view.ShouldNotBeNull();
+        view.VendorTenantId.ShouldBe(vendorId);
+        view.AssignedBy.ShouldBe("system");
+        view.AssignedAt.ShouldNotBeNull();
     }
 
     // ── Bulk assignment ────────────────────────────────────────────────────
