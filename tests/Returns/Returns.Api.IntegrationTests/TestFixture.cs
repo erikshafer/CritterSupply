@@ -1,6 +1,11 @@
+using System.Security.Claims;
+using System.Text.Encodings.Web;
 using JasperFx.CommandLine;
 using Marten;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.Tracking;
@@ -42,6 +47,23 @@ public class TestFixture : IAsyncLifetime
 
                 // Disable external Wolverine transports for testing
                 services.DisableAllExternalWolverineTransports();
+
+                // Replace authentication with test authentication handlers
+                // Register test handlers for each named scheme the authorization policies reference
+                var authServices = services.Where(s =>
+                    s.ServiceType.Namespace == "Microsoft.AspNetCore.Authentication" ||
+                    s.ServiceType.FullName?.Contains("Authentication") == true)
+                    .ToList();
+                foreach (var service in authServices)
+                {
+                    services.Remove(service);
+                }
+
+                services.AddAuthentication("Backoffice")
+                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Backoffice", _ => { })
+                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Vendor", _ => { });
+
+                services.AddAuthorization();
             });
         });
     }
@@ -110,5 +132,38 @@ public class TestFixture : IAsyncLifetime
             {
                 return ctx.InvokeAsync(message);
             });
+    }
+}
+
+/// <summary>
+/// Fake authentication handler for integration tests.
+/// Automatically authenticates with roles satisfying CustomerService, WarehouseClerk,
+/// and OperationsManager authorization policies defined in Returns.Api Program.cs.
+/// </summary>
+internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
+{
+    public TestAuthHandler(
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder)
+        : base(options, logger, encoder)
+    {
+    }
+
+    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+            new Claim(ClaimTypes.Name, "test-user"),
+            new Claim(ClaimTypes.Role, "CustomerService"),
+            new Claim(ClaimTypes.Role, "WarehouseClerk"),
+            new Claim(ClaimTypes.Role, "OperationsManager"),
+            new Claim(ClaimTypes.Role, "SystemAdmin"),
+        };
+        var identity = new ClaimsIdentity(claims, "Test");
+        var principal = new ClaimsPrincipal(identity);
+        var ticket = new AuthenticationTicket(principal, "Test");
+        return Task.FromResult(AuthenticateResult.Success(ticket));
     }
 }
