@@ -116,6 +116,16 @@ builder.Host.UseWolverine(opts =>
     opts.PublishMessage<Messages.Contracts.Returns.ReturnReceived>()
         .ToRabbitQueue("orders-returns-events");
 
+    // === Outbound: Cross-product exchange events to Orders BC ===
+    opts.PublishMessage<Messages.Contracts.Returns.CrossProductExchangeRequested>()
+        .ToRabbitQueue("orders-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ExchangeAdditionalPaymentRequired>()
+        .ToRabbitQueue("orders-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ExchangeAdditionalPaymentCaptured>()
+        .ToRabbitQueue("orders-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ExchangePartialRefundIssued>()
+        .ToRabbitQueue("orders-returns-events");
+
     // === Outbound: Customer Experience BC (Storefront) ===
     // Real-time updates for return status via SignalR
     opts.PublishMessage<Messages.Contracts.Returns.ReturnRequested>()
@@ -131,6 +141,16 @@ builder.Host.UseWolverine(opts =>
     opts.PublishMessage<Messages.Contracts.Returns.ReturnCompleted>()
         .ToRabbitQueue("storefront-returns-events");
     opts.PublishMessage<Messages.Contracts.Returns.ReturnReceived>()
+        .ToRabbitQueue("storefront-returns-events");
+
+    // === Outbound: Cross-product exchange events to Storefront ===
+    opts.PublishMessage<Messages.Contracts.Returns.CrossProductExchangeRequested>()
+        .ToRabbitQueue("storefront-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ExchangeAdditionalPaymentRequired>()
+        .ToRabbitQueue("storefront-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ExchangeAdditionalPaymentCaptured>()
+        .ToRabbitQueue("storefront-returns-events");
+    opts.PublishMessage<Messages.Contracts.Returns.ExchangePartialRefundIssued>()
         .ToRabbitQueue("storefront-returns-events");
 
     // === Outbound: Backoffice BC (M33.0 Session 2) ===

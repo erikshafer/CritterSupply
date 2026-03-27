@@ -162,4 +162,79 @@ public sealed class ExchangeWorkflowTests
 
         result.PriceDifference.ShouldBe(10.00m); // Customer gets $10 refund
     }
+
+    // ---------------------------------------------------------------------------
+    // Cross-product exchange tests (Phase 2)
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void Apply_CrossProductExchangeRequested_marks_cross_product()
+    {
+        var returnAggregate = Return.Create(CreateExchangeRequested(
+            originalSku: "PET-CARRIER-M", replacementSku: "PET-CARRIER-XL"));
+
+        var result = returnAggregate.Apply(new CrossProductExchangeRequested(
+            ReturnId, "PET-CARRIER-M", "PET-CARRIER-XL", 50.00m, 75.00m, 1, DateTimeOffset.UtcNow));
+
+        result.IsCrossProductExchange.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Apply_AdditionalPaymentRequired_sets_amount_due()
+    {
+        var returnAggregate = Return.Create(CreateExchangeRequested(
+            originalPrice: 50.00m, replacementPrice: 75.00m))
+            .Apply(new ExchangeApproved(ReturnId, -25.00m,
+                DateTimeOffset.UtcNow.AddDays(30), DateTimeOffset.UtcNow));
+
+        var result = returnAggregate.Apply(new ExchangeAdditionalPaymentRequired(
+            ReturnId, 25.00m, DateTimeOffset.UtcNow));
+
+        result.AdditionalPaymentAmount.ShouldBe(25.00m);
+        result.AdditionalPaymentCaptured.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Apply_AdditionalPaymentCaptured_sets_payment_captured()
+    {
+        var returnAggregate = Return.Create(CreateExchangeRequested(
+            originalPrice: 50.00m, replacementPrice: 75.00m))
+            .Apply(new ExchangeApproved(ReturnId, -25.00m,
+                DateTimeOffset.UtcNow.AddDays(30), DateTimeOffset.UtcNow))
+            .Apply(new ExchangeAdditionalPaymentRequired(ReturnId, 25.00m, DateTimeOffset.UtcNow));
+
+        var result = returnAggregate.Apply(new ExchangeAdditionalPaymentCaptured(
+            ReturnId, 25.00m, "PAY-REF-123", DateTimeOffset.UtcNow));
+
+        result.AdditionalPaymentCaptured.ShouldBeTrue();
+        result.PaymentReference.ShouldBe("PAY-REF-123");
+    }
+
+    [Fact]
+    public void Apply_PartialRefundIssued_sets_final_refund_amount()
+    {
+        var returnAggregate = Return.Create(CreateExchangeRequested(
+            originalPrice: 50.00m, replacementPrice: 30.00m))
+            .Apply(new ExchangeApproved(ReturnId, 20.00m,
+                DateTimeOffset.UtcNow.AddDays(30), DateTimeOffset.UtcNow));
+
+        var result = returnAggregate.Apply(new ExchangePartialRefundIssued(
+            ReturnId, 20.00m, DateTimeOffset.UtcNow));
+
+        result.FinalRefundAmount.ShouldBe(20.00m);
+    }
+
+    [Fact]
+    public void CrossProductExchange_expensive_replacement_has_negative_price_difference()
+    {
+        var returnAggregate = Return.Create(CreateExchangeRequested(
+            originalPrice: 50.00m, replacementPrice: 75.00m));
+
+        var approved = new ExchangeApproved(ReturnId, -25.00m,
+            DateTimeOffset.UtcNow.AddDays(30), DateTimeOffset.UtcNow);
+
+        var result = returnAggregate.Apply(approved);
+
+        result.PriceDifference.ShouldBe(-25.00m); // Customer owes $25 more
+    }
 }

@@ -4,6 +4,7 @@ namespace Returns.ReturnProcessing;
 /// Event-sourced aggregate representing a customer return request.
 /// Lifecycle: Requested → Approved/Denied → Received → Inspecting → Completed/Rejected/Expired
 /// Exchange Lifecycle: Requested → Approved/Denied → Received → Inspecting → ExchangeShipping → ExchangeCompleted/Rejected
+/// Cross-Product Exchange: Same as Exchange but supports price difference handling (additional payment or partial refund).
 /// </summary>
 public sealed record Return(
     Guid Id,
@@ -23,6 +24,10 @@ public sealed record Return(
     ExchangeRequest? ExchangeRequest,
     string? ReplacementShipmentId,
     decimal? PriceDifference,
+    bool IsCrossProductExchange,
+    decimal? AdditionalPaymentAmount,
+    bool AdditionalPaymentCaptured,
+    string? PaymentReference,
     DateTimeOffset RequestedAt,
     DateTimeOffset? ApprovedAt,
     DateTimeOffset? DeniedAt,
@@ -58,6 +63,10 @@ public sealed record Return(
             ExchangeRequest: @event.ExchangeRequest,
             ReplacementShipmentId: null,
             PriceDifference: null,
+            IsCrossProductExchange: false,
+            AdditionalPaymentAmount: null,
+            AdditionalPaymentCaptured: false,
+            PaymentReference: null,
             RequestedAt: @event.RequestedAt,
             ApprovedAt: null,
             DeniedAt: null,
@@ -176,6 +185,36 @@ public sealed record Return(
     {
         Status = ReturnStatus.Rejected,
         CompletedAt = @event.RejectedAt
+    };
+
+    // ---------------------------------------------------------------------------
+    // Cross-product exchange Apply methods (Phase 2)
+    // ---------------------------------------------------------------------------
+
+    public Return Apply(CrossProductExchangeRequested e) => this with
+    {
+        IsCrossProductExchange = true
+    };
+
+    public Return Apply(ExchangePriceDifferenceCalculated e) => this with
+    {
+        PriceDifference = e.PriceDifference
+    };
+
+    public Return Apply(ExchangeAdditionalPaymentRequired e) => this with
+    {
+        AdditionalPaymentAmount = e.AmountDue
+    };
+
+    public Return Apply(ExchangeAdditionalPaymentCaptured e) => this with
+    {
+        AdditionalPaymentCaptured = true,
+        PaymentReference = e.PaymentReference
+    };
+
+    public Return Apply(ExchangePartialRefundIssued e) => this with
+    {
+        FinalRefundAmount = e.RefundAmount
     };
 
     /// <summary>
