@@ -87,6 +87,14 @@
                             Icon="@Icons.Material.Filled.EditNote">
                     Change Requests
                 </MudNavLink>
+                @if (AuthState.CanManageUsers)
+                {
+                    <MudNavLink Href="/team"
+                                Icon="@Icons.Material.Filled.Group"
+                                data-testid="nav-team-management">
+                        Team Management
+                    </MudNavLink>
+                }
                 <MudNavLink Href="/settings"
                             Icon="@Icons.Material.Filled.Settings">
                     Settings
