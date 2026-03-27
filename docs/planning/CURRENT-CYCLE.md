@@ -41,67 +41,56 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M34.0 — Experience Completion + Vocabulary Alignment |
-| **Status** | ✅ **COMPLETE** — All tracks delivered; CI verified green (Run #320) |
-| **Recent Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
-| **Previous Completion** | M32.4 — Backoffice Phase 4 E2E Stabilization (2026-03-21) |
+| **Current Milestone** | M35.0 — Product Expansion Begins |
+| **Status** | 🚀 **IN PROGRESS** — Session 1 |
+| **Recent Completion** | M34.0 — Experience Completion + Vocabulary Alignment (2026-03-26) |
+| **Previous Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-26 (M34.0 Session 3: CI verification, homepage completion, label drift resolution)*
+*Last Updated: 2026-03-27 (M35.0 Session 1: CURRENT-CYCLE.md update, CustomerSearch detail page implementation)*
 
 ---
 
 ## Active Milestone
 
-### 📋 M34.0: Experience Completion + Vocabulary Alignment
+### 📋 M35.0: Product Expansion Begins
+
+**Status:** 🚀 **IN PROGRESS** — Session 1
+**Goal:** Deliver deferred M34.0 product items (CustomerSearch detail page), then begin product expansion
+
+**Session 1 Progress (2026-03-27):**
+- ✅ **Housekeeping:** Updated CURRENT-CYCLE.md — moved M34.0 to Recent Completions, set M35.0 as active milestone
+- ✅ **Plan:** Created [M35.0 plan](./milestones/m35-0-plan.md) documenting deferred items and Session 1 scope
+- 🚧 **CustomerSearch detail:** Implementing `GET /api/backoffice/customers/{customerId}` BFF endpoint + `CustomerDetail.razor` page
+- 🚧 **View Details button:** Enabling previously-disabled button in `CustomerSearch.razor`
+- 🚧 **Integration tests:** Writing tests for new BFF endpoint
+
+**Planned Tracks (sequenced):**
+- **Track 1:** Housekeeping — CURRENT-CYCLE.md update, M35.0 plan creation
+- **Track 2:** CustomerSearch detail page (deferred from M34.0) — BFF endpoint, Blazor page, integration tests
+- **Track 3 (future sessions):** Product expansion — Exchange v2, Product Catalog Evolution
+
+**References:**
+- [M35.0 Plan](./milestones/m35-0-plan.md)
+- [M34.0 Plan](./milestones/m34-0-plan.md)
+
+---
+
+## Recent Completions
+
+### M34.0: Experience Completion + Vocabulary Alignment
 
 **Status:** ✅ **COMPLETE** — All tracks delivered; CI verified green (Run #320)
 **Goal:** Restore trustworthy test signal first, then complete already-supported user experiences and align vocabulary across BC boundaries
 
-**Session 3 Progress (2026-03-26):**
-- ✅ **CI verification:** E2E Run #320 green (all 6 jobs), CI Run #750 green, CodeQL Run #323 green. Full suite baseline confirmed.
-- ✅ **F1 (Homepage completion):** Fixed Index.razor — added `Href` links to Customer Search (`/customers/search`), Executive Dashboard (`/dashboard`), and Operations Alerts (`/alerts`). Removed stale "(Coming in Session 7)" text. Removed stale M32.3 alert banner.
-- ✅ **F2 (Homepage vocabulary):** Renamed "Warehouse Admin (Manage Inventory)" → "Inventory Management" on Index.razor to match NavMenu vocabulary.
-- ✅ **Label drift resolution:** Reviewed all 9 open `⚠️ Label Drift Detected` issues (#239, #241-244, #250-253). Root cause: `bc:admin-portal` label exists in repo but not in `01-labels.sh`. Four other reported labels (`bc:notifications`, `bc:pricing`, `bc:promotions`, `bc:vendor-identity`) were already defined — issues are workflow artifacts. Added `bc:admin-portal` as documented legacy alias and `bc:correspondence` (ADR 0030 rename) and `bc:backoffice-identity` to `01-labels.sh`.
-- ✅ **Workflow fix:** Removed `issues` event trigger from `validate-labels.yml` — label drift detection is a repo-level concern that should only run on schedule/dispatch, not per-issue (prevented duplicate issue creation feedback loop).
-- ✅ **F1 findings (deferred):** CustomerSearch "View Details" still disabled — requires new `GET /api/backoffice/customers/{customerId}` endpoint (new backend surface area, deferred per guard rails). Vendor Portal "Team management" button still disabled — not architecturally supported.
-
-**Session 2 Progress (2026-03-26):**
-- ✅ **S5 (Gate):** Confirmed all E2E tests green on main (Run #313): all 6 CI jobs passed.
-- ✅ **F1 (NavMenu):** Enabled 4 disabled nav items with correct routes: `/warehouse`→`/inventory`, `/pricing`→`/products`, `/products` enabled, `/admin/users`→`/users`.
-- ✅ **F1 (OrderDetail):** Created OrderDetail.razor at `/orders/{orderId}` wired to existing `GetOrderDetailView` API endpoint. Displays order header, line items, returnable items, cancellation reason. Back-navigation to Order Search.
-- ✅ **F1 (ReturnDetail):** Created ReturnDetail.razor at `/returns/{returnId}` with full approve/deny workflow wired to existing `ApproveReturn`/`DenyReturn` API endpoints. Deny requires reason input via dialog.
-- ✅ **F1 (View Details buttons):** Enabled "View Details" buttons in OrderSearch and ReturnManagement that were previously disabled with "coming soon" tooltips.
-- ✅ **F1 (E2E tests):** Created ReturnDetailPage and OrderDetailPage page objects. Added 3 new ReturnManagement.feature scenarios: detail navigation, approve, deny.
-- ✅ **F1 (Finding — not architecturally supported):** CustomerSearch "View Details" button requires a GET-by-ID endpoint that doesn't exist (only email search). Flagged as deferred — needs new backend surface area.
-- ✅ **F2 (Critical bug fix):** GetReturnDetails.cs `canApprove`/`canDeny` checked for "Pending"/"AwaitingApproval" but domain model uses "Requested". Approve/deny buttons would never display. Fixed to check "Requested".
-- ✅ **F2 (NavMenu vocabulary):** "Warehouse Tools" → "Inventory Management" to match InventoryList.razor page heading.
-- ✅ **F2 (Test vocabulary):** Fixed "Pending" → "Requested" in 3 integration tests, 2 E2E feature scenarios, 1 step definition, and 1 E2E test fixture seed method.
-- ✅ **Suite health:** Backoffice.UnitTests 21/21, Backoffice.Api.IntegrationTests 91/91 — all pass.
-
-**Session 1 Progress (2026-03-25):**
-- ✅ **S1 (Bootstrap fix):** BackofficeIdentity.Api EF Core connection string resolved lazily inside `AddDbContext` delegate (matching VendorIdentity.Api pattern). `UseEnvironment("Development")` added to test fixture. Root cause: eager capture of connection string before `ConfigureAppConfiguration` overrides.
-- ✅ **S2 (Baseline):** Backoffice.UnitTests 21/21, Backoffice.Api.IntegrationTests 91/91, BackofficeIdentity.Api.IntegrationTests 6/6 — all pass. Backoffice.Web.UnitTests has 0 tests (empty project).
-- ✅ **S3 (Route drift):** Fixed `/customer-service` → `/customers/search`, `/operations/alerts` → `/alerts` across page objects and feature files.
-- ✅ **S4 (Vocabulary):** Mapped stale `finance-clerk` role to `Executive` in E2E fixture (role not in BackofficeRole enum).
-- ✅ **B1 (Issue #460):** Moved "View Change Requests" outside `CanSubmitChangeRequests` gate in Dashboard.razor. ReadOnly users can now view change requests.
-- ✅ **Pre-existing fix:** Added missing `MudPopoverProvider` to `VendorPortal.Web/App.razor`. The Submit Change Request page uses `MudSelect` which requires this provider — without it, the `blazor-error-ui` overlay blocks all button clicks. This was a pre-existing bug (same 2 tests failed on main run #302).
-- ✅ **CI fix (Run #307):** Sanitized Playwright trace filenames across all 3 E2E suites — removes `"`, `:`, `<`, `>`, `|`, `*`, `?` characters that cause GitHub Actions artifact upload failures.
-- ✅ **CI fix (Run #307):** Removed `Required="true"` from `MudSelect` in SubmitChangeRequest.razor — field always has a default value ("Description"), so `Required` validation prevented `MudForm.IsValid` from becoming `true`, keeping the submit button permanently disabled.
-- ✅ **S5 (Gate):** CI verified green — Run #320 (E2E all 6 jobs passed), Run #750 (CI), Run #323 (CodeQL).
-
-**CI Comparison (main → Session 1 → Session 3 final):**
-| Suite | Run #302 (main) | Run #307 (post-MudPopover) | Run #320 (final) |
-|-------|-----------------|----------------------------|-------------------|
-| Storefront E2E | ✅ 7/7 | ✅ 7/7 | ✅ 7/7 |
-| Vendor Portal E2E | ⚠️ 9/12 | ⚠️ 11/12 | ✅ 12/12 |
-| Backoffice E2E | ❌ 0/111 (bootstrap) | ❌ trace upload failure | ✅ All passing |
-
-**Planned Tracks (sequenced):**
-- **Track A:** Stabilization (1-2 sessions) — Backoffice E2E bootstrap, inventory, selector/route cleanup, false-positive audit
-- **Track B:** High-value bug fix (1 session) — Vendor Portal RBAC issue #460
-- **Track C:** Experience completion (3-4 sessions) — finish already-supported experiences still blocked by drift or missing access
-- **Track D:** Vocabulary alignment (2-3 sessions) — event/UI naming consistency after test signal is trustworthy
+**What Shipped:**
+- ✅ **S1–S4 (Stabilization):** Backoffice E2E bootstrap fix, test baseline (118 non-E2E tests), route drift cleanup, vocabulary normalization
+- ✅ **B1 (Issue #460):** Vendor Portal RBAC fix — ReadOnly users can now view change requests
+- ✅ **F1 (Experience completion):** OrderDetail.razor, ReturnDetail.razor, NavMenu link enablement, Homepage link enablement
+- ✅ **F2 (Vocabulary):** Return status "Requested" alignment, NavMenu vocabulary alignment, Homepage vocabulary alignment
+- ✅ **CI:** E2E Run #320 green (all 6 jobs), CI Run #750 green, CodeQL Run #323 green
+- ✅ **Label drift:** Resolved 9 open issues, added missing labels to `01-labels.sh`, fixed workflow trigger
+- ⏳ **Deferred:** CustomerSearch detail page (needs new backend surface area → M35.0), Vendor Portal team management (not architecturally supported)
 
 **Session 1 Retrospective:** [m34-0-session-1-retrospective.md](./milestones/m34-0-session-1-retrospective.md)
 
@@ -110,9 +99,9 @@
 - [M34.0 Plan](./milestones/m34-0-plan.md)
 - [M34 RBAC Issue Draft](./milestones/m34-0-rbac-issue-draft.md)
 
----
+*Completed: 2026-03-26*
 
-## Recent Completions
+---
 
 ### M33.0: Code Correction + Broken Feedback Loop Repair
 
@@ -1072,43 +1061,24 @@
 
 ### Next 3-4 Milestones
 
-> ⚠️ **Updated 2026-03-21:** Following the post-audit discussion, the owner directed that M33 and M34 be **engineering-led milestones** — not product expansion. Product Catalog Evolution and other future BCs are pushed to M35+. See full proposal: [`docs/planning/milestones/m33-m34-engineering-proposal-2026-03-21.md`](milestones/m33-m34-engineering-proposal-2026-03-21.md).
+> ⚠️ **Updated 2026-03-27:** M33, M34 engineering milestones complete. M35.0 begins product expansion.
 
-- **M32.4 (active):** Backoffice Phase 4 — E2E fixture stabilization + UX polish
-  - Resolve Blazor WASM app-loading timeout blocking 12/34 E2E scenarios
-  - Address remaining UX polish items from audit
-  - Close out the Backoffice series
+- **M35.0 (active):** Product Expansion Begins
+  - Deferred M34 items: CustomerSearch detail page (BFF endpoint + Blazor page)
+  - Product expansion planning: Exchange v2, Product Catalog Evolution
+  - See [M35.0 Plan](milestones/m35-0-plan.md) for full scope
 
-- **M33 (planned — engineering-led):** Code Correction + Broken Feedback Loop Repair
-  - **10–13 sessions** (PSA + UXE + QAE joint effort)
-  - Fix INV-3 (`AdjustInventoryEndpoint` bypass) + instrument `BackofficeTestFixture` (F-8) — first
-  - Build three missing Marten projections (`FulfillmentPipelineView`, `ReturnMetricsView`, `CorrespondenceMetricsView`) — after INV-3+F-8
-  - Add Order Search (`/orders/search`) and Return Management (`/returns`) pages to Backoffice
-  - Returns BC full structural refactor (R-1 through R-7) + UXE event renames in same PR
-  - Vendor Portal structural refactor (VP-1 through VP-6) + E2E `@ignore` Phase A removal
-  - Backoffice folder restructure (BO-1/BO-2/BO-3) + `AcknowledgeAlert` transaction fix (XC-3)
-  - ADR for canonical validator placement (XC-1)
-  - `CheckoutCompleted` dual-payload collision fix (🔴)
-  - Quick wins: INV-1/2, PR-1, CO-1, PAY-1/FUL-1/ORD-1, F-9
-  - See full scope + sequencing diagram in proposal document
+- **M35.1+ (planned):** Product Catalog Evolution
+  - Variants, Listings, Marketplaces ([plan](catalog-listings-marketplaces-cycle-plan.md))
+  - Search BC — Full-text product search, faceted navigation
 
-- **M34 (planned — engineering-led):** Architecture Completion + Vocabulary Alignment
-  - **8–12 sessions** (PSA + UXE + QAE)
-  - Untapped value: `Returns → Correspondence` integration, customer order status timeline, live return count in SignalR hub, `LowStockDetected` → Correspondence notification
-  - Test pyramid completion: Vendor Portal bUnit, Vendor Portal E2E Phase B (step definitions), Customer Experience E2E (`cart-real-time-updates`, `product-browsing`), Promotions unit tests + `ICollectionFixture`
-  - Vocabulary alignment: `PriceChanged`/`PriceUpdated`, `CheckoutStarted`/`CheckoutReceived`, Correspondence contract alignment, VP transient command-masquerade renames
-  - Shopping dual-handler ADR (SH-1)
-  - Persisted event rename investigation + migration ADR
-  - XC-2 `.Api` folder naming normalization pass
-  - See full scope + untapped value items in proposal document
+### Future BCs (Priority Roadmap — Post M35)
 
-### Future BCs (Priority Roadmap — Post M34)
+> Engineering health gap closed in M33+M34. Product expansion begins in M35.
 
-> Product expansion milestones are deferred until M33 and M34 close the engineering health gap.
-
-**High Priority (Next after M34):**
+**High Priority (Active in M35+):**
 - 🟡 **Exchange v2** — Cross-product exchanges, upcharge payment collection
-- 🟡 **Product Catalog Evolution** — Variants, Listings, Marketplaces ([plan](catalog-listings-marketplaces-cycle-plan.md) — M35+ estimated, re-numbered from former M33 estimate)
+- 🟡 **Product Catalog Evolution** — Variants, Listings, Marketplaces ([plan](catalog-listings-marketplaces-cycle-plan.md))
 
 **Medium Priority:**
 - 🟡 **Search BC** — Full-text product search, faceted navigation
@@ -1122,7 +1092,7 @@
 
 See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specifications.
 
-*Roadmap Last Updated: 2026-03-21 (M33+M34 engineering milestones inserted; product BCs shifted to M35+)*
+*Roadmap Last Updated: 2026-03-27 (M35.0 active; M33+M34 engineering milestones complete)*
 
 ---
 
