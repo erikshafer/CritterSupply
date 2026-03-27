@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M35.0 — Product Expansion Begins |
-| **Status** | 🚀 **IN PROGRESS** — Session 3 |
+| **Status** | 🚀 **IN PROGRESS** — Session 4 |
 | **Recent Completion** | M34.0 — Experience Completion + Vocabulary Alignment (2026-03-26) |
 | **Previous Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-27 (M35.0 Session 3: Stale locator fix + CustomerService.feature rewrite)*
+*Last Updated: 2026-03-27 (M35.0 Session 4: Prerequisite resolution + event modeling for Track 3)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 📋 M35.0: Product Expansion Begins
 
-**Status:** 🚀 **IN PROGRESS** — Session 3
+**Status:** 🚀 **IN PROGRESS** — Session 4
 **Goal:** Deliver deferred M34.0 product items (CustomerSearch detail page), then begin product expansion
 
 **Session 1 Progress (2026-03-27):**
@@ -84,14 +84,33 @@
 - ✅ **Integration tests:** 95/95 Backoffice.Api.IntegrationTests still passing
 - ✅ **CI:** E2E Run #331, CI Run #760 (action_required — awaiting environment approval for PR). Main baseline: E2E Run #330 (green).
 
+**Session 4 Progress (2026-03-27):**
+- ✅ **ASIE prerequisite assessment:** Confirmed issues #254 (EF Core project structure) and #255 (CreateVendorTenant command) are already fully implemented in the codebase. Both GitHub issues are stale — work was completed but issues were never closed. No Track 3 items are blocked by Vendor Identity prerequisites.
+- ✅ **EMF: Exchange v2 cross-product exchange:** Modeled 5 new domain events, 4 commands, 2 read models, 5 slices, 5 Given/When/Then scenarios. Committed 10 Gherkin scenarios to `docs/features/returns/cross-product-exchange.feature`.
+- ✅ **EMF: Vendor Portal team management:** Confirmed 7 existing events/commands in VendorIdentity BC. Identified 2 new read models (TeamRosterView, PendingInvitationsView), 8 slices, 6 Given/When/Then scenarios. Committed 17 Gherkin scenarios to `docs/features/vendor-portal/team-management.feature`.
+- ✅ **EMF: Product Catalog Evolution:** Modeled 11 domain events, 11 commands, 2 read models, 5 slices, 4 Given/When/Then scenarios. Committed 13 Gherkin scenarios to `docs/features/product-catalog/catalog-event-sourcing-migration.feature`.
+- ✅ **Search BC:** Confirmed out of scope for M35.0 Track 3. Deferred to future milestone.
+- ✅ **Session plan:** Created [m35-0-session-4-plan.md](./milestones/m35-0-session-4-plan.md) with full event models, slice tables, and implementation contract for Session 5.
+- ✅ **Build:** 0 errors, 34 warnings (unchanged — no application code modified)
+- ✅ **Integration tests:** 95/95 Backoffice.Api.IntegrationTests still passing
+- ✅ **CI:** E2E Run #333 (green on main), CI Run #762 (green on main)
+
+**Track 3 Clearance Status:**
+- ✅ **Exchange v2 (cross-product)** — EMF cleared, ASIE cleared, ready for Session 5
+- ✅ **Vendor Portal Team Management** — EMF cleared, ASIE cleared, ready for Session 5
+- ✅ **Product Catalog Evolution** — EMF cleared, ASIE cleared, ready for Session 5
+- ❌ **Search BC** — Deferred to future milestone (no existing design)
+
 **Planned Tracks (sequenced):**
 - **Track 1:** Housekeeping — CURRENT-CYCLE.md update, M35.0 plan creation ✅
 - **Track 2:** CustomerSearch detail page (deferred from M34.0) — BFF endpoint, Blazor page, integration tests ✅
-- **Track 3 (future sessions):** Product expansion — Exchange v2, Product Catalog Evolution (all items deferred)
+- **Track 3:** Product expansion — 3 items cleared for Session 5 implementation ✅ (event models committed)
 
 **Session 1 Retrospective:** [m35-0-session-1-retrospective.md](./milestones/m35-0-session-1-retrospective.md)
 **Session 2 Retrospective:** [m35-0-session-2-retrospective.md](./milestones/m35-0-session-2-retrospective.md)
 **Session 3 Retrospective:** [m35-0-session-3-retrospective.md](./milestones/m35-0-session-3-retrospective.md)
+**Session 4 Plan:** [m35-0-session-4-plan.md](./milestones/m35-0-session-4-plan.md)
+**Session 4 Retrospective:** [m35-0-session-4-retrospective.md](./milestones/m35-0-session-4-retrospective.md)
 
 **References:**
 - [M35.0 Plan](./milestones/m35-0-plan.md)
