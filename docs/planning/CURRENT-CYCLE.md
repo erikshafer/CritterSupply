@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M35.0 — Product Expansion Begins |
-| **Status** | 🚀 **IN PROGRESS** — Session 4 |
+| **Status** | ✅ **EFFECTIVELY COMPLETE** — Session 6 delivered; documentation audit complete |
 | **Recent Completion** | M34.0 — Experience Completion + Vocabulary Alignment (2026-03-26) |
 | **Previous Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-27 (M35.0 Session 4: Prerequisite resolution + event modeling for Track 3)*
+*Last Updated: 2026-03-27 (M35.0 Documentation Audit: Sessions 5+6 progress recorded, CONTEXTS.md + README.md aligned)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 📋 M35.0: Product Expansion Begins
 
-**Status:** 🚀 **IN PROGRESS** — Session 4
+**Status:** ✅ **EFFECTIVELY COMPLETE** — Session 6 delivered; documentation audit complete
 **Goal:** Deliver deferred M34.0 product items (CustomerSearch detail page), then begin product expansion
 
 **Session 1 Progress (2026-03-27):**
@@ -96,21 +96,49 @@
 - ✅ **CI:** E2E Run #333 (green on main), CI Run #762 (green on main)
 
 **Track 3 Clearance Status:**
-- ✅ **Exchange v2 (cross-product)** — EMF cleared, ASIE cleared, ready for Session 5
-- ✅ **Vendor Portal Team Management** — EMF cleared, ASIE cleared, ready for Session 5
-- ✅ **Product Catalog Evolution** — EMF cleared, ASIE cleared, ready for Session 5
+- ✅ **Exchange v2 (cross-product)** — EMF cleared, ASIE cleared, **implemented in Session 5**
+- ✅ **Vendor Portal Team Management** — EMF cleared, ASIE cleared, **BFF implemented in Session 6** (frontend deferred)
+- ✅ **Product Catalog Evolution** — EMF cleared, ASIE cleared, **implemented in Sessions 5+6**
 - ❌ **Search BC** — Deferred to future milestone (no existing design)
+
+**Session 5 Progress (2026-03-27):**
+- ✅ **Product Catalog ES migration (foundation):** 11 domain events, `CatalogProduct` aggregate, `ProductCatalogView` projection (inline), `ProductCatalogViewProjection`. Event-sourced handlers: `CreateProduct`, `ChangeProductName`, `ChangeProductStatus`, `SoftDeleteProduct`, `RestoreProduct`, `MigrateProduct`. Query handlers: `GetProductES`, `ListProductsES`. Integration event publishing for `ProductAdded` and `ProductDiscontinued`.
+- ✅ **Exchange v2 (cross-product exchange):** 5 new domain events (`CrossProductExchangeRequested`, `ExchangePriceDifferenceCalculated`, `ExchangeAdditionalPaymentRequired`, `ExchangeAdditionalPaymentCaptured`, `ExchangePartialRefundIssued`). `ApproveExchange` handler updated to support price differences in both directions. RabbitMQ routing for new events. 4 new integration message contracts.
+- ✅ **Product Catalog integration tests:** 41/41 passing
+- ✅ **Returns unit tests:** 66/66 passing (6 new cross-product exchange tests)
+- ✅ **Returns integration tests:** 30/30 passing (14 pre-existing failures due to auth — fixed in Session 6)
+
+**Session 6 Progress (2026-03-27):**
+- ✅ **Returns test fix:** Root cause — GET endpoints had `[Authorize]` but test fixture lacked auth bypass. Fixed by registering `TestAuthHandler` for both `Backoffice` and `Vendor` JWT schemes. **44/44 Returns integration tests now pass.**
+- ✅ **Product Catalog ES migration (granular handlers):** 5 new event-sourced handlers — `ChangeProductDescriptionES`, `ChangeProductCategoryES`, `UpdateProductImagesES`, `ChangeProductDimensionsES`, `UpdateProductTagsES`. 3 legacy document-store handlers removed (`UpdateProduct.cs`, `UpdateProductDescription.cs`, `UpdateProductDisplayName.cs`). **48/48 integration tests pass.**
+- ✅ **Vendor Portal Team Management BFF:** 2 BFF proxy endpoints (`GET /api/vendor-portal/team/roster`, `GET /api/vendor-portal/team/invitations/pending`). Local Marten read models (`TeamMember`, `TeamInvitation`). Event handlers subscribing to 7 VendorIdentity lifecycle events. RabbitMQ wiring in both VendorIdentity.Api and VendorPortal.Api. **86/86 VendorPortal tests pass.**
+- ⏳ **VP Team Management Blazor page:** Deferred — BFF backend complete, frontend page not yet implemented
+- ⏳ **GitHub issues #254 and #255:** Still open despite being flagged for closure since Session 4
+
+**Documentation Audit (2026-03-27):**
+- ✅ **Audit findings:** [m35-0-audit-findings.md](./milestones/m35-0-audit-findings.md) — handler-by-handler Product Catalog migration table, Returns exchange assessment, VP team management completion status, issue #254/#255 status
+- ✅ **CURRENT-CYCLE.md:** Updated with Session 5+6 progress, corrected status
+- ✅ **CONTEXTS.md:** Updated Product Catalog (ES migration), Returns (cross-product exchange), Vendor Portal (team management BFF), Backoffice (moved to Implemented)
+- ✅ **README.md:** Updated Backoffice status, Product Catalog description
+- ✅ **Session 6 retrospective:** Created retroactively
 
 **Planned Tracks (sequenced):**
 - **Track 1:** Housekeeping — CURRENT-CYCLE.md update, M35.0 plan creation ✅
 - **Track 2:** CustomerSearch detail page (deferred from M34.0) — BFF endpoint, Blazor page, integration tests ✅
-- **Track 3:** Product expansion — 3 items cleared for Session 5 implementation ✅ (event models committed)
+- **Track 3:** Product expansion — 3 items implemented across Sessions 5+6 ✅ (VP frontend deferred)
 
 **Session 1 Retrospective:** [m35-0-session-1-retrospective.md](./milestones/m35-0-session-1-retrospective.md)
 **Session 2 Retrospective:** [m35-0-session-2-retrospective.md](./milestones/m35-0-session-2-retrospective.md)
 **Session 3 Retrospective:** [m35-0-session-3-retrospective.md](./milestones/m35-0-session-3-retrospective.md)
 **Session 4 Plan:** [m35-0-session-4-plan.md](./milestones/m35-0-session-4-plan.md)
 **Session 4 Retrospective:** [m35-0-session-4-retrospective.md](./milestones/m35-0-session-4-retrospective.md)
+**Session 5 Retrospective:** [m35-0-session-5-retrospective.md](./milestones/m35-0-session-5-retrospective.md)
+**Session 6 Retrospective:** [m35-0-session-6-retrospective.md](./milestones/m35-0-session-6-retrospective.md)
+**Audit Findings:** [m35-0-audit-findings.md](./milestones/m35-0-audit-findings.md)
+
+**Remaining Before Milestone Closure:**
+- ⏳ Close GitHub issues #254 and #255 (stale — work completed, issues never closed)
+- ⏳ VP Team Management Blazor page (deferred to M36.0)
 
 **References:**
 - [M35.0 Plan](./milestones/m35-0-plan.md)
@@ -1103,24 +1131,39 @@
 
 ### Next 3-4 Milestones
 
-> ⚠️ **Updated 2026-03-27:** M33, M34 engineering milestones complete. M35.0 begins product expansion.
+> ⚠️ **Updated 2026-03-27:** M35.0 effectively complete. Product Catalog ES migration done. Exchange v2 shipped. Next milestone focuses on remaining frontend + downstream features.
 
-- **M35.0 (active):** Product Expansion Begins
-  - Deferred M34 items: CustomerSearch detail page (BFF endpoint + Blazor page)
-  - Product expansion planning: Exchange v2, Product Catalog Evolution
-  - See [M35.0 Plan](milestones/m35-0-plan.md) for full scope
+- **M35.0 (effectively complete):** Product Expansion Begins
+  - ✅ Product Catalog ES migration (all core handlers event-sourced)
+  - ✅ Exchange v2 cross-product exchange (price difference handling)
+  - ✅ VP Team Management BFF (endpoints + event handlers)
+  - ⏳ VP Team Management Blazor page (deferred to M36.0)
+  - See [M35.0 Plan](milestones/m35-0-plan.md) and [Audit Findings](milestones/m35-0-audit-findings.md)
 
-- **M35.1+ (planned):** Product Catalog Evolution
-  - Variants, Listings, Marketplaces ([plan](catalog-listings-marketplaces-cycle-plan.md))
-  - Search BC — Full-text product search, faceted navigation
+- **M36.0 (next):** Product Catalog Completion + Frontend Polish
+  - VP Team Management Blazor page (BFF backend already done)
+  - AssignProductToVendor ES migration (last document-store handler)
+  - Close GitHub issues #254 and #255
+  - Product Catalog Variants (unlocked by ES migration)
 
-### Future BCs (Priority Roadmap — Post M35)
+- **M36.1+ (planned):** Variants, Listings, Marketplaces
+  - Product Variants support (colors, sizes, bundles)
+  - Listings BC — curated product lists for storefronts
+  - Marketplaces BC — multi-channel product syndication
+  - See [plan](catalog-listings-marketplaces-cycle-plan.md)
 
-> Engineering health gap closed in M33+M34. Product expansion begins in M35.
+- **M37.0 (planned):** Search BC
+  - Full-text product search, faceted navigation
+  - Projects data from Product Catalog and Pricing
 
-**High Priority (Active in M35+):**
-- 🟡 **Exchange v2** — Cross-product exchanges, upcharge payment collection
-- 🟡 **Product Catalog Evolution** — Variants, Listings, Marketplaces ([plan](catalog-listings-marketplaces-cycle-plan.md))
+### Future BCs (Priority Roadmap — Post M36)
+
+> Product Catalog ES migration complete. Variants and downstream features unlocked.
+
+**High Priority (Active in M36+):**
+- 🟢 **Product Variants** — Unlocked by ES migration; colors, sizes, bundles
+- 🟡 **Listings BC** — Curated product lists for storefronts
+- 🟡 **Marketplaces BC** — Multi-channel product syndication
 
 **Medium Priority:**
 - 🟡 **Search BC** — Full-text product search, faceted navigation
@@ -1134,7 +1177,7 @@
 
 See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specifications.
 
-*Roadmap Last Updated: 2026-03-27 (M35.0 active; M33+M34 engineering milestones complete)*
+*Roadmap Last Updated: 2026-03-27 (M35.0 effectively complete; ES migration shipped)*
 
 ---
 
@@ -1151,6 +1194,6 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Document Last Updated: 2026-03-18*
-*Active Milestone: M32.2 (Backoffice Phase 3A) — Option A selected, backlog intake in progress*
+*Document Last Updated: 2026-03-27*
+*Active Milestone: M35.0 — Effectively complete (documentation audit session)*
 *Update Policy: At milestone start, milestone end, and significant task changes*

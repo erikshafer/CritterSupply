@@ -100,7 +100,7 @@ Manages return and exchange workflows — eligibility checks, inspection, refund
 | Fulfillment | ↔ bidirectional | Expects return receipt; publishes approval for reverse logistics |
 | Payments | ↔ bidirectional | Requests refunds; receives completion confirmation |
 
-**Constraint:** Exchanges are same-SKU only (Phase 1). 30-day eligibility window post-delivery.
+**Constraint:** Cross-product exchanges supported (M35.0) with price difference handling — additional payment for more expensive replacements, partial refund for cheaper ones. Same-SKU exchanges also supported. 30-day eligibility window post-delivery.
 
 ---
 
@@ -142,14 +142,14 @@ Backend-for-Frontend (BFF) for the customer-facing Blazor storefront. Stateless 
 
 **Folder:** `src/Product Catalog/`
 
-Product master data — SKU, name, description, images, manufacturer info. Currently a Marten document store (non-event-sourced).
+Product master data — SKU, name, description, images, manufacturer info. Event-sourced via Marten with `CatalogProduct` aggregate and `ProductCatalogView` inline projection.
 
 | Communicates with | Direction | Notes |
 |---|---|---|
 | Pricing | → publishes | Product lifecycle events consumed by Pricing |
 | Customer Experience | ← queried by | Product listings for storefront |
 
-**Constraint:** Planned migration to event sourcing for audit trail and variant support — see `docs/planning/catalog-listings-marketplaces-evolution-plan.md`.
+**Key decisions:** Migrated from Marten document store to event sourcing in M35.0 (Sessions 5+6). 11 domain events, full inline projection coverage. Legacy `Product` document model retained for vendor assignment handler and migration bootstrap. Vendor assignment (`AssignProductToVendor`) is the sole remaining document-store write path — planned for ES migration in M36.0. See `docs/planning/catalog-listings-marketplaces-evolution-plan.md` for variants/listings roadmap unlocked by the ES migration.
 
 ---
 
@@ -171,7 +171,7 @@ Vendor authentication, multi-tenancy, and invitation workflow.
 
 **Folder:** `src/Vendor Portal/`
 
-BFF for vendor operations — order management, pricing updates, user administration. Blazor WASM frontend with tenant-isolated SignalR groups.
+BFF for vendor operations — order management, pricing updates, user administration, and team management. Blazor WASM frontend with tenant-isolated SignalR groups.
 
 | Communicates with | Direction | Notes |
 |---|---|---|
@@ -181,7 +181,7 @@ BFF for vendor operations — order management, pricing updates, user administra
 | Payments | ← receives | Refund events |
 | Pricing | → queries + commands | Price history reads; MAP/floor price updates |
 
-**Key decisions:** Blazor WASM with in-memory JWT storage ([ADR 0021](docs/decisions/0021-blazor-wasm-for-vendor-portal-web.md)). SignalR groups scoped to `vendor:{vendorId}` for tenant isolation.
+**Key decisions:** Blazor WASM with in-memory JWT storage ([ADR 0021](docs/decisions/0021-blazor-wasm-for-vendor-portal-web.md)). SignalR groups scoped to `vendor:{vendorId}` for tenant isolation. Team management BFF endpoints added in M35.0 (roster and pending invitations views via Marten projections of VendorIdentity events). Team management Blazor page planned for M36.0.
 
 ---
 
@@ -227,9 +227,31 @@ JWT-based authentication and authorization for internal admin users. Provides ac
 
 | Communicates with | Direction | Notes |
 |---|---|---|
-| Backoffice (planned) | ← queried by | Auth tokens for admin operations |
+| Backoffice | ← queried by | Auth tokens for admin operations |
 
 **Key decisions:** EF Core with policy-based RBAC — 7 roles from CopyWriter to SystemAdmin ([ADR 0031](docs/decisions/0031-admin-portal-rbac-model.md)). Single role per user in Phase 1. JWT Bearer authentication (not session-based, unlike Customer Identity).
+
+---
+
+### Backoffice
+
+**Folder:** `src/Backoffice/`
+
+Internal operations portal — BFF pattern composing data from multiple BCs with RBAC via Backoffice Identity. Blazor WASM frontend with role-based navigation, real-time alerts via SignalR, and write operations for product admin, pricing, inventory, returns, and user management.
+
+| Communicates with | Direction | Notes |
+|---|---|---|
+| Backoffice Identity | → queries | JWT authentication and user management |
+| Customer Identity | → queries | Customer profile and address data for CS workflows |
+| Orders | → queries + commands | Order search, detail views, cancellation, order notes |
+| Returns | → queries + commands | Return listing, detail, approve/deny actions |
+| Product Catalog | → queries | Product list for admin views |
+| Pricing | → queries + commands | Price management |
+| Inventory | → queries + commands | Stock levels, adjustments, receiving |
+| Fulfillment | → queries | Pipeline views for warehouse ops |
+| Correspondence | → queries | Correspondence history for CS workflows |
+
+**Key decisions:** BFF pattern with 8 feature folders (AlertManagement, CustomerService, DashboardReporting, OrderManagement, OrderNotes, ProductCatalog, ReturnManagement, WarehouseOperations). Blazor WASM with in-memory JWT storage, background token refresh, session-expired recovery UX. Marten projections for dashboard metrics and alert feeds. SignalR hub for real-time operational alerts. Built across M32.0–M35.0 milestones.
 
 ---
 
@@ -288,12 +310,6 @@ Issue and redeem credits, gift cards, and refund-to-credit.
 ### Analytics
 
 Business intelligence — dashboards, reports, ML model training. Consumes events from across the system.
-
----
-
-### Backoffice
-
-Internal tooling for operations, customer service, and merchandising. BFF pattern composing data from multiple BCs with RBAC via Backoffice Identity.
 
 ---
 
