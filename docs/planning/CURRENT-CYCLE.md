@@ -61,14 +61,16 @@
 **Session 1 Progress (2026-03-27):**
 - ✅ **Housekeeping:** Updated CURRENT-CYCLE.md — moved M34.0 to Recent Completions, set M35.0 as active milestone
 - ✅ **Plan:** Created [M35.0 plan](./milestones/m35-0-plan.md) documenting deferred items and Session 1 scope
-- 🚧 **CustomerSearch detail:** Implementing `GET /api/backoffice/customers/{customerId}` BFF endpoint + `CustomerDetail.razor` page
-- 🚧 **View Details button:** Enabling previously-disabled button in `CustomerSearch.razor`
-- 🚧 **Integration tests:** Writing tests for new BFF endpoint
+- ✅ **CustomerSearch detail:** Created `GET /api/backoffice/customers/{customerId}` BFF endpoint + `CustomerDetail.razor` page at `/customers/{customerId:guid}`
+- ✅ **View Details button:** Enabled previously-disabled button in `CustomerSearch.razor` with navigation to detail page
+- ✅ **Integration tests:** 4 new tests (happy path, not-found, no-orders, with-addresses) — 95/95 Backoffice.Api.IntegrationTests pass
 
 **Planned Tracks (sequenced):**
 - **Track 1:** Housekeeping — CURRENT-CYCLE.md update, M35.0 plan creation
 - **Track 2:** CustomerSearch detail page (deferred from M34.0) — BFF endpoint, Blazor page, integration tests
 - **Track 3 (future sessions):** Product expansion — Exchange v2, Product Catalog Evolution
+
+**Session 1 Retrospective:** [m35-0-session-1-retrospective.md](./milestones/m35-0-session-1-retrospective.md)
 
 **References:**
 - [M35.0 Plan](./milestones/m35-0-plan.md)
