@@ -21,7 +21,7 @@ E-commerce was chosen as the domain partly from the maintainer's industry experi
 
 ### 🏢 Vendor & Operations <a id='1.1.1'></a>
 
-CritterSupply also models the vendor and operational sides of a retail platform. Vendor Identity and the Vendor Portal serve the businesses that supply products—providing authentication, tenant isolation, analytics, and change request workflows. Backoffice Identity grounds staff authentication for internal operations, establishing the identity foundation for the planned Backoffice BFF that will serve CritterSupply's own team.
+CritterSupply also models the vendor and operational sides of a retail platform. Vendor Identity and the Vendor Portal serve the businesses that supply products—providing authentication, tenant isolation, analytics, and change request workflows. Backoffice Identity grounds staff authentication for internal operations, and the Backoffice BFF provides CritterSupply's own team with customer service, order management, return processing, inventory management, and product administration through a Blazor WASM frontend with role-based access control.
 
 ### ️🔎️ Patterns in Practice <a id='1.2'></a>
 
@@ -33,7 +33,7 @@ This isn't a reference architecture padded with unnecessary layers, abstractions
 
 A non-exhaustive list of the patterns, paradigms, and principles demonstrated in this codebase, in no particular order:
 
-- Event Sourcing (Orders, Payments, Inventory, Fulfillment)
+- Event Sourcing (Orders, Payments, Inventory, Fulfillment, Product Catalog)
 - Command Query Responsibility Segregation (CQRS)
 - Stateful Sagas (Order orchestration)
 - Inbox Pattern (guaranteed message processing)
@@ -143,7 +143,7 @@ graph TB
     %% Vendor-Facing Layer
     VP["🏪 Vendor Portal<br/>Analytics & Change Requests"]
 
-    %% Operations Layer (Planned)
+    %% Operations Layer
     BO["🖥️ Backoffice<br/>Internal Operations BFF"]
 
     %% Identity Contexts
@@ -173,11 +173,12 @@ graph TB
     classDef identity fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
     classDef core fill:#fff3e0,stroke:#e65100,stroke-width:2px
     classDef planned fill:#f5f5f5,stroke:#9e9e9e,stroke-width:2px,stroke-dasharray: 5 5
+    classDef ops fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
 
     class VP vendor
     class VendorID,BackofficeID identity
     class Catalog,Inventory,Orders,Pricing,Promotions core
-    class BO planned
+    class BO ops
 ```
 
 **Legend:**
@@ -187,6 +188,7 @@ graph TB
 - **Orange**: Core business contexts (event-sourced)
 - **Purple**: Supporting contexts
 - **Green**: Identity contexts
+- **Light Blue**: Operations layer (Backoffice)
 - **Dashed border**: Planned (not yet implemented)
 
 ### Bounded Context Status
@@ -201,16 +203,16 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 | 📊 **Inventory**              | Stock levels and reservations                                         | ✅ Complete |
 | 🚚 **Fulfillment**            | Picking, packing, shipping                                            | ✅ Complete |
 | 👤 **Customer Identity**      | Customer authentication, addresses, and profiles                      | ✅ Complete |
-| 📦 **Product Catalog**        | Product definitions and catalog data                                  | ✅ Complete |
+| 📦 **Product Catalog**        | Product definitions and catalog data (event-sourced)                  | ✅ Complete |
 | 🎁 **Customer Experience**    | Storefront BFF (Blazor + SignalR)                                     | ✅ Complete |
 | 🏢 **Vendor Identity**        | Vendor user authentication & tenant management                        | ✅ Complete |
 | 🏪 **Vendor Portal**          | Vendor analytics, insights, change requests                           | ✅ Complete |
-| 🔄 **Returns**                | Return authorization and processing                                   | ✅ Complete |
+| 🔄 **Returns**                | Return authorization, exchanges (same-SKU and cross-product)          | ✅ Complete |
 | 💰 **Pricing**                | Server-authoritative pricing and scheduled price changes              | ✅ Complete |
 | 🏷️ **Promotions**             | Coupon codes and discount rules                                       | ✅ Complete |
 | ✉️ **Correspondence**         | Customer email and SMS notifications                                  | ✅ Complete |
 | 🔐 **Backoffice Identity**    | Staff and admin authentication                                        | ✅ Complete |
-| 🖥️ **Backoffice**             | Internal operations portal (BFF layer)                                | 🔜 Planned  |
+| 🖥️ **Backoffice**             | Internal operations portal (BFF + Blazor WASM)                        | ✅ Complete |
 | 🔍 **Search**                 | Product search and discovery                                          | 🔜 Planned  |
 | 💡 **Recommendations**        | Personalized product recommendations                                  | 🔜 Planned  |
 | 🏦 **Store Credit**           | Store credit and refund balance management                            | 🔜 Planned  |
