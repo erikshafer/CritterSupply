@@ -41,22 +41,51 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M35.0 — Product Expansion Begins |
-| **Status** | ✅ **EFFECTIVELY COMPLETE** — Session 6 delivered; documentation audit complete |
-| **Recent Completion** | M34.0 — Experience Completion + Vocabulary Alignment (2026-03-26) |
-| **Previous Completion** | M33.0 — Code Correction + Broken Feedback Loop Repair (2026-03-25) |
+| **Current Milestone** | M36.0 — Engineering Quality (planning) |
+| **Status** | 📋 **Planning** — Pre-planning quality findings committed; awaiting planning session |
+| **Recent Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
+| **Previous Completion** | M34.0 — Experience Completion + Vocabulary Alignment (2026-03-26) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-27 (M35.0 Documentation Audit: Sessions 5+6 progress recorded, CONTEXTS.md + README.md aligned)*
+*Last Updated: 2026-03-27 (M35.0 closed; M36.0 set as active in planning status)*
 
 ---
 
 ## Active Milestone
 
-### 📋 M35.0: Product Expansion Begins
+### 📋 M36.0: Engineering Quality
 
-**Status:** ✅ **EFFECTIVELY COMPLETE** — Session 6 delivered; documentation audit complete
-**Goal:** Deliver deferred M34.0 product items (CustomerSearch detail page), then begin product expansion
+**Status:** 📋 **Planning** — Pre-planning quality findings committed; awaiting planning session
+**Goal:** Critter Stack idiom compliance, DDD-influenced naming audit, integration and E2E test coverage gaps
+
+**Direction from owner:**
+> No new BCs for a while. M36.0 is about engineering quality — Critter Stack idioms, DDD-influenced naming practices across all classes/commands/queries/events/messages, and thorough integration and E2E testing everywhere it is missing.
+
+**Pre-Planning Input:**
+- [M36.0 Pre-Planning Quality Findings](./milestones/m36-0-pre-planning-quality-findings.md) — Ranked list of quality work candidates
+- [M35.0 Milestone Closure Retrospective](./milestones/m35-0-milestone-closure-retrospective.md) — What M36.0 inherits
+
+**Known Priority Items:**
+1. Fix pre-existing test failures (Orders: 15, CustomerIdentity: 4, Correspondence: 2)
+2. VP Team Management E2E step definitions and page objects (17 Gherkin scenarios ready)
+3. Returns integration test skips (6 tests)
+4. Critter Stack idiom audit (priority: Orders, Shopping, Payments)
+5. Event/command naming audit (priority: Messages.Contracts)
+6. Vertical slice completeness audit (per ADR 0039)
+
+**CI Baseline:**
+- CI Run #770 (green on main)
+- E2E Run #341 (green on main)
+- CodeQL Run #339 (green on main)
+
+---
+
+## Recent Completions
+
+### ✅ M35.0: Product Expansion Begins (2026-03-27)
+
+**Status:** ✅ **Complete** — 7 sessions + documentation audit + closure session
+**Goal:** Deliver deferred M34.0 product items, begin product expansion
 
 **Session 1 Progress (2026-03-27):**
 - ✅ **Housekeeping:** Updated CURRENT-CYCLE.md — moved M34.0 to Recent Completions, set M35.0 as active milestone
@@ -112,8 +141,8 @@
 - ✅ **Returns test fix:** Root cause — GET endpoints had `[Authorize]` but test fixture lacked auth bypass. Fixed by registering `TestAuthHandler` for both `Backoffice` and `Vendor` JWT schemes. **44/44 Returns integration tests now pass.**
 - ✅ **Product Catalog ES migration (granular handlers):** 5 new event-sourced handlers — `ChangeProductDescriptionES`, `ChangeProductCategoryES`, `UpdateProductImagesES`, `ChangeProductDimensionsES`, `UpdateProductTagsES`. 3 legacy document-store handlers removed (`UpdateProduct.cs`, `UpdateProductDescription.cs`, `UpdateProductDisplayName.cs`). **48/48 integration tests pass.**
 - ✅ **Vendor Portal Team Management BFF:** 2 BFF proxy endpoints (`GET /api/vendor-portal/team/roster`, `GET /api/vendor-portal/team/invitations/pending`). Local Marten read models (`TeamMember`, `TeamInvitation`). Event handlers subscribing to 7 VendorIdentity lifecycle events. RabbitMQ wiring in both VendorIdentity.Api and VendorPortal.Api. **86/86 VendorPortal tests pass.**
-- ⏳ **VP Team Management Blazor page:** Deferred — BFF backend complete, frontend page not yet implemented
-- ⏳ **GitHub issues #254 and #255:** Still open despite being flagged for closure since Session 4
+- ✅ **VP Team Management Blazor page:** Delivered in Closure Session
+- ✅ **GitHub issues #254 and #255:** Closed in Closure Session
 
 **Documentation Audit (2026-03-27):**
 - ✅ **Audit findings:** [m35-0-audit-findings.md](./milestones/m35-0-audit-findings.md) — handler-by-handler Product Catalog migration table, Returns exchange assessment, VP team management completion status, issue #254/#255 status
@@ -136,9 +165,20 @@
 **Session 6 Retrospective:** [m35-0-session-6-retrospective.md](./milestones/m35-0-session-6-retrospective.md)
 **Audit Findings:** [m35-0-audit-findings.md](./milestones/m35-0-audit-findings.md)
 
-**Remaining Before Milestone Closure:**
-- ⏳ Close GitHub issues #254 and #255 (stale — work completed, issues never closed)
-- ⏳ VP Team Management Blazor page (deferred to M36.0)
+**Closure Session Progress (2026-03-27):**
+- ✅ **Product Catalog ES migration (final handler):** AssignProductToVendor migrated to event sourcing — added `ProductVendorAssigned` event, aggregate Apply method, projection handler. Created `AssignProductToVendorES.cs` with GET + POST single + POST bulk endpoints. Removed old document-store handler. **14/14 handlers now event-sourced. 48/48 integration tests pass.**
+- ✅ **VP Team Management Blazor page:** Created `TeamManagement.razor` at `/team` with team roster table, pending invitations table, loading/error/empty states, admin-only access guard, data-testid attributes on all interactive elements. Added NavMenu entry (Admin-only visibility).
+- ✅ **GitHub issues #254 and #255:** Closed with implementation citations
+- ✅ **Milestone closure retrospective:** [m35-0-milestone-closure-retrospective.md](./milestones/m35-0-milestone-closure-retrospective.md)
+- ✅ **M36.0 pre-planning findings:** [m36-0-pre-planning-quality-findings.md](./milestones/m36-0-pre-planning-quality-findings.md)
+- ✅ **CURRENT-CYCLE.md:** M35.0 moved to Recent Completions, M36.0 set as active
+
+**Milestone Closure:**
+- **All planned Track 1, 2, 3 items delivered**
+- **CI:** Main baseline CI Run #770 (green), E2E Run #341 (green), CodeQL Run #339 (green)
+- **PR:** CI Run #772, E2E Run #343 (pending approval)
+
+**Remaining Before Milestone Closure:** None — milestone complete.
 
 **References:**
 - [M35.0 Plan](./milestones/m35-0-plan.md)
@@ -1131,20 +1171,20 @@
 
 ### Next 3-4 Milestones
 
-> ⚠️ **Updated 2026-03-27:** M35.0 effectively complete. Product Catalog ES migration done. Exchange v2 shipped. Next milestone focuses on remaining frontend + downstream features.
+> ⚠️ **Updated 2026-03-27:** M35.0 complete. M36.0 is about engineering quality — no new BCs.
 
-- **M35.0 (effectively complete):** Product Expansion Begins
-  - ✅ Product Catalog ES migration (all core handlers event-sourced)
+- **M35.0 (complete):** Product Expansion Begins
+  - ✅ Product Catalog ES migration (all 14 handlers event-sourced)
   - ✅ Exchange v2 cross-product exchange (price difference handling)
-  - ✅ VP Team Management BFF (endpoints + event handlers)
-  - ⏳ VP Team Management Blazor page (deferred to M36.0)
-  - See [M35.0 Plan](milestones/m35-0-plan.md) and [Audit Findings](milestones/m35-0-audit-findings.md)
+  - ✅ VP Team Management (BFF + Blazor page)
+  - ✅ CustomerSearch detail page (BFF + Blazor + E2E)
+  - See [M35.0 Closure Retrospective](milestones/m35-0-milestone-closure-retrospective.md)
 
-- **M36.0 (next):** Product Catalog Completion + Frontend Polish
-  - VP Team Management Blazor page (BFF backend already done)
-  - AssignProductToVendor ES migration (last document-store handler)
-  - Close GitHub issues #254 and #255
-  - Product Catalog Variants (unlocked by ES migration)
+- **M36.0 (active — planning):** Engineering Quality
+  - Fix pre-existing test failures (21 failures across 3 BCs)
+  - VP Team Management E2E tests (17 Gherkin scenarios ready)
+  - Critter Stack idiom audit, naming audit, vertical slice completeness
+  - See [M36.0 Pre-Planning Quality Findings](milestones/m36-0-pre-planning-quality-findings.md)
 
 - **M36.1+ (planned):** Variants, Listings, Marketplaces
   - Product Variants support (colors, sizes, bundles)
@@ -1177,7 +1217,7 @@
 
 See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specifications.
 
-*Roadmap Last Updated: 2026-03-27 (M35.0 effectively complete; ES migration shipped)*
+*Roadmap Last Updated: 2026-03-27 (M35.0 complete; M36.0 is engineering quality)*
 
 ---
 
@@ -1195,5 +1235,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 ---
 
 *Document Last Updated: 2026-03-27*
-*Active Milestone: M35.0 — Effectively complete (documentation audit session)*
+*Active Milestone: M36.0 — Engineering Quality (planning)*
 *Update Policy: At milestone start, milestone end, and significant task changes*
