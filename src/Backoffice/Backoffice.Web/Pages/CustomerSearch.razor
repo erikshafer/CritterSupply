@@ -113,15 +113,13 @@
                     </MudTd>
                     <MudTd DataLabel="Total Orders">@context.TotalOrders</MudTd>
                     <MudTd DataLabel="Actions">
-                        <MudTooltip Text="Customer detail page coming soon">
-                            <MudButton Variant="Variant.Text"
-                                       Color="Color.Secondary"
-                                       Size="Size.Small"
-                                       Disabled="true"
-                                       data-testid="@($"view-customer-{context.CustomerId}")">
-                                View Details
-                            </MudButton>
-                        </MudTooltip>
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   Href="@($"/customers/{context.CustomerId}")"
+                                   data-testid="@($"view-customer-{context.CustomerId}")">
+                            View Details
+                        </MudButton>
                     </MudTd>
                 </RowTemplate>
             </MudTable>
