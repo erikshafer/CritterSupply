@@ -1,3 +1,4 @@
+using CritterSupply.TestUtilities;
 using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,6 +48,13 @@ public class TestFixture : IAsyncLifetime
 
                 // Disable external Wolverine transports for testing
                 services.DisableAllExternalWolverineTransports();
+
+                // Register test authentication for all schemes and roles used by Orders.Api
+                // Schemes: Backoffice (backoffice JWT), Vendor (vendor JWT)
+                // Policies: CustomerService, WarehouseClerk, OperationsManager, VendorAdmin, AnyAuthenticated
+                services.AddTestAuthentication(
+                    roles: ["CustomerService", "WarehouseClerk", "OperationsManager", "SystemAdmin", "VendorAdmin"],
+                    schemes: ["Backoffice", "Vendor"]);
             });
         });
     }
