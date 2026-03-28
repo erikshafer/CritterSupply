@@ -71,30 +71,32 @@ public sealed class RequestReturnItemValidator : AbstractValidator<RequestReturn
 public static class RequestReturnHandler
 {
     [WolverinePost("/api/returns")]
-    public static async Task<RequestReturnResponse> Handle(
+    public static async Task<(RequestReturnResponse, OutgoingMessages)> Handle(
         RequestReturn command,
         IDocumentSession session,
         IMessageBus bus,
         CancellationToken ct)
     {
+        var outgoing = new OutgoingMessages();
+
         // Look up eligibility window for this order
         var eligibility = await session
             .LoadAsync<ReturnEligibilityWindow>(command.OrderId, ct);
 
         if (eligibility is null)
         {
-            return RequestReturnResponse.Denied(
+            return (RequestReturnResponse.Denied(
                 command.OrderId,
                 "OrderNotDelivered",
-                "This order has not been delivered yet or is not eligible for returns.");
+                "This order has not been delivered yet or is not eligible for returns."), outgoing);
         }
 
         if (eligibility.IsExpired)
         {
-            return RequestReturnResponse.Denied(
+            return (RequestReturnResponse.Denied(
                 command.OrderId,
                 "OutsideReturnWindow",
-                $"Your order was delivered more than {ReturnEligibilityWindow.ReturnWindowDays} days ago and is no longer eligible for return.");
+                $"Your order was delivered more than {ReturnEligibilityWindow.ReturnWindowDays} days ago and is no longer eligible for return."), outgoing);
         }
 
         // Map command items to return line items
@@ -137,8 +139,8 @@ public static class RequestReturnHandler
         // Exchanges ALWAYS require manual approval (stock check required)
         if (returnType == ReturnType.Exchange)
         {
-            // Publish integration event for Orders BC
-            await bus.PublishAsync(new Messages.Contracts.Returns.ExchangeRequested(
+            // Integration event for Orders BC
+            outgoing.Add(new Messages.Contracts.Returns.ExchangeRequested(
                 ReturnId: returnId,
                 OrderId: command.OrderId,
                 CustomerId: command.CustomerId,
@@ -147,8 +149,8 @@ public static class RequestReturnHandler
                 ReplacementUnitPrice: exchangeRequest.ReplacementUnitPrice,
                 RequestedAt: now));
 
-            return RequestReturnResponse.UnderReview(
-                returnId, command.OrderId, items, 0m, 0m, now); // No refund estimate for exchanges
+            return (RequestReturnResponse.UnderReview(
+                returnId, command.OrderId, items, 0m, 0m, now), outgoing); // No refund estimate for exchanges
         }
 
         // Refund path: Determine auto-approval
@@ -170,18 +172,18 @@ public static class RequestReturnHandler
 
             session.Events.Append(returnId, approved);
 
-            // Schedule expiration
+            // Schedule expiration — only justified IMessageBus use
             await bus.ScheduleAsync(new ExpireReturn(returnId), shipByDeadline);
 
-            // Publish integration events
-            await bus.PublishAsync(new Messages.Contracts.Returns.ReturnRequested(
+            // Integration events via OutgoingMessages (replaces bus.PublishAsync)
+            outgoing.Add(new Messages.Contracts.Returns.ReturnRequested(
                 ReturnId: returnId,
                 OrderId: command.OrderId,
                 CustomerId: command.CustomerId,
                 RequestedAt: now));
 
-            // Publish ReturnApproved for Customer Experience BC / Notifications BC
-            await bus.PublishAsync(new Messages.Contracts.Returns.ReturnApproved(
+            // ReturnApproved for Customer Experience BC / Notifications BC
+            outgoing.Add(new Messages.Contracts.Returns.ReturnApproved(
                 ReturnId: returnId,
                 OrderId: command.OrderId,
                 CustomerId: command.CustomerId,
@@ -190,20 +192,20 @@ public static class RequestReturnHandler
                 ShipByDeadline: shipByDeadline,
                 ApprovedAt: now));
 
-            return RequestReturnResponse.Approved(
+            return (RequestReturnResponse.Approved(
                 returnId, command.OrderId, items, estimatedRefund,
-                restockingFee, shipByDeadline, now);
+                restockingFee, shipByDeadline, now), outgoing);
         }
 
-        // Requires CS review — publish integration event but stay in Requested state
-        await bus.PublishAsync(new Messages.Contracts.Returns.ReturnRequested(
+        // Requires CS review — integration event but stay in Requested state
+        outgoing.Add(new Messages.Contracts.Returns.ReturnRequested(
             ReturnId: returnId,
             OrderId: command.OrderId,
             CustomerId: command.CustomerId,
             RequestedAt: now));
 
-        return RequestReturnResponse.UnderReview(
-            returnId, command.OrderId, items, estimatedRefund, restockingFee, now);
+        return (RequestReturnResponse.UnderReview(
+            returnId, command.OrderId, items, estimatedRefund, restockingFee, now), outgoing);
     }
 }
 
