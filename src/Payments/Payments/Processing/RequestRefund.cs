@@ -7,14 +7,14 @@ using IntegrationMessages = Messages.Contracts.Payments;
 
 namespace Payments.Processing;
 
-public sealed record RefundRequested(
+public sealed record RequestRefund(
     Guid PaymentId,
     Guid OrderId,
     decimal Amount)
 {
-    public class RefundRequestedValidator : AbstractValidator<RefundRequested>
+    public class RequestRefundValidator : AbstractValidator<RequestRefund>
     {
-        public RefundRequestedValidator()
+        public RequestRefundValidator()
         {
             RuleFor(x => x.PaymentId).NotEmpty();
             RuleFor(x => x.OrderId).NotEmpty();
@@ -23,10 +23,10 @@ public sealed record RefundRequested(
     }
 }
 
-public static class RefundRequestedHandler
+public static class RequestRefundHandler
 {
     public static ProblemDetails Before(
-        RefundRequested command,
+        RequestRefund command,
         Payment? payment)
     {
         if (payment is null)
@@ -54,7 +54,7 @@ public static class RefundRequestedHandler
     }
 
     public static async Task<(Events, OutgoingMessages)> Handle(
-        RefundRequested command,
+        RequestRefund command,
         [WriteAggregate] Payment payment,
         IPaymentGateway gateway,
         CancellationToken cancellationToken)
