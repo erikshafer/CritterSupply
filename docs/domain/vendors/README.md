@@ -1,0 +1,7 @@
+# Vendor Domain Reference Data
+
+This directory contains CritterSupply's canonical imaginary vendor roster. The files here are documentation artifacts rather than executable seeds: `vendor-catalog.md` is the narrative source of truth for the companies, people, and product lines, while `vendor-catalog.json` carries the same roster in a structured format that mirrors the current Vendor Identity, Vendor Portal, Product Catalog, and Pricing shapes closely enough for future tooling to consume.
+
+The data was created as a domain exercise instead of an implementation task. The goal was to make the vendor side of CritterSupply feel inhabited and internally consistent so that demos, E2E fixtures, manual walkthroughs, and future seed infrastructure all draw from the same believable cast rather than inventing a new fake vendor every time.
+
+**Recommended future seeding strategy (@QAE):** use a hybrid approach. Load the JSON as deterministic fixture input for baseline tenants, users, products, and prices; shape authentication separately with well-known vendor claims for `VendorTenantId`, `VendorUserId`, and `Role`; and reserve event-stream replay or command/event append workflows for tests that explicitly validate projections, messaging, or event-sourced behavior. In short: fixture-load for speed and readability, claims for auth coverage, and replay only when replay itself is what the test is about.

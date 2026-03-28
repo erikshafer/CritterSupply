@@ -1,0 +1,1385 @@
+{
+  "Vendors": [
+    {
+      "VendorTenant": {
+        "Id": "10000000-0000-0000-0000-000000000101",
+        "OrganizationName": "HearthHound Nutrition Co.",
+        "ContactEmail": "ops@hearthhound.com",
+        "Status": "Active",
+        "OnboardedAt": "2024-09-12T14:00:00Z",
+        "SuspendedAt": null,
+        "SuspensionReason": null,
+        "TerminatedAt": null,
+        "TerminationReason": null
+      },
+      "DocumentationProfile": {
+        "Tagline": "Everyday nutrition built for active pets and the people who feed them well.",
+        "FoundedYear": 2013,
+        "HeadquartersCity": "Denver",
+        "HeadquartersState": "Colorado",
+        "CompanyType": "Privately held mid-size pet nutrition manufacturer",
+        "PrimarySpecialty": "Food and nutrition",
+        "SecondarySpecialty": "Functional treats",
+        "FixtureRole": "Default test vendor / happy-path baseline",
+        "Backstory": "HearthHound Nutrition Co. was founded by former regional pet-retail buyers who believed there was room between commodity grocery brands and ultra-premium niche foods. The company built its reputation on dependable replenishment, clear feeding guidance, and approachable formulas that independent retailers could recommend without hesitation. Over the last decade it has expanded into toppers and wellness chews without drifting into catalog sprawl, which makes it feel like a realistic mid-size wholesale partner. In demos, HearthHound is the vendor that makes everything look normal in the best possible way.",
+        "NotableContext": "Best all-around baseline vendor for most integration, E2E, and demo scenarios.",
+        "OperatorNotes": [
+          "Healthy active account with all three portal roles represented.",
+          "Good default for role-based UI tests, catalog browsing, and standard change request flows."
+        ]
+      },
+      "VendorUsers": [
+        {
+          "Id": "10000000-0000-0000-0000-000000001101",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000101",
+          "Email": "mkerr@hearthhound.com",
+          "FirstName": "Melissa",
+          "LastName": "Kerr",
+          "Role": "Admin",
+          "Status": "Active",
+          "InvitedAt": "2024-09-12T15:00:00Z",
+          "ActivatedAt": "2024-09-13T09:30:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-25T16:45:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000001102",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000101",
+          "Email": "jpike@hearthhound.com",
+          "FirstName": "Jordan",
+          "LastName": "Pike",
+          "Role": "CatalogManager",
+          "Status": "Active",
+          "InvitedAt": "2024-09-14T14:15:00Z",
+          "ActivatedAt": "2024-09-15T10:00:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-24T12:10:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000001103",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000101",
+          "Email": "esuarez@hearthhound.com",
+          "FirstName": "Elena",
+          "LastName": "Suarez",
+          "Role": "ReadOnly",
+          "Status": "Active",
+          "InvitedAt": "2024-09-18T11:00:00Z",
+          "ActivatedAt": "2024-09-19T08:20:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-21T14:05:00Z"
+        }
+      ],
+      "VendorUserInvitations": [],
+      "CatalogProducts": [
+        {
+          "Id": "10000000-0000-0000-0000-000000002101",
+          "Sku": "HH-SALMON-22LB",
+          "Name": "Open Range Salmon Kibble 22 lb",
+          "Description": "Grain-inclusive salmon and brown rice kibble for active adult dogs. It is HearthHound's dependable core assortment item.",
+          "LongDescription": null,
+          "Category": "Dry Dog Food",
+          "Subcategory": "Adult Formula",
+          "Brand": "HearthHound",
+          "Images": [],
+          "Tags": [
+            "nutrition",
+            "dog",
+            "core assortment"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000101",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-09-16T09:00:00Z",
+          "AddedAt": "2024-09-16T09:00:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002102",
+          "Sku": "HH-TURKEY-TOPPER",
+          "Name": "Turkey & Pumpkin Topper 12-Pack",
+          "Description": "Shelf-stable turkey and pumpkin topper for dogs with sensitive stomachs. It works well as an attachment item to core kibble orders.",
+          "LongDescription": null,
+          "Category": "Wet Food Toppers",
+          "Subcategory": "Digestive Support",
+          "Brand": "HearthHound",
+          "Images": [],
+          "Tags": [
+            "nutrition",
+            "dog",
+            "topper"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000101",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-09-16T09:05:00Z",
+          "AddedAt": "2024-09-16T09:05:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002103",
+          "Sku": "HH-JOINT-CHEWS90",
+          "Name": "Joint Support Chews 90-Count",
+          "Description": "Soft chews with glucosamine and green-lipped mussel for aging dogs. Positioned as a wellness add-on rather than a therapeutic claim product.",
+          "LongDescription": null,
+          "Category": "Functional Dog Treats",
+          "Subcategory": "Joint Support",
+          "Brand": "HearthHound",
+          "Images": [],
+          "Tags": [
+            "wellness",
+            "dog",
+            "chews"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000101",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-09-16T09:10:00Z",
+          "AddedAt": "2024-09-16T09:10:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002104",
+          "Sku": "HH-PUPPY-STARTER",
+          "Name": "Puppy Starter Feeding Kit",
+          "Description": "Starter assortment with puppy kibble, topper pouches, and a simple feeding guide. It exists to support launch-ready bundle merchandising.",
+          "LongDescription": null,
+          "Category": "Puppy Feeding Kits",
+          "Subcategory": "Starter Bundles",
+          "Brand": "HearthHound",
+          "Images": [],
+          "Tags": [
+            "puppy",
+            "bundle",
+            "launch"
+          ],
+          "Dimensions": null,
+          "Status": "ComingSoon",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000101",
+          "AssignedBy": "system",
+          "AssignedAt": "2025-12-03T10:30:00Z",
+          "AddedAt": "2025-12-03T10:30:00Z",
+          "UpdatedAt": "2026-02-28T09:00:00Z"
+        }
+      ],
+      "InitialPrices": [
+        {
+          "Sku": "HH-SALMON-22LB",
+          "Amount": 64.99,
+          "Currency": "USD",
+          "FloorAmount": 52.0,
+          "CeilingAmount": 79.99,
+          "SetBy": "10000000-0000-0000-0000-000000001101",
+          "PricedAt": "2024-09-16T09:30:00Z"
+        },
+        {
+          "Sku": "HH-TURKEY-TOPPER",
+          "Amount": 19.99,
+          "Currency": "USD",
+          "FloorAmount": 15.0,
+          "CeilingAmount": 24.99,
+          "SetBy": "10000000-0000-0000-0000-000000001101",
+          "PricedAt": "2024-09-16T09:35:00Z"
+        },
+        {
+          "Sku": "HH-JOINT-CHEWS90",
+          "Amount": 29.99,
+          "Currency": "USD",
+          "FloorAmount": 22.5,
+          "CeilingAmount": 36.0,
+          "SetBy": "10000000-0000-0000-0000-000000001101",
+          "PricedAt": "2024-09-16T09:40:00Z"
+        },
+        {
+          "Sku": "HH-PUPPY-STARTER",
+          "Amount": 34.5,
+          "Currency": "USD",
+          "FloorAmount": 28.0,
+          "CeilingAmount": 42.0,
+          "SetBy": "10000000-0000-0000-0000-000000001101",
+          "PricedAt": "2026-02-28T09:05:00Z"
+        }
+      ]
+    },
+    {
+      "VendorTenant": {
+        "Id": "10000000-0000-0000-0000-000000000102",
+        "OrganizationName": "TumblePaw Play Labs",
+        "ContactEmail": "hello@tumblepaw.com",
+        "Status": "Onboarding",
+        "OnboardedAt": "2026-03-20T13:00:00Z",
+        "SuspendedAt": null,
+        "SuspensionReason": null,
+        "TerminatedAt": null,
+        "TerminationReason": null
+      },
+      "DocumentationProfile": {
+        "Tagline": "Modern enrichment toys for pets that get bored faster than their humans.",
+        "FoundedYear": 2023,
+        "HeadquartersCity": "Austin",
+        "HeadquartersState": "Texas",
+        "CompanyType": "VC-backed startup brand",
+        "PrimarySpecialty": "Toys and enrichment",
+        "SecondarySpecialty": "Training accessories",
+        "FixtureRole": "Onboarding and invitation edge case",
+        "Backstory": "TumblePaw Play Labs was started by a former children's toy designer and a canine behavior consultant who saw a gap between cheap novelty toys and enrichment products that actually held a pet's attention. The brand gained traction through social-first direct-to-consumer bundles before expanding into selective wholesale. Its assortment is still compact, packaging-forward, and unmistakably startup-shaped: every product feels intentional, but the operational bench is still thin. In CritterSupply, TumblePaw is the vendor that helps onboarding flows feel real instead of hypothetical.",
+        "NotableContext": "Primary onboarding vendor with pending invitations and an incomplete team roster.",
+        "OperatorNotes": [
+          "Best fit for invite resend, activation, and onboarding-dashboard scenarios.",
+          "Portal expectation: the tenant exists, one admin can work, and setup still feels in progress."
+        ]
+      },
+      "VendorUsers": [
+        {
+          "Id": "10000000-0000-0000-0000-000000001201",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000102",
+          "Email": "asha@tumblepaw.com",
+          "FirstName": "Asha",
+          "LastName": "Bell",
+          "Role": "Admin",
+          "Status": "Active",
+          "InvitedAt": "2026-03-20T14:00:00Z",
+          "ActivatedAt": "2026-03-21T09:15:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-27T17:20:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000001202",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000102",
+          "Email": "connor@tumblepaw.com",
+          "FirstName": "Connor",
+          "LastName": "Reeves",
+          "Role": "CatalogManager",
+          "Status": "Invited",
+          "InvitedAt": "2026-03-27T15:00:00Z",
+          "ActivatedAt": null,
+          "DeactivatedAt": null,
+          "LastLoginAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000001203",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000102",
+          "Email": "mina@tumblepaw.com",
+          "FirstName": "Mina",
+          "LastName": "Albright",
+          "Role": "ReadOnly",
+          "Status": "Invited",
+          "InvitedAt": "2026-03-28T10:00:00Z",
+          "ActivatedAt": null,
+          "DeactivatedAt": null,
+          "LastLoginAt": null
+        }
+      ],
+      "VendorUserInvitations": [
+        {
+          "Id": "10000000-0000-0000-0000-000000003201",
+          "VendorUserId": "10000000-0000-0000-0000-000000001202",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000102",
+          "Token": "<pending-token-hash>",
+          "InvitedRole": "CatalogManager",
+          "Status": "Pending",
+          "InvitedAt": "2026-03-27T15:00:00Z",
+          "ExpiresAt": "2026-03-30T15:00:00Z",
+          "AcceptedAt": null,
+          "RevokedAt": null,
+          "ResendCount": 1
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000003202",
+          "VendorUserId": "10000000-0000-0000-0000-000000001203",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000102",
+          "Token": "<pending-token-hash>",
+          "InvitedRole": "ReadOnly",
+          "Status": "Pending",
+          "InvitedAt": "2026-03-28T10:00:00Z",
+          "ExpiresAt": "2026-03-31T10:00:00Z",
+          "AcceptedAt": null,
+          "RevokedAt": null,
+          "ResendCount": 0
+        }
+      ],
+      "CatalogProducts": [
+        {
+          "Id": "10000000-0000-0000-0000-000000002201",
+          "Sku": "TP-ORBIT-FEED",
+          "Name": "Orbit Puzzle Feeder",
+          "Description": "Wobble-style enrichment feeder with adjustable difficulty for dogs and cats. It supports slower feeding and daily mental stimulation.",
+          "LongDescription": null,
+          "Category": "Interactive Feeders",
+          "Subcategory": "Puzzle Feeders",
+          "Brand": "TumblePaw",
+          "Images": [],
+          "Tags": [
+            "enrichment",
+            "dog",
+            "cat"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000102",
+          "AssignedBy": "system",
+          "AssignedAt": "2026-03-22T09:00:00Z",
+          "AddedAt": "2026-03-22T09:00:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002202",
+          "Sku": "TP-RIPPLE-MAT",
+          "Name": "Ripple Silicone Lick Mat",
+          "Description": "Dishwasher-safe silicone mat with suction cups for bathing, grooming, or calming routines. It is a small visual product with strong impulse appeal.",
+          "LongDescription": null,
+          "Category": "Lick Mats",
+          "Subcategory": "Calming Accessories",
+          "Brand": "TumblePaw",
+          "Images": [],
+          "Tags": [
+            "enrichment",
+            "grooming",
+            "calming"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000102",
+          "AssignedBy": "system",
+          "AssignedAt": "2026-03-22T09:05:00Z",
+          "AddedAt": "2026-03-22T09:05:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002203",
+          "Sku": "TP-POCKET-TUG",
+          "Name": "Pocket Tug Mini",
+          "Description": "Compact tug toy aimed at puppy classes and reward-based training sessions. Sized and priced as an easy add-on purchase.",
+          "LongDescription": null,
+          "Category": "Training Toys",
+          "Subcategory": "Tug Toys",
+          "Brand": "TumblePaw",
+          "Images": [],
+          "Tags": [
+            "training",
+            "dog",
+            "starter"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000102",
+          "AssignedBy": "system",
+          "AssignedAt": "2026-03-22T09:10:00Z",
+          "AddedAt": "2026-03-22T09:10:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002204",
+          "Sku": "TP-BURROW-BEETLE",
+          "Name": "Burrow Beetle Plush Puzzle Set",
+          "Description": "Hide-and-seek plush set for small dogs and enrichment-driven gifting. Final retail packaging is still in approval, making it a realistic future-launch item.",
+          "LongDescription": null,
+          "Category": "Plush Puzzle Toys",
+          "Subcategory": "Hide-and-Seek Toys",
+          "Brand": "TumblePaw",
+          "Images": [],
+          "Tags": [
+            "launch",
+            "plush",
+            "enrichment"
+          ],
+          "Dimensions": null,
+          "Status": "ComingSoon",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000102",
+          "AssignedBy": "system",
+          "AssignedAt": "2026-03-25T11:00:00Z",
+          "AddedAt": "2026-03-25T11:00:00Z",
+          "UpdatedAt": "2026-03-27T09:00:00Z"
+        }
+      ],
+      "InitialPrices": [
+        {
+          "Sku": "TP-ORBIT-FEED",
+          "Amount": 26.0,
+          "Currency": "USD",
+          "FloorAmount": 19.0,
+          "CeilingAmount": 32.0,
+          "SetBy": "10000000-0000-0000-0000-000000001201",
+          "PricedAt": "2026-03-22T09:30:00Z"
+        },
+        {
+          "Sku": "TP-RIPPLE-MAT",
+          "Amount": 14.5,
+          "Currency": "USD",
+          "FloorAmount": 10.5,
+          "CeilingAmount": 18.0,
+          "SetBy": "10000000-0000-0000-0000-000000001201",
+          "PricedAt": "2026-03-22T09:35:00Z"
+        },
+        {
+          "Sku": "TP-POCKET-TUG",
+          "Amount": 12.0,
+          "Currency": "USD",
+          "FloorAmount": 8.5,
+          "CeilingAmount": 15.0,
+          "SetBy": "10000000-0000-0000-0000-000000001201",
+          "PricedAt": "2026-03-22T09:40:00Z"
+        },
+        {
+          "Sku": "TP-BURROW-BEETLE",
+          "Amount": 24.0,
+          "Currency": "USD",
+          "FloorAmount": 18.0,
+          "CeilingAmount": 30.0,
+          "SetBy": "10000000-0000-0000-0000-000000001201",
+          "PricedAt": "2026-03-27T09:05:00Z"
+        }
+      ]
+    },
+    {
+      "VendorTenant": {
+        "Id": "10000000-0000-0000-0000-000000000103",
+        "OrganizationName": "Red Clay Kennel Goods",
+        "ContactEmail": "accounts@redclaykennel.com",
+        "Status": "Active",
+        "OnboardedAt": "2024-04-10T13:00:00Z",
+        "SuspendedAt": null,
+        "SuspensionReason": null,
+        "TerminatedAt": null,
+        "TerminationReason": null
+      },
+      "DocumentationProfile": {
+        "Tagline": "Hardworking collars, clean coats, and kennel basics built to last.",
+        "FoundedYear": 1992,
+        "HeadquartersCity": "Asheville",
+        "HeadquartersState": "North Carolina",
+        "CompanyType": "Family-owned manufacturer and distributor",
+        "PrimarySpecialty": "Accessories and gear",
+        "SecondarySpecialty": "Grooming",
+        "FixtureRole": "Legacy family business with mixed product lifecycle states",
+        "Backstory": "Red Clay Kennel Goods began as a family leather shop making leads and collars for hunting dogs across the Southeast. Over time, the McRae family expanded into kennel pads, grooming concentrates, and durable everyday accessories that fit feed stores, grooming shops, and independent pet retailers. The business still has a practical operator-led feel: fewer flashy launches, more dependable replenishment, and just enough catalog drift to produce realistic cleanup work. It is exactly the kind of regional family vendor that would have both loyal buyers and a few long-tail SKUs that need periodic rationalization.",
+        "NotableContext": "Best family-business example in the roster.",
+        "OperatorNotes": [
+          "Useful for testing catalog filters that combine Active, OutOfSeason, and Discontinued products.",
+          "Two CatalogManager users make role-based list and concurrency scenarios more believable."
+        ]
+      },
+      "VendorUsers": [
+        {
+          "Id": "10000000-0000-0000-0000-000000001301",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000103",
+          "Email": "thomas@redclaykennel.com",
+          "FirstName": "Thomas",
+          "LastName": "McRae",
+          "Role": "Admin",
+          "Status": "Active",
+          "InvitedAt": "2024-04-10T14:00:00Z",
+          "ActivatedAt": "2024-04-11T09:00:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-26T15:30:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000001302",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000103",
+          "Email": "lila@redclaykennel.com",
+          "FirstName": "Lila",
+          "LastName": "McRae Foster",
+          "Role": "CatalogManager",
+          "Status": "Active",
+          "InvitedAt": "2024-04-11T10:15:00Z",
+          "ActivatedAt": "2024-04-12T08:45:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-24T11:20:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000001303",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000103",
+          "Email": "denise@redclaykennel.com",
+          "FirstName": "Denise",
+          "LastName": "Waller",
+          "Role": "CatalogManager",
+          "Status": "Active",
+          "InvitedAt": "2024-06-02T14:00:00Z",
+          "ActivatedAt": "2024-06-03T09:00:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-22T10:00:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000001304",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000103",
+          "Email": "owen.patel@redclaykennel.com",
+          "FirstName": "Owen",
+          "LastName": "Patel",
+          "Role": "ReadOnly",
+          "Status": "Active",
+          "InvitedAt": "2024-05-07T13:15:00Z",
+          "ActivatedAt": "2024-05-08T08:30:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-20T13:50:00Z"
+        }
+      ],
+      "VendorUserInvitations": [],
+      "CatalogProducts": [
+        {
+          "Id": "10000000-0000-0000-0000-000000002301",
+          "Sku": "RCKG-FIELD-COLLAR",
+          "Name": "Field Collar 1 in",
+          "Description": "Oiled-leather collar with solid brass hardware aimed at everyday wear and field use. It reads as a durable heritage item rather than a trend product.",
+          "LongDescription": null,
+          "Category": "Dog Collars",
+          "Subcategory": "Leather Collars",
+          "Brand": "Red Clay Kennel Goods",
+          "Images": [],
+          "Tags": [
+            "gear",
+            "dog",
+            "heritage"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000103",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-04-15T09:00:00Z",
+          "AddedAt": "2024-04-15T09:00:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002302",
+          "Sku": "RCKG-TREAT-POUCH",
+          "Name": "Waxed Canvas Treat Pouch",
+          "Description": "Waxed-canvas waist pouch for classes, walks, and recall work. It is a practical accessory with a strong add-on price point.",
+          "LongDescription": null,
+          "Category": "Training Gear",
+          "Subcategory": "Treat Storage",
+          "Brand": "Red Clay Kennel Goods",
+          "Images": [],
+          "Tags": [
+            "training",
+            "gear",
+            "dog"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000103",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-04-15T09:05:00Z",
+          "AddedAt": "2024-04-15T09:05:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002303",
+          "Sku": "RCKG-SHED-SHAMPOO",
+          "Name": "Shed Control Shampoo 16 oz",
+          "Description": "Concentrated oatmeal-based shampoo for routine coat maintenance. Suitable for both salon resale and home use.",
+          "LongDescription": null,
+          "Category": "Dog Grooming",
+          "Subcategory": "Shampoo",
+          "Brand": "Red Clay Kennel Goods",
+          "Images": [],
+          "Tags": [
+            "grooming",
+            "dog",
+            "core assortment"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000103",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-04-15T09:10:00Z",
+          "AddedAt": "2024-04-15T09:10:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002304",
+          "Sku": "RCKG-CEDAR-PAD",
+          "Name": "Cedar Kennel Pad",
+          "Description": "Washable kennel pad sized for common wire crates and travel kennels. This plaid seasonal pattern rotates in colder months.",
+          "LongDescription": null,
+          "Category": "Kennel Bedding",
+          "Subcategory": "Seasonal Pads",
+          "Brand": "Red Clay Kennel Goods",
+          "Images": [],
+          "Tags": [
+            "seasonal",
+            "bedding",
+            "kennel"
+          ],
+          "Dimensions": null,
+          "Status": "OutOfSeason",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000103",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-08-12T10:00:00Z",
+          "AddedAt": "2024-08-12T10:00:00Z",
+          "UpdatedAt": "2026-03-01T08:00:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002305",
+          "Sku": "RCKG-BRASS-LEAD",
+          "Name": "Brass Slip Lead",
+          "Description": "Former staple training lead with classic hardware. It was retired after material cost increases and lower turns.",
+          "LongDescription": null,
+          "Category": "Slip Leads",
+          "Subcategory": "Training Leads",
+          "Brand": "Red Clay Kennel Goods",
+          "Images": [],
+          "Tags": [
+            "discontinued",
+            "training",
+            "heritage"
+          ],
+          "Dimensions": null,
+          "Status": "Discontinued",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000103",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-04-20T10:00:00Z",
+          "AddedAt": "2024-04-20T10:00:00Z",
+          "UpdatedAt": "2026-01-15T08:30:00Z"
+        }
+      ],
+      "InitialPrices": [
+        {
+          "Sku": "RCKG-FIELD-COLLAR",
+          "Amount": 38.0,
+          "Currency": "USD",
+          "FloorAmount": 28.0,
+          "CeilingAmount": 46.0,
+          "SetBy": "10000000-0000-0000-0000-000000001301",
+          "PricedAt": "2024-04-15T09:30:00Z"
+        },
+        {
+          "Sku": "RCKG-TREAT-POUCH",
+          "Amount": 22.0,
+          "Currency": "USD",
+          "FloorAmount": 16.5,
+          "CeilingAmount": 28.0,
+          "SetBy": "10000000-0000-0000-0000-000000001301",
+          "PricedAt": "2024-04-15T09:35:00Z"
+        },
+        {
+          "Sku": "RCKG-SHED-SHAMPOO",
+          "Amount": 18.5,
+          "Currency": "USD",
+          "FloorAmount": 13.0,
+          "CeilingAmount": 24.0,
+          "SetBy": "10000000-0000-0000-0000-000000001301",
+          "PricedAt": "2024-04-15T09:40:00Z"
+        },
+        {
+          "Sku": "RCKG-CEDAR-PAD",
+          "Amount": 44.0,
+          "Currency": "USD",
+          "FloorAmount": 33.0,
+          "CeilingAmount": 52.0,
+          "SetBy": "10000000-0000-0000-0000-000000001301",
+          "PricedAt": "2024-08-12T10:15:00Z"
+        },
+        {
+          "Sku": "RCKG-BRASS-LEAD",
+          "Amount": 31.0,
+          "Currency": "USD",
+          "FloorAmount": 24.0,
+          "CeilingAmount": 38.0,
+          "SetBy": "10000000-0000-0000-0000-000000001301",
+          "PricedAt": "2024-04-20T10:15:00Z"
+        }
+      ]
+    },
+    {
+      "VendorTenant": {
+        "Id": "10000000-0000-0000-0000-000000000104",
+        "OrganizationName": "Prairie Nest Habitat Works",
+        "ContactEmail": "partners@prairienest.com",
+        "Status": "Active",
+        "OnboardedAt": "2024-01-22T12:30:00Z",
+        "SuspendedAt": null,
+        "SuspensionReason": null,
+        "TerminatedAt": null,
+        "TerminationReason": null
+      },
+      "DocumentationProfile": {
+        "Tagline": "Thoughtful habitats and pet furniture built for everyday living spaces.",
+        "FoundedYear": 1961,
+        "HeadquartersCity": "Madison",
+        "HeadquartersState": "Wisconsin",
+        "CompanyType": "Legacy employee-owned habitat manufacturer",
+        "PrimarySpecialty": "Habitat and furniture",
+        "SecondarySpecialty": "Small animal and bird habitat accessories",
+        "FixtureRole": "Legacy bulky-goods vendor / seasonal assortment example",
+        "Backstory": "Prairie Nest Habitat Works started as a Midwestern woodshop producing rabbit hutches and bird stands for local feed stores. Over six decades it evolved into a broad habitat and furniture supplier with products spanning cat towers, small-animal enclosures, and cage accessories sold through specialty retail and regional farm channels. The founder family exited years ago, but the employee-owned structure preserved the company's practical product DNA and slower release cadence. In CritterSupply it represents the vendor whose assortment is operationally heavier: bigger dimensions, more seasonal carryover, and fewer impulse-buy items.",
+        "NotableContext": "Best legacy 50+ year vendor in the set.",
+        "OperatorNotes": [
+          "Useful for demos involving bulky-goods language, furniture-style categories, and seasonal assortment changes.",
+          "Strong operator lookup example when someone needs the habitat vendor rather than a brand-led DTC story."
+        ]
+      },
+      "VendorUsers": [
+        {
+          "Id": "10000000-0000-0000-0000-000000001401",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000104",
+          "Email": "bng@prairienest.com",
+          "FirstName": "Barbara",
+          "LastName": "Ng",
+          "Role": "Admin",
+          "Status": "Active",
+          "InvitedAt": "2024-01-22T13:00:00Z",
+          "ActivatedAt": "2024-01-23T09:00:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-25T11:45:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000001402",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000104",
+          "Email": "msorensen@prairienest.com",
+          "FirstName": "Michael",
+          "LastName": "Sorensen",
+          "Role": "CatalogManager",
+          "Status": "Active",
+          "InvitedAt": "2024-01-23T10:00:00Z",
+          "ActivatedAt": "2024-01-24T08:20:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-23T14:10:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000001403",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000104",
+          "Email": "kdarden@prairienest.com",
+          "FirstName": "Keisha",
+          "LastName": "Darden",
+          "Role": "ReadOnly",
+          "Status": "Active",
+          "InvitedAt": "2024-01-25T13:00:00Z",
+          "ActivatedAt": "2024-01-26T08:15:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-19T09:30:00Z"
+        }
+      ],
+      "VendorUserInvitations": [],
+      "CatalogProducts": [
+        {
+          "Id": "10000000-0000-0000-0000-000000002401",
+          "Sku": "PNHW-ALDER-TOWER",
+          "Name": "Alder Cat Tower",
+          "Description": "Multi-level cat tower with replaceable sisal posts and neutral upholstery. It is a representative bulky assembled furniture item.",
+          "LongDescription": null,
+          "Category": "Cat Furniture",
+          "Subcategory": "Cat Trees",
+          "Brand": "Prairie Nest",
+          "Images": [],
+          "Tags": [
+            "cat",
+            "furniture",
+            "bulky"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000104",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-01-28T10:00:00Z",
+          "AddedAt": "2024-01-28T10:00:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002402",
+          "Sku": "PNHW-MEADOW-CONDO",
+          "Name": "Meadow Rabbit Condo",
+          "Description": "Wood-and-wire habitat with removable tray and hay loft. Designed for retailers serving rabbit and guinea pig owners.",
+          "LongDescription": null,
+          "Category": "Small Animal Habitats",
+          "Subcategory": "Rabbit Housing",
+          "Brand": "Prairie Nest",
+          "Images": [],
+          "Tags": [
+            "small animal",
+            "habitat",
+            "bulky"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000104",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-01-28T10:05:00Z",
+          "AddedAt": "2024-01-28T10:05:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002403",
+          "Sku": "PNHW-AVIARY-PERCH",
+          "Name": "Aviary Perch Set",
+          "Description": "Assorted natural-wood perches cut to fit common cage sizes. It is a simpler accessory within a more complex habitat catalog.",
+          "LongDescription": null,
+          "Category": "Bird Habitat Accessories",
+          "Subcategory": "Perches",
+          "Brand": "Prairie Nest",
+          "Images": [],
+          "Tags": [
+            "bird",
+            "habitat",
+            "accessory"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000104",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-01-28T10:10:00Z",
+          "AddedAt": "2024-01-28T10:10:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002404",
+          "Sku": "PNHW-PORCH-BED",
+          "Name": "Summer Porch Bed",
+          "Description": "Elevated indoor-outdoor lounger with washable sling cover. It is merchandised seasonally in warmer months.",
+          "LongDescription": null,
+          "Category": "Pet Furniture",
+          "Subcategory": "Seasonal Loungers",
+          "Brand": "Prairie Nest",
+          "Images": [],
+          "Tags": [
+            "seasonal",
+            "furniture",
+            "indoor-outdoor"
+          ],
+          "Dimensions": null,
+          "Status": "OutOfSeason",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000104",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-04-10T10:00:00Z",
+          "AddedAt": "2024-04-10T10:00:00Z",
+          "UpdatedAt": "2025-11-01T08:00:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002405",
+          "Sku": "PNHW-TRAVEL-CRATE",
+          "Name": "Fold-Flat Travel Crate",
+          "Description": "Steel-frame soft-sided crate for short stays and vehicle transport. It represents a furniture-gear crossover product with moderate price and size.",
+          "LongDescription": null,
+          "Category": "Travel Crates",
+          "Subcategory": "Soft Crates",
+          "Brand": "Prairie Nest",
+          "Images": [],
+          "Tags": [
+            "travel",
+            "crate",
+            "gear"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000104",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-05-04T10:00:00Z",
+          "AddedAt": "2024-05-04T10:00:00Z",
+          "UpdatedAt": null
+        }
+      ],
+      "InitialPrices": [
+        {
+          "Sku": "PNHW-ALDER-TOWER",
+          "Amount": 189.0,
+          "Currency": "USD",
+          "FloorAmount": 145.0,
+          "CeilingAmount": 229.0,
+          "SetBy": "10000000-0000-0000-0000-000000001401",
+          "PricedAt": "2024-01-28T10:30:00Z"
+        },
+        {
+          "Sku": "PNHW-MEADOW-CONDO",
+          "Amount": 249.0,
+          "Currency": "USD",
+          "FloorAmount": 189.0,
+          "CeilingAmount": 299.0,
+          "SetBy": "10000000-0000-0000-0000-000000001401",
+          "PricedAt": "2024-01-28T10:35:00Z"
+        },
+        {
+          "Sku": "PNHW-AVIARY-PERCH",
+          "Amount": 27.5,
+          "Currency": "USD",
+          "FloorAmount": 20.0,
+          "CeilingAmount": 33.0,
+          "SetBy": "10000000-0000-0000-0000-000000001401",
+          "PricedAt": "2024-01-28T10:40:00Z"
+        },
+        {
+          "Sku": "PNHW-PORCH-BED",
+          "Amount": 79.0,
+          "Currency": "USD",
+          "FloorAmount": 59.0,
+          "CeilingAmount": 95.0,
+          "SetBy": "10000000-0000-0000-0000-000000001401",
+          "PricedAt": "2024-04-10T10:15:00Z"
+        },
+        {
+          "Sku": "PNHW-TRAVEL-CRATE",
+          "Amount": 96.0,
+          "Currency": "USD",
+          "FloorAmount": 72.0,
+          "CeilingAmount": 118.0,
+          "SetBy": "10000000-0000-0000-0000-000000001401",
+          "PricedAt": "2024-05-04T10:15:00Z"
+        }
+      ]
+    },
+    {
+      "VendorTenant": {
+        "Id": "10000000-0000-0000-0000-000000000105",
+        "OrganizationName": "Harbor & Fern Pet Apothecary",
+        "ContactEmail": "wholesale@harborandfern.com",
+        "Status": "Active",
+        "OnboardedAt": "2024-11-08T12:00:00Z",
+        "SuspendedAt": null,
+        "SuspensionReason": null,
+        "TerminatedAt": null,
+        "TerminationReason": null
+      },
+      "DocumentationProfile": {
+        "Tagline": "Botanical wellness and grooming for pets, packaged with a lighter footprint.",
+        "FoundedYear": 2018,
+        "HeadquartersCity": "Burlington",
+        "HeadquartersState": "Vermont",
+        "CompanyType": "Certified B Corporation",
+        "PrimarySpecialty": "Health and wellness",
+        "SecondarySpecialty": "Grooming",
+        "FixtureRole": "Sustainability-focused boutique brand / premium content review example",
+        "Backstory": "Harbor & Fern Pet Apothecary was founded by an herbal formulator and a former veterinary technician who wanted premium wellness products that looked modern without making irresponsible claims. The brand built an audience through refill pouches, post-consumer packaging, and transparent ingredient sourcing before expanding into selective wholesale. Its assortment is intentionally tight, premium-priced, and copy-sensitive, which makes it useful for tests involving content review, curated merchandising, and brand consistency. This is the vendor that makes sustainability and premium positioning feel specific instead of generic.",
+        "NotableContext": "Best sustainability-focused vendor in the roster.",
+        "OperatorNotes": [
+          "Good fit for premium assortment demos, content-review workflows, and boutique-brand storytelling.",
+          "ReadOnly user is intentionally finance-oriented rather than a synthetic filler role."
+        ]
+      },
+      "VendorUsers": [
+        {
+          "Id": "10000000-0000-0000-0000-000000001501",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000105",
+          "Email": "nora@harborandfern.com",
+          "FirstName": "Nora",
+          "LastName": "Whitcomb",
+          "Role": "Admin",
+          "Status": "Active",
+          "InvitedAt": "2024-11-08T13:00:00Z",
+          "ActivatedAt": "2024-11-09T09:00:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-26T10:25:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000001502",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000105",
+          "Email": "seth@harborandfern.com",
+          "FirstName": "Seth",
+          "LastName": "Molina",
+          "Role": "CatalogManager",
+          "Status": "Active",
+          "InvitedAt": "2024-11-10T13:00:00Z",
+          "ActivatedAt": "2024-11-11T09:00:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-24T09:40:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000001503",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000105",
+          "Email": "priyanka@harborandfern.com",
+          "FirstName": "Priyanka",
+          "LastName": "Desai",
+          "Role": "ReadOnly",
+          "Status": "Active",
+          "InvitedAt": "2024-11-12T12:00:00Z",
+          "ActivatedAt": "2024-11-13T08:30:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-03-18T11:10:00Z"
+        }
+      ],
+      "VendorUserInvitations": [],
+      "CatalogProducts": [
+        {
+          "Id": "10000000-0000-0000-0000-000000002501",
+          "Sku": "HF-CALM-DROPS",
+          "Name": "Calm Tide Drops",
+          "Description": "Hemp-free calming tincture for dogs with chamomile and L-theanine. Positioned for everyday situational support rather than heavy sedation.",
+          "LongDescription": null,
+          "Category": "Calming Supplements",
+          "Subcategory": "Liquid Supplements",
+          "Brand": "Harbor & Fern",
+          "Images": [],
+          "Tags": [
+            "wellness",
+            "calming",
+            "dog"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000105",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-11-15T09:00:00Z",
+          "AddedAt": "2024-11-15T09:00:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002502",
+          "Sku": "HF-PAW-BALM",
+          "Name": "Paw Balm Tin",
+          "Description": "Beeswax-free balm in a recyclable aluminum tin for dry pads and winter salt exposure. It carries the brand's strongest sustainability story.",
+          "LongDescription": null,
+          "Category": "Paw Care",
+          "Subcategory": "Balms",
+          "Brand": "Harbor & Fern",
+          "Images": [],
+          "Tags": [
+            "grooming",
+            "sustainability",
+            "paw care"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000105",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-11-15T09:05:00Z",
+          "AddedAt": "2024-11-15T09:05:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002503",
+          "Sku": "HF-COAT-RINSE",
+          "Name": "Coat Restore Rinse",
+          "Description": "Lightweight leave-in coat rinse for long-haired dogs using botanical oils and a low-fragrance profile. It is a premium grooming SKU with boutique positioning.",
+          "LongDescription": null,
+          "Category": "Dog Grooming",
+          "Subcategory": "Leave-In Treatments",
+          "Brand": "Harbor & Fern",
+          "Images": [],
+          "Tags": [
+            "grooming",
+            "premium",
+            "dog"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000105",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-11-15T09:10:00Z",
+          "AddedAt": "2024-11-15T09:10:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002504",
+          "Sku": "HF-GUT-FLORA",
+          "Name": "Gut Flora Powder",
+          "Description": "Daily probiotic powder packed in a compostable refill pouch. It is a replenishable premium wellness item.",
+          "LongDescription": null,
+          "Category": "Digestive Supplements",
+          "Subcategory": "Probiotic Powders",
+          "Brand": "Harbor & Fern",
+          "Images": [],
+          "Tags": [
+            "digestive",
+            "wellness",
+            "refill"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000105",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-11-15T09:15:00Z",
+          "AddedAt": "2024-11-15T09:15:00Z",
+          "UpdatedAt": null
+        }
+      ],
+      "InitialPrices": [
+        {
+          "Sku": "HF-CALM-DROPS",
+          "Amount": 32.0,
+          "Currency": "USD",
+          "FloorAmount": 24.0,
+          "CeilingAmount": 39.0,
+          "SetBy": "10000000-0000-0000-0000-000000001501",
+          "PricedAt": "2024-11-15T09:30:00Z"
+        },
+        {
+          "Sku": "HF-PAW-BALM",
+          "Amount": 16.0,
+          "Currency": "USD",
+          "FloorAmount": 12.0,
+          "CeilingAmount": 20.0,
+          "SetBy": "10000000-0000-0000-0000-000000001501",
+          "PricedAt": "2024-11-15T09:35:00Z"
+        },
+        {
+          "Sku": "HF-COAT-RINSE",
+          "Amount": 24.0,
+          "Currency": "USD",
+          "FloorAmount": 18.0,
+          "CeilingAmount": 30.0,
+          "SetBy": "10000000-0000-0000-0000-000000001501",
+          "PricedAt": "2024-11-15T09:40:00Z"
+        },
+        {
+          "Sku": "HF-GUT-FLORA",
+          "Amount": 36.0,
+          "Currency": "USD",
+          "FloorAmount": 27.0,
+          "CeilingAmount": 44.0,
+          "SetBy": "10000000-0000-0000-0000-000000001501",
+          "PricedAt": "2024-11-15T09:45:00Z"
+        }
+      ]
+    },
+    {
+      "VendorTenant": {
+        "Id": "10000000-0000-0000-0000-000000000106",
+        "OrganizationName": "Iron Mesa Animal Health",
+        "ContactEmail": "compliance@ironmesahealth.com",
+        "Status": "Suspended",
+        "OnboardedAt": "2024-05-13T12:00:00Z",
+        "SuspendedAt": "2026-02-19T15:30:00Z",
+        "SuspensionReason": "Temporary trading hold while packaging substantiation and safety documentation are reviewed.",
+        "TerminatedAt": null,
+        "TerminationReason": null
+      },
+      "DocumentationProfile": {
+        "Tagline": "Practical animal wellness products scaled for modern retail channels.",
+        "FoundedYear": 2004,
+        "HeadquartersCity": "Omaha",
+        "HeadquartersState": "Nebraska",
+        "CompanyType": "PE-backed veterinary consumer health platform",
+        "PrimarySpecialty": "Health and wellness",
+        "SecondarySpecialty": "Oral care and first aid",
+        "FixtureRole": "Suspended-tenant and compliance-hold edge case",
+        "Backstory": "Iron Mesa Animal Health grew through the acquisition of several regional veterinary-adjacent brands, then used private-equity backing to expand quickly into national retail and marketplace distribution. The company has a broad commercial mindset and a catalog built around velocity items like dental, digestive, and joint support products. It is currently suspended because a packaging revision and supporting compliance-document lapse triggered a temporary hold while trading terms and safety substantiation are reviewed. In CritterSupply, Iron Mesa is the vendor that makes access restrictions, operational banners, and support escalation flows feel grounded.",
+        "NotableContext": "Primary suspended-tenant scenario for authorization, portal messaging, and operator escalation flows.",
+        "OperatorNotes": [
+          "Account exists and products exist, but write access should be restricted until reinstatement.",
+          "Best fit for backoffice demos involving compliance holds, support questions, and visible vendor-state banners."
+        ]
+      },
+      "VendorUsers": [
+        {
+          "Id": "10000000-0000-0000-0000-000000001601",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000106",
+          "Email": "ghume@ironmesahealth.com",
+          "FirstName": "Garrett",
+          "LastName": "Hume",
+          "Role": "Admin",
+          "Status": "Active",
+          "InvitedAt": "2024-05-13T13:00:00Z",
+          "ActivatedAt": "2024-05-14T09:00:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-02-18T17:00:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000001602",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000106",
+          "Email": "priyan@ironmesahealth.com",
+          "FirstName": "Priya",
+          "LastName": "Nandakumar",
+          "Role": "CatalogManager",
+          "Status": "Active",
+          "InvitedAt": "2024-05-14T14:00:00Z",
+          "ActivatedAt": "2024-05-15T09:10:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-02-18T16:15:00Z"
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000001603",
+          "VendorTenantId": "10000000-0000-0000-0000-000000000106",
+          "Email": "ebroderick@ironmesahealth.com",
+          "FirstName": "Elaine",
+          "LastName": "Broderick",
+          "Role": "ReadOnly",
+          "Status": "Active",
+          "InvitedAt": "2024-05-16T12:00:00Z",
+          "ActivatedAt": "2024-05-17T08:30:00Z",
+          "DeactivatedAt": null,
+          "LastLoginAt": "2026-02-17T12:00:00Z"
+        }
+      ],
+      "VendorUserInvitations": [],
+      "CatalogProducts": [
+        {
+          "Id": "10000000-0000-0000-0000-000000002601",
+          "Sku": "IMAH-DENTAL-CARE",
+          "Name": "Dental Care Sticks Medium",
+          "Description": "Daily dental chew sold in mass-retail case packs. It is a velocity item with broad channel appeal.",
+          "LongDescription": null,
+          "Category": "Dental Chews",
+          "Subcategory": "Daily Care",
+          "Brand": "Iron Mesa",
+          "Images": [],
+          "Tags": [
+            "dental",
+            "dog",
+            "velocity"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000106",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-05-20T09:00:00Z",
+          "AddedAt": "2024-05-20T09:00:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002602",
+          "Sku": "IMAH-PROBIO-30",
+          "Name": "Probiotic Paste 30 mL",
+          "Description": "Fast-acting probiotic paste intended for travel-related or occasional stomach upset support. It reads like a practical over-the-counter wellness item.",
+          "LongDescription": null,
+          "Category": "Digestive Health",
+          "Subcategory": "Probiotics",
+          "Brand": "Iron Mesa",
+          "Images": [],
+          "Tags": [
+            "digestive",
+            "dog",
+            "wellness"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000106",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-05-20T09:05:00Z",
+          "AddedAt": "2024-05-20T09:05:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002603",
+          "Sku": "IMAH-HOTSPOT-8OZ",
+          "Name": "Hot Spot Spray 8 oz",
+          "Description": "Topical spray for minor itching and irritated skin. This item sits closest to the packaging-review storyline for the suspended account.",
+          "LongDescription": null,
+          "Category": "Skin & Coat Care",
+          "Subcategory": "Topical Sprays",
+          "Brand": "Iron Mesa",
+          "Images": [],
+          "Tags": [
+            "topical",
+            "wellness",
+            "compliance"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000106",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-05-20T09:10:00Z",
+          "AddedAt": "2024-05-20T09:10:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002604",
+          "Sku": "IMAH-SENIOR-MOB",
+          "Name": "Senior Mobility Tablets",
+          "Description": "Tablet-form glucosamine and MSM supplement for aging dogs. It is a long-running core SKU across vet and farm channels.",
+          "LongDescription": null,
+          "Category": "Joint Supplements",
+          "Subcategory": "Senior Support",
+          "Brand": "Iron Mesa",
+          "Images": [],
+          "Tags": [
+            "joint",
+            "senior",
+            "wellness"
+          ],
+          "Dimensions": null,
+          "Status": "Active",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000106",
+          "AssignedBy": "system",
+          "AssignedAt": "2024-05-20T09:15:00Z",
+          "AddedAt": "2024-05-20T09:15:00Z",
+          "UpdatedAt": null
+        },
+        {
+          "Id": "10000000-0000-0000-0000-000000002605",
+          "Sku": "IMAH-FIRSTAID-KIT",
+          "Name": "Travel First Aid Kit",
+          "Description": "Compact first-aid kit for cars, kennels, and trail outings. It is a useful cross-category example spanning wellness and gear.",
+          "LongDescription": null,
+          "Category": "Pet First Aid",
+          "Subcategory": "Travel Kits",
+          "Brand": "Iron Mesa",
+          "Images": [],
+          "Tags": [
+            "first aid",
+            "travel",
+            "launch"
+          ],
+          "Dimensions": null,
+          "Status": "ComingSoon",
+          "IsDeleted": false,
+          "VendorTenantId": "10000000-0000-0000-0000-000000000106",
+          "AssignedBy": "system",
+          "AssignedAt": "2026-01-10T10:00:00Z",
+          "AddedAt": "2026-01-10T10:00:00Z",
+          "UpdatedAt": "2026-02-10T08:00:00Z"
+        }
+      ],
+      "InitialPrices": [
+        {
+          "Sku": "IMAH-DENTAL-CARE",
+          "Amount": 21.99,
+          "Currency": "USD",
+          "FloorAmount": 16.0,
+          "CeilingAmount": 27.0,
+          "SetBy": "10000000-0000-0000-0000-000000001601",
+          "PricedAt": "2024-05-20T09:30:00Z"
+        },
+        {
+          "Sku": "IMAH-PROBIO-30",
+          "Amount": 18.75,
+          "Currency": "USD",
+          "FloorAmount": 14.0,
+          "CeilingAmount": 23.0,
+          "SetBy": "10000000-0000-0000-0000-000000001601",
+          "PricedAt": "2024-05-20T09:35:00Z"
+        },
+        {
+          "Sku": "IMAH-HOTSPOT-8OZ",
+          "Amount": 17.5,
+          "Currency": "USD",
+          "FloorAmount": 13.0,
+          "CeilingAmount": 22.0,
+          "SetBy": "10000000-0000-0000-0000-000000001601",
+          "PricedAt": "2024-05-20T09:40:00Z"
+        },
+        {
+          "Sku": "IMAH-SENIOR-MOB",
+          "Amount": 34.99,
+          "Currency": "USD",
+          "FloorAmount": 26.0,
+          "CeilingAmount": 43.0,
+          "SetBy": "10000000-0000-0000-0000-000000001601",
+          "PricedAt": "2024-05-20T09:45:00Z"
+        },
+        {
+          "Sku": "IMAH-FIRSTAID-KIT",
+          "Amount": 28.0,
+          "Currency": "USD",
+          "FloorAmount": 21.0,
+          "CeilingAmount": 34.0,
+          "SetBy": "10000000-0000-0000-0000-000000001601",
+          "PricedAt": "2026-01-10T10:15:00Z"
+        }
+      ]
+    }
+  ]
+}
