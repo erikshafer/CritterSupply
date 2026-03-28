@@ -42,7 +42,7 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M36.0 — Engineering Quality (planning) |
-| **Status** | 📋 **Planning** — Pre-planning quality findings committed; awaiting planning session |
+| **Status** | 🚀 **IN PROGRESS** — Planning complete; plan committed 2026-03-28 |
 | **Recent Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
 | **Previous Completion** | M34.0 — Experience Completion + Vocabulary Alignment (2026-03-26) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
@@ -55,7 +55,7 @@
 
 ### 📋 M36.0: Engineering Quality
 
-**Status:** 📋 **Planning** — Pre-planning quality findings committed; awaiting planning session
+**Status:** 🚀 **IN PROGRESS** — Planning complete; plan committed 2026-03-28
 **Goal:** Critter Stack idiom compliance, DDD-influenced naming audit, integration and E2E test coverage gaps
 
 **Direction from owner:**
