@@ -51,7 +51,6 @@ public static class CancelScheduledPriceChangeEndpoint
             CancelledAt: DateTimeOffset.UtcNow);
 
         session.Events.Append(streamId, evt);
-        await session.SaveChangesAsync(ct);
 
         return Results.Ok(new
         {

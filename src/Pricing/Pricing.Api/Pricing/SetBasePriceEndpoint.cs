@@ -59,7 +59,6 @@ public static class SetBasePriceEndpoint
                 PricedAt: DateTimeOffset.UtcNow);
 
             session.Events.Append(streamId, initialPriceEvt);
-            await session.SaveChangesAsync(ct);
 
             return Results.Ok(new
             {
@@ -104,7 +103,6 @@ public static class SetBasePriceEndpoint
                 SourceSuggestionId: null);
 
             session.Events.Append(streamId, priceChangedEvt);
-            await session.SaveChangesAsync(ct);
 
             return Results.Ok(new
             {
