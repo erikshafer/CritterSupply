@@ -35,7 +35,7 @@ public class RefundFlowTests : IAsyncLifetime
         var currency = "USD";
         var successToken = "tok_success_visa";
 
-        var paymentCommand = new PaymentRequested(orderId, customerId, amount, currency, successToken);
+        var paymentCommand = new RequestPayment(orderId, customerId, amount, currency, successToken);
         await _fixture.ExecuteAndWaitAsync(paymentCommand);
 
         // Get the payment ID
@@ -73,7 +73,7 @@ public class RefundFlowTests : IAsyncLifetime
         var currency = "USD";
         var successToken = "tok_success_mastercard";
 
-        var paymentCommand = new PaymentRequested(orderId, customerId, amount, currency, successToken);
+        var paymentCommand = new RequestPayment(orderId, customerId, amount, currency, successToken);
         await _fixture.ExecuteAndWaitAsync(paymentCommand);
 
         // Get the payment ID
@@ -112,7 +112,7 @@ public class RefundFlowTests : IAsyncLifetime
         var currency = "USD";
         var successToken = "tok_success_amex";
 
-        var paymentCommand = new PaymentRequested(orderId, customerId, amount, currency, successToken);
+        var paymentCommand = new RequestPayment(orderId, customerId, amount, currency, successToken);
         await _fixture.ExecuteAndWaitAsync(paymentCommand);
 
         // Get the payment ID
@@ -155,7 +155,7 @@ public class RefundFlowTests : IAsyncLifetime
         var currency = "USD";
         var successToken = "tok_success_visa";
 
-        var paymentCommand = new PaymentRequested(orderId, customerId, amount, currency, successToken);
+        var paymentCommand = new RequestPayment(orderId, customerId, amount, currency, successToken);
         await _fixture.ExecuteAndWaitAsync(paymentCommand);
 
         // Get the payment ID
@@ -215,7 +215,7 @@ public class RefundFlowTests : IAsyncLifetime
         var currency = "USD";
         var declineToken = "tok_decline_insufficient_funds";
 
-        var paymentCommand = new PaymentRequested(orderId, customerId, amount, currency, declineToken);
+        var paymentCommand = new RequestPayment(orderId, customerId, amount, currency, declineToken);
         await _fixture.ExecuteAndWaitAsync(paymentCommand);
 
         // Get the payment ID
@@ -253,7 +253,7 @@ public class RefundFlowTests : IAsyncLifetime
         var currency = "USD";
         var successToken = "tok_success_visa";
 
-        var paymentCommand = new PaymentRequested(orderId, customerId, amount, currency, successToken);
+        var paymentCommand = new RequestPayment(orderId, customerId, amount, currency, successToken);
         await _fixture.ExecuteAndWaitAsync(paymentCommand);
 
         await using var session = _fixture.GetDocumentSession();

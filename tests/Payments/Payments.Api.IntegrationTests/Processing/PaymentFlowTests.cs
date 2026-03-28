@@ -5,7 +5,7 @@ namespace Payments.Api.IntegrationTests.Processing;
 
 /// <summary>
 /// Integration tests for payment processing flows.
-/// Tests the complete flow from PaymentRequested command through gateway to persisted state.
+/// Tests the complete flow from RequestPayment command through gateway to persisted state.
 /// </summary>
 [Collection(IntegrationTestCollection.Name)]
 public class PaymentFlowTests : IAsyncLifetime
@@ -22,20 +22,20 @@ public class PaymentFlowTests : IAsyncLifetime
 
     /// <summary>
     /// Integration test for successful payment flow.
-    /// Sends PaymentRequested with success token, verifies payment is captured.
+    /// Sends RequestPayment with success token, verifies payment is captured.
     /// **Validates: Requirements 1.1, 2.2, 2.5**
     /// </summary>
     [Fact]
-    public async Task PaymentRequested_With_Success_Token_Creates_Captured_Payment()
+    public async Task RequestPayment_With_Success_Token_Creates_Captured_Payment()
     {
-        // Arrange: Create a PaymentRequested command with a success token
+        // Arrange: Create a RequestPayment command with a success token
         var orderId = Guid.NewGuid();
         var customerId = Guid.NewGuid();
         var amount = 99.99m;
         var currency = "USD";
         var successToken = "tok_success_visa";
 
-        var command = new PaymentRequested(
+        var command = new RequestPayment(
             orderId,
             customerId,
             amount,
@@ -66,20 +66,20 @@ public class PaymentFlowTests : IAsyncLifetime
 
     /// <summary>
     /// Integration test for failed payment flow.
-    /// Sends PaymentRequested with decline token, verifies payment is failed.
+    /// Sends RequestPayment with decline token, verifies payment is failed.
     /// **Validates: Requirements 3.1, 3.4**
     /// </summary>
     [Fact]
-    public async Task PaymentRequested_With_Decline_Token_Creates_Failed_Payment()
+    public async Task RequestPayment_With_Decline_Token_Creates_Failed_Payment()
     {
-        // Arrange: Create a PaymentRequested command with a decline token
+        // Arrange: Create a RequestPayment command with a decline token
         var orderId = Guid.NewGuid();
         var customerId = Guid.NewGuid();
         var amount = 150.00m;
         var currency = "EUR";
         var declineToken = "tok_decline_insufficient_funds";
 
-        var command = new PaymentRequested(
+        var command = new RequestPayment(
             orderId,
             customerId,
             amount,
@@ -110,20 +110,20 @@ public class PaymentFlowTests : IAsyncLifetime
 
     /// <summary>
     /// Integration test for retriable failure (timeout).
-    /// Sends PaymentRequested with timeout token, verifies payment is failed with retriable flag.
+    /// Sends RequestPayment with timeout token, verifies payment is failed with retriable flag.
     /// **Validates: Requirements 3.1, 3.4, 3.5**
     /// </summary>
     [Fact]
-    public async Task PaymentRequested_With_Timeout_Token_Creates_Retriable_Failed_Payment()
+    public async Task RequestPayment_With_Timeout_Token_Creates_Retriable_Failed_Payment()
     {
-        // Arrange: Create a PaymentRequested command with a timeout token
+        // Arrange: Create a RequestPayment command with a timeout token
         var orderId = Guid.NewGuid();
         var customerId = Guid.NewGuid();
         var amount = 75.50m;
         var currency = "GBP";
         var timeoutToken = "tok_timeout_network";
 
-        var command = new PaymentRequested(
+        var command = new RequestPayment(
             orderId,
             customerId,
             amount,

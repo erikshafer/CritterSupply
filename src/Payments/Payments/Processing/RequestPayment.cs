@@ -5,16 +5,16 @@ using IntegrationMessages = Messages.Contracts.Payments;
 
 namespace Payments.Processing;
 
-public sealed record PaymentRequested(
+public sealed record RequestPayment(
     Guid OrderId,
     Guid CustomerId,
     decimal Amount,
     string Currency,
     string PaymentMethodToken)
 {
-    public class PaymentRequestedValidator : AbstractValidator<PaymentRequested>
+    public class RequestPaymentValidator : AbstractValidator<RequestPayment>
     {
-        public PaymentRequestedValidator()
+        public RequestPaymentValidator()
         {
             RuleFor(x => x.Amount).GreaterThan(0);
             RuleFor(x => x.OrderId).NotEmpty();
@@ -25,10 +25,10 @@ public sealed record PaymentRequested(
     }
 }
 
-public static class PaymentRequestedHandler
+public static class RequestPaymentHandler
 {
     public static async Task<(IStartStream, OutgoingMessages)> Handle(
-        PaymentRequested command,
+        RequestPayment command,
         IPaymentGateway gateway,
         CancellationToken cancellationToken)
     {
