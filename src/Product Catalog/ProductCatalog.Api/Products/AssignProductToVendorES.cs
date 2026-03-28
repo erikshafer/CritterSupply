@@ -149,7 +149,6 @@ public static class AssignProductToVendorHandler
             ReassignmentNote: command.ReassignmentNote);
 
         session.Events.Append(view.Id, @event);
-        await session.SaveChangesAsync(ct);
 
         outgoing.Add(new VendorProductAssociated(
             Sku: sku,
@@ -307,8 +306,6 @@ public static class BulkAssignProductsToVendorHandler
             succeeded.Add(new AssignmentSuccess(item.Sku, view.Name, item.VendorTenantId, assignedAt,
                 previousVendorTenantId));
         }
-
-        await session.SaveChangesAsync(ct);
 
         var result = new BulkAssignmentResult(
             Succeeded: succeeded.AsReadOnly(),
