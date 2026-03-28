@@ -39,6 +39,5 @@ public static class StockReplenishedHandler
         };
 
         session.Store(snapshot);
-        await session.SaveChangesAsync(ct);
     }
 }

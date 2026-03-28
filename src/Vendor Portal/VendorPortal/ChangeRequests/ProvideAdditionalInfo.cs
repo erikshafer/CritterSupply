@@ -78,7 +78,6 @@ public static class ProvideAdditionalInfoHandler
         request.SubmittedAt = now;
 
         session.Store(request);
-        await session.SaveChangesAsync(ct);
 
         // Return both the Catalog integration message and the hub notification
         var outgoing = new List<object>

@@ -109,6 +109,5 @@ public static class DraftChangeRequestHandler
         };
 
         session.Store(request);
-        await session.SaveChangesAsync(ct);
     }
 }

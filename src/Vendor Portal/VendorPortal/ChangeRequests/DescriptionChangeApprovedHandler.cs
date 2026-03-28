@@ -24,7 +24,6 @@ public static class DescriptionChangeApprovedHandler
         request.Status = ChangeRequestStatus.Approved;
         request.ResolvedAt = @event.ApprovedAt;
         session.Store(request);
-        await session.SaveChangesAsync(ct);
 
         return
         [

@@ -64,7 +64,6 @@ public static class WithdrawChangeRequestHandler
         request.ResolvedAt = now;
 
         session.Store(request);
-        await session.SaveChangesAsync(ct);
 
         return new ChangeRequestStatusUpdated(
             VendorTenantId: request.VendorTenantId,

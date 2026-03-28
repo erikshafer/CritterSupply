@@ -25,7 +25,6 @@ public static class ImageChangeRejectedHandler
         request.RejectionReason = reason;
         request.ResolvedAt = @event.RejectedAt;
         session.Store(request);
-        await session.SaveChangesAsync(ct);
 
         return
         [

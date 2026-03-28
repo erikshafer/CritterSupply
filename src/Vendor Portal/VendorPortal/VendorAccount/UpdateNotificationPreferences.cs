@@ -62,7 +62,6 @@ public static class UpdateNotificationPreferencesHandler
         account.UpdatedAt = DateTimeOffset.UtcNow;
 
         session.Store(account);
-        await session.SaveChangesAsync(ct);
 
         logger.LogInformation(
             "Updated notification preferences for tenant {TenantId}: " +

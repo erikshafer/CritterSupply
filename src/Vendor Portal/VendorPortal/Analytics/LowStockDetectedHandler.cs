@@ -49,7 +49,6 @@ public static class LowStockDetectedHandler
         };
 
         session.Store(alert);
-        await session.SaveChangesAsync(ct);
 
         // Push real-time alert to vendor's hub group only on NEW alerts (not quantity updates).
         // Rationale: firing a hub push on every quantity update would cause UI noise for alerts

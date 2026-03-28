@@ -39,7 +39,6 @@ public static class VendorTenantCreatedHandler
         };
 
         session.Store(account);
-        await session.SaveChangesAsync(ct);
 
         logger.LogInformation(
             "VendorAccount initialized for tenant {TenantId} ({OrgName})",

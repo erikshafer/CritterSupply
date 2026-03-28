@@ -76,7 +76,6 @@ public static class SaveDashboardViewHandler
         account.UpdatedAt = DateTimeOffset.UtcNow;
 
         session.Store(account);
-        await session.SaveChangesAsync(ct);
 
         logger.LogInformation(
             "Saved dashboard view '{ViewName}' (Id={ViewId}) for tenant {TenantId}",

@@ -40,7 +40,6 @@ public static class InventoryAdjustedHandler
         };
 
         session.Store(snapshot);
-        await session.SaveChangesAsync(ct);
 
         return new InventoryLevelUpdated(
             VendorTenantId: vendorTenantId,
