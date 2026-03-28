@@ -1,5 +1,6 @@
 using Alba;
 using Correspondence;
+using CritterSupply.TestUtilities;
 using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +51,13 @@ public sealed class TestFixture : IAsyncLifetime
 
                 // Disable external Wolverine transports for single-BC testing
                 services.DisableAllExternalWolverineTransports();
+
+                // Register test authentication for all schemes and roles used by Correspondence.Api
+                // Schemes: Backoffice (backoffice JWT)
+                // Policies: CustomerService, OperationsManager
+                services.AddTestAuthentication(
+                    roles: ["CustomerService", "OperationsManager", "SystemAdmin"],
+                    schemes: ["Backoffice"]);
             });
         });
     }
