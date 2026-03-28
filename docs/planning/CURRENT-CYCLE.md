@@ -47,7 +47,7 @@
 | **Previous Completion** | M34.0 — Experience Completion + Vocabulary Alignment (2026-03-26) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-28 (M36.0 Session 2 complete — Track B, 4 Critter Stack idiom violations fixed)*
+*Last Updated: 2026-03-28 (M36.0 Session 3 complete — Track B remaining + Track C naming)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 📋 M36.0: Engineering Quality
 
-**Status:** 🚀 **IN PROGRESS** — Session 2 complete (2026-03-28); Tracks A + B done
+**Status:** 🚀 **IN PROGRESS** — Session 3 complete (2026-03-28); Tracks A + B complete, Track C naming started
 **Goal:** Critter Stack idiom compliance, DDD-influenced naming audit, integration and E2E test coverage gaps
 
 **Direction from owner:**
@@ -104,6 +104,19 @@
 - ✅ **B-4 (Orders — High):** Replaced `bus.PublishAsync(new CancelOrder(...))` with `OutgoingMessages` cascading command in `CancelOrderEndpoint.cs`. `CancelOrder` now routes through Wolverine's full command pipeline including saga validators.
 - ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (all E2E test files)
 - ✅ **Session 2 Retrospective:** [m36-0-session-2-retrospective.md](./milestones/m36-0-session-2-retrospective.md)
+
+**Session 3 Progress (2026-03-28):**
+- ✅ **B-5 (Vendor Portal):** Removed 27 redundant `SaveChangesAsync()` calls across 21 handler files. `IntegrateWithWolverine()` confirmed at `Program.cs:70`. Seed data file untouched.
+- ✅ **B-6 (Pricing):** Removed 5 redundant `SaveChangesAsync()` calls in `SetBasePriceEndpoint.cs`, `SchedulePriceChangeEndpoint.cs`, `CancelScheduledPriceChangeEndpoint.cs`. Both `IntegrateWithWolverine()` and `AutoApplyTransactions()` confirmed.
+- ✅ **B-7 (Product Catalog):** Removed 2 redundant `SaveChangesAsync()` calls in `AssignProductToVendorES.cs` (single + bulk assignment handlers). `IntegrateWithWolverine()` confirmed at `Program.cs:47`.
+- ✅ **bus.PublishAsync() audit:** Zero violations remaining across all BCs. Only comments from Session 2 fixes remain. 4 `ScheduleAsync` calls confirmed as justified (Pricing + Returns).
+- ✅ **C-1 (Payments — rename):** `PaymentRequested` → `RequestPayment` — internal command record, validator, handler, file, and 5 test files renamed. Integration event NOT affected (none exists). Zero remaining code references.
+- ✅ **C-2 (Payments — rename):** `RefundRequested` → `RequestRefund` — internal command renamed. `Messages.Contracts.Payments.RefundRequested` integration event preserved unchanged. Name collision resolved: `RefundRequested` = integration event, `RequestRefund` = internal command.
+- ✅ **C-3 (Promotions — rename):** `CalculateDiscountRequest` → `CalculateDiscount` — command, validator, files renamed. Handler class renamed to `CalculateDiscountEndpoint` to resolve naming collision. Shopping client updated.
+- ✅ **C-7 (ADR 0040):** Documented `*Requested` integration event convention — 4 canonical examples, rationale, future evolution path.
+- ✅ **Track B total:** 34 `SaveChangesAsync()` calls removed across 25 files (Sessions 2 + 3 combined)
+- ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (unchanged)
+- ✅ **Session 3 Retrospective:** [m36-0-session-3-retrospective.md](./milestones/m36-0-session-3-retrospective.md)
 
 ---
 
