@@ -1,6 +1,10 @@
 using Alba;
+using CritterSupply.TestUtilities;
 using CustomerIdentity.AddressBook;
 using JasperFx.CommandLine;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -42,6 +46,41 @@ public class TestFixture : IAsyncLifetime
                     options.UseNpgsql(_connectionString));
 
                 services.DisableAllExternalWolverineTransports();
+
+                // Replace authentication: keep Cookie (real) + replace Backoffice JWT (test).
+                // Cookie auth is needed for login/logout/session tests.
+                // Backoffice scheme is needed for [Authorize(Policy = "CustomerService")] endpoints.
+                var authServices = services.Where(s =>
+                    s.ServiceType.Namespace == "Microsoft.AspNetCore.Authentication" ||
+                    s.ServiceType.FullName?.Contains("Authentication") == true)
+                    .ToList();
+                foreach (var service in authServices)
+                {
+                    services.Remove(service);
+                }
+
+                services.Configure<TestAuthOptions>(opts =>
+                {
+                    opts.Roles = ["CustomerService", "OperationsManager", "SystemAdmin"];
+                });
+
+                services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                    .AddCookie(options =>
+                    {
+                        options.Cookie.Name = "CritterSupply.Auth";
+                        options.Cookie.HttpOnly = true;
+                        options.Cookie.SameSite = SameSiteMode.Lax;
+                        options.ExpireTimeSpan = TimeSpan.FromDays(7);
+                        options.SlidingExpiration = true;
+                        options.Events.OnRedirectToLogin = context =>
+                        {
+                            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                            return Task.CompletedTask;
+                        };
+                    })
+                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Backoffice", _ => { });
+
+                services.AddAuthorization();
             });
         });
 

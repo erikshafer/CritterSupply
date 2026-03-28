@@ -92,11 +92,19 @@ public sealed class OrderPlacedHandlerTests : IAsyncLifetime
         // Act
         var tracked = await _fixture.ExecuteAndWaitAsync(orderPlaced);
 
-        // Assert - CorrespondenceQueued was published
-        var queuedEvent = tracked.Sent.SingleMessage<global::Messages.Contracts.Correspondence.CorrespondenceQueued>();
+        // Assert - CorrespondenceQueued was published.
+        // The handler emits exactly 1 CorrespondenceQueued, but Wolverine creates one
+        // envelope per routing destination (monitoring + backoffice queues in Program.cs).
+        // Use MessagesOf<T>() instead of SingleMessage<T>() to handle multi-destination routing.
+        var queuedEvents = tracked.Sent.MessagesOf<global::Messages.Contracts.Correspondence.CorrespondenceQueued>().ToList();
+        queuedEvents.ShouldNotBeEmpty();
+        var queuedEvent = queuedEvents.First();
         queuedEvent.CustomerId.ShouldBe(customerId);
         queuedEvent.Channel.ShouldBe("Email");
         queuedEvent.QueuedAt.ShouldNotBe(default);
+
+        // All envelopes should carry the same logical message (same customer, same channel)
+        queuedEvents.ShouldAllBe(e => e.CustomerId == customerId && e.Channel == "Email");
     }
 
     [Fact]

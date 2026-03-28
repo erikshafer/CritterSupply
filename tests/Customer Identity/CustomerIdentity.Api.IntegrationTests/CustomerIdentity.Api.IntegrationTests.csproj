@@ -30,6 +30,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\..\src/Customer Identity\CustomerIdentity.Api\CustomerIdentity.Api.csproj" />
+        <ProjectReference Include="..\..\Shared\CritterSupply.TestUtilities\CritterSupply.TestUtilities.csproj" />
     </ItemGroup>
 
 </Project>
