@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M36.0 — Engineering Quality (Track A complete) |
-| **Status** | 🚀 **IN PROGRESS** — Session 1 complete (2026-03-28); Track A done — 21 failures fixed |
+| **Current Milestone** | M36.0 — Engineering Quality (Tracks A + B complete) |
+| **Status** | 🚀 **IN PROGRESS** — Session 2 complete (2026-03-28); Track B done — 4 Critter Stack violations fixed |
 | **Recent Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
 | **Previous Completion** | M34.0 — Experience Completion + Vocabulary Alignment (2026-03-26) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-28 (M36.0 Session 1 complete — Track A, 21 pre-existing failures eliminated)*
+*Last Updated: 2026-03-28 (M36.0 Session 2 complete — Track B, 4 Critter Stack idiom violations fixed)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 📋 M36.0: Engineering Quality
 
-**Status:** 🚀 **IN PROGRESS** — Session 1 complete (2026-03-28); Track A done — 21 pre-existing failures eliminated
+**Status:** 🚀 **IN PROGRESS** — Session 2 complete (2026-03-28); Tracks A + B done
 **Goal:** Critter Stack idiom compliance, DDD-influenced naming audit, integration and E2E test coverage gaps
 
 **Direction from owner:**
@@ -96,6 +96,14 @@
 | Correspondence.Api.IntegrationTests | 5 | 0 | 0 |
 | Returns.Api.IntegrationTests | 44 | 0 | 6 (pre-existing saga issue) |
 | All other projects | passing | 0 | 0 |
+
+**Session 2 Progress (2026-03-28):**
+- ✅ **B-1 (Payments — Critical):** Replaced manual `session.Events.StartStream()` with `MartenOps.StartStream()` returning `(IStartStream, OutgoingMessages)` tuples in `AuthorizePayment.cs` and `PaymentRequested.cs`. Removed `IDocumentSession` parameter. Wolverine's transactional middleware now handles stream persistence and outbox routing.
+- ✅ **B-2 (Returns — High):** Replaced 4 `bus.PublishAsync()` calls with `OutgoingMessages` tuple return in `RequestReturn.cs`. Changed return type to `Task<(RequestReturnResponse, OutgoingMessages)>`. `bus.ScheduleAsync()` for expiration timer correctly retained — only justified `IMessageBus` use.
+- ✅ **B-3 (Inventory — High):** Replaced `bus.PublishAsync()` with `OutgoingMessages` and removed manual `SaveChangesAsync()` in `AdjustInventory.cs`. Confirmed `IntegrateWithWolverine()` + `AutoApplyTransactions()` in Program.cs. Compute new quantity mathematically instead of save+reload.
+- ✅ **B-4 (Orders — High):** Replaced `bus.PublishAsync(new CancelOrder(...))` with `OutgoingMessages` cascading command in `CancelOrderEndpoint.cs`. `CancelOrder` now routes through Wolverine's full command pipeline including saga validators.
+- ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (all E2E test files)
+- ✅ **Session 2 Retrospective:** [m36-0-session-2-retrospective.md](./milestones/m36-0-session-2-retrospective.md)
 
 ---
 
