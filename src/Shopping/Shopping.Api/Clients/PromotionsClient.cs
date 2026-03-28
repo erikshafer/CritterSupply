@@ -59,7 +59,7 @@ public sealed class PromotionsClient : IPromotionsClient
         IReadOnlyList<string> couponCodes,
         CancellationToken ct = default)
     {
-        var request = new CalculateDiscountRequest(
+        var request = new CalculateDiscount(
             cartItems.Select(i => new PromotionsCartItem(i.Sku, i.Quantity, i.UnitPrice)).ToList(),
             couponCodes.ToList());
 
@@ -95,7 +95,7 @@ public sealed class PromotionsClient : IPromotionsClient
         decimal? DiscountValue,
         string? Reason);
 
-    private sealed record CalculateDiscountRequest(
+    private sealed record CalculateDiscount(
         List<PromotionsCartItem> CartItems,
         List<string> CouponCodes);
 

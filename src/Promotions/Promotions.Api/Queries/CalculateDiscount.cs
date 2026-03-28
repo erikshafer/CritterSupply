@@ -12,11 +12,11 @@ namespace Promotions.Api.Queries;
 /// Phase 1: Single coupon, percentage discounts only, stub floor price (allow full discount).
 /// Phase 2+: Pricing BC integration for real floor price enforcement.
 /// </summary>
-public sealed class CalculateDiscount
+public static class CalculateDiscountEndpoint
 {
     [WolverinePost("/api/promotions/discounts/calculate")]
     public static async Task<Ok<CalculateDiscountResponse>> Handle(
-        CalculateDiscountRequest request,
+        CalculateDiscount request,
         IDocumentSession session,
         CancellationToken ct)
     {
