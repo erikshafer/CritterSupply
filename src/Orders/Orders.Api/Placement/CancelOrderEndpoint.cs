@@ -13,38 +13,39 @@ public static class CancelOrderEndpoint
 {
     [WolverinePost("/api/orders/{orderId}/cancel")]
     [Authorize(Policy = "CustomerService")]
-    public static async Task<IResult> Handle(
+    public static async Task<(IResult, OutgoingMessages)> Handle(
         Guid orderId,
         [FromBody] CancelOrderRequest request,
-        IQuerySession querySession,
-        IMessageBus bus)
+        IQuerySession querySession)
     {
+        var outgoing = new OutgoingMessages();
+
         if (string.IsNullOrWhiteSpace(request.Reason))
-            return Results.BadRequest(new ProblemDetails
+            return (Results.BadRequest(new ProblemDetails
             {
                 Detail = "Cancellation reason is required",
                 Status = 400
-            });
+            }), outgoing);
 
         var order = await querySession.LoadAsync<Order>(orderId);
 
         if (order is null)
-            return Results.NotFound(new ProblemDetails
+            return (Results.NotFound(new ProblemDetails
             {
                 Detail = "Order not found",
                 Status = 404
-            });
+            }), outgoing);
 
         if (!Orders.Placement.OrderDecider.CanBeCancelled(order.Status))
         {
             var detail = order.Status is OrderStatus.Cancelled
                 ? "Order is already cancelled"
                 : "Order cannot be cancelled after it has been shipped";
-            return Results.Conflict(new ProblemDetails { Detail = detail, Status = 409 });
+            return (Results.Conflict(new ProblemDetails { Detail = detail, Status = 409 }), outgoing);
         }
 
-        await bus.PublishAsync(new CancelOrder(orderId, request.Reason));
+        outgoing.Add(new CancelOrder(orderId, request.Reason));
 
-        return Results.Accepted();
+        return (Results.Accepted(), outgoing);
     }
 }
