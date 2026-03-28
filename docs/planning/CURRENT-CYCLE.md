@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M36.0 — Engineering Quality (planning) |
-| **Status** | 🚀 **IN PROGRESS** — Planning complete; plan committed 2026-03-28 |
+| **Current Milestone** | M36.0 — Engineering Quality (Track A complete) |
+| **Status** | 🚀 **IN PROGRESS** — Session 1 complete (2026-03-28); Track A done — 21 failures fixed |
 | **Recent Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
 | **Previous Completion** | M34.0 — Experience Completion + Vocabulary Alignment (2026-03-26) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-27 (M35.0 closed; M36.0 set as active in planning status)*
+*Last Updated: 2026-03-28 (M36.0 Session 1 complete — Track A, 21 pre-existing failures eliminated)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 📋 M36.0: Engineering Quality
 
-**Status:** 🚀 **IN PROGRESS** — Planning complete; plan committed 2026-03-28
+**Status:** 🚀 **IN PROGRESS** — Session 1 complete (2026-03-28); Track A done — 21 pre-existing failures eliminated
 **Goal:** Critter Stack idiom compliance, DDD-influenced naming audit, integration and E2E test coverage gaps
 
 **Direction from owner:**
@@ -77,6 +77,25 @@
 - CI Run #770 (green on main)
 - E2E Run #341 (green on main)
 - CodeQL Run #339 (green on main)
+
+**Session 1 Progress (2026-03-28):**
+- ✅ **A-1 (TestAuthHandler utility):** Created `tests/Shared/CritterSupply.TestUtilities/` — shared `TestAuthHandler` + `AddTestAuthentication` extension. Supports multiple named JWT schemes and configurable roles. Added to solution under `/Shared/`.
+- ✅ **A-2 (Orders fixture):** Registered TestAuthHandler for `Backoffice` + `Vendor` schemes with all 5 policy roles. **48/48 Orders integration tests now pass** (was 33/48 — 15 failures eliminated).
+- ✅ **A-3 (Customer Identity fixture):** Replaced Backoffice JWT with TestAuthHandler while preserving real Cookie auth for login/logout/session tests. **29/29 CustomerIdentity integration tests now pass** (was 25/29 — 4 failures eliminated).
+- ✅ **A-4 (Correspondence fixture):** Registered TestAuthHandler for `Backoffice` scheme. Auth failure resolved.
+- ✅ **A-5 (Correspondence duplicate event):** Root cause differs from plan — not a double handler emit but a dual RabbitMQ routing rule (`monitoring` + `backoffice` queues) creating 2 tracked envelopes for 1 logical message. Fixed by using `MessagesOf<T>()` instead of `SingleMessage<T>()`. **5/5 Correspondence integration tests now pass** (was 3/5 — 2 failures eliminated).
+- ✅ **Total: 21 pre-existing failures eliminated.** Zero failures across all test projects.
+- ✅ **Session 1 Retrospective:** [m36-0-session-1-retrospective.md](./milestones/m36-0-session-1-retrospective.md)
+
+**Session 1 Test Summary (all non-E2E projects):**
+
+| Project | Passed | Failed | Skipped |
+|---------|--------|--------|---------|
+| Orders.Api.IntegrationTests | 48 | 0 | 0 |
+| CustomerIdentity.Api.IntegrationTests | 29 | 0 | 0 |
+| Correspondence.Api.IntegrationTests | 5 | 0 | 0 |
+| Returns.Api.IntegrationTests | 44 | 0 | 6 (pre-existing saga issue) |
+| All other projects | passing | 0 | 0 |
 
 ---
 
