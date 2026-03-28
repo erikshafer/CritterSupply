@@ -1,6 +1,6 @@
 using FluentValidation;
-using Marten;
 using Wolverine;
+using Wolverine.Marten;
 using IntegrationMessages = Messages.Contracts.Payments;
 
 namespace Payments.Processing;
@@ -27,10 +27,9 @@ public sealed record PaymentRequested(
 
 public static class PaymentRequestedHandler
 {
-    public static async Task<OutgoingMessages> Handle(
+    public static async Task<(IStartStream, OutgoingMessages)> Handle(
         PaymentRequested command,
         IPaymentGateway gateway,
-        IDocumentSession session,
         CancellationToken cancellationToken)
     {
         var paymentId = Guid.CreateVersion7();
@@ -63,7 +62,7 @@ public static class PaymentRequestedHandler
                 result.IsRetriable,
                 processedAt);
 
-            session.Events.StartStream<Payment>(paymentId, initiated, failedEvent);
+            var stream = MartenOps.StartStream<Payment>(paymentId, initiated, failedEvent);
 
             outgoing.Add(new IntegrationMessages.PaymentFailed(
                 paymentId,
@@ -72,7 +71,7 @@ public static class PaymentRequestedHandler
                 result.IsRetriable,
                 processedAt));
 
-            return outgoing;
+            return (stream, outgoing);
         }
 
         var capturedEvent = new PaymentCaptured(
@@ -80,7 +79,7 @@ public static class PaymentRequestedHandler
             result.TransactionId!,
             processedAt);
 
-        session.Events.StartStream<Payment>(paymentId, initiated, capturedEvent);
+        var successStream = MartenOps.StartStream<Payment>(paymentId, initiated, capturedEvent);
 
         outgoing.Add(new IntegrationMessages.PaymentCaptured(
             paymentId,
@@ -89,6 +88,6 @@ public static class PaymentRequestedHandler
             result.TransactionId!,
             processedAt));
 
-        return outgoing;
+        return (successStream, outgoing);
     }
 }
