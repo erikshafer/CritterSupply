@@ -58,17 +58,19 @@ public static class AdjustInventoryEndpoint
 {
     /// <summary>
     /// Adjusts inventory quantity (positive or negative).
-    /// Validates manually, then dispatches command for event appending and integration message publishing.
+    /// Validates manually, then appends domain event and returns integration messages
+    /// via OutgoingMessages. Wolverine's auto-transaction handles persistence.
     /// </summary>
     [WolverinePost("/api/inventory/{sku}/adjust")]
     [Authorize(Policy = "WarehouseClerk")]
-    public static async Task<IResult> Handle(
+    public static async Task<(IResult, OutgoingMessages)> Handle(
         string sku,
         AdjustInventoryRequest request,
-        IMessageBus bus,
         IDocumentSession session,
         CancellationToken ct)
     {
+        var outgoing = new OutgoingMessages();
+
         // Inventory uses SKU + WarehouseId as composite key
         // For simplicity, assume "main" warehouse for now
         var warehouseId = "main";
@@ -79,23 +81,24 @@ public static class AdjustInventoryEndpoint
 
         if (inventory is null)
         {
-            return Results.NotFound(new { Error = $"Inventory for SKU '{sku}' not found" });
+            return (Results.NotFound(new { Error = $"Inventory for SKU '{sku}' not found" }), outgoing);
         }
 
         // Validate: Check if negative adjustment would result in negative available quantity
         if (request.AdjustmentQuantity < 0 &&
             inventory.AvailableQuantity + request.AdjustmentQuantity < 0)
         {
-            return Results.BadRequest(new
+            return (Results.BadRequest(new
             {
                 Error = $"Cannot adjust by {request.AdjustmentQuantity}. Available quantity is {inventory.AvailableQuantity}"
-            });
+            }), outgoing);
         }
 
         var previousQuantity = inventory.AvailableQuantity;
+        var newQuantity = previousQuantity + request.AdjustmentQuantity;
         var adjustedAt = DateTimeOffset.UtcNow;
 
-        // Append domain event directly (don't go through handler since we already validated)
+        // Append domain event — Wolverine's auto-transaction handles SaveChangesAsync
         var domainEvent = new InventoryAdjusted(
             request.AdjustmentQuantity,
             request.Reason,
@@ -103,19 +106,9 @@ public static class AdjustInventoryEndpoint
             adjustedAt);
 
         session.Events.Append(inventoryId, domainEvent);
-        await session.SaveChangesAsync(ct);
 
-        // Reload to get fresh state after event appending
-        inventory = await session.LoadAsync<ProductInventory>(inventoryId, ct);
-        if (inventory is null)
-        {
-            return Results.Problem("Inventory not found after successful adjustment");
-        }
-
-        var newQuantity = inventory.AvailableQuantity;
-
-        // Publish InventoryAdjusted integration message via message bus
-        await bus.PublishAsync(new Messages.Contracts.Inventory.InventoryAdjusted(
+        // Integration messages via OutgoingMessages (replaces bus.PublishAsync)
+        outgoing.Add(new Messages.Contracts.Inventory.InventoryAdjusted(
             inventory.Sku,
             inventory.WarehouseId,
             request.AdjustmentQuantity,
@@ -125,8 +118,7 @@ public static class AdjustInventoryEndpoint
         // Check if low stock threshold crossed downward
         if (AdjustInventoryHandler.CrossedLowStockThreshold(previousQuantity, newQuantity))
         {
-            // Publish LowStockDetected integration message
-            await bus.PublishAsync(new Messages.Contracts.Inventory.LowStockDetected(
+            outgoing.Add(new Messages.Contracts.Inventory.LowStockDetected(
                 inventory.Sku,
                 inventory.WarehouseId,
                 newQuantity,
@@ -134,10 +126,10 @@ public static class AdjustInventoryEndpoint
                 adjustedAt));
         }
 
-        return Results.Ok(new AdjustInventoryResult(
+        return (Results.Ok(new AdjustInventoryResult(
             inventory.Id,
             inventory.Sku,
             inventory.WarehouseId,
-            inventory.AvailableQuantity));
+            newQuantity)), outgoing);
     }
 }
