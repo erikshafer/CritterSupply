@@ -127,16 +127,12 @@
 
         @if (AuthState.IsAdmin)
         {
-            <MudTooltip Text="Team management — coming soon">
-                <span>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
-                               StartIcon="@Icons.Material.Filled.Group" Class="mr-2"
-                               Disabled="true"
-                               data-testid="manage-users-btn">
-                        Manage Users
-                    </MudButton>
-                </span>
-            </MudTooltip>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.Group" Class="mr-2"
+                       Href="/team"
+                       data-testid="manage-users-btn">
+                Manage Users
+            </MudButton>
         }
 
         <MudButton Variant="Variant.Outlined" Color="Color.Default"
