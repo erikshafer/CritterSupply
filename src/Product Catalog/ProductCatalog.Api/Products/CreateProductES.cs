@@ -1,7 +1,9 @@
 using FluentValidation;
 using Marten;
+using Messages.Contracts.ProductCatalog;
 using Microsoft.AspNetCore.Authorization;
 using ProductCatalog.Products;
+using Wolverine;
 using Wolverine.Http;
 
 namespace ProductCatalog.Api.Products;
@@ -40,18 +42,20 @@ public static class CreateProductHandler
 {
     [WolverinePost("/api/products")]
     [Authorize(Policy = "VendorAdmin")]
-    public static async Task<IResult> Handle(
+    public static async Task<(IResult, OutgoingMessages)> Handle(
         CreateProduct command,
         IDocumentSession session,
         CancellationToken ct)
     {
+        var outgoing = new OutgoingMessages();
+
         // Check for duplicate SKU via projection
         var existing = await session.Query<ProductCatalogView>()
             .Where(p => p.Sku == command.Sku)
             .AnyAsync(ct);
 
         if (existing)
-            return Results.Conflict(new { Message = "Product with SKU already exists" });
+            return (Results.Conflict(new { Message = "Product with SKU already exists" }), outgoing);
 
         var productId = Guid.NewGuid();
         var images = command.Images?
@@ -63,6 +67,8 @@ public static class CreateProductHandler
             ? ProductDimensions.Create(command.Dimensions.Length, command.Dimensions.Width,
                 command.Dimensions.Height, command.Dimensions.Weight)
             : null;
+
+        var createdAt = DateTimeOffset.UtcNow;
 
         var @event = new ProductCreated(
             ProductId: productId,
@@ -76,11 +82,19 @@ public static class CreateProductHandler
             Images: images,
             Tags: command.Tags?.AsReadOnly(),
             Dimensions: dimensions,
-            CreatedAt: DateTimeOffset.UtcNow);
+            CreatedAt: createdAt);
 
         session.Events.StartStream<CatalogProduct>(productId, @event);
-        await session.SaveChangesAsync(ct);
 
-        return Results.Created($"/api/products/{command.Sku}", new { Sku = command.Sku, ProductId = productId });
+        outgoing.Add(new ProductAdded(
+            Sku: command.Sku,
+            Name: command.Name,
+            Category: command.Category,
+            AddedAt: createdAt,
+            Status: ProductStatus.Active.ToString(),
+            Brand: command.Brand,
+            HasDimensions: dimensions is not null));
+
+        return (Results.Created($"/api/products/{command.Sku}", new { Sku = command.Sku, ProductId = productId }), outgoing);
     }
 }

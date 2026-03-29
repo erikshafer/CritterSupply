@@ -262,6 +262,29 @@ services:
       - backend
     profiles: [all, returns]
 
+  listings-api:
+    container_name: crittersupply-listings
+    build:
+      context: .
+      dockerfile: src/Listings/Listings.Api/Dockerfile
+    ports:
+      - "5246:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__postgres: "Host=postgres;Port=5432;Database=listings;Username=postgres;Password=postgres"
+      RabbitMQ__hostname: rabbitmq
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: Listings.Api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    profiles: [all, listings]
+
   vendoridentity-api:
     container_name: crittersupply-vendoridentity
     build:

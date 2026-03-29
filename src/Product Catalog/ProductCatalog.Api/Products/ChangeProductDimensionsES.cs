@@ -1,9 +1,12 @@
 using FluentValidation;
 using Marten;
+using Messages.Contracts.ProductCatalog;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProductCatalog.Products;
+using Wolverine;
 using Wolverine.Http;
+using IntegrationProductDimensionsChanged = Messages.Contracts.ProductCatalog.ProductDimensionsChanged;
 
 namespace ProductCatalog.Api.Products;
 
@@ -26,17 +29,19 @@ public static class ChangeProductDimensionsHandler
 {
     [WolverinePut("/api/products/{sku}/dimensions")]
     [Authorize]
-    public static async Task<IResult> Handle(
+    public static async Task<(IResult, OutgoingMessages)> Handle(
         ChangeProductDimensions command,
         IDocumentSession session,
         CancellationToken ct)
     {
+        var outgoing = new OutgoingMessages();
+
         var view = await session.Query<ProductCatalogView>()
             .Where(p => p.Sku == command.Sku && !p.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
         if (view is null)
-            return Results.NotFound(new ProblemDetails { Detail = "Product not found", Status = 404 });
+            return (Results.NotFound(new ProblemDetails { Detail = "Product not found", Status = 404 }), outgoing);
 
         var newDimensions = ProductDimensions.Create(
             command.NewDimensions.Length,
@@ -44,15 +49,22 @@ public static class ChangeProductDimensionsHandler
             command.NewDimensions.Height,
             command.NewDimensions.Weight);
 
-        var @event = new ProductDimensionsChanged(
+        var @event = new ProductCatalog.Products.ProductDimensionsChanged(
             ProductId: view.Id,
             PreviousDimensions: view.Dimensions,
             NewDimensions: newDimensions,
             ChangedAt: DateTimeOffset.UtcNow);
 
         session.Events.Append(view.Id, @event);
-        await session.SaveChangesAsync(ct);
 
-        return Results.NoContent();
+        outgoing.Add(new IntegrationProductDimensionsChanged(
+            Sku: command.Sku,
+            Weight: newDimensions.Weight,
+            Length: newDimensions.Length,
+            Width: newDimensions.Width,
+            Height: newDimensions.Height,
+            OccurredAt: @event.ChangedAt));
+
+        return (Results.NoContent(), outgoing);
     }
 }

@@ -1,5 +1,4 @@
 using Marten;
-using Messages.Contracts.ProductCatalog;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Exporter;
@@ -132,14 +131,39 @@ builder.Host.UseWolverine(opts =>
     .AutoProvision();
 
     // Publish VendorProductAssociated events to the Vendor Portal exchange
-    opts.PublishMessage<VendorProductAssociated>()
+    opts.PublishMessage<Messages.Contracts.ProductCatalog.VendorProductAssociated>()
         .ToRabbitExchange("vendor-portal-product-associated");
 
     // Publish product lifecycle integration events
-    opts.PublishMessage<ProductAdded>()
+    opts.PublishMessage<Messages.Contracts.ProductCatalog.ProductAdded>()
         .ToRabbitExchange("product-catalog-product-added");
-    opts.PublishMessage<ProductDiscontinued>()
+    opts.PublishMessage<Messages.Contracts.ProductCatalog.ProductDiscontinued>()
         .ToRabbitExchange("product-catalog-product-discontinued");
+
+    // Publish granular product catalog integration events
+    opts.PublishMessage<Messages.Contracts.ProductCatalog.ProductContentUpdated>()
+        .ToRabbitExchange("product-catalog-product-content-updated");
+    opts.PublishMessage<Messages.Contracts.ProductCatalog.ProductCategoryChanged>()
+        .ToRabbitExchange("product-catalog-product-category-changed");
+    opts.PublishMessage<Messages.Contracts.ProductCatalog.ProductImagesUpdated>()
+        .ToRabbitExchange("product-catalog-product-images-updated");
+    opts.PublishMessage<Messages.Contracts.ProductCatalog.ProductDimensionsChanged>()
+        .ToRabbitExchange("product-catalog-product-dimensions-changed");
+    opts.PublishMessage<Messages.Contracts.ProductCatalog.ProductStatusChanged>()
+        .ToRabbitExchange("product-catalog-product-status-changed");
+    opts.PublishMessage<Messages.Contracts.ProductCatalog.ProductDeleted>()
+        .ToRabbitExchange("product-catalog-product-deleted");
+    opts.PublishMessage<Messages.Contracts.ProductCatalog.ProductRestored>()
+        .ToRabbitExchange("product-catalog-product-restored");
+
+    // Priority exchange for product recalls — recall messages (ProductDiscontinued with IsRecall=true)
+    // are also routed here so downstream consumers can process recalls ahead of standard catalog events.
+    // Listings BC binds to this exchange via the "product-recall" queue.
+    opts.PublishMessage<Messages.Contracts.ProductCatalog.ProductDiscontinued>()
+        .ToRabbitExchange("product-recall", exchange =>
+        {
+            exchange.ExchangeType = Wolverine.RabbitMQ.ExchangeType.Fanout;
+        });
 });
 
 // Wolverine HTTP

@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M36.1 — Listings BC Foundation (Planning) |
-| **Status** | 📋 **PLANNING** — Phase 0 reconciliation complete; implementation plan written |
+| **Current Milestone** | M36.1 — Listings BC Foundation (Session 1 Complete) |
+| **Status** | 🔨 **IN PROGRESS** — Phase 0 complete; Listings BC scaffold delivered |
 | **Recent Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Previous Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
-| **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
+| **Active BCs** | 19 total (Listings BC scaffold added) |
 
-*Last Updated: 2026-03-29 (M36.0 closed; M36.1 planning complete)*
+*Last Updated: 2026-03-29 (M36.1 Session 1 complete)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 📋 M36.1: Listings BC Foundation
 
-**Status:** 📋 **PLANNING** — Phase 0 reconciliation and implementation plan complete
+**Status:** 🔨 **IN PROGRESS** — Session 1 complete; Phase 0 cleanup delivered + Listings BC scaffold
 **Goal:** Deliver the Listings BC with full listing lifecycle, OWN_WEBSITE fast-path, recall cascade, ProductSummaryView anti-corruption layer, and Backoffice admin pages
 
 **Scope:** Phase 0 cleanup + full Phase 1 (Option B — 5–7 sessions)
@@ -99,6 +99,28 @@
 - CI Run #808 (green on main)
 - E2E Run #381 (green on main)
 - CodeQL Run #369 (green on main)
+
+**Session 1 Progress (2026-03-29):**
+- Phase 0 tasks completed:
+  - ✅ 7 granular integration contracts created (`Messages.Contracts/ProductCatalog/`)
+  - ✅ `ProductAdded` enriched with Status, Brand, HasDimensions
+  - ✅ `ProductDiscontinued` enriched with Reason, IsRecall
+  - ✅ `ProductUpdated` marked `[Obsolete]`
+  - ✅ 8 handlers updated to publish granular events + CreateProductES enriched
+  - ✅ `product-recall` fanout exchange configured
+  - ✅ 10 event sourcing behavior tests added (58/58 Product Catalog tests pass)
+- Listings BC scaffold:
+  - ✅ Domain project (`src/Listings/Listings/`)
+  - ✅ API project (`src/Listings/Listings.Api/`) with AutoApplyTransactions, JWT auth, health endpoint
+  - ✅ Integration test project with TestAuth (1/1 health check test passes)
+  - ✅ Added to CritterSupply.slnx, Docker Compose (port 5246), postgres init script
+  - ✅ `Messages.Contracts/Listings/` directory created
+- ADRs:
+  - ✅ ADR 0041 — Product Catalog ES Migration Decisions
+  - ✅ ADR 0042 — `catalog:` Namespace UUID v5 Convention
+- Build: 0 errors, 33 warnings (matches M36.0 baseline)
+- Session 2 picks up: Listing aggregate + ProductSummaryView ACL
+- Retrospective: [Session 1](./milestones/m36-1-session-1-retrospective.md)
 
 ---
 
