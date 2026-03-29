@@ -117,6 +117,7 @@ builder.Host.UseWolverine(opts =>
     opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
     opts.Discovery.IncludeAssembly(typeof(Product).Assembly);
     opts.UseFluentValidation();
+    opts.Policies.AutoApplyTransactions();
 
     // Configure RabbitMQ for integration messages
     var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");
