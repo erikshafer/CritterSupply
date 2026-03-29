@@ -19,7 +19,7 @@ public sealed record ListingsActiveView
     /// <summary>
     /// Stream IDs of all non-ended listings for this SKU.
     /// </summary>
-    public List<Guid> ActiveListingStreamIds { get; init; } = [];
+    public IReadOnlyList<Guid> ActiveListingStreamIds { get; init; } = [];
 }
 
 /// <summary>

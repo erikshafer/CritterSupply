@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M36.1 — Listings BC Foundation (Session 1 Complete) |
-| **Status** | 🔨 **IN PROGRESS** — Phase 0 complete; Listings BC scaffold delivered |
+| **Current Milestone** | M36.1 — Listings BC Foundation (Session 2 Complete) |
+| **Status** | 🔨 **IN PROGRESS** — Domain core delivered; lifecycle handlers, recall cascade, integration tests passing |
 | **Recent Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Previous Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
 | **Active BCs** | 19 total (Listings BC scaffold added) |
 
-*Last Updated: 2026-03-29 (M36.1 Session 1 complete)*
+*Last Updated: 2026-03-29 (M36.1 Session 2 complete)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 📋 M36.1: Listings BC Foundation
 
-**Status:** 🔨 **IN PROGRESS** — Session 1 complete; Phase 0 cleanup delivered + Listings BC scaffold
+**Status:** 🔨 **IN PROGRESS** — Session 2 complete; domain core delivered (aggregate, projections, handlers, recall cascade)
 **Goal:** Deliver the Listings BC with full listing lifecycle, OWN_WEBSITE fast-path, recall cascade, ProductSummaryView anti-corruption layer, and Backoffice admin pages
 
 **Scope:** Phase 0 cleanup + full Phase 1 (Option B — 5–7 sessions)
@@ -121,6 +121,45 @@
 - Build: 0 errors, 33 warnings (matches M36.0 baseline)
 - Session 2 picks up: Listing aggregate + ProductSummaryView ACL
 - Retrospective: [Session 1](./milestones/m36-1-session-1-retrospective.md)
+
+**Session 2 Progress (2026-03-29):**
+- Listing aggregate (event-sourced):
+  - ✅ `Listing` aggregate with `Create()` factory and `Apply()` methods per event
+  - ✅ Domain events: `ListingDraftCreated`, `ListingSubmittedForReview`, `ListingApproved`, `ListingActivated`, `ListingPaused`, `ListingResumed`, `ListingEnded`, `ListingForcedDown`, `ListingContentUpdated`
+  - ✅ `ListingStatus` enum: `Draft`, `ReadyForReview`, `Submitted`, `Live`, `Paused`, `Ended`
+  - ✅ `ListingStreamId` — UUID v5 deterministic stream IDs per ADR 0042 (`listing:{sku}:{channelCode}`)
+  - ✅ `EndedCause` enum: `ManualEnd`, `ProductDiscontinued`, `SubmissionRejected`, `ProductDeleted`
+- ProductSummaryView (anti-corruption layer):
+  - ✅ Marten document keyed by SKU — stores Name, Description, Category, Status, Brand, HasDimensions, ImageUrls
+  - ✅ 9 individual handler classes consuming Product Catalog integration events (one per `*Handler` class per Wolverine convention)
+  - ✅ Handlers: `ProductAddedHandler`, `ProductContentUpdatedHandler`, `ProductCategoryChangedHandler`, `ProductImagesUpdatedHandler`, `ProductDimensionsChangedHandler`, `ProductStatusChangedHandler`, `ProductDeletedHandler`, `ProductRestoredHandler`, `ProductDiscontinuedSummaryHandler`
+- ListingsActiveView projection:
+  - ✅ Inline `MultiStreamProjection<ListingsActiveView, string>` keyed by SKU
+  - ✅ Maintains per-SKU list of active listing stream IDs (incremented on `ListingDraftCreated`, decremented on `ListingEnded`/`ListingForcedDown`)
+- Lifecycle command handlers:
+  - ✅ `CreateListing` — validates product in `ProductSummaryView`, checks `ListingsActiveView` for duplicates, starts event stream
+  - ✅ `ActivateListing` — supports `OWN_WEBSITE` fast path (`Draft → Live`) and normal `Submitted → Live`
+  - ✅ `PauseListing` — validates `Live → Paused`
+  - ✅ `ResumeListing` — validates `Paused → Live`
+  - ✅ `EndListing` — validates non-terminal state, appends `ListingEnded` with `ManualEnd` cause
+- RecallCascadeHandler:
+  - ✅ Consumes `ProductDiscontinued` messages (reacts only when `IsRecall == true`)
+  - ✅ Loads `ListingsActiveView` for SKU, iterates active streams
+  - ✅ Idempotency: skips already-ended listings before appending `ListingForcedDown`
+- Integration message contracts:
+  - ✅ `Messages.Contracts.Listings`: `ListingCreated`, `ListingActivated`, `ListingEnded`, `ListingForcedDown`, `ListingsCascadeCompleted`
+- Program.cs:
+  - ✅ Inline snapshot for `Listing` aggregate
+  - ✅ `ListingsActiveViewProjection` registered as inline projection
+  - ✅ Domain assembly discovery for handler scanning
+- Integration tests: 18/18 passing
+  - ✅ 9 lifecycle tests (create, activate OWN_WEBSITE, pause, resume, end, invalid transitions, error cases)
+  - ✅ 4 ProductSummaryView tests (add, status change, delete, content update)
+  - ✅ 4 recall cascade tests (3-channel force-down, idempotency, count verification, non-recall skip)
+  - ✅ 1 health check test
+- Build: 0 errors, 33 warnings (matches M36.0 baseline)
+- Session 3 picks up: HTTP endpoints + admin UI
+- Retrospective: [Session 2](./milestones/m36-1-session-2-retrospective.md)
 
 ---
 

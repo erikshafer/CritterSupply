@@ -74,6 +74,10 @@ public sealed record Listing(
             EndCause = EndedCause.ProductDiscontinued
         };
 
+    /// <summary>
+    /// Apply for content updates propagated from Product Catalog changes.
+    /// Prepared for Session 3+ content propagation work — not raised by any handler in Session 2.
+    /// </summary>
     public Listing Apply(ListingContentUpdated @event) =>
         this with
         {
