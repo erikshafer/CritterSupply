@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M36.0 — Engineering Quality (Tracks A + B complete) |
-| **Status** | 🚀 **IN PROGRESS** — Session 2 complete (2026-03-28); Track B done — 4 Critter Stack violations fixed |
+| **Current Milestone** | M36.0 — Engineering Quality (Tracks A + B + C complete, D-1 done) |
+| **Status** | 🚀 **IN PROGRESS** — Session 4 complete (2026-03-29); Tracks A–C complete, Track D started |
 | **Recent Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
 | **Previous Completion** | M34.0 — Experience Completion + Vocabulary Alignment (2026-03-26) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-28 (M36.0 Session 3 complete — Track B remaining + Track C naming)*
+*Last Updated: 2026-03-29 (M36.0 Session 4 complete — Track C vertical slices + Track D auth started)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 📋 M36.0: Engineering Quality
 
-**Status:** 🚀 **IN PROGRESS** — Session 3 complete (2026-03-28); Tracks A + B complete, Track C naming started
+**Status:** 🚀 **IN PROGRESS** — Session 4 complete (2026-03-29); Tracks A–C complete, Track D started
 **Goal:** Critter Stack idiom compliance, DDD-influenced naming audit, integration and E2E test coverage gaps
 
 **Direction from owner:**
@@ -117,6 +117,16 @@
 - ✅ **Track B total:** 34 `SaveChangesAsync()` calls removed across 25 files (Sessions 2 + 3 combined)
 - ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (unchanged)
 - ✅ **Session 3 Retrospective:** [m36-0-session-3-retrospective.md](./milestones/m36-0-session-3-retrospective.md)
+
+**Session 4 Progress (2026-03-29):**
+- ✅ **C-4 (Vendor Portal vertical slice):** Split `TeamEventHandlers.cs` into 7 individual files in `TeamManagement/`. Each handler in its own file. No shared types needed to migrate. No `SaveChangesAsync()` reintroduced.
+- ✅ **C-5 (Product Catalog vertical slice):** Split `AssignProductToVendorES.cs` into 3 files: `GetVendorAssignment.cs`, `AssignProductToVendor.cs`, `BulkAssignProductsToVendor.cs`. Shared `VendorAssignmentResponse` lives in query file.
+- ✅ **C-6 (Vendor Identity validators):** Colocated 6 validators with their command files per ADR 0039. 3 in `UserInvitations/`, 3 in `UserManagement/`. 6 standalone validator files deleted.
+- ✅ **D-1 (Vendor Identity auth):** Added JWT Bearer authentication + authorization middleware. 10 endpoints now require `[Authorize]`, 3 auth endpoints explicitly `[AllowAnonymous]`. Test fixture updated with `AddTestAuthentication()`. **57/57 Vendor Identity tests pass.**
+- ✅ **Track C complete:** All vertical slice refactors done (C-4, C-5, C-6).
+- ✅ **Track D started:** D-1 (critical severity) shipped and verified.
+- ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (unchanged)
+- ✅ **Session 4 Retrospective:** [m36-0-session-4-retrospective.md](./milestones/m36-0-session-4-retrospective.md)
 
 ---
 
