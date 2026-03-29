@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -41,6 +42,7 @@ public static class ConfirmDeliveryHandler
     }
 
     [WolverinePost("/api/fulfillment/shipments/{shipmentId}/confirm-delivery")]
+    [Authorize]
     public static (Events, OutgoingMessages) Handle(
         ConfirmDelivery command,
         [WriteAggregate] Shipment shipment)

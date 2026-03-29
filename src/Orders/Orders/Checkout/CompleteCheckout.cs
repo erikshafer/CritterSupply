@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine.Http;
 using Wolverine.Marten;
@@ -60,6 +61,7 @@ public static class CompleteCheckoutHandler
     }
 
     [WolverinePost("/api/checkouts/{checkoutId}/complete")]
+    [Authorize]
     public static (OrderCreated, ShoppingContracts.CartCheckoutCompleted) Handle(
         CompleteCheckout command,
         [WriteAggregate] Checkout checkout)

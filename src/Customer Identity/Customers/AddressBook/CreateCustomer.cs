@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Wolverine;
@@ -85,6 +86,7 @@ public static class CreateCustomerHandler
     }
 
     [WolverinePost("/api/customers")]
+    [Authorize]
     public static async Task<CreationResponse<Guid>> Handle(
         CreateCustomer command,
         CustomerIdentityDbContext dbContext,

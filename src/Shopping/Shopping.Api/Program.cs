@@ -6,8 +6,10 @@ using JasperFx.Events.Daemon;
 using JasperFx.Resources;
 using Marten;
 using Marten.Events.Projections;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -140,6 +142,37 @@ builder.Services.AddScoped<Shopping.Clients.IPromotionsClient, Shopping.Api.Clie
 
 builder.Services.AddWolverineHttp();
 
+// Configure multi-issuer JWT authentication
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer("Backoffice", options =>
+    {
+        options.Authority = "https://localhost:5249"; // Backoffice Identity BC
+        options.Audience = "https://localhost:5249";
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            RoleClaimType = "role"
+        };
+    })
+    .AddJwtBearer("Vendor", options =>
+    {
+        options.Authority = "https://localhost:5240"; // Vendor Identity BC
+        options.Audience = "https://localhost:5240";
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            RoleClaimType = "role"
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -158,6 +191,10 @@ if (app.Environment.IsDevelopment())
 
 // Map Aspire default endpoints (/health, /alive)
 app.MapDefaultEndpoints();
+
+// Add authentication and authorization middleware
+app.UseAuthentication();
+app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {

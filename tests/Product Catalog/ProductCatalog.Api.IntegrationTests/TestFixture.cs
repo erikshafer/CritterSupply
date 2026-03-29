@@ -54,8 +54,10 @@ public class TestFixture : IAsyncLifetime
 
                 // Register the test auth scheme alongside (not replacing) the real JWT Bearer
                 // scheme, then use PostConfigure to set it as the default. This preserves the
-                // JWT Bearer registration for scenarios that may want to test real token validation
-                // while ensuring all admin endpoint tests automatically authenticate as Admin.
+                // JWT Bearer registration. The handler provides Admin role for VendorAdmin policy
+                // and satisfies plain [Authorize] on all endpoints.
+                // Note: "Backoffice" scheme is already registered in Program.cs, so we only add
+                // the TestAdmin scheme and override the default.
                 services.AddAuthentication()
                     .AddScheme<AuthenticationSchemeOptions, AdminAuthHandler>(
                         AdminAuthHandler.SchemeName, _ => { });
@@ -184,9 +186,9 @@ internal sealed class AdminAuthHandler : AuthenticationHandler<AuthenticationSch
             new Claim(ClaimTypes.Name, "test-admin"),
             new Claim(ClaimTypes.Role, "Admin"),
         };
-        var identity = new ClaimsIdentity(claims, SchemeName);
+        var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);
-        var ticket = new AuthenticationTicket(principal, SchemeName);
+        var ticket = new AuthenticationTicket(principal, Scheme.Name);
         return Task.FromResult(AuthenticateResult.Success(ticket));
     }
 }

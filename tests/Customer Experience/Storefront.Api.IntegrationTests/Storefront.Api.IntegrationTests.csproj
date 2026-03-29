@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../../src/Customer Experience/Storefront.Api/Storefront.Api.csproj" />
+    <ProjectReference Include="..\..\Shared\CritterSupply.TestUtilities\CritterSupply.TestUtilities.csproj" />
   </ItemGroup>
 
   <ItemGroup>

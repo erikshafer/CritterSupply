@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine.Http;
 using Wolverine.Marten;
@@ -41,6 +42,7 @@ public static class SelectShippingMethodHandler
     }
 
     [WolverinePost("/api/checkouts/{checkoutId}/shipping-method")]
+    [Authorize]
     public static ShippingMethodSelected Handle(
         SelectShippingMethod command,
         [WriteAggregate] Checkout checkout)

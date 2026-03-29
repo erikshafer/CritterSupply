@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Storefront.Clients;
 using Wolverine.Http;
 
@@ -21,6 +22,7 @@ public sealed class CompleteCheckoutValidator : AbstractValidator<CompleteChecko
 public static class CompleteCheckoutHandler
 {
     [WolverinePost("/api/storefront/checkouts/{checkoutId}/complete")]
+    [Authorize]
     public static async Task<IResult> Handle(
         Guid checkoutId,
         IOrdersClient ordersClient,

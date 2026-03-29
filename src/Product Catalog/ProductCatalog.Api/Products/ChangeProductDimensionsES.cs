@@ -1,5 +1,6 @@
 using FluentValidation;
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProductCatalog.Products;
 using Wolverine.Http;
@@ -24,6 +25,7 @@ public sealed class ChangeProductDimensionsValidator : AbstractValidator<ChangeP
 public static class ChangeProductDimensionsHandler
 {
     [WolverinePut("/api/products/{sku}/dimensions")]
+    [Authorize]
     public static async Task<IResult> Handle(
         ChangeProductDimensions command,
         IDocumentSession session,

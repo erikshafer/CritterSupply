@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Wolverine.Http;
 
@@ -12,6 +13,7 @@ public static class Logout
     /// Signs out the user and clears the session cookie.
     /// </summary>
     [WolverinePost("/api/auth/logout")]
+    [AllowAnonymous]
     public static async Task<IResult> Handle(HttpContext httpContext)
     {
         await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);

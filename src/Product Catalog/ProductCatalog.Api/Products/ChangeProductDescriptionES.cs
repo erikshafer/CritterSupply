@@ -1,5 +1,6 @@
 using FluentValidation;
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProductCatalog.Products;
 using Wolverine.Http;
@@ -20,6 +21,7 @@ public sealed class ChangeProductDescriptionValidator : AbstractValidator<Change
 public static class ChangeProductDescriptionHandler
 {
     [WolverinePut("/api/products/{sku}/description")]
+    [Authorize]
     public static async Task<IResult> Handle(
         ChangeProductDescription command,
         IDocumentSession session,

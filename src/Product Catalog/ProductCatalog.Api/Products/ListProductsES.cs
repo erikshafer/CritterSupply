@@ -1,4 +1,5 @@
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using ProductCatalog.Products;
 using Wolverine.Http;
 
@@ -7,6 +8,7 @@ namespace ProductCatalog.Api.Products;
 public static class ListProductsESHandler
 {
     [WolverineGet("/api/products")]
+    [Authorize]
     public static async Task<IResult> Handle(
         int? page,
         int? pageSize,

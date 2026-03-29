@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -49,6 +50,7 @@ public static class ChangeItemQuantityHandler
     }
 
     [WolverinePut("/api/carts/{cartId}/items/{sku}/quantity")]
+    [Authorize]
     public static (Events, OutgoingMessages) Handle(
         ChangeItemQuantity command,
         [WriteAggregate] Cart cart)

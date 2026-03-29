@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Storefront.Clients;
 using Wolverine.Http;
 
@@ -11,6 +12,7 @@ namespace Storefront.Api.Commands;
 public static class SelectCheckoutShippingMethodHandler
 {
     [WolverinePost("/api/storefront/checkouts/{checkoutId}/shipping-method")]
+    [Authorize]
     public static async Task<IResult> Handle(
         Guid checkoutId,
         SelectCheckoutShippingMethodRequest request,

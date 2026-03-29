@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Wolverine.Http;
@@ -59,6 +60,7 @@ public static class SetDefaultAddressHandler
     }
 
     [WolverinePut("/api/customers/{customerId}/addresses/{addressId}/set-default")]
+    [Authorize]
     public static async Task Handle(
         SetDefaultAddress command,
         CustomerAddress address,

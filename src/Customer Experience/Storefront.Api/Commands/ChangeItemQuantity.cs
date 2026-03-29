@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Storefront.Clients;
 using Wolverine.Http;
 
@@ -26,6 +27,7 @@ public sealed class ChangeItemQuantityValidator : AbstractValidator<ChangeItemQu
 public static class ChangeItemQuantityHandler
 {
     [WolverinePut("/api/storefront/carts/{cartId}/items/{sku}/quantity")]
+    [Authorize]
     public static async Task<IResult> Handle(
         Guid cartId,
         string sku,

@@ -128,6 +128,18 @@
 - ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (unchanged)
 - ✅ **Session 4 Retrospective:** [m36-0-session-4-retrospective.md](./milestones/m36-0-session-4-retrospective.md)
 
+**Session 5 Progress (2026-03-29):**
+- ✅ **D-3 (Returns auth):** Added `[Authorize]` to 9 mutation endpoints. Fixture pre-existing from M35.0. **44/44 passed, 6 skipped.**
+- ✅ **D-5 (Orders auth):** Added `[Authorize]` to 4 checkout mutation endpoints. Fixture pre-existing from A-2. **48/48 passed.**
+- ✅ **D-2 (Shopping auth):** Added JWT Bearer middleware + `[Authorize]` on all 9 endpoints. **70/70 passed.**
+- ✅ **D-2 (Storefront auth):** Added JWT Bearer middleware + `[Authorize]` on all 13 endpoints. **49/49 passed.**
+- ✅ **D-4 (Fulfillment auth):** Added `[Authorize]` to 5 mutation endpoints. Migrated fixture to shared TestAuthHandler. **17/17 passed.**
+- ✅ **D-4 (Product Catalog auth):** Added `[Authorize]` to 10 unprotected endpoints. **43/48 passed (5 pre-existing projection failures).**
+- ✅ **D-4 (Customer Identity auth):** Added `[Authorize]` to 5 account endpoints, `[AllowAnonymous]` on Login/Logout. **29/29 passed.**
+- ✅ **Track D complete:** All authorization hardening items (D-1 through D-5) shipped. 55 endpoints protected, 2 marked `[AllowAnonymous]`.
+- ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (unchanged)
+- ✅ **Session 5 Retrospective:** [m36-0-session-5-retrospective.md](./milestones/m36-0-session-5-retrospective.md)
+
 ---
 
 ## Recent Completions
@@ -1284,6 +1296,6 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Document Last Updated: 2026-03-27*
-*Active Milestone: M36.0 — Engineering Quality (planning)*
+*Document Last Updated: 2026-03-29*
+*Active Milestone: M36.0 — Engineering Quality (in progress)*
 *Update Policy: At milestone start, milestone end, and significant task changes*

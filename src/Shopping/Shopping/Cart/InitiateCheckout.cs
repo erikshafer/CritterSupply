@@ -1,5 +1,6 @@
 using FluentValidation;
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -46,6 +47,7 @@ public static class InitiateCheckoutHandler
     }
 
     [WolverinePost("/api/carts/{cartId}/checkout")]
+    [Authorize]
     public static (CreationResponse<Guid>, Events, OutgoingMessages) Handle(
         InitiateCheckout command,
         [WriteAggregate] Cart cart)

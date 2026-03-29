@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine.Http;
 using Wolverine.Marten;
@@ -77,6 +78,7 @@ public static class ClearCartHttpEndpoint
     }
 
     [WolverineDelete("/api/carts/{cartId}")]
+    [Authorize]
     public static Events Handle(
         Guid cartId,
         [FromQuery] string? reason,

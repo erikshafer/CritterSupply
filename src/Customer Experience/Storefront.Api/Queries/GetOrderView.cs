@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Storefront.Clients;
 using Wolverine.Http;
 
@@ -10,6 +11,7 @@ namespace Storefront.Api.Queries;
 public static class GetOrderViewHandler
 {
     [WolverineGet("/api/storefront/orders/{orderId}")]
+    [Authorize]
     public static async Task<IResult> Handle(
         Guid orderId,
         IOrdersClient ordersClient,
