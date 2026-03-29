@@ -1,4 +1,7 @@
+using JasperFx.Events.Projections;
+using Listings.Projections;
 using Marten;
+using Marten.Events.Projections;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -22,6 +25,12 @@ builder.Services.AddMarten(opts =>
 {
     opts.Connection(connectionString);
     opts.DatabaseSchemaName = "listings";
+
+    // Event-sourced Listing aggregate — inline snapshot for queryable state
+    opts.Projections.Snapshot<Listings.Listing.Listing>(SnapshotLifecycle.Inline);
+
+    // Multi-stream projection: per-SKU index of active listing stream IDs
+    opts.Projections.Add<ListingsActiveViewProjection>(ProjectionLifecycle.Inline);
 })
     .UseLightweightSessions()
     .IntegrateWithWolverine();
@@ -54,7 +63,12 @@ builder.Services.AddAuthorization();
 // Wolverine messaging and HTTP
 builder.Host.UseWolverine(opts =>
 {
+    // API assembly (HTTP endpoints)
     opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
+
+    // Domain assembly (command handlers, integration message handlers)
+    opts.Discovery.IncludeAssembly(typeof(Listings.Listing.Listing).Assembly);
+
     opts.UseFluentValidation();
 
     // CRITICAL: AutoApplyTransactions ensures Marten sessions are committed by Wolverine.
