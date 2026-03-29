@@ -1,5 +1,4 @@
 using Marten;
-using Messages.Contracts.ProductCatalog;
 using ProductCatalog.Api.Products;
 using ProductCatalog.Products;
 using Shouldly;
