@@ -6,6 +6,6 @@ namespace Promotions.Discount;
 /// Phase 1: Single coupon support, percentage discounts only.
 /// Phase 2+: Multiple coupons, stacking rules, fixed amount, free shipping.
 /// </summary>
-public sealed record CalculateDiscountRequest(
+public sealed record CalculateDiscount(
     IReadOnlyList<CartLineItem> CartItems,
     IReadOnlyList<string> CouponCodes);

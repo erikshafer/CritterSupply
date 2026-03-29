@@ -49,8 +49,6 @@ public static class VendorUserInvitedHandler
             });
         }
 
-        await session.SaveChangesAsync(ct);
-
         logger.LogInformation(
             "Team member invited: {Email} for tenant {TenantId}",
             message.Email, message.VendorTenantId);
@@ -81,8 +79,6 @@ public static class VendorUserActivatedHandler
         // Remove the invitation — it's been accepted
         session.Delete<TeamInvitation>(message.UserId);
 
-        await session.SaveChangesAsync(ct);
-
         logger.LogInformation(
             "Team member activated: {UserId} for tenant {TenantId}",
             message.UserId, message.VendorTenantId);
@@ -107,7 +103,6 @@ public static class VendorUserDeactivatedHandler
             member.Status = "Deactivated";
             member.DeactivatedAt = message.DeactivatedAt;
             session.Store(member);
-            await session.SaveChangesAsync(ct);
         }
 
         logger.LogInformation(
@@ -134,7 +129,6 @@ public static class VendorUserReactivatedHandler
             member.Status = "Active";
             member.DeactivatedAt = null;
             session.Store(member);
-            await session.SaveChangesAsync(ct);
         }
 
         logger.LogInformation(
@@ -160,7 +154,6 @@ public static class VendorUserRoleChangedHandler
         {
             member.Role = message.NewRole.ToString();
             session.Store(member);
-            await session.SaveChangesAsync(ct);
         }
 
         logger.LogInformation(
@@ -187,7 +180,6 @@ public static class VendorUserInvitationResentHandler
             invitation.ResendCount = message.ResendCount;
             invitation.ExpiresAt = message.NewExpiresAt;
             session.Store(invitation);
-            await session.SaveChangesAsync(ct);
         }
 
         logger.LogInformation(
@@ -216,8 +208,6 @@ public static class VendorUserInvitationRevokedHandler
         {
             session.Delete<TeamMember>(message.UserId);
         }
-
-        await session.SaveChangesAsync(ct);
 
         logger.LogInformation(
             "Invitation revoked for user {UserId}",

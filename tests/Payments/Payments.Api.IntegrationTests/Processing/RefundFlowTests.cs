@@ -5,7 +5,7 @@ namespace Payments.Api.IntegrationTests.Processing;
 
 /// <summary>
 /// Integration tests for refund processing flows.
-/// Tests the complete flow from RefundRequested command through gateway to persisted state.
+/// Tests the complete flow from RequestRefund command through gateway to persisted state.
 /// </summary>
 [Collection(IntegrationTestCollection.Name)]
 public class RefundFlowTests : IAsyncLifetime
@@ -35,7 +35,7 @@ public class RefundFlowTests : IAsyncLifetime
         var currency = "USD";
         var successToken = "tok_success_visa";
 
-        var paymentCommand = new PaymentRequested(orderId, customerId, amount, currency, successToken);
+        var paymentCommand = new RequestPayment(orderId, customerId, amount, currency, successToken);
         await _fixture.ExecuteAndWaitAsync(paymentCommand);
 
         // Get the payment ID
@@ -45,7 +45,7 @@ public class RefundFlowTests : IAsyncLifetime
             .SingleAsync();
 
         // Act: Request a full refund
-        var refundCommand = new RefundRequested(payment.Id, orderId, amount);
+        var refundCommand = new RequestRefund(payment.Id, orderId, amount);
         await _fixture.ExecuteAndWaitAsync(refundCommand);
 
         // Assert: Verify the payment was refunded
@@ -73,7 +73,7 @@ public class RefundFlowTests : IAsyncLifetime
         var currency = "USD";
         var successToken = "tok_success_mastercard";
 
-        var paymentCommand = new PaymentRequested(orderId, customerId, amount, currency, successToken);
+        var paymentCommand = new RequestPayment(orderId, customerId, amount, currency, successToken);
         await _fixture.ExecuteAndWaitAsync(paymentCommand);
 
         // Get the payment ID
@@ -84,7 +84,7 @@ public class RefundFlowTests : IAsyncLifetime
 
         // Act: Request a partial refund
         var refundAmount = 40.00m;
-        var refundCommand = new RefundRequested(payment.Id, orderId, refundAmount);
+        var refundCommand = new RequestRefund(payment.Id, orderId, refundAmount);
         await _fixture.ExecuteAndWaitAsync(refundCommand);
 
         // Assert: Verify the payment is partially refunded but still Captured
@@ -112,7 +112,7 @@ public class RefundFlowTests : IAsyncLifetime
         var currency = "USD";
         var successToken = "tok_success_amex";
 
-        var paymentCommand = new PaymentRequested(orderId, customerId, amount, currency, successToken);
+        var paymentCommand = new RequestPayment(orderId, customerId, amount, currency, successToken);
         await _fixture.ExecuteAndWaitAsync(paymentCommand);
 
         // Get the payment ID
@@ -124,8 +124,8 @@ public class RefundFlowTests : IAsyncLifetime
         // Act: Request two partial refunds
         var firstRefund = 30.00m;
         var secondRefund = 20.00m;
-        var firstRefundCommand = new RefundRequested(payment.Id, orderId, firstRefund);
-        var secondRefundCommand = new RefundRequested(payment.Id, orderId, secondRefund);
+        var firstRefundCommand = new RequestRefund(payment.Id, orderId, firstRefund);
+        var secondRefundCommand = new RequestRefund(payment.Id, orderId, secondRefund);
 
         await _fixture.ExecuteAndWaitAsync(firstRefundCommand);
         await _fixture.ExecuteAndWaitAsync(secondRefundCommand);
@@ -155,7 +155,7 @@ public class RefundFlowTests : IAsyncLifetime
         var currency = "USD";
         var successToken = "tok_success_visa";
 
-        var paymentCommand = new PaymentRequested(orderId, customerId, amount, currency, successToken);
+        var paymentCommand = new RequestPayment(orderId, customerId, amount, currency, successToken);
         await _fixture.ExecuteAndWaitAsync(paymentCommand);
 
         // Get the payment ID
@@ -166,7 +166,7 @@ public class RefundFlowTests : IAsyncLifetime
 
         // Act: Request a refund exceeding the payment amount
         var excessiveRefund = 150.00m;
-        var refundCommand = new RefundRequested(payment.Id, orderId, excessiveRefund);
+        var refundCommand = new RequestRefund(payment.Id, orderId, excessiveRefund);
         await _fixture.ExecuteAndWaitAsync(refundCommand);
 
         // Assert: Verify payment state unchanged
@@ -191,7 +191,7 @@ public class RefundFlowTests : IAsyncLifetime
         var refundAmount = 50.00m;
 
         // Act: Request refund for non-existent payment
-        var refundCommand = new RefundRequested(nonExistentPaymentId, orderId, refundAmount);
+        var refundCommand = new RequestRefund(nonExistentPaymentId, orderId, refundAmount);
         await _fixture.ExecuteAndWaitAsync(refundCommand);
 
         // Assert: Handler completes without error
@@ -215,7 +215,7 @@ public class RefundFlowTests : IAsyncLifetime
         var currency = "USD";
         var declineToken = "tok_decline_insufficient_funds";
 
-        var paymentCommand = new PaymentRequested(orderId, customerId, amount, currency, declineToken);
+        var paymentCommand = new RequestPayment(orderId, customerId, amount, currency, declineToken);
         await _fixture.ExecuteAndWaitAsync(paymentCommand);
 
         // Get the payment ID
@@ -227,7 +227,7 @@ public class RefundFlowTests : IAsyncLifetime
         payment.Status.ShouldBe(PaymentStatus.Failed); // Verify it failed
 
         // Act: Request refund on failed payment
-        var refundCommand = new RefundRequested(payment.Id, orderId, amount);
+        var refundCommand = new RequestRefund(payment.Id, orderId, amount);
         await _fixture.ExecuteAndWaitAsync(refundCommand);
 
         // Assert: Verify payment remains in Failed status (no refund applied)
@@ -253,7 +253,7 @@ public class RefundFlowTests : IAsyncLifetime
         var currency = "USD";
         var successToken = "tok_success_visa";
 
-        var paymentCommand = new PaymentRequested(orderId, customerId, amount, currency, successToken);
+        var paymentCommand = new RequestPayment(orderId, customerId, amount, currency, successToken);
         await _fixture.ExecuteAndWaitAsync(paymentCommand);
 
         await using var session = _fixture.GetDocumentSession();
@@ -262,11 +262,11 @@ public class RefundFlowTests : IAsyncLifetime
             .SingleAsync();
 
         // Fully refund the payment
-        var firstRefundCommand = new RefundRequested(payment.Id, orderId, amount);
+        var firstRefundCommand = new RequestRefund(payment.Id, orderId, amount);
         await _fixture.ExecuteAndWaitAsync(firstRefundCommand);
 
         // Act: Attempt another refund
-        var secondRefundCommand = new RefundRequested(payment.Id, orderId, 10.00m);
+        var secondRefundCommand = new RequestRefund(payment.Id, orderId, 10.00m);
         await _fixture.ExecuteAndWaitAsync(secondRefundCommand);
 
         // Assert: Verify payment remains fully refunded (no additional refund applied)

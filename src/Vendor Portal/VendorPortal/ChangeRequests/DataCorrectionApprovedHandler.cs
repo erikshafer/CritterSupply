@@ -22,7 +22,6 @@ public static class DataCorrectionApprovedHandler
         request.Status = ChangeRequestStatus.Approved;
         request.ResolvedAt = @event.ApprovedAt;
         session.Store(request);
-        await session.SaveChangesAsync(ct);
 
         return
         [

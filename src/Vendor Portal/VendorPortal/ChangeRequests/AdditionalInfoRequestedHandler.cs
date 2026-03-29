@@ -28,7 +28,6 @@ public static class AdditionalInfoRequestedHandler
         request.Status = ChangeRequestStatus.NeedsMoreInfo;
         request.Question = @event.Question;
         session.Store(request);
-        await session.SaveChangesAsync(ct);
 
         return
         [

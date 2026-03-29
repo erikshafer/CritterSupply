@@ -27,7 +27,7 @@ public sealed class DiscountCalculationTests : IClassFixture<TestFixture>
         // Arrange
         await _fixture.CleanAllDataAsync();
 
-        var request = new CalculateDiscountRequest(
+        var request = new CalculateDiscount(
             CartItems: new List<CartLineItem>
             {
                 new("SKU-001", 2, 19.99m),
@@ -75,7 +75,7 @@ public sealed class DiscountCalculationTests : IClassFixture<TestFixture>
         await _fixture.ExecuteAndWaitAsync(new ActivatePromotion(promotion.Id));
         await _fixture.ExecuteAndWaitAsync(new IssueCoupon("DISCOUNT20", promotion.Id));
 
-        var request = new CalculateDiscountRequest(
+        var request = new CalculateDiscount(
             CartItems: new List<CartLineItem>
             {
                 new("SKU-A", 1, 100.00m),
@@ -117,7 +117,7 @@ public sealed class DiscountCalculationTests : IClassFixture<TestFixture>
         // Arrange
         await _fixture.CleanAllDataAsync();
 
-        var request = new CalculateDiscountRequest(
+        var request = new CalculateDiscount(
             CartItems: new List<CartLineItem>
             {
                 new("SKU-X", 1, 75.00m)
@@ -171,7 +171,7 @@ public sealed class DiscountCalculationTests : IClassFixture<TestFixture>
             Guid.NewGuid(),
             DateTimeOffset.UtcNow));
 
-        var request = new CalculateDiscountRequest(
+        var request = new CalculateDiscount(
             CartItems: new List<CartLineItem>
             {
                 new("SKU-Y", 1, 100.00m)
@@ -218,7 +218,7 @@ public sealed class DiscountCalculationTests : IClassFixture<TestFixture>
         await _fixture.ExecuteAndWaitAsync(new ActivatePromotion(promotion.Id));
         await _fixture.ExecuteAndWaitAsync(new IssueCoupon("EXPIRED30", promotion.Id));
 
-        var request = new CalculateDiscountRequest(
+        var request = new CalculateDiscount(
             CartItems: new List<CartLineItem>
             {
                 new("SKU-Z", 1, 200.00m)
@@ -265,7 +265,7 @@ public sealed class DiscountCalculationTests : IClassFixture<TestFixture>
         await _fixture.ExecuteAndWaitAsync(new ActivatePromotion(promotion.Id));
         await _fixture.ExecuteAndWaitAsync(new IssueCoupon("FUTURE15", promotion.Id));
 
-        var request = new CalculateDiscountRequest(
+        var request = new CalculateDiscount(
             CartItems: new List<CartLineItem>
             {
                 new("SKU-FUTURE", 1, 150.00m)
@@ -312,7 +312,7 @@ public sealed class DiscountCalculationTests : IClassFixture<TestFixture>
         await _fixture.ExecuteAndWaitAsync(new IssueCoupon("CASE10", promotion.Id));
 
         // Request with lowercase coupon code
-        var request = new CalculateDiscountRequest(
+        var request = new CalculateDiscount(
             CartItems: new List<CartLineItem>
             {
                 new("SKU-CASE", 1, 50.00m)
@@ -358,7 +358,7 @@ public sealed class DiscountCalculationTests : IClassFixture<TestFixture>
         await _fixture.ExecuteAndWaitAsync(new ActivatePromotion(promotion.Id));
         await _fixture.ExecuteAndWaitAsync(new IssueCoupon("MULTI15", promotion.Id));
 
-        var request = new CalculateDiscountRequest(
+        var request = new CalculateDiscount(
             CartItems: new List<CartLineItem>
             {
                 new("SKU-001", 3, 29.99m), // 89.97

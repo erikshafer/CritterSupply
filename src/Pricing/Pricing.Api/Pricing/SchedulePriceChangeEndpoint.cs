@@ -99,8 +99,6 @@ public static class SchedulePriceChangeEndpoint
         var activationMessage = new ActivateScheduledPriceChange(sku, scheduleId);
         await messaging.ScheduleAsync(activationMessage, request.ScheduledFor);
 
-        await session.SaveChangesAsync(ct);
-
         return Results.Ok(new
         {
             sku = sku.ToUpperInvariant(),
@@ -149,6 +147,5 @@ public static class ActivateScheduledPriceChangeHandler
             ActivatedAt: DateTimeOffset.UtcNow);
 
         session.Events.Append(streamId, evt);
-        await session.SaveChangesAsync(ct);
     }
 }

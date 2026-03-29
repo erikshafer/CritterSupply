@@ -231,8 +231,8 @@ public class AuthorizationFlowTests : IAsyncLifetime
         var currency = "USD";
         var successToken = "tok_success_visa";
 
-        // Use immediate capture flow (PaymentRequested, not AuthorizePayment)
-        var paymentCommand = new PaymentRequested(orderId, customerId, amount, currency, successToken);
+        // Use immediate capture flow (RequestPayment, not AuthorizePayment)
+        var paymentCommand = new RequestPayment(orderId, customerId, amount, currency, successToken);
         await _fixture.ExecuteAndWaitAsync(paymentCommand);
 
         await using var session = _fixture.GetDocumentSession();

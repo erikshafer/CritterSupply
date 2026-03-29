@@ -41,8 +41,6 @@ public static class VendorTenantTerminatedHandler
             session.Store(request);
         }
 
-        await session.SaveChangesAsync(ct);
-
         logger.LogInformation(
             "Auto-rejected {Count} in-flight change requests for terminated tenant {TenantId}",
             inflight.Count, message.VendorTenantId);

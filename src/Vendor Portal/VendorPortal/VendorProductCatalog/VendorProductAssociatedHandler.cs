@@ -32,6 +32,5 @@ public static class VendorProductAssociatedHandler
         };
 
         session.Store(entry);
-        await session.SaveChangesAsync(ct);
     }
 }

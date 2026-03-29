@@ -3,11 +3,11 @@ using Payments.Processing;
 namespace Payments.UnitTests.Processing;
 
 /// <summary>
-/// Unit tests for PaymentRequestedValidator edge cases.
+/// Unit tests for RequestPaymentValidator edge cases.
 /// </summary>
-public class PaymentRequestedValidatorTests
+public class RequestPaymentValidatorTests
 {
-    private readonly PaymentRequested.PaymentRequestedValidator _validator = new();
+    private readonly RequestPayment.RequestPaymentValidator _validator = new();
 
     /// <summary>
     /// Requirement 4.2: Missing order identifier should fail validation.
@@ -16,7 +16,7 @@ public class PaymentRequestedValidatorTests
     public void Validation_Fails_When_OrderId_Is_Empty()
     {
         // Arrange
-        var command = new PaymentRequested(
+        var command = new RequestPayment(
             OrderId: Guid.Empty,
             CustomerId: Guid.NewGuid(),
             Amount: 100.00m,
@@ -28,7 +28,7 @@ public class PaymentRequestedValidatorTests
 
         // Assert
         result.IsValid.ShouldBeFalse();
-        result.Errors.ShouldContain(e => e.PropertyName == nameof(PaymentRequested.OrderId));
+        result.Errors.ShouldContain(e => e.PropertyName == nameof(RequestPayment.OrderId));
     }
 
     /// <summary>
@@ -38,7 +38,7 @@ public class PaymentRequestedValidatorTests
     public void Validation_Fails_When_PaymentMethodToken_Is_Empty()
     {
         // Arrange
-        var command = new PaymentRequested(
+        var command = new RequestPayment(
             OrderId: Guid.NewGuid(),
             CustomerId: Guid.NewGuid(),
             Amount: 100.00m,
@@ -50,7 +50,7 @@ public class PaymentRequestedValidatorTests
 
         // Assert
         result.IsValid.ShouldBeFalse();
-        result.Errors.ShouldContain(e => e.PropertyName == nameof(PaymentRequested.PaymentMethodToken));
+        result.Errors.ShouldContain(e => e.PropertyName == nameof(RequestPayment.PaymentMethodToken));
     }
 
     /// <summary>
@@ -60,7 +60,7 @@ public class PaymentRequestedValidatorTests
     public void Validation_Fails_When_Currency_Is_Empty()
     {
         // Arrange
-        var command = new PaymentRequested(
+        var command = new RequestPayment(
             OrderId: Guid.NewGuid(),
             CustomerId: Guid.NewGuid(),
             Amount: 100.00m,
@@ -72,7 +72,7 @@ public class PaymentRequestedValidatorTests
 
         // Assert
         result.IsValid.ShouldBeFalse();
-        result.Errors.ShouldContain(e => e.PropertyName == nameof(PaymentRequested.Currency));
+        result.Errors.ShouldContain(e => e.PropertyName == nameof(RequestPayment.Currency));
     }
 
     /// <summary>
@@ -82,7 +82,7 @@ public class PaymentRequestedValidatorTests
     public void Validation_Fails_When_CustomerId_Is_Empty()
     {
         // Arrange
-        var command = new PaymentRequested(
+        var command = new RequestPayment(
             OrderId: Guid.NewGuid(),
             CustomerId: Guid.Empty,
             Amount: 100.00m,
@@ -94,7 +94,7 @@ public class PaymentRequestedValidatorTests
 
         // Assert
         result.IsValid.ShouldBeFalse();
-        result.Errors.ShouldContain(e => e.PropertyName == nameof(PaymentRequested.CustomerId));
+        result.Errors.ShouldContain(e => e.PropertyName == nameof(RequestPayment.CustomerId));
     }
 
     /// <summary>
@@ -104,7 +104,7 @@ public class PaymentRequestedValidatorTests
     public void Validation_Passes_For_Valid_Command()
     {
         // Arrange
-        var command = new PaymentRequested(
+        var command = new RequestPayment(
             OrderId: Guid.NewGuid(),
             CustomerId: Guid.NewGuid(),
             Amount: 100.00m,

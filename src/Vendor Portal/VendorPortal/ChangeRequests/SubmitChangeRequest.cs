@@ -104,8 +104,6 @@ public static class SubmitChangeRequestHandler
         request.SubmittedAt = now;
         session.Store(request);
 
-        await session.SaveChangesAsync(ct);
-
         // Return both the Catalog integration message and the hub notification.
         // Wolverine routes each based on publish rules and message type.
         var outgoing = new List<object>

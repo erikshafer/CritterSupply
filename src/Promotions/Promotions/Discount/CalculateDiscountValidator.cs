@@ -2,9 +2,9 @@ using FluentValidation;
 
 namespace Promotions.Discount;
 
-public sealed class CalculateDiscountRequestValidator : AbstractValidator<CalculateDiscountRequest>
+public sealed class CalculateDiscountValidator : AbstractValidator<CalculateDiscount>
 {
-    public CalculateDiscountRequestValidator()
+    public CalculateDiscountValidator()
     {
         RuleFor(x => x.CartItems)
             .NotEmpty()

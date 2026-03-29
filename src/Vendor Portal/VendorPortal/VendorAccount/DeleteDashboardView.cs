@@ -62,7 +62,6 @@ public static class DeleteDashboardViewHandler
         account.UpdatedAt = DateTimeOffset.UtcNow;
 
         session.Store(account);
-        await session.SaveChangesAsync(ct);
 
         logger.LogInformation(
             "Deleted dashboard view {ViewId} from tenant {TenantId}",
