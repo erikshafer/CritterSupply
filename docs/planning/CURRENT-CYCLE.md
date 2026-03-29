@@ -55,7 +55,7 @@
 
 ### 📋 M36.0: Engineering Quality
 
-**Status:** 🚀 **IN PROGRESS** — Session 4 complete (2026-03-29); Tracks A–C complete, Track D started
+**Status:** 🏁 **COMPLETE** — All 6 sessions shipped; all 9 definition-of-done criteria met (CI confirmation pending for E2E)
 **Goal:** Critter Stack idiom compliance, DDD-influenced naming audit, integration and E2E test coverage gaps
 
 **Direction from owner:**
@@ -139,6 +139,19 @@
 - ✅ **Track D complete:** All authorization hardening items (D-1 through D-5) shipped. 55 endpoints protected, 2 marked `[AllowAnonymous]`.
 - ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (unchanged)
 - ✅ **Session 5 Retrospective:** [m36-0-session-5-retrospective.md](./milestones/m36-0-session-5-retrospective.md)
+
+**Session 6 Progress (2026-03-29):**
+- ✅ **Product Catalog triage:** Root cause identified — missing `AutoApplyTransactions()` Wolverine policy (implementation bug, not projection timing). Fix: one line in Program.cs. **48/48 passed (was 43/48).**
+- ✅ **E-1 (Storefront P0):** Removed "coming soon" text from Checkout payment step. Changed brand from "Storefront.Web" to "CritterSupply" in NavMenu.
+- ✅ **E-1 (Storefront P1):** Deleted Counter.razor and Weather.razor template pages + NavMenu entries + CounterTests.cs.
+- ✅ **E-1 (Vendor Portal P1):** Enabled VP Dashboard Team Management button — wired to /team, removed disabled/coming-soon tooltip.
+- ✅ **E-2 (VP Team Mgmt E2E):** Created TeamManagementPage.cs page object, vendor-team-management.feature (2 executable, 13 @wip), step definitions.
+- ✅ **E-3 (Backoffice Order E2E):** Created OrderSearchPage.cs, OrderSearch.feature (2 scenarios), OrderDetail.feature (2 scenarios), step definitions.
+- ✅ **Track E complete.** All E-1 through E-3 items shipped.
+- ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (unchanged)
+- ✅ **M36.0 definition of done:** All 9 criteria met (CI confirmation pending for E2E scenarios).
+- ✅ **Session 6 Retrospective:** [m36-0-session-6-retrospective.md](./milestones/m36-0-session-6-retrospective.md)
+- 🏁 **M36.0 ready for milestone closure** — all tracks (A through E) complete.
 
 ---
 
@@ -1297,5 +1310,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 ---
 
 *Document Last Updated: 2026-03-29*
-*Active Milestone: M36.0 — Engineering Quality (in progress)*
+*Active Milestone: M36.0 — Engineering Quality (complete — ready for closure)*
 *Update Policy: At milestone start, milestone end, and significant task changes*
