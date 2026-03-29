@@ -104,6 +104,11 @@
     <File Path="docs\features\customer-experience\checkout-flow.feature" />
     <File Path="docs\features\customer-experience\product-browsing.feature" />
   </Folder>
+  <Folder Name="/Listings/">
+    <Project Path="src/Listings/Listings.Api/Listings.Api.csproj" />
+    <Project Path="src/Listings/Listings/Listings.csproj" />
+    <Project Path="tests/Listings/Listings.Api.IntegrationTests/Listings.Api.IntegrationTests.csproj" />
+  </Folder>
   <Folder Name="/Orders/">
     <Project Path="src/Orders/Orders.Api/Orders.Api.csproj" />
     <Project Path="src/Orders/Orders/Orders.csproj" />
