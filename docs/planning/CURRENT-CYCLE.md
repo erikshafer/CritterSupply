@@ -41,121 +41,89 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M36.0 — Engineering Quality (Tracks A + B + C complete, D-1 done) |
-| **Status** | 🚀 **IN PROGRESS** — Session 4 complete (2026-03-29); Tracks A–C complete, Track D started |
-| **Recent Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
-| **Previous Completion** | M34.0 — Experience Completion + Vocabulary Alignment (2026-03-26) |
+| **Current Milestone** | M36.1 — Listings BC Foundation (Planning) |
+| **Status** | 📋 **PLANNING** — Phase 0 reconciliation complete; implementation plan written |
+| **Recent Completion** | M36.0 — Engineering Quality (2026-03-29) |
+| **Previous Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
 | **Active BCs** | 18 total (including Backoffice BFF + Backoffice.Web) |
 
-*Last Updated: 2026-03-29 (M36.0 Session 4 complete — Track C vertical slices + Track D auth started)*
+*Last Updated: 2026-03-29 (M36.0 closed; M36.1 planning complete)*
 
 ---
 
 ## Active Milestone
 
-### 📋 M36.0: Engineering Quality
+### 📋 M36.1: Listings BC Foundation
 
-**Status:** 🏁 **COMPLETE** — All 6 sessions shipped; all 9 definition-of-done criteria met (CI confirmation pending for E2E)
-**Goal:** Critter Stack idiom compliance, DDD-influenced naming audit, integration and E2E test coverage gaps
+**Status:** 📋 **PLANNING** — Phase 0 reconciliation and implementation plan complete
+**Goal:** Deliver the Listings BC with full listing lifecycle, OWN_WEBSITE fast-path, recall cascade, ProductSummaryView anti-corruption layer, and Backoffice admin pages
 
-**Direction from owner:**
-> No new BCs for a while. M36.0 is about engineering quality — Critter Stack idioms, DDD-influenced naming practices across all classes/commands/queries/events/messages, and thorough integration and E2E testing everywhere it is missing.
+**Scope:** Phase 0 cleanup + full Phase 1 (Option B — 5–7 sessions)
 
 **Pre-Planning Input:**
-- [M36.0 Pre-Planning Quality Findings](./milestones/m36-0-pre-planning-quality-findings.md) — Ranked list of quality work candidates
-- [M35.0 Milestone Closure Retrospective](./milestones/m35-0-milestone-closure-retrospective.md) — What M36.0 inherits
+- [M36.0 Milestone Closure Retrospective](./milestones/m36-0-milestone-closure-retrospective.md) — What M36.1 inherits
+- [M36.1 Phase 0 Reconciliation](./milestones/m36-1-phase-0-reconciliation.md) — Task-by-task audit of Product Catalog ES migration
+- [M36.1 Plan](./milestones/m36-1-plan.md) — Implementation contract with session sequence, guard rails, and DoD
+- [Catalog-Listings-Marketplaces Cycle Plan](./catalog-listings-marketplaces-cycle-plan.md) — Approved execution plan (Phases 0–3)
 
-**Known Priority Items:**
-1. Fix pre-existing test failures (Orders: 15, CustomerIdentity: 4, Correspondence: 2)
-2. VP Team Management E2E step definitions and page objects (17 Gherkin scenarios ready)
-3. Returns integration test skips (6 tests)
-4. Critter Stack idiom audit (priority: Orders, Shopping, Payments)
-5. Event/command naming audit (priority: Messages.Contracts)
-6. Vertical slice completeness audit (per ADR 0039)
+**Key Decisions:**
+- D1–D10 from execution plan remain valid
+- D11 (new): Authorization for new BCs from day one — `[Authorize]` on all endpoints from first commit
+- ADRs renumbered: 0041–0046 (plan's 0030–0038 range occupied)
+- Backoffice.Web absorbs Phase 1 admin pages (no new scaffold)
+- Listings.Api: port 5246, database `listings`
+
+**Phase 0 Prerequisites (deliver in Session 1):**
+- 7 granular Product Catalog integration contracts (Task 0.8)
+- Enriched `ProductDiscontinued` with `Reason` + `IsRecall` (Task 0.9)
+- `product-recall` priority exchange (Task 0.12)
+- Event sourcing behavior tests (Task 0.15)
+
+**Session Plan:**
+1. Phase 0 cleanup + Listings BC scaffold
+2. Listing aggregate + ProductSummaryView
+3. Recall cascade + ListingsActiveView
+4. Backoffice admin pages
+5. Integration tests + E2E + polish
+
+**Guard Rails:**
+- GR-1: Every new BC must include `opts.Policies.AutoApplyTransactions()` before any handler is written
+- GR-2: Every new BC API must have `[Authorize]` from first commit
+- GR-3: No HTTP calls from Listings to Product Catalog — `ProductSummaryView` is the ACL
+- GR-4: Phase 0 prerequisites confirmed green before Listings aggregate work
+- GR-5: New projects added to solution file and Docker Compose immediately
+- GR-6: Integration tests before UI work
+- GR-7: Naming conventions per ADR 0040
 
 **CI Baseline:**
-- CI Run #770 (green on main)
-- E2E Run #341 (green on main)
-- CodeQL Run #339 (green on main)
-
-**Session 1 Progress (2026-03-28):**
-- ✅ **A-1 (TestAuthHandler utility):** Created `tests/Shared/CritterSupply.TestUtilities/` — shared `TestAuthHandler` + `AddTestAuthentication` extension. Supports multiple named JWT schemes and configurable roles. Added to solution under `/Shared/`.
-- ✅ **A-2 (Orders fixture):** Registered TestAuthHandler for `Backoffice` + `Vendor` schemes with all 5 policy roles. **48/48 Orders integration tests now pass** (was 33/48 — 15 failures eliminated).
-- ✅ **A-3 (Customer Identity fixture):** Replaced Backoffice JWT with TestAuthHandler while preserving real Cookie auth for login/logout/session tests. **29/29 CustomerIdentity integration tests now pass** (was 25/29 — 4 failures eliminated).
-- ✅ **A-4 (Correspondence fixture):** Registered TestAuthHandler for `Backoffice` scheme. Auth failure resolved.
-- ✅ **A-5 (Correspondence duplicate event):** Root cause differs from plan — not a double handler emit but a dual RabbitMQ routing rule (`monitoring` + `backoffice` queues) creating 2 tracked envelopes for 1 logical message. Fixed by using `MessagesOf<T>()` instead of `SingleMessage<T>()`. **5/5 Correspondence integration tests now pass** (was 3/5 — 2 failures eliminated).
-- ✅ **Total: 21 pre-existing failures eliminated.** Zero failures across all test projects.
-- ✅ **Session 1 Retrospective:** [m36-0-session-1-retrospective.md](./milestones/m36-0-session-1-retrospective.md)
-
-**Session 1 Test Summary (all non-E2E projects):**
-
-| Project | Passed | Failed | Skipped |
-|---------|--------|--------|---------|
-| Orders.Api.IntegrationTests | 48 | 0 | 0 |
-| CustomerIdentity.Api.IntegrationTests | 29 | 0 | 0 |
-| Correspondence.Api.IntegrationTests | 5 | 0 | 0 |
-| Returns.Api.IntegrationTests | 44 | 0 | 6 (pre-existing saga issue) |
-| All other projects | passing | 0 | 0 |
-
-**Session 2 Progress (2026-03-28):**
-- ✅ **B-1 (Payments — Critical):** Replaced manual `session.Events.StartStream()` with `MartenOps.StartStream()` returning `(IStartStream, OutgoingMessages)` tuples in `AuthorizePayment.cs` and `PaymentRequested.cs`. Removed `IDocumentSession` parameter. Wolverine's transactional middleware now handles stream persistence and outbox routing.
-- ✅ **B-2 (Returns — High):** Replaced 4 `bus.PublishAsync()` calls with `OutgoingMessages` tuple return in `RequestReturn.cs`. Changed return type to `Task<(RequestReturnResponse, OutgoingMessages)>`. `bus.ScheduleAsync()` for expiration timer correctly retained — only justified `IMessageBus` use.
-- ✅ **B-3 (Inventory — High):** Replaced `bus.PublishAsync()` with `OutgoingMessages` and removed manual `SaveChangesAsync()` in `AdjustInventory.cs`. Confirmed `IntegrateWithWolverine()` + `AutoApplyTransactions()` in Program.cs. Compute new quantity mathematically instead of save+reload.
-- ✅ **B-4 (Orders — High):** Replaced `bus.PublishAsync(new CancelOrder(...))` with `OutgoingMessages` cascading command in `CancelOrderEndpoint.cs`. `CancelOrder` now routes through Wolverine's full command pipeline including saga validators.
-- ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (all E2E test files)
-- ✅ **Session 2 Retrospective:** [m36-0-session-2-retrospective.md](./milestones/m36-0-session-2-retrospective.md)
-
-**Session 3 Progress (2026-03-28):**
-- ✅ **B-5 (Vendor Portal):** Removed 27 redundant `SaveChangesAsync()` calls across 21 handler files. `IntegrateWithWolverine()` confirmed at `Program.cs:70`. Seed data file untouched.
-- ✅ **B-6 (Pricing):** Removed 5 redundant `SaveChangesAsync()` calls in `SetBasePriceEndpoint.cs`, `SchedulePriceChangeEndpoint.cs`, `CancelScheduledPriceChangeEndpoint.cs`. Both `IntegrateWithWolverine()` and `AutoApplyTransactions()` confirmed.
-- ✅ **B-7 (Product Catalog):** Removed 2 redundant `SaveChangesAsync()` calls in `AssignProductToVendorES.cs` (single + bulk assignment handlers). `IntegrateWithWolverine()` confirmed at `Program.cs:47`.
-- ✅ **bus.PublishAsync() audit:** Zero violations remaining across all BCs. Only comments from Session 2 fixes remain. 4 `ScheduleAsync` calls confirmed as justified (Pricing + Returns).
-- ✅ **C-1 (Payments — rename):** `PaymentRequested` → `RequestPayment` — internal command record, validator, handler, file, and 5 test files renamed. Integration event NOT affected (none exists). Zero remaining code references.
-- ✅ **C-2 (Payments — rename):** `RefundRequested` → `RequestRefund` — internal command renamed. `Messages.Contracts.Payments.RefundRequested` integration event preserved unchanged. Name collision resolved: `RefundRequested` = integration event, `RequestRefund` = internal command.
-- ✅ **C-3 (Promotions — rename):** `CalculateDiscountRequest` → `CalculateDiscount` — command, validator, files renamed. Handler class renamed to `CalculateDiscountEndpoint` to resolve naming collision. Shopping client updated.
-- ✅ **C-7 (ADR 0040):** Documented `*Requested` integration event convention — 4 canonical examples, rationale, future evolution path.
-- ✅ **Track B total:** 34 `SaveChangesAsync()` calls removed across 25 files (Sessions 2 + 3 combined)
-- ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (unchanged)
-- ✅ **Session 3 Retrospective:** [m36-0-session-3-retrospective.md](./milestones/m36-0-session-3-retrospective.md)
-
-**Session 4 Progress (2026-03-29):**
-- ✅ **C-4 (Vendor Portal vertical slice):** Split `TeamEventHandlers.cs` into 7 individual files in `TeamManagement/`. Each handler in its own file. No shared types needed to migrate. No `SaveChangesAsync()` reintroduced.
-- ✅ **C-5 (Product Catalog vertical slice):** Split `AssignProductToVendorES.cs` into 3 files: `GetVendorAssignment.cs`, `AssignProductToVendor.cs`, `BulkAssignProductsToVendor.cs`. Shared `VendorAssignmentResponse` lives in query file.
-- ✅ **C-6 (Vendor Identity validators):** Colocated 6 validators with their command files per ADR 0039. 3 in `UserInvitations/`, 3 in `UserManagement/`. 6 standalone validator files deleted.
-- ✅ **D-1 (Vendor Identity auth):** Added JWT Bearer authentication + authorization middleware. 10 endpoints now require `[Authorize]`, 3 auth endpoints explicitly `[AllowAnonymous]`. Test fixture updated with `AddTestAuthentication()`. **57/57 Vendor Identity tests pass.**
-- ✅ **Track C complete:** All vertical slice refactors done (C-4, C-5, C-6).
-- ✅ **Track D started:** D-1 (critical severity) shipped and verified.
-- ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (unchanged)
-- ✅ **Session 4 Retrospective:** [m36-0-session-4-retrospective.md](./milestones/m36-0-session-4-retrospective.md)
-
-**Session 5 Progress (2026-03-29):**
-- ✅ **D-3 (Returns auth):** Added `[Authorize]` to 9 mutation endpoints. Fixture pre-existing from M35.0. **44/44 passed, 6 skipped.**
-- ✅ **D-5 (Orders auth):** Added `[Authorize]` to 4 checkout mutation endpoints. Fixture pre-existing from A-2. **48/48 passed.**
-- ✅ **D-2 (Shopping auth):** Added JWT Bearer middleware + `[Authorize]` on all 9 endpoints. **70/70 passed.**
-- ✅ **D-2 (Storefront auth):** Added JWT Bearer middleware + `[Authorize]` on all 13 endpoints. **49/49 passed.**
-- ✅ **D-4 (Fulfillment auth):** Added `[Authorize]` to 5 mutation endpoints. Migrated fixture to shared TestAuthHandler. **17/17 passed.**
-- ✅ **D-4 (Product Catalog auth):** Added `[Authorize]` to 10 unprotected endpoints. **43/48 passed (5 pre-existing projection failures).**
-- ✅ **D-4 (Customer Identity auth):** Added `[Authorize]` to 5 account endpoints, `[AllowAnonymous]` on Login/Logout. **29/29 passed.**
-- ✅ **Track D complete:** All authorization hardening items (D-1 through D-5) shipped. 55 endpoints protected, 2 marked `[AllowAnonymous]`.
-- ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (unchanged)
-- ✅ **Session 5 Retrospective:** [m36-0-session-5-retrospective.md](./milestones/m36-0-session-5-retrospective.md)
-
-**Session 6 Progress (2026-03-29):**
-- ✅ **Product Catalog triage:** Root cause identified — missing `AutoApplyTransactions()` Wolverine policy (implementation bug, not projection timing). Fix: one line in Program.cs. **48/48 passed (was 43/48).**
-- ✅ **E-1 (Storefront P0):** Removed "coming soon" text from Checkout payment step. Changed brand from "Storefront.Web" to "CritterSupply" in NavMenu.
-- ✅ **E-1 (Storefront P1):** Deleted Counter.razor and Weather.razor template pages + NavMenu entries + CounterTests.cs.
-- ✅ **E-1 (Vendor Portal P1):** Enabled VP Dashboard Team Management button — wired to /team, removed disabled/coming-soon tooltip.
-- ✅ **E-2 (VP Team Mgmt E2E):** Created TeamManagementPage.cs page object, vendor-team-management.feature (2 executable, 13 @wip), step definitions.
-- ✅ **E-3 (Backoffice Order E2E):** Created OrderSearchPage.cs, OrderSearch.feature (2 scenarios), OrderDetail.feature (2 scenarios), step definitions.
-- ✅ **Track E complete.** All E-1 through E-3 items shipped.
-- ✅ **Full solution build:** 0 errors, 33 pre-existing warnings (unchanged)
-- ✅ **M36.0 definition of done:** All 9 criteria met (CI confirmation pending for E2E scenarios).
-- ✅ **Session 6 Retrospective:** [m36-0-session-6-retrospective.md](./milestones/m36-0-session-6-retrospective.md)
-- 🏁 **M36.0 ready for milestone closure** — all tracks (A through E) complete.
+- CI Run #808 (green on main)
+- E2E Run #381 (green on main)
+- CodeQL Run #369 (green on main)
 
 ---
 
 ## Recent Completions
+
+### ✅ M36.0: Engineering Quality (2026-03-29)
+
+**Status:** ✅ **Complete** — 6 sessions; all 9 definition-of-done criteria met
+**Goal:** Critter Stack idiom compliance, DDD naming audit, authorization hardening, integration and E2E test coverage
+**CI Confirmation:** CI Run #808, E2E Run #381, CodeQL Run #369
+
+**Key Deliverables:**
+- **Track A (Session 1):** Shared `TestAuthHandler` utility. 21 pre-existing test failures eliminated across Orders, CustomerIdentity, Correspondence.
+- **Track B (Sessions 2–3):** All `bus.PublishAsync()` replaced with `OutgoingMessages`. 34 `SaveChangesAsync()` calls removed. `IStartStream` applied to Payments.
+- **Track C (Sessions 3–4):** Command renames (`PaymentRequested` → `RequestPayment`, etc.). ADR 0040 documented. Vertical slice splits across VP, PC, VI.
+- **Track D (Sessions 4–5):** 55 endpoints protected with `[Authorize]` across 10 BCs. JWT Bearer added to Shopping + Storefront.
+- **Track E (Session 6):** UI cleanup (brand, templates, dead-end buttons). VP Team Management E2E (15 scenarios). Backoffice Order Search/Detail E2E (4 scenarios).
+- **Root cause fix:** `AutoApplyTransactions()` added to Product Catalog — root cause of 5 projection failures misclassified as timing.
+
+**Inherited by M36.1:**
+1. VP Team Management `@wip` scenarios (13) — deferred to M37.x
+2. Returns cross-BC saga tests (6 skipped) — monitor
+3. Product Catalog `SaveChangesAsync` sweep (12 calls) — address opportunistically
+
+**Retrospectives:** [Session 1](./milestones/m36-0-session-1-retrospective.md) · [Session 2](./milestones/m36-0-session-2-retrospective.md) · [Session 3](./milestones/m36-0-session-3-retrospective.md) · [Session 4](./milestones/m36-0-session-4-retrospective.md) · [Session 5](./milestones/m36-0-session-5-retrospective.md) · [Session 6](./milestones/m36-0-session-6-retrospective.md) · [Milestone Closure](./milestones/m36-0-milestone-closure-retrospective.md)
 
 ### ✅ M35.0: Product Expansion Begins (2026-03-27)
 
@@ -1246,39 +1214,41 @@
 
 ### Next 3-4 Milestones
 
-> ⚠️ **Updated 2026-03-27:** M35.0 complete. M36.0 is about engineering quality — no new BCs.
+> ⚠️ **Updated 2026-03-29:** M36.0 complete. M36.1 planning complete — Listings BC foundation.
 
-- **M35.0 (complete):** Product Expansion Begins
-  - ✅ Product Catalog ES migration (all 14 handlers event-sourced)
-  - ✅ Exchange v2 cross-product exchange (price difference handling)
-  - ✅ VP Team Management (BFF + Blazor page)
-  - ✅ CustomerSearch detail page (BFF + Blazor + E2E)
-  - See [M35.0 Closure Retrospective](milestones/m35-0-milestone-closure-retrospective.md)
+- **M36.0 (complete):** Engineering Quality
+  - ✅ 21 pre-existing test failures eliminated (TestAuthHandler utility)
+  - ✅ 55 endpoints protected with `[Authorize]` across 10 BCs
+  - ✅ 34 `SaveChangesAsync()` calls removed, `bus.PublishAsync()` violations fixed
+  - ✅ `AutoApplyTransactions` root cause fix for Product Catalog
+  - See [M36.0 Milestone Closure Retrospective](milestones/m36-0-milestone-closure-retrospective.md)
 
-- **M36.0 (active — planning):** Engineering Quality
-  - Fix pre-existing test failures (21 failures across 3 BCs)
-  - VP Team Management E2E tests (17 Gherkin scenarios ready)
-  - Critter Stack idiom audit, naming audit, vertical slice completeness
-  - See [M36.0 Pre-Planning Quality Findings](milestones/m36-0-pre-planning-quality-findings.md)
+- **M36.1 (active — planning):** Listings BC Foundation
+  - Phase 0 cleanup: granular Product Catalog integration messages
+  - Listings BC: event-sourced listing aggregate, OWN_WEBSITE fast-path, recall cascade
+  - ProductSummaryView anti-corruption layer
+  - Backoffice admin pages (extend existing Backoffice.Web)
+  - Port 5246, database `listings`, ADRs 0041–0046
+  - See [M36.1 Plan](milestones/m36-1-plan.md)
 
-- **M36.1+ (planned):** Variants, Listings, Marketplaces
-  - Product Variants support (colors, sizes, bundles)
-  - Listings BC — curated product lists for storefronts
-  - Marketplaces BC — multi-channel product syndication
-  - See [plan](catalog-listings-marketplaces-cycle-plan.md)
+- **M37.x (planned):** Marketplaces BC Foundation (Phase 2)
+  - Marketplace document entity, category mapping, adapter pattern
+  - Bidirectional async messaging with Listings BC
+  - Vault credential storage interface
+  - See [Catalog-Listings-Marketplaces Cycle Plan](catalog-listings-marketplaces-cycle-plan.md)
 
-- **M37.0 (planned):** Search BC
-  - Full-text product search, faceted navigation
-  - Projects data from Product Catalog and Pricing
+- **M38.x (planned):** Variants + Compliance + Real API Calls (Phase 3)
+  - ProductFamily aggregate, variant-aware listings
+  - Full compliance metadata, real marketplace API calls
 
-### Future BCs (Priority Roadmap — Post M36)
+### Future BCs (Priority Roadmap — Post M36.1)
 
-> Product Catalog ES migration complete. Variants and downstream features unlocked.
+> Product Catalog ES migration complete. Listings BC foundation in progress (M36.1).
 
-**High Priority (Active in M36+):**
-- 🟢 **Product Variants** — Unlocked by ES migration; colors, sizes, bundles
-- 🟡 **Listings BC** — Curated product lists for storefronts
-- 🟡 **Marketplaces BC** — Multi-channel product syndication
+**High Priority (Active in M36.1+):**
+- 🟢 **Listings BC** — M36.1 active; event-sourced listing aggregate, recall cascade, OWN_WEBSITE
+- 🟡 **Marketplaces BC** — M37.x planned; marketplace adapters, category mapping
+- 🟡 **Product Variants** — M38.x planned; ProductFamily aggregate, variant-aware listings
 
 **Medium Priority:**
 - 🟡 **Search BC** — Full-text product search, faceted navigation
