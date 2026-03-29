@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine.Http;
 using Wolverine.Marten;
@@ -49,6 +50,7 @@ public static class ProvideShippingAddressHandler
     }
 
     [WolverinePost("/api/checkouts/{checkoutId}/shipping-address")]
+    [Authorize]
     public static ShippingAddressProvided Handle(
         ProvideShippingAddress command,
         [WriteAggregate] Checkout checkout)
