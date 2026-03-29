@@ -1,4 +1,5 @@
 using Messages.Contracts.VendorIdentity;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using VendorIdentity.Identity;
 using Wolverine;
@@ -8,6 +9,7 @@ namespace VendorIdentity.TenantManagement;
 
 public static class CreateVendorTenantHandler
 {
+    [Authorize]
     [WolverinePost("/api/vendor-identity/tenants")]
     public static async Task<(CreationResponse, OutgoingMessages)> Handle(
         CreateVendorTenant command,

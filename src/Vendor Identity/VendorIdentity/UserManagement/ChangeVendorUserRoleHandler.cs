@@ -1,4 +1,5 @@
 using Messages.Contracts.VendorIdentity;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using VendorIdentity.Identity;
@@ -10,6 +11,7 @@ namespace VendorIdentity.UserManagement;
 
 public static class ChangeVendorUserRoleHandler
 {
+    [Authorize]
     [WolverinePatch("/api/vendor-identity/tenants/{tenantId}/users/{userId}/role")]
     public static async Task<(IResult, OutgoingMessages)> Handle(
         ChangeVendorUserRole command,

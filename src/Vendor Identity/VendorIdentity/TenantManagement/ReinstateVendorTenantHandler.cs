@@ -1,4 +1,5 @@
 using Messages.Contracts.VendorIdentity;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using VendorIdentity.Identity;
@@ -9,6 +10,7 @@ namespace VendorIdentity.TenantManagement;
 
 public static class ReinstateVendorTenantHandler
 {
+    [Authorize]
     [WolverinePost("/api/vendor-identity/tenants/{tenantId}/reinstate")]
     public static async Task<(IResult, OutgoingMessages)> Handle(
         ReinstateVendorTenant command,

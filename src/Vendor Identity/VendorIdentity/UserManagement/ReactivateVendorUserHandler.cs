@@ -1,4 +1,5 @@
 using Messages.Contracts.VendorIdentity;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using VendorIdentity.Identity;
@@ -10,6 +11,7 @@ namespace VendorIdentity.UserManagement;
 
 public static class ReactivateVendorUserHandler
 {
+    [Authorize]
     [WolverinePost("/api/vendor-identity/tenants/{tenantId}/users/{userId}/reactivate")]
     public static async Task<(IResult, OutgoingMessages)> Handle(
         ReactivateVendorUser command,
