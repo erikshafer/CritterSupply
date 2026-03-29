@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -39,6 +40,7 @@ public static class ReceiveReturnHandler
     }
 
     [WolverinePost("/api/returns/{returnId}/receive")]
+    [Authorize]
     public static (ReturnReceived, OutgoingMessages) Handle(
         ReceiveReturn command,
         [WriteAggregate] Return aggregate)

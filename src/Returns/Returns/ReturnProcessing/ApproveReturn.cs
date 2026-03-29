@@ -1,5 +1,6 @@
 using FluentValidation;
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -40,6 +41,7 @@ public static class ApproveReturnHandler
     }
 
     [WolverinePost("/api/returns/{returnId}/approve")]
+    [Authorize]
     public static async Task<(ReturnApproved, OutgoingMessages)> Handle(
         ApproveReturn command,
         [WriteAggregate] Return aggregate,

@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -56,6 +57,7 @@ public static class ShipReplacementItemHandler
     }
 
     [WolverinePost("/api/returns/{returnId}/ship-replacement")]
+    [Authorize]
     public static (Events, OutgoingMessages) Handle(
         ShipReplacementItem command,
         [WriteAggregate] Return aggregate)

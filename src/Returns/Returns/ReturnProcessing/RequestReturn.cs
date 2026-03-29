@@ -1,5 +1,6 @@
 using FluentValidation;
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Wolverine;
 using Wolverine.Http;
 
@@ -71,6 +72,7 @@ public sealed class RequestReturnItemValidator : AbstractValidator<RequestReturn
 public static class RequestReturnHandler
 {
     [WolverinePost("/api/returns")]
+    [Authorize]
     public static async Task<(RequestReturnResponse, OutgoingMessages)> Handle(
         RequestReturn command,
         IDocumentSession session,

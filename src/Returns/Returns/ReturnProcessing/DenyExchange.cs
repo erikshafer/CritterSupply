@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -47,6 +48,7 @@ public static class DenyExchangeHandler
     }
 
     [WolverinePost("/api/returns/{returnId}/deny-exchange")]
+    [Authorize]
     public static (ExchangeDenied, OutgoingMessages) Handle(
         DenyExchange command,
         [WriteAggregate] Return aggregate)

@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -41,6 +42,7 @@ public static class DenyReturnHandler
     }
 
     [WolverinePost("/api/returns/{returnId}/deny")]
+    [Authorize]
     public static (ReturnDenied, OutgoingMessages) Handle(
         DenyReturn command,
         [WriteAggregate] Return aggregate)

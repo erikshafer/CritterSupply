@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -40,6 +41,7 @@ public static class StartInspectionHandler
     }
 
     [WolverinePost("/api/returns/{returnId}/inspection/start")]
+    [Authorize]
     public static InspectionStarted Handle(
         StartInspection command,
         [WriteAggregate] Return aggregate)

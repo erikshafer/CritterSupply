@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -68,6 +69,7 @@ public static class ApproveExchangeHandler
     }
 
     [WolverinePost("/api/returns/{returnId}/approve-exchange")]
+    [Authorize]
     public static async Task<(Events, OutgoingMessages)> Handle(
         ApproveExchange command,
         [WriteAggregate] Return aggregate,
