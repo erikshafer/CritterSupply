@@ -24,6 +24,7 @@
 
     <ItemGroup>
         <ProjectReference Include="../../../src/Product Catalog/ProductCatalog.Api/ProductCatalog.Api.csproj" />
+        <ProjectReference Include="..\..\Shared\CritterSupply.TestUtilities\CritterSupply.TestUtilities.csproj" />
     </ItemGroup>
 
 </Project>

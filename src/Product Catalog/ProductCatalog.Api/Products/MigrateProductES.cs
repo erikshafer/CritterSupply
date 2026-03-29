@@ -1,4 +1,5 @@
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProductCatalog.Products;
 using Wolverine.Http;
@@ -10,6 +11,7 @@ public sealed record MigrateProduct(string Sku);
 public static class MigrateProductHandler
 {
     [WolverinePost("/api/products/{sku}/migrate")]
+    [Authorize]
     public static async Task<IResult> Handle(
         MigrateProduct command,
         IDocumentSession session,

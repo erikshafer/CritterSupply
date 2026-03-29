@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine.Http;
 
@@ -35,6 +36,7 @@ public static class GetAddressSnapshotHandler
     }
 
     [WolverineGet("/api/addresses/{addressId}/snapshot")]
+    [Authorize]
     public static async Task<AddressSnapshot> Handle(
         Guid addressId,
         CustomerAddress address,

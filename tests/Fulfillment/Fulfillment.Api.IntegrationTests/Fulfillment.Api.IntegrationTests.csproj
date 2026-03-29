@@ -27,6 +27,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\..\src\Fulfillment\Fulfillment.Api\Fulfillment.Api.csproj" />
+        <ProjectReference Include="..\..\Shared\CritterSupply.TestUtilities\CritterSupply.TestUtilities.csproj" />
     </ItemGroup>
 
 </Project>

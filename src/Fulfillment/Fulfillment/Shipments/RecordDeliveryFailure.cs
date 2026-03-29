@@ -1,5 +1,6 @@
 using FluentValidation;
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -51,6 +52,7 @@ public static class RecordDeliveryFailureHandler
     }
 
     [WolverinePost("/api/fulfillment/shipments/{shipmentId}/record-delivery-failure")]
+    [Authorize]
     public static (Events, OutgoingMessages) Handle(
         RecordDeliveryFailure command,
         [WriteAggregate] Shipment shipment)

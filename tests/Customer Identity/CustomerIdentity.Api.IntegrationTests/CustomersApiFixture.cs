@@ -80,6 +80,17 @@ public class TestFixture : IAsyncLifetime
                     })
                     .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Backoffice", _ => { });
 
+                // Configure the default authorization policy to accept both Cookie and
+                // Backoffice schemes. This ensures plain [Authorize] endpoints work for
+                // both cookie-based auth flow tests and API tests using TestAuthHandler.
+                services.PostConfigure<Microsoft.AspNetCore.Authorization.AuthorizationOptions>(opts =>
+                {
+                    opts.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder(
+                            CookieAuthenticationDefaults.AuthenticationScheme, "Backoffice")
+                        .RequireAuthenticatedUser()
+                        .Build();
+                });
+
                 services.AddAuthorization();
             });
         });

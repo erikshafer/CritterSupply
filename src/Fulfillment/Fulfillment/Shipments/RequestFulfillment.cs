@@ -1,5 +1,6 @@
 using FluentValidation;
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Wolverine.Http;
 
 namespace Fulfillment.Shipments;
@@ -27,6 +28,7 @@ public sealed record RequestFulfillment(
 public static class RequestFulfillmentHandler
 {
     [WolverinePost("/api/fulfillment/shipments")]
+    [Authorize]
     public static CreationResponse Handle(
         RequestFulfillment command,
         IDocumentSession session)

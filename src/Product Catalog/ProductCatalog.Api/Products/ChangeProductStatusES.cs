@@ -1,5 +1,6 @@
 using FluentValidation;
 using Marten;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProductCatalog.Products;
 using Wolverine.Http;
@@ -20,6 +21,7 @@ public sealed class ChangeProductStatusCommandValidator : AbstractValidator<Chan
 public static class ChangeProductStatusESHandler
 {
     [WolverinePatch("/api/products/{sku}/status")]
+    [Authorize]
     public static async Task<IResult> Handle(
         ChangeProductStatusCommand command,
         IDocumentSession session,

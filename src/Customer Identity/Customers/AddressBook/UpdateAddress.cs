@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine.Http;
 
@@ -105,6 +106,7 @@ public static class UpdateAddressHandler
     }
 
     [WolverinePut("/api/customers/{customerId}/addresses/{addressId}")]
+    [Authorize]
     public static async Task Handle(
         UpdateAddress command,
         CustomerAddress address,

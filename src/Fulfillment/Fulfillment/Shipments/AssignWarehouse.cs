@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine.Http;
 using Wolverine.Marten;
@@ -39,6 +40,7 @@ public static class AssignWarehouseHandler
     }
 
     [WolverinePost("/api/fulfillment/shipments/{shipmentId}/assign")]
+    [Authorize]
     public static WarehouseAssigned Handle(
         AssignWarehouse command,
         [WriteAggregate] Shipment shipment)

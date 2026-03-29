@@ -2,6 +2,7 @@ using System.Security.Claims;
 using CustomerIdentity.AddressBook;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Wolverine.Http;
@@ -27,6 +28,7 @@ public static class Login
     /// - Future upgrade: Add password hash validation (bcrypt, ASP.NET Core Identity)
     /// </summary>
     [WolverinePost("/api/auth/login")]
+    [AllowAnonymous]
     public static async Task<IResult> Handle(LoginRequest request, CustomerIdentityDbContext db, HttpContext httpContext)
     {
         // Look up customer by email
