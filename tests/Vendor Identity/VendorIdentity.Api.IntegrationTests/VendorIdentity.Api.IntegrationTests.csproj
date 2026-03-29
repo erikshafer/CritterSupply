@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Vendor Identity\VendorIdentity.Api\VendorIdentity.Api.csproj" />
     <ProjectReference Include="..\..\..\src\Shared\Messages.Contracts\Messages.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\CritterSupply.TestUtilities\CritterSupply.TestUtilities.csproj" />
   </ItemGroup>
 
   <ItemGroup>

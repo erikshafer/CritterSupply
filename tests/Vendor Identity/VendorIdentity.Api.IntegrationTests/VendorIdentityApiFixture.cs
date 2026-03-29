@@ -1,5 +1,7 @@
 using Alba;
+using CritterSupply.TestUtilities;
 using JasperFx.CommandLine;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -43,6 +45,11 @@ public sealed class VendorIdentityApiFixture : IAsyncLifetime
 
                 // Disable RabbitMQ for integration tests
                 services.DisableAllExternalWolverineTransports();
+
+                // Register test authentication for the JWT Bearer scheme
+                services.AddTestAuthentication(
+                    roles: ["Admin"],
+                    schemes: JwtBearerDefaults.AuthenticationScheme);
             });
         });
 

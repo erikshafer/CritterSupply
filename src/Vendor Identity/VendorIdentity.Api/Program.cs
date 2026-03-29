@@ -1,7 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using System.Text.Json.Serialization;
 using JasperFx;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using VendorIdentity.Api.Auth;
 using VendorIdentity.Identity;
 using Wolverine;
@@ -36,6 +39,25 @@ var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
     ?? throw new Exception("JWT settings not found in configuration");
 builder.Services.AddSingleton(jwtSettings);
 builder.Services.AddSingleton<JwtTokenService>();
+
+// JWT Bearer authentication (validates tokens issued by this API)
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtSettings.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtSettings.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SigningKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 // CORS for VendorPortal.Web (Blazor WASM at port 5241)
 builder.Services.AddCors(options =>
@@ -115,6 +137,9 @@ builder.Services.AddWolverineHttp();
 var app = builder.Build();
 
 app.UseCors("VendorPortalWeb");
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Apply EF Core migrations on startup (development only)
 if (app.Environment.IsDevelopment())

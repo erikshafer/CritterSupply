@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Messages.Contracts.VendorIdentity;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using VendorIdentity.Identity;
 using Wolverine;
@@ -10,6 +11,7 @@ namespace VendorIdentity.UserInvitations;
 
 public static class InviteVendorUserHandler
 {
+    [Authorize]
     [WolverinePost("/api/vendor-identity/tenants/{tenantId}/users/invite")]
     public static async Task<(CreationResponse, OutgoingMessages)> Handle(
         InviteVendorUser command,
