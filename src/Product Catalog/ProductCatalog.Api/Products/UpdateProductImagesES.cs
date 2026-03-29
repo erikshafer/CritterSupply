@@ -1,9 +1,12 @@
 using FluentValidation;
 using Marten;
+using Messages.Contracts.ProductCatalog;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProductCatalog.Products;
+using Wolverine;
 using Wolverine.Http;
+using IntegrationProductImagesUpdated = Messages.Contracts.ProductCatalog.ProductImagesUpdated;
 
 namespace ProductCatalog.Api.Products;
 
@@ -28,32 +31,38 @@ public static class UpdateProductImagesHandler
 {
     [WolverinePut("/api/products/{sku}/images")]
     [Authorize]
-    public static async Task<IResult> Handle(
+    public static async Task<(IResult, OutgoingMessages)> Handle(
         UpdateProductImages command,
         IDocumentSession session,
         CancellationToken ct)
     {
+        var outgoing = new OutgoingMessages();
+
         var view = await session.Query<ProductCatalogView>()
             .Where(p => p.Sku == command.Sku && !p.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
         if (view is null)
-            return Results.NotFound(new ProblemDetails { Detail = "Product not found", Status = 404 });
+            return (Results.NotFound(new ProblemDetails { Detail = "Product not found", Status = 404 }), outgoing);
 
         var newImages = command.NewImages
             .Select(dto => ProductImage.Create(dto.Url, dto.AltText, dto.SortOrder))
             .ToList()
             .AsReadOnly();
 
-        var @event = new ProductImagesUpdated(
+        var @event = new ProductCatalog.Products.ProductImagesUpdated(
             ProductId: view.Id,
             PreviousImages: view.Images,
             NewImages: newImages,
             ChangedAt: DateTimeOffset.UtcNow);
 
         session.Events.Append(view.Id, @event);
-        await session.SaveChangesAsync(ct);
 
-        return Results.NoContent();
+        outgoing.Add(new IntegrationProductImagesUpdated(
+            Sku: command.Sku,
+            ImageUrls: newImages.Select(i => i.Url).ToList().AsReadOnly(),
+            OccurredAt: @event.ChangedAt));
+
+        return (Results.NoContent(), outgoing);
     }
 }
