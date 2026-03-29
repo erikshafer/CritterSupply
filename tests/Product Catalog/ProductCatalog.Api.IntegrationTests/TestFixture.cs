@@ -54,10 +54,8 @@ public class TestFixture : IAsyncLifetime
 
                 // Register the test auth scheme alongside (not replacing) the real JWT Bearer
                 // scheme, then use PostConfigure to set it as the default. This preserves the
-                // JWT Bearer registration. The handler provides Admin role for VendorAdmin policy
-                // and satisfies plain [Authorize] on all endpoints.
-                // Note: "Backoffice" scheme is already registered in Program.cs, so we only add
-                // the TestAdmin scheme and override the default.
+                // JWT Bearer registration. The handler provides Admin + ProductManager roles
+                // for VendorAdmin and ProductManager policies, and satisfies plain [Authorize].
                 services.AddAuthentication()
                     .AddScheme<AuthenticationSchemeOptions, AdminAuthHandler>(
                         AdminAuthHandler.SchemeName, _ => { });
@@ -65,6 +63,17 @@ public class TestFixture : IAsyncLifetime
                 {
                     options.DefaultAuthenticateScheme = AdminAuthHandler.SchemeName;
                     options.DefaultChallengeScheme = AdminAuthHandler.SchemeName;
+                });
+                // Override the Backoffice scheme handler to use our test handler
+                // so ProductManager policy (which requires Backoffice scheme) works
+                services.PostConfigure<AuthenticationSchemeOptions>("Backoffice", _ => { });
+                services.Configure<AuthenticationOptions>(options =>
+                {
+                    var scheme = options.Schemes.FirstOrDefault(s => s.Name == "Backoffice");
+                    if (scheme is not null)
+                    {
+                        scheme.HandlerType = typeof(AdminAuthHandler);
+                    }
                 });
             });
         });
@@ -185,6 +194,9 @@ internal sealed class AdminAuthHandler : AuthenticationHandler<AuthenticationSch
         {
             new Claim(ClaimTypes.Name, "test-admin"),
             new Claim(ClaimTypes.Role, "Admin"),
+            new Claim(ClaimTypes.Role, "ProductManager"),
+            new Claim("role", "Admin"),
+            new Claim("role", "ProductManager"),
         };
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);
