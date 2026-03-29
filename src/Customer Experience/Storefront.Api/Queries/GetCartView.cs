@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Storefront.Clients;
 using Storefront.Composition;
@@ -13,6 +14,7 @@ public sealed record GetCartView(Guid CartId);
 public static class GetCartViewHandler
 {
     [WolverineGet("/api/storefront/carts/{cartId}")]
+    [Authorize]
     public static async Task<IResult> Handle(
         Guid cartId,
         IShoppingClient shoppingClient,

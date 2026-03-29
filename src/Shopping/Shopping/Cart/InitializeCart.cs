@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Wolverine.Http;
 using Wolverine.Marten;
@@ -23,6 +24,7 @@ public sealed record InitializeCart(
 public static class InitializeCartHandler
 {
     [WolverinePost("/api/carts")]
+    [Authorize]
     public static (CreationResponse<Guid>, IStartStream) Handle(InitializeCart command)
     {
         var cartId = Guid.CreateVersion7();

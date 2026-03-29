@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Storefront.Clients;
 using Storefront.Composition;
 using Wolverine.Http;
@@ -16,6 +17,7 @@ public static class GetProductListingHandler
     private const int MinPage = 1;
 
     [WolverineGet("/api/storefront/products")]
+    [Authorize]
     public static async Task<ProductListingView> Handle(
         ICatalogClient catalogClient,
         string? category = null,

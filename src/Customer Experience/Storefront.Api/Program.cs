@@ -1,4 +1,6 @@
 using Marten;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -134,6 +136,37 @@ builder.Services.AddScoped<Storefront.Clients.ICatalogClient, Storefront.Api.Cli
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Configure multi-issuer JWT authentication
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer("Backoffice", options =>
+    {
+        options.Authority = "https://localhost:5249"; // Backoffice Identity BC
+        options.Audience = "https://localhost:5249";
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            RoleClaimType = "role"
+        };
+    })
+    .AddJwtBearer("Vendor", options =>
+    {
+        options.Authority = "https://localhost:5240"; // Vendor Identity BC
+        options.Audience = "https://localhost:5240";
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            RoleClaimType = "role"
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 // Configure Swagger UI (development only)
@@ -157,6 +190,10 @@ app.MapDefaultEndpoints();
 // Enable CORS — must be placed before MapWolverineEndpoints and MapHub so that
 // the negotiate POST to /hub/storefront/negotiate includes CORS response headers.
 app.UseCors();
+
+// Add authentication and authorization middleware
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Map Wolverine HTTP endpoints
 app.MapWolverineEndpoints(opts =>
