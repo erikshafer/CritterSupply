@@ -340,6 +340,20 @@ services:
       - backend
     profiles: [all, vendor]
 
+  vendorportal-web:
+    container_name: crittersupply-vendorportal-web
+    build:
+      context: .
+      dockerfile: src/Vendor Portal/VendorPortal.Web/Dockerfile
+    ports:
+      - "5241:8080"
+    depends_on:
+      - vendoridentity-api
+      - vendorportal-api
+    networks:
+      - backend
+    profiles: [all, vendor]
+
   storefront-api:
     container_name: crittersupply-storefront-api
     build:
@@ -422,7 +436,7 @@ services:
         condition: service_healthy
     networks:
       - backend
-    profiles: [all, backofficeidentity]
+    profiles: [all, backofficeidentity, backoffice]
 
   backoffice-api:
     container_name: crittersupply-backoffice
@@ -447,6 +461,20 @@ services:
         condition: service_healthy
       backofficeidentity-api:
         condition: service_started
+    networks:
+      - backend
+    profiles: [all, backoffice]
+
+  backoffice-web:
+    container_name: crittersupply-backoffice-web
+    build:
+      context: .
+      dockerfile: src/Backoffice/Backoffice.Web/Dockerfile
+    ports:
+      - "5244:8080"
+    depends_on:
+      - backofficeidentity-api
+      - backoffice-api
     networks:
       - backend
     profiles: [all, backoffice]

@@ -193,29 +193,29 @@ graph TB
 
 Below is a table of each contexts' focused responsibilities, along with their current implementation status.
 
-| Context                       | Responsibility                                                        | Status      |
-|-------------------------------|-----------------------------------------------------------------------|-------------|
-| 📨 **Orders**                 | Checkout intake and post-purchase order orchestration | ✅ Complete |
-| 💳 **Payments**               | Authorization, capture, refunds                                       | ✅ Complete |
-| 🛒 **Shopping**               | Cart management                                                       | ✅ Complete |
-| 📊 **Inventory**              | Stock levels and reservations                                         | ✅ Complete |
-| 🚚 **Fulfillment**            | Picking, packing, shipping                                            | ✅ Complete |
-| 👤 **Customer Identity**      | Customer authentication, addresses, and profiles                      | ✅ Complete |
-| 📦 **Product Catalog**        | Product definitions and catalog data (event-sourced)                  | ✅ Complete |
-| 🎁 **Customer Experience**    | Storefront BFF (Blazor + SignalR)                                     | ✅ Complete |
-| 🏢 **Vendor Identity**        | Vendor user authentication & tenant management                        | ✅ Complete |
-| 🏪 **Vendor Portal**          | Vendor analytics, insights, change requests                           | ✅ Complete |
-| 🔄 **Returns**                | Return authorization, exchanges (same-SKU and cross-product)          | ✅ Complete |
-| 💰 **Pricing**                | Server-authoritative pricing and scheduled price changes              | ✅ Complete |
-| 🏷️ **Promotions**             | Coupon codes and discount rules                                       | ✅ Complete |
-| ✉️ **Correspondence**         | Customer email and SMS notifications                                  | ✅ Complete |
-| 🔐 **Backoffice Identity**    | Staff and admin authentication                                        | ✅ Complete |
-| 🖥️ **Backoffice**             | Internal operations portal (BFF + Blazor WASM)                        | ✅ Complete |
-| 🔍 **Search**                 | Product search and discovery                                          | 🔜 Planned  |
-| 💡 **Recommendations**        | Personalized product recommendations                                  | 🔜 Planned  |
-| 🏦 **Store Credit**           | Store credit and refund balance management                            | 🔜 Planned  |
-| 📈 **Analytics**              | Business intelligence projections                                     | 🔜 Planned  |
-| 🔧 **Operations Dashboard**   | Engineering/SRE observability tooling                                 | 🔜 Planned  |
+| Context                     | Responsibility                                               | Status     |
+|-----------------------------|--------------------------------------------------------------|------------|
+| 📨 **Orders**               | Checkout intake and post-purchase order orchestration        | ✅ Complete |
+| 💳 **Payments**             | Authorization, capture, refunds                              | ✅ Complete |
+| 🛒 **Shopping**             | Cart management                                              | ✅ Complete |
+| 📊 **Inventory**            | Stock levels and reservations                                | ✅ Complete |
+| 🚚 **Fulfillment**          | Picking, packing, shipping                                   | ✅ Complete |
+| 👤 **Customer Identity**    | Customer authentication, addresses, and profiles             | ✅ Complete |
+| 📦 **Product Catalog**      | Product definitions and catalog data (event-sourced)         | ✅ Complete |
+| 🎁 **Customer Experience**  | Storefront BFF (Blazor + SignalR)                            | ✅ Complete |
+| 🏢 **Vendor Identity**      | Vendor user authentication & tenant management               | ✅ Complete |
+| 🏪 **Vendor Portal**        | Vendor analytics, insights, change requests                  | ✅ Complete |
+| 🔄 **Returns**              | Return authorization, exchanges (same-SKU and cross-product) | ✅ Complete |
+| 💰 **Pricing**              | Server-authoritative pricing and scheduled price changes     | ✅ Complete |
+| 🏷️ **Promotions**          | Coupon codes and discount rules                              | ✅ Complete |
+| ✉️ **Correspondence**       | Customer email and SMS notifications                         | ✅ Complete |
+| 🔐 **Backoffice Identity**  | Staff and admin authentication                               | ✅ Complete |
+| 🖥️ **Backoffice**          | Internal operations portal (BFF + Blazor WASM)               | ✅ Complete |
+| 🔍 **Search**               | Product search and discovery                                 | 🔜 Planned |
+| 💡 **Recommendations**      | Personalized product recommendations                         | 🔜 Planned |
+| 🏦 **Store Credit**         | Store credit and refund balance management                   | 🔜 Planned |
+| 📈 **Analytics**            | Business intelligence projections                            | 🔜 Planned |
+| 🔧 **Operations Dashboard** | Engineering/SRE observability tooling                        | 🔜 Planned |
 
 For detailed responsibilities, interactions, and event flows between contexts, see [CONTEXTS.md](./CONTEXTS.md).
 

@@ -86,7 +86,7 @@ builder.Host.UseWolverine(opts =>
     opts.UseFluentValidation();
 
     // RabbitMQ configuration
-    var rabbitMqHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
+    var rabbitMqHost = builder.Configuration["RabbitMQ:hostname"] ?? "localhost";
     opts.UseRabbitMq(rabbit =>
     {
         rabbit.HostName = rabbitMqHost;
