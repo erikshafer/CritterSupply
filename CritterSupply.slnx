@@ -204,6 +204,7 @@
   <Folder Name="/Marketplaces/">
     <Project Path="src/Marketplaces/Marketplaces.Api/Marketplaces.Api.csproj" />
     <Project Path="src/Marketplaces/Marketplaces/Marketplaces.csproj" />
+    <Project Path="tests/Marketplaces/Marketplaces.Api.IntegrationTests/Marketplaces.Api.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Vendor Identity/">
     <Project Path="src/Vendor Identity/VendorIdentity.Api/VendorIdentity.Api.csproj" />
