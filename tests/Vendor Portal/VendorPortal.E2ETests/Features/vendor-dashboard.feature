@@ -8,7 +8,7 @@ Feature: Vendor Portal Dashboard
 
   @p0
   Scenario: Dashboard shows accurate KPI cards after login
-    Given I am logged in as "admin@acmepets.test" with password "password"
+    Given I am logged in as "mkerr@hearthhound.com" with password "Dev@123!"
     Then I should see the dashboard KPI cards
     And the low stock alerts count should be "0"
     And the pending change requests count should be "0"
@@ -16,19 +16,19 @@ Feature: Vendor Portal Dashboard
 
   @p0
   Scenario: SignalR connection indicator shows Live
-    Given I am logged in as "admin@acmepets.test" with password "password"
+    Given I am logged in as "mkerr@hearthhound.com" with password "Dev@123!"
     Then the hub status indicator should show "Live"
 
   @p0
   Scenario: Low stock alert via SignalR updates the KPI card count
-    Given I am logged in as "admin@acmepets.test" with password "password"
+    Given I am logged in as "mkerr@hearthhound.com" with password "Dev@123!"
     And I am on the dashboard
     When a LowStockAlertRaised hub message is sent to the tenant group
     Then the low stock alerts count should be "1"
 
   @p0
   Scenario: Change request decision toast appears via SignalR
-    Given I am logged in as "admin@acmepets.test" with password "password"
+    Given I am logged in as "mkerr@hearthhound.com" with password "Dev@123!"
     And I am on the dashboard
     When a ChangeRequestDecisionPersonal hub message with decision "Approved" is sent
     Then I should see a snackbar containing "approved"

@@ -237,6 +237,17 @@
 - Session 6 picks up: Marketplaces.Api scaffold + Marketplace document CRUD + seed data
 - Retrospective: [Session 5](./milestones/m36-1-session-5-retrospective.md)
 
+**(QoL) Dev Seed Data (2026-03-30):**
+- ✅ `BackofficeIdentitySeedData.cs` — 7 users, one per ADR 0031 role (SystemAdmin, Executive, OperationsManager, CustomerService, WarehouseClerk, PricingManager, CopyWriter)
+- ✅ `VendorIdentitySeedData.cs` expanded — replaced Acme Pet Supplies with HearthHound Nutrition Co. (Active, 3 users) and TumblePaw Play Labs (Onboarding, 1 active + 2 invited)
+- ✅ `VendorPortalSeedData.cs` updated for new tenant IDs
+- ✅ Vendor Portal E2E test data updated (`WellKnownVendorTestData.cs`, feature files, step definitions)
+- ✅ `DEV-CREDENTIALS.md` cheat sheet at repository root
+- ✅ All passwords: `Dev@123!` (Development environment only)
+- ✅ No GUID collisions between dev seed and E2E test data (confirmed)
+- ✅ Build: 0 errors, 33 warnings (matches baseline)
+- Retrospective: [Dev Seed Data](./dev-seed-data-session-retrospective.md)
+
 ---
 
 ## Recent Completions

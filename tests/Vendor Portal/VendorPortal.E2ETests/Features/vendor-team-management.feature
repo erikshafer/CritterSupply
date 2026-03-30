@@ -5,7 +5,7 @@ Feature: Vendor Team Management
   So that I can control who has access to our vendor portal and what they can do
 
   Background:
-    Given I am logged in as "admin@acmepets.test" with password "password"
+    Given I am logged in as "mkerr@hearthhound.com" with password "Dev@123!"
 
   # ─────────────────────────────────────────────
   # Team Roster
@@ -31,19 +31,19 @@ Feature: Vendor Team Management
   @wip
   Scenario: Admin invites new team member as CatalogManager
     When I navigate to "Team Management" and click "Invite Member"
-    And I enter email "newuser@acmepets.test"
+    And I enter email "newuser@hearthhound.com"
     And I select role "CatalogManager"
     And I click "Send Invitation"
     Then the invitation is created with status "Pending"
     And the invitation expires in 72 hours
     And the invited user appears in the "Pending Invitations" section
-    And an invitation email is sent to "newuser@acmepets.test"
+    And an invitation email is sent to "newuser@hearthhound.com"
 
   # @wip — Blocked: invite member form UI not yet implemented in TeamManagement.razor
   @wip
   Scenario: Cannot invite user with email already in the team
-    Given "catalog@acmepets.test" is an active team member
-    When I attempt to invite "catalog@acmepets.test"
+    Given "jpike@hearthhound.com" is an active team member
+    When I attempt to invite "jpike@hearthhound.com"
     Then the invitation is rejected with "A user with this email already exists in your team"
 
   # @wip — Blocked: invite member form UI not yet implemented in TeamManagement.razor
@@ -59,7 +59,7 @@ Feature: Vendor Team Management
   # @wip — Blocked: invitation acceptance flow not yet implemented
   @wip
   Scenario: Invited user accepts invitation and joins team
-    Given an invitation was sent to "newuser@acmepets.test" with role "CatalogManager"
+    Given an invitation was sent to "newuser@hearthhound.com" with role "CatalogManager"
     And the invitation has not expired
     When the invited user clicks the invitation link
     And enters their name "New User" and sets a password
@@ -71,7 +71,7 @@ Feature: Vendor Team Management
   # @wip — Blocked: invitation acceptance flow not yet implemented
   @wip
   Scenario: Invitation link expired
-    Given an invitation was sent to "newuser@acmepets.test" 4 days ago
+    Given an invitation was sent to "newuser@hearthhound.com" 4 days ago
     When the invited user clicks the invitation link
     Then they see a message: "This invitation has expired. Please ask your admin to resend."
     And the invitation status is "Expired" in the admin's pending invitations view
@@ -83,10 +83,10 @@ Feature: Vendor Team Management
   # @wip — Blocked: role change UI not yet implemented in TeamManagement.razor
   @wip
   Scenario: Admin changes team member role from CatalogManager to ReadOnly
-    Given "catalog@acmepets.test" is an active team member with role "CatalogManager"
+    Given "jpike@hearthhound.com" is an active team member with role "CatalogManager"
     When I change their role to "ReadOnly"
     Then the role change is applied immediately
-    And the team roster shows "catalog@acmepets.test" with role "ReadOnly"
+    And the team roster shows "jpike@hearthhound.com" with role "ReadOnly"
 
   # @wip — Blocked: role change UI not yet implemented in TeamManagement.razor
   @wip
@@ -101,7 +101,7 @@ Feature: Vendor Team Management
   # @wip — Blocked: deactivate/reactivate UI not yet implemented in TeamManagement.razor
   @wip
   Scenario: Admin deactivates a team member
-    Given "readonly@acmepets.test" is an active team member with role "ReadOnly"
+    Given "esuarez@hearthhound.com" is an active team member with role "ReadOnly"
     When I click "Deactivate" on their row and confirm
     Then their status changes to "Deactivated"
     And they cannot log in until reactivated
@@ -109,7 +109,7 @@ Feature: Vendor Team Management
   # @wip — Blocked: deactivate/reactivate UI not yet implemented in TeamManagement.razor
   @wip
   Scenario: Admin reactivates a previously deactivated team member
-    Given "readonly@acmepets.test" has status "Deactivated"
+    Given "esuarez@hearthhound.com" has status "Deactivated"
     When I click "Reactivate" on their row
     Then their status changes to "Active"
     And they can log in again with their existing credentials
@@ -127,7 +127,7 @@ Feature: Vendor Team Management
   # @wip — Blocked: invitation management UI not yet implemented in TeamManagement.razor
   @wip
   Scenario: Admin resends an expired invitation
-    Given an invitation to "newuser@acmepets.test" has status "Expired"
+    Given an invitation to "newuser@hearthhound.com" has status "Expired"
     When I click "Resend Invitation"
     Then a new invitation is created with a fresh 72-hour expiration
     And the resend count is incremented
@@ -136,7 +136,7 @@ Feature: Vendor Team Management
   # @wip — Blocked: invitation management UI not yet implemented in TeamManagement.razor
   @wip
   Scenario: Admin revokes a pending invitation
-    Given an invitation to "newuser@acmepets.test" has status "Pending"
+    Given an invitation to "newuser@hearthhound.com" has status "Pending"
     When I click "Revoke Invitation" and confirm
     Then the invitation status changes to "Revoked"
     And the invitation link is no longer valid
