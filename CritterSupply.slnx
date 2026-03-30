@@ -1,13 +1,15 @@
 <Solution>
   <Folder Name="/.SolutionItems/">
     <File Path=".editorconfig" />
+    <File Path="AGENTS.md" />
     <File Path="CLAUDE.md" />
+    <File Path="CODE_OF_CONDUCT.md" />
     <File Path="CONTEXTS.md" />
     <File Path="CONTRIBUTING.md" />
-    <File Path="DEVPROGRESS.md" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
     <File Path="docker-compose.yml" />
+    <File Path="LICENSE" />
     <File Path="README.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/Planning/Cycles/">
@@ -63,25 +65,13 @@
     <File Path="docs/workflows/WORKFLOW-AUDIT.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/">
-    <File Path="docs/CYCLE-18-TESTING-SUMMARY.md" />
     <File Path="docs/QUICK-START.md" />
     <File Path="docs\DATA-SEEDING.http" />
     <File Path="docs\HTTP-FILES-GUIDE.md" />
-    <File Path="docs\MANUAL-TEST-CHECKLIST.md" />
-    <File Path="docs\MANUAL-TESTING-SETUP.md" />
     <File Path="docs\README.md" />
     <File Path="docs\RUN-CONFIGURATIONS.md" />
   </Folder>
-  <Folder Name="/.SolutionItems/Documentation/Planning/">
-    <File Path="docs/planning/BACKLOG.md" />
-    <File Path="docs\planning\CYCLES.md" />
-  </Folder>
-  <Folder Name="/.SolutionItems/Documentation/Archive/" />
-  <Folder Name="/.SolutionItems/Documentation/Archive/Sessions/">
-    <File Path="docs/archive/sessions/DEVOPS-REVIEW-SUMMARY.md" />
-    <File Path="docs/archive/sessions/DOCUMENTATION_REVIEW_FEEDBACK.md" />
-    <File Path="docs/archive/sessions/SESSION-SUMMARY-2026-02-13.md" />
-  </Folder>
+  <Folder Name="/.SolutionItems/Documentation/Planning/" />
   <Folder Name="/.SolutionItems/Documentation/Decisions/">
     <File Path="docs/decisions/0007-github-workflow-improvements.md" />
     <File Path="docs/decisions/0008-rabbitmq-configuration-consistency.md" />
@@ -89,6 +79,25 @@
     <File Path="docs/decisions/0010-stripe-payment-gateway-integration.md" />
     <File Path="docs/decisions/0011-github-projects-issues-migration.md" />
     <File Path="docs/decisions/0012-simple-session-based-authentication.md" />
+    <File Path="docs/decisions/0026-polecat-sql-server-migration.md" />
+    <File Path="docs/decisions/0027-per-bc-postgres-databases.md" />
+    <File Path="docs/decisions/0028-jwt-for-vendor-identity.md" />
+    <File Path="docs/decisions/0029-order-saga-design-decisions.md" />
+    <File Path="docs/decisions/0030-notifications-to-correspondence-rename.md" />
+    <File Path="docs/decisions/0031-admin-portal-rbac-model.md" />
+    <File Path="docs/decisions/0032-adr-review-discussion.md" />
+    <File Path="docs/decisions/0032-milestone-based-planning-schema.md" />
+    <File Path="docs/decisions/0032-multi-issuer-jwt-strategy.md" />
+    <File Path="docs/decisions/0033-admin-portal-to-backoffice-rename.md" />
+    <File Path="docs/decisions/0034-backoffice-bff-architecture.md" />
+    <File Path="docs/decisions/0035-backoffice-signalr-hub-design.md" />
+    <File Path="docs/decisions/0036-bff-projections-strategy.md" />
+    <File Path="docs/decisions/0037-ordernote-aggregate-ownership.md" />
+    <File Path="docs/decisions/0038-identity-access-management-evaluation.md" />
+    <File Path="docs/decisions/0039-canonical-validator-placement.md" />
+    <File Path="docs/decisions/0040-requested-integration-event-convention.md" />
+    <File Path="docs/decisions/0041-product-catalog-es-migration-decisions.md" />
+    <File Path="docs/decisions/0042-catalog-namespace-uuid-v5-convention.md" />
     <File Path="docs\decisions\0004-sse-over-signalr.md" />
     <File Path="docs\decisions\0005-mudblazor-ui-framework.md" />
     <File Path="docs\decisions\0006-reqnroll-bdd-framework.md" />
@@ -162,6 +171,7 @@
     <Project Path="tests/Backoffice/Backoffice.Api.IntegrationTests/Backoffice.Api.IntegrationTests.csproj" />
     <Project Path="tests/Backoffice/Backoffice.E2ETests/Backoffice.E2ETests.csproj" />
     <Project Path="tests/Backoffice/Backoffice.UnitTests/Backoffice.UnitTests.csproj" />
+    <Project Path="tests/Backoffice/Backoffice.Web.UnitTests/Backoffice.Web.UnitTests.csproj" />
   </Folder>
   <Folder Name="/Correspondence/">
     <Project Path="src/Correspondence/Correspondence.Api/Correspondence.Api.csproj" />
@@ -190,12 +200,6 @@
   <Folder Name="/Aspire/">
     <Project Path="src/CritterSupply.AppHost/CritterSupply.AppHost.csproj" />
     <Project Path="src/CritterSupply.ServiceDefaults/CritterSupply.ServiceDefaults.csproj" />
-  </Folder>
-  <Folder Name="/src/" />
-  <Folder Name="/src/Backoffice/" />
-  <Folder Name="/tests/" />
-  <Folder Name="/tests/Backoffice/">
-    <Project Path="tests/Backoffice/Backoffice.Web.UnitTests/Backoffice.Web.UnitTests.csproj" />
   </Folder>
   <Folder Name="/Vendor Identity/">
     <Project Path="src/Vendor Identity/VendorIdentity.Api/VendorIdentity.Api.csproj" />

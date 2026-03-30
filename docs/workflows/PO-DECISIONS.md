@@ -18,21 +18,21 @@
 
 ### P0 Gaps (BLOCKING - Must Complete in Cycle 19)
 
-| Gap | Decision | SLA / Requirement |
-|-----|----------|-------------------|
-| **RabbitMQ Durability** | **HARD REQUIREMENT** - Non-negotiable for production | 99.99% durability (1 in 10,000 acceptable loss only in catastrophic failures) |
-| **Customer Isolation (Privacy)** | **BLOCKING** - Cannot launch without fix. Disable real-time features if not ready | Zero privacy breaches (GDPR compliance) |
-| **Payment Refund Compensation** | **CRITICAL** - Financial control issue | 95% automated refunds within 5 min. 5% manual escalation within 1 hour. |
+| Gap                              | Decision                                                                          | SLA / Requirement                                                             |
+|----------------------------------|-----------------------------------------------------------------------------------|-------------------------------------------------------------------------------|
+| **RabbitMQ Durability**          | **HARD REQUIREMENT** - Non-negotiable for production                              | 99.99% durability (1 in 10,000 acceptable loss only in catastrophic failures) |
+| **Customer Isolation (Privacy)** | **BLOCKING** - Cannot launch without fix. Disable real-time features if not ready | Zero privacy breaches (GDPR compliance)                                       |
+| **Payment Refund Compensation**  | **CRITICAL** - Financial control issue                                            | 95% automated refunds within 5 min. 5% manual escalation within 1 hour.       |
 
 ### P1 Gaps (HIGH - Must Complete in Cycle 19 or 20)
 
-| Gap | Decision | Priority |
-|-----|----------|----------|
-| **Retry Logic** | Implement in Cycle 19. Payment 3x, Inventory 5x, HTTP 2x | MUST-HAVE |
-| **Saga Timeout** | **5 minutes** (not 1 hour). Timeout → OnHold → Alert | MUST-HAVE |
-| **Cart Abandonment** | Anonymous = 24 hours, Authenticated = never. Cycle 20 | NICE-TO-HAVE |
-| **Price Drift** | Warn at checkout (show old vs new price). Cycle 20 | MUST-HAVE |
-| **Product Validation** | Allow out-of-stock with warning. Block invalid SKUs. Cycle 19 | MUST-HAVE |
+| Gap                    | Decision                                                      | Priority     |
+|------------------------|---------------------------------------------------------------|--------------|
+| **Retry Logic**        | Implement in Cycle 19. Payment 3x, Inventory 5x, HTTP 2x      | MUST-HAVE    |
+| **Saga Timeout**       | **5 minutes** (not 1 hour). Timeout → OnHold → Alert          | MUST-HAVE    |
+| **Cart Abandonment**   | Anonymous = 24 hours, Authenticated = never. Cycle 20         | NICE-TO-HAVE |
+| **Price Drift**        | Warn at checkout (show old vs new price). Cycle 20            | MUST-HAVE    |
+| **Product Validation** | Allow out-of-stock with warning. Block invalid SKUs. Cycle 19 | MUST-HAVE    |
 
 ---
 
@@ -212,22 +212,22 @@
 
 ### Performance SLAs
 
-| Metric | Target | Notes |
-|--------|--------|-------|
-| **Checkout completion time** | 90% within 5 seconds, 98% within 10 seconds | With retries |
-| **Message durability** | 99.99% survive server restart | Acceptable loss: 1 in 10,000 only in catastrophic failures |
-| **Automated refunds** | 95% within 5 minutes | 5% manual escalation within 1 hour |
-| **Order confirmation email** | Within 5 minutes | Post-payment, post-inventory |
-| **Shipment notification email** | Within 1 hour | Post-carrier pickup |
+| Metric                          | Target                                      | Notes                                                      |
+|---------------------------------|---------------------------------------------|------------------------------------------------------------|
+| **Checkout completion time**    | 90% within 5 seconds, 98% within 10 seconds | With retries                                               |
+| **Message durability**          | 99.99% survive server restart               | Acceptable loss: 1 in 10,000 only in catastrophic failures |
+| **Automated refunds**           | 95% within 5 minutes                        | 5% manual escalation within 1 hour                         |
+| **Order confirmation email**    | Within 5 minutes                            | Post-payment, post-inventory                               |
+| **Shipment notification email** | Within 1 hour                               | Post-carrier pickup                                        |
 
 ### Operational SLAs
 
-| Metric | Target | Notes |
-|--------|--------|-------|
-| **Saga timeout** | 5 minutes → OnHold state | Alert PagerDuty, release inventory, refund payment |
-| **OnHold manual review** | Within 1 hour | Support team investigates |
-| **Failed automatic refund** | 3 retries → manual escalation within 24 hours | Finance team processes |
-| **Delivery failure escalation** | After 3rd failure → customer service calls customer | Proactive outreach |
+| Metric                          | Target                                              | Notes                                              |
+|---------------------------------|-----------------------------------------------------|----------------------------------------------------|
+| **Saga timeout**                | 5 minutes → OnHold state                            | Alert PagerDuty, release inventory, refund payment |
+| **OnHold manual review**        | Within 1 hour                                       | Support team investigates                          |
+| **Failed automatic refund**     | 3 retries → manual escalation within 24 hours       | Finance team processes                             |
+| **Delivery failure escalation** | After 3rd failure → customer service calls customer | Proactive outreach                                 |
 
 ---
 

@@ -23,13 +23,13 @@ This document explains how to use the `.http` files in JetBrains IDEs (Rider, In
 
 All `.http` files are located in their respective API project folders:
 
-| API | Location | Port |
-|-----|----------|------|
-| **Shopping** | `src/Shopping/Shopping.Api/Shopping.Api.http` | 5236 |
-| **Orders** | `src/Orders/Orders.Api/Orders.Api.http` | 5231 |
+| API                   | Location                                                               | Port |
+|-----------------------|------------------------------------------------------------------------|------|
+| **Shopping**          | `src/Shopping/Shopping.Api/Shopping.Api.http`                          | 5236 |
+| **Orders**            | `src/Orders/Orders.Api/Orders.Api.http`                                | 5231 |
 | **Customer Identity** | `src/Customer Identity/CustomerIdentity.Api/CustomerIdentity.Api.http` | 5235 |
-| **Product Catalog** | `src/Product Catalog/Catalog.Api/Catalog.Api.http` | 5133 |
-| **Storefront (BFF)** | `src/Customer Experience/Storefront.Api/Storefront.Api.http` | 5237 |
+| **Product Catalog**   | `src/Product Catalog/Catalog.Api/Catalog.Api.http`                     | 5133 |
+| **Storefront (BFF)**  | `src/Customer Experience/Storefront.Api/Storefront.Api.http`           | 5237 |
 
 ---
 
