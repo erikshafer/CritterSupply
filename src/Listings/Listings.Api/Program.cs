@@ -17,6 +17,19 @@ var builder = WebApplication.CreateBuilder(args);
 // Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
 builder.AddServiceDefaults();
 
+// CORS — allow Backoffice.Web (Blazor WASM) to call Listings.Api directly
+var backofficeOrigin = builder.Configuration["Cors:BackofficeOrigin"]
+    ?? "http://localhost:5244";
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("BackofficePolicy", policy =>
+        policy.WithOrigins(backofficeOrigin)
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials());
+});
+
 // Marten document store configuration
 var connectionString = builder.Configuration.GetConnectionString("postgres")
     ?? "Host=localhost;Port=5433;Database=listings;Username=postgres;Password=postgres";
@@ -120,6 +133,8 @@ if (app.Environment.IsDevelopment())
         opts.SwaggerEndpoint("/api/v1/swagger.json", "Listings API");
     });
 }
+
+app.UseCors("BackofficePolicy");
 
 app.UseAuthentication();
 app.UseAuthorization();
