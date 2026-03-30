@@ -1,0 +1,254 @@
+@page "/admin/listings/{ListingId:guid}"
+@using Microsoft.AspNetCore.Authorization
+@using Backoffice.Web.Auth
+@using Backoffice.Web.Components.Shared
+@attribute [Authorize(Roles = "product-manager,system-admin")]
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Navigation
+@inject SessionExpiredService SessionExpiredService
+@inject BackofficeAuthState AuthState
+
+<PageTitle>Listing Detail — Backoffice</PageTitle>
+
+<div data-testid="listing-detail-page">
+
+<MudBreadcrumbs Items="_breadcrumbs" />
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+else if (_listing is null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4" data-testid="listing-not-found">
+        @(_errorMessage ?? "Listing not found.")
+    </MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12">
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <div class="d-flex align-center mb-4">
+                    <MudText Typo="Typo.h5" Class="mr-4">
+                        Listing <span data-testid="listing-id">@_listing.ListingId.ToString()[..8]…</span>
+                    </MudText>
+                    <ListingStatusBadge Status="@_listing.Status" data-testid="listing-status-badge" />
+                </div>
+
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">SKU</MudText>
+                        <MudText Typo="Typo.body1" data-testid="listing-sku">@_listing.Sku</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Channel</MudText>
+                        <MudText Typo="Typo.body1" data-testid="listing-channel">@_listing.ChannelCode</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudDivider Class="my-2" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Product Name</MudText>
+                        <MudText Typo="Typo.body1" data-testid="listing-product-name">@_listing.ProductName</MudText>
+                    </MudItem>
+
+                    @if (!string.IsNullOrEmpty(_listing.Content))
+                    {
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Description</MudText>
+                            <MudText Typo="Typo.body1" data-testid="listing-description">@_listing.Content</MudText>
+                        </MudItem>
+                    }
+
+                    <MudItem xs="12">
+                        <MudDivider Class="my-2" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Created At</MudText>
+                        <MudText Typo="Typo.body1" data-testid="listing-created-at">
+                            @_listing.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                        </MudText>
+                    </MudItem>
+
+                    @if (_listing.ActivatedAt.HasValue)
+                    {
+                        <MudItem xs="12" md="4">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Last Activated</MudText>
+                            <MudText Typo="Typo.body1" data-testid="listing-activated-at">
+                                @_listing.ActivatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss")
+                            </MudText>
+                        </MudItem>
+                    }
+
+                    @if (_listing.EndedAt.HasValue)
+                    {
+                        <MudItem xs="12" md="4">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Ended At</MudText>
+                            <MudText Typo="Typo.body1" data-testid="listing-ended-at">
+                                @_listing.EndedAt.Value.ToString("yyyy-MM-dd HH:mm:ss")
+                            </MudText>
+                        </MudItem>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_listing.EndCause))
+                    {
+                        <MudItem xs="12" md="4">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">End Cause</MudText>
+                            <MudText Typo="Typo.body1" data-testid="listing-end-cause">@_listing.EndCause</MudText>
+                        </MudItem>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_listing.PauseReason))
+                    {
+                        <MudItem xs="12" md="4">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Pause Reason</MudText>
+                            <MudText Typo="Typo.body1" data-testid="listing-pause-reason">@_listing.PauseReason</MudText>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
+        @* Actions row — disabled stubs for future sessions *@
+        <MudItem xs="12">
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Actions</MudText>
+                <MudStack Row="true" Spacing="2">
+                    @* @wip: Approve action — blocked until action handlers are wired in a future session *@
+                    <MudTooltip Text="Coming in a future session">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Success"
+                                   Disabled="true"
+                                   data-testid="listing-approve-btn">
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-1" />
+                            Approve
+                        </MudButton>
+                    </MudTooltip>
+
+                    @* @wip: Pause action — blocked until action handlers are wired in a future session *@
+                    <MudTooltip Text="Coming in a future session">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Warning"
+                                   Disabled="true"
+                                   data-testid="listing-pause-btn">
+                            <MudIcon Icon="@Icons.Material.Filled.Pause" Class="mr-1" />
+                            Pause
+                        </MudButton>
+                    </MudTooltip>
+
+                    @* @wip: End listing action — blocked until action handlers are wired in a future session *@
+                    <MudTooltip Text="Coming in a future session">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Error"
+                                   Disabled="true"
+                                   data-testid="listing-end-btn">
+                            <MudIcon Icon="@Icons.Material.Filled.Stop" Class="mr-1" />
+                            End Listing
+                        </MudButton>
+                    </MudTooltip>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        @* Back navigation *@
+        <MudItem xs="12">
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Primary"
+                       OnClick="NavigateBack"
+                       data-testid="listing-back-btn">
+                <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Class="mr-1" />
+                Back to Listings
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+}
+
+</div>
+
+@code {
+    [Parameter] public Guid ListingId { get; set; }
+
+    private sealed record ListingDto(
+        Guid ListingId,
+        string Sku,
+        string ChannelCode,
+        string ProductName,
+        string? Content,
+        string Status,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset? ActivatedAt,
+        DateTimeOffset? EndedAt,
+        string? EndCause,
+        string? PauseReason);
+
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Listings", href: "/admin/listings"),
+        new BreadcrumbItem("Detail", href: null, disabled: true)
+    };
+
+    private ListingDto? _listing;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadListingAsync();
+    }
+
+    private async Task LoadListingAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("ListingsApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.GetAsync($"/api/listings/{ListingId}");
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _listing = null;
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                _listing = await response.Content.ReadFromJsonAsync<ListingDto>();
+            }
+            else
+            {
+                _errorMessage = "Failed to load listing details. Please try again.";
+            }
+        }
+        catch (Exception)
+        {
+            _listing = null;
+            _errorMessage = "Error loading listing details. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void NavigateBack()
+    {
+        Navigation.NavigateTo("/admin/listings");
+    }
+}

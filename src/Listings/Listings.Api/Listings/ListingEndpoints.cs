@@ -181,3 +181,52 @@ public static class ListListingsEndpoint
         return Results.Ok(responses);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Paginated Listings Query (Admin)
+// ---------------------------------------------------------------------------
+
+public sealed record PaginatedListingsResponse(
+    IReadOnlyList<ListingResponse> Items,
+    int TotalCount,
+    int Page,
+    int PageSize);
+
+public static class ListAllListingsEndpoint
+{
+    [WolverineGet("/api/listings/all")]
+    [Authorize]
+    public static async Task<IResult> Handle(
+        int? page,
+        int? pageSize,
+        string? status,
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        var currentPage = Math.Max(page ?? 1, 1);
+        var currentPageSize = Math.Clamp(pageSize ?? 25, 1, 100);
+
+        // Build base queryable — apply optional status filter
+        IQueryable<Listing.Listing> query = session.Query<Listing.Listing>();
+
+        if (!string.IsNullOrWhiteSpace(status) &&
+            Enum.TryParse<ListingStatus>(status, ignoreCase: true, out var parsedStatus))
+        {
+            query = query.Where(l => l.Status == parsedStatus);
+        }
+
+        var totalCount = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderByDescending(l => l.CreatedAt)
+            .Skip((currentPage - 1) * currentPageSize)
+            .Take(currentPageSize)
+            .ToListAsync(ct);
+
+        var responses = items
+            .Select(GetListingEndpoint.ToResponse)
+            .ToList();
+
+        return Results.Ok(new PaginatedListingsResponse(responses, totalCount, currentPage, currentPageSize));
+    }
+}

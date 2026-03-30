@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M36.1 — Listings BC Foundation (Session 3 Complete) |
-| **Status** | 🔨 **IN PROGRESS** — HTTP endpoints + lifecycle handlers + admin UI delivered; 32/32 tests passing |
+| **Current Milestone** | M36.1 — Listings BC Foundation (Session 4 Complete — Phase 1 Gate Met) |
+| **Status** | ✅ **PHASE 1 COMPLETE** — Paginated endpoint + CORS + detail page + E2E coverage; 35/35 tests passing |
 | **Recent Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Previous Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
 | **Active BCs** | 19 total (Listings BC scaffold added) |
 
-*Last Updated: 2026-03-30 (M36.1 Session 3 complete)*
+*Last Updated: 2026-03-30 (M36.1 Session 4 complete — Phase 1 gate met)*
 
 ---
 
@@ -190,6 +190,30 @@
 - Build: 0 errors, 33 warnings (matches M36.0 baseline)
 - Session 4 picks up: E2E stubs, listing detail page, full listing query, pre-flight modal wiring
 - Retrospective: [Session 3](./milestones/m36-1-session-3-retrospective.md)
+
+**Session 4 Progress (2026-03-30):**
+- Backend completions:
+  - ✅ CORS configuration in `Listings.Api/Program.cs` — `BackofficePolicy` allowing `http://localhost:5244`
+  - ✅ Paginated `GET /api/listings/all?page=&pageSize=&status=` endpoint — coexists with SKU-filtered endpoint
+  - ✅ `ListingsApi` named HttpClient added to `Backoffice.Web/Program.cs` (base `http://localhost:5246`)
+  - ✅ `ListingsAdmin.razor` updated to use paginated endpoint with server-side filtering and pagination
+  - ✅ Pre-flight discontinuation modal wired into `ProductEdit.razor` via `IDialogService`
+- Listing detail page:
+  - ✅ `/admin/listings/{id}` read-only detail page with all `data-testid` attributes
+  - ✅ Action buttons (Approve, Pause, End) present as disabled stubs with tooltips
+  - ✅ Back navigation to `/admin/listings`
+  - ✅ 404 handling, session expired handling
+- E2E page objects:
+  - ✅ `ListingsAdminPage.cs` — navigate, filter, row count, detail navigation
+  - ✅ `ListingDetailPage.cs` — navigate, read fields, check disabled buttons, back nav
+- E2E feature files:
+  - ✅ `ListingsAdmin.feature` — 3 executable + 2 `@wip` scenarios
+  - ✅ `ListingsDetail.feature` — 1 executable + 3 `@wip` scenarios
+- Integration tests: 35/35 passing (32 baseline + 3 new paginated endpoint tests)
+- Build: 0 errors, 33 warnings
+- **Phase 1 gate: MET** — all criteria from execution plan satisfied
+- Session 5 picks up: Phase 2 planning (Marketplaces BC), E2E step definitions, action button wiring
+- Retrospective: [Session 4](./milestones/m36-1-session-4-retrospective.md)
 
 ---
 
