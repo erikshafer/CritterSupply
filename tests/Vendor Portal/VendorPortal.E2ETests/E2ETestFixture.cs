@@ -119,7 +119,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
         var store = _portalApiFactory.Services.GetRequiredService<IDocumentStore>();
         await using var session = store.LightweightSession();
         var account = await session.LoadAsync<VendorPortal.VendorAccount.VendorAccount>(
-            Guid.Parse("00000000-0000-0000-0000-000000000001"));
+            WellKnownVendorTestData.Tenant.HearthHoundTenantId);
         Console.WriteLine($"[E2ETestFixture] ✅ VendorPortal seed data: VendorAccount exists = {account != null}");
         if (account != null)
             Console.WriteLine($"[E2ETestFixture]    Organization: {account.OrganizationName}, Contact: {account.ContactEmail}");

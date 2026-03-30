@@ -156,8 +156,8 @@ Screenshots: debug-before-nav-*.png, debug-after-nav-*.png
         // This bypasses UI navigation issues (Blazor error UI, SignalR connection timing)
         // and makes tests faster and more reliable.
 
-        // Get JWT token for the catalog@acmepets.test user
-        var accessToken = await Fixture.GetAccessTokenAsync("catalog@acmepets.test", "password");
+        // Get JWT token for the jpike@hearthhound.com user
+        var accessToken = await Fixture.GetAccessTokenAsync("jpike@hearthhound.com", "Dev@123!");
         using var client = Fixture.CreateAuthenticatedPortalApiClient(accessToken);
 
         var requestId = Guid.NewGuid();

@@ -4,32 +4,33 @@ namespace VendorPortal.E2ETests;
 /// Well-known, stable test data constants for Vendor Portal E2E scenarios.
 /// These match the seed data created by VendorIdentitySeedData.cs (auto-seeded in Development).
 ///
-/// The "Acme Pet Supplies" tenant with 3 demo users is the canonical test context.
+/// HearthHound Nutrition Co. is the default happy-path vendor with all three roles.
+/// Source: docs/domain/vendors/vendor-catalog.md
 /// </summary>
 internal static class WellKnownVendorTestData
 {
     /// <summary>
-    /// Acme Pet Supplies tenant — the single test tenant seeded by VendorIdentitySeedData.
+    /// HearthHound Nutrition Co. — the default test tenant seeded by VendorIdentitySeedData.
     /// </summary>
     internal static class Tenant
     {
-        public static readonly Guid AcmeTenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        public const string AcmeTenantName = "Acme Pet Supplies";
+        public static readonly Guid HearthHoundTenantId = Guid.Parse("10000000-0000-0000-0000-000000000101");
+        public const string HearthHoundTenantName = "HearthHound Nutrition Co.";
     }
 
     /// <summary>
-    /// Demo users seeded by VendorIdentitySeedData — password for all: "password"
+    /// Demo users seeded by VendorIdentitySeedData — password for all: "Dev@123!"
     /// </summary>
     internal static class Users
     {
-        public const string AdminEmail = "admin@acmepets.test";
-        public const string CatalogManagerEmail = "catalog@acmepets.test";
-        public const string ReadOnlyEmail = "readonly@acmepets.test";
-        public const string SharedPassword = "password";
+        public const string AdminEmail = "mkerr@hearthhound.com";
+        public const string CatalogManagerEmail = "jpike@hearthhound.com";
+        public const string ReadOnlyEmail = "esuarez@hearthhound.com";
+        public const string SharedPassword = "Dev@123!";
 
-        public const string AdminFirstName = "Alice";
-        public const string CatalogManagerFirstName = "Bob";
-        public const string ReadOnlyFirstName = "Carol";
+        public const string AdminFirstName = "Melissa";
+        public const string CatalogManagerFirstName = "Jordan";
+        public const string ReadOnlyFirstName = "Elena";
     }
 
     /// <summary>

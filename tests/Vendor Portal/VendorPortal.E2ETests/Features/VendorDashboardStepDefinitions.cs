@@ -171,7 +171,7 @@ public sealed class VendorDashboardStepDefinitions
         var hubContext = Fixture.PortalApiHost.Services
             .GetRequiredService<IHubContext<VendorPortal.Api.Hubs.VendorPortalHub>>();
 
-        var tenantId = WellKnownVendorTestData.Tenant.AcmeTenantId;
+        var tenantId = WellKnownVendorTestData.Tenant.HearthHoundTenantId;
 
         // Wolverine wraps all messages in a CloudEvents envelope with "type" and "data" fields
         var envelope = new
@@ -197,7 +197,7 @@ public sealed class VendorDashboardStepDefinitions
         // Personal messages are sent to user:{userId} group
         // We use the admin user's ID from the seed data
         // Since we don't have the exact userId, send to the tenant group as a fallback
-        var tenantId = WellKnownVendorTestData.Tenant.AcmeTenantId;
+        var tenantId = WellKnownVendorTestData.Tenant.HearthHoundTenantId;
 
         var envelope = new
         {
