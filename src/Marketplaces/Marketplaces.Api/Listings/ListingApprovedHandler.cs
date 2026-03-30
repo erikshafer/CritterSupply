@@ -33,6 +33,18 @@ public static class ListingApprovedHandler
         if (string.Equals(message.ChannelCode, "OWN_WEBSITE", StringComparison.OrdinalIgnoreCase))
             return outgoing;
 
+        // Guard: category must be present in the message
+        if (string.IsNullOrWhiteSpace(message.Category))
+        {
+            outgoing.Add(new MarketplaceSubmissionRejected(
+                message.ListingId,
+                message.Sku,
+                message.ChannelCode,
+                "Listing has no product category — cannot determine category mapping",
+                now));
+            return outgoing;
+        }
+
         // Look up category mapping
         var categoryMappingId = $"{message.ChannelCode}:{message.Category}";
         var categoryMapping = await session.LoadAsync<CategoryMapping>(categoryMappingId);

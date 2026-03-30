@@ -34,7 +34,7 @@ public static class ApproveListingHandler
         var @event = new ListingApproved(command.ListingId, now);
         session.Events.Append(command.ListingId, @event);
 
-        // Look up product summary for category data (Session 7: enrich ListingApproved)
+        // TODO(M37.x): Replace with ProductSummaryView ACL in Marketplaces BC
         var productSummary = await session.LoadAsync<Listings.ProductSummary.ProductSummaryView>(listing.Sku);
 
         var outgoing = new OutgoingMessages();
