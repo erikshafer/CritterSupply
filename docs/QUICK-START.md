@@ -198,10 +198,6 @@ You've verified:
 
 ## Next Steps
 
-**For detailed testing:** See [MANUAL-TEST-CHECKLIST.md](./MANUAL-TEST-CHECKLIST.md)
-
-**For troubleshooting:** See [MANUAL-TESTING-SETUP.md](./MANUAL-TESTING-SETUP.md)
-
 **For HTTP file usage:** See [HTTP-FILES-GUIDE.md](./HTTP-FILES-GUIDE.md)
 
 **Next Cycle:** Cycle 19 - Authentication & Authorization

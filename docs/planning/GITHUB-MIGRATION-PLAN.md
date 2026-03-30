@@ -1,8 +1,8 @@
 # GitHub Projects & Issues Migration Plan
 
-> **Decision:** [ADR 0011](../decisions/0011-github-projects-issues-migration.md)  
-> **Status:** 📋 Ready to Execute  
-> **Supersedes:** `CYCLES.md` and `BACKLOG.md` as tracking sources (those files become deprecated)
+> **Decision:** [ADR 0011](../decisions/0011-github-projects-issues-migration.md)
+> **Status:** ✅ Complete
+> **Supersedes:** `CYCLES.md` and `BACKLOG.md` — both files have been archived and removed
 
 ---
 

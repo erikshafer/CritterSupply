@@ -110,7 +110,7 @@ This project includes pre-configured compound run configurations for launching m
    - `crittersupply-rabbitmq`
 
 3. **Seed Test Data (Optional):**
-   - See `docs/MANUAL-TESTING-SETUP.md` for data seeding instructions
+   - See [docs/DATA-SEEDING.http](./DATA-SEEDING.http) for HTTP-based seed requests
 
 ---
 
@@ -176,7 +176,7 @@ These files are committed to Git so all team members have the same configuration
 
 1. Start infrastructure: `docker-compose --profile all up -d`
 2. Launch: `Full Stack (APIs + Blazor UI)` run configuration
-3. Seed test data (see `MANUAL-TESTING-SETUP.md`)
+3. Seed test data (see `DATA-SEEDING.http`)
 4. Open browser: http://localhost:5238
 5. Test customer journey: Browse → Add to Cart → Checkout → Order Confirmation
 6. Verify SSE real-time updates

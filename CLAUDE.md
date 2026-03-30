@@ -272,7 +272,7 @@ CritterSupply uses a modular documentation structure optimized for AI-assisted d
 - **GitHub Project Board** — Kanban board view with columns: Backlog → In Progress → In Review → Done
 - **[docs/planning/CURRENT-CYCLE.md](./docs/planning/CURRENT-CYCLE.md)** — Lightweight AI-readable summary (fallback when GitHub MCP not available)
 
-**Legacy archives:** See [`docs/planning/`](./docs/planning/) for CYCLES.md, BACKLOG.md, milestone retrospectives, and milestone mapping. For GitHub MCP setup, see [GITHUB-ACCESS-GUIDE.md](./docs/planning/GITHUB-ACCESS-GUIDE.md).
+**Legacy archives:** See [`docs/planning/`](./docs/planning/) for milestone retrospectives and milestone mapping. For GitHub MCP setup, see [GITHUB-ACCESS-GUIDE.md](./docs/planning/GITHUB-ACCESS-GUIDE.md).
 
 **When to Use What:**
 - Starting a new milestone: Create GitHub Milestone + Issues; write `docs/planning/milestones/mNN.M-name.md` for detailed plan

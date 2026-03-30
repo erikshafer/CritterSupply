@@ -94,8 +94,7 @@ When reviewing CritterSupply, I always consult:
 2. **[CLAUDE.md](../../CLAUDE.md)** - Development guidelines, project structure, coding standards
 3. **[README.md](../../README.md)** - High-level overview, technology stack, bounded context status
 4. **[docs/planning/CURRENT-CYCLE.md](../../docs/planning/CURRENT-CYCLE.md)** - Current development cycle, recent completions, upcoming work
-5. **[docs/planning/BACKLOG.md](../../docs/planning/BACKLOG.md)** - Future features and improvements
-6. **[skills/](../../docs/skills/)** - Detailed pattern guides:
+5. **[skills/](../../docs/skills/)** - Detailed pattern guides:
    - `wolverine-message-handlers.md` - Handler patterns, return types, aggregate workflows
    - `marten-event-sourcing.md` - Event-sourced aggregates, domain events
    - `marten-document-store.md` - Document database patterns

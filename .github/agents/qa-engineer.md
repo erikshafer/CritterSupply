@@ -190,4 +190,4 @@ WHERE "Email" = 'test@example.com';
 - [TestContainers Integration Tests](../../docs/skills/testcontainers-integration-tests.md)
 - [CONTEXTS.md](../../CONTEXTS.md) — Integration contracts and bounded context definitions
 - [docs/features/](../../docs/features/) — Gherkin feature files by bounded context
-- [docs/MANUAL-TEST-CHECKLIST.md](../../docs/MANUAL-TEST-CHECKLIST.md) — Manual testing checklist
+

@@ -341,7 +341,6 @@ This directory contains comprehensive workflow documentation for CritterSupply's
 ### Planning
 
 - **[docs/planning/CURRENT-CYCLE.md](../../planning/CURRENT-CYCLE.md)** - Current development cycle tracking
-- **[docs/planning/BACKLOG.md](../../planning/BACKLOG.md)** - Future work (deprecated - see GitHub Issues)
 
 ### Skills
 

@@ -19,17 +19,9 @@ See [CLAUDE.md](../CLAUDE.md) for comprehensive AI development guidelines, inclu
 
 See [docs/README.md](./README.md) for the complete documentation structure.
 
-## Architectural Review
-
-See [docs/ARCHITECTURAL-REVIEW.md](./ARCHITECTURAL-REVIEW.md) for an independent review of bounded context design, service communication patterns, and recommendations from an experienced software architect perspective.
-
----
-
 ## Custom GitHub Copilot Agents
 
 CritterSupply includes specialized GitHub Copilot agents with domain expertise to assist with development. These agents provide focused feedback from different perspectives to improve code quality, architecture, and business alignment.
-
-> **Considering additional agents?** See [AGENT-EXPANSION-PROPOSAL.md](./AGENT-EXPANSION-PROPOSAL.md) for a gap analysis of the current roster plus six draft agent documents written in GitHub's custom-agent markdown style.
 
 ### Available Agents
 
