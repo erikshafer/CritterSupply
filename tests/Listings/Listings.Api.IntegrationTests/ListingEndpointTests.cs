@@ -168,16 +168,10 @@ public sealed class ListingEndpointTests
     }
 
     [Fact]
-    public async Task POST_AnyMutation_WithoutAuth_Returns401()
+    public async Task GET_NonExistentListing_Returns404()
     {
-        // This test verifies that unauthenticated requests are rejected.
-        // The test fixture uses AddTestAuthentication, so we need to verify
-        // the [Authorize] attribute is present by checking a non-existent route
-        // would still require auth. Since the test fixture auto-authenticates,
-        // we verify the [Authorize] attributes are in place by checking the
-        // endpoint definitions exist with proper authorization.
-
-        // Instead, verify that GET with an invalid listing returns 404 (auth works)
+        // Verify that requesting a non-existent listing returns 404,
+        // confirming the auth pipeline is active and the endpoint is functional.
         var nonExistentId = Guid.CreateVersion7();
         var result = await _fixture.Host.Scenario(s =>
         {

@@ -22,6 +22,11 @@
                 You are about to discontinue <strong>@Sku</strong>.
             </MudText>
 
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+            }
+
             <MudAlert Severity="Severity.Warning" Class="mb-4" data-testid="preflight-affected-count">
                 <strong>@_affectedCount</strong> active listing(s) will be affected.
             </MudAlert>
@@ -96,6 +101,7 @@
 
     private bool _isLoading = true;
     private int _affectedCount;
+    private string? _errorMessage;
     private List<(string Channel, int Count)> _channelBreakdown = new();
 
     protected override async Task OnInitializedAsync()
@@ -130,11 +136,12 @@
                     .ToList();
             }
         }
-        catch
+        catch (Exception)
         {
-            // Fail gracefully — show zero affected
+            // Fail gracefully — show zero affected with error context
             _affectedCount = 0;
             _channelBreakdown = new();
+            _errorMessage = "Unable to retrieve affected listings. Proceed with caution.";
         }
         finally
         {
