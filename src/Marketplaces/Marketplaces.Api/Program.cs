@@ -105,6 +105,12 @@ builder.Host.UseWolverine(opts =>
 
     // Queue for consuming ListingApproved from Listings BC
     opts.ListenToRabbitQueue("marketplaces-listings-events");
+
+    // Publish integration messages to RabbitMQ exchanges
+    opts.PublishMessage<Messages.Contracts.Marketplaces.MarketplaceListingActivated>()
+        .ToRabbitExchange("marketplaces-listing-activated");
+    opts.PublishMessage<Messages.Contracts.Marketplaces.MarketplaceSubmissionRejected>()
+        .ToRabbitExchange("marketplaces-submission-rejected");
 });
 
 // Wolverine HTTP

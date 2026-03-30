@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 using Wolverine;
+using Wolverine.Tracking;
 
 namespace Marketplaces.Api.IntegrationTests;
 
@@ -95,5 +96,20 @@ public class TestFixture : IAsyncLifetime
     {
         var store = GetDocumentStore();
         await store.Advanced.Clean.DeleteAllDocumentsAsync();
+    }
+
+    /// <summary>
+    /// Executes a message through Wolverine and waits for all cascading messages.
+    /// </summary>
+    public async Task<ITrackedSession> ExecuteAndWaitAsync<T>(T message, int timeoutSeconds = 15)
+        where T : class
+    {
+        return await Host.TrackActivity(TimeSpan.FromSeconds(timeoutSeconds))
+            .DoNotAssertOnExceptionsDetected()
+            .AlsoTrack(Host)
+            .ExecuteAndWaitAsync((Func<IMessageContext, Task>)(async ctx =>
+            {
+                await ctx.InvokeAsync(message);
+            }));
     }
 }
