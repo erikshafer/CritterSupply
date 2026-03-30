@@ -201,6 +201,11 @@
     <Project Path="src/CritterSupply.AppHost/CritterSupply.AppHost.csproj" />
     <Project Path="src/CritterSupply.ServiceDefaults/CritterSupply.ServiceDefaults.csproj" />
   </Folder>
+  <Folder Name="/Marketplaces/">
+    <Project Path="src/Marketplaces/Marketplaces.Api/Marketplaces.Api.csproj" />
+    <Project Path="src/Marketplaces/Marketplaces/Marketplaces.csproj" />
+    <Project Path="tests/Marketplaces/Marketplaces.Api.IntegrationTests/Marketplaces.Api.IntegrationTests.csproj" />
+  </Folder>
   <Folder Name="/Vendor Identity/">
     <Project Path="src/Vendor Identity/VendorIdentity.Api/VendorIdentity.Api.csproj" />
     <Project Path="src/Vendor Identity/VendorIdentity/VendorIdentity.csproj" />

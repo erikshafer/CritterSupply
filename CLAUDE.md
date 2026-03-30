@@ -532,8 +532,8 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 | **Backoffice (API)**                | **5243** | 📋 Reserved | Backoffice API (future)                          |
 | **Backoffice (Web)**                | **5244** | 📋 Reserved | Backoffice frontend (future; React/Vue/Blazor)   |
 | **Returns**                         | **5245** | ✅ Assigned  | Returns/                                         |
-| **Listings**                        | **5246** | 📋 Reserved | Listings API (future)                            |
-| **Marketplaces**                    | **5247** | 📋 Reserved | Marketplaces API (future)                        |
+| **Listings**                        | **5246** | ✅ Assigned  | Listings/                                        |
+| **Marketplaces**                    | **5247** | ✅ Assigned  | Marketplaces/                                    |
 | **Correspondence**                  | **5248** | ✅ Assigned  | Correspondence/                                  |
 | **Backoffice Identity**             | **5249** | ✅ Assigned  | Backoffice Identity/                             |
 | **Promotions**                      | **5250** | ✅ Assigned  | Promotions/                                      |
