@@ -56,6 +56,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
     private BackofficeIdentityApiKestrelFactory? _identityFactory;
     private BackofficeApiKestrelFactory? _backofficeApiFactory;
     private WasmStaticFileHost? _wasmHost;
+    private StubListingsApiHost? _listingsApiHost;
 
     /// <summary>Stub clients to configure domain BC behavior per scenario.</summary>
     public StubOrdersClient StubOrdersClient { get; } = new();
@@ -67,6 +68,9 @@ public sealed class E2ETestFixture : IAsyncLifetime
     public StubCorrespondenceClient StubCorrespondenceClient { get; } = new();
     public StubPricingClient StubPricingClient { get; } = new();
     public StubBackofficeIdentityClient StubBackofficeIdentityClient { get; } = new();
+
+    /// <summary>Stub Listings API host for E2E scenarios that need listing data.</summary>
+    internal StubListingsApiHost StubListingsApi { get; } = new();
 
     /// <summary>Base URL of Backoffice.Web WASM host — what Playwright navigates to.</summary>
     public string WasmBaseUrl { get; private set; } = string.Empty;
@@ -108,8 +112,12 @@ public sealed class E2ETestFixture : IAsyncLifetime
         BackofficeApiBaseUrl = _backofficeApiFactory.ServerAddress;
         BackofficeApiHost = _backofficeApiFactory.Services.GetRequiredService<IHost>();
 
-        // Step 4: Start WASM static file host serving Backoffice.Web with test API URLs
-        _wasmHost = new WasmStaticFileHost(IdentityApiBaseUrl, BackofficeApiBaseUrl);
+        // Step 4: Start stub Listings API (returns mock listing data for Backoffice.Web)
+        _listingsApiHost = StubListingsApi;
+        await _listingsApiHost.StartAsync();
+
+        // Step 5: Start WASM static file host serving Backoffice.Web with test API URLs
+        _wasmHost = new WasmStaticFileHost(IdentityApiBaseUrl, BackofficeApiBaseUrl, _listingsApiHost.BaseUrl);
         await _wasmHost.StartAsync();
         WasmBaseUrl = _wasmHost.BaseUrl;
     }
@@ -117,6 +125,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         if (_wasmHost != null) await _wasmHost.DisposeAsync();
+        if (_listingsApiHost != null) await _listingsApiHost.DisposeAsync();
         if (_backofficeApiFactory != null) await _backofficeApiFactory.DisposeAsync();
         if (_identityFactory != null) await _identityFactory.DisposeAsync();
         await _postgres.DisposeAsync();
@@ -150,6 +159,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
         StubFulfillmentClient.Clear();
         StubCorrespondenceClient.Clear();
         StubPricingClient.Clear();
+        StubListingsApi.Clear();
 
         // Reset session-expired simulation flags
         StubInventoryClient.SimulateSessionExpired = false;
@@ -476,10 +486,13 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
 
     public string BaseUrl { get; private set; } = string.Empty;
 
-    public WasmStaticFileHost(string identityApiUrl, string backofficeApiUrl)
+    private readonly string _listingsApiUrl;
+
+    public WasmStaticFileHost(string identityApiUrl, string backofficeApiUrl, string listingsApiUrl)
     {
         _identityApiUrl = identityApiUrl;
         _backofficeApiUrl = backofficeApiUrl;
+        _listingsApiUrl = listingsApiUrl;
     }
 
     public async Task StartAsync()
@@ -543,13 +556,15 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
                 ApiClients = new
                 {
                     BackofficeIdentityApiUrl = _identityApiUrl,
-                    BackofficeApiUrl = _backofficeApiUrl
+                    BackofficeApiUrl = _backofficeApiUrl,
+                    ListingsApiUrl = _listingsApiUrl
                 }
             };
 
             Console.WriteLine("✅ [WasmStaticFileHost] Intercepted appsettings.json request");
             Console.WriteLine($"   BackofficeIdentityApiUrl: {_identityApiUrl}");
             Console.WriteLine($"   BackofficeApiUrl: {_backofficeApiUrl}");
+            Console.WriteLine($"   ListingsApiUrl: {_listingsApiUrl}");
 
             return Results.Json(config);
         });
@@ -644,6 +659,116 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
         throw new InvalidOperationException(
             "Could not locate repository root (expected directory with src/ subdirectory). " +
             $"Started from: {AppContext.BaseDirectory}");
+    }
+}
+
+
+/// <summary>
+/// Lightweight stub Listings API host for E2E tests.
+/// Serves mock listing data that Backoffice.Web (Blazor WASM) fetches via browser HTTP calls.
+/// Supports seeding listings per scenario and clearing between scenarios.
+/// Endpoints:
+///   GET /api/listings/all?page=&amp;pageSize=&amp;status= — paginated listing list
+///   GET /api/listings/{id} — single listing detail
+/// </summary>
+internal sealed class StubListingsApiHost : IAsyncDisposable
+{
+    private WebApplication? _app;
+    private readonly List<StubListing> _listings = new();
+
+    public string BaseUrl { get; private set; } = string.Empty;
+
+    public sealed record StubListing(
+        Guid ListingId,
+        string Sku,
+        string ChannelCode,
+        string ProductName,
+        string? Content,
+        string Status,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset? ActivatedAt,
+        DateTimeOffset? EndedAt,
+        string? EndCause,
+        string? PauseReason);
+
+    public void SeedListing(Guid id, string sku, string channel, string productName, string status,
+        string? content = null, DateTimeOffset? createdAt = null, DateTimeOffset? activatedAt = null)
+    {
+        _listings.Add(new StubListing(
+            id, sku, channel, productName, content, status,
+            createdAt ?? DateTimeOffset.UtcNow.AddDays(-1),
+            activatedAt, null, null, null));
+    }
+
+    public void Clear() => _listings.Clear();
+
+    public async Task StartAsync()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+
+        builder.Services.AddCors(opts =>
+        {
+            opts.AddDefaultPolicy(policy => policy
+                .SetIsOriginAllowed(_ => true)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials());
+        });
+
+        _app = builder.Build();
+        _app.UseCors();
+
+        // GET /api/listings/all — paginated list (mirrors Listings.Api endpoint)
+        _app.MapGet("/api/listings/all", (int? page, int? pageSize, string? status) =>
+        {
+            var p = page ?? 1;
+            var ps = Math.Clamp(pageSize ?? 25, 1, 100);
+
+            var filtered = string.IsNullOrEmpty(status)
+                ? _listings.ToList()
+                : _listings.Where(l => l.Status.Equals(status, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            var items = filtered
+                .OrderByDescending(l => l.CreatedAt)
+                .Skip((p - 1) * ps)
+                .Take(ps)
+                .ToList();
+
+            return Results.Json(new
+            {
+                items,
+                totalCount = filtered.Count,
+                page = p,
+                pageSize = ps
+            });
+        });
+
+        // GET /api/listings/{id} — single listing detail
+        _app.MapGet("/api/listings/{id:guid}", (Guid id) =>
+        {
+            var listing = _listings.FirstOrDefault(l => l.ListingId == id);
+            return listing is not null
+                ? Results.Json(listing)
+                : Results.NotFound();
+        });
+
+        await _app.StartAsync();
+
+        var addresses = _app.Services
+            .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
+            .Features
+            .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
+
+        BaseUrl = BackofficeIdentityApiKestrelFactory.NormalizeAddress(
+            addresses?.Addresses.FirstOrDefault() ?? string.Empty);
+
+        Console.WriteLine($"✅ [StubListingsApiHost] Started on: {BaseUrl}");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_app != null) await _app.DisposeAsync();
     }
 }
 
