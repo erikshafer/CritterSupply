@@ -1,0 +1,157 @@
+@* Pre-flight discontinuation modal (P0.1).
+   Triggered before a product discontinuation command, shows affected listings count.
+   Lives in Products area of Backoffice, guards the ChangeProductStatus flow. *@
+
+@inject IHttpClientFactory HttpClientFactory
+
+<MudDialog data-testid="preflight-modal">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-2" />
+            Confirm Product Discontinuation
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_isLoading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+        }
+        else
+        {
+            <MudText Typo="Typo.body1" Class="mb-4">
+                You are about to discontinue <strong>@Sku</strong>.
+            </MudText>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+            }
+
+            <MudAlert Severity="Severity.Warning" Class="mb-4" data-testid="preflight-affected-count">
+                <strong>@_affectedCount</strong> active listing(s) will be affected.
+            </MudAlert>
+
+            @if (_channelBreakdown.Count > 0)
+            {
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Affected channels:</MudText>
+                <MudList T="string" Dense="true">
+                    @foreach (var (channel, count) in _channelBreakdown)
+                    {
+                        <MudListItem T="string">
+                            @channel: @count listing(s)
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+
+            <MudTextField @bind-Value="Reason"
+                          Label="Reason for discontinuation"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          Class="mt-4"
+                          data-testid="preflight-reason-input" />
+
+            <MudCheckBox @bind-Value="IsRecall"
+                         Label="This is a product recall"
+                         Color="Color.Error"
+                         Class="mt-2"
+                         data-testid="preflight-is-recall-checkbox" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel"
+                   data-testid="preflight-cancel-btn">
+            Cancel
+        </MudButton>
+        <MudButton Color="Color.Error"
+                   Variant="Variant.Filled"
+                   OnClick="Confirm"
+                   Disabled="_isLoading"
+                   data-testid="preflight-confirm-btn">
+            Confirm Discontinuation
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private sealed record ListingDto(
+        Guid ListingId,
+        string Sku,
+        string ChannelCode,
+        string ProductName,
+        string? Content,
+        string Status,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset? ActivatedAt,
+        DateTimeOffset? EndedAt,
+        string? EndCause,
+        string? PauseReason);
+
+    [CascadingParameter]
+    private IMudDialogInstance? MudDialog { get; set; }
+
+    [Parameter]
+    public string Sku { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Reason { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool IsRecall { get; set; }
+
+    private bool _isLoading = true;
+    private int _affectedCount;
+    private string? _errorMessage;
+    private List<(string Channel, int Count)> _channelBreakdown = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAffectedListingsAsync();
+    }
+
+    private async Task LoadAffectedListingsAsync()
+    {
+        _isLoading = true;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            var response = await client.GetAsync($"/api/listings?sku={Uri.EscapeDataString(Sku)}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var listings = await response.Content.ReadFromJsonAsync<List<ListingDto>>() ?? new();
+
+                // Filter to non-ended listings (active listings affected by discontinuation)
+                var activeListings = listings
+                    .Where(l => !string.Equals(l.Status, "Ended", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                _affectedCount = activeListings.Count;
+
+                _channelBreakdown = activeListings
+                    .GroupBy(l => l.ChannelCode)
+                    .Select(g => (Channel: g.Key, Count: g.Count()))
+                    .OrderBy(x => x.Channel)
+                    .ToList();
+            }
+        }
+        catch (Exception)
+        {
+            // Fail gracefully — show zero affected with error context
+            _affectedCount = 0;
+            _channelBreakdown = new();
+            _errorMessage = "Unable to retrieve affected listings. Proceed with caution.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog?.Cancel();
+
+    private void Confirm() => MudDialog?.Close(DialogResult.Ok(new DiscontinuationResult(Reason, IsRecall)));
+
+    public sealed record DiscontinuationResult(string Reason, bool IsRecall);
+}

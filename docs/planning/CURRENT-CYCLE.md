@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M36.1 — Listings BC Foundation (Session 2 Complete) |
-| **Status** | 🔨 **IN PROGRESS** — Domain core delivered; lifecycle handlers, recall cascade, integration tests passing |
+| **Current Milestone** | M36.1 — Listings BC Foundation (Session 3 Complete) |
+| **Status** | 🔨 **IN PROGRESS** — HTTP endpoints + lifecycle handlers + admin UI delivered; 32/32 tests passing |
 | **Recent Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Previous Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
 | **Active BCs** | 19 total (Listings BC scaffold added) |
 
-*Last Updated: 2026-03-29 (M36.1 Session 2 complete)*
+*Last Updated: 2026-03-30 (M36.1 Session 3 complete)*
 
 ---
 
@@ -160,6 +160,36 @@
 - Build: 0 errors, 33 warnings (matches M36.0 baseline)
 - Session 3 picks up: HTTP endpoints + admin UI
 - Retrospective: [Session 2](./milestones/m36-1-session-2-retrospective.md)
+
+**Session 3 Progress (2026-03-30):**
+- Remaining lifecycle handlers:
+  - ✅ `SubmitListingForReview` — Draft → ReadyForReview transition, validator, no integration message (internal only)
+  - ✅ `ApproveListing` — ReadyForReview → Submitted transition, publishes `ListingApproved` integration message
+  - ✅ `ContentPropagationHandler` — consumes `ProductContentUpdated`, propagates to Live listings only (Draft/Paused/ReadyForReview/Submitted skipped)
+- Integration message contracts:
+  - ✅ `ListingApproved` added to `Messages.Contracts/Listings/ListingIntegrationMessages.cs`
+- HTTP endpoints (9 total in `Listings.Api/Listings/ListingEndpoints.cs`):
+  - ✅ POST `/api/listings` — CreateListing [Authorize]
+  - ✅ POST `/api/listings/{id}/submit-for-review` — SubmitForReview [Authorize]
+  - ✅ POST `/api/listings/{id}/approve` — ApproveListing [Authorize]
+  - ✅ POST `/api/listings/{id}/activate` — ActivateListing [Authorize]
+  - ✅ POST `/api/listings/{id}/pause` — PauseListing [Authorize]
+  - ✅ POST `/api/listings/{id}/resume` — ResumeListing [Authorize]
+  - ✅ POST `/api/listings/{id}/end` — EndListing [Authorize]
+  - ✅ GET `/api/listings/{id}` — GetListing [Authorize]
+  - ✅ GET `/api/listings?sku={sku}` — ListListings [Authorize]
+- Backoffice Blazor components:
+  - ✅ `ListingStatusBadge` shared component with data-testid per status variant
+  - ✅ Listings admin page at `/admin/listings` with status filtering
+  - ✅ Pre-flight discontinuation modal (P0.1) with affected listing count from API
+  - ✅ NavMenu updated with Listings link under ProductManager policy
+- Integration tests: 32/32 passing (18 baseline + 14 new)
+  - ✅ 5 ReviewWorkflowTests (submit/approve lifecycle + invalid transitions)
+  - ✅ 3 ContentPropagationTests (Live updated, Draft ignored, Paused ignored)
+  - ✅ 6 ListingEndpointTests (create 201, submit 200, approve 200, get 200, list 200, auth verification)
+- Build: 0 errors, 33 warnings (matches M36.0 baseline)
+- Session 4 picks up: E2E stubs, listing detail page, full listing query, pre-flight modal wiring
+- Retrospective: [Session 3](./milestones/m36-1-session-3-retrospective.md)
 
 ---
 

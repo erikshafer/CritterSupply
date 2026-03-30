@@ -1,0 +1,170 @@
+@page "/admin/listings"
+@using Microsoft.AspNetCore.Authorization
+@using Backoffice.Web.Auth
+@using Backoffice.Web.Components.Shared
+@attribute [Authorize(Roles = "product-manager,system-admin")]
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Navigation
+@inject SessionExpiredService SessionExpiredService
+
+<PageTitle>Listings — Backoffice</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" />
+
+<div class="d-flex align-center mb-4">
+    <MudText Typo="Typo.h4">Listings Management</MudText>
+    <MudSpacer />
+    <MudSelect T="string" Label="Status Filter" Value="_statusFilter"
+               Variant="Variant.Outlined" Margin="Margin.Dense"
+               Style="max-width: 200px;" data-testid="status-filter"
+               ValueChanged="OnStatusFilterChanged">
+        <MudSelectItem T="string" Value="@("All")">All</MudSelectItem>
+        <MudSelectItem T="string" Value="@("Live")">Live</MudSelectItem>
+        <MudSelectItem T="string" Value="@("Draft")">Draft</MudSelectItem>
+        <MudSelectItem T="string" Value="@("Paused")">Paused</MudSelectItem>
+        <MudSelectItem T="string" Value="@("Ended")">Ended</MudSelectItem>
+    </MudSelect>
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+}
+
+<MudTable Items="@_filteredListings" Hover="true" Striped="true" Dense="true" data-testid="listings-table">
+    <HeaderContent>
+        <MudTh>SKU</MudTh>
+        <MudTh>Product Name</MudTh>
+        <MudTh>Channel</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh>Created</MudTh>
+        <MudTh>Last Updated</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="SKU" data-testid="@($"listing-row-{context.ListingId}")">
+            <MudLink Href="@($"/admin/listings/{context.ListingId}")">
+                <strong>@context.Sku</strong>
+            </MudLink>
+        </MudTd>
+        <MudTd DataLabel="Product Name">
+            <MudText Typo="Typo.body2">@context.ProductName</MudText>
+        </MudTd>
+        <MudTd DataLabel="Channel">
+            <MudText Typo="Typo.body2">@context.ChannelCode</MudText>
+        </MudTd>
+        <MudTd DataLabel="Status">
+            <ListingStatusBadge Status="@context.Status" />
+        </MudTd>
+        <MudTd DataLabel="Created">
+            <MudText Typo="Typo.body2">@context.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+        </MudTd>
+        <MudTd DataLabel="Last Updated">
+            <MudText Typo="Typo.body2">@(context.ActivatedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</MudText>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">
+            No listings found.
+        </MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private sealed record ListingDto(
+        Guid ListingId,
+        string Sku,
+        string ChannelCode,
+        string ProductName,
+        string? Content,
+        string Status,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset? ActivatedAt,
+        DateTimeOffset? EndedAt,
+        string? EndCause,
+        string? PauseReason);
+
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Listings", href: null, disabled: true)
+    };
+
+    private List<ListingDto> _allListings = new();
+    private List<ListingDto> _filteredListings = new();
+    private string _statusFilter = "All";
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadListingsAsync();
+    }
+
+    private async Task LoadListingsAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("BackofficeApi");
+            var response = await client.GetAsync("/api/listings?sku=");
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                // No SKU filter — stub empty until full listing query is available
+                _allListings = new();
+                _filteredListings = new();
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _errorMessage = "Failed to load listings. Please try again.";
+                return;
+            }
+
+            _allListings = await response.Content.ReadFromJsonAsync<List<ListingDto>>() ?? new();
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading listings: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OnStatusFilterChanged(string newValue)
+    {
+        _statusFilter = newValue;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        if (_statusFilter == "All")
+        {
+            _filteredListings = _allListings;
+        }
+        else
+        {
+            _filteredListings = _allListings
+                .Where(l => string.Equals(l.Status, _statusFilter, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+    }
+}

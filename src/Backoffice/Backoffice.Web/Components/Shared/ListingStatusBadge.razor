@@ -1,0 +1,25 @@
+@* Shared component for rendering listing status as a colored MudChip.
+   Each status variant has a data-testid for E2E test selectors. *@
+
+<MudChip T="string"
+         Size="Size.Small"
+         Color="@GetStatusColor()"
+         data-testid="@($"listing-status-{Status?.ToLowerInvariant()}")">
+    @Status
+</MudChip>
+
+@code {
+    [Parameter]
+    public string? Status { get; set; }
+
+    private Color GetStatusColor() => Status?.ToLowerInvariant() switch
+    {
+        "draft" => Color.Default,
+        "readyforreview" => Color.Warning,
+        "submitted" => Color.Info,
+        "live" => Color.Success,
+        "paused" => Color.Warning,
+        "ended" => Color.Error,
+        _ => Color.Default
+    };
+}

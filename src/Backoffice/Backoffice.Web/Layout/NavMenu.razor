@@ -50,6 +50,12 @@
         </MudNavLink>
     </AuthorizeView>
 
+    <AuthorizeView Policy="ProductManager">
+        <MudNavLink Href="/admin/listings" Icon="@Icons.Material.Filled.Storefront">
+            Listings
+        </MudNavLink>
+    </AuthorizeView>
+
     <AuthorizeView Policy="SystemAdmin">
         <MudNavLink Href="/users" Icon="@Icons.Material.Filled.AdminPanelSettings">
             User Management
