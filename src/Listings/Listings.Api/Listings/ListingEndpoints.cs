@@ -1,6 +1,5 @@
 using Listings.Listing;
 using Marten;
-using Marten.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Wolverine;
 using Wolverine.Http;
@@ -207,13 +206,13 @@ public static class ListAllListingsEndpoint
         var currentPage = Math.Max(page ?? 1, 1);
         var currentPageSize = Math.Clamp(pageSize ?? 25, 1, 100);
 
-        var query = session.Query<Listing.Listing>();
+        // Build base queryable — apply optional status filter
+        IQueryable<Listing.Listing> query = session.Query<Listing.Listing>();
 
-        // Optional status filter
         if (!string.IsNullOrWhiteSpace(status) &&
             Enum.TryParse<ListingStatus>(status, ignoreCase: true, out var parsedStatus))
         {
-            query = (IMartenQueryable<Listing.Listing>)query.Where(l => l.Status == parsedStatus);
+            query = query.Where(l => l.Status == parsedStatus);
         }
 
         var totalCount = await query.CountAsync(ct);

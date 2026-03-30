@@ -21,7 +21,7 @@
 else if (_listing is null)
 {
     <MudAlert Severity="Severity.Error" Class="mb-4" data-testid="listing-not-found">
-        Listing not found.
+        @(_errorMessage ?? "Listing not found.")
     </MudAlert>
 }
 else
@@ -195,6 +195,7 @@ else
 
     private ListingDto? _listing;
     private bool _isLoading = true;
+    private string? _errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -204,6 +205,7 @@ else
     private async Task LoadListingAsync()
     {
         _isLoading = true;
+        _errorMessage = null;
 
         try
         {
@@ -229,10 +231,15 @@ else
             {
                 _listing = await response.Content.ReadFromJsonAsync<ListingDto>();
             }
+            else
+            {
+                _errorMessage = "Failed to load listing details. Please try again.";
+            }
         }
         catch (Exception)
         {
             _listing = null;
+            _errorMessage = "Error loading listing details. Please try again.";
         }
         finally
         {
