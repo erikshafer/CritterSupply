@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M36.1 — Listings BC Foundation (Session 4 Complete — Phase 1 Gate Met) |
-| **Status** | ✅ **PHASE 1 COMPLETE** — Paginated endpoint + CORS + detail page + E2E coverage; 35/35 tests passing |
+| **Current Milestone** | M36.1 — Listings BC Foundation (Session 5 Complete — Phase 2 Plan Committed) |
+| **Status** | 🔨 **PHASE 2 PLANNING COMPLETE** — Phase 2 plan committed; E2E step definitions written for 4 scenarios; 35/35 tests |
 | **Recent Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Previous Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
 | **Active BCs** | 19 total (Listings BC scaffold added) |
 
-*Last Updated: 2026-03-30 (M36.1 Session 4 complete — Phase 1 gate met)*
+*Last Updated: 2026-03-30 (M36.1 Session 5 complete — Phase 2 plan committed)*
 
 ---
 
@@ -214,6 +214,28 @@
 - **Phase 1 gate: MET** — all criteria from execution plan satisfied
 - Session 5 picks up: Phase 2 planning (Marketplaces BC), E2E step definitions, action button wiring
 - Retrospective: [Session 4](./milestones/m36-1-session-4-retrospective.md)
+
+**Session 5 Progress (2026-03-30):**
+- Phase 2 planning (Marketplaces BC):
+  - ✅ Phase 2 reconciliation — port 5247 free, database `marketplaces` free, ADR numbers corrected to 0048–0049
+  - ✅ Scope: Phase 2a + stub `ListingApproved` consumer in M36.1; Phase 2b deferred to M37.x
+  - ✅ PO decision: OWN_WEBSITE NOT seeded in Marketplaces BC (it's Listings BC's internal fast-path)
+  - ✅ Seed data: 3 marketplaces (AMAZON_US, WALMART_US, EBAY_US) + 18 category mappings (6 categories × 3)
+  - ✅ Vault pattern: `IVaultClient` interface + `DevVaultClient` stub with production safety guard
+  - ✅ Session sequence: Session 6 (scaffold + CRUD), Session 7 (mappings + adapters + consumer), Session 8 (admin UI + E2E)
+  - ✅ Plan committed: [Phase 2 Plan](./milestones/m36-1-phase-2-plan.md)
+- E2E step definitions:
+  - ✅ `ListingsAdminSteps.cs` — 10 step definitions for 3 executable scenarios
+  - ✅ `ListingsDetailSteps.cs` — 8 step definitions for 1 executable scenario
+  - ✅ `StubListingsApiHost` — stub Listings API for browser-initiated HTTP calls in E2E tests
+  - ✅ `WasmStaticFileHost` updated — `ListingsApiUrl` added to intercepted appsettings.json
+  - ✅ `WellKnownTestData.Listings` — deterministic test listing IDs and SKUs
+- E2E scenario counts: 4 executable (step defs written), 5 @wip (blocked on unbuilt UI)
+- Integration tests: 35/35 passing (unchanged — no new tests this session)
+- Build: 0 errors, 33 warnings (unchanged)
+- CI Run #836 (dotnet.yml), E2E Run #412 (e2e.yml) — both pending approval
+- Session 6 picks up: Marketplaces.Api scaffold + Marketplace document CRUD + seed data
+- Retrospective: [Session 5](./milestones/m36-1-session-5-retrospective.md)
 
 **(QoL) Dev Seed Data (2026-03-30):**
 - ✅ `BackofficeIdentitySeedData.cs` — 7 users, one per ADR 0031 role (SystemAdmin, Executive, OperationsManager, CustomerService, WarehouseClerk, PricingManager, CopyWriter)
