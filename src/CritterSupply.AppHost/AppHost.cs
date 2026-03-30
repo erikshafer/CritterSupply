@@ -45,6 +45,9 @@ var storefrontApi = builder.AddProject<Projects.Storefront_Api>("crittersupply-a
 // Backoffice Identity BC - JWT-based authentication for internal backoffice users (port 5249)
 var backofficeIdentityApi = builder.AddProject<Projects.BackofficeIdentity_Api>("crittersupply-aspire-backofficeidentity-api");
 
+// Marketplaces BC - Marketplace channel registry and category mappings (port 5247)
+builder.AddProject<Projects.Marketplaces_Api>("crittersupply-aspire-marketplaces-api");
+
 // ===== BLAZOR WEB APP =====
 
 // Storefront Web - Customer-facing Blazor Server app
