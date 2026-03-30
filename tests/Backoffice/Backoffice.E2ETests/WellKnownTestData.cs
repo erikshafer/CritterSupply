@@ -82,4 +82,19 @@ internal static class WellKnownTestData
         public const decimal CeramicDogBowlPrice = 19.99m;
         public const decimal InteractiveCatLaserPrice = 29.99m;
     }
+
+    internal static class Listings
+    {
+        public static readonly Guid LiveListing = Guid.Parse("77777777-7777-7777-7777-777777777777");
+        public const string LiveListingSku = "DOG-BOWL-01";
+        public const string LiveListingChannel = "OWN_WEBSITE";
+        public const string LiveListingProductName = "Ceramic Dog Bowl";
+        public const string LiveListingStatus = "Live";
+
+        public static readonly Guid DraftListing = Guid.Parse("77777777-7777-7777-7777-777777777778");
+        public const string DraftListingSku = "CAT-LASER-01";
+        public const string DraftListingChannel = "OWN_WEBSITE";
+        public const string DraftListingProductName = "Interactive Cat Laser";
+        public const string DraftListingStatus = "Draft";
+    }
 }
