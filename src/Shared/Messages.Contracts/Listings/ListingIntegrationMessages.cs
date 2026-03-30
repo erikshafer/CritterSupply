@@ -10,6 +10,16 @@ public sealed record ListingCreated(
     DateTimeOffset OccurredAt);
 
 /// <summary>
+/// Integration message published when a listing is approved (transitions to Submitted).
+/// Marketplaces BC can react to this in Phase 2.
+/// </summary>
+public sealed record ListingApproved(
+    Guid ListingId,
+    string Sku,
+    string ChannelCode,
+    DateTimeOffset OccurredAt);
+
+/// <summary>
 /// Integration message published when a listing transitions to Live.
 /// </summary>
 public sealed record ListingActivated(
