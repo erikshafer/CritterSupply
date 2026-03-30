@@ -12,7 +12,7 @@ Feature: Vendor Portal Authentication
     And I enter "mkerr@hearthhound.com" as email and "Dev@123!" as password
     And I click the sign in button
     Then I should be redirected to the dashboard
-    And I should see the user info "Alice" in the app bar
+    And I should see the user info "Melissa" in the app bar
 
   @p0
   Scenario: Invalid credentials show inline error message
