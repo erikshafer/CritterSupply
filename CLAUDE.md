@@ -272,19 +272,7 @@ CritterSupply uses a modular documentation structure optimized for AI-assisted d
 - **GitHub Project Board** — Kanban board view with columns: Backlog → In Progress → In Review → Done
 - **[docs/planning/CURRENT-CYCLE.md](./docs/planning/CURRENT-CYCLE.md)** — Lightweight AI-readable summary (fallback when GitHub MCP not available)
 
-**Why GitHub-first works across any machine (MacBook, Windows, Linux):**
-Project state lives in GitHub's cloud, not in local files. Any machine with the GitHub MCP server configured and GitHub auth completed gets the same authoritative view of open issues, active milestones, and backlog — no stale markdown, no sync needed.
-
-**Prerequisites per machine:**
-- ✅ **GitHub MCP server** — configured in your AI tool's MCP settings (VS Code, Cursor, Claude Desktop, etc.)
-- ✅ **GitHub auth** — personal access token with `repo` + `project` scopes
-- See [GITHUB-ACCESS-GUIDE.md](./docs/planning/GITHUB-ACCESS-GUIDE.md) for complete setup instructions (PAT creation, MCP config JSON, domain allowlist, verification checklist)
-
-**Legacy Markdown (Read-Only Archives):**
-- **[docs/planning/CYCLES.md](./docs/planning/CYCLES.md)** — Historical cycle records (Cycles 1–18); **deprecated and outdated** — use CURRENT-CYCLE.md for active milestone tracking
-- **[docs/planning/BACKLOG.md](./docs/planning/BACKLOG.md)** — Historical backlog; **deprecated** (items migrated to GitHub Issues)
-- **[docs/planning/cycles/](./docs/planning/cycles/)** — Per-cycle retrospective docs; still created as markdown after each milestone
-- **[docs/planning/milestone-mapping.md](./docs/planning/milestone-mapping.md)** — Maps legacy "Cycle N" identifiers to new milestone IDs
+**Legacy archives:** See [`docs/planning/`](./docs/planning/) for CYCLES.md, BACKLOG.md, milestone retrospectives, and milestone mapping. For GitHub MCP setup, see [GITHUB-ACCESS-GUIDE.md](./docs/planning/GITHUB-ACCESS-GUIDE.md).
 
 **When to Use What:**
 - Starting a new milestone: Create GitHub Milestone + Issues; write `docs/planning/milestones/mNN.M-name.md` for detailed plan
@@ -327,11 +315,7 @@ Project state lives in GitHub's cloud, not in local files. Any machine with the 
 **References:** [Links to cycle plans, CONTEXTS.md sections, skills docs]
 ```
 
-**Existing ADRs:**
-- [ADR 0001: Checkout Migration to Orders](./docs/decisions/0001-checkout-migration-to-orders.md) (Cycle 8)
-- [ADR 0002: EF Core for Customer Identity](./docs/decisions/0002-ef-core-for-customer-identity.md) (Cycle 13)
-- [ADR 0003: Value Objects vs Primitives for Queryable Fields](./docs/decisions/0003-value-objects-vs-primitives-queryable-fields.md) (Cycle 14)
-- [ADR 0004: SSE over SignalR](./docs/decisions/0004-sse-over-signalr.md) (Cycle 16)
+See [`docs/decisions/`](./docs/decisions/) for the full ADR index (42+ records).
 
 ### BDD Feature Specifications (Gherkin)
 
@@ -416,14 +400,6 @@ docs/features/
 3. Update `CONTEXTS.md` only if BC ownership or communication directions changed (not for implementation details)
 4. Create retrospective doc: `docs/planning/milestones/m30.1-retrospective.md`
 5. Update `docs/planning/CURRENT-CYCLE.md` to next milestone
-
-### Legacy Documentation
-
-**DEVPROGRESS.md** — Deprecated as of 2026-02-04. Kept for historical reference only.
-
-**docs/planning/CYCLES.md** — Deprecated as of 2026-02-23 and no longer maintained. Use **CURRENT-CYCLE.md** for active cycle tracking. CYCLES.md kept as historical archive (Cycles 1–18) but is outdated.
-
-**docs/planning/BACKLOG.md** — Deprecated as of 2026-02-23 (migrated to GitHub Issues). Kept as historical reference.
 
 ---
 
@@ -556,11 +532,11 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 | **Backoffice (API)**                | **5243** | 📋 Reserved | Backoffice API (future)                          |
 | **Backoffice (Web)**                | **5244** | 📋 Reserved | Backoffice frontend (future; React/Vue/Blazor)   |
 | **Returns**                         | **5245** | ✅ Assigned  | Returns/                                         |
-| **Listings**                        | **5246** | 📋 Reserved | Listings API (future; Cycle 30+)                 |
-| **Marketplaces**                    | **5247** | 📋 Reserved | Marketplaces API (future; Cycle 32+)             |
-| **Correspondence**                  | **5248** | ✅ Assigned  | Correspondence/ (Cycle 28)                       |
-| **Backoffice Identity**             | **5249** | ✅ Assigned  | Backoffice Identity/ (Cycle 29)                  |
-| **Promotions**                      | **5250** | ✅ Assigned  | Promotions/ (Cycle 29 Phase 2)                   |
+| **Listings**                        | **5246** | 📋 Reserved | Listings API (future)                            |
+| **Marketplaces**                    | **5247** | 📋 Reserved | Marketplaces API (future)                        |
+| **Correspondence**                  | **5248** | ✅ Assigned  | Correspondence/                                  |
+| **Backoffice Identity**             | **5249** | ✅ Assigned  | Backoffice Identity/                             |
+| **Promotions**                      | **5250** | ✅ Assigned  | Promotions/                                      |
 
 **Why this matters:**
 - Allows running multiple APIs simultaneously during development
@@ -571,77 +547,15 @@ When creating a new API project (e.g., `Orders.Api`, `Payments.Api`), ensure the
 
 ### 3. BFF Project Structure Pattern
 
-**IMPORTANT:** Backend-for-Frontend (BFF) projects follow the **same domain/API split pattern** as all other bounded contexts.
+BFF projects follow the same **domain/API split** as all other BCs: a domain project (regular SDK) holds `Clients/`, `Composition/`, `Notifications/`, and `RealTime/`; the API project (Web SDK) holds `Queries/`, client implementations, and the SignalR hub.
 
-**BFF Anatomy:**
-
-```
-src/<BC Name>/
-├── <ProjectName>/                      # Domain project (regular SDK)
-│   ├── <ProjectName>.csproj            # References: Messages.Contracts only
-│   ├── Clients/                        # HTTP client interfaces (domain)
-│   │   └── I*Client.cs
-│   ├── Composition/                    # View models for UI
-│   │   └── *View.cs
-│   ├── Notifications/                  # Integration message handlers
-│   │   └── *Handler.cs                 # Wolverine handlers for RabbitMQ messages
-│   └── RealTime/                       # SignalR transport types
-│       ├── IStorefrontWebSocketMessage.cs  # Marker interface for SignalR routing
-│       └── StorefrontEvent.cs          # Discriminated union for real-time events
-│
-└── <ProjectName>.Api/                  # API project (Web SDK)
-    ├── <ProjectName>.Api.csproj        # References: <ProjectName>, Messages.Contracts
-    ├── Program.cs                      # Wolverine + Marten + DI setup
-    ├── appsettings.json                # Connection strings
-    ├── Properties/launchSettings.json  # Port allocation
-    ├── Queries/                        # HTTP endpoints (composition)
-    │   └── Get*View.cs                 # namespace: <ProjectName>.Api.Queries
-    ├── Clients/                        # HTTP client implementations
-    │   └── *Client.cs                  # namespace: <ProjectName>.Api.Clients
-    └── *Hub.cs                         # SignalR hub (namespace: <ProjectName>.Api)
-```
-
-**Example: Customer Experience BFF (Storefront)**
-
-```
-src/Customer Experience/
-├── Storefront/                         # Domain project
-│   ├── Clients/                        # Interfaces for Shopping, Orders, Catalog, etc.
-│   ├── Composition/                    # CartView, CheckoutView, ProductListingView
-│   ├── Notifications/                  # ItemAddedHandler, OrderPlacedHandler, ShipmentDispatchedHandler, etc.
-│   └── RealTime/                       # IStorefrontWebSocketMessage, StorefrontEvent
-│
-└── Storefront.Api/                     # API project
-    ├── Program.cs                      # Wolverine handler discovery for both assemblies
-    ├── Queries/                        # GetCartView, GetCheckoutView, GetProductListing
-    ├── Clients/                        # ShoppingClient, OrdersClient, CatalogClient
-    └── StorefrontHub.cs                # SignalR hub at /hub/storefront
-```
-
-**Key Configuration (Program.cs):**
-
+**Critical:** `Program.cs` must discover handlers from both assemblies:
 ```csharp
-// Discover handlers in both API and Domain assemblies
-builder.Host.UseWolverine(opts =>
-{
-    // API assembly (Queries)
-    opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
-
-    // Domain assembly (Integration message handlers)
-    opts.Discovery.IncludeAssembly(typeof(Storefront.RealTime.IStorefrontWebSocketMessage).Assembly);
-});
+opts.Discovery.IncludeAssembly(typeof(Program).Assembly);               // API (Queries)
+opts.Discovery.IncludeAssembly(typeof(Storefront.RealTime.IXxx).Assembly); // Domain (Notifications)
 ```
 
-**Why This Pattern:**
-- **Separation of Concerns:** Domain logic (composition, notification handling) separate from infrastructure (HTTP, DI)
-- **Testability:** Test project references API project (brings in domain transitively)
-- **Consistency:** BFF follows same pattern as Orders, Shopping, Payments, etc.
-- **Namespace Clarity:** `<ProjectName>.*` for domain, `<ProjectName>.Api.*` for infrastructure
-
-**Common Mistakes to Avoid:**
-- ❌ Single Web SDK project combining domain + infrastructure
-- ❌ Domain project referencing Wolverine packages (not needed - handlers discovered via API assembly reference)
-- ❌ Forgetting to include domain assembly in `opts.Discovery.IncludeAssembly()`
+See `docs/skills/bff-realtime-patterns.md` for full BFF anatomy and examples.
 
 ---
 
@@ -1008,6 +922,19 @@ Covers:
 - CORS `AllowCredentials()` for cross-origin HttpOnly refresh token cookie
 - Key differences from Storefront.Web (Blazor Server)
 
+### When Adding a New Bounded Context
+
+For creating a new BC from scratch — project scaffolding, Docker, Postgres schema, Aspire, CONTEXTS.md, tests:
+
+**Read:** `docs/skills/adding-new-bounded-context.md`
+
+Covers:
+- Complete project creation checklist
+- `.sln` and `.slnx` registration
+- Docker Compose profile and service setup
+- Port allocation and `launchSettings.json`
+- Integration test fixture wiring
+
 ### When Organizing Code
 
 For file structure and vertical slice organization:
@@ -1107,6 +1034,19 @@ Covers:
 - CritterSupply mini example (Returns BC)
 - Reference: `docs/skills/references/scenarios.md` for Given/When/Then patterns
 
+### When Writing a Copilot Session Prompt
+
+For any request to write, plan, or generate a structured session prompt for CritterSupply's custom Copilot agent roster:
+
+**Read:** `docs/skills/copilot-session-prompt.md`
+
+Covers:
+- Agent roster table and persona invocation (`@psa`, `@qae`, `@uxe`, etc.)
+- Session types: implementation, planning, review, retrospective
+- Nine-section prompt structure and required fields
+- Retrospective requirements and CURRENT-CYCLE.md update protocol
+- Anti-patterns and guard rails
+
 ### When Wrapping Up an Implementation Session
 
 For any session that includes implementation work — including **implementation-only** sessions and **planning + implementation** sessions that move from design into repository changes:
@@ -1203,209 +1143,17 @@ For a mature BC like Orders:
 - **~15% BDD Tests** — Key user scenarios in Gherkin format
 - **~5% E2E Tests** — Critical happy paths only
 
-### Common Testing Patterns
-
-**Integration test with Alba + TestContainers:**
-```csharp
-public class OrdersTests : IClassFixture<OrdersTestFixture>
-{
-    private readonly OrdersTestFixture _fixture;
-
-    public OrdersTests(OrdersTestFixture fixture) => _fixture = fixture;
-
-    [Fact]
-    public async Task PlaceOrder_WithValidData_ReturnsOrderId()
-    {
-        // Arrange
-        var cmd = new PlaceOrder(Guid.NewGuid(), new[] { new OrderLineItem("SKU123", 2) });
-
-        // Act
-        var result = await _fixture.Host.PostJson($"/api/orders", cmd)
-            .Receive<PlaceOrderResult>();
-
-        // Assert
-        result.OrderId.ShouldNotBe(Guid.Empty);
-    }
-}
-```
-
-**BDD test with Reqnroll:**
-```gherkin
-# docs/features/orders/order-placement.feature
-Feature: Order Placement
-  As a customer
-  I want to place an order
-  So that I can purchase products
-
-  Scenario: Place order with valid items
-    Given a customer with ID "cust-123"
-    And items in their cart: "SKU123" (2), "SKU456" (1)
-    When they place an order
-    Then the order is created
-    And a payment is authorized
-    And inventory is reserved
-```
-
-**E2E test with Playwright:**
-```csharp
-[Fact]
-public async Task Checkout_HappyPath_CreatesOrder()
-{
-    await Page.GotoAsync("http://localhost:5238");
-    await Page.GetByTestId("product-sku123").ClickAsync();
-    await Page.GetByTestId("add-to-cart").ClickAsync();
-    await Page.GetByTestId("checkout-button").ClickAsync();
-    await Page.GetByTestId("confirm-order").ClickAsync();
-
-    await Expect(Page.GetByTestId("order-confirmation")).ToBeVisibleAsync();
-}
-```
-
 ---
 
 ## Integration Patterns
 
-**CritterSupply uses two primary integration patterns:**
+CritterSupply uses three integration patterns. Use the decision matrix below to choose the right one; see [CONTEXTS.md](./CONTEXTS.md) for which pattern each BC uses.
 
-### 1. Choreography (Event-Driven, Autonomous)
+**Choreography** — BCs autonomously react to RabbitMQ events from other BCs. Use when loose coupling matters more than strict ordering and no compensation is needed. Examples: Correspondence reacts to order/payment events; Inventory reacts to `OrderPlaced`.
 
-**Pattern:** BCs autonomously react to events published by other BCs. No central coordinator.
+**Orchestration (Saga)** — One BC coordinates others via commands over time, with a stateful saga holding progress. Use when strict ordering, timeouts, or compensation logic are required. Examples: `OrderSaga` (Orders → Payments → Inventory → Fulfillment), `ReturnSaga`.
 
-**When to use:**
-- Loose coupling is more important than strict ordering
-- Downstream BCs can handle events asynchronously
-- No need for error compensation across BCs
-
-**Example:** Inventory reacts to `OrderPlaced`
-```csharp
-// In Inventory BC
-public static class OrderPlacedHandler
-{
-    public static async Task<StockReserved> Handle(OrderPlaced evt, IInventoryRepository repo)
-    {
-        await repo.ReserveStock(evt.OrderId, evt.Items);
-        return new StockReserved(evt.OrderId);
-    }
-}
-```
-
-**Pros:**
-- ✅ Loose coupling
-- ✅ High autonomy
-- ✅ Easy to add new subscribers
-
-**Cons:**
-- ❌ Hard to trace end-to-end flow
-- ❌ No centralized error handling
-- ❌ Eventual consistency can confuse users
-
-**Examples in CritterSupply:**
-- Inventory → Orders (stock reserved)
-- Correspondence → Orders, Fulfillment, Payments (transactional emails)
-- Customer Experience → Shopping, Orders, Fulfillment (real-time UI updates)
-
----
-
-### 2. Orchestration (Saga-Driven, Coordinated)
-
-**Pattern:** One BC (the orchestrator) actively coordinates others via commands/requests. Centralized state machine.
-
-**When to use:**
-- Need strict ordering of operations (payment before fulfillment)
-- Need error compensation (refund if fulfillment fails)
-- Business logic spans multiple BCs
-
-**Example:** OrderSaga orchestrates Payments, Inventory, Fulfillment
-```csharp
-public class OrderSaga : Saga
-{
-    public Guid Id { get; set; }
-    public OrderStatus Status { get; set; }
-
-    public OutgoingMessages Handle(OrderPlaced evt, IMessageContext ctx)
-    {
-        Status = OrderStatus.PaymentPending;
-        return new OutgoingMessages()
-            .Add(new AuthorizePayment(evt.OrderId, evt.TotalAmount))
-            .Add(new ReserveStock(evt.OrderId, evt.Items))
-            .ScheduleTimeout(TimeSpan.FromMinutes(10));
-    }
-
-    public void Handle(PaymentAuthorized evt)
-    {
-        if (Status == OrderStatus.PaymentPending && StockReserved)
-        {
-            Status = OrderStatus.Confirmed;
-            Publish(new RequestFulfillment(Id));
-        }
-    }
-
-    public void Handle(PaymentFailed evt)
-    {
-        Status = OrderStatus.Cancelled;
-        Publish(new ReleaseStockReservation(Id));
-        MarkCompleted();
-    }
-}
-```
-
-**Pros:**
-- ✅ Clear end-to-end flow
-- ✅ Centralized error handling
-- ✅ Easy to add compensation logic
-
-**Cons:**
-- ❌ Orchestrator becomes a bottleneck
-- ❌ Tight coupling to orchestrated BCs
-- ❌ Harder to test in isolation
-
-**Examples in CritterSupply:**
-- OrderSaga (Orders → Payments, Inventory, Fulfillment)
-- ReturnSaga (Returns → Fulfillment, Payments)
-- BulkPricingJobSaga (Pricing → internal approval workflow)
-
----
-
-### 3. Query-Only (BFF Pattern)
-
-**Pattern:** BFF queries multiple BCs synchronously via HTTP to compose a view. No state, no persistence.
-
-**When to use:**
-- UI needs data from multiple BCs
-- No domain logic, pure composition
-- Read-only operations
-
-**Example:** Storefront BFF composes CartView
-```csharp
-public static class GetCartViewQuery
-{
-    [WolverineGet("/api/cart/{cartId}")]
-    public static async Task<CartView> Get(
-        Guid cartId,
-        IShoppingClient shopping,
-        ICatalogClient catalog)
-    {
-        var cart = await shopping.GetCart(cartId);
-        var products = await catalog.GetProducts(cart.Items.Select(i => i.Sku));
-
-        return new CartView(
-            cart.Id,
-            cart.Items.Select(i => new CartItemView(
-                i.Sku,
-                products[i.Sku].Name,
-                i.Quantity,
-                products[i.Sku].Price
-            ))
-        );
-    }
-}
-```
-
-**Examples in CritterSupply:**
-- Customer Experience (Storefront) queries Shopping, Orders, Catalog, Customer Identity
-- Vendor Portal queries Vendor Identity, Orders, Fulfillment, Pricing
-
----
+**Query-Only (BFF)** — BFF composes views by querying multiple BCs synchronously via HTTP. No state, no domain logic. Use for read-only UI composition. Examples: Storefront BFF, Vendor Portal BFF.
 
 ### Decision Matrix
 
@@ -1711,31 +1459,10 @@ These skills document CritterSupply's established patterns. For exploring Wolver
 
 ## Development Progress
 
-See [DEVPROGRESS.md](./DEVPROGRESS.md) for current development status.
+See [docs/planning/CURRENT-CYCLE.md](./docs/planning/CURRENT-CYCLE.md) for active milestone tracking.
 
 ---
 
 ## Available Skills
 
-| Skill | Purpose |
-|-------|---------|
-| `wolverine-message-handlers.md` | Compound handlers, return patterns, aggregate workflows |
-| `wolverine-sagas.md` | Stateful orchestration sagas, multi-BC coordination, compensation chains, idempotency |
-| `marten-event-sourcing.md` | Event-sourced aggregates, domain events, decider pattern |
-| `event-sourcing-projections.md` | Marten projections: snapshots, multi-stream, live aggregation, FetchForWriting() |
-| `marten-document-store.md` | Document database patterns (non-event-sourced) |
-| `efcore-wolverine-integration.md` | Entity Framework Core with Wolverine |
-| `efcore-marten-projections.md` | Projecting Marten events to EF Core tables |
-| `external-service-integration.md` | Strategy pattern, graceful degradation |
-| `bff-realtime-patterns.md` | Backend-for-Frontend, real-time updates (SignalR) |
-| `wolverine-signalr.md` | Wolverine SignalR transport, hub auth, group routing, WASM client |
-| `blazor-wasm-jwt.md` | Blazor WASM + JWT: named HTTP clients, in-memory tokens, SignalR AccessTokenProvider, RBAC |
-| `vertical-slice-organization.md` | File structure, naming conventions, colocation patterns, anti-pattern warnings |
-| `modern-csharp-coding-standards.md` | C# language features, immutability |
-| `adding-new-bounded-context.md` | Complete checklist: projects, Docker, Postgres, Aspire, CONTEXTS.md, tests |
-| `event-modeling-workshop.md` | Collaborative design: brain dumps, slicing, scenarios, multi-persona facilitation |
-| `critterstack-testing-patterns.md` | Unit and integration testing |
-| `testcontainers-integration-tests.md` | TestContainers setup, patterns for Marten and EF Core |
-| `reqnroll-bdd-testing.md` | BDD testing with Gherkin and Reqnroll |
-| `e2e-playwright-testing.md` | Browser E2E tests with Playwright, real Kestrel, Page Object Model |
-| `bunit-component-testing.md` | Blazor component unit testing with bUnit, MudBlazor setup, auth emulation |
+See [`docs/skills/README.md`](./docs/skills/README.md) for the full skill index organized by use case, technology, and development phase.

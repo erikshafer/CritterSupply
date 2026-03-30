@@ -221,21 +221,7 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 
 For detailed responsibilities, interactions, and event flows between contexts, see [CONTEXTS.md](./CONTEXTS.md).
 
-### 🔌 External Service Integration (Stripe)
-
-The Payments BC includes a reference implementation for third-party payment integration: a [research spike](./docs/planning/spikes/stripe-api-integration.md), [ADR 0010](./docs/decisions/0010-stripe-payment-gateway-integration.md), and [code examples](./docs/examples/stripe/) covering Stripe's webhook-driven model, two-phase authorize/capture aligned with the Order saga, HMAC-SHA256 signature verification, and idempotency keys for safe retries.
-
 ## ⏩ How to Run <a id='5.0'></a>
-
-### Quick start (one command)
-
-If you just want to get a running storefront quickly (infrastructure + Storefront API), run:
-
-```bash
-./scripts/dev-start.sh quick-start
-```
-
-This starts Postgres, RabbitMQ, Jaeger (infrastructure) and runs the Storefront API locally (launchSettings.json uses port 5237 by convention).
 
 ### Requirements <a id='5.2'></a>
 

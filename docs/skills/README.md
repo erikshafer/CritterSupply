@@ -36,6 +36,7 @@ This directory contains implementation patterns and best practices for building 
 - 🐳 [TestContainers Integration Tests](./testcontainers-integration-tests.md) - Why real infrastructure, container setup, performance tips
 - 🥒 [Reqnroll BDD Testing](./reqnroll-bdd-testing.md) - Gherkin features, step definitions, when to use BDD
 - 🎭 [E2E Testing with Playwright](./e2e-playwright-testing.md) - Browser E2E tests, real Kestrel, POM, MudBlazor patterns
+- 🧩 [bUnit Component Testing](./bunit-component-testing.md) - Blazor component unit testing with bUnit, MudBlazor setup, auth emulation
 
 **Code Organization & Style:**
 - 📂 [Vertical Slice Organization](./vertical-slice-organization.md) - File structure, colocation, project naming conventions
@@ -46,6 +47,9 @@ This directory contains implementation patterns and best practices for building 
 
 **External Integrations:**
 - 🔌 [External Service Integration](./external-service-integration.md) - Strategy pattern, stub vs production, graceful degradation
+
+**AI Agent Workflows:**
+- 🤖 [Copilot Session Prompt](./copilot-session-prompt.md) - Writing structured session prompts for CritterSupply's custom Copilot agent roster (@PSA, @QAE, @UXE, etc.)
 
 ---
 
@@ -71,6 +75,7 @@ This directory contains implementation patterns and best practices for building 
 - [TestContainers Integration Tests](./testcontainers-integration-tests.md) - Real infrastructure testing
 - [Reqnroll BDD Testing](./reqnroll-bdd-testing.md) - Behavior-driven development with Gherkin
 - [E2E Testing with Playwright](./e2e-playwright-testing.md) - Browser E2E with real Kestrel servers
+- [bUnit Component Testing](./bunit-component-testing.md) - Blazor component unit testing with bUnit
 
 ### UI Frameworks
 - [Blazor WASM + JWT](./blazor-wasm-jwt.md) - Vendor Portal-style WASM auth, SignalR reconnect, cross-origin HTTP clients
@@ -107,7 +112,8 @@ This directory contains implementation patterns and best practices for building 
 2. Set up TestContainers → [TestContainers Integration Tests](./testcontainers-integration-tests.md)
 3. Implement BDD scenarios → [Reqnroll BDD Testing](./reqnroll-bdd-testing.md)
 4. Write browser E2E tests → [E2E Testing with Playwright](./e2e-playwright-testing.md)
-5. Stabilizing a Blazor WASM UI test suite? Read [E2E Testing with Playwright](./e2e-playwright-testing.md) together with [Blazor WASM + JWT](./blazor-wasm-jwt.md)
+5. Write Blazor component unit tests → [bUnit Component Testing](./bunit-component-testing.md)
+6. Stabilizing a Blazor WASM UI test suite? Read [E2E Testing with Playwright](./e2e-playwright-testing.md) together with [Blazor WASM + JWT](./blazor-wasm-jwt.md)
 
 ### Session Wrap-up Phase
 1. Run final QA/UX sign-off → [Final QA/UX Review](./final-qa-ux-review.md)
@@ -309,7 +315,9 @@ Each skill document follows this structure:
 - *"How do I organize my code?"* → [Vertical Slice Organization](./vertical-slice-organization.md)
 - *"When should I use EF Core?"* → [EF Core + Wolverine Integration](./efcore-wolverine-integration.md)
 - *"How do I add a new bounded context?"* → [Adding a New Bounded Context](./adding-new-bounded-context.md)
+- *"How do I test a Blazor component in isolation?"* → [bUnit Component Testing](./bunit-component-testing.md)
+- *"How do I write a session prompt for Copilot agents?"* → [Copilot Session Prompt](./copilot-session-prompt/SKILL.md)
 
 ---
 
-**Last Updated:** 2026-03-15
+**Last Updated:** 2026-03-29
