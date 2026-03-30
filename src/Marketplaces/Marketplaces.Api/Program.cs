@@ -1,4 +1,7 @@
 using Marten;
+using Marketplaces.Adapters;
+using Marketplaces.CategoryMappings;
+using Marketplaces.Credentials;
 using Marketplaces.Marketplaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -26,6 +29,9 @@ builder.Services.AddMarten(opts =>
 
     // Marketplace is a document entity — not event-sourced (D4)
     opts.Schema.For<Marketplace>().Identity(x => x.Id);
+
+    // CategoryMapping uses composite key: "{ChannelCode}:{InternalCategory}" (D5)
+    opts.Schema.For<CategoryMapping>().Identity(x => x.Id);
 })
     .UseLightweightSessions()
     .IntegrateWithWolverine();
@@ -54,6 +60,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+
+// Vault client — Development only; production safety guard below
+if (builder.Environment.IsDevelopment())
+    builder.Services.AddSingleton<IVaultClient, DevVaultClient>();
+
+// Marketplace adapter stubs (Development) — resolved by ChannelCode at runtime
+builder.Services.AddSingleton<IMarketplaceAdapter, StubAmazonAdapter>();
+builder.Services.AddSingleton<IMarketplaceAdapter, StubWalmartAdapter>();
+builder.Services.AddSingleton<IMarketplaceAdapter, StubEbayAdapter>();
+
+builder.Services.AddSingleton<IReadOnlyDictionary<string, IMarketplaceAdapter>>(sp =>
+    sp.GetServices<IMarketplaceAdapter>()
+      .ToDictionary(a => a.ChannelCode, StringComparer.OrdinalIgnoreCase));
 
 // Wolverine messaging and HTTP
 builder.Host.UseWolverine(opts =>
@@ -84,8 +103,8 @@ builder.Host.UseWolverine(opts =>
     })
     .AutoProvision();
 
-    // Queue for consuming ListingApproved from Listings BC (wired in Session 7)
-    // opts.ListenToRabbitQueue("marketplaces-listings-events");
+    // Queue for consuming ListingApproved from Listings BC
+    opts.ListenToRabbitQueue("marketplaces-listings-events");
 });
 
 // Wolverine HTTP
@@ -96,6 +115,12 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+// Production safety guard — DevVaultClient must never run outside Development
+if (!app.Environment.IsDevelopment() &&
+    builder.Services.Any(s => s.ImplementationType == typeof(DevVaultClient)))
+    throw new InvalidOperationException(
+        "DevVaultClient must not be used in Production. Configure a real IVaultClient.");
 
 // Seed marketplace data in development
 if (app.Environment.IsDevelopment())

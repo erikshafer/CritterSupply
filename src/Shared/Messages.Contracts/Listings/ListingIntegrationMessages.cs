@@ -11,12 +11,17 @@ public sealed record ListingCreated(
 
 /// <summary>
 /// Integration message published when a listing is approved (transitions to Submitted).
-/// Marketplaces BC can react to this in Phase 2.
+/// Carries product content so that downstream consumers (Marketplaces BC) can build
+/// marketplace submissions without an HTTP callback. This is a deliberate Session 7
+/// tradeoff — a ProductSummaryView ACL in Marketplaces BC is the long-term solution (M37.x).
 /// </summary>
 public sealed record ListingApproved(
     Guid ListingId,
     string Sku,
     string ChannelCode,
+    string ProductName,
+    string? Category,
+    decimal? Price,
     DateTimeOffset OccurredAt);
 
 /// <summary>

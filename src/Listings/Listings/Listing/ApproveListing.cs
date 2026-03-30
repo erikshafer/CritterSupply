@@ -34,11 +34,17 @@ public static class ApproveListingHandler
         var @event = new ListingApproved(command.ListingId, now);
         session.Events.Append(command.ListingId, @event);
 
+        // Look up product summary for category data (Session 7: enrich ListingApproved)
+        var productSummary = await session.LoadAsync<Listings.ProductSummary.ProductSummaryView>(listing.Sku);
+
         var outgoing = new OutgoingMessages();
         outgoing.Add(new IntegrationMessages.ListingApproved(
             command.ListingId,
             listing.Sku,
             listing.ChannelCode,
+            listing.ProductName,
+            productSummary?.Category,
+            Price: null,
             now));
 
         return outgoing;
