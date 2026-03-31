@@ -41,363 +41,64 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M36.1 — Listings BC Foundation (Session 9 Complete — ADRs + E2E + Phase 2 Gate Closure) |
-| **Status** | ✅ **PHASE 2 COMPLETE** — Session 9 complete; ADRs 0048-0049, E2E marketplace admin, Phase 2 gate PASS (16/16); 62/62 tests |
-| **Recent Completion** | M36.0 — Engineering Quality (2026-03-29) |
-| **Previous Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
-| **Active BCs** | 19 total (Listings BC scaffold added) |
+| **Current Milestone** | M37.x — Marketplaces Phase 3 (planning) |
+| **Status** | 📋 **PLANNING** — M36.1 complete; M37.x scope to be defined |
+| **Recent Completion** | M36.1 — Listings BC Foundation + Marketplaces BC Foundation (2026-03-31) |
+| **Previous Completion** | M36.0 — Engineering Quality (2026-03-29) |
+| **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-03-31 (M36.1 Session 9 complete — ADRs + E2E + Phase 2 Gate PASS)*
+*Last Updated: 2026-03-31 (M36.1 complete — milestone closure, ES cleanup, M37.x planning)*
 
 ---
 
 ## Active Milestone
 
-### 📋 M36.1: Listings BC Foundation
+### 📋 M37.x: Marketplaces Phase 3 — Production Adapters
 
-**Status:** 🔨 **IN PROGRESS** — Session 2 complete; domain core delivered (aggregate, projections, handlers, recall cascade)
-**Goal:** Deliver the Listings BC with full listing lifecycle, OWN_WEBSITE fast-path, recall cascade, ProductSummaryView anti-corruption layer, and Backoffice admin pages
-
-**Scope:** Phase 0 cleanup + full Phase 1 (Option B — 5–7 sessions)
+**Status:** 📋 **PLANNING** — M36.1 complete; scope to be defined in M37.x planning session
+**Goal:** Deliver real marketplace adapter implementations (Amazon SP-API, Walmart Marketplace API, eBay Sell API), resolve `ListingApproved` message enrichment debt, and ensure E2E CI coverage for Listings + Marketplaces admin pages
 
 **Pre-Planning Input:**
-- [M36.0 Milestone Closure Retrospective](./milestones/m36-0-milestone-closure-retrospective.md) — What M36.1 inherits
-- [M36.1 Phase 0 Reconciliation](./milestones/m36-1-phase-0-reconciliation.md) — Task-by-task audit of Product Catalog ES migration
-- [M36.1 Plan](./milestones/m36-1-plan.md) — Implementation contract with session sequence, guard rails, and DoD
-- [Catalog-Listings-Marketplaces Cycle Plan](./catalog-listings-marketplaces-cycle-plan.md) — Approved execution plan (Phases 0–3)
+- [M36.1 Milestone Closure Retrospective](./milestones/m36-1-milestone-closure-retrospective.md) — What M37.x inherits
+- [M37.x Planning Notes](./milestones/m37-x-planning-notes.md) — Pre-planning notes for M37.x
+- [Catalog-Listings-Marketplaces Cycle Plan](./catalog-listings-marketplaces-cycle-plan.md) — Phase 3 scope
+- [ADR 0049](../decisions/0049-category-mapping-ownership.md) — Category taxonomy coupling risk
 
-**Key Decisions:**
-- D1–D10 from execution plan remain valid
-- D11 (new): Authorization for new BCs from day one — `[Authorize]` on all endpoints from first commit
-- ADRs renumbered: 0041–0046 (plan's 0030–0038 range occupied)
-- Backoffice.Web absorbs Phase 1 admin pages (no new scaffold)
-- Listings.Api: port 5246, database `listings`
+**Known Scope (from M36.1 debt table):**
+- Replace `ListingApproved` message enrichment with `ProductSummaryView` ACL in Marketplaces BC
+- Add `@shard-3` tags to MarketplacesAdmin.feature and ListingsAdmin.feature for CI execution
+- Address category taxonomy coupling (ADR 0049 risk section)
+- Real Amazon/Walmart/eBay adapter implementations replacing stubs
+- Production IVaultClient implementation
 
-**Phase 0 Prerequisites (deliver in Session 1):**
-- 7 granular Product Catalog integration contracts (Task 0.8)
-- Enriched `ProductDiscontinued` with `Reason` + `IsRecall` (Task 0.9)
-- `product-recall` priority exchange (Task 0.12)
-- Event sourcing behavior tests (Task 0.15)
-
-**Session Plan:**
-1. Phase 0 cleanup + Listings BC scaffold
-2. Listing aggregate + ProductSummaryView
-3. Recall cascade + ListingsActiveView
-4. Backoffice admin pages
-5. Integration tests + E2E + polish
-
-**Guard Rails:**
-- GR-1: Every new BC must include `opts.Policies.AutoApplyTransactions()` before any handler is written
-- GR-2: Every new BC API must have `[Authorize]` from first commit
-- GR-3: No HTTP calls from Listings to Product Catalog — `ProductSummaryView` is the ACL
-- GR-4: Phase 0 prerequisites confirmed green before Listings aggregate work
-- GR-5: New projects added to solution file and Docker Compose immediately
-- GR-6: Integration tests before UI work
-- GR-7: Naming conventions per ADR 0040
-
-**CI Baseline:**
-- CI Run #808 (green on main)
-- E2E Run #381 (green on main)
-- CodeQL Run #369 (green on main)
-
-**Session 1 Progress (2026-03-29):**
-- Phase 0 tasks completed:
-  - ✅ 7 granular integration contracts created (`Messages.Contracts/ProductCatalog/`)
-  - ✅ `ProductAdded` enriched with Status, Brand, HasDimensions
-  - ✅ `ProductDiscontinued` enriched with Reason, IsRecall
-  - ✅ `ProductUpdated` marked `[Obsolete]`
-  - ✅ 8 handlers updated to publish granular events + CreateProductES enriched
-  - ✅ `product-recall` fanout exchange configured
-  - ✅ 10 event sourcing behavior tests added (58/58 Product Catalog tests pass)
-- Listings BC scaffold:
-  - ✅ Domain project (`src/Listings/Listings/`)
-  - ✅ API project (`src/Listings/Listings.Api/`) with AutoApplyTransactions, JWT auth, health endpoint
-  - ✅ Integration test project with TestAuth (1/1 health check test passes)
-  - ✅ Added to CritterSupply.slnx, Docker Compose (port 5246), postgres init script
-  - ✅ `Messages.Contracts/Listings/` directory created
-- ADRs:
-  - ✅ ADR 0041 — Product Catalog ES Migration Decisions
-  - ✅ ADR 0042 — `catalog:` Namespace UUID v5 Convention
-- Build: 0 errors, 33 warnings (matches M36.0 baseline)
-- Session 2 picks up: Listing aggregate + ProductSummaryView ACL
-- Retrospective: [Session 1](./milestones/m36-1-session-1-retrospective.md)
-
-**Session 2 Progress (2026-03-29):**
-- Listing aggregate (event-sourced):
-  - ✅ `Listing` aggregate with `Create()` factory and `Apply()` methods per event
-  - ✅ Domain events: `ListingDraftCreated`, `ListingSubmittedForReview`, `ListingApproved`, `ListingActivated`, `ListingPaused`, `ListingResumed`, `ListingEnded`, `ListingForcedDown`, `ListingContentUpdated`
-  - ✅ `ListingStatus` enum: `Draft`, `ReadyForReview`, `Submitted`, `Live`, `Paused`, `Ended`
-  - ✅ `ListingStreamId` — UUID v5 deterministic stream IDs per ADR 0042 (`listing:{sku}:{channelCode}`)
-  - ✅ `EndedCause` enum: `ManualEnd`, `ProductDiscontinued`, `SubmissionRejected`, `ProductDeleted`
-- ProductSummaryView (anti-corruption layer):
-  - ✅ Marten document keyed by SKU — stores Name, Description, Category, Status, Brand, HasDimensions, ImageUrls
-  - ✅ 9 individual handler classes consuming Product Catalog integration events (one per `*Handler` class per Wolverine convention)
-  - ✅ Handlers: `ProductAddedHandler`, `ProductContentUpdatedHandler`, `ProductCategoryChangedHandler`, `ProductImagesUpdatedHandler`, `ProductDimensionsChangedHandler`, `ProductStatusChangedHandler`, `ProductDeletedHandler`, `ProductRestoredHandler`, `ProductDiscontinuedSummaryHandler`
-- ListingsActiveView projection:
-  - ✅ Inline `MultiStreamProjection<ListingsActiveView, string>` keyed by SKU
-  - ✅ Maintains per-SKU list of active listing stream IDs (incremented on `ListingDraftCreated`, decremented on `ListingEnded`/`ListingForcedDown`)
-- Lifecycle command handlers:
-  - ✅ `CreateListing` — validates product in `ProductSummaryView`, checks `ListingsActiveView` for duplicates, starts event stream
-  - ✅ `ActivateListing` — supports `OWN_WEBSITE` fast path (`Draft → Live`) and normal `Submitted → Live`
-  - ✅ `PauseListing` — validates `Live → Paused`
-  - ✅ `ResumeListing` — validates `Paused → Live`
-  - ✅ `EndListing` — validates non-terminal state, appends `ListingEnded` with `ManualEnd` cause
-- RecallCascadeHandler:
-  - ✅ Consumes `ProductDiscontinued` messages (reacts only when `IsRecall == true`)
-  - ✅ Loads `ListingsActiveView` for SKU, iterates active streams
-  - ✅ Idempotency: skips already-ended listings before appending `ListingForcedDown`
-- Integration message contracts:
-  - ✅ `Messages.Contracts.Listings`: `ListingCreated`, `ListingActivated`, `ListingEnded`, `ListingForcedDown`, `ListingsCascadeCompleted`
-- Program.cs:
-  - ✅ Inline snapshot for `Listing` aggregate
-  - ✅ `ListingsActiveViewProjection` registered as inline projection
-  - ✅ Domain assembly discovery for handler scanning
-- Integration tests: 18/18 passing
-  - ✅ 9 lifecycle tests (create, activate OWN_WEBSITE, pause, resume, end, invalid transitions, error cases)
-  - ✅ 4 ProductSummaryView tests (add, status change, delete, content update)
-  - ✅ 4 recall cascade tests (3-channel force-down, idempotency, count verification, non-recall skip)
-  - ✅ 1 health check test
-- Build: 0 errors, 33 warnings (matches M36.0 baseline)
-- Session 3 picks up: HTTP endpoints + admin UI
-- Retrospective: [Session 2](./milestones/m36-1-session-2-retrospective.md)
-
-**Session 3 Progress (2026-03-30):**
-- Remaining lifecycle handlers:
-  - ✅ `SubmitListingForReview` — Draft → ReadyForReview transition, validator, no integration message (internal only)
-  - ✅ `ApproveListing` — ReadyForReview → Submitted transition, publishes `ListingApproved` integration message
-  - ✅ `ContentPropagationHandler` — consumes `ProductContentUpdated`, propagates to Live listings only (Draft/Paused/ReadyForReview/Submitted skipped)
-- Integration message contracts:
-  - ✅ `ListingApproved` added to `Messages.Contracts/Listings/ListingIntegrationMessages.cs`
-- HTTP endpoints (9 total in `Listings.Api/Listings/ListingEndpoints.cs`):
-  - ✅ POST `/api/listings` — CreateListing [Authorize]
-  - ✅ POST `/api/listings/{id}/submit-for-review` — SubmitForReview [Authorize]
-  - ✅ POST `/api/listings/{id}/approve` — ApproveListing [Authorize]
-  - ✅ POST `/api/listings/{id}/activate` — ActivateListing [Authorize]
-  - ✅ POST `/api/listings/{id}/pause` — PauseListing [Authorize]
-  - ✅ POST `/api/listings/{id}/resume` — ResumeListing [Authorize]
-  - ✅ POST `/api/listings/{id}/end` — EndListing [Authorize]
-  - ✅ GET `/api/listings/{id}` — GetListing [Authorize]
-  - ✅ GET `/api/listings?sku={sku}` — ListListings [Authorize]
-- Backoffice Blazor components:
-  - ✅ `ListingStatusBadge` shared component with data-testid per status variant
-  - ✅ Listings admin page at `/admin/listings` with status filtering
-  - ✅ Pre-flight discontinuation modal (P0.1) with affected listing count from API
-  - ✅ NavMenu updated with Listings link under ProductManager policy
-- Integration tests: 32/32 passing (18 baseline + 14 new)
-  - ✅ 5 ReviewWorkflowTests (submit/approve lifecycle + invalid transitions)
-  - ✅ 3 ContentPropagationTests (Live updated, Draft ignored, Paused ignored)
-  - ✅ 6 ListingEndpointTests (create 201, submit 200, approve 200, get 200, list 200, auth verification)
-- Build: 0 errors, 33 warnings (matches M36.0 baseline)
-- Session 4 picks up: E2E stubs, listing detail page, full listing query, pre-flight modal wiring
-- Retrospective: [Session 3](./milestones/m36-1-session-3-retrospective.md)
-
-**Session 4 Progress (2026-03-30):**
-- Backend completions:
-  - ✅ CORS configuration in `Listings.Api/Program.cs` — `BackofficePolicy` allowing `http://localhost:5244`
-  - ✅ Paginated `GET /api/listings/all?page=&pageSize=&status=` endpoint — coexists with SKU-filtered endpoint
-  - ✅ `ListingsApi` named HttpClient added to `Backoffice.Web/Program.cs` (base `http://localhost:5246`)
-  - ✅ `ListingsAdmin.razor` updated to use paginated endpoint with server-side filtering and pagination
-  - ✅ Pre-flight discontinuation modal wired into `ProductEdit.razor` via `IDialogService`
-- Listing detail page:
-  - ✅ `/admin/listings/{id}` read-only detail page with all `data-testid` attributes
-  - ✅ Action buttons (Approve, Pause, End) present as disabled stubs with tooltips
-  - ✅ Back navigation to `/admin/listings`
-  - ✅ 404 handling, session expired handling
-- E2E page objects:
-  - ✅ `ListingsAdminPage.cs` — navigate, filter, row count, detail navigation
-  - ✅ `ListingDetailPage.cs` — navigate, read fields, check disabled buttons, back nav
-- E2E feature files:
-  - ✅ `ListingsAdmin.feature` — 3 executable + 2 `@wip` scenarios
-  - ✅ `ListingsDetail.feature` — 1 executable + 3 `@wip` scenarios
-- Integration tests: 35/35 passing (32 baseline + 3 new paginated endpoint tests)
-- Build: 0 errors, 33 warnings
-- **Phase 1 gate: MET** — all criteria from execution plan satisfied
-- Session 5 picks up: Phase 2 planning (Marketplaces BC), E2E step definitions, action button wiring
-- Retrospective: [Session 4](./milestones/m36-1-session-4-retrospective.md)
-
-**Session 5 Progress (2026-03-30):**
-- Phase 2 planning (Marketplaces BC):
-  - ✅ Phase 2 reconciliation — port 5247 free, database `marketplaces` free, ADR numbers corrected to 0048–0049
-  - ✅ Scope: Phase 2a + stub `ListingApproved` consumer in M36.1; Phase 2b deferred to M37.x
-  - ✅ PO decision: OWN_WEBSITE NOT seeded in Marketplaces BC (it's Listings BC's internal fast-path)
-  - ✅ Seed data: 3 marketplaces (AMAZON_US, WALMART_US, EBAY_US) + 18 category mappings (6 categories × 3)
-  - ✅ Vault pattern: `IVaultClient` interface + `DevVaultClient` stub with production safety guard
-  - ✅ Session sequence: Session 6 (scaffold + CRUD), Session 7 (mappings + adapters + consumer), Session 8 (admin UI + E2E)
-  - ✅ Plan committed: [Phase 2 Plan](./milestones/m36-1-phase-2-plan.md)
-- E2E step definitions:
-  - ✅ `ListingsAdminSteps.cs` — 10 step definitions for 3 executable scenarios
-  - ✅ `ListingsDetailSteps.cs` — 8 step definitions for 1 executable scenario
-  - ✅ `StubListingsApiHost` — stub Listings API for browser-initiated HTTP calls in E2E tests
-  - ✅ `WasmStaticFileHost` updated — `ListingsApiUrl` added to intercepted appsettings.json
-  - ✅ `WellKnownTestData.Listings` — deterministic test listing IDs and SKUs
-- E2E scenario counts: 4 executable (step defs written), 5 @wip (blocked on unbuilt UI)
-- Integration tests: 35/35 passing (unchanged — no new tests this session)
-- Build: 0 errors, 33 warnings (unchanged)
-- CI Run #836 (dotnet.yml), E2E Run #412 (e2e.yml) — both pending approval
-- Session 6 picks up: Marketplaces.Api scaffold + Marketplace document CRUD + seed data
-- Retrospective: [Session 5](./milestones/m36-1-session-5-retrospective.md)
-
-**Session 6 Progress (2026-03-30):**
-- Infrastructure fix:
-  - ✅ `docker/postgres/create-databases.sh` — added `marketplaces` (was missing since M36.1 planning)
-  - ✅ Listings entry confirmed present (added in a prior session)
-- Marketplaces BC scaffold (items 6.1–6.3, 6.8–6.9):
-  - ✅ `src/Marketplaces/Marketplaces/Marketplaces.csproj` — domain project created
-  - ✅ `src/Marketplaces/Marketplaces.Api/Marketplaces.Api.csproj` — API project created
-  - ✅ Both projects added to `CritterSupply.slnx` under `/Marketplaces/` folder
-  - ✅ `launchSettings.json` — port 5247
-  - ✅ `appsettings.json` — `Host=localhost;Port=5433;Database=marketplaces`
-  - ✅ `Program.cs` — Marten (`marketplaces` schema), `AutoApplyTransactions` (GR-1), `UseDurableLocalQueues`, `UseDurableOutboxOnAllSendingEndpoints`, JWT Bearer, health check `/health` (AllowAnonymous), RabbitMQ wired (Session 7 queue commented)
-  - ✅ `Dockerfile` — multi-stage build matching Listings.Api pattern
-  - ✅ `docker-compose.yml` — `marketplaces-api` service, port 5247, profile `marketplaces`
-  - ✅ `src/CritterSupply.AppHost/AppHost.cs` — registered as `crittersupply-aspire-marketplaces-api`
-  - ✅ `CLAUDE.md` port table — Listings (5246) and Marketplaces (5247) both updated to ✅ Assigned
-- Marketplace document entity (item 6.4):
-  - ✅ `src/Marketplaces/Marketplaces/Marketplaces/Marketplace.cs` — `string Id` (ChannelCode), `DisplayName`, `IsActive`, `IsOwnWebsite=false`, `ApiCredentialVaultPath`, `CreatedAt`, `UpdatedAt`
-  - ✅ Registered in `Program.cs` via `opts.Schema.For<Marketplace>().Identity(x => x.Id)`
-- CRUD handlers (item 6.5) — all with `[Authorize]` (GR-2/D11):
-  - ✅ `RegisterMarketplace.cs` — POST /api/marketplaces — idempotent by ChannelCode (GR-NEW-3)
-  - ✅ `UpdateMarketplace.cs` — PUT /api/marketplaces/{channelCode}
-  - ✅ `DeactivateMarketplace.cs` — POST /api/marketplaces/{channelCode}/deactivate — idempotent
-  - ✅ `GetMarketplace.cs` — GET /api/marketplaces/{channelCode}
-  - ✅ `ListMarketplaces.cs` — GET /api/marketplaces
-- Seed data (item 6.6):
-  - ✅ `MarketplacesSeedData.cs` — AMAZON_US, WALMART_US, EBAY_US seeded on startup in Development
-  - ✅ Idempotency guard: `if (await session.Query<Marketplace>().AnyAsync()) return;`
-  - ✅ OWN_WEBSITE NOT seeded (PO decision confirmed)
-- Integration tests (item 6.7):
-  - ✅ `tests/Marketplaces/Marketplaces.Api.IntegrationTests/` project created and added to solution
-  - ✅ `TestFixture.cs` — TestContainers Postgres, `DisableAllExternalWolverineTransports`, `AddTestAuthentication`
-  - ✅ `HealthCheckTests.cs` — 1 test: `Health_ReturnsOk`
-  - ✅ `MarketplaceCrudTests.cs` — 10 tests covering all CRUD operations + auth + idempotency + seed data
-  - ✅ Total test count: 45/45 (35 Listings + 10 Marketplaces — **Note:** Marketplaces tests require infrastructure; count represents compile-time verified tests)
-- Build: 0 errors (Marketplaces.Api and test project both build clean)
-- Session 7 picks up: CategoryMapping CRUD + IMarketplaceAdapter stubs + ListingApproved consumer
-- Retrospective: [Session 6](./milestones/m36-1-session-6-retrospective.md)
-
-**Session 7 Progress (2026-03-30):**
-- CategoryMapping document entity (items 7.1–7.2):
-  - ✅ `src/Marketplaces/Marketplaces/CategoryMappings/CategoryMapping.cs` — composite key `{ChannelCode}:{InternalCategory}`, `MarketplaceCategoryId`, `MarketplaceCategoryPath`, `LastVerifiedAt`
-  - ✅ Registered in `Program.cs` via `opts.Schema.For<CategoryMapping>().Identity(x => x.Id)`
-  - ✅ `SetCategoryMapping.cs` — POST /api/category-mappings — upsert by composite Id, `[Authorize]`
-  - ✅ `GetCategoryMapping.cs` — GET /api/category-mappings/{channelCode}/{internalCategory}, `[Authorize]`
-  - ✅ `ListCategoryMappings.cs` — GET /api/category-mappings?channelCode={channelCode}, `[Authorize]`
-- Category mapping seed data (item 7.3):
-  - ✅ 18 mappings seeded (6 categories × 3 channels: AMAZON_US, WALMART_US, EBAY_US)
-  - ✅ Idempotency guard: `if (await session.Query<CategoryMapping>().AnyAsync()) return;`
-- IVaultClient + DevVaultClient (item 7.6):
-  - ✅ `src/Marketplaces/Marketplaces/Credentials/IVaultClient.cs` — `GetSecretAsync(string path)`
-  - ✅ `src/Marketplaces/Marketplaces/Credentials/DevVaultClient.cs` — reads from `IConfiguration` Vault section
-  - ✅ Production safety guard in `Program.cs` — throws `InvalidOperationException` if DevVaultClient registered outside Development
-  - ✅ DevVaultClient registered as singleton only in Development environment
-- IMarketplaceAdapter interface + 3 stub implementations (items 7.4–7.5):
-  - ✅ `src/Marketplaces/Marketplaces/Adapters/IMarketplaceAdapter.cs` — interface reflecting 3 spike findings:
-    - `SubmitListingAsync` returns `SubmissionResult` with `ExternalSubmissionId` (spike finding #1)
-    - `CheckSubmissionStatusAsync` for async status polling (spike finding #2)
-    - `ListingSubmission` includes `ChannelExtensions` dictionary (spike finding #3)
-    - `DeactivateListingAsync` for listing deactivation
-  - ✅ `StubAmazonAdapter.cs` — `ChannelCode = "AMAZON_US"`, returns `amzn-{guid}`, 100ms delay
-  - ✅ `StubWalmartAdapter.cs` — `ChannelCode = "WALMART_US"`, returns `wmrt-{guid}`, 100ms delay
-  - ✅ `StubEbayAdapter.cs` — `ChannelCode = "EBAY_US"`, returns `ebay-{guid}`, 100ms delay
-  - ✅ Adapter resolver registered as `IReadOnlyDictionary<string, IMarketplaceAdapter>` via DI
-- Integration message contracts (item 7.8):
-  - ✅ `src/Shared/Messages.Contracts/Marketplaces/MarketplaceIntegrationMessages.cs`:
-    - `MarketplaceRegistered(ChannelCode, DisplayName, OccurredAt)`
-    - `MarketplaceDeactivated(ChannelCode, OccurredAt)`
-    - `MarketplaceListingActivated(ListingId, Sku, ChannelCode, ExternalListingId, OccurredAt)`
-    - `MarketplaceSubmissionRejected(ListingId, Sku, ChannelCode, Reason, OccurredAt)`
-  - ✅ `ListingApproved` contract expanded with `ProductName`, `Category`, `Price` (Session 7 shortcut — M37.x will use ACL)
-  - ✅ RabbitMQ publish routes configured for `MarketplaceListingActivated` and `MarketplaceSubmissionRejected`
-- ListingApproved consumer handler (item 7.7):
-  - ✅ `src/Marketplaces/Marketplaces.Api/Listings/ListingApprovedHandler.cs`
-  - ✅ `marketplaces-listings-events` queue uncommented in `Program.cs`
-  - ✅ OWN_WEBSITE guard — skips adapter invocation entirely
-  - ✅ Missing category mapping → publishes `MarketplaceSubmissionRejected` (GR-NEW-2)
-  - ✅ Inactive marketplace → publishes `MarketplaceSubmissionRejected`
-  - ✅ No adapter registered → publishes `MarketplaceSubmissionRejected`
-  - ✅ Successful submission → publishes `MarketplaceListingActivated` with `ExternalListingId`
-- Integration tests (item 7.9):
-  - ✅ `TestFixture.cs` enhanced with `ExecuteAndWaitAsync<T>()` for message handler testing
-  - ✅ `CategoryMappingTests.cs` — 7 tests (set, upsert, auth, get, not-found, list-filter, seed data)
-  - ✅ `ListingSubmissionFlowTests.cs` — 5 tests (Amazon happy path, Walmart happy path, OWN_WEBSITE skip, missing mapping rejection, inactive marketplace rejection)
-  - ✅ Total test count: 58 (35 Listings + 23 Marketplaces)
-  - ✅ Listings tests: 35/35 pass (no regression from ListingApproved contract change)
-  - ✅ Marketplaces tests: 19/23 pass (4 pre-existing failures from Session 6: auth handler + seed data cleanup ordering)
-- Build: 0 errors
-- Session 8 picks up: Marketplace admin UI, CORS, ADRs 0048–0049, Phase 2 gate verification
-- Retrospective: [Session 7](./milestones/m36-1-session-7-retrospective.md)
-
-**Session 8 Progress (2026-03-31):**
-- Test failure resolution (items 8.1–8.2):
-  - ✅ Auth test failures (2): `TestAuthHandler` now checks for `Authorization` header; returns `NoResult` if absent
-  - ✅ Added `AddDefaultAuthHeader()` extension on `IAlbaHost` in `CritterSupply.TestUtilities`
-  - ✅ Updated all 8 test fixtures to call `Host.AddDefaultAuthHeader()`
-  - ✅ Seed data test failures (2): Moved to dedicated `SeedDataTests.cs` class with `ReseedAsync()` in `InitializeAsync()`
-  - ✅ Refactored `MarketplacesSeedData.SeedAsync()` to accept `IServiceProvider`
-  - ✅ All 23 previously existing Marketplaces tests now pass (0 failures)
-  - ✅ All 35 Listings tests pass (0 regressions)
-- CORS configuration (item 8.3):
-  - ✅ `BackofficePolicy` CORS policy added to `Marketplaces.Api/Program.cs`
-  - ✅ Origin: `http://localhost:5244` (configurable via `Cors:BackofficeOrigin`)
-  - ✅ Applied via `app.UseCors("BackofficePolicy")` before `UseAuthentication`
-- Integration message publishing (item 8.4):
-  - ✅ `RegisterMarketplace` now publishes `MarketplaceRegistered` via `OutgoingMessages` (return type: `(IResult, OutgoingMessages)`)
-  - ✅ `DeactivateMarketplace` now publishes `MarketplaceDeactivated` via `OutgoingMessages` (only on active→inactive transition)
-  - ✅ RabbitMQ exchanges: `marketplaces-registered`, `marketplaces-deactivated`
-  - ✅ 4 new tests in `MarketplaceMessagePublishingTests.cs` (publish + idempotency for both handlers)
-  - ✅ `TrackedHttpCall()` helper added to TestFixture
-- Marketplace admin UI (items 8.5–8.7):
-  - ✅ `MarketplacesApi` named HttpClient added in `Backoffice.Web/Program.cs` (port 5247)
-  - ✅ `MarketplacesList.razor` at `/marketplaces` — read-only list (ChannelCode, DisplayName, IsActive, CreatedAt)
-  - ✅ `CategoryMappingsList.razor` at `/marketplaces/category-mappings` — read-only with channel filter (stretch goal delivered)
-  - ✅ Nav menu entries added under ProductManager policy
-  - ✅ `wwwroot/appsettings.json` updated with `MarketplacesApiUrl`
-- Phase 2 gate verification (item 8.8):
-  - ✅ 14/16 gate criteria met
-  - ❌ E2E tests for marketplace admin pages — carry to Session 9
-  - ❌ ADRs 0048 and 0049 — carry to Session 9
-- Build: 0 errors, 33 warnings (unchanged)
-- Total tests: 62 (35 Listings + 27 Marketplaces) — 0 failures
-- Session 9 picks up: E2E tests, ADRs 0048–0049, Phase 2 gate closure
-- Retrospective: [Session 8](./milestones/m36-1-session-8-retrospective.md)
-
-**Session 9 Progress (2026-03-31):**
-- Stream A — ADRs (items 9.1–9.2):
-  - ✅ ADR 0048 — Marketplace Document Entity Design (committed in Session 8, verified complete)
-  - ✅ ADR 0049 — Category Mapping Ownership (5 decisions: BC ownership, composite key, taxonomy alignment, seed data, alternatives rejected)
-- Stream B — E2E Coverage (items 9.3–9.8):
-  - ✅ `data-testid` audit on `MarketplacesList.razor` — added 12 new attributes: page container, breadcrumbs, title, loading, error, display-name, status, active/inactive chips, created, no-records
-  - ✅ `data-testid` audit on `CategoryMappingsList.razor` — added 8 new attributes: page container, breadcrumbs, title, loading, error, category, marketplace-id, no-records
-  - ✅ `StubMarketplacesApiHost` created — serves `/api/marketplaces` and `/api/category-mappings` with channel filter support
-  - ✅ `WasmStaticFileHost` updated — `MarketplacesApiUrl` added to intercepted appsettings.json
-  - ✅ `E2ETestFixture` updated — starts, disposes, and clears StubMarketplacesApi
-  - ✅ `MarketplacesListPage.cs` page object — navigate, row count, display name, status chip, table visibility
-  - ✅ `CategoryMappingsListPage.cs` page object — navigate, row count, channel filter, breadcrumb validation
-  - ✅ `MarketplacesAdmin.feature` — 6 scenarios (3 marketplace list + 3 category mappings)
-  - ✅ `MarketplacesAdminSteps.cs` — step definitions for all 6 scenarios
-  - ✅ `wwwroot/appsettings.json` — added missing `ListingsApiUrl` for consistency
-- Stream C — Phase 2 Gate:
-  - ✅ Gate criterion 14: E2E page objects + feature files for marketplace admin pages — **DELIVERED**
-  - ✅ Gate criterion 15: ADRs 0048 and 0049 written — **DELIVERED**
-  - ✅ Phase 2 Gate Result: **PASS** (16/16 criteria met)
-- Build: 0 errors, 33 warnings (unchanged)
-- Total tests: 62 (35 Listings + 27 Marketplaces) — 0 failures
-- Retrospective: [Session 9](./milestones/m36-1-session-9-retrospective.md)
-
-**(QoL) Dev Seed Data (2026-03-30):**
-- ✅ `BackofficeIdentitySeedData.cs` — 7 users, one per ADR 0031 role (SystemAdmin, Executive, OperationsManager, CustomerService, WarehouseClerk, PricingManager, CopyWriter)
-- ✅ `VendorIdentitySeedData.cs` expanded — replaced Acme Pet Supplies with HearthHound Nutrition Co. (Active, 3 users) and TumblePaw Play Labs (Onboarding, 1 active + 2 invited)
-- ✅ `VendorPortalSeedData.cs` updated for new tenant IDs
-- ✅ Vendor Portal E2E test data updated (`WellKnownVendorTestData.cs`, feature files, step definitions)
-- ✅ `DEV-CREDENTIALS.md` cheat sheet at repository root
-- ✅ All passwords: `Dev@123!` (Development environment only)
-- ✅ No GUID collisions between dev seed and E2E test data (confirmed)
-- ✅ Build: 0 errors, 33 warnings (matches baseline)
-- Retrospective: [Dev Seed Data](./dev-seed-data-session-retrospective.md)
+**Test Baseline:** 62 integration tests (35 Listings + 27 Marketplaces), 6 E2E scenarios (marketplace admin), 0 failures
+**Next ADR:** 0050
 
 ---
 
 ## Recent Completions
+
+### ✅ M36.1: Listings BC Foundation + Marketplaces BC Foundation (2026-03-31)
+
+**Status:** ✅ **Complete** — 10 sessions (9 implementation + 1 closure); Phase 1 gate (12/12) + Phase 2 gate (16/16) both met
+**Goal:** Deliver the Listings BC and Marketplaces BC as production-ready foundations — event-sourced listing lifecycle, ProductSummaryView ACL, marketplace channel configuration, stub adapter infrastructure, and Backoffice admin UI coverage
+
+**Key Deliverables:**
+- **Phase 1 (Sessions 1–5):** Listings BC — event-sourced aggregate with full lifecycle (Draft → Live → Ended), ProductSummaryView ACL, recall cascade, 9 HTTP endpoints, Backoffice admin pages, E2E infrastructure. 35 integration tests.
+- **Phase 2 (Sessions 6–9):** Marketplaces BC — Marketplace + CategoryMapping documents, CRUD handlers, 3 stub adapters (Amazon/Walmart/eBay), ListingApproved consumer, IVaultClient pattern, Backoffice admin pages, 6 E2E scenarios. 27 integration tests.
+- **Session 10 (Closure):** Milestone retrospective, Product Catalog `*ES` naming cleanup (13 files, 5 classes), 2 redundant `SaveChangesAsync()` removals, CURRENT-CYCLE.md update.
+- **Cross-cutting:** TestAuthHandler fix (Session 8), reseed-on-verify pattern, ADRs 0040–0042, 0048–0049.
+
+**Test Baseline:** 62 integration tests (35 Listings + 27 Marketplaces), 6 E2E scenarios, 0 failures
+**CI:** CI Run #856 (green on main), E2E Run #432 (green on main)
+
+**Inherited by M37.x:**
+1. `ListingApproved` message enrichment — replace with `ProductSummaryView` ACL in Marketplaces BC
+2. E2E CI execution — MarketplacesAdmin.feature and ListingsAdmin.feature missing `@shard-X` tags
+3. Category taxonomy coupling (ADR 0049) — silent break risk
+4. Phase 3 production adapters — real Amazon/Walmart/eBay implementations
+
+**Retrospectives:** [Session 1](./milestones/m36-1-session-1-retrospective.md) · [Session 2](./milestones/m36-1-session-2-retrospective.md) · [Session 3](./milestones/m36-1-session-3-retrospective.md) · [Session 4](./milestones/m36-1-session-4-retrospective.md) · [Session 5](./milestones/m36-1-session-5-retrospective.md) · [Session 6](./milestones/m36-1-session-6-retrospective.md) · [Session 7](./milestones/m36-1-session-7-retrospective.md) · [Session 8](./milestones/m36-1-session-8-retrospective.md) · [Session 9](./milestones/m36-1-session-9-retrospective.md) · [Session 10](./milestones/m36-1-session-10-retrospective.md) · [Milestone Closure](./milestones/m36-1-milestone-closure-retrospective.md)
 
 ### ✅ M36.0: Engineering Quality (2026-03-29)
 
@@ -1509,28 +1210,20 @@
 
 ### Next 3-4 Milestones
 
-> ⚠️ **Updated 2026-03-29:** M36.0 complete. M36.1 planning complete — Listings BC foundation.
+> ⚠️ **Updated 2026-03-31:** M36.1 complete. M37.x planning begins — Marketplaces Phase 3.
 
-- **M36.0 (complete):** Engineering Quality
-  - ✅ 21 pre-existing test failures eliminated (TestAuthHandler utility)
-  - ✅ 55 endpoints protected with `[Authorize]` across 10 BCs
-  - ✅ 34 `SaveChangesAsync()` calls removed, `bus.PublishAsync()` violations fixed
-  - ✅ `AutoApplyTransactions` root cause fix for Product Catalog
-  - See [M36.0 Milestone Closure Retrospective](milestones/m36-0-milestone-closure-retrospective.md)
+- **M36.1 (complete):** Listings BC Foundation + Marketplaces BC Foundation
+  - ✅ Listings BC: event-sourced aggregate, ProductSummaryView ACL, recall cascade, admin UI
+  - ✅ Marketplaces BC: document store, stub adapters, ListingApproved consumer, admin UI
+  - ✅ 62 integration tests (35 Listings + 27 Marketplaces), 6 E2E scenarios
+  - See [M36.1 Milestone Closure Retrospective](milestones/m36-1-milestone-closure-retrospective.md)
 
-- **M36.1 (active — planning):** Listings BC Foundation
-  - Phase 0 cleanup: granular Product Catalog integration messages
-  - Listings BC: event-sourced listing aggregate, OWN_WEBSITE fast-path, recall cascade
-  - ProductSummaryView anti-corruption layer
-  - Backoffice admin pages (extend existing Backoffice.Web)
-  - Port 5246, database `listings`, ADRs 0041–0046
-  - See [M36.1 Plan](milestones/m36-1-plan.md)
-
-- **M37.x (planned):** Marketplaces BC Foundation (Phase 2)
-  - Marketplace document entity, category mapping, adapter pattern
-  - Bidirectional async messaging with Listings BC
-  - Vault credential storage interface
-  - See [Catalog-Listings-Marketplaces Cycle Plan](catalog-listings-marketplaces-cycle-plan.md)
+- **M37.x (planning):** Marketplaces Phase 3 — Production Adapters
+  - Real Amazon/Walmart/eBay adapter implementations replacing stubs
+  - ProductSummaryView ACL in Marketplaces BC (resolve ListingApproved enrichment debt)
+  - Production IVaultClient for credential storage
+  - E2E CI execution for marketplace and listings admin pages
+  - See [M37.x Planning Notes](milestones/m37-x-planning-notes.md)
 
 - **M38.x (planned):** Variants + Compliance + Real API Calls (Phase 3)
   - ProductFamily aggregate, variant-aware listings
@@ -1538,11 +1231,12 @@
 
 ### Future BCs (Priority Roadmap — Post M36.1)
 
-> Product Catalog ES migration complete. Listings BC foundation in progress (M36.1).
+> Product Catalog ES migration complete. Listings + Marketplaces BCs delivered (M36.1). Phase 3 next.
 
-**High Priority (Active in M36.1+):**
-- 🟢 **Listings BC** — M36.1 active; event-sourced listing aggregate, recall cascade, OWN_WEBSITE
-- 🟡 **Marketplaces BC** — M37.x planned; marketplace adapters, category mapping
+**High Priority (Active in M37.x+):**
+- 🟢 **Listings BC** — M36.1 complete; event-sourced listing aggregate, recall cascade, OWN_WEBSITE
+- 🟢 **Marketplaces BC** — M36.1 complete; stub adapters, ListingApproved consumer
+- 🟡 **Marketplaces Phase 3** — M37.x planned; real Amazon/Walmart/eBay adapters
 - 🟡 **Product Variants** — M38.x planned; ProductFamily aggregate, variant-aware listings
 
 **Medium Priority:**
@@ -1557,7 +1251,7 @@
 
 See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specifications.
 
-*Roadmap Last Updated: 2026-03-27 (M35.0 complete; M36.0 is engineering quality)*
+*Roadmap Last Updated: 2026-03-31 (M36.1 complete; M37.x is Marketplaces Phase 3)*
 
 ---
 
@@ -1574,6 +1268,6 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Document Last Updated: 2026-03-29*
-*Active Milestone: M36.0 — Engineering Quality (complete — ready for closure)*
+*Document Last Updated: 2026-03-31*
+*Active Milestone: M37.x — Marketplaces Phase 3 (planning)*
 *Update Policy: At milestone start, milestone end, and significant task changes*
