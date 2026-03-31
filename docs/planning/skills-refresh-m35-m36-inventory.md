@@ -137,4 +137,36 @@
 
 ## Final Results
 
-*To be completed after Phase 2 updates.*
+**Completed: 2026-03-31**
+
+### Files Updated (10 total)
+
+| Skill File | What Was Added |
+|------------|---------------|
+| `wolverine-message-handlers.md` | Pattern 7: `(IResult, OutgoingMessages)` tuple for HTTP endpoints; Anti-Pattern #11: `bus.PublishAsync()` in HTTP endpoints; idempotent guard pattern; ToC updated |
+| `critterstack-testing-patterns.md` | `TestAuthHandler` auth header check fix; `AddDefaultAuthHeader()` requirement; seed data isolation pattern with `ReseedAsync()`; warning signs updated |
+| `integration-messaging.md` | Warning 7: `bus.PublishAsync()` bypasses outbox; Pattern 2 annotation corrected; Lessons 13–15 (OutgoingMessages mandate, idempotent publishing, message enrichment tradeoffs); ToC updated |
+| `marten-document-store.md` | Natural key as document identity pattern; composite key identity pattern; `AutoApplyTransactions()` mandatory policy with M36.0 context |
+| `marten-event-sourcing.md` | Lessons L6–L8 (AutoApplyTransactions silent failure, SaveChangesAsync redundancy, incremental ES migration); last-updated note |
+| `event-sourcing-projections.md` | Lesson 7: missing `AutoApplyTransactions()` mimics projection timing issues |
+| `adding-new-bounded-context.md` | 5 new checklist items: AutoApplyTransactions, [Authorize], OutgoingMessages routing, seed data isolation, E2E dynamic appsettings |
+| `e2e-playwright-testing.md` | Stub API Host pattern for external BC APIs; DO NOT: omit API URLs from dynamic appsettings; DO NOT: create .feature files without @shard-N tags; M36.1 reference files |
+| `external-service-integration.md` | Credential management stubs (IVaultClient/DevVaultClient); production safety guard; strategy pattern with keyed DI dictionary |
+| `vertical-slice-organization.md` | Anti-pattern: implementation-detail suffixes (*ES); Lesson L6: migration artifact cleanup |
+
+### Files Reviewed — No Change Required (13 total)
+
+All lower-priority files were assessed and confirmed to be current. No changes needed.
+
+### Deliberately Excluded Lessons
+
+| Retro Finding | Why Excluded from Skills |
+|---------------|------------------------|
+| E2E shard tags missing on 3 specific .feature files (M36.1 S10) | Documented as a DO NOT pattern in `e2e-playwright-testing.md`; the specific files are a code fix, not a skill update |
+| `SaveChangesAsync` removal from specific handler files | The pattern is documented in `marten-event-sourcing.md` L7; specific file changes are implementation, not skill content |
+| VP Team Management / PC Vendor Assignment vertical slice splits (M36.0) | File-level reorganization; the vertical slice principle was already well-documented in L1 |
+
+### README Updated
+
+- `external-service-integration.md` description expanded to include credential management stubs and keyed DI dictionaries
+- Last Updated date set to 2026-03-31

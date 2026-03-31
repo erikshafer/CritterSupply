@@ -47,7 +47,7 @@
 | **Previous Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-03-31 (M36.1 complete — milestone closure, ES cleanup, M37.x planning)*
+*Last Updated: 2026-03-31 (M36.1 complete — milestone closure, ES cleanup, M37.x planning, skills refresh M35.0–M36.1 completed)*
 
 ---
 
@@ -99,6 +99,12 @@
 4. Phase 3 production adapters — real Amazon/Walmart/eBay implementations
 
 **Retrospectives:** [Session 1](./milestones/m36-1-session-1-retrospective.md) · [Session 2](./milestones/m36-1-session-2-retrospective.md) · [Session 3](./milestones/m36-1-session-3-retrospective.md) · [Session 4](./milestones/m36-1-session-4-retrospective.md) · [Session 5](./milestones/m36-1-session-5-retrospective.md) · [Session 6](./milestones/m36-1-session-6-retrospective.md) · [Session 7](./milestones/m36-1-session-7-retrospective.md) · [Session 8](./milestones/m36-1-session-8-retrospective.md) · [Session 9](./milestones/m36-1-session-9-retrospective.md) · [Session 10](./milestones/m36-1-session-10-retrospective.md) · [Milestone Closure](./milestones/m36-1-milestone-closure-retrospective.md)
+
+### ✅ Skills Refresh: M35.0–M36.1 (2026-03-31)
+
+**Status:** ✅ **Complete** — 10 skill files updated, 13 reviewed with no changes needed
+**Scope:** Mined M35.0, M36.0, and M36.1 retrospectives (3 milestone closures + 22 session retros)
+**Inventory:** [skills-refresh-m35-m36-inventory.md](./skills-refresh-m35-m36-inventory.md)
 
 ### ✅ M36.0: Engineering Quality (2026-03-29)
 
