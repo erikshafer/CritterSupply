@@ -68,6 +68,9 @@ dotnet_style_prefer_auto_properties = true:warning
 dotnet_style_prefer_conditional_expression_over_assignment = true:warning
 dotnet_style_prefer_conditional_expression_over_return = true:silent
 
+# Resharper Arrange Type Member Modifiers preferences to silence `ArrangeTypeMemberModifiers`
+resharper_arrange_type_member_modifiers_highlighting = none
+
 ###############################
 # Naming Conventions          #
 ###############################

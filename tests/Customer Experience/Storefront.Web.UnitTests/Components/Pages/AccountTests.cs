@@ -8,7 +8,7 @@ public sealed class AccountTests : BunitTestBase
 {
     private BunitAuthorizationContext SetupAuthenticatedUser()
     {
-        var authContext = this.AddAuthorization();
+        var authContext = AddAuthorization();
         authContext.SetAuthorized("alice@critter.test");
         authContext.SetClaims(
             new Claim("CustomerId", "a1b2c3d4-e5f6-7890-abcd-ef1234567890"),
@@ -50,7 +50,7 @@ public sealed class AccountTests : BunitTestBase
     [Fact]
     public void Account_WhenNotAuthenticated_ShowsLoadingState()
     {
-        var authContext = this.AddAuthorization();
+        var authContext = AddAuthorization();
         authContext.SetNotAuthorized();
 
         var cut = Render<Account>();

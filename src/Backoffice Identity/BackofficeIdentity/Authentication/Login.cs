@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using BackofficeIdentity.Identity;
 using FluentValidation;
 using Microsoft.AspNetCore.Identity;
@@ -151,6 +152,7 @@ public static class LoginHandler
 /// Interface for JWT token generation.
 /// Implemented in the API project to avoid coupling domain logic to System.IdentityModel.Tokens.Jwt.
 /// </summary>
+[SuppressMessage("ReSharper", "ArrangeTypeMemberModifiers")]
 public interface IJwtTokenGenerator
 {
     string GenerateAccessToken(BackofficeUser user);

@@ -13,7 +13,7 @@ public sealed class ProductsTests : BunitTestBase
 
     public ProductsTests()
     {
-        var authContext = this.AddAuthorization();
+        var authContext = AddAuthorization();
         authContext.SetNotAuthorized();
 
         Services.AddSingleton<IHttpClientFactory>(new MockHttpClientFactory(_mockHandler));
