@@ -2335,6 +2335,44 @@ public static async Task<(IResult, OutgoingMessages)> Handle(
 
 **Exception:** `bus.ScheduleAsync()` remains a valid use of `IMessageBus` — delayed message delivery cannot be expressed via `OutgoingMessages`.
 
+### 12. ❌ Mixing `IMessageBus.InvokeAsync()` with Manual `session.Events.Append()` ⭐ *M33.0 Addition*
+
+**Problem:** Combining `IMessageBus.InvokeAsync()` (which triggers the full Wolverine handler lifecycle — `Before()` → `Validate()` → `Load()` → `Handle()` → auto-commit) with manual `session.Events.Append()` + `session.SaveChangesAsync()` in the same endpoint creates two competing persistence strategies. Wolverine manages one path; you manage the other. The manual path bypasses Wolverine's `Before()` validation lifecycle, and the session may commit in unpredictable order.
+
+**❌ WRONG — Mixed persistence strategies:**
+
+```csharp
+[WolverinePost("/api/inventory/{sku}/adjust")]
+public static async Task<IResult> Handle(
+    string sku, AdjustInventoryRequest request,
+    IDocumentSession session, IMessageBus bus)
+{
+    // Path A: Wolverine-managed (full lifecycle)
+    await bus.InvokeAsync(new AdjustInventory(sku, request.Quantity, request.Reason));
+
+    // Path B: Manual (bypasses Before(), no validation, competes with session)
+    var evt = new InventoryAdjusted(sku, request.Quantity);
+    session.Events.Append(sku, evt);
+    await session.SaveChangesAsync();  // ← Competes with Wolverine's auto-commit
+    return Results.Ok();
+}
+```
+
+**✅ CORRECT — Choose one strategy:**
+
+```csharp
+// Option A: Wolverine-managed (preferred)
+await bus.InvokeAsync(new AdjustInventory(sku, request.Quantity, request.Reason));
+
+// Option B: Manual — handle everything yourself
+session.Events.Append(sku, evt);
+// Let AutoApplyTransactions commit, or call SaveChangesAsync explicitly
+```
+
+**Evidence:** INV-3 fix in M33.0 Session 1 — `AdjustInventoryEndpoint` mixed both patterns, causing silent event publishing failures. The `LowStockDetected` → `AlertFeedView` chain broke because manual-path events were not reaching the outbox.
+
+**Reference:** [M33.0 Milestone Closure Retrospective — Cross-Cutting Learning 1](../../docs/planning/milestones/m33-0-milestone-closure-retrospective.md)
+
 ---
 
 ## File Organization and Naming

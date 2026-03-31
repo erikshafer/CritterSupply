@@ -104,6 +104,35 @@ builder.Services.AddHttpClient("VendorPortalApi", c =>
     c.BaseAddress = new Uri("http://localhost:5239"));
 ```
 
+### Local DTOs: No Backend Project References ⭐ *M32.3 Addition*
+
+**Constraint:** Blazor WASM projects (`Microsoft.NET.Sdk.BlazorWebAssembly`) **cannot** add `<ProjectReference>` to backend API or domain projects (`Microsoft.NET.Sdk.Web` / `Microsoft.NET.Sdk`). Attempting this either fails the WASM build or bloats the client bundle with server-side dependencies.
+
+**Pattern:** Redefine all types received from APIs as local DTO records in the component's `@code` block or in a dedicated `Models/` folder within the WASM project:
+
+```csharp
+@code {
+    // Local DTO — NOT shared with backend
+    private record ProductDto(string Sku, string Name, string Description, string Status);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var httpClient = HttpClientFactory.CreateClient("BackofficeApi");
+        _product = await httpClient.GetFromJsonAsync<ProductDto>($"/api/catalog/products/{Sku}");
+    }
+}
+```
+
+**Benefits:**
+- Zero dependency on backend project assemblies
+- Keeps WASM bundle minimal (only client-side code)
+- Prevents namespace conflicts between client and server types
+- Follows Vendor Portal pattern (proven since M22, applied to Backoffice in M32.3)
+
+**Applied to:** All 10 Backoffice.Web Blazor WASM pages created in M32.3 (ProductList, ProductEdit, PriceEdit, InventoryList, InventoryEdit, UserList, UserCreate, UserEdit, Dashboard, CustomerSearch).
+
+**Reference:** [M32.3 Retrospective — Key Technical Win 1](../../docs/planning/milestones/m32-3-retrospective.md)
+
 **Usage in components/services:**
 
 ```csharp

@@ -684,6 +684,32 @@ public async Task HttpEndpoint_PublishesIntegrationMessage()
 
 ## Unit Testing Pure Functions
 
+### ⚠️ Auto-Transactions Do Not Apply to Direct Handler Calls ⭐ *M33.0 Addition*
+
+Wolverine's `AutoApplyTransactions()` policy only fires for HTTP endpoints and Wolverine message handlers — **not** when you call a handler method directly in a test.
+
+If a test calls a handler class directly (bypassing the Wolverine pipeline), you must explicitly call `await session.SaveChangesAsync()` after the handler returns. Otherwise changes are silently discarded.
+
+```csharp
+// ❌ WRONG — Handler called directly, auto-transaction does not fire
+var handler = new AcknowledgeAlertHandler();
+await handler.Handle(new AcknowledgeAlert(alertId, operatorId), session);
+// Changes NOT committed — silently lost
+
+// ✅ CORRECT — Explicit commit after direct handler invocation
+await handler.Handle(new AcknowledgeAlert(alertId, operatorId), session);
+await session.SaveChangesAsync();  // Required for direct calls
+
+// ✅ PREFERRED — Use Wolverine pipeline (auto-transaction fires)
+await _fixture.ExecuteAndWaitAsync(new AcknowledgeAlert(alertId, operatorId));
+```
+
+**Evidence:** M33.0 Session 13 found 3 integration tests failing after removing a manual `SaveChangesAsync()` from the `AcknowledgeAlert` handler (correct production fix — Wolverine handles the commit). The tests broke because they called the handler directly.
+
+**Rule:** Prefer `ExecuteAndWaitAsync()` or `TrackedHttpCall()` in integration tests. Reserve direct handler invocation for unit tests of pure-function handlers that produce no persistence side effects.
+
+---
+
 Thanks to A-Frame architecture, handlers are pure functions:
 
 ```csharp

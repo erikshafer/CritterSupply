@@ -1300,6 +1300,32 @@ public TestFixture()
 
 **Fix:** Use `IAsyncLifetime` with proper async/await.
 
+### ❌ Eager Configuration Capture in `Program.cs` ⭐ *M34.0 Addition*
+
+**Problem:** When `WebApplicationFactory<T>` applies `ConfigureAppConfiguration` overrides (as TestContainers fixtures do to inject dynamic connection strings), values captured **eagerly** in `Program.cs` — i.e., resolved into local variables before DI is built — use the **original** `appsettings.json` values, not the test overrides.
+
+```csharp
+// ❌ EAGER — captures before WebApplicationFactory overrides apply
+var connectionString = builder.Configuration.GetConnectionString("postgres");
+builder.Services.AddDbContext<MyDbContext>(options =>
+    options.UseNpgsql(connectionString));  // Uses appsettings.json, NOT TestContainers
+
+// ✅ LAZY — resolves inside DI delegate (after overrides applied)
+builder.Services.AddDbContext<MyDbContext>((sp, options) =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    options.UseNpgsql(config.GetConnectionString("postgres"));
+});
+```
+
+**Symptom:** Tests start the TestContainers PostgreSQL instance, the fixture passes the dynamic connection string, but the API connects to `localhost:5433` (from `appsettings.json`) instead. All tests fail with connection refused.
+
+**Debugging tip:** When one fixture works and another doesn't, diff the `Program.cs` files side by side. The M34.0 fix was discovered by comparing `BackofficeIdentityApiKestrelFactory` (broken — eager) against `VendorIdentityApiKestrelFactory` (working — lazy).
+
+**Evidence:** M34.0 Session 1 — all 111 Backoffice E2E tests failed during startup because `BackofficeIdentity.Api/Program.cs` captured the connection string eagerly.
+
+**Reference:** [M34.0 Session 1 Retrospective — Learning 1](../../docs/planning/milestones/m34-0-session-1-retrospective.md)
+
 ## CI/CD Considerations
 
 ### GitHub Actions

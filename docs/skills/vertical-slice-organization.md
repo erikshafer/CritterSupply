@@ -890,6 +890,61 @@ Not everything belongs in a feature folder. Some code genuinely is infrastructur
 
 ---
 
+### L7 — Shared Value Objects Belong in a `/Shared/` Folder Within the BC ⭐ *M33.0 Addition*
+
+**Problem (M33.0 Sessions 10-11):** When multiple commands in the same BC share a value object (e.g., `RefundAmount` used by `ApproveReturn`, `ReceiveReturn`, `DenyReturn`), placing the shared type in one command's folder creates coupling. Other command folders reference a sibling folder — breaking vertical slice independence.
+
+**Pattern:** Extract shared types to a `/Shared/` folder within the BC:
+
+```
+Returns/Returns/
+├── Shared/
+│   └── RefundAmount.cs        ← Shared value object
+├── ApproveReturn/
+│   └── ApproveReturn.cs       ← References ../Shared/RefundAmount.cs
+├── ReceiveReturn/
+│   └── ReceiveReturn.cs       ← References ../Shared/RefundAmount.cs
+└── DenyReturn/
+    └── DenyReturn.cs          ← References ../Shared/RefundAmount.cs
+```
+
+**When to use `/Shared/`:** When 3+ vertical slices in the same BC reference the same value object, event type, or domain constant. Do not preemptively create a `/Shared/` folder — wait until the duplication becomes apparent.
+
+**Note:** This is distinct from `src/Shared/Messages.Contracts/` which holds cross-BC integration messages. The `/Shared/` folder here is BC-internal.
+
+---
+
+### L8 — Canonical Validator Placement: ADR 0039 ⭐ *M33.0 Addition*
+
+**Convention (ADR 0039):** Top-level `AbstractValidator<T>` colocated in the same file as the command and handler. This is the canonical CritterSupply validator placement pattern, formalized after M33.0 found inconsistent placement across Returns, Vendor Portal, and Backoffice BCs.
+
+```csharp
+// File: ApproveReturn.cs — command + validator + handler in one file
+public sealed record ApproveReturn(Guid ReturnId, RefundAmount RefundAmount);
+
+public sealed class ApproveReturnValidator : AbstractValidator<ApproveReturn>
+{
+    public ApproveReturnValidator()
+    {
+        RuleFor(x => x.RefundAmount.Amount).GreaterThan(0);
+    }
+}
+
+public static class ApproveReturnHandler
+{
+    public static (ReturnApproved, OutgoingMessages) Handle(ApproveReturn cmd, Return @return)
+    {
+        // ...
+    }
+}
+```
+
+**Anti-pattern:** Bulk validator files (e.g., `ReturnValidators.cs` containing all BC validators). These were dissolved in M33.0 Sessions 10-13 across Returns, Vendor Portal, and Backoffice BCs.
+
+**Reference:** [ADR 0039: Canonical Validator Placement Convention](../decisions/0039-canonical-validator-placement.md)
+
+---
+
 ## Appendix: Exemplary Implementations
 
 Use these real CritterSupply examples as templates when creating new features or BCs:

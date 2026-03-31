@@ -133,11 +133,13 @@ public abstract class BunitTestBase : BunitContext, IAsyncLifetime
 
 2. **`JSInterop.Mode = JSRuntimeMode.Loose`** — MudBlazor components make many internal JS interop calls. Strict mode (bUnit's default) throws on any unhandled call.
 
-3. **`MudPopoverProvider` must be pre-rendered** — Components using `MudSelect`, `MudMenu`, `MudTable`, `MudAutocomplete`, etc. require a `MudPopoverProvider` in the render tree. The `RenderWithMud<T>()` helper method handles this. **Do NOT** use `RenderTree.TryAdd<MudPopoverProvider>()` — that component doesn't have a `ChildContent` parameter and will throw `ArgumentException`.
+3. **`MudPopoverProvider` must be pre-rendered** — Components using `MudSelect`, `MudMenu`, `MudTable`, `MudAutocomplete`, etc. require a `MudPopoverProvider` in the render tree. The `RenderWithMud<T>()` helper method handles this. **Do NOT** use `RenderTree.TryAdd<MudPopoverProvider>()` — that component doesn't have a `ChildContent` parameter and will throw `ArgumentException`. (**M34.0 note:** This also applies to E2E — the root `App.razor` must include `<MudPopoverProvider />` or pages with popover components will trigger the `blazor-error-ui` overlay. M34.0 found this missing in `VendorPortal.Web/App.razor`.)
 
 4. **Use `Render<T>()` for simple components** — Components that only use basic MudBlazor controls (MudText, MudButton, MudIcon, MudGrid, MudPaper, MudAlert) work fine with plain `Render<T>()` — no `MudPopoverProvider` needed.
 
 5. **Currency formatting is locale-dependent** — `ToString("C")` produces `$129.99` in `en-US` but `¤129.99` in `C.UTF-8` (common in CI). Assert on the numeric portion (e.g., `"129.99"`) rather than the formatted string.
+
+6. **`MudSelect` with `Required="true"` and a default value** ⭐ *M34.0 Addition* — `MudForm`'s `@bind-IsValid` does **not** consider a programmatically-set default value as "validated." A `MudSelect` initialized with `_type = "Description"` but marked `Required="true"` will never pass validation until the user explicitly interacts with the component — leaving the submit button permanently disabled. **Fix:** Remove `Required="true"` from `MudSelect` fields that have a sensible default value and can never be empty. Only use `Required` on fields that start empty and need user input.
 
 ### MudBlazor v9+ Type Parameters (M32.1)
 
