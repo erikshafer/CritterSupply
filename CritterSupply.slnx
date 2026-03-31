@@ -98,6 +98,9 @@
     <File Path="docs/decisions/0040-requested-integration-event-convention.md" />
     <File Path="docs/decisions/0041-product-catalog-es-migration-decisions.md" />
     <File Path="docs/decisions/0042-catalog-namespace-uuid-v5-convention.md" />
+    <File Path="docs/decisions/0043-storefront-web-technology-options.md" />
+    <File Path="docs/decisions/0048-marketplace-document-entity-design.md" />
+    <File Path="docs/decisions/0049-category-mapping-ownership.md" />
     <File Path="docs\decisions\0004-sse-over-signalr.md" />
     <File Path="docs\decisions\0005-mudblazor-ui-framework.md" />
     <File Path="docs\decisions\0006-reqnroll-bdd-framework.md" />

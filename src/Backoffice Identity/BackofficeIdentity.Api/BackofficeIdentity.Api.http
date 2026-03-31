@@ -1,6 +1,6 @@
-@BackofficeIdentity.Api_HostAddress = http://localhost:5251
+@BackofficeIdentity.Api_HostAddress = http://localhost:5249
 
-GET {{BackofficeIdentity.Api_HostAddress}}/weatherforecast/
+GET {{BackofficeIdentity.Api_HostAddress}}/api/backoffice-identity/users/
 Accept: application/json
 
 ###
