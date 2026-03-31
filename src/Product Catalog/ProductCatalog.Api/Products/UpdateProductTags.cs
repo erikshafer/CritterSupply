@@ -42,7 +42,6 @@ public static class UpdateProductTagsHandler
             ChangedAt: DateTimeOffset.UtcNow);
 
         session.Events.Append(view.Id, @event);
-        await session.SaveChangesAsync(ct);
 
         return Results.NoContent();
     }

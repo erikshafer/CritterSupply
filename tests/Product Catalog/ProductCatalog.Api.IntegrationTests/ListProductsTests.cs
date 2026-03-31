@@ -6,7 +6,7 @@ namespace ProductCatalog.Api.IntegrationTests;
 
 /// <summary>
 /// Test-only DTO for deserializing the list products response.
-/// Mirrors the anonymous type shape returned by ListProductsESHandler.
+/// Mirrors the anonymous type shape returned by ListProductsHandler.
 /// Must be kept in sync if the handler response shape changes.
 /// </summary>
 public sealed record ProductListResponse(

@@ -52,7 +52,6 @@ public static class MigrateProductHandler
             MigratedAt: DateTimeOffset.UtcNow);
 
         session.Events.StartStream<CatalogProduct>(productId, @event);
-        await session.SaveChangesAsync(ct);
 
         return Results.Ok(new { Message = "Product migrated to event sourcing", Sku = command.Sku, ProductId = productId });
     }

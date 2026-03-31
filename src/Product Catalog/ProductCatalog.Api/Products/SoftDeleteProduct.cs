@@ -5,13 +5,12 @@ using Microsoft.AspNetCore.Mvc;
 using ProductCatalog.Products;
 using Wolverine;
 using Wolverine.Http;
-using IntegrationProductRestored = Messages.Contracts.ProductCatalog.ProductRestored;
 
 namespace ProductCatalog.Api.Products;
 
-public static class RestoreProductESHandler
+public static class SoftDeleteProductHandler
 {
-    [WolverinePost("/api/products/{sku}/restore")]
+    [WolverineDelete("/api/products/{sku}")]
     [Authorize(Policy = "ProductManager")]
     public static async Task<(IResult, OutgoingMessages)> Handle(
         string sku,
@@ -21,21 +20,21 @@ public static class RestoreProductESHandler
         var outgoing = new OutgoingMessages();
 
         var view = await session.Query<ProductCatalogView>()
-            .Where(p => p.Sku == sku && p.IsDeleted)
+            .Where(p => p.Sku == sku && !p.IsDeleted)
             .FirstOrDefaultAsync(ct);
 
         if (view is null)
-            return (Results.NotFound(new ProblemDetails { Detail = "Deleted product not found", Status = 404 }), outgoing);
+            return (Results.NotFound(new ProblemDetails { Detail = "Product not found", Status = 404 }), outgoing);
 
-        var @event = new ProductCatalog.Products.ProductRestored(
+        var @event = new ProductSoftDeleted(
             ProductId: view.Id,
-            RestoredAt: DateTimeOffset.UtcNow);
+            DeletedAt: DateTimeOffset.UtcNow);
 
         session.Events.Append(view.Id, @event);
 
-        outgoing.Add(new IntegrationProductRestored(
+        outgoing.Add(new ProductDeleted(
             Sku: sku,
-            OccurredAt: @event.RestoredAt));
+            OccurredAt: @event.DeletedAt));
 
         return (Results.NoContent(), outgoing);
     }
