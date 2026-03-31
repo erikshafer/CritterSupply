@@ -5,7 +5,7 @@ using Wolverine.Http;
 
 namespace ProductCatalog.Api.Products;
 
-public static class ListProductsESHandler
+public static class ListProductsHandler
 {
     [WolverineGet("/api/products")]
     [Authorize]

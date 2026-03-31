@@ -21,7 +21,7 @@ public sealed class ChangeProductStatusCommandValidator : AbstractValidator<Chan
     }
 }
 
-public static class ChangeProductStatusESHandler
+public static class ChangeProductStatusHandler
 {
     [WolverinePatch("/api/products/{sku}/status")]
     [Authorize]
