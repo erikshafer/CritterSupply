@@ -233,6 +233,21 @@ public static class AddItemToCartHandler
 | **Aggregate** | `{AggregateName}.cs` | `{AggregateName}` | Separate file |
 | **Value Object** | `{Name}.cs` | `{Name}` | Separate file or colocated with aggregate |
 
+### ❌ ANTI-PATTERN: Implementation-Detail Suffixes in File or Handler Names ⭐ *M36.1 Addition*
+
+**DO NOT** include persistence or pattern suffixes in file or handler names:
+
+```
+❌ CreateProductES.cs          → ✅ CreateProduct.cs
+❌ UpdateProductES.cs          → ✅ UpdateProduct.cs
+❌ CreateProductESHandler      → ✅ CreateProductHandler
+❌ AssignProductToVendorES.cs  → ✅ AssignProductToVendor.cs
+```
+
+**Why:** The `*ES` (Event Sourcing) suffix leaks implementation details into the public API surface. A handler's file name should describe the business operation, not the persistence strategy. If the BC migrates from document store to event sourcing (as Product Catalog did in M35.0), the file names should remain stable — only the handler's internals change.
+
+**History:** Product Catalog accumulated 13 `*ES`-suffixed files and 5 `*ES`-suffixed handler classes during the M35.0 ES migration. These were cleaned up in M36.1 Session 10 (ADR 0041). The suffix was an artifact of running old and new handlers in parallel during migration — once migration was complete, the suffix had no purpose.
+
 ---
 
 ## Colocation Patterns
@@ -864,6 +879,14 @@ Not everything belongs in a feature folder. Some code genuinely is infrastructur
 - `Configuration/` (if you have complex Marten or EF Core setup split into multiple files)
 
 **Rule of thumb:** If the code is **shared across multiple features** and has no single business capability owner, it belongs in an infrastructure folder. But name it semantically (`Identity/`), not generically (`Data/`, `Entities/`).
+
+### L6 — Implementation-Detail Suffixes Must Be Removed After Migration ⭐ *M36.1 Addition*
+
+**Observation (M36.1 Session 10):** Product Catalog accumulated 13 `*ES.cs` files and 5 `*ES`-suffixed handler classes during the M35.0 event sourcing migration. The suffix was useful during migration (to distinguish old and new handlers running in parallel) but became misleading once migration was complete — it leaked implementation details into the public API surface.
+
+**Fix:** Renamed all 13 files and 5 handler classes, removing the `ES` suffix. No behavioral change — only file and class names updated.
+
+**Takeaway:** If a migration requires temporary naming conventions (e.g., `*ES`, `*V2`, `*New`), track the cleanup as a follow-up task and complete it in the milestone closure session. Do not let migration artifacts persist beyond the milestone.
 
 ---
 
