@@ -57,6 +57,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
     private BackofficeApiKestrelFactory? _backofficeApiFactory;
     private WasmStaticFileHost? _wasmHost;
     private StubListingsApiHost? _listingsApiHost;
+    private StubMarketplacesApiHost? _marketplacesApiHost;
 
     /// <summary>Stub clients to configure domain BC behavior per scenario.</summary>
     public StubOrdersClient StubOrdersClient { get; } = new();
@@ -71,6 +72,9 @@ public sealed class E2ETestFixture : IAsyncLifetime
 
     /// <summary>Stub Listings API host for E2E scenarios that need listing data.</summary>
     internal StubListingsApiHost StubListingsApi { get; } = new();
+
+    /// <summary>Stub Marketplaces API host for E2E scenarios that need marketplace/category mapping data.</summary>
+    internal StubMarketplacesApiHost StubMarketplacesApi { get; } = new();
 
     /// <summary>Base URL of Backoffice.Web WASM host — what Playwright navigates to.</summary>
     public string WasmBaseUrl { get; private set; } = string.Empty;
@@ -116,8 +120,12 @@ public sealed class E2ETestFixture : IAsyncLifetime
         _listingsApiHost = StubListingsApi;
         await _listingsApiHost.StartAsync();
 
-        // Step 5: Start WASM static file host serving Backoffice.Web with test API URLs
-        _wasmHost = new WasmStaticFileHost(IdentityApiBaseUrl, BackofficeApiBaseUrl, _listingsApiHost.BaseUrl);
+        // Step 5: Start stub Marketplaces API (returns mock marketplace/category data for Backoffice.Web)
+        _marketplacesApiHost = StubMarketplacesApi;
+        await _marketplacesApiHost.StartAsync();
+
+        // Step 6: Start WASM static file host serving Backoffice.Web with test API URLs
+        _wasmHost = new WasmStaticFileHost(IdentityApiBaseUrl, BackofficeApiBaseUrl, _listingsApiHost.BaseUrl, _marketplacesApiHost.BaseUrl);
         await _wasmHost.StartAsync();
         WasmBaseUrl = _wasmHost.BaseUrl;
     }
@@ -125,6 +133,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         if (_wasmHost != null) await _wasmHost.DisposeAsync();
+        if (_marketplacesApiHost != null) await _marketplacesApiHost.DisposeAsync();
         if (_listingsApiHost != null) await _listingsApiHost.DisposeAsync();
         if (_backofficeApiFactory != null) await _backofficeApiFactory.DisposeAsync();
         if (_identityFactory != null) await _identityFactory.DisposeAsync();
@@ -160,6 +169,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
         StubCorrespondenceClient.Clear();
         StubPricingClient.Clear();
         StubListingsApi.Clear();
+        StubMarketplacesApi.Clear();
 
         // Reset session-expired simulation flags
         StubInventoryClient.SimulateSessionExpired = false;
@@ -487,12 +497,14 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
     public string BaseUrl { get; private set; } = string.Empty;
 
     private readonly string _listingsApiUrl;
+    private readonly string _marketplacesApiUrl;
 
-    public WasmStaticFileHost(string identityApiUrl, string backofficeApiUrl, string listingsApiUrl)
+    public WasmStaticFileHost(string identityApiUrl, string backofficeApiUrl, string listingsApiUrl, string marketplacesApiUrl)
     {
         _identityApiUrl = identityApiUrl;
         _backofficeApiUrl = backofficeApiUrl;
         _listingsApiUrl = listingsApiUrl;
+        _marketplacesApiUrl = marketplacesApiUrl;
     }
 
     public async Task StartAsync()
@@ -557,7 +569,8 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
                 {
                     BackofficeIdentityApiUrl = _identityApiUrl,
                     BackofficeApiUrl = _backofficeApiUrl,
-                    ListingsApiUrl = _listingsApiUrl
+                    ListingsApiUrl = _listingsApiUrl,
+                    MarketplacesApiUrl = _marketplacesApiUrl
                 }
             };
 
@@ -565,6 +578,7 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
             Console.WriteLine($"   BackofficeIdentityApiUrl: {_identityApiUrl}");
             Console.WriteLine($"   BackofficeApiUrl: {_backofficeApiUrl}");
             Console.WriteLine($"   ListingsApiUrl: {_listingsApiUrl}");
+            Console.WriteLine($"   MarketplacesApiUrl: {_marketplacesApiUrl}");
 
             return Results.Json(config);
         });
@@ -764,6 +778,120 @@ internal sealed class StubListingsApiHost : IAsyncDisposable
             addresses?.Addresses.FirstOrDefault() ?? string.Empty);
 
         Console.WriteLine($"✅ [StubListingsApiHost] Started on: {BaseUrl}");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_app != null) await _app.DisposeAsync();
+    }
+}
+
+
+/// <summary>
+/// Lightweight stub Marketplaces API host for E2E tests.
+/// Serves mock marketplace and category mapping data that Backoffice.Web (Blazor WASM)
+/// fetches via browser HTTP calls to the MarketplacesApi named HttpClient.
+/// Supports seeding data per scenario and clearing between scenarios.
+/// Endpoints:
+///   GET /api/marketplaces — all marketplaces
+///   GET /api/category-mappings?channelCode= — category mappings (optional channel filter)
+/// </summary>
+internal sealed class StubMarketplacesApiHost : IAsyncDisposable
+{
+    private WebApplication? _app;
+    private readonly List<StubMarketplace> _marketplaces = new();
+    private readonly List<StubCategoryMapping> _mappings = new();
+
+    public string BaseUrl { get; private set; } = string.Empty;
+
+    public sealed record StubMarketplace(
+        string Id,
+        string DisplayName,
+        bool IsActive,
+        bool IsOwnWebsite,
+        string? ApiCredentialVaultPath,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset UpdatedAt);
+
+    public sealed record StubCategoryMapping(
+        string Id,
+        string ChannelCode,
+        string InternalCategory,
+        string MarketplaceCategoryId,
+        string? MarketplaceCategoryPath,
+        DateTimeOffset LastVerifiedAt);
+
+    public void SeedMarketplace(string id, string displayName, bool isActive,
+        DateTimeOffset? createdAt = null)
+    {
+        var now = createdAt ?? DateTimeOffset.UtcNow.AddDays(-30);
+        _marketplaces.Add(new StubMarketplace(
+            id, displayName, isActive, false, $"marketplace/{id.ToLowerInvariant().Replace('_', '-')}",
+            now, now));
+    }
+
+    public void SeedCategoryMapping(string channelCode, string internalCategory,
+        string marketplaceCategoryId, string? marketplaceCategoryPath = null)
+    {
+        _mappings.Add(new StubCategoryMapping(
+            $"{channelCode}:{internalCategory}",
+            channelCode,
+            internalCategory,
+            marketplaceCategoryId,
+            marketplaceCategoryPath,
+            DateTimeOffset.UtcNow.AddDays(-7)));
+    }
+
+    public void Clear()
+    {
+        _marketplaces.Clear();
+        _mappings.Clear();
+    }
+
+    public async Task StartAsync()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+
+        builder.Services.AddCors(opts =>
+        {
+            opts.AddDefaultPolicy(policy => policy
+                .SetIsOriginAllowed(_ => true)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials());
+        });
+
+        _app = builder.Build();
+        _app.UseCors();
+
+        // GET /api/marketplaces — all marketplaces (mirrors Marketplaces.Api endpoint)
+        _app.MapGet("/api/marketplaces", () =>
+        {
+            return Results.Json(_marketplaces.OrderBy(m => m.Id).ToList());
+        });
+
+        // GET /api/category-mappings — category mappings with optional channel filter
+        _app.MapGet("/api/category-mappings", (string? channelCode) =>
+        {
+            var filtered = string.IsNullOrEmpty(channelCode)
+                ? _mappings.ToList()
+                : _mappings.Where(m => m.ChannelCode.Equals(channelCode, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            return Results.Json(filtered.OrderBy(m => m.Id).ToList());
+        });
+
+        await _app.StartAsync();
+
+        var addresses = _app.Services
+            .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
+            .Features
+            .Get<Microsoft.AspNetCore.Hosting.Server.Features.IServerAddressesFeature>();
+
+        BaseUrl = BackofficeIdentityApiKestrelFactory.NormalizeAddress(
+            addresses?.Addresses.FirstOrDefault() ?? string.Empty);
+
+        Console.WriteLine($"✅ [StubMarketplacesApiHost] Started on: {BaseUrl}");
     }
 
     public async ValueTask DisposeAsync()

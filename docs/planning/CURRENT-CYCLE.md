@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M36.1 — Listings BC Foundation (Session 8 Complete — Marketplace Admin UI + Test Fixes + Phase 2 Gate) |
-| **Status** | 🔨 **PHASE 2 IN PROGRESS** — Session 8 complete; test fixes (4 resolved), CORS, message publishing, admin UI; 62/62 tests |
+| **Current Milestone** | M36.1 — Listings BC Foundation (Session 9 Complete — ADRs + E2E + Phase 2 Gate Closure) |
+| **Status** | ✅ **PHASE 2 COMPLETE** — Session 9 complete; ADRs 0048-0049, E2E marketplace admin, Phase 2 gate PASS (16/16); 62/62 tests |
 | **Recent Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Previous Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
 | **Active BCs** | 19 total (Listings BC scaffold added) |
 
-*Last Updated: 2026-03-31 (M36.1 Session 8 complete — Marketplace Admin UI + Test Fixes + Phase 2 Gate)*
+*Last Updated: 2026-03-31 (M36.1 Session 9 complete — ADRs + E2E + Phase 2 Gate PASS)*
 
 ---
 
@@ -360,6 +360,29 @@
 - Total tests: 62 (35 Listings + 27 Marketplaces) — 0 failures
 - Session 9 picks up: E2E tests, ADRs 0048–0049, Phase 2 gate closure
 - Retrospective: [Session 8](./milestones/m36-1-session-8-retrospective.md)
+
+**Session 9 Progress (2026-03-31):**
+- Stream A — ADRs (items 9.1–9.2):
+  - ✅ ADR 0048 — Marketplace Document Entity Design (committed in Session 8, verified complete)
+  - ✅ ADR 0049 — Category Mapping Ownership (5 decisions: BC ownership, composite key, taxonomy alignment, seed data, alternatives rejected)
+- Stream B — E2E Coverage (items 9.3–9.8):
+  - ✅ `data-testid` audit on `MarketplacesList.razor` — added 12 new attributes: page container, breadcrumbs, title, loading, error, display-name, status, active/inactive chips, created, no-records
+  - ✅ `data-testid` audit on `CategoryMappingsList.razor` — added 8 new attributes: page container, breadcrumbs, title, loading, error, category, marketplace-id, no-records
+  - ✅ `StubMarketplacesApiHost` created — serves `/api/marketplaces` and `/api/category-mappings` with channel filter support
+  - ✅ `WasmStaticFileHost` updated — `MarketplacesApiUrl` added to intercepted appsettings.json
+  - ✅ `E2ETestFixture` updated — starts, disposes, and clears StubMarketplacesApi
+  - ✅ `MarketplacesListPage.cs` page object — navigate, row count, display name, status chip, table visibility
+  - ✅ `CategoryMappingsListPage.cs` page object — navigate, row count, channel filter, breadcrumb validation
+  - ✅ `MarketplacesAdmin.feature` — 6 scenarios (3 marketplace list + 3 category mappings)
+  - ✅ `MarketplacesAdminSteps.cs` — step definitions for all 6 scenarios
+  - ✅ `wwwroot/appsettings.json` — added missing `ListingsApiUrl` for consistency
+- Stream C — Phase 2 Gate:
+  - ✅ Gate criterion 14: E2E page objects + feature files for marketplace admin pages — **DELIVERED**
+  - ✅ Gate criterion 15: ADRs 0048 and 0049 written — **DELIVERED**
+  - ✅ Phase 2 Gate Result: **PASS** (16/16 criteria met)
+- Build: 0 errors, 33 warnings (unchanged)
+- Total tests: 62 (35 Listings + 27 Marketplaces) — 0 failures
+- Retrospective: [Session 9](./milestones/m36-1-session-9-retrospective.md)
 
 **(QoL) Dev Seed Data (2026-03-30):**
 - ✅ `BackofficeIdentitySeedData.cs` — 7 users, one per ADR 0031 role (SystemAdmin, Executive, OperationsManager, CustomerService, WarehouseClerk, PricingManager, CopyWriter)

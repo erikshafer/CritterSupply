@@ -9,20 +9,22 @@
 
 <PageTitle>Marketplaces — Backoffice</PageTitle>
 
-<MudBreadcrumbs Items="_breadcrumbs" />
+<div data-testid="marketplaces-page">
+
+<MudBreadcrumbs Items="_breadcrumbs" data-testid="marketplaces-breadcrumbs" />
 
 <div class="d-flex align-center mb-4">
-    <MudText Typo="Typo.h4">Marketplace Channels</MudText>
+    <MudText Typo="Typo.h4" data-testid="marketplaces-title">Marketplace Channels</MudText>
 </div>
 
 @if (_isLoading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" data-testid="marketplaces-loading" />
 }
 
 @if (!string.IsNullOrEmpty(_errorMessage))
 {
-    <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+    <MudAlert Severity="Severity.Error" Class="mb-4" data-testid="marketplaces-error">@_errorMessage</MudAlert>
 }
 
 <MudTable Items="@_marketplaces" Hover="true" Striped="true" Dense="true" data-testid="marketplaces-table">
@@ -36,29 +38,31 @@
         <MudTd DataLabel="Channel Code" data-testid="@($"marketplace-row-{context.Id}")">
             <MudText Typo="Typo.body2"><strong>@context.Id</strong></MudText>
         </MudTd>
-        <MudTd DataLabel="Display Name">
+        <MudTd DataLabel="Display Name" data-testid="@($"marketplace-display-name-{context.Id}")">
             <MudText Typo="Typo.body2">@context.DisplayName</MudText>
         </MudTd>
-        <MudTd DataLabel="Active">
+        <MudTd DataLabel="Active" data-testid="@($"marketplace-status-{context.Id}")">
             @if (context.IsActive)
             {
-                <MudChip T="string" Color="Color.Success" Size="Size.Small">Active</MudChip>
+                <MudChip T="string" Color="Color.Success" Size="Size.Small" data-testid="@($"marketplace-active-chip-{context.Id}")">Active</MudChip>
             }
             else
             {
-                <MudChip T="string" Color="Color.Default" Size="Size.Small">Inactive</MudChip>
+                <MudChip T="string" Color="Color.Default" Size="Size.Small" data-testid="@($"marketplace-inactive-chip-{context.Id}")">Inactive</MudChip>
             }
         </MudTd>
-        <MudTd DataLabel="Created">
+        <MudTd DataLabel="Created" data-testid="@($"marketplace-created-{context.Id}")">
             <MudText Typo="Typo.body2">@context.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
         </MudTd>
     </RowTemplate>
     <NoRecordsContent>
-        <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">
+        <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4" data-testid="marketplaces-no-records">
             No marketplaces found.
         </MudText>
     </NoRecordsContent>
 </MudTable>
+
+</div>
 
 @code {
     private sealed record MarketplaceDto(
