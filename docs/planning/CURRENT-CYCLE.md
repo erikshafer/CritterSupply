@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M36.1 — Listings BC Foundation (Session 6 Complete — Marketplaces BC Scaffolded) |
-| **Status** | 🔨 **PHASE 2 IN PROGRESS** — Session 6 complete; Marketplaces BC scaffolded + CRUD + seed data; 45/45 tests |
+| **Current Milestone** | M36.1 — Listings BC Foundation (Session 7 Complete — Category Mappings + Adapter Stubs + ListingApproved Consumer) |
+| **Status** | 🔨 **PHASE 2 IN PROGRESS** — Session 7 complete; CategoryMapping CRUD + IMarketplaceAdapter stubs + ListingApproved consumer; 58/58 tests |
 | **Recent Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Previous Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
 | **Active BCs** | 19 total (Listings BC scaffold added) |
 
-*Last Updated: 2026-03-30 (M36.1 Session 6 complete — Marketplaces BC scaffolded)*
+*Last Updated: 2026-03-30 (M36.1 Session 7 complete — Category Mappings + Adapter Stubs + ListingApproved Consumer)*
 
 ---
 
@@ -274,6 +274,58 @@
 - Build: 0 errors (Marketplaces.Api and test project both build clean)
 - Session 7 picks up: CategoryMapping CRUD + IMarketplaceAdapter stubs + ListingApproved consumer
 - Retrospective: [Session 6](./milestones/m36-1-session-6-retrospective.md)
+
+**Session 7 Progress (2026-03-30):**
+- CategoryMapping document entity (items 7.1–7.2):
+  - ✅ `src/Marketplaces/Marketplaces/CategoryMappings/CategoryMapping.cs` — composite key `{ChannelCode}:{InternalCategory}`, `MarketplaceCategoryId`, `MarketplaceCategoryPath`, `LastVerifiedAt`
+  - ✅ Registered in `Program.cs` via `opts.Schema.For<CategoryMapping>().Identity(x => x.Id)`
+  - ✅ `SetCategoryMapping.cs` — POST /api/category-mappings — upsert by composite Id, `[Authorize]`
+  - ✅ `GetCategoryMapping.cs` — GET /api/category-mappings/{channelCode}/{internalCategory}, `[Authorize]`
+  - ✅ `ListCategoryMappings.cs` — GET /api/category-mappings?channelCode={channelCode}, `[Authorize]`
+- Category mapping seed data (item 7.3):
+  - ✅ 18 mappings seeded (6 categories × 3 channels: AMAZON_US, WALMART_US, EBAY_US)
+  - ✅ Idempotency guard: `if (await session.Query<CategoryMapping>().AnyAsync()) return;`
+- IVaultClient + DevVaultClient (item 7.6):
+  - ✅ `src/Marketplaces/Marketplaces/Credentials/IVaultClient.cs` — `GetSecretAsync(string path)`
+  - ✅ `src/Marketplaces/Marketplaces/Credentials/DevVaultClient.cs` — reads from `IConfiguration` Vault section
+  - ✅ Production safety guard in `Program.cs` — throws `InvalidOperationException` if DevVaultClient registered outside Development
+  - ✅ DevVaultClient registered as singleton only in Development environment
+- IMarketplaceAdapter interface + 3 stub implementations (items 7.4–7.5):
+  - ✅ `src/Marketplaces/Marketplaces/Adapters/IMarketplaceAdapter.cs` — interface reflecting 3 spike findings:
+    - `SubmitListingAsync` returns `SubmissionResult` with `ExternalSubmissionId` (spike finding #1)
+    - `CheckSubmissionStatusAsync` for async status polling (spike finding #2)
+    - `ListingSubmission` includes `ChannelExtensions` dictionary (spike finding #3)
+    - `DeactivateListingAsync` for listing deactivation
+  - ✅ `StubAmazonAdapter.cs` — `ChannelCode = "AMAZON_US"`, returns `amzn-{guid}`, 100ms delay
+  - ✅ `StubWalmartAdapter.cs` — `ChannelCode = "WALMART_US"`, returns `wmrt-{guid}`, 100ms delay
+  - ✅ `StubEbayAdapter.cs` — `ChannelCode = "EBAY_US"`, returns `ebay-{guid}`, 100ms delay
+  - ✅ Adapter resolver registered as `IReadOnlyDictionary<string, IMarketplaceAdapter>` via DI
+- Integration message contracts (item 7.8):
+  - ✅ `src/Shared/Messages.Contracts/Marketplaces/MarketplaceIntegrationMessages.cs`:
+    - `MarketplaceRegistered(ChannelCode, DisplayName, OccurredAt)`
+    - `MarketplaceDeactivated(ChannelCode, OccurredAt)`
+    - `MarketplaceListingActivated(ListingId, Sku, ChannelCode, ExternalListingId, OccurredAt)`
+    - `MarketplaceSubmissionRejected(ListingId, Sku, ChannelCode, Reason, OccurredAt)`
+  - ✅ `ListingApproved` contract expanded with `ProductName`, `Category`, `Price` (Session 7 shortcut — M37.x will use ACL)
+  - ✅ RabbitMQ publish routes configured for `MarketplaceListingActivated` and `MarketplaceSubmissionRejected`
+- ListingApproved consumer handler (item 7.7):
+  - ✅ `src/Marketplaces/Marketplaces.Api/Listings/ListingApprovedHandler.cs`
+  - ✅ `marketplaces-listings-events` queue uncommented in `Program.cs`
+  - ✅ OWN_WEBSITE guard — skips adapter invocation entirely
+  - ✅ Missing category mapping → publishes `MarketplaceSubmissionRejected` (GR-NEW-2)
+  - ✅ Inactive marketplace → publishes `MarketplaceSubmissionRejected`
+  - ✅ No adapter registered → publishes `MarketplaceSubmissionRejected`
+  - ✅ Successful submission → publishes `MarketplaceListingActivated` with `ExternalListingId`
+- Integration tests (item 7.9):
+  - ✅ `TestFixture.cs` enhanced with `ExecuteAndWaitAsync<T>()` for message handler testing
+  - ✅ `CategoryMappingTests.cs` — 7 tests (set, upsert, auth, get, not-found, list-filter, seed data)
+  - ✅ `ListingSubmissionFlowTests.cs` — 5 tests (Amazon happy path, Walmart happy path, OWN_WEBSITE skip, missing mapping rejection, inactive marketplace rejection)
+  - ✅ Total test count: 58 (35 Listings + 23 Marketplaces)
+  - ✅ Listings tests: 35/35 pass (no regression from ListingApproved contract change)
+  - ✅ Marketplaces tests: 19/23 pass (4 pre-existing failures from Session 6: auth handler + seed data cleanup ordering)
+- Build: 0 errors
+- Session 8 picks up: Marketplace admin UI, CORS, ADRs 0048–0049, Phase 2 gate verification
+- Retrospective: [Session 7](./milestones/m36-1-session-7-retrospective.md)
 
 **(QoL) Dev Seed Data (2026-03-30):**
 - ✅ `BackofficeIdentitySeedData.cs` — 7 users, one per ADR 0031 role (SystemAdmin, Executive, OperationsManager, CustomerService, WarehouseClerk, PricingManager, CopyWriter)
