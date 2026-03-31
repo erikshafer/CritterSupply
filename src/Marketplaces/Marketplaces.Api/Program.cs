@@ -18,6 +18,19 @@ var builder = WebApplication.CreateBuilder(args);
 // Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
 builder.AddServiceDefaults();
 
+// CORS — allow Backoffice.Web (Blazor WASM) to call Marketplaces.Api directly
+var backofficeOrigin = builder.Configuration["Cors:BackofficeOrigin"]
+    ?? "http://localhost:5244";
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("BackofficePolicy", policy =>
+        policy.WithOrigins(backofficeOrigin)
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials());
+});
+
 // Marten document store configuration
 var connectionString = builder.Configuration.GetConnectionString("postgres")
     ?? "Host=localhost;Port=5433;Database=marketplaces;Username=postgres;Password=postgres";
@@ -111,6 +124,10 @@ builder.Host.UseWolverine(opts =>
         .ToRabbitExchange("marketplaces-listing-activated");
     opts.PublishMessage<Messages.Contracts.Marketplaces.MarketplaceSubmissionRejected>()
         .ToRabbitExchange("marketplaces-submission-rejected");
+    opts.PublishMessage<Messages.Contracts.Marketplaces.MarketplaceRegistered>()
+        .ToRabbitExchange("marketplaces-registered");
+    opts.PublishMessage<Messages.Contracts.Marketplaces.MarketplaceDeactivated>()
+        .ToRabbitExchange("marketplaces-deactivated");
 });
 
 // Wolverine HTTP
@@ -148,6 +165,8 @@ if (app.Environment.IsDevelopment())
         opts.SwaggerEndpoint("/api/v1/swagger.json", "Marketplaces API");
     });
 }
+
+app.UseCors("BackofficePolicy");
 
 app.UseAuthentication();
 app.UseAuthorization();

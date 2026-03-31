@@ -125,4 +125,19 @@ public class TestFixture : IAsyncLifetime
                 await ctx.InvokeAsync(message);
             }));
     }
+
+    /// <summary>
+    /// Makes HTTP calls with message tracking to verify outgoing messages.
+    /// </summary>
+    public async Task<(ITrackedSession, IScenarioResult)> TrackedHttpCall(Action<Scenario> configuration)
+    {
+        IScenarioResult result = null!;
+
+        var tracked = await Host.ExecuteAndWaitAsync(async () =>
+        {
+            result = await Host.Scenario(configuration);
+        });
+
+        return (tracked, result);
+    }
 }
