@@ -12,6 +12,7 @@ Patterns and practices for building message handlers and HTTP endpoints with Wol
 4. [Aggregate Handler Workflow (Decider Pattern)](#aggregate-handler-workflow-decider-pattern)
 5. [Entity and Document Loading](#entity-and-document-loading)
 6. [Handler Return Patterns](#handler-return-patterns)
+   - [Pattern 7: HTTP Endpoint with Integration Messages](#pattern-7-http-endpoint-with-integration-messages--m361-addition) ⭐ *M36.1 Addition*
    - [Pattern 8: Async vs Sync Return Types](#pattern-8-async-vs-sync-return-types-m320-lesson) ⭐ *M32 Addition*
 7. [Railway Programming in Handlers](#railway-programming-in-handlers)
 8. [HTTP Endpoints](#http-endpoints)
@@ -664,6 +665,35 @@ public static async Task<LiveMetricUpdated> Handle(OrderPlaced message, IDocumen
 
 **Decision Rule:** Use `async Task<T>` when calling `await` on anything; use synchronous `T` for pure functions.
 
+### Pattern 7: HTTP Endpoint with Integration Messages ⭐ *M36.1 Addition*
+
+HTTP endpoints that need to publish integration messages alongside an HTTP response use the `(IResult, OutgoingMessages)` tuple return. Wolverine sends the `IResult` as the HTTP response and publishes the `OutgoingMessages` via the transactional outbox.
+
+```csharp
+[WolverinePost("/api/marketplaces")]
+public static async Task<(IResult, OutgoingMessages)> Handle(
+    RegisterMarketplace cmd,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    var outgoing = new OutgoingMessages();
+
+    var existing = await session.LoadAsync<Marketplace>(cmd.ChannelCode, ct);
+    if (existing is not null)
+        return (Results.Ok(existing), outgoing); // Idempotent — no event published
+
+    var marketplace = Marketplace.Create(cmd.ChannelCode, cmd.DisplayName);
+    session.Store(marketplace);
+
+    outgoing.Add(new MarketplaceRegistered(marketplace.ChannelCode, marketplace.DisplayName));
+    return (Results.Created($"/api/marketplaces/{marketplace.ChannelCode}", marketplace), outgoing);
+}
+```
+
+**Idempotent guard:** If the aggregate already exists or is already in the target state, return the HTTP response but leave `OutgoingMessages` empty. This prevents duplicate integration events from idempotent HTTP calls.
+
+**⚠️ CRITICAL:** Do NOT use `IMessageBus.PublishAsync()` for integration events in HTTP endpoints. See Anti-Pattern #11 below.
+
 ### Summary Table
 
 | Scenario | Return Type | Stream Creation | Example |
@@ -672,6 +702,7 @@ public static async Task<LiveMetricUpdated> Handle(OrderPlaced message, IDocumen
 | Return updated aggregate state | `UpdatedAggregate<T>` | N/A — `[WriteAggregate]` | ConfirmOrder |
 | Start new stream (message handler) | `IStartStream` or `OutgoingMessages` | `MartenOps.StartStream<T>()` or `session.Events.StartStream<T>()` | StartPayment |
 | Start new stream (HTTP endpoint) | `(CreationResponse, IStartStream)` | `MartenOps.StartStream<T>()` | InitializeCart |
+| HTTP response + integration messages | `(IResult, OutgoingMessages)` | N/A | RegisterMarketplace |
 | Multi-transport dispatch | `IEnumerable<object>` | N/A | DescriptionChangeApproved |
 
 ---
@@ -2252,6 +2283,57 @@ public static async Task<IResult> Handle(
 - Railway programming with async validation (see anti-pattern #4)
 
 **Reference:** [M32.3 Session 10 Retrospective - Wolverine Pattern Limitations](../../planning/milestones/m32-3-session-10-retrospective.md)
+
+### 11. ❌ Using `bus.PublishAsync()` for Integration Events in HTTP Endpoints ⭐ *M36.0 Addition*
+
+**Problem:** `IMessageBus.PublishAsync()` in HTTP endpoints bypasses Wolverine's transactional outbox. The message is published immediately — even if the database transaction rolls back. This was the most pervasive Critter Stack idiom violation found in M36.0 (fixed across 4 BCs).
+
+**❌ WRONG:**
+
+```csharp
+[WolverinePost("/api/marketplaces/{channelCode}/deactivate")]
+public static async Task<IResult> Handle(
+    string channelCode,
+    IDocumentSession session,
+    IMessageBus bus, // ❌ Injecting IMessageBus
+    CancellationToken ct)
+{
+    var marketplace = await session.LoadAsync<Marketplace>(channelCode, ct);
+    marketplace.IsActive = false;
+    session.Store(marketplace);
+
+    await bus.PublishAsync(new MarketplaceDeactivated(channelCode)); // ❌ Outside outbox
+    return Results.Ok();
+}
+```
+
+**✅ CORRECT:**
+
+```csharp
+[WolverinePost("/api/marketplaces/{channelCode}/deactivate")]
+public static async Task<(IResult, OutgoingMessages)> Handle(
+    string channelCode,
+    IDocumentSession session,
+    CancellationToken ct)
+{
+    var outgoing = new OutgoingMessages();
+    var marketplace = await session.LoadAsync<Marketplace>(channelCode, ct);
+
+    if (marketplace.IsActive)
+    {
+        marketplace.IsActive = false;
+        session.Store(marketplace);
+        outgoing.Add(new MarketplaceDeactivated(channelCode)); // ✅ Inside outbox
+    }
+    // Idempotent: already inactive → no event published
+
+    return (Results.Ok(), outgoing);
+}
+```
+
+**Why:** `OutgoingMessages` is processed within the same Wolverine middleware pipeline that commits the Marten session. If the session commit fails, messages are not published. `bus.PublishAsync()` sends immediately, outside this transaction boundary.
+
+**Exception:** `bus.ScheduleAsync()` remains a valid use of `IMessageBus` — delayed message delivery cannot be expressed via `OutgoingMessages`.
 
 ---
 
