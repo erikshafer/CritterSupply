@@ -30,6 +30,9 @@ Patterns, conventions, and pitfalls for asynchronous message-based communication
     - [Lesson 10: Test Timing for Fan-Out Workflows](#lesson-10-test-timing-for-fan-out-workflows-m300-d4)
     - [Lesson 11: Integration Contract Assertion Tests](#lesson-11-integration-contract-assertion-tests)
     - [Lesson 12: Integration Message Handler → SignalR Broadcast Pattern](#lesson-12-integration-message-handler--signalr-broadcast-pattern-m320-w3) ⭐ *M32 Addition*
+    - [Lesson 13: OutgoingMessages Is the Only Safe HTTP Publishing Mechanism](#lesson-13-outgoingmessages-is-the-only-safe-http-publishing-mechanism-m360) ⭐ *M36.0 Addition*
+    - [Lesson 14: Idempotent Integration Event Publishing](#lesson-14-idempotent-integration-event-publishing-m361) ⭐ *M36.1 Addition*
+    - [Lesson 15: Message Enrichment Tradeoffs Must Be Documented](#lesson-15-message-enrichment-tradeoffs-must-be-documented-m361) ⭐ *M36.1 Addition*
 13. [Appendix](#appendix)
 
 ---
@@ -308,9 +311,12 @@ public static class PlaceOrderHandler
 }
 ```
 
-**Pattern 2: Inject `IMessageBus` for conditional publishing**
+**Pattern 2: Inject `IMessageBus` for conditional publishing (message handlers only)**
+
+⚠️ **M36.0 Correction:** `IMessageBus.PublishAsync()` is safe **only** in Wolverine message handlers (not HTTP endpoints). In message handlers, Wolverine enlists the `IMessageBus` calls within the same transaction. In HTTP endpoints, `bus.PublishAsync()` bypasses the transactional outbox — see Warning 7 below.
 
 ```csharp
+// ✅ OK in message handlers — Wolverine wraps in same transaction
 public static async Task Handle(
     CompleteReturn cmd,
     [WriteAggregate] Return @return,
@@ -318,7 +324,6 @@ public static async Task Handle(
 {
     var evt = @return.Complete(cmd.ActualRefundAmount);
 
-    // Conditionally publish integration message based on business logic
     if (@return.Type == ReturnType.Refund)
     {
         await bus.PublishAsync(new Messages.Contracts.Returns.ReturnCompleted(
@@ -329,6 +334,9 @@ public static async Task Handle(
             DateTimeOffset.UtcNow));
     }
 }
+```
+
+**⭐ M36.0 Addition:** For HTTP endpoints that need to publish integration events, always use `OutgoingMessages` as part of the return tuple — never inject `IMessageBus`. See `wolverine-message-handlers.md` Pattern 7 for the `(IResult, OutgoingMessages)` tuple pattern.
 ```
 
 **Wolverine Transactional Outbox:** All published messages are enrolled in the transactional outbox automatically when `opts.Policies.UseDurableOutboxOnAllSendingEndpoints()` is configured (which it is in all CritterSupply APIs). Messages are durably persisted **before** the handler transaction commits, guaranteeing at-least-once delivery.
@@ -1097,6 +1105,43 @@ When building outgoing integration messages, pass **transient command values exp
 
 **Lesson:** This was discovered in Cycle 22, Lesson 2. Vendor's actual response was silently lost in Catalog BC message. See [Lessons Learned](#lessons-learned).
 
+### ⚠️ Warning 7: `bus.PublishAsync()` in HTTP Endpoints Bypasses Transactional Outbox ⭐ *M36.0 Addition*
+
+**Problem:** `IMessageBus.PublishAsync()` called inside an HTTP endpoint publishes messages **immediately**, outside Wolverine's transactional outbox. If the database transaction rolls back (e.g., Marten session commit fails), the integration message has already been sent.
+
+**❌ WRONG — HTTP endpoint with `bus.PublishAsync()`:**
+
+```csharp
+[WolverinePost("/api/orders/{orderId}/cancel")]
+public static async Task<IResult> Handle(Guid orderId, IDocumentSession session, IMessageBus bus, CancellationToken ct)
+{
+    var order = await session.LoadAsync<Order>(orderId, ct);
+    order.Status = OrderStatus.Cancelled;
+    session.Store(order);
+    await bus.PublishAsync(new OrderCancelled(orderId)); // ❌ Published even if commit fails
+    return Results.Ok();
+}
+```
+
+**✅ CORRECT — HTTP endpoint with `OutgoingMessages`:**
+
+```csharp
+[WolverinePost("/api/orders/{orderId}/cancel")]
+public static async Task<(IResult, OutgoingMessages)> Handle(Guid orderId, IDocumentSession session, CancellationToken ct)
+{
+    var outgoing = new OutgoingMessages();
+    var order = await session.LoadAsync<Order>(orderId, ct);
+    order.Status = OrderStatus.Cancelled;
+    session.Store(order);
+    outgoing.Add(new OrderCancelled(orderId)); // ✅ Processed within transaction
+    return (Results.Ok(), outgoing);
+}
+```
+
+**Impact:** This was the most pervasive Critter Stack idiom violation found in M36.0. Fixed across 4 BCs (Returns, Inventory, Orders, Payments).
+
+**Exception:** `bus.ScheduleAsync()` is still acceptable — delayed message delivery cannot be expressed via `OutgoingMessages`.
+
 ---
 
 ## Lessons Learned
@@ -1449,6 +1494,42 @@ public static LiveMetricUpdated Handle(
 **Key Rule:** If your handler appends events and queries projections in the same transaction, it MUST be `async Task<T>` to call `await session.SaveChangesAsync()`.
 
 **Cross-Reference:** See `docs/skills/event-sourcing-projections.md` → "Lesson 0: Inline Projections Require Explicit SaveChanges" for projection-specific details.
+
+### Lesson 13: `OutgoingMessages` Is the Only Safe HTTP Publishing Mechanism (M36.0)
+
+**Problem:** `bus.PublishAsync()` in HTTP endpoints bypasses the transactional outbox. This was the most pervasive idiom violation found in M36.0, fixed across Returns, Inventory, Orders, and Payments BCs.
+
+**Rule:** HTTP endpoints that publish integration events must return `(IResult, OutgoingMessages)` or `(ResponseType, OutgoingMessages)`. The `OutgoingMessages` collection is processed within the same Wolverine middleware pipeline that commits the Marten/EF Core session.
+
+**Exception:** `bus.ScheduleAsync()` remains valid for delayed delivery. `IMessageBus` in non-HTTP message handlers is also valid — Wolverine manages the transaction envelope correctly in that context.
+
+### Lesson 14: Idempotent Integration Event Publishing (M36.1)
+
+**Problem:** Idempotent HTTP endpoints (e.g., `RegisterMarketplace` returns existing document if ChannelCode already exists) should not publish integration events when the request is a no-op.
+
+**Pattern:** Check whether the state change actually occurred before adding to `OutgoingMessages`:
+
+```csharp
+var outgoing = new OutgoingMessages();
+var existing = await session.LoadAsync<Marketplace>(cmd.ChannelCode, ct);
+if (existing is not null)
+    return (Results.Ok(existing), outgoing); // ✅ No event — already exists
+
+var marketplace = Marketplace.Create(cmd.ChannelCode, cmd.DisplayName);
+session.Store(marketplace);
+outgoing.Add(new MarketplaceRegistered(marketplace.ChannelCode, marketplace.DisplayName));
+return (Results.Created($"/api/marketplaces/{marketplace.ChannelCode}", marketplace), outgoing);
+```
+
+**Why:** Duplicate integration events trigger duplicate downstream processing. Idempotent HTTP calls should be truly idempotent — including their side effects.
+
+### Lesson 15: Message Enrichment Tradeoffs Must Be Documented (M36.1)
+
+**Problem:** `ListingApproved` was expanded to carry `ProductName`, `Category`, and `Price` directly in the integration message — a Session 7 shortcut to avoid implementing a full `ProductSummaryView` ACL in the Marketplaces BC. The consuming BC (Marketplaces) uses these fields directly instead of querying its own local projection.
+
+**Tradeoff:** Simpler implementation now vs. coupling to the publishing BC's data availability later. If the Listings BC stops enriching these fields, or the data shape changes, the Marketplaces BC silently receives stale or missing data.
+
+**Rule:** When enriching an integration message beyond its natural payload (event ID + correlation IDs), document the decision and the planned remediation. In this case, ADR 0049 captures the coupling risk and the M37.x plan to replace enrichment with a Marketplaces-local `ProductSummaryView` ACL query.
 
 ---
 

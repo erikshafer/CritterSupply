@@ -270,3 +270,84 @@ public async Task AddAddress_WithValidAddress_MarksAsVerified()
 3. **Resilience** — Graceful degradation prevents service outages from blocking customers
 4. **Separation of Concerns** — Domain logic remains pure; external calls isolated
 5. **Development Speed** — Stub services work offline without API keys
+
+---
+
+## Credential Management Stubs ⭐ *M36.1 Addition*
+
+For BCs that need runtime secret retrieval (API keys, OAuth tokens), define an `IVaultClient` interface with a `DevVaultClient` stub that reads from `IConfiguration`:
+
+```csharp
+public interface IVaultClient
+{
+    Task<string> GetSecretAsync(string path);
+}
+
+public sealed class DevVaultClient : IVaultClient
+{
+    private readonly IConfiguration _config;
+    public DevVaultClient(IConfiguration config) => _config = config;
+
+    public Task<string> GetSecretAsync(string path)
+    {
+        // "credentials/amazon/api-key" → Configuration key "Vault:credentials:amazon:api-key"
+        var key = $"Vault:{path.Replace('/', ':')}";
+        var value = _config[key] ?? throw new KeyNotFoundException($"Secret not found: {path}");
+        return Task.FromResult(value);
+    }
+}
+```
+
+**Production safety guard:** At startup, verify `DevVaultClient` is not registered in non-Development environments:
+
+```csharp
+if (!builder.Environment.IsDevelopment())
+{
+    var vault = app.Services.GetService<IVaultClient>();
+    if (vault is DevVaultClient)
+        throw new InvalidOperationException("DevVaultClient must not be used outside Development");
+}
+```
+
+**Dev secrets in `appsettings.Development.json`:**
+```json
+{
+  "Vault": {
+    "credentials": {
+      "amazon": { "api-key": "dev-test-key", "secret": "dev-test-secret" }
+    }
+  }
+}
+```
+
+## Strategy Pattern with Keyed DI Dictionary ⭐ *M36.1 Addition*
+
+When multiple strategy implementations must be resolved by a runtime key (e.g., marketplace channel code), register them as a keyed dictionary:
+
+```csharp
+// Register individual adapters
+builder.Services.AddSingleton<IMarketplaceAdapter, AmazonAdapter>();
+builder.Services.AddSingleton<IMarketplaceAdapter, WalmartAdapter>();
+builder.Services.AddSingleton<IMarketplaceAdapter, EbayAdapter>();
+
+// Build the keyed dictionary
+builder.Services.AddSingleton<IReadOnlyDictionary<string, IMarketplaceAdapter>>(sp =>
+    sp.GetServices<IMarketplaceAdapter>()
+      .ToDictionary(a => a.ChannelCode, StringComparer.OrdinalIgnoreCase));
+```
+
+**Handler usage:**
+
+```csharp
+public static async Task Handle(
+    SubmitListing cmd,
+    IReadOnlyDictionary<string, IMarketplaceAdapter> adapters)
+{
+    if (!adapters.TryGetValue(cmd.ChannelCode, out var adapter))
+        throw new InvalidOperationException($"No adapter for channel: {cmd.ChannelCode}");
+
+    var result = await adapter.SubmitListingAsync(cmd.Submission);
+}
+```
+
+**Why a dictionary instead of service locator:** The dictionary is injected as a typed dependency — no `IServiceProvider` access in handlers. Each adapter exposes a `ChannelCode` property for keying. This pattern avoids service locator anti-patterns while supporting runtime dispatch.

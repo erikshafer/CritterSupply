@@ -65,6 +65,9 @@ Quick reference for key decisions you'll make while adding a BC:
 - [ ] Added project(s) to `CritterSupply.slnx` with `dotnet sln add`
 - [ ] Added `ProjectReference` to `Messages.Contracts` and `CritterSupply.ServiceDefaults`
 - [ ] `Program.cs` wired up: Wolverine + Marten (or EF Core), reads `GetConnectionString("postgres")`
+- [ ] `Program.cs` includes `opts.Policies.AutoApplyTransactions()` — mandatory, do not omit ⭐ *M36.0*
+- [ ] All non-auth endpoints have `[Authorize]` from the first commit ⭐ *M36.0*
+- [ ] `Program.cs` includes `OutgoingMessages` routing (`PublishMessage<T>()`) for any integration events ⭐ *M36.1*
 - [ ] `appsettings.json` has `"postgres"` key with correct `Database=<bcname>`
 - [ ] `Properties/launchSettings.json` set to the reserved port
 
@@ -85,6 +88,8 @@ Quick reference for key decisions you'll make while adding a BC:
 - [ ] `docs/skills/README.md` updated if adding new skill docs
 - [ ] Integration `TestFixture.cs` created using TestContainers pattern
 - [ ] Integration tests written for happy path and key error cases
+- [ ] Seed data tests use dedicated `SeedDataTests` class with `ReseedAsync()` in `InitializeAsync()` ⭐ *M36.1*
+- [ ] If BC API is wired into `Backoffice.Web`, E2E fixture's dynamic `appsettings.json` includes the new API URL ⭐ *M36.1*
 
 ---
 

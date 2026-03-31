@@ -148,6 +148,59 @@ builder.Services.AddMarten(opts =>
 
 **Key takeaway:** Application-assigned IDs (Guid or string) avoid extra database round trips. CritterSupply uses Guid for most BCs, string for Product Catalog (natural key).
 
+### Natural Key as Document Identity ⭐ *M36.1 Addition*
+
+Configuration entities with a natural, stable business identifier can use that identifier directly as the Marten document `Id`. This eliminates lookup-by-property queries.
+
+```csharp
+// Marketplace document uses ChannelCode as the Id
+public sealed class Marketplace
+{
+    public string Id { get; init; } = null!; // = ChannelCode (e.g., "AMAZON_US")
+    public string DisplayName { get; set; } = null!;
+    public bool IsActive { get; set; }
+}
+
+// Registration:
+opts.Schema.For<Marketplace>().Identity(x => x.Id);
+
+// Lookup is direct:
+var marketplace = await session.LoadAsync<Marketplace>("AMAZON_US", ct);
+```
+
+**When to use natural keys:** Configuration entities, reference data, or entities where the business identifier is immutable and unique (e.g., channel codes, ISO country codes, tenant slugs).
+
+### Composite Key Identity ⭐ *M36.1 Addition*
+
+Documents keyed by two or more fields can use a composite string key. This enables single `LoadAsync` calls without multi-field queries.
+
+```csharp
+public sealed class CategoryMapping
+{
+    public string Id { get; init; } = null!; // "{ChannelCode}:{InternalCategory}"
+    public string ChannelCode { get; init; } = null!;
+    public string InternalCategory { get; init; } = null!;
+    public string ExternalCategory { get; set; } = null!;
+
+    public static CategoryMapping Create(string channelCode, string internalCategory, string externalCategory)
+        => new()
+        {
+            Id = $"{channelCode}:{internalCategory}",
+            ChannelCode = channelCode,
+            InternalCategory = internalCategory,
+            ExternalCategory = externalCategory
+        };
+}
+
+// Registration:
+opts.Schema.For<CategoryMapping>().Identity(x => x.Id);
+
+// Direct lookup by composite key:
+var mapping = await session.LoadAsync<CategoryMapping>("AMAZON_US:Dogs", ct);
+```
+
+**Why:** Avoids `session.Query<CategoryMapping>().Where(x => x.ChannelCode == code && x.InternalCategory == cat)` — a single `LoadAsync` is faster and simpler. See ADR 0049 for the design rationale.
+
 > **Reference:** [Marten Document Identity](https://martendb.io/documents/identity.html)
 
 ---
@@ -188,6 +241,19 @@ public static async Task Handle(
 - Opens the session at handler start
 - Calls `SaveChangesAsync()` after handler completes successfully
 - Rolls back on exceptions
+
+**⚠️ CRITICAL (M36.0): `AutoApplyTransactions()` is mandatory.** This middleware only activates when `opts.Policies.AutoApplyTransactions()` is present in the Wolverine configuration. Without it, `IDocumentSession` changes (including `session.Events.Append()`) are silently discarded — handlers return HTTP 200 but no data is persisted.
+
+```csharp
+builder.Host.UseWolverine(opts =>
+{
+    opts.Policies.AutoApplyTransactions(); // ⭐ M36.0 Addition: MANDATORY — do not omit
+    opts.Policies.UseDurableLocalQueues();
+    opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
+});
+```
+
+This was the most impactful correctness fix in M36.0. Product Catalog had 5 integration test failures misclassified as async projection timing issues — the actual root cause was a missing `AutoApplyTransactions()` in `Program.cs`. Every other BC (13 total) already had this policy; Product Catalog was the sole outlier after its M35.0 ES migration.
 
 **❌ DO NOT call `SaveChangesAsync()` manually inside Wolverine handlers** — the middleware handles it:
 

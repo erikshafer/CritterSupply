@@ -1852,6 +1852,39 @@ public async Task ProductPrice_WithAllEventTypes_LoadsCorrectly()
 
 **Reference:** [ADR 0029: Order Saga Design Decisions](../decisions/0029-order-saga-design-decisions.md)
 
+### L6: Missing `AutoApplyTransactions()` Causes Silent Data Loss (M36.0) ⭐ *M36.0 Addition*
+
+**What happened:** Product Catalog had 5 integration test failures misclassified as async projection timing issues. Handlers returned HTTP 200 with correct data from local state, but events and projection updates were silently discarded because `AutoApplyTransactions()` was missing from `Program.cs`.
+
+**Root cause:** Without `AutoApplyTransactions()`, Wolverine HTTP endpoints do not auto-commit the Marten `IDocumentSession`. The policy was missed during the M35.0 ES migration because Product Catalog was originally a document-store BC.
+
+**Fix:** Added `opts.Policies.AutoApplyTransactions()` to `ProductCatalog.Api/Program.cs`. All 5 failures resolved immediately.
+
+**Takeaway:** `AutoApplyTransactions()` is non-negotiable in every Marten BC. Its absence fails silently — handlers appear to work but persist nothing. See also `marten-document-store.md` and `adding-new-bounded-context.md`.
+
+### L7: `SaveChangesAsync()` Is Redundant with `AutoApplyTransactions()` (M36.0) ⭐ *M36.0 Addition*
+
+**What happened:** 34 manual `SaveChangesAsync()` calls across 4 BCs (Vendor Portal: 27, Pricing: 5, Product Catalog: 2) were redundant because `AutoApplyTransactions()` already commits the session after handler execution.
+
+**Root cause:** Handlers written before the team understood Wolverine's middleware pipeline included manual commits as a defensive pattern.
+
+**Fix:** Removed all 34 calls. Tests remained green — Wolverine auto-commits correctly.
+
+**Takeaway:** Do not call `SaveChangesAsync()` manually inside Wolverine handlers when `AutoApplyTransactions()` is configured. The manual call is harmless (double-commit is idempotent) but misleading — it implies the middleware doesn't handle commits.
+
+### L8: Incremental Event Sourcing Migration (M35.0) ⭐ *M35.0 Addition*
+
+**What happened:** Product Catalog was migrated from document store to event sourcing across Sessions 5–6 of M35.0. The migration succeeded because it followed a disciplined incremental pattern.
+
+**Pattern:**
+1. Define all domain events first (11 events for Product lifecycle)
+2. Build the event-sourced aggregate with `Create()` + `Apply()` methods
+3. Build the snapshot projection (`ProductCatalogView`) with inline lifecycle
+4. Migrate handlers one by one, keeping tests green after each handler
+5. Retain the legacy document store model for migration reads (`MigrateProduct` handler)
+
+**Takeaway:** Incremental migration is safer than big-bang. Each handler migration is a self-contained unit of work with clear before/after test verification. The final handler (AssignProductToVendor) was the most complex but followed the exact same pattern as the other thirteen.
+
 ---
 
 ## Related Documentation
@@ -1901,5 +1934,5 @@ public async Task ProductPrice_WithAllEventTypes_LoadsCorrectly()
 
 ---
 
-*Last updated: 2026-03-13*
-*Reflects lessons learned through Cycle 27 (Returns BC Phase 3)*
+*Last updated: 2026-03-31*
+*Reflects lessons learned through M36.1 (Listings + Marketplaces)*

@@ -46,7 +46,7 @@ This directory contains implementation patterns and best practices for building 
 - 🏗️ [Adding a New Bounded Context](./adding-new-bounded-context.md) - Complete step-by-step guide: .NET projects, Docker, Postgres, Aspire, CONTEXTS.md, tests
 
 **External Integrations:**
-- 🔌 [External Service Integration](./external-service-integration.md) - Strategy pattern, stub vs production, graceful degradation
+- 🔌 [External Service Integration](./external-service-integration.md) - Strategy pattern, stub vs production, graceful degradation, credential management stubs, keyed DI dictionaries
 
 **AI Agent Workflows:**
 - 🤖 [Copilot Session Prompt](./copilot-session-prompt.md) - Writing structured session prompts for CritterSupply's custom Copilot agent roster (@PSA, @QAE, @UXE, etc.)
@@ -320,4 +320,4 @@ Each skill document follows this structure:
 
 ---
 
-**Last Updated:** 2026-03-29
+**Last Updated:** 2026-03-31

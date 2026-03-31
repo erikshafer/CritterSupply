@@ -623,6 +623,20 @@ public static async Task<LiveMetricUpdated> Handle(
 
 **Takeaway:** BFF-owned projections are a pragmatic alternative to creating a separate Analytics BC. Start with BFF projections; migrate to Analytics BC when requirements demand it.
 
+### Lesson 7: Missing `AutoApplyTransactions()` Mimics Projection Timing Issues ⭐ *M36.0 Addition*
+
+**From:** Product Catalog BC (M36.0)
+
+**Problem:** 5 integration tests failed with stale projection data. Symptom was identical to an async projection race condition — projection state did not reflect events appended by the handler. The root cause was not projection timing but a missing `opts.Policies.AutoApplyTransactions()` in `Program.cs`.
+
+**Why it was misclassified:** Without `AutoApplyTransactions()`, the Marten session is never committed. Events are appended to the in-memory session but never persisted to the database. Inline projections, which update during `SaveChangesAsync()`, never fire. The result — stale projection data — looks exactly like a projection lag issue.
+
+**Diagnostic:** When projection tests fail with stale data:
+1. First check `Program.cs` for `opts.Policies.AutoApplyTransactions()` — if missing, add it
+2. Only investigate projection lifecycle or timing issues after confirming the policy is present
+
+**Takeaway:** Always verify `AutoApplyTransactions()` before debugging projection timing. This policy is required in every Marten BC. See `marten-document-store.md` and `marten-event-sourcing.md` for full documentation.
+
 ---
 
 ## Decision Matrix: Which Projection Pattern?

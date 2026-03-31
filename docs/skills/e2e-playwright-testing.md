@@ -2899,3 +2899,79 @@ Scenario: Session expiry on operations alerts page preserves returnUrl
 - `src/Backoffice Identity/BackofficeIdentity/Identity/BackofficeUser.cs` - BackofficeRole enum (7 values)
 
 ---
+
+## M36.1: Stub API Host Pattern for External BC APIs ⭐ *M36.1 Addition*
+
+When a Blazor WASM frontend calls a BC API that lives in a separate process (not stubbed via in-process `IXxxClient`), E2E tests need a lightweight stub HTTP server serving known responses.
+
+### Stub API Host Pattern
+
+```csharp
+public class StubListingsApiHost : IAsyncDisposable
+{
+    private WebApplication? _app;
+    private readonly List<ListingSummaryResponse> _listings = new();
+
+    public void SeedListings(params ListingSummaryResponse[] listings) => _listings.AddRange(listings);
+    public void Clear() => _listings.Clear();
+
+    public async Task StartAsync(int port)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls($"http://localhost:{port}");
+        _app = builder.Build();
+        _app.UseCors(p => p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+        _app.MapGet("/api/listings", () => Results.Ok(_listings));
+        // Add more endpoints as needed
+        await _app.StartAsync();
+    }
+
+    public async ValueTask DisposeAsync() { if (_app is not null) await _app.DisposeAsync(); }
+}
+```
+
+**Key elements:**
+- `SeedXxx()` methods for per-scenario data setup
+- `Clear()` for between-scenario cleanup (call in `BeforeScenario` hook)
+- CORS fully open for test origins
+- Registered in `E2ETestFixture` initialization before the WASM static file host
+
+### ⚠️ DO NOT: Omit New API URLs from Dynamic `appsettings.json`
+
+When a new BC API is wired into Backoffice.Web via `AddHttpClient`, the `WasmStaticFileHost`'s dynamic `appsettings.json` endpoint **must** include the new API's URL. Without it, the WASM app falls back to the hardcoded default URL (which doesn't exist in E2E), and HTTP calls silently fail or hit a non-existent server.
+
+```csharp
+// ✅ CORRECT — Dynamic appsettings includes ALL API URLs
+app.MapGet("/appsettings.json", () => Results.Json(new
+{
+    ApiClients = new
+    {
+        BackofficeIdentityApiUrl = identityApiUrl,
+        BackofficeApiUrl = backofficeApiUrl,
+        ListingsApiUrl = listingsStubUrl,       // ✅ Added when Listings API was wired
+        MarketplacesApiUrl = marketplacesStubUrl // ✅ Added when Marketplaces API was wired
+    }
+}));
+```
+
+This gap existed for `MarketplacesApiUrl` in M36.1 Session 9 and caused marketplace admin E2E tests to silently call a non-existent URL.
+
+### ⚠️ DO NOT: Create `.feature` Files Without `@shard-N` Tags
+
+Every Backoffice E2E `.feature` file must have a `@shard-N` tag on line 1. The E2E CI workflow (`e2e.yml`) filters tests by `Category=shard-N` traits derived from Reqnroll tags. Without a shard tag, scenarios have no `Category` trait and are **silently skipped** by CI runners.
+
+```gherkin
+@shard-3
+Feature: Marketplaces Administration
+  ...
+```
+
+This gap was discovered in M36.1 Session 10 — `MarketplacesAdmin.feature`, `ListingsAdmin.feature`, and `ListingsDetail.feature` were all missing shard tags.
+
+### M36.1 Reference Files
+
+- **Stub Hosts:** `tests/Backoffice/Backoffice.E2ETests/E2ETestFixture.cs` — `StubListingsApiHost`, `StubMarketplacesApiHost`
+- **Dynamic Appsettings:** `E2ETestFixture.cs` — `WasmStaticFileHost` constructor with all 4 API URLs
+- **Feature Files:** `tests/Backoffice/Backoffice.E2ETests/Features/MarketplacesAdmin.feature`, `ListingsAdmin.feature`, `ListingsDetail.feature`
+
+---
