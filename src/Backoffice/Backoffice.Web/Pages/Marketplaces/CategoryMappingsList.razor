@@ -9,10 +9,12 @@
 
 <PageTitle>Category Mappings — Backoffice</PageTitle>
 
-<MudBreadcrumbs Items="_breadcrumbs" />
+<div data-testid="category-mappings-page">
+
+<MudBreadcrumbs Items="_breadcrumbs" data-testid="category-mappings-breadcrumbs" />
 
 <div class="d-flex align-center mb-4">
-    <MudText Typo="Typo.h4">Category Mappings</MudText>
+    <MudText Typo="Typo.h4" data-testid="category-mappings-title">Category Mappings</MudText>
     <MudSpacer />
     <MudSelect T="string" Label="Channel Filter" Value="_channelFilter"
                Variant="Variant.Outlined" Margin="Margin.Dense"
@@ -27,12 +29,12 @@
 
 @if (_isLoading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" data-testid="category-mappings-loading" />
 }
 
 @if (!string.IsNullOrEmpty(_errorMessage))
 {
-    <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+    <MudAlert Severity="Severity.Error" Class="mb-4" data-testid="category-mappings-error">@_errorMessage</MudAlert>
 }
 
 <MudTable Items="@_mappings" Hover="true" Striped="true" Dense="true" data-testid="category-mappings-table">
@@ -47,10 +49,10 @@
         <MudTd DataLabel="Channel" data-testid="@($"mapping-row-{context.Id}")">
             <MudText Typo="Typo.body2"><strong>@context.ChannelCode</strong></MudText>
         </MudTd>
-        <MudTd DataLabel="Internal Category">
+        <MudTd DataLabel="Internal Category" data-testid="@($"mapping-category-{context.Id}")">
             <MudText Typo="Typo.body2">@context.InternalCategory</MudText>
         </MudTd>
-        <MudTd DataLabel="Marketplace Category ID">
+        <MudTd DataLabel="Marketplace Category ID" data-testid="@($"mapping-marketplace-id-{context.Id}")">
             <MudText Typo="Typo.body2">@context.MarketplaceCategoryId</MudText>
         </MudTd>
         <MudTd DataLabel="Marketplace Path">
@@ -61,11 +63,13 @@
         </MudTd>
     </RowTemplate>
     <NoRecordsContent>
-        <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">
+        <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4" data-testid="category-mappings-no-records">
             No category mappings found.
         </MudText>
     </NoRecordsContent>
 </MudTable>
+
+</div>
 
 @code {
     private sealed record CategoryMappingDto(
