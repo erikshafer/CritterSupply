@@ -186,6 +186,10 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        // ⭐ M36.1 Addition: Check for Authorization header presence
+        if (!Context.Request.Headers.ContainsKey("Authorization"))
+            return Task.FromResult(AuthenticateResult.NoResult());
+
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, _authContext.UserId.ToString()),
@@ -202,6 +206,8 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
 }
 ```
 
+**⚠️ CRITICAL (M36.1):** `TestAuthHandler` must check for the `Authorization` header and return `AuthenticateResult.NoResult()` if absent. Without this check, `[Authorize]` endpoints always succeed in tests — even without credentials — masking production authentication failures. This bug existed silently from M36.0 through M36.1 Session 7.
+
 **TestFixture Registration:**
 
 ```csharp
@@ -209,6 +215,15 @@ services.AddSingleton<ITestAuthContext, TestAuthContext>();
 services.AddAuthentication("Test")
     .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
 ```
+
+**⭐ M36.1 Addition:** After creating the `AlbaHost`, call `AddDefaultAuthHeader()` to inject the default `Authorization: Bearer test-token` header into all Alba scenarios:
+
+```csharp
+Host = await AlbaHost.For<Program>(builder => { /* ... */ });
+Host.AddDefaultAuthHeader(); // Required — ensures all scenarios are authenticated by default
+```
+
+**DO NOT** skip `AddDefaultAuthHeader()`. Without it, all HTTP requests via Alba will fail with 401 on `[Authorize]` endpoints because `TestAuthHandler` now correctly rejects requests without the header.
 
 ### Authorization Bypass for Policy-Based Endpoints
 
@@ -351,6 +366,41 @@ public class TestFixture : IAsyncLifetime
 - ❌ Tests pass in one order, fail in another
 - ❌ Test depends on data created by fixture
 - ❌ Data leakage between tests
+- ❌ Seed data tests fail non-deterministically (see Seed Data Isolation below)
+
+### Seed Data Isolation ⭐ *M36.1 Addition*
+
+**Problem:** Test classes that call `CleanAllDocumentsAsync()` in `DisposeAsync()` can wipe seed data before seed data verification tests run. xUnit does not guarantee test class execution order.
+
+**Solution:** Create a dedicated `SeedDataTests` class that reseeds in `InitializeAsync()` and does NOT clean in `DisposeAsync()`:
+
+```csharp
+[Collection(IntegrationTestCollection.Name)]
+public class SeedDataTests : IAsyncLifetime
+{
+    private readonly TestFixture _fixture;
+
+    public SeedDataTests(TestFixture fixture) => _fixture = fixture;
+
+    public async Task InitializeAsync() => await _fixture.ReseedAsync(); // ✅ Reseed before verification
+    public Task DisposeAsync() => Task.CompletedTask; // ✅ Do NOT clean — leave seed data intact
+
+    [Fact]
+    public async Task Should_have_seeded_marketplaces() { /* verify seed data */ }
+}
+```
+
+**TestFixture must expose `ReseedAsync()`:**
+
+```csharp
+public async Task ReseedAsync()
+{
+    await using var session = Store.LightweightSession();
+    await YourSeedData.SeedAsync(Host.Services); // Reuse the same seed method as app startup
+}
+```
+
+**DO NOT** verify seed data in a test class that also calls `CleanAllDocumentsAsync()` in `DisposeAsync()`. The cleanup will race with other test classes.
 
 ### Collection Fixtures for Sequential Execution
 
