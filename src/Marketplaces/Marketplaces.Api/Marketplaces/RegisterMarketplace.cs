@@ -1,7 +1,9 @@
 using FluentValidation;
 using Marten;
 using Marketplaces.Marketplaces;
+using Messages.Contracts.Marketplaces;
 using Microsoft.AspNetCore.Authorization;
+using Wolverine;
 using Wolverine.Http;
 
 namespace Marketplaces.Api.Marketplaces;
@@ -41,24 +43,26 @@ public static class RegisterMarketplaceEndpoint
     /// <summary>
     /// Registers a new marketplace channel. Idempotent by ChannelCode (GR-NEW-3):
     /// if the channel code already exists, returns 200 with the existing document
-    /// rather than 409.
+    /// rather than 409. Publishes <see cref="MarketplaceRegistered"/> on new registrations.
     /// </summary>
     [WolverinePost("/api/marketplaces")]
     [Authorize]
-    public static async Task<IResult> Handle(
+    public static async Task<(IResult, OutgoingMessages)> Handle(
         RegisterMarketplace command,
         IDocumentSession session,
         CancellationToken ct)
     {
+        var outgoing = new OutgoingMessages();
+
         var existing = await session.LoadAsync<Marketplace>(command.ChannelCode, ct);
         if (existing is not null)
         {
-            // Idempotent upsert — return existing document with 200
-            return Results.Ok(new RegisterMarketplaceResponse(
+            // Idempotent upsert — return existing document with 200, no event published
+            return (Results.Ok(new RegisterMarketplaceResponse(
                 existing.Id,
                 existing.DisplayName,
                 existing.IsActive,
-                existing.CreatedAt));
+                existing.CreatedAt)), outgoing);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -76,12 +80,17 @@ public static class RegisterMarketplaceEndpoint
         session.Store(marketplace);
         await session.SaveChangesAsync(ct);
 
-        return Results.Created(
+        outgoing.Add(new MarketplaceRegistered(
+            marketplace.Id,
+            marketplace.DisplayName,
+            now));
+
+        return (Results.Created(
             $"/api/marketplaces/{marketplace.Id}",
             new RegisterMarketplaceResponse(
                 marketplace.Id,
                 marketplace.DisplayName,
                 marketplace.IsActive,
-                marketplace.CreatedAt));
+                marketplace.CreatedAt)), outgoing);
     }
 }

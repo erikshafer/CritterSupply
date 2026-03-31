@@ -52,6 +52,10 @@ public class TestFixture : IAsyncLifetime
                     schemes: "Bearer");
             });
         });
+
+        // Ensure all Alba scenarios include an Authorization header so TestAuthHandler
+        // authenticates them. Raw HttpClient requests (auth tests) won't have this header.
+        Host.AddDefaultAuthHeader();
     }
 
     public async Task DisposeAsync()
@@ -99,6 +103,15 @@ public class TestFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Re-runs seed data logic. Use after <see cref="CleanAllDocumentsAsync"/> when
+    /// a subsequent test needs the canonical marketplace and category mapping documents.
+    /// </summary>
+    public async Task ReseedAsync()
+    {
+        await MarketplacesSeedData.SeedAsync(Host.Services);
+    }
+
+    /// <summary>
     /// Executes a message through Wolverine and waits for all cascading messages.
     /// </summary>
     public async Task<ITrackedSession> ExecuteAndWaitAsync<T>(T message, int timeoutSeconds = 15)
@@ -111,5 +124,20 @@ public class TestFixture : IAsyncLifetime
             {
                 await ctx.InvokeAsync(message);
             }));
+    }
+
+    /// <summary>
+    /// Makes HTTP calls with message tracking to verify outgoing messages.
+    /// </summary>
+    public async Task<(ITrackedSession, IScenarioResult)> TrackedHttpCall(Action<Scenario> configuration)
+    {
+        IScenarioResult result = null!;
+
+        var tracked = await Host.ExecuteAndWaitAsync(async () =>
+        {
+            result = await Host.Scenario(configuration);
+        });
+
+        return (tracked, result);
     }
 }

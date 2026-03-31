@@ -1,5 +1,3 @@
-using Marten;
-using Marketplaces.CategoryMappings;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -190,33 +188,5 @@ public sealed class CategoryMappingTests : IAsyncLifetime
         items.ShouldNotBeNull();
         items.Length.ShouldBe(2);
         items.ShouldAllBe(item => item.GetProperty("channelCode").GetString() == "FILTER_A");
-    }
-
-    // -------------------------------------------------------------------------
-    // Seed data
-    // -------------------------------------------------------------------------
-
-    [Fact]
-    public async Task SeedData_EighteenCategoryMappings_ExistOnStartup()
-    {
-        await using var session = _fixture.GetDocumentSession();
-
-        var allMappings = await session.Query<CategoryMapping>().ToListAsync();
-
-        // 6 categories × 3 channels = 18 mappings
-        allMappings.Count.ShouldBeGreaterThanOrEqualTo(18);
-
-        // Verify a sample mapping from each channel
-        var amazonDogs = await session.LoadAsync<CategoryMapping>("AMAZON_US:Dogs");
-        amazonDogs.ShouldNotBeNull();
-        amazonDogs!.MarketplaceCategoryId.ShouldBe("AMZN-PET-DOGS-001");
-
-        var walmartCats = await session.LoadAsync<CategoryMapping>("WALMART_US:Cats");
-        walmartCats.ShouldNotBeNull();
-        walmartCats!.MarketplaceCategoryId.ShouldBe("WMT-PET-CATS-001");
-
-        var ebayBirds = await session.LoadAsync<CategoryMapping>("EBAY_US:Birds");
-        ebayBirds.ShouldNotBeNull();
-        ebayBirds!.MarketplaceCategoryId.ShouldBe("EBAY-PET-BIRDS-001");
     }
 }

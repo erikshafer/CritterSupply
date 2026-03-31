@@ -12,7 +12,16 @@ public static class MarketplacesSeedData
 {
     public static async Task SeedAsync(WebApplication app)
     {
-        using var scope = app.Services.CreateScope();
+        await SeedAsync(app.Services);
+    }
+
+    /// <summary>
+    /// Seeds marketplace and category mapping documents using the given service provider.
+    /// Can be called from both application startup and integration test fixtures.
+    /// </summary>
+    public static async Task SeedAsync(IServiceProvider services)
+    {
+        using var scope = services.CreateScope();
         await using var session = scope.ServiceProvider
             .GetRequiredService<IDocumentStore>()
             .LightweightSession();

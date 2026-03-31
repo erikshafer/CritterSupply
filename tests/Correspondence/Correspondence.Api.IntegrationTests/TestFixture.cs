@@ -60,6 +60,8 @@ public sealed class TestFixture : IAsyncLifetime
                     schemes: ["Backoffice"]);
             });
         });
+
+        Host.AddDefaultAuthHeader();
     }
 
     /// <summary>

@@ -54,6 +54,8 @@ public class TestFixture : IAsyncLifetime
                     schemes: ["Backoffice", "Vendor"]);
             });
         });
+
+        Host.AddDefaultAuthHeader();
     }
 
     public async Task DisposeAsync()

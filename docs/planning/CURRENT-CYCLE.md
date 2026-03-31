@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M36.1 — Listings BC Foundation (Session 7 Complete — Category Mappings + Adapter Stubs + ListingApproved Consumer) |
-| **Status** | 🔨 **PHASE 2 IN PROGRESS** — Session 7 complete; CategoryMapping CRUD + IMarketplaceAdapter stubs + ListingApproved consumer; 58/58 tests |
+| **Current Milestone** | M36.1 — Listings BC Foundation (Session 8 Complete — Marketplace Admin UI + Test Fixes + Phase 2 Gate) |
+| **Status** | 🔨 **PHASE 2 IN PROGRESS** — Session 8 complete; test fixes (4 resolved), CORS, message publishing, admin UI; 62/62 tests |
 | **Recent Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Previous Completion** | M35.0 — Product Expansion Begins (2026-03-27) |
 | **Active BCs** | 19 total (Listings BC scaffold added) |
 
-*Last Updated: 2026-03-30 (M36.1 Session 7 complete — Category Mappings + Adapter Stubs + ListingApproved Consumer)*
+*Last Updated: 2026-03-31 (M36.1 Session 8 complete — Marketplace Admin UI + Test Fixes + Phase 2 Gate)*
 
 ---
 
@@ -326,6 +326,40 @@
 - Build: 0 errors
 - Session 8 picks up: Marketplace admin UI, CORS, ADRs 0048–0049, Phase 2 gate verification
 - Retrospective: [Session 7](./milestones/m36-1-session-7-retrospective.md)
+
+**Session 8 Progress (2026-03-31):**
+- Test failure resolution (items 8.1–8.2):
+  - ✅ Auth test failures (2): `TestAuthHandler` now checks for `Authorization` header; returns `NoResult` if absent
+  - ✅ Added `AddDefaultAuthHeader()` extension on `IAlbaHost` in `CritterSupply.TestUtilities`
+  - ✅ Updated all 8 test fixtures to call `Host.AddDefaultAuthHeader()`
+  - ✅ Seed data test failures (2): Moved to dedicated `SeedDataTests.cs` class with `ReseedAsync()` in `InitializeAsync()`
+  - ✅ Refactored `MarketplacesSeedData.SeedAsync()` to accept `IServiceProvider`
+  - ✅ All 23 previously existing Marketplaces tests now pass (0 failures)
+  - ✅ All 35 Listings tests pass (0 regressions)
+- CORS configuration (item 8.3):
+  - ✅ `BackofficePolicy` CORS policy added to `Marketplaces.Api/Program.cs`
+  - ✅ Origin: `http://localhost:5244` (configurable via `Cors:BackofficeOrigin`)
+  - ✅ Applied via `app.UseCors("BackofficePolicy")` before `UseAuthentication`
+- Integration message publishing (item 8.4):
+  - ✅ `RegisterMarketplace` now publishes `MarketplaceRegistered` via `OutgoingMessages` (return type: `(IResult, OutgoingMessages)`)
+  - ✅ `DeactivateMarketplace` now publishes `MarketplaceDeactivated` via `OutgoingMessages` (only on active→inactive transition)
+  - ✅ RabbitMQ exchanges: `marketplaces-registered`, `marketplaces-deactivated`
+  - ✅ 4 new tests in `MarketplaceMessagePublishingTests.cs` (publish + idempotency for both handlers)
+  - ✅ `TrackedHttpCall()` helper added to TestFixture
+- Marketplace admin UI (items 8.5–8.7):
+  - ✅ `MarketplacesApi` named HttpClient added in `Backoffice.Web/Program.cs` (port 5247)
+  - ✅ `MarketplacesList.razor` at `/marketplaces` — read-only list (ChannelCode, DisplayName, IsActive, CreatedAt)
+  - ✅ `CategoryMappingsList.razor` at `/marketplaces/category-mappings` — read-only with channel filter (stretch goal delivered)
+  - ✅ Nav menu entries added under ProductManager policy
+  - ✅ `wwwroot/appsettings.json` updated with `MarketplacesApiUrl`
+- Phase 2 gate verification (item 8.8):
+  - ✅ 14/16 gate criteria met
+  - ❌ E2E tests for marketplace admin pages — carry to Session 9
+  - ❌ ADRs 0048 and 0049 — carry to Session 9
+- Build: 0 errors, 33 warnings (unchanged)
+- Total tests: 62 (35 Listings + 27 Marketplaces) — 0 failures
+- Session 9 picks up: E2E tests, ADRs 0048–0049, Phase 2 gate closure
+- Retrospective: [Session 8](./milestones/m36-1-session-8-retrospective.md)
 
 **(QoL) Dev Seed Data (2026-03-30):**
 - ✅ `BackofficeIdentitySeedData.cs` — 7 users, one per ADR 0031 role (SystemAdmin, Executive, OperationsManager, CustomerService, WarehouseClerk, PricingManager, CopyWriter)

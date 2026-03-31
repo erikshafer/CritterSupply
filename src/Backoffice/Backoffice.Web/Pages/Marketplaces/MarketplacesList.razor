@@ -1,0 +1,128 @@
+@page "/marketplaces"
+@using Microsoft.AspNetCore.Authorization
+@using Backoffice.Web.Auth
+@attribute [Authorize(Roles = "product-manager,system-admin")]
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Navigation
+@inject SessionExpiredService SessionExpiredService
+@inject BackofficeAuthState AuthState
+
+<PageTitle>Marketplaces — Backoffice</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" />
+
+<div class="d-flex align-center mb-4">
+    <MudText Typo="Typo.h4">Marketplace Channels</MudText>
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+}
+
+<MudTable Items="@_marketplaces" Hover="true" Striped="true" Dense="true" data-testid="marketplaces-table">
+    <HeaderContent>
+        <MudTh>Channel Code</MudTh>
+        <MudTh>Display Name</MudTh>
+        <MudTh>Active</MudTh>
+        <MudTh>Created</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Channel Code" data-testid="@($"marketplace-row-{context.Id}")">
+            <MudText Typo="Typo.body2"><strong>@context.Id</strong></MudText>
+        </MudTd>
+        <MudTd DataLabel="Display Name">
+            <MudText Typo="Typo.body2">@context.DisplayName</MudText>
+        </MudTd>
+        <MudTd DataLabel="Active">
+            @if (context.IsActive)
+            {
+                <MudChip T="string" Color="Color.Success" Size="Size.Small">Active</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Color="Color.Default" Size="Size.Small">Inactive</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="Created">
+            <MudText Typo="Typo.body2">@context.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">
+            No marketplaces found.
+        </MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private sealed record MarketplaceDto(
+        string Id,
+        string DisplayName,
+        bool IsActive,
+        bool IsOwnWebsite,
+        string? ApiCredentialVaultPath,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset UpdatedAt);
+
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Marketplaces", href: null, disabled: true)
+    };
+
+    private List<MarketplaceDto> _marketplaces = new();
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMarketplacesAsync();
+    }
+
+    private async Task LoadMarketplacesAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("MarketplacesApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var response = await client.GetAsync("/api/marketplaces");
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _errorMessage = "Failed to load marketplaces. Please try again.";
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<List<MarketplaceDto>>();
+            if (result is not null)
+            {
+                _marketplaces = result;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading marketplaces: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

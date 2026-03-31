@@ -1,0 +1,146 @@
+@page "/marketplaces/category-mappings"
+@using Microsoft.AspNetCore.Authorization
+@using Backoffice.Web.Auth
+@attribute [Authorize(Roles = "product-manager,system-admin")]
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Navigation
+@inject SessionExpiredService SessionExpiredService
+@inject BackofficeAuthState AuthState
+
+<PageTitle>Category Mappings — Backoffice</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" />
+
+<div class="d-flex align-center mb-4">
+    <MudText Typo="Typo.h4">Category Mappings</MudText>
+    <MudSpacer />
+    <MudSelect T="string" Label="Channel Filter" Value="_channelFilter"
+               Variant="Variant.Outlined" Margin="Margin.Dense"
+               Style="max-width: 200px;" data-testid="channel-filter"
+               ValueChanged="OnChannelFilterChanged">
+        <MudSelectItem T="string" Value="@("All")">All Channels</MudSelectItem>
+        <MudSelectItem T="string" Value="@("AMAZON_US")">Amazon US</MudSelectItem>
+        <MudSelectItem T="string" Value="@("WALMART_US")">Walmart US</MudSelectItem>
+        <MudSelectItem T="string" Value="@("EBAY_US")">eBay US</MudSelectItem>
+    </MudSelect>
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+}
+
+<MudTable Items="@_mappings" Hover="true" Striped="true" Dense="true" data-testid="category-mappings-table">
+    <HeaderContent>
+        <MudTh>Channel</MudTh>
+        <MudTh>Internal Category</MudTh>
+        <MudTh>Marketplace Category ID</MudTh>
+        <MudTh>Marketplace Path</MudTh>
+        <MudTh>Last Verified</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Channel" data-testid="@($"mapping-row-{context.Id}")">
+            <MudText Typo="Typo.body2"><strong>@context.ChannelCode</strong></MudText>
+        </MudTd>
+        <MudTd DataLabel="Internal Category">
+            <MudText Typo="Typo.body2">@context.InternalCategory</MudText>
+        </MudTd>
+        <MudTd DataLabel="Marketplace Category ID">
+            <MudText Typo="Typo.body2">@context.MarketplaceCategoryId</MudText>
+        </MudTd>
+        <MudTd DataLabel="Marketplace Path">
+            <MudText Typo="Typo.body2">@(context.MarketplaceCategoryPath ?? "—")</MudText>
+        </MudTd>
+        <MudTd DataLabel="Last Verified">
+            <MudText Typo="Typo.body2">@context.LastVerifiedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">
+            No category mappings found.
+        </MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private sealed record CategoryMappingDto(
+        string Id,
+        string ChannelCode,
+        string InternalCategory,
+        string MarketplaceCategoryId,
+        string? MarketplaceCategoryPath,
+        DateTimeOffset LastVerifiedAt);
+
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Marketplaces", href: "/marketplaces"),
+        new BreadcrumbItem("Category Mappings", href: null, disabled: true)
+    };
+
+    private List<CategoryMappingDto> _mappings = new();
+    private string _channelFilter = "All";
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMappingsAsync();
+    }
+
+    private async Task LoadMappingsAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("MarketplacesApi");
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+
+            var url = _channelFilter != "All"
+                ? $"/api/category-mappings?channelCode={_channelFilter}"
+                : "/api/category-mappings";
+
+            var response = await client.GetAsync(url);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _errorMessage = "Failed to load category mappings. Please try again.";
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<List<CategoryMappingDto>>();
+            if (result is not null)
+            {
+                _mappings = result;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading category mappings: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OnChannelFilterChanged(string newValue)
+    {
+        _channelFilter = newValue;
+        await LoadMappingsAsync();
+    }
+}

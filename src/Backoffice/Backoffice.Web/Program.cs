@@ -17,6 +17,8 @@ var backofficeApiUrl = builder.Configuration["ApiClients:BackofficeApiUrl"]
     ?? "http://localhost:5243";
 var listingsApiUrl = builder.Configuration["ApiClients:ListingsApiUrl"]
     ?? "http://localhost:5246";
+var marketplacesApiUrl = builder.Configuration["ApiClients:MarketplacesApiUrl"]
+    ?? "http://localhost:5247";
 
 builder.Services.AddHttpClient("BackofficeIdentityApi", client =>
 {
@@ -31,6 +33,11 @@ builder.Services.AddHttpClient("BackofficeApi", client =>
 builder.Services.AddHttpClient("ListingsApi", client =>
 {
     client.BaseAddress = new Uri(listingsApiUrl);
+});
+
+builder.Services.AddHttpClient("MarketplacesApi", client =>
+{
+    client.BaseAddress = new Uri(marketplacesApiUrl);
 });
 
 builder.Services.AddMudServices();
