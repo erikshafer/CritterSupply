@@ -189,7 +189,6 @@ public sealed class MarketplacesAdminSteps
         var page = new CategoryMappingsListPage(Page, Fixture.WasmBaseUrl);
         var breadcrumbText = await page.GetBreadcrumbTextAsync();
         breadcrumbText.ShouldNotBeNull("Expected breadcrumb text to be non-null");
-        breadcrumbText!.ShouldContain(expectedText,
-            $"Expected breadcrumb trail to contain '{expectedText}' but got '{breadcrumbText}'");
+        breadcrumbText!.ShouldContain(expectedText);
     }
 }
