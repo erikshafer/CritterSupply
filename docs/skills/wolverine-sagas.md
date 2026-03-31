@@ -2,6 +2,36 @@
 
 Patterns and practices for building stateful orchestration sagas with Wolverine + Marten in CritterSupply.
 
+---
+
+## Table of Contents
+
+1. [Core Principle: Sagas Are Mutable State Machines](#core-principle-sagas-are-mutable-state-machines)
+2. [When to Use a Saga vs. Other Patterns](#when-to-use-a-saga-vs-other-patterns)
+   - [Event-Sourced Aggregate vs. Document-Based Saga](#event-sourced-aggregate-vs-document-based-saga)
+3. [The Wolverine Saga API](#the-wolverine-saga-api)
+   - [The `Saga` Base Class](#the-saga-base-class)
+   - [Saga Identity and Message Correlation](#saga-identity-and-message-correlation)
+   - [`MarkCompleted()`](#markcompleted)
+4. [Starting a Saga](#starting-a-saga)
+5. [Handler Discovery: `IncludeAssembly` vs. `IncludeType`](#handler-discovery-includeassembly-vs-includetype)
+6. [Marten Document Configuration for Sagas](#marten-document-configuration-for-sagas)
+   - [Optimistic Concurrency with `ConcurrencyException`](#optimistic-concurrency-with-concurrencyexception)
+7. [The Decider Pattern for Saga Business Logic](#the-decider-pattern-for-saga-business-logic)
+8. [Multi-SKU Race Conditions](#multi-sku-race-conditions)
+9. [At-Least-Once Delivery and Idempotency](#at-least-once-delivery-and-idempotency)
+10. [Scheduling Delayed Messages](#scheduling-delayed-messages)
+11. [Saga Lifecycle Completion](#saga-lifecycle-completion)
+12. [Return Processing — Active Return Tracking](#return-processing--active-return-tracking) ⭐ *M32-M34 Addition*
+13. [Shared Guard: `CanBeCancelled()`](#shared-guard-canbecancelled)
+14. [DOs and DO NOTs](#dos-and-do-nots) ⭐ *M32-M34 Addition*
+15. [File Organization](#file-organization)
+16. [Common Pitfalls](#common-pitfalls)
+17. [Testing Sagas](#testing-sagas)
+18. [Quick Reference](#quick-reference)
+
+---
+
 ## Core Principle: Sagas Are Mutable State Machines
 
 A Wolverine saga is the right tool when business logic must coordinate **multiple bounded contexts over time**, maintaining mutable state that drives orchestration decisions. Unlike event-sourced aggregates, which append immutable events, a saga is a **living document** that mutates as the process progresses.
@@ -256,6 +286,7 @@ public sealed record OrderDecision
 {
     public OrderStatus? Status { get; init; }
     public bool? IsPaymentCaptured { get; init; }
+    public Guid? PaymentId { get; init; }
     public int? ConfirmedReservationCount { get; init; }
     public Dictionary<Guid, string>? ReservationIds { get; init; }
     public HashSet<Guid>? CommittedReservationIds { get; init; }
@@ -315,6 +346,7 @@ public sealed class Order : Saga
         // 2. Apply state changes from decision
         if (decision.Status.HasValue) Status = decision.Status.Value;
         if (decision.IsPaymentCaptured.HasValue) IsPaymentCaptured = decision.IsPaymentCaptured.Value;
+        if (decision.PaymentId.HasValue) PaymentId = decision.PaymentId.Value;
 
         // 3. Return outgoing messages for Wolverine to dispatch
         var outgoing = new OutgoingMessages();
@@ -575,24 +607,30 @@ public static class OrderDecider
 
 Wolverine deletes the saga document only when `MarkCompleted()` is explicitly called. Failing to call it leaves the saga in Marten forever — an orphaned document that wastes storage and confuses monitoring.
 
-The Order saga has **four terminal paths**:
+The Order saga has **six terminal paths** (increased from 4 with the addition of return processing):
 
 | Terminal Path | Handler | Completion Logic |
 |--------------|---------|-----------------|
-| Return window expires | `Handle(ReturnWindowExpired)` | Always |
+| Return window expires (no active returns) | `Handle(ReturnWindowExpired)` | If `ActiveReturnIds.Count == 0` |
+| Return window already expired + last return resolved | `Handle(ReturnCompleted/Denied/Rejected/Expired)` | If `ActiveReturnIds.Count == 0 && ReturnWindowFired` |
 | Cancelled with no payment | `Handle(CancelOrder)` | Immediately if `!IsPaymentCaptured` |
 | Cancelled with payment | `Handle(RefundCompleted)` | After refund confirmed |
 | OutOfStock with payment | `Handle(RefundCompleted)` | After refund confirmed |
+| PaymentFailed | `Handle(PaymentFailed)` | After compensation (release reservations) |
 
-### Path 1: Return Window (Happy Path)
+### Path 1: Return Window (Happy Path — No Active Returns)
 
 ```csharp
 public void Handle(ReturnWindowExpired message)
 {
+    ReturnWindowFired = true;
+    if (ActiveReturnIds.Count > 0) return; // Stay open; return completion will close the saga
     Status = OrderStatus.Closed;
-    MarkCompleted(); // Simple — always complete here
+    MarkCompleted();
 }
 ```
+
+**Key change from earlier implementation:** The return window handler no longer unconditionally closes the saga. If returns are in progress, it sets `ReturnWindowFired = true` and keeps the saga alive. Each return-terminal handler (`ReturnCompleted`, `ReturnDenied`, `ReturnRejected`, `ReturnExpired`) checks `ActiveReturnIds.Count == 0 && ReturnWindowFired` to close the saga when the last return resolves. See [Return Processing](#return-processing--active-return-tracking) for details.
 
 ### Path 2: Cancel Without Payment
 
@@ -654,6 +692,130 @@ public static OrderDecision HandleRefundCompleted(Order current, RefundCompleted
 
 > **Reference:** [Wolverine Saga Persistence](https://wolverinefx.net/guide/durability/marten/sagas.html)
 
+## Return Processing — Active Return Tracking
+
+⭐ *M32-M34 Addition*
+
+The Order saga stays open after delivery to handle customer returns. This creates a coordination problem: `ReturnWindowExpired` fires on a timer (30 days after delivery), but a return may already be in progress. The saga must not close until all active returns have resolved.
+
+### The Coordination Fields
+
+```csharp
+public sealed class Order : Saga
+{
+    // ... existing fields ...
+
+    /// <summary>
+    /// List of active return IDs currently in progress.
+    /// Prevents premature saga closure when ReturnWindowExpired fires.
+    /// Supports multiple concurrent returns from the same order.
+    /// </summary>
+    public IReadOnlyList<Guid> ActiveReturnIds { get; set; } = [];
+
+    /// <summary>
+    /// True if the ReturnWindowExpired message has already fired.
+    /// Used to close the saga when all returns eventually complete after window expiry.
+    /// </summary>
+    public bool ReturnWindowFired { get; set; }
+
+    /// <summary>
+    /// The delivery timestamp from Fulfillment BC.
+    /// Used by the BFF for "Return by {date}" display.
+    /// </summary>
+    public DateTimeOffset? DeliveredAt { get; set; }
+}
+```
+
+### The Return Lifecycle Handlers
+
+The saga handles 5 return messages from the Returns BC. All follow the same immutable-update pattern for `ActiveReturnIds`:
+
+```csharp
+// 1. ReturnRequested — add to active list
+public void Handle(Messages.Contracts.Returns.ReturnRequested message)
+{
+    var activeReturns = ActiveReturnIds.ToList();
+    if (!activeReturns.Contains(message.ReturnId))
+    {
+        activeReturns.Add(message.ReturnId);
+        ActiveReturnIds = activeReturns.AsReadOnly();
+    }
+}
+
+// 2. ReturnCompleted — remove from active list, request refund, maybe close
+public OutgoingMessages Handle(Messages.Contracts.Returns.ReturnCompleted message)
+{
+    var activeReturns = ActiveReturnIds.ToList();
+    activeReturns.Remove(message.ReturnId);
+    ActiveReturnIds = activeReturns.AsReadOnly();
+
+    var outgoing = new OutgoingMessages();
+
+    if (message.FinalRefundAmount > 0m)
+    {
+        outgoing.Add(new RefundRequested(
+            Id, message.FinalRefundAmount,
+            "Customer return approved and completed",
+            DateTimeOffset.UtcNow));
+    }
+
+    // Close saga if: no active returns remaining AND return window already expired
+    if (ActiveReturnIds.Count == 0 && ReturnWindowFired)
+    {
+        Status = OrderStatus.Closed;
+        MarkCompleted();
+    }
+
+    return outgoing;
+}
+
+// 3-5. ReturnDenied, ReturnRejected, ReturnExpired — remove from active list, maybe close
+public void Handle(Messages.Contracts.Returns.ReturnDenied message)
+{
+    var activeReturns = ActiveReturnIds.ToList();
+    activeReturns.Remove(message.ReturnId);
+    ActiveReturnIds = activeReturns.AsReadOnly();
+
+    if (ActiveReturnIds.Count == 0 && ReturnWindowFired)
+    {
+        Status = OrderStatus.Closed;
+        MarkCompleted();
+    }
+}
+// ReturnRejected and ReturnExpired follow the identical pattern
+```
+
+### The Closure Logic
+
+Two conditions must both be true for the saga to close via the return path:
+
+1. **`ActiveReturnIds.Count == 0`** — all returns have resolved (completed, denied, rejected, or expired)
+2. **`ReturnWindowFired == true`** — the 30-day `ReturnWindowExpired` timer has already fired
+
+**Why both conditions?** Consider these scenarios:
+
+| Scenario | ReturnWindowFired | ActiveReturnIds | Saga Action |
+|----------|-------------------|-----------------|-------------|
+| Window expires, no returns ever filed | `true` | empty | ✅ Close immediately |
+| Window expires while return in progress | `true` | non-empty | ⏳ Stay open |
+| Return completes before window | `false` | empty | ⏳ Stay open (window hasn't fired yet) |
+| Last return completes after window | `true` | empty | ✅ Close now |
+
+### Immutable Update Pattern
+
+`ActiveReturnIds` is `IReadOnlyList<Guid>`, not `List<Guid>`. The saga modifies it using `.ToList()` → mutate → `.AsReadOnly()`. This ensures Marten detects the change (a new reference is assigned) and serializes it correctly.
+
+```csharp
+// ✅ CORRECT — creates new list reference; Marten serializes the change
+var activeReturns = ActiveReturnIds.ToList();
+activeReturns.Remove(message.ReturnId);
+ActiveReturnIds = activeReturns.AsReadOnly();
+
+// ❌ WRONG — if ActiveReturnIds were List<Guid>, removing an element
+// would not change the reference, and Marten might not detect the change
+ActiveReturnIds.Remove(message.ReturnId); // Compiler error: IReadOnlyList has no Remove
+```
+
 ## Shared Guard: `CanBeCancelled()`
 
 The cancellation eligibility rule is shared between the HTTP endpoint (pre-flight validation) and the saga handler (idempotency/correctness). Keeping it in the Decider enforces consistency:
@@ -690,21 +852,64 @@ public OutgoingMessages Handle(CancelOrder command)
 
 **Why the saga also checks:** The HTTP endpoint validates before publishing, but Wolverine's at-least-once delivery means the handler may process the same `CancelOrder` message twice. Both guards are necessary.
 
+## DOs and DO NOTs
+
+⭐ *M32-M34 Addition*
+
+### ✅ DOs
+
+| # | Rule | Rationale |
+|---|------|-----------|
+| 1 | **DO** inherit from `Wolverine.Saga` with `public Guid Id { get; set; }` | Wolverine correlation requires this exact property |
+| 2 | **DO** name the correlation property `{SagaTypeName}Id` on all messages | Convention-based routing — no configuration needed |
+| 3 | **DO** start sagas via a separate handler class returning `(SagaType, ...)` | Separates construction from state evolution |
+| 4 | **DO** use `IncludeAssembly(typeof(Order).Assembly)` for handler discovery | Discovers all handlers, not just saga methods |
+| 5 | **DO** configure `UseNumericRevisions(true)` for saga documents | Enables optimistic concurrency |
+| 6 | **DO** configure `ConcurrencyException` retry policy | Prevents silent data loss on concurrent updates |
+| 7 | **DO** extract business logic to a static Decider class with pure functions | Enables unit testing without infrastructure |
+| 8 | **DO** call `MarkCompleted()` on every terminal path | Prevents orphaned saga documents |
+| 9 | **DO** add idempotency guards on all handlers (check for duplicate message IDs) | At-least-once delivery means redelivery happens |
+| 10 | **DO** add terminal-state guards at the top of handlers that issue compensation | Late-arriving messages must not trigger spurious commands |
+| 11 | **DO** use `IReadOnlyList<Guid>` with immutable update pattern for tracking lists | Ensures Marten detects reference changes and serializes correctly |
+| 12 | **DO** derive counts from authoritative collections (`CommittedReservationIds.Count`) | Prevents drift between stored count and actual set size |
+| 13 | **DO** share cancellation eligibility rules between HTTP endpoint and saga handler | Both paths need the same business rule |
+| 14 | **DO** use `OutgoingMessages.Delay()` for scheduled messages (not in-memory timers) | Survives restarts, deployments, and scaling |
+| 15 | **DO** track `ReturnWindowFired` + `ActiveReturnIds` for post-delivery return coordination | Prevents premature saga closure while returns are in progress |
+
+### ❌ DO NOTs
+
+| # | Rule | Consequence |
+|---|------|-------------|
+| 1 | **DO NOT** use `IStartStream` / `MartenOps.StartStream<T>()` for sagas | Creates an event-sourced stream, not a saga document |
+| 2 | **DO NOT** use `IncludeType<T>()` for handler discovery | Misses `PlaceOrderHandler` and other handler classes |
+| 3 | **DO NOT** put FluentValidation on internally-constructed commands | Validators only fire for bus-dispatched messages; dead code |
+| 4 | **DO NOT** store derived counts as separate properties | They drift from the authoritative collection |
+| 5 | **DO NOT** throw exceptions for late-arriving messages in terminal states | Causes infinite retry; silently return instead |
+| 6 | **DO NOT** forget `OutOfStock` in `HandleRefundCompleted` | OutOfStock orders with payment also receive `RefundCompleted` |
+| 7 | **DO NOT** unconditionally close the saga in `Handle(ReturnWindowExpired)` | Returns may be in progress; check `ActiveReturnIds.Count` first |
+| 8 | **DO NOT** use `List<Guid>` for saga tracking fields | Use `IReadOnlyList<Guid>` + immutable update pattern for Marten change detection |
+| 9 | **DO NOT** mix `IMessageBus.InvokeAsync()` with manual `session.Events.Append()` | Two competing persistence strategies — one silently loses |
+| 10 | **DO NOT** put initialization logic in the saga class | Use a separate `PlaceOrderHandler` class |
+
 ## File Organization
 
 Saga files should be colocated in a single feature folder:
 
 ```
 src/Orders/Orders/Placement/
-  Order.cs             # Saga class — state properties + thin Handle() adapters
-  OrderDecider.cs      # Pure business logic + OrderDecision record
-  OrderStatus.cs       # Enum — all lifecycle states
-  OrderLineItem.cs     # Value object
-  PlaceOrder.cs        # Initialization command + PlaceOrderValidator (NOTE: see pitfalls)
-  PlaceOrderHandler.cs # Saga start handler (returns (Order, OrderPlaced))
-  CancelOrder.cs       # Cancellation command + validator
-  ReturnWindowExpired.cs # Scheduled message
-  OrderPlaced.cs       # Integration event published to other BCs
+  Order.cs               # Saga class — state properties + thin Handle() adapters
+  OrderDecider.cs        # Pure business logic + OrderDecision record
+  OrderStatus.cs         # Enum — all lifecycle states
+  OrderLineItem.cs       # Value object
+  ShippingAddress.cs     # Value object (snapshot)
+  AppliedDiscount.cs     # Value object
+  CheckoutLineItem.cs    # Value object (input from Shopping BC)
+  PlaceOrder.cs          # Initialization command + PlaceOrderValidator (NOTE: see pitfalls)
+  PlaceOrderHandler.cs   # Saga start handler (returns (Order, OrderPlaced))
+  CancelOrder.cs         # Cancellation command + validator
+  ReturnWindowExpired.cs # Scheduled message (saga-internal)
+  OrderPlaced.cs         # Integration event published to other BCs
+  OrderResponse.cs       # API response DTO
 ```
 
 The handler (`PlaceOrderHandler`) lives in a separate file from the saga (`Order`) because they serve different purposes: the handler creates the saga, the saga evolves it.
@@ -812,6 +1017,28 @@ public static OrderDecision HandleReservationConfirmed(Order current, Reservatio
 }
 ```
 
+### ❌ Pitfall 7: Unconditional Close in `ReturnWindowExpired` ⭐ *M32-M34 Addition*
+
+```csharp
+// ❌ WRONG — closes the saga even when a return is in progress
+public void Handle(ReturnWindowExpired message)
+{
+    Status = OrderStatus.Closed;
+    MarkCompleted(); // Customer's active return is now orphaned!
+}
+
+// ✅ CORRECT — check for active returns before closing
+public void Handle(ReturnWindowExpired message)
+{
+    ReturnWindowFired = true;
+    if (ActiveReturnIds.Count > 0) return; // Stay open
+    Status = OrderStatus.Closed;
+    MarkCompleted();
+}
+```
+
+Premature saga closure means the `ReturnCompleted` message from Returns BC finds no saga to route to — the refund is never requested.
+
 ## Testing Sagas
 
 Test sagas at two levels:
@@ -874,19 +1101,54 @@ public async Task Order_ReachesPaymentConfirmed_WhenPaymentCapturedAfterInventor
 
 ### Saga Checklist
 
+**Infrastructure:**
 - [ ] Inherits from `Saga` with `public Guid Id { get; set; }`
 - [ ] Integration messages have `{SagaName}Id` property for correlation
-- [ ] Saga started via separate `PlaceOrderHandler` returning `(Order, ...)`
+- [ ] Saga started via separate handler returning `(SagaType, ...)`
 - [ ] `IncludeAssembly(typeof(Order).Assembly)` in Program.cs (not `IncludeType<T>()`)
 - [ ] `[assembly: WolverineModule]` in domain assembly's `AssemblyAttributes.cs`
 - [ ] Marten configured with `.Identity(x => x.Id).UseNumericRevisions(true)`
 - [ ] `ConcurrencyException` retry policy configured
+
+**Business Logic:**
 - [ ] Business logic in static `Decider` class (pure functions)
-- [ ] Every terminal path calls `MarkCompleted()`
+- [ ] `OrderDecision` record carries nullable state changes + messages
+- [ ] `CanBeCancelled()` shared between HTTP endpoint and saga handler
+- [ ] Derived counts computed from authoritative collections, not stored separately
+
+**Idempotency & Safety:**
 - [ ] Idempotency guards on all handlers (HashSet for committed IDs, ContainsKey for reservations)
-- [ ] Terminal-state guard at top of `HandleReservationConfirmed` (and any handler that issues compensation)
+- [ ] Terminal-state guard at top of handlers that issue compensation messages
 - [ ] `ShipmentDelivered` handler checks status before scheduling `ReturnWindowExpired`
 - [ ] `HandleRefundCompleted` handles BOTH `Cancelled` AND `OutOfStock`
+
+**Lifecycle Completion:**
+- [ ] Every terminal path calls `MarkCompleted()`
 - [ ] `CancelOrder` calls `MarkCompleted()` immediately when `!IsPaymentCaptured`
-- [ ] Derived counts (`CommittedReservationCount`) computed from authoritative collections, not stored separately
-- [ ] `CanBeCancelled()` shared between HTTP endpoint and saga handler
+- [ ] `ReturnWindowExpired` checks `ActiveReturnIds.Count` before closing
+- [ ] Return-terminal handlers check `ActiveReturnIds.Count == 0 && ReturnWindowFired`
+- [ ] `ActiveReturnIds` uses `IReadOnlyList<Guid>` with immutable update pattern
+
+### Handler Method Summary (Current Implementation)
+
+| Handler | Message Source | Returns | Key Behavior |
+|---------|--------------|---------|-------------|
+| `Handle(CancelOrder)` | Orders API | `OutgoingMessages` | Compensation + conditional `MarkCompleted()` |
+| `Handle(PaymentCaptured)` | Payments BC | `OutgoingMessages` | Tracks `PaymentId`; commits if inventory ready |
+| `Handle(PaymentFailed)` | Payments BC | `OutgoingMessages` | Releases reservations |
+| `Handle(PaymentAuthorized)` | Payments BC | `void` | Sets `PendingPayment` status |
+| `Handle(RefundCompleted)` | Payments BC | `void` | Closes `Cancelled` / `OutOfStock` sagas |
+| `Handle(RefundFailed)` | Payments BC | `void` | Logs; no status change |
+| `Handle(ReservationConfirmed)` | Inventory BC | `OutgoingMessages` | Multi-SKU tracking; race-condition fix |
+| `Handle(ReservationFailed)` | Inventory BC | `OutgoingMessages` | `OutOfStock` compensation |
+| `Handle(ReservationCommitted)` | Inventory BC | `OutgoingMessages` | Fulfillment request when all committed |
+| `Handle(ReservationReleased)` | Inventory BC | `void` | Compensation acknowledgement |
+| `Handle(ShipmentDispatched)` | Fulfillment BC | `void` | `Shipped` status |
+| `Handle(ShipmentDelivered)` | Fulfillment BC | `OutgoingMessages` | `Delivered` + schedules return window |
+| `Handle(ShipmentDeliveryFailed)` | Fulfillment BC | `void` | Delivery failure tracking |
+| `Handle(ReturnWindowExpired)` | Scheduled | `void` | Closes if no active returns |
+| `Handle(ReturnRequested)` | Returns BC | `void` | Adds to `ActiveReturnIds` |
+| `Handle(ReturnCompleted)` | Returns BC | `OutgoingMessages` | Refund request + conditional close |
+| `Handle(ReturnDenied)` | Returns BC | `void` | Removes from active + conditional close |
+| `Handle(ReturnRejected)` | Returns BC | `void` | Removes from active + conditional close |
+| `Handle(ReturnExpired)` | Returns BC | `void` | Removes from active + conditional close |
