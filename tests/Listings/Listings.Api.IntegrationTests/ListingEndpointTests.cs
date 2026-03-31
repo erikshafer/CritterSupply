@@ -1,9 +1,5 @@
-using System.Net;
 using Listings.Listing;
 using Listings.ProductSummary;
-using Marten;
-using Shouldly;
-using Wolverine.Tracking;
 
 namespace Listings.Api.IntegrationTests;
 

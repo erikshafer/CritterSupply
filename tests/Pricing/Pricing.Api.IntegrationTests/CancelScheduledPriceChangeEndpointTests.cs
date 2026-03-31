@@ -1,6 +1,4 @@
-using Marten;
 using Pricing.Products;
-using Shouldly;
 
 namespace Pricing.Api.IntegrationTests;
 

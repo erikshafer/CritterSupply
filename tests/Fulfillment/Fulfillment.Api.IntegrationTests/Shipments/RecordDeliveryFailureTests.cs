@@ -1,8 +1,6 @@
 using Fulfillment.Shipments;
 using Marten;
-using Marten.Linq;
 using Shouldly;
-using Wolverine.Tracking;
 using IntegrationContracts = Messages.Contracts.Fulfillment;
 
 namespace Fulfillment.Api.IntegrationTests.Shipments;

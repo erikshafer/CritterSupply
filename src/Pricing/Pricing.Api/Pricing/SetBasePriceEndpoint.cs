@@ -3,7 +3,6 @@ using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Pricing.Products;
 using Wolverine.Http;
-using Wolverine.Marten;
 
 namespace Pricing.Api.Pricing;
 

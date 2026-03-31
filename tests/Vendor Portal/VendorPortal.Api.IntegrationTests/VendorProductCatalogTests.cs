@@ -1,4 +1,3 @@
-using Marten;
 using Messages.Contracts.ProductCatalog;
 using Shouldly;
 using VendorPortal.VendorProductCatalog;

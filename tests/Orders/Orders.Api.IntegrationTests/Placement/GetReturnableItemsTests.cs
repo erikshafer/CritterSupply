@@ -1,8 +1,6 @@
 using Marten;
-using Marten.Linq;
 using Messages.Contracts.Fulfillment;
 using Orders.Placement;
-using Shouldly;
 using OrdersShippingAddress = Orders.Placement.ShippingAddress;
 
 namespace Orders.Api.IntegrationTests.Placement;

@@ -1,6 +1,5 @@
 using Messages.Contracts.Fulfillment;
 using Returns.ReturnProcessing;
-using Shouldly;
 
 namespace Returns.Api.IntegrationTests.CrossBcSmokeTests;
 

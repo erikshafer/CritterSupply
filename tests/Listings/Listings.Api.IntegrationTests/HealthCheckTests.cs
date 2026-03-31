@@ -1,5 +1,3 @@
-using Shouldly;
-
 namespace Listings.Api.IntegrationTests;
 
 /// <summary>

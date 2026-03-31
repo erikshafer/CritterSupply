@@ -1,6 +1,3 @@
-using Microsoft.Playwright;
-using Reqnroll;
-
 namespace Backoffice.E2ETests.Hooks;
 
 /// <summary>
@@ -121,7 +118,7 @@ public sealed class TestHooks
 
                 try
                 {
-                    await context.Tracing.StopAsync(new() { Path = tracePath });
+                    await context!.Tracing.StopAsync(new() { Path = tracePath });
                     Console.WriteLine($"✅ Playwright trace saved: {tracePath}");
                     Console.WriteLine($"   View with: pwsh bin/Debug/net10.0/playwright.ps1 show-trace {tracePath}");
                 }
@@ -133,16 +130,16 @@ public sealed class TestHooks
             else
             {
                 // Success — discard trace to save disk space
-                await context.Tracing.StopAsync();
+                await context!.Tracing.StopAsync();
             }
 
-            await context.CloseAsync();
+            await context!.CloseAsync();
         }
 
         // Step 4: Close page if still open
         if (scenarioContext.TryGetValue(ScenarioContextKeys.Page, out IPage? page))
         {
-            await page.CloseAsync();
+            await page!.CloseAsync();
         }
     }
 

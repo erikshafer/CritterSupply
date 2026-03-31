@@ -134,7 +134,7 @@ public sealed class StubInventoryClient : IInventoryClient
             var result = new AdjustInventoryResultDto(
                 Id: Guid.NewGuid(),
                 Sku: sku,
-                WarehouseId: existing.WarehouseId,
+                WarehouseId: existing.WarehouseId!,
                 AvailableQuantity: newAvailable);
 
             return Task.FromResult<AdjustInventoryResultDto?>(result);
@@ -165,7 +165,7 @@ public sealed class StubInventoryClient : IInventoryClient
             var result = new ReceiveStockResultDto(
                 Id: Guid.NewGuid(),
                 Sku: sku,
-                WarehouseId: existing.WarehouseId,
+                WarehouseId: existing.WarehouseId!,
                 AvailableQuantity: newAvailable);
 
             return Task.FromResult<ReceiveStockResultDto?>(result);

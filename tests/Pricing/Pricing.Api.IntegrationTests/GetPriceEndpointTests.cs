@@ -1,4 +1,3 @@
-using Marten;
 using Pricing.Products;
 using Shouldly;
 

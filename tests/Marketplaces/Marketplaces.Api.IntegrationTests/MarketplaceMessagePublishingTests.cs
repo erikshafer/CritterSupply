@@ -1,5 +1,4 @@
 using Messages.Contracts.Marketplaces;
-using Wolverine.Tracking;
 
 namespace Marketplaces.Api.IntegrationTests;
 

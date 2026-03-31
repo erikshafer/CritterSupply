@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Storefront.Clients;
 using Storefront.Composition;
 using Wolverine.Http;

@@ -1,6 +1,5 @@
 using Marten;
 using Microsoft.AspNetCore.Authorization;
-using Shopping.Cart;
 using Wolverine.Http;
 
 namespace Shopping.Api.Cart;

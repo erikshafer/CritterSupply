@@ -1,4 +1,3 @@
-using Marten;
 using Wolverine.Marten;
 
 namespace Promotions.Promotion;

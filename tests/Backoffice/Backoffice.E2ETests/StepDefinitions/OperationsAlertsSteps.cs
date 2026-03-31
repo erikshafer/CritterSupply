@@ -1,7 +1,4 @@
 using Backoffice.E2ETests.Pages;
-using Microsoft.Playwright;
-using Reqnroll;
-using Shouldly;
 
 namespace Backoffice.E2ETests.StepDefinitions;
 
@@ -357,7 +354,7 @@ public sealed class OperationsAlertsSteps
         var firstAlertRow = Page.GetByTestId($"alert-{alertIds[0]}");
         var skuCell = firstAlertRow.Locator("[data-testid='alert-sku']");
         var actualSku = await skuCell.TextContentAsync();
-        actualSku.ShouldContain(expectedSku);
+        (actualSku ?? throw new InvalidOperationException()).ShouldContain(expectedSku);
     }
 
     [Then(@"the alert should have severity ""(.*)"" or ""(.*)""")]
@@ -432,7 +429,7 @@ public sealed class OperationsAlertsSteps
         var alertRow = Page.GetByTestId($"alert-{alertId}");
         var statusCell = alertRow.Locator("[data-testid='alert-status']");
         var status = await statusCell.TextContentAsync();
-        status.ShouldContain("Unacknowledged");
+        (status ?? throw new InvalidOperationException()).ShouldContain("Unacknowledged");
     }
 
     [Then(@"I should see a ""(.*)"" message")]
@@ -473,7 +470,7 @@ public sealed class OperationsAlertsSteps
             var row = alertRows.Nth(i);
             var skuCell = row.Locator("[data-testid='alert-sku']");
             var actualSku = await skuCell.TextContentAsync();
-            actualSku.ShouldContain(expectedSku);
+            (actualSku ?? throw new InvalidOperationException()).ShouldContain(expectedSku);
         }
     }
 

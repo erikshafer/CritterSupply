@@ -1,6 +1,5 @@
 using FluentValidation.TestHelper;
 using Pricing.Products;
-using Xunit;
 
 namespace Pricing.UnitTests;
 

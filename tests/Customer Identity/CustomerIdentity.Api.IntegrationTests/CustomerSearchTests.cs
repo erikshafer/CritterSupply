@@ -1,6 +1,5 @@
 using Alba;
 using CustomerIdentity.AddressBook;
-using Microsoft.EntityFrameworkCore;
 using Shouldly;
 
 namespace CustomerIdentity.Api.IntegrationTests;

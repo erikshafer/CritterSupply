@@ -1,7 +1,5 @@
 using System.Net;
-using System.Net.Http.Json;
 using Orders.Api.Placement;
-using Messages.Contracts.Shopping;
 
 namespace Orders.Api.IntegrationTests.Placement;
 

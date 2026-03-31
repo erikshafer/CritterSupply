@@ -1,6 +1,3 @@
-using Shouldly;
-using System.Net.Http.Json;
-
 namespace Backoffice.Api.IntegrationTests.CustomerService;
 
 /// <summary>

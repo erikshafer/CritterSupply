@@ -1,6 +1,5 @@
 using Marten;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Wolverine.Http;
 using Returns.ReturnProcessing;
 

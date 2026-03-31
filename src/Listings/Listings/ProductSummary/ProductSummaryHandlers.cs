@@ -1,4 +1,3 @@
-using Listings.ProductSummary;
 using Marten;
 using IntegrationProductAdded = Messages.Contracts.ProductCatalog.ProductAdded;
 using IntegrationProductContentUpdated = Messages.Contracts.ProductCatalog.ProductContentUpdated;

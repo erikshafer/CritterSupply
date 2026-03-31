@@ -1,4 +1,3 @@
-using Marten.Events.Aggregation;
 using Marten.Events.Projections;
 using Messages.Contracts.Orders;
 using Messages.Contracts.Payments;

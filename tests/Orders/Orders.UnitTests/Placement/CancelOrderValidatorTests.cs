@@ -1,4 +1,3 @@
-using FluentValidation;
 using Orders.Placement;
 
 namespace Orders.UnitTests.Placement;

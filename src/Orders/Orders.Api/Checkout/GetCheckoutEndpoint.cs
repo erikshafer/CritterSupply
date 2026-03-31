@@ -1,8 +1,6 @@
 using Marten;
 using Microsoft.AspNetCore.Authorization;
-using Orders.Checkout;
 using Wolverine.Http;
-using ShoppingContracts = Messages.Contracts.Shopping;
 
 namespace Orders.Api.Checkout;
 

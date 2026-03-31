@@ -1,7 +1,6 @@
 using Marten;
 using Orders.Checkout;
 using System.Net;
-using System.Net.Http.Json;
 using Orders.Api.Checkout;
 using Messages.Contracts.Shopping;
 

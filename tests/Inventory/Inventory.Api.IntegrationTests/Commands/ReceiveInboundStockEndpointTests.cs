@@ -1,7 +1,5 @@
 using Inventory.Api.InventoryManagement;
 using Inventory.Management;
-using Marten;
-using Shouldly;
 
 namespace Inventory.Api.IntegrationTests.Commands;
 

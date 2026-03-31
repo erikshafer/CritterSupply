@@ -1,5 +1,3 @@
-using Shouldly;
-
 namespace Marketplaces.Api.IntegrationTests;
 
 /// <summary>

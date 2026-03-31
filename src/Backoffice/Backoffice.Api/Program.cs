@@ -1,4 +1,3 @@
-using System.Text;
 using JasperFx;
 using JasperFx.Events.Projections;
 using Marten;

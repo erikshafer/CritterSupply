@@ -1,6 +1,5 @@
 using FluentValidation;
 using Marten;
-using Messages.Contracts.ProductCatalog;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProductCatalog.Products;

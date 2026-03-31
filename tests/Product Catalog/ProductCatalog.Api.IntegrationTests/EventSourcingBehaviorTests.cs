@@ -1,9 +1,7 @@
-using Marten;
 using Messages.Contracts.ProductCatalog;
 using ProductCatalog.Api.Products;
 using ProductCatalog.Products;
 using Shouldly;
-using Wolverine.Tracking;
 
 #pragma warning disable CS0618 // ProductUpdated is intentionally tested as deprecated
 

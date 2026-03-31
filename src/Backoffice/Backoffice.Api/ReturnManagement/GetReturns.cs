@@ -1,6 +1,5 @@
 using Backoffice.Clients;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Wolverine.Http;
 
 namespace Backoffice.Api.Queries;

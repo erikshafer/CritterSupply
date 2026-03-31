@@ -1,6 +1,4 @@
 @page "/admin/listings/{ListingId:guid}"
-@using Microsoft.AspNetCore.Authorization
-@using Backoffice.Web.Auth
 @using Backoffice.Web.Components.Shared
 @attribute [Authorize(Roles = "product-manager,system-admin")]
 @inject IHttpClientFactory HttpClientFactory

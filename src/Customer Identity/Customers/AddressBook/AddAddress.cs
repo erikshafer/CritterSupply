@@ -2,7 +2,6 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Wolverine;
 using Wolverine.Http;
 
 namespace CustomerIdentity.AddressBook;

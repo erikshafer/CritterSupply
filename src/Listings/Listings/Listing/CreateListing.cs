@@ -1,10 +1,8 @@
 using FluentValidation;
-using Listings.Listing;
 using Listings.ProductSummary;
 using Listings.Projections;
 using Marten;
 using Wolverine;
-using Wolverine.Marten;
 using IntegrationMessages = Messages.Contracts.Listings;
 
 namespace Listings.Listing;

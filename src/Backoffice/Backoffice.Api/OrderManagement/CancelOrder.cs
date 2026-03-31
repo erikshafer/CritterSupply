@@ -2,7 +2,6 @@ using System.Security.Claims;
 using Backoffice.Clients;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Wolverine.Http;
 
 namespace Backoffice.Api.Commands;

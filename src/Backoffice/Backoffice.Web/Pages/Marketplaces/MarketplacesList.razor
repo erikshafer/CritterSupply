@@ -1,6 +1,4 @@
 @page "/marketplaces"
-@using Microsoft.AspNetCore.Authorization
-@using Backoffice.Web.Auth
 @attribute [Authorize(Roles = "product-manager,system-admin")]
 @inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager Navigation

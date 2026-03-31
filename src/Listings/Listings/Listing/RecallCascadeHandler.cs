@@ -1,4 +1,3 @@
-using Listings.Listing;
 using Listings.Projections;
 using Marten;
 using Wolverine;

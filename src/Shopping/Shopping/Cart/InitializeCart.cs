@@ -1,6 +1,5 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Wolverine.Http;
 using Wolverine.Marten;
 

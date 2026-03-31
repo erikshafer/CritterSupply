@@ -1,7 +1,4 @@
 using Backoffice.E2ETests.Pages;
-using Microsoft.Playwright;
-using Reqnroll;
-using Shouldly;
 using Backoffice.Clients;
 
 namespace Backoffice.E2ETests.StepDefinitions;

@@ -1,5 +1,4 @@
 using Listings.Listing;
-using Marten.Events.Aggregation;
 using Marten.Events.Projections;
 
 namespace Listings.Projections;

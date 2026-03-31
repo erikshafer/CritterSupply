@@ -1,4 +1,3 @@
-using Alba;
 using Backoffice.Api.Queries;
 
 namespace Backoffice.Api.IntegrationTests.CustomerService;
@@ -122,6 +121,7 @@ public class OrderNoteTests
         var notes = await _fixture.Host.GetAsJson<IReadOnlyList<OrderNoteDto>>(
             $"/api/backoffice/orders/{orderId}/notes");
 
+        notes.ShouldNotBeNull();
         notes.Count.ShouldBe(1);
         notes[0].NoteId.ShouldBe(noteId);
         notes[0].Text.ShouldBe("Updated text with more details");
@@ -181,7 +181,7 @@ public class OrderNoteTests
         var notes = await _fixture.Host.GetAsJson<IReadOnlyList<OrderNoteDto>>(
             $"/api/backoffice/orders/{orderId}/notes");
 
-        notes.Count.ShouldBe(0); // Soft-deleted notes should not appear
+        notes!.Count.ShouldBe(0); // Soft-deleted notes should not appear
     }
 
     [Fact]
@@ -267,6 +267,7 @@ public class OrderNoteTests
             $"/api/backoffice/orders/{orderId}/notes");
 
         // Assert
+        notes.ShouldNotBeNull();
         notes.Count.ShouldBe(3);
         notes[0].Text.ShouldBe("First note");
         notes[1].Text.ShouldBe("Second note");
@@ -349,6 +350,7 @@ public class OrderNoteTests
         var notes = await _fixture.Host.GetAsJson<IReadOnlyList<OrderNoteDto>>(
             $"/api/backoffice/orders/{orderId}/notes");
 
+        notes.ShouldNotBeNull();
         notes.Count.ShouldBe(1);
         notes[0].Text.Length.ShouldBe(2000);
     }
@@ -450,6 +452,7 @@ public class OrderNoteTests
         var notes = await _fixture.Host.GetAsJson<IReadOnlyList<OrderNoteDto>>(
             $"/api/backoffice/orders/{orderId}/notes");
 
+        notes.ShouldNotBeNull();
         notes.Count.ShouldBe(1);
         notes[0].Text.Length.ShouldBe(2000);
         notes[0].EditedAt.ShouldNotBeNull();
@@ -536,10 +539,11 @@ public class OrderNoteTests
         var notes = await _fixture.Host.GetAsJson<IReadOnlyList<OrderNoteDto>>(
             $"/api/backoffice/orders/{orderId}/notes");
 
+        notes.ShouldNotBeNull();
         notes.Count.ShouldBe(1);
         notes[0].Text.ShouldBe("Version 3");
         notes[0].EditedAt.ShouldNotBeNull();
-        notes[0].EditedAt.Value.ShouldBeGreaterThan(notes[0].CreatedAt);
+        notes[0].EditedAt!.Value.ShouldBeGreaterThan(notes[0].CreatedAt);
     }
 
     #endregion

@@ -1,6 +1,4 @@
-using Alba;
 using Shouldly;
-using Xunit;
 
 namespace CustomerIdentity.Api.IntegrationTests;
 

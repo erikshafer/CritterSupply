@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using Backoffice.Clients;
 
 namespace Backoffice.Api.Clients;

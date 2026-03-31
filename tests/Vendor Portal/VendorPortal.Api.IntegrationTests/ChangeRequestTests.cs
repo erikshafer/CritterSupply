@@ -1,11 +1,8 @@
-using Marten;
 using Messages.Contracts.ProductCatalog;
 using Shouldly;
 using VendorPortal.ChangeRequests;
 
 using VendorPortal.RealTime;
-using VendorPortal.VendorProductCatalog;
-using Wolverine.Tracking;
 
 namespace VendorPortal.Api.IntegrationTests;
 

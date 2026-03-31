@@ -1,7 +1,6 @@
 using CritterSupply.TestUtilities;
 using JasperFx.CommandLine;
 using Marten;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 using Wolverine;

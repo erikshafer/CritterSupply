@@ -1,5 +1,3 @@
-using Microsoft.Playwright;
-
 namespace Backoffice.E2ETests.Pages;
 
 /// <summary>

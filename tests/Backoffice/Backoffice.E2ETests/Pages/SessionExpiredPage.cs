@@ -1,5 +1,3 @@
-using Microsoft.Playwright;
-
 namespace Backoffice.E2ETests.Pages;
 
 /// <summary>
@@ -100,6 +98,7 @@ public sealed class SessionExpiredPage
     }
 
     // Assertions - Modal Blocking Behavior
+    [Obsolete("NoWaitAfter is Obsolete")]
     public async Task<bool> CanInteractWithPageBehindModalAsync()
     {
         // Attempt to click a specific element behind the modal (e.g., a button on the dashboard)

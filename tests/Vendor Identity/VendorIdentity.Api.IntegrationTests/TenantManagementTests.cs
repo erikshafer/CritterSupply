@@ -1,6 +1,3 @@
-using Alba;
-using Messages.Contracts.VendorIdentity;
-using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using VendorIdentity.TenantManagement;
 

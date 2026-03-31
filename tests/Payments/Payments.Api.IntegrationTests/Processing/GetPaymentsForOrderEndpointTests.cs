@@ -1,7 +1,4 @@
-using Marten;
-using Messages.Contracts.Payments;
 using Payments.Processing;
-using Shouldly;
 
 namespace Payments.Api.IntegrationTests.Processing;
 

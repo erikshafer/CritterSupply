@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Pricing;
 
 namespace Pricing.UnitTests;
 

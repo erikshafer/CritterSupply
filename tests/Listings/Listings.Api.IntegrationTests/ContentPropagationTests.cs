@@ -1,9 +1,6 @@
 using Listings.Listing;
 using Listings.ProductSummary;
-using Marten;
 using Messages.Contracts.ProductCatalog;
-using Shouldly;
-using Wolverine.Tracking;
 
 namespace Listings.Api.IntegrationTests;
 

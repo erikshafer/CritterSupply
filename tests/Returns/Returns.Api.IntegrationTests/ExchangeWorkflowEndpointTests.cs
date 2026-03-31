@@ -1,5 +1,4 @@
 using System.Net;
-using Marten;
 using Returns.ReturnProcessing;
 
 namespace Returns.Api.IntegrationTests;
@@ -110,6 +109,7 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
         // Verify state
         using var session = _fixture.GetDocumentSession();
         var returnAggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
+        returnAggregate.ShouldNotBeNull();
         returnAggregate.Status.ShouldBe(ReturnStatus.Approved);
         returnAggregate.PriceDifference.ShouldBe(0m);
     }
@@ -133,6 +133,7 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
         // Verify state
         using var session = _fixture.GetDocumentSession();
         var returnAggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
+        returnAggregate.ShouldNotBeNull();
         returnAggregate.Status.ShouldBe(ReturnStatus.Approved);
         returnAggregate.PriceDifference.ShouldBe(10.00m); // Customer gets $10 refund
     }
@@ -183,6 +184,7 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
         // Verify state
         using var session = _fixture.GetDocumentSession();
         var returnAggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
+        returnAggregate.ShouldNotBeNull();
         returnAggregate.Status.ShouldBe(ReturnStatus.Denied);
         returnAggregate.DenialReason.ShouldBe("OutOfStock");
         returnAggregate.IsTerminal.ShouldBeTrue();
@@ -215,6 +217,7 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
         // Verify exchange rejected (no replacement, no refund)
         using var session = _fixture.GetDocumentSession();
         var returnAggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
+        returnAggregate.ShouldNotBeNull();
         returnAggregate.Status.ShouldBe(ReturnStatus.Rejected);
         returnAggregate.IsTerminal.ShouldBeTrue();
     }
@@ -246,6 +249,7 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
         // Verify exchange ready for replacement shipment
         using var session = _fixture.GetDocumentSession();
         var returnAggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
+        returnAggregate.ShouldNotBeNull();
         returnAggregate.Status.ShouldBe(ReturnStatus.Inspecting); // Ready for ShipReplacementItem
         returnAggregate.IsTerminal.ShouldBeFalse();
     }
@@ -282,6 +286,7 @@ public sealed class ExchangeWorkflowEndpointTests : IAsyncLifetime
         // Verify exchange completed
         using var session = _fixture.GetDocumentSession();
         var returnAggregate = await session.Events.AggregateStreamAsync<Return>(returnId);
+        returnAggregate.ShouldNotBeNull();
         returnAggregate.Status.ShouldBe(ReturnStatus.Completed);
         returnAggregate.ReplacementShipmentId.ShouldBe("SHIP-123");
         returnAggregate.FinalRefundAmount.ShouldBe(10.00m); // Price difference refund

@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using VendorIdentity.Identity;
-using VendorIdentity.UserInvitations;
 using Wolverine;
 using Wolverine.Http;
 

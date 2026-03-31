@@ -1,6 +1,4 @@
 using Marten;
-using Wolverine;
-using Wolverine.Marten;
 
 namespace Promotions.Coupon;
 

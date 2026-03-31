@@ -1,11 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using Alba;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using VendorIdentity.Api.Auth;
-using VendorIdentity.Identity;
 using VendorIdentity.TenantManagement;
 using VendorIdentity.UserInvitations;
 

@@ -1,4 +1,3 @@
-using Marten;
 using Orders.Checkout;
 using ShoppingContracts = Messages.Contracts.Shopping;
 

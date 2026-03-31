@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using Marten;
 using Messages.Contracts.Inventory;
 using Messages.Contracts.Orders;
@@ -6,7 +5,6 @@ using Shouldly;
 using VendorPortal.Analytics;
 using VendorPortal.RealTime;
 using VendorPortal.VendorProductCatalog;
-using Wolverine.Tracking;
 
 namespace VendorPortal.Api.IntegrationTests;
 

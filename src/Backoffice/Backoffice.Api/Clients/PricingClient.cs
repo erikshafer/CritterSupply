@@ -1,5 +1,4 @@
 using Backoffice.Clients;
-using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace Backoffice.Api.Clients;

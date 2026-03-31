@@ -1,8 +1,6 @@
 using Storefront.Clients;
 using Storefront.Notifications;
 using Storefront.RealTime;
-using Wolverine.SignalR;
-using Wolverine.Tracking;
 
 namespace Storefront.Api.IntegrationTests;
 

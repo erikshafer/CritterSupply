@@ -1,5 +1,4 @@
 using Inventory.Management;
-using Marten;
 
 namespace Inventory.Api.IntegrationTests.Management;
 

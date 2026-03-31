@@ -1,9 +1,7 @@
 using FluentValidation;
 using Marten;
 using Microsoft.AspNetCore.Mvc;
-using Wolverine;
 using Wolverine.Http;
-using IntegrationMessages = Messages.Contracts.Inventory;
 
 namespace Inventory.Management;
 

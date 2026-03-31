@@ -1,5 +1,3 @@
-using Pricing;
-
 namespace Pricing.UnitTests;
 
 /// <summary>

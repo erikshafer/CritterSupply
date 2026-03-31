@@ -1,5 +1,4 @@
 using JasperFx.Events;
-using NSubstitute;
 
 namespace Shopping.UnitTests.Cart;
 

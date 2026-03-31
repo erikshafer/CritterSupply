@@ -1,5 +1,4 @@
 using Backoffice.Clients;
-using Shouldly;
 
 namespace Backoffice.Api.IntegrationTests.Orders;
 

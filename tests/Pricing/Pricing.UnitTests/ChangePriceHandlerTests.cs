@@ -1,8 +1,6 @@
 using Marten;
 using NSubstitute;
 using Pricing.Products;
-using Shouldly;
-using Xunit;
 
 namespace Pricing.UnitTests;
 

@@ -1,6 +1,5 @@
 using FluentValidation;
 using Marten;
-using Wolverine.Marten;
 
 namespace Pricing.Products;
 

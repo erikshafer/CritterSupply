@@ -1,6 +1,5 @@
 using Backoffice.Clients;
 using Backoffice.Composition;
-using Shouldly;
 
 namespace Backoffice.Api.IntegrationTests.CustomerService;
 

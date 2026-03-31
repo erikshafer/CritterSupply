@@ -1,4 +1,3 @@
-using System.Net;
 using Marten;
 using Promotions.Coupon;
 using Promotions.Promotion;

@@ -1,6 +1,4 @@
 @page "/products"
-@using Microsoft.AspNetCore.Authorization
-@using Backoffice.Web.Auth
 @attribute [Authorize(Roles = "copy-writer,product-manager,pricing-manager,system-admin")]
 @inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager Navigation

@@ -1,5 +1,3 @@
-using Alba;
-using Marten;
 using Messages.Contracts.VendorIdentity;
 using Shouldly;
 using VendorPortal.VendorAccount;

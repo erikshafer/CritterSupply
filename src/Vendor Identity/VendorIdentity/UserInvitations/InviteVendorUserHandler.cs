@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using Messages.Contracts.VendorIdentity;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using VendorIdentity.Identity;
 using Wolverine;
 using Wolverine.Http;

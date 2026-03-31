@@ -1,9 +1,7 @@
-using Marten;
 using Marketplaces.CategoryMappings;
 using Marketplaces.Marketplaces;
 using Messages.Contracts.Listings;
 using Messages.Contracts.Marketplaces;
-using Wolverine.Tracking;
 
 namespace Marketplaces.Api.IntegrationTests;
 

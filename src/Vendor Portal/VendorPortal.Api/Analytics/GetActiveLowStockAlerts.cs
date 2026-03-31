@@ -1,5 +1,4 @@
 using Marten;
-using Marten.Linq;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using VendorPortal.Analytics;

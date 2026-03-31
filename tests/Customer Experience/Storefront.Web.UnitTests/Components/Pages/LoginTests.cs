@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Storefront.Web.Components.Pages;
 
 namespace Storefront.Web.Tests.Components.Pages;

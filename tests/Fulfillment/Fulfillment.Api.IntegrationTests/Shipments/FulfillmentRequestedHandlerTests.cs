@@ -1,6 +1,5 @@
 using Fulfillment.Shipments;
 using Marten;
-using Marten.Linq;
 using Messages.Contracts.Common;
 using Shouldly;
 using IntegrationContracts = Messages.Contracts.Fulfillment;

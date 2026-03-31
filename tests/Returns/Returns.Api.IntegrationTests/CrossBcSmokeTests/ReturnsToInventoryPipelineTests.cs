@@ -1,5 +1,4 @@
 using Messages.Contracts.Returns;
-using Shouldly;
 
 namespace Returns.Api.IntegrationTests.CrossBcSmokeTests;
 

@@ -8,7 +8,6 @@ using JasperFx.Events.Daemon;
 using JasperFx.Events.Projections;
 using JasperFx.Resources;
 using Marten;
-using Marten.Events.Projections;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Pricing;

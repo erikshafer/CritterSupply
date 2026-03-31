@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Storefront.Web.Components.Pages;

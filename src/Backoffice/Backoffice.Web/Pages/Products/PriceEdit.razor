@@ -1,6 +1,4 @@
 @page "/products/{sku}/price"
-@using System.Net.Http.Json
-@using Backoffice.Web.Auth
 @using Backoffice.Web.Hub
 @attribute [Authorize(Roles = "pricing-manager,system-admin")]
 @inject BackofficeAuthState AuthState

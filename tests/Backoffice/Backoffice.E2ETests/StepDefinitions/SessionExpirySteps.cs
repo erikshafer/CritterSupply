@@ -1,7 +1,4 @@
 using Backoffice.E2ETests.Pages;
-using Microsoft.Playwright;
-using Reqnroll;
-using Shouldly;
 
 namespace Backoffice.E2ETests.StepDefinitions;
 
@@ -88,6 +85,7 @@ public sealed class SessionExpirySteps
     }
 
     [Then(@"the modal should block interaction with the page")]
+    [Obsolete("CanInteractWithPAgeBehindModalAsync() is Obsolete")]
     public async Task ThenTheModalShouldBlockInteractionWithThePage()
     {
         var sessionExpiredPage = new SessionExpiredPage(Page);
@@ -96,6 +94,7 @@ public sealed class SessionExpirySteps
     }
 
     [Then(@"I should not be able to interact with the alerts feed")]
+    [Obsolete("ThenTheModalShouldBlockInteractionWithThePage is Obsolete")]
     public async Task ThenIShouldNotBeAbleToInteractWithTheAlertsFeed()
     {
         // Session expired modal should block interaction

@@ -1,8 +1,6 @@
-using System.Security.Claims;
 using Marten;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using VendorPortal.TeamManagement;
 using Wolverine.Http;
 

@@ -1,7 +1,6 @@
 using Messages.Contracts.Returns;
 using Messages.Contracts.Payments;
 using Orders.Placement;
-using Shouldly;
 
 namespace Returns.Api.IntegrationTests.CrossBcSmokeTests;
 

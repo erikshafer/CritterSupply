@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <!-- Aspire Hosting Components -->
+    <PackageReference Include="Aspire.Hosting.AppHost" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" />
     <PackageReference Include="Aspire.Hosting.RabbitMQ" />
   </ItemGroup>

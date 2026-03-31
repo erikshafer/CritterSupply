@@ -2,7 +2,6 @@ using Marten;
 using ProductCatalog.Api.Products;
 using ProductCatalog.Products;
 using Shouldly;
-using Wolverine.Tracking;
 
 namespace ProductCatalog.Api.IntegrationTests;
 

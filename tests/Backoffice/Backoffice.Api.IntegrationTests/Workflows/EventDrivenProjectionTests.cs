@@ -7,7 +7,6 @@ using Messages.Contracts.Inventory;
 using Messages.Contracts.Fulfillment;
 using Messages.Contracts.Returns;
 using Messages.Contracts.Correspondence;
-using Shouldly;
 
 namespace Backoffice.Api.IntegrationTests.Workflows;
 
@@ -331,7 +330,7 @@ public class EventDrivenProjectionTests
         using (var session = _fixture.GetDocumentSession())
         {
             var alert = await session.LoadAsync<AlertFeedView>(alertId);
-            var acknowledged = alert with
+            var acknowledged = alert! with
             {
                 AcknowledgedBy = adminUserId,
                 AcknowledgedAt = DateTimeOffset.UtcNow
@@ -520,7 +519,7 @@ public class EventDrivenProjectionTests
         using (var session = _fixture.GetDocumentSession())
         {
             var metrics = await session.LoadAsync<ReturnMetricsView>("current");
-            activeCountAfterRequest = metrics.ActiveReturnCount;
+            activeCountAfterRequest = metrics!.ActiveReturnCount;
         }
 
         using (var session = _fixture.GetDocumentSession())
