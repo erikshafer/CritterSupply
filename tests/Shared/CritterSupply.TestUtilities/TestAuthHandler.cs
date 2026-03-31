@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using Alba;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -9,9 +10,10 @@ namespace CritterSupply.TestUtilities;
 
 /// <summary>
 /// Fake authentication handler for integration tests.
-/// Automatically authenticates all requests without validating tokens.
-/// Supports configurable claims via <see cref="TestAuthOptions"/> so BCs with different
-/// claim requirements (user ID, roles, tenant ID) can use the same handler.
+/// Authenticates requests that include an <c>Authorization</c> header using configurable
+/// claims from <see cref="TestAuthOptions"/>. Requests without the header receive
+/// <see cref="AuthenticateResult.NoResult"/> so that <c>[Authorize]</c> endpoints
+/// correctly return 401 for unauthenticated callers.
 /// </summary>
 public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
@@ -29,6 +31,14 @@ public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationScheme
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        // If no Authorization header is present, do not authenticate.
+        // This allows [Authorize] endpoints to correctly return 401 for unauthenticated requests.
+        // Endpoints with [AllowAnonymous] are unaffected by this check.
+        if (!Request.Headers.ContainsKey("Authorization"))
+        {
+            return Task.FromResult(AuthenticateResult.NoResult());
+        }
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, _testOptions.UserId),
@@ -130,5 +140,23 @@ public static class TestAuthExtensions
         // Re-register authorization with default settings so policies evaluate
         // against the test identity's claims (roles provided via TestAuthOptions)
         services.AddAuthorization();
+    }
+
+    /// <summary>
+    /// Adds a default <c>Authorization: Bearer test-token</c> header to every Alba scenario.
+    /// Call this after creating the <see cref="IAlbaHost"/> so that <see cref="TestAuthHandler"/>
+    /// recognises each scenario request as authenticated. Requests made via raw
+    /// <c>HttpClient</c> (e.g., <c>Server.CreateClient()</c>) are unaffected and will
+    /// correctly receive 401 from <c>[Authorize]</c> endpoints.
+    /// </summary>
+    public static void AddDefaultAuthHeader(this IAlbaHost host)
+    {
+        host.BeforeEach(ctx =>
+        {
+            if (!ctx.Request.Headers.ContainsKey("Authorization"))
+            {
+                ctx.Request.Headers["Authorization"] = "Bearer test-token";
+            }
+        });
     }
 }

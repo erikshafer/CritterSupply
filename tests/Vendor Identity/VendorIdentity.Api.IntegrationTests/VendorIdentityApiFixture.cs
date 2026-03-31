@@ -53,6 +53,8 @@ public sealed class VendorIdentityApiFixture : IAsyncLifetime
             });
         });
 
+        Host.AddDefaultAuthHeader();
+
         // Apply migrations
         using var scope = Host.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<VendorIdentityDbContext>();

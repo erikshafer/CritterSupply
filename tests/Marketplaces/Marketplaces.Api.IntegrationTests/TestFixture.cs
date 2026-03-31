@@ -52,6 +52,10 @@ public class TestFixture : IAsyncLifetime
                     schemes: "Bearer");
             });
         });
+
+        // Ensure all Alba scenarios include an Authorization header so TestAuthHandler
+        // authenticates them. Raw HttpClient requests (auth tests) won't have this header.
+        Host.AddDefaultAuthHeader();
     }
 
     public async Task DisposeAsync()
@@ -96,6 +100,15 @@ public class TestFixture : IAsyncLifetime
     {
         var store = GetDocumentStore();
         await store.Advanced.Clean.DeleteAllDocumentsAsync();
+    }
+
+    /// <summary>
+    /// Re-runs seed data logic. Use after <see cref="CleanAllDocumentsAsync"/> when
+    /// a subsequent test needs the canonical marketplace and category mapping documents.
+    /// </summary>
+    public async Task ReseedAsync()
+    {
+        await MarketplacesSeedData.SeedAsync(Host.Services);
     }
 
     /// <summary>

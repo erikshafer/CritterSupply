@@ -75,6 +75,8 @@ public class TestFixture : IAsyncLifetime
                 services.AddSingleton<IPromotionsClient>(StubPromotionsClient);
             });
         });
+
+        Host.AddDefaultAuthHeader();
     }
 
     public async Task DisposeAsync()

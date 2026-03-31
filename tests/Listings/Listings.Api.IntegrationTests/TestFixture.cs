@@ -52,6 +52,10 @@ public class TestFixture : IAsyncLifetime
                     schemes: "Bearer");
             });
         });
+
+        // Ensure all Alba scenarios include an Authorization header so TestAuthHandler
+        // authenticates them. Raw HttpClient requests (auth tests) won't have this header.
+        Host.AddDefaultAuthHeader();
     }
 
     public async Task DisposeAsync()

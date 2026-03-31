@@ -9,4 +9,8 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Alba" />
+  </ItemGroup>
+
 </Project>

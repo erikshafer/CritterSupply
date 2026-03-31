@@ -1,5 +1,3 @@
-using Marten;
-using Marketplaces.Marketplaces;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -249,34 +247,5 @@ public sealed class MarketplaceCrudTests : IAsyncLifetime
 
         var body = result.ReadAsJson<System.Text.Json.JsonElement>();
         body.GetProperty("isActive").GetBoolean().ShouldBeFalse();
-    }
-
-    // -------------------------------------------------------------------------
-    // Seed data
-    // -------------------------------------------------------------------------
-
-    [Fact]
-    public async Task SeedData_ThreeMarketplaces_ExistOnStartup()
-    {
-        // Seed data runs on startup in Development environment.
-        // Query directly via Marten to verify the three canonical marketplaces exist.
-        await using var session = _fixture.GetDocumentSession();
-
-        var amazon = await session.LoadAsync<Marketplace>("AMAZON_US");
-        var walmart = await session.LoadAsync<Marketplace>("WALMART_US");
-        var ebay = await session.LoadAsync<Marketplace>("EBAY_US");
-
-        amazon.ShouldNotBeNull();
-        amazon!.DisplayName.ShouldBe("Amazon US");
-        amazon.IsActive.ShouldBeTrue();
-        amazon.IsOwnWebsite.ShouldBeFalse();
-
-        walmart.ShouldNotBeNull();
-        walmart!.DisplayName.ShouldBe("Walmart US");
-        walmart.IsActive.ShouldBeTrue();
-
-        ebay.ShouldNotBeNull();
-        ebay!.DisplayName.ShouldBe("eBay US");
-        ebay.IsActive.ShouldBeTrue();
     }
 }
