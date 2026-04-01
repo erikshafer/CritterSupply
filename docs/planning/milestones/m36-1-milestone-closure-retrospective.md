@@ -69,7 +69,7 @@ Final build state: 0 errors, 33 warnings (all pre-existing). 62 integration test
 | 0041 | Product Catalog ES Migration Decisions | Event-sourced Product Catalog uses inline ProjectionLifecycle for ProductCatalogView, deterministic UUID v5 stream IDs, and retains the legacy document store model for migration support. |
 | 0042 | `catalog:` Namespace UUID v5 Convention | Marten stream IDs for Product Catalog use UUID v5 with `catalog:` namespace prefix for deterministic, collision-resistant identifiers. |
 | 0048 | Marketplace Document Entity Design | Marketplaces uses Marten document store (not event sourcing) for configuration data. Id = ChannelCode as natural key. Sealed class with mutable operational fields. OWN_WEBSITE excluded. |
-| 0049 | Category Mapping Ownership | Category mappings owned by Marketplaces BC with composite key `{ChannelCode}:{InternalCategory}`. Coupling risk to Product Catalog category taxonomy documented with `ProductSummaryView` ACL mitigation planned for M37.x. |
+| 0049 | Category Mapping Ownership | Category mappings owned by Marketplaces BC with composite key `{ChannelCode}:{InternalCategory}`. Coupling risk to Product Catalog category taxonomy documented with `ProductSummaryView` ACL mitigation planned for M37.0. |
 
 **Note:** ADRs 0044–0047 were reserved during Phase 1 planning but not used. ADR 0043 (Storefront Web Technology Options) was authored outside M36.1.
 
@@ -103,19 +103,19 @@ Seed data tests failed non-deterministically in Session 7 because another test c
 
 | Item | Documented In | Target |
 |------|--------------|--------|
-| `ListingApproved` message enrichment — replace direct field carrying with `ProductSummaryView` ACL query in Marketplaces BC | Session 7 retro, ADR 0049 risk section | M37.x |
-| E2E CI execution — MarketplacesAdmin.feature and ListingsAdmin.feature missing `@shard-X` tags; scenarios not discovered by CI shard runners | Session 9 retro, Session 10 CI verification | M37.x Session 1 |
-| Category taxonomy coupling — silent break if Product Catalog renames categories without Marketplaces BC awareness | ADR 0049 risk section | M37.x |
-| Phase 3 production adapters — real Amazon/Walmart/eBay API implementations replacing stubs | Phase 2 plan (Phase 3 section) | M37.x |
+| `ListingApproved` message enrichment — replace direct field carrying with `ProductSummaryView` ACL query in Marketplaces BC | Session 7 retro, ADR 0049 risk section | M37.0 |
+| E2E CI execution — MarketplacesAdmin.feature and ListingsAdmin.feature missing `@shard-X` tags; scenarios not discovered by CI shard runners | Session 9 retro, Session 10 CI verification | M37.0 Session 1 |
+| Category taxonomy coupling — silent break if Product Catalog renames categories without Marketplaces BC awareness | ADR 0049 risk section | M37.0 |
+| Phase 3 production adapters — real Amazon/Walmart/eBay API implementations replacing stubs | Phase 2 plan (Phase 3 section) | M37.0 |
 | Product Catalog `*ES` naming cleanup — vestigial ES suffix removed from 13 files and 5 classes in Session 10 | M36.0 Session 6 retro, Session 10 | ✅ Resolved in Session 10 |
 | Redundant `SaveChangesAsync()` calls in Product Catalog — 2 remaining calls in UpdateProductTags and MigrateProduct removed in Session 10 | M36.0 Session 6 retro | ✅ Resolved in Session 10 |
-| Listings admin action buttons — approve/pause/end buttons are disabled stubs on the detail page | Session 4 retro | M37.x or later |
-| ListingsDetail.feature `@wip` scenarios — 3 scenarios tagged @wip (action button flows) | Session 4 retro | M37.x or later |
-| Bidirectional marketplace feedback — Listings BC consuming MarketplaceListingActivated / MarketplaceSubmissionRejected | Phase 2 plan deferred scope | M37.x |
+| Listings admin action buttons — approve/pause/end buttons are disabled stubs on the detail page | Session 4 retro | M37.0 or later |
+| ListingsDetail.feature `@wip` scenarios — 3 scenarios tagged @wip (action button flows) | Session 4 retro | M37.0 or later |
+| Bidirectional marketplace feedback — Listings BC consuming MarketplaceListingActivated / MarketplaceSubmissionRejected | Phase 2 plan deferred scope | M37.0 |
 
 ---
 
-## 6. What M37.x Inherits
+## 6. What M37.0 Inherits
 
 ### Codebase State
 
@@ -135,7 +135,7 @@ Both BCs are registered in the solution file, Docker Compose, and the Aspire App
 
 ### Open Debt Items
 
-See Section 5 above. The highest-priority items for M37.x Session 1:
+See Section 5 above. The highest-priority items for M37.0 Session 1:
 
 1. **Add `@shard-3` tags** to MarketplacesAdmin.feature and ListingsAdmin.feature/ListingsDetail.feature to enable CI execution
 2. **Replace `ListingApproved` message enrichment** with Marketplaces-local `ProductSummaryView` ACL query (eliminates coupling to Listings message payload)

@@ -33,7 +33,7 @@
 
 ### Explicitly Out of Scope
 
-- **Marketplaces BC (Phase 2):** No marketplace adapter, no `Marketplace` document entity, no category mapping, no external API calls. Deferred to M37.x.
+- **Marketplaces BC (Phase 2):** No marketplace adapter, no `Marketplace` document entity, no category mapping, no external API calls. Deferred to M37.0.
 - **Variants (Phase 3):** No `ProductFamily` aggregate, no variant-aware listings. Deferred to M38.x.
 - **VP Team Management UI:** 13 `@wip` E2E scenarios remain deferred. Carry to dedicated VP milestone.
 - **Migration batch job (Task 0.13):** Per-product migration endpoint exists. Batch job deferred unless testing requires it.
@@ -47,7 +47,7 @@
 
 | Item | Source | Disposition |
 |------|--------|-------------|
-| VP Team Management `@wip` scenarios (13) | M36.0 Session 6 | **Defer** — out of M36.1 scope (Listings focus). Carry to M37.x. |
+| VP Team Management `@wip` scenarios (13) | M36.0 Session 6 | **Defer** — out of M36.1 scope (Listings focus). Carry to M37.0. |
 | Returns cross-BC saga tests (6 skipped) | Pre-existing | **Monitor** — no action unless Wolverine releases fix. Tests remain skipped with documentation. |
 | Product Catalog `SaveChangesAsync` sweep (12 calls) | M36.0 Session 3 | **Address opportunistically** — when Phase 0 cleanup modifies Product Catalog handlers (Tasks 0.8, 0.9), remove any `SaveChangesAsync()` in touched files. Not a standalone work item. |
 

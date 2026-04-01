@@ -50,7 +50,7 @@ The `InternalCategory` field on `CategoryMapping` aligns with the `Category` fie
 
 **Rationale:** This string-based alignment is the simplest integration path — the `ListingApprovedHandler` receives a `ListingApproved` message containing a `Category` field and constructs the composite key directly. No formal anti-corruption layer exists today.
 
-**Known coupling risk:** If the Listings BC or Product Catalog BC renames its category taxonomy (e.g., "Fish & Aquatics" → "Aquarium & Fish"), all category mappings break silently. This is documented as a follow-up concern. The planned M37.x work to replace `ListingApproved` message enrichment with a proper `ProductSummaryView` ACL in the Marketplaces BC would mitigate this risk by giving Marketplaces BC control over how it resolves product metadata.
+**Known coupling risk:** If the Listings BC or Product Catalog BC renames its category taxonomy (e.g., "Fish & Aquatics" → "Aquarium & Fish"), all category mappings break silently. This is documented as a follow-up concern. The planned M37.0 work to replace `ListingApproved` message enrichment with a proper `ProductSummaryView` ACL in the Marketplaces BC would mitigate this risk by giving Marketplaces BC control over how it resolves product metadata.
 
 ### 4. 18 Seed Mappings (6 Categories × 3 Channels)
 
@@ -80,7 +80,7 @@ Seeding uses the same idempotency guard (`AnyAsync()`) and dual-invocation patte
 **Consequences:**
 
 - Category mapping lookups in the `ListingApprovedHandler` are a single `LoadAsync` call — no queries, no projections
-- The string-based alignment between `InternalCategory` and Product Catalog's `Category` is a known coupling risk that will be mitigated by the M37.x ACL work
+- The string-based alignment between `InternalCategory` and Product Catalog's `Category` is a known coupling risk that will be mitigated by the M37.0 ACL work
 - Adding a new marketplace channel requires seeding new category mappings (one per internal category)
 - Adding a new internal category requires seeding new mappings across all existing channels
 - The composite key convention (`{ChannelCode}:{InternalCategory}`) must be maintained consistently wherever category mappings are constructed or referenced

@@ -41,7 +41,7 @@
 
 3. **Bidirectional integration scoped down** — The execution plan's Phase 2b
    (Listings BC consuming `MarketplaceListingActivated`/`MarketplaceSubmissionRejected`)
-   is deferred to M37.x. M36.1 delivers the Marketplaces → adapter → publish direction
+   is deferred to M37.0. M36.1 delivers the Marketplaces → adapter → publish direction
    only.
 
 **Port/database/Docker Compose assignments confirmed:**

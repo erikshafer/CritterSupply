@@ -1,4 +1,4 @@
-# M37.x Session 1 Retrospective — Debt Clearance + ProductSummaryView ACL
+# M37.0 Session 1 Retrospective — Debt Clearance + ProductSummaryView ACL
 
 **Date:** 2026-04-01
 **Status:** ✅ Complete
@@ -8,7 +8,7 @@
 
 ## 1. Session Objective
 
-Clear the two highest-priority debt items from M36.1 (message enrichment coupling and E2E shard tags) so that Phase 3 production adapter work in M37.x Session 2+ starts from a clean foundation.
+Clear the two highest-priority debt items from M36.1 (message enrichment coupling and E2E shard tags) so that Phase 3 production adapter work in M37.0 Session 2+ starts from a clean foundation.
 
 **Outcome: All three deliverables completed.**
 

@@ -14,7 +14,7 @@ This tradeoff was documented in the Session 7 retrospective and later captured i
 2. **Category taxonomy coupling (ADR 0049 risk):** The `Category` field passed through two BC boundaries (Product Catalog → Listings → Marketplaces) as a raw string. If Product Catalog renamed a category, the Marketplaces BC would silently fail category mapping lookups with no visibility into the root cause.
 3. **No independent data verification:** The Marketplaces BC could not verify product status (e.g., whether a product was discontinued) before submitting to external channels.
 
-M37.x Session 1 resolves this debt by introducing a local `ProductSummaryView` anti-corruption layer (ACL) in the Marketplaces BC.
+M37.0 Session 1 resolves this debt by introducing a local `ProductSummaryView` anti-corruption layer (ACL) in the Marketplaces BC.
 
 **Decisions:**
 
@@ -82,7 +82,7 @@ The `ListingApprovedHandler` falls back to `0m` when `BasePrice` is null (`produ
 - Accept that the `ListingApproved` message's `Price` field (from Listings BC) remains the primary price source until a Pricing BC integration is built
 - Add a Marketplaces API endpoint for manual price override per SKU
 
-This gap is acceptable for the current stub adapter phase. Real production adapters (M37.x Session 2+) will need to resolve pricing before going live.
+This gap is acceptable for the current stub adapter phase. Real production adapters (M37.0 Session 2+) will need to resolve pricing before going live.
 
 **Alternatives Considered:**
 

@@ -147,7 +147,7 @@ Created `src/Shared/Messages.Contracts/Marketplaces/MarketplaceIntegrationMessag
 - The Listing aggregate has `ProductName` available
 - `Category` comes from `ProductSummaryView` lookup in the Listings BC's `ApproveListingHandler`
 - `Price` is nullable because it's not currently available in the Listings BC
-- **M37.x follow-up:** Replace this with a proper `ProductSummaryView` ACL in the Marketplaces BC
+- **M37.0 follow-up:** Replace this with a proper `ProductSummaryView` ACL in the Marketplaces BC
 
 RabbitMQ publish routes configured in `Program.cs`:
 - `MarketplaceListingActivated` → `marketplaces-listing-activated` exchange
@@ -221,7 +221,7 @@ The Phase 2 plan's preferred approach was to either query Listings.Api via HTTP 
 - `Category` — from `ProductSummaryView.Category` (Marten document lookup)
 - `Price` — nullable (`decimal?`) because price data doesn't exist in the Listings BC
 
-**M37.x follow-up:** Replace this message enrichment pattern with a proper `ProductSummaryView` ACL in the Marketplaces BC that consumes Product Catalog events directly.
+**M37.0 follow-up:** Replace this message enrichment pattern with a proper `ProductSummaryView` ACL in the Marketplaces BC that consumes Product Catalog events directly.
 
 ### Pre-existing Test Failures
 

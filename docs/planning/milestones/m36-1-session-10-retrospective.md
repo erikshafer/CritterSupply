@@ -15,7 +15,7 @@ Session 10 was the milestone closure session for M36.1. No implementation code w
 2. ✅ Product Catalog `*ES` naming audit + cleanup (tertiary)
 3. ✅ CURRENT-CYCLE.md update (secondary)
 4. ✅ E2E CI verification (quaternary)
-5. ✅ M37.x planning notes (stretch)
+5. ✅ M37.0 planning notes (stretch)
 
 ---
 
@@ -31,7 +31,7 @@ Synthesized all 9 implementation sessions into a coherent milestone-level docume
 - ADR summary table (0040, 0041, 0042, 0048, 0049)
 - 5 key lessons learned (synthesized from 9 session retros)
 - Technical debt table (9 items, 2 resolved in Session 10)
-- M37.x handoff section (codebase state, test baseline, open debt, Phase 3 requirements)
+- M37.0 handoff section (codebase state, test baseline, open debt, Phase 3 requirements)
 
 ### 2. Product Catalog `*ES` Naming Cleanup
 
@@ -68,7 +68,7 @@ Synthesized all 9 implementation sessions into a coherent milestone-level docume
 
 **CI evidence:** E2E Run #432 (main, 2026-03-31) — `Backoffice E2E (admin)` job ran `--filter "Category=shard-3"` but the upload step reported "No files were found with the provided path: **/TestResults/**/*.trx", suggesting no tests matched the shard-3 filter from the marketplace/listings features.
 
-**Fix required (M37.x Session 1):** Add `@shard-3` to line 1 of:
+**Fix required (M37.0 Session 1):** Add `@shard-3` to line 1 of:
 - `tests/Backoffice/Backoffice.E2ETests/Features/MarketplacesAdmin.feature`
 - `tests/Backoffice/Backoffice.E2ETests/Features/ListingsAdmin.feature`
 - `tests/Backoffice/Backoffice.E2ETests/Features/ListingsDetail.feature`
@@ -78,15 +78,15 @@ This is a one-line change per file. The generated `.feature.cs` files will autom
 ### 4. CURRENT-CYCLE.md Update
 
 - Moved M36.1 from Active Milestone to Recent Completions
-- Set M37.x as the new Active Milestone (planning status)
+- Set M37.0 as the new Active Milestone (planning status)
 - Updated Quick Status table with M36.1 completion date and test baseline
-- Updated Roadmap section (M36.1 → complete, M37.x → planning)
+- Updated Roadmap section (M36.1 → complete, M37.0 → planning)
 - Updated Future BCs priority list (Listings + Marketplaces now green/complete)
 - Updated document timestamps
 
-### 5. M37.x Planning Notes (Stretch)
+### 5. M37.0 Planning Notes (Stretch)
 
-**File:** `docs/planning/milestones/m37-x-planning-notes.md`
+**File:** `docs/planning/milestones/m37-0-planning-notes.md`
 
 Lightweight pre-planning document capturing:
 - What Phase 3 means (real adapter implementations)
@@ -102,7 +102,7 @@ Lightweight pre-planning document capturing:
 
 1. **ES cleanup was straightforward.** The audit-first approach revealed that 8 of 13 handler classes already had correct names — only 5 needed class renames. Wolverine's assembly-scanning discovery meant no routing configuration needed updating.
 
-2. **CI verification caught a real gap.** The missing `@shard-X` tags on marketplace and listings feature files would have continued to silently skip E2E scenarios in CI indefinitely. Documenting this now ensures M37.x Session 1 addresses it.
+2. **CI verification caught a real gap.** The missing `@shard-X` tags on marketplace and listings feature files would have continued to silently skip E2E scenarios in CI indefinitely. Documenting this now ensures M37.0 Session 1 addresses it.
 
 3. **Milestone closure retrospective synthesis worked.** Writing at the phase level (not session level) produced a more useful document for future agents than a session-by-session concatenation would have.
 

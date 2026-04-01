@@ -56,17 +56,17 @@ API integrations.
 - **ADRs** — 0048 (Marketplace document entity), 0049 (Category mapping ownership)
 - **Solution, Docker Compose, DB script updates**
 
-### Explicitly Out of Scope (defer to M37.x+)
+### Explicitly Out of Scope (defer to M37.0+)
 
 - **Listings BC consuming `MarketplaceListingActivated` / `MarketplaceSubmissionRejected`**
   — Listings aggregate state transitions (Submitted → Live / Draft) are Phase 2b
-  completion, deferred to M37.x
+  completion, deferred to M37.0
 - **`AttributeSchemaPublished` event + `RequiresSchemaReview` flagging** (D10) —
   Schema versioning deferred to late Phase 2b or Phase 3
 - **Submission timeout safety net** — Wolverine scheduled message for orphaned
-  Submitted listings deferred to M37.x
+  Submitted listings deferred to M37.0
 - **Full marketplace admin UI** — 4-tab detail page, create wizard, category mapping
-  editor deferred to M37.x
+  editor deferred to M37.0
 - **Real marketplace API integrations** — Phase 3 (M38.x)
 - **`OWN_WEBSITE` in Marketplaces BC** — OWN_WEBSITE is not an external marketplace;
   it is handled by the Listings BC fast-path (Draft → Live)
@@ -309,7 +309,7 @@ Adapted from execution plan Phase 2 Gate, scoped to M36.1 delivery:
 
 ---
 
-## 12. What M37.x Picks Up (Phase 2b Completion)
+## 12. What M37.0 Picks Up (Phase 2b Completion)
 
 Items deferred from M36.1 Phase 2:
 
