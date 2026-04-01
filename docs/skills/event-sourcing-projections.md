@@ -115,7 +115,7 @@ public sealed class MyProjection : SingleStreamProjection<MyDocument>
 }
 ```
 
-**Third option — `Evolve(IEvent e)`:** Marten 8.27 / Polecat 1.5 also support defining single-stream projection logic with an `Evolve(IEvent e)` method on the aggregate or projection type instead of separate `Apply()` overloads. Use this when a switch expression is clearer for your team or when event subclass hierarchies make `Apply()` conventions ambiguous. Existing CritterSupply `Apply()` projections remain correct; Jeremy's guidance is to choose the style your team prefers rather than treating `Evolve()` as a mandatory replacement.
+**Third option — `Evolve(IEvent e)`:** Marten 8.27 / Polecat 1.5 also support defining single-stream projection logic with an `Evolve(IEvent e)` method on the aggregate or projection type instead of separate `Apply()` overloads. Use this when a switch expression is clearer for your team or when event subclass hierarchies make `Apply()` conventions ambiguous. Existing CritterSupply `Apply()` projections remain correct; official guidance is to choose the style your team prefers rather than treating `Evolve()` as a mandatory replacement.
 
 ### Example: Checkout Snapshot (Orders BC)
 

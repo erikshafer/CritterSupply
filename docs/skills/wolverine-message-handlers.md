@@ -266,7 +266,7 @@ The aggregate handler workflow is Wolverine's flavor of the Decider pattern. It 
 | `[WriteAggregate]` | Modify aggregate (append events) | Automatic via return |
 | `[AggregateHandler]` | Class-level attribute for single-stream handlers | Automatic via return |
 
-**Prefer `[WriteAggregate]`** — It's parameter-level, supports multi-stream operations, and is now the clearer modern name for write scenarios. The older `[Aggregate]` attribute still works for the same aggregate workflow behavior, but use `[WriteAggregate]` in new write-handler examples unless you specifically need to mirror legacy docs or code.
+**Prefer `[WriteAggregate]`** — It's parameter-level and supports multi-stream operations. `[WriteAggregate]` is now the clearer modern name for write scenarios; the older `[Aggregate]` attribute still works for the same aggregate workflow behavior, but use `[WriteAggregate]` in new write-handler examples unless you specifically need to mirror legacy docs or code.
 
 ### `[WriteAggregate]` — Standard Pattern
 
