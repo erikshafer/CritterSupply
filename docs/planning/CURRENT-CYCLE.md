@@ -41,38 +41,48 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M37.x — Marketplaces Phase 3 (planning) |
-| **Status** | 📋 **PLANNING** — M36.1 complete; M37.x scope to be defined |
+| **Current Milestone** | M37.x — Marketplaces Phase 3 (in progress) |
+| **Status** | 🚀 **IN PROGRESS** — Session 1 complete (debt clearance + ProductSummaryView ACL) |
 | **Recent Completion** | M36.1 — Listings BC Foundation + Marketplaces BC Foundation (2026-03-31) |
 | **Previous Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-01 (M36.1 complete, M37.x planning active, March 2026 Critter Stack feature awareness review completed)*
+*Last Updated: 2026-04-01 (M37.x Session 1 complete — debt clearance + ProductSummaryView ACL delivered)*
 
 ---
 
 ## Active Milestone
 
-### 📋 M37.x: Marketplaces Phase 3 — Production Adapters
+### 🚀 M37.x: Marketplaces Phase 3 — Production Adapters
 
-**Status:** 📋 **PLANNING** — M36.1 complete; scope to be defined in M37.x planning session
+**Status:** 🚀 **IN PROGRESS** — Session 1 complete; Session 2 picks up production adapter work
 **Goal:** Deliver real marketplace adapter implementations (Amazon SP-API, Walmart Marketplace API, eBay Sell API), resolve `ListingApproved` message enrichment debt, and ensure E2E CI coverage for Listings + Marketplaces admin pages
+
+**Session History:**
+- [Session 1 Retrospective](./milestones/m37-x-session-1-retrospective.md) — Debt clearance + ProductSummaryView ACL (2026-04-01)
 
 **Pre-Planning Input:**
 - [M36.1 Milestone Closure Retrospective](./milestones/m36-1-milestone-closure-retrospective.md) — What M37.x inherits
 - [M37.x Planning Notes](./milestones/m37-x-planning-notes.md) — Pre-planning notes for M37.x
 - [Catalog-Listings-Marketplaces Cycle Plan](./catalog-listings-marketplaces-cycle-plan.md) — Phase 3 scope
 - [ADR 0049](../decisions/0049-category-mapping-ownership.md) — Category taxonomy coupling risk
+- [ADR 0050](../decisions/0050-marketplaces-product-summary-acl.md) — ProductSummaryView ACL decision
 
-**Known Scope (from M36.1 debt table):**
-- Replace `ListingApproved` message enrichment with `ProductSummaryView` ACL in Marketplaces BC
-- Add `@shard-3` tags to MarketplacesAdmin.feature and ListingsAdmin.feature for CI execution
-- Address category taxonomy coupling (ADR 0049 risk section)
+**M37.x Session 1 Progress (2026-04-01):**
+- ✅ D-1: Added `@shard-3` tags to MarketplacesAdmin.feature, ListingsAdmin.feature, ListingsDetail.feature
+- ✅ D-2: Built `ProductSummaryView` ACL in Marketplaces BC — 4 Product Catalog event handlers, updated `ListingApprovedHandler` to query local view (zero message payload reads)
+- ✅ D-3: Authored ADR 0050 — Marketplaces ProductSummaryView ACL decision
+- ✅ 6 new integration tests (33 total Marketplaces, 68 total Listings+Marketplaces)
+
+**Remaining Scope (Session 2+):**
 - Real Amazon/Walmart/eBay adapter implementations replacing stubs
 - Production IVaultClient implementation
+- Resolve BasePrice gap (ADR 0050 Decision 5)
+- Async submission status polling
+- Bidirectional marketplace feedback (Listings BC consuming activation/rejection events)
 
-**Test Baseline:** 62 integration tests (35 Listings + 27 Marketplaces), 6 E2E scenarios (marketplace admin), 0 failures
-**Next ADR:** 0050
+**Test Baseline:** 68 integration tests (35 Listings + 33 Marketplaces), 6 E2E scenarios (marketplace admin), 0 failures
+**Next ADR:** 0051
 
 ---
 
