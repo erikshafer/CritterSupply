@@ -1,4 +1,4 @@
-﻿name: Qodana Configuration Upload
+ame: Qodana Configuration Upload
 
 on:
   push:
@@ -15,7 +15,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # TODO(qodana): Add qodana-global-configurations.yaml (Qodana Cloud global configurations)
+      # so this job can upload org-wide configuration to https://qodana.cloud.
+      # For now, skip gracefully when the file is not present.
       - name: Run Qodana Configuration Uploader
+        if: ${{ hashFiles('qodana-global-configurations.yaml') != '' }}
         env:
           QODANA_CONFIGURATIONS_TOKEN: ${{ secrets.QODANA_CONFIGURATIONS_TOKEN }}
         run: |
