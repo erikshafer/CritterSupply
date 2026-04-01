@@ -47,7 +47,7 @@
 | **Previous Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-03-31 (M36.1 complete — milestone closure, ES cleanup, M37.x planning, skills refresh M35.0–M36.1 completed)*
+*Last Updated: 2026-04-01 (M36.1 complete, M37.x planning active, March 2026 Critter Stack feature awareness review completed)*
 
 ---
 
@@ -105,6 +105,13 @@
 **Status:** ✅ **Complete** — 10 skill files updated, 13 reviewed with no changes needed
 **Scope:** Mined M35.0, M36.0, and M36.1 retrospectives (3 milestone closures + 22 session retros)
 **Inventory:** [skills-refresh-m35-m36-inventory.md](./skills-refresh-m35-m36-inventory.md)
+
+### ✅ Critter Stack March 2026 Feature Awareness Review (2026-04-01)
+
+**Status:** ✅ **Complete** — inventory committed first, 3 skill files updated, `critterstack-testing-patterns.md` reviewed as no-change
+**Scope:** Reviewed March 2026 releases across Marten 8.27, Wolverine 5.25, Polecat 1.5, and Weasel 8.11.1 so skill guidance acknowledges newly relevant Critter Stack features
+**Inventory:** [critter-stack-march-2026-feature-inventory.md](./critter-stack-march-2026-feature-inventory.md)
+**Files Updated:** `wolverine-message-handlers.md`, `event-sourcing-projections.md`, `wolverine-sagas.md`
 
 ### ✅ M36.0: Engineering Quality (2026-03-29)
 
