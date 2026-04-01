@@ -1,3 +1,4 @@
+@shard-3
 Feature: Listing Detail Page
   As a ProductManager or SystemAdmin
   I want to view listing details from the Backoffice
