@@ -266,7 +266,7 @@ The aggregate handler workflow is Wolverine's flavor of the Decider pattern. It 
 | `[WriteAggregate]` | Modify aggregate (append events) | Automatic via return |
 | `[AggregateHandler]` | Class-level attribute for single-stream handlers | Automatic via return |
 
-**Prefer `[WriteAggregate]`** — It's parameter-level and supports multi-stream operations, making it more flexible for complex scenarios.
+**Prefer `[WriteAggregate]`** — It's parameter-level and supports multi-stream operations. `[WriteAggregate]` is now the clearer modern name for write scenarios; the older `[Aggregate]` attribute still works for the same aggregate workflow behavior, but use `[WriteAggregate]` in new write-handler examples unless you specifically need to mirror legacy docs or code.
 
 ### `[WriteAggregate]` — Standard Pattern
 
@@ -297,11 +297,13 @@ public static class CapturePaymentHandler
 }
 ```
 
-**How Wolverine resolves the aggregate ID:**
+**How Wolverine resolves the aggregate ID by default:**
 
 1. Look for a command property named `{AggregateName}Id` (e.g., `PaymentId` for `Payment`)
 2. Look for a command property with `[Identity]` attribute
 3. Look for an HTTP route parameter (e.g., `/payments/{paymentId}`)
+
+**Wolverine 5.25 awareness:** `[WriteAggregate]`, `[ReadAggregate]`, and `[Aggregate]` also support explicit custom identity resolution via `FromHeader`, `FromClaim`, `FromMethod`, and `FromRoute`. Use these when the aggregate identity naturally lives in a request header, authenticated-user claim, or a static resolver method instead of the route/body defaults. See the official docs for details: <https://wolverinefx.net/guide/http/marten.html#custom-identity-resolution>.
 
 **Example with explicit identity:**
 

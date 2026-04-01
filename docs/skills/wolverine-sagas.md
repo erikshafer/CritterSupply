@@ -21,14 +21,15 @@ Patterns and practices for building stateful orchestration sagas with Wolverine 
 8. [Multi-SKU Race Conditions](#multi-sku-race-conditions)
 9. [At-Least-Once Delivery and Idempotency](#at-least-once-delivery-and-idempotency)
 10. [Scheduling Delayed Messages](#scheduling-delayed-messages)
-11. [Saga Lifecycle Completion](#saga-lifecycle-completion)
-12. [Return Processing — Active Return Tracking](#return-processing--active-return-tracking) ⭐ *M32-M34 Addition*
-13. [Shared Guard: `CanBeCancelled()`](#shared-guard-canbecancelled)
-14. [DOs and DO NOTs](#dos-and-do-nots) ⭐ *M32-M34 Addition*
-15. [File Organization](#file-organization)
-16. [Common Pitfalls](#common-pitfalls)
-17. [Testing Sagas](#testing-sagas)
-18. [Quick Reference](#quick-reference)
+11. [Advanced Patterns for Ordered Workloads](#advanced-patterns-for-ordered-workloads)
+12. [Saga Lifecycle Completion](#saga-lifecycle-completion)
+13. [Return Processing — Active Return Tracking](#return-processing--active-return-tracking) ⭐ *M32-M34 Addition*
+14. [Shared Guard: `CanBeCancelled()`](#shared-guard-canbecancelled)
+15. [DOs and DO NOTs](#dos-and-do-nots) ⭐ *M32-M34 Addition*
+16. [File Organization](#file-organization)
+17. [Common Pitfalls](#common-pitfalls)
+18. [Testing Sagas](#testing-sagas)
+19. [Quick Reference](#quick-reference)
 
 ---
 
@@ -600,6 +601,18 @@ public static class OrderDecider
 ```
 
 > **Reference:** [Wolverine Scheduled Messages](https://wolverinefx.net/guide/messaging/scheduled.html)
+
+## Advanced Patterns for Ordered Workloads
+
+These are awareness notes, not default guidance. Reach for them only when ordering guarantees become the actual problem.
+
+### Re-Sequencer Saga
+
+If related messages may arrive out of order, Wolverine's `ResequencerSaga<T>` can buffer gaps and replay messages in sequence once the missing order number arrives. Use it when message types in the workflow can implement `SequencedMessage` and ordering bugs would otherwise force custom buffering logic. Reference: <https://wolverinefx.io/guide/durability/sagas.html#resequencer-saga>.
+
+### Global Partitioning
+
+If a saga workload needs cluster-wide sequential processing within each message group, `UseInferredMessageGrouping()` plus `GlobalPartitioned()` spreads work across sharded queues while preserving ordering per group. This is Wolverine's advanced answer for scaling ordered saga traffic without falling back to pessimistic locking. Reference: <https://wolverinefx.io/guide/messaging/partitioning.html#global-partitioning>.
 
 ## Saga Lifecycle Completion
 

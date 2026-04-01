@@ -100,7 +100,8 @@ Projections are denormalized read models built from event-sourced aggregates. Th
 **Key conventions:**
 - `Create()` — Optional; runs on first event
 - `Apply()` — One overload per event type
-- Method names are exact: `Create` and `Apply` (case-sensitive)
+- `Evolve(IEvent e)` — Alternative single-method style for explicit switch-based projection logic
+- Method names are exact: `Create`, `Apply`, and `Evolve` (case-sensitive)
 - Return type must match document type
 
 ```csharp
@@ -113,6 +114,8 @@ public sealed class MyProjection : SingleStreamProjection<MyDocument>
         current with { Property = evt.NewValue };
 }
 ```
+
+**Third option — `Evolve(IEvent e)`:** Marten 8.27 / Polecat 1.5 also support defining single-stream projection logic with an `Evolve(IEvent e)` method on the aggregate or projection type instead of separate `Apply()` overloads. Use this when a switch expression is clearer for your team or when event subclass hierarchies make `Apply()` conventions ambiguous. Existing CritterSupply `Apply()` projections remain correct; official guidance is to choose the style your team prefers rather than treating `Evolve()` as a mandatory replacement.
 
 ### Example: Checkout Snapshot (Orders BC)
 
@@ -247,12 +250,13 @@ public static async Task<IEnumerable<object>> Handle(
     ChangePrice cmd,
     IDocumentSession session)
 {
-    var streamId = ProductPrice.StreamId(cmd.Sku);
-    var price = await session.Events.FetchForWriting<ProductPrice>(streamId);
+    var price = await session.Events.FetchForWriting<ProductPrice>(ProductPrice.StreamId(cmd.Sku));
 
     return [new PriceChanged(...)];  // Marten auto-appends with optimistic concurrency
 }
 ```
+
+**Marten 8.27 awareness:** `FetchForWriting()` now auto-discovers natural keys without requiring explicit projection registration for that natural-key support. If your aggregate already uses a natural key, you may be able to load it directly by that natural key instead of precomputing a stream id; keep the explicit `StreamId()` helper when that remains the clearest fit for the aggregate design.
 
 **What FetchForWriting() does:**
 1. Replays events to reconstitute aggregate
