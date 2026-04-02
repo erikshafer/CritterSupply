@@ -1,50 +1,53 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Mvc;
+using Marten;
+using Microsoft.AspNetCore.Http;
 using Wolverine.Http;
-using Wolverine.Marten;
 
 namespace Orders.Checkout;
 
-public sealed record ProvidePaymentMethod(
-    Guid CheckoutId,
+/// <summary>
+/// Request body for providing a checkout payment method.
+/// </summary>
+public sealed record ProvidePaymentMethodRequest(
     string PaymentMethodToken)
 {
-    public class ProvidePaymentMethodValidator : AbstractValidator<ProvidePaymentMethod>
+    public class ProvidePaymentMethodRequestValidator : AbstractValidator<ProvidePaymentMethodRequest>
     {
-        public ProvidePaymentMethodValidator()
+        public ProvidePaymentMethodRequestValidator()
         {
-            RuleFor(x => x.CheckoutId).NotEmpty();
             RuleFor(x => x.PaymentMethodToken).NotEmpty().MaximumLength(500);
         }
     }
 }
 
+/// <summary>
+/// Direct Implementation pattern — see ProvideShippingAddress.cs for rationale.
+/// </summary>
 public static class ProvidePaymentMethodHandler
 {
-    public static ProblemDetails Before(
-        ProvidePaymentMethod command,
-        Checkout? checkout)
+    [WolverinePost("/api/checkouts/{checkoutId}/payment-method")]
+    public static async Task<IResult> Handle(
+        Guid checkoutId,
+        ProvidePaymentMethodRequest request,
+        IDocumentSession session,
+        CancellationToken ct)
     {
+        var stream = await session.Events.FetchForWriting<Checkout>(checkoutId, ct);
+        var checkout = stream.Aggregate;
+
         if (checkout is null)
-            return new ProblemDetails { Detail = "Checkout not found", Status = 404 };
+            return Results.NotFound(new { detail = "Checkout not found" });
 
         if (checkout.IsCompleted)
-            return new ProblemDetails
-            {
-                Detail = "Cannot modify a completed checkout",
-                Status = 400
-            };
+            return Results.BadRequest(new { detail = "Cannot modify a completed checkout" });
 
-        return WolverineContinue.NoProblems;
-    }
-
-    [WolverinePost("/api/checkouts/{checkoutId}/payment-method")]
-    public static PaymentMethodProvided Handle(
-        ProvidePaymentMethod command,
-        [WriteAggregate] Checkout checkout)
-    {
-        return new PaymentMethodProvided(
-            command.PaymentMethodToken,
+        var @event = new PaymentMethodProvided(
+            request.PaymentMethodToken,
             DateTimeOffset.UtcNow);
+
+        stream.AppendOne(@event);
+        await session.SaveChangesAsync(ct);
+
+        return Results.Ok(@event);
     }
 }

@@ -1,0 +1,124 @@
+@inject IHttpClientFactory HttpClientFactory
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.LocationOn" Class="mr-2" />
+            Add New Shipping Address
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_nickname" Label="Nickname" Placeholder="e.g. Home, Office" Variant="Variant.Outlined" Required="true" RequiredError="Nickname is required" Class="mb-3" data-testid="dialog-nickname" />
+        <MudTextField @bind-Value="_addressLine1" Label="Address Line 1" Variant="Variant.Outlined" Required="true" RequiredError="Address is required" Class="mb-3" data-testid="dialog-address-line1" />
+        <MudTextField @bind-Value="_addressLine2" Label="Address Line 2 (Optional)" Variant="Variant.Outlined" Class="mb-3" data-testid="dialog-address-line2" />
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_city" Label="City" Variant="Variant.Outlined" Required="true" RequiredError="City is required" data-testid="dialog-city" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_stateOrProvince" Label="State / Province" Variant="Variant.Outlined" Required="true" RequiredError="State is required" data-testid="dialog-state" />
+            </MudItem>
+        </MudGrid>
+        <MudGrid Class="mt-3">
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_postalCode" Label="Postal Code" Variant="Variant.Outlined" Required="true" RequiredError="Postal code is required" data-testid="dialog-postal-code" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_country" Label="Country (2-letter code)" Variant="Variant.Outlined" Required="true" RequiredError="Country is required" data-testid="dialog-country" />
+            </MudItem>
+        </MudGrid>
+
+        @if (_isSubmitting)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mt-4" data-testid="dialog-submitting" />
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-4" data-testid="dialog-error">@_errorMessage</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="@_isSubmitting" data-testid="dialog-btn-cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit" Disabled="@(_isSubmitting || !IsFormValid)" data-testid="dialog-btn-submit">
+            Add Address
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public Guid CustomerId { get; set; }
+
+    private string _nickname = "";
+    private string _addressLine1 = "";
+    private string? _addressLine2;
+    private string _city = "";
+    private string _stateOrProvince = "";
+    private string _postalCode = "";
+    private string _country = "US";
+    private bool _isSubmitting = false;
+    private string? _errorMessage;
+
+    private bool IsFormValid =>
+        !string.IsNullOrWhiteSpace(_nickname) &&
+        !string.IsNullOrWhiteSpace(_addressLine1) &&
+        !string.IsNullOrWhiteSpace(_city) &&
+        !string.IsNullOrWhiteSpace(_stateOrProvince) &&
+        !string.IsNullOrWhiteSpace(_postalCode) &&
+        !string.IsNullOrWhiteSpace(_country) &&
+        _country.Length == 2;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        if (!IsFormValid) return;
+
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("StorefrontApi");
+            var payload = new
+            {
+                nickname = _nickname.Trim(),
+                addressLine1 = _addressLine1.Trim(),
+                addressLine2 = string.IsNullOrWhiteSpace(_addressLine2) ? (string?)null : _addressLine2.Trim(),
+                city = _city.Trim(),
+                stateOrProvince = _stateOrProvince.Trim(),
+                postalCode = _postalCode.Trim(),
+                country = _country.Trim().ToUpperInvariant()
+            };
+
+            var response = await client.PostAsJsonAsync($"/api/storefront/customers/{CustomerId}/addresses", payload);
+
+            if (response.IsSuccessStatusCode)
+            {
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                _errorMessage = "An address with that nickname already exists. Please choose a different name.";
+            }
+            else
+            {
+                _errorMessage = "Failed to add address. Please check your entries and try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error adding address: {ex.Message}");
+            _errorMessage = "Network error. Please check your connection and try again.";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

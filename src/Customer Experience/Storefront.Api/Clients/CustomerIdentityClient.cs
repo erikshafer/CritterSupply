@@ -33,6 +33,39 @@ public sealed class CustomerIdentityClient : ICustomerIdentityClient
         return (IReadOnlyList<CustomerAddressDto>)(list ?? new List<CustomerAddressDto>());
     }
 
+    public async Task<Guid> AddAddressAsync(
+        Guid customerId,
+        AddAddressRequest request,
+        CancellationToken ct = default)
+    {
+        var payload = new
+        {
+            customerId,
+            type = "Shipping",
+            nickname = request.Nickname,
+            addressLine1 = request.AddressLine1,
+            addressLine2 = request.AddressLine2,
+            city = request.City,
+            stateOrProvince = request.StateOrProvince,
+            postalCode = request.PostalCode,
+            country = request.Country,
+            isDefault = true
+        };
+
+        var response = await _httpClient.PostAsJsonAsync($"/api/customers/{customerId}/addresses", payload, ct);
+        response.EnsureSuccessStatusCode();
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        var result = JsonSerializer.Deserialize<CreationResponseDto>(content, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        return result?.Id ?? throw new InvalidOperationException("Failed to parse address creation response");
+    }
+
+    private sealed record CreationResponseDto(string Url, Guid Id);
+
     public async Task<LoginResponse?> LoginAsync(string email, string password, CancellationToken ct = default)
     {
         var request = new { email, password };

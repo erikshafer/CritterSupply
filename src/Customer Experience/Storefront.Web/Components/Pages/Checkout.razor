@@ -8,6 +8,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Checkout - CritterSupply</PageTitle>
 
@@ -46,12 +47,16 @@ else
                             <MudAlert Severity="Severity.Info" data-testid="no-saved-addresses">No saved addresses. Add an address to continue.</MudAlert>
                         }
 
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="@OpenAddAddressDialog" Disabled="@_isProcessing" Class="mt-4 mr-2" StartIcon="@Icons.Material.Filled.Add" data-testid="btn-add-address">
+                            Add New Address
+                        </MudButton>
+
                         @if (_isProcessing)
                         {
                             <MudProgressLinear Indeterminate="true" Class="mt-4" data-testid="checkout-processing" />
                         }
 
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveShippingAddressAndContinue" Disabled="@_isProcessing" Class="mt-4" data-testid="btn-save-address">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@SaveShippingAddressAndContinue" Disabled="@(_isProcessing || _selectedAddressId == Guid.Empty)" Class="mt-4" data-testid="btn-save-address">
                             Save & Continue
                         </MudButton>
                     </ChildContent>
@@ -109,7 +114,7 @@ else
                         @foreach (var item in _checkoutView.Items)
                         {
                             <div class="d-flex justify-space-between mb-2" data-testid="@($"line-item-{item.Sku}")">
-                                <MudText>@item.ProductName (x@item.Quantity)</MudText>
+                                <MudText>@item.ProductName (x@(item.Quantity))</MudText>
                                 <MudText data-testid="@($"line-item-total-{item.Sku}")">@item.LineTotal.ToString("C")</MudText>
                             </div>
                         }
@@ -150,7 +155,7 @@ else
 
                 <div class="d-flex justify-space-between">
                     <MudText Typo="Typo.h6">Total</MudText>
-                    <MudText Typo="Typo.h6" data-testid="order-total">@(_checkoutView.Subtotal + CurrentShippingCost).ToString("C")</MudText>
+                    <MudText Typo="Typo.h6" data-testid="order-total">@((_checkoutView.Subtotal + CurrentShippingCost).ToString("C"))</MudText>
                 </div>
             </MudPaper>
         </MudItem>
@@ -220,9 +225,11 @@ else
 
             var client = HttpClientFactory.CreateClient("StorefrontApi");
 
-            // Retry logic to handle async message processing delay
-            const int maxRetries = 3;
-            const int delayMs = 500;
+            // Retry logic to handle async message processing delay.
+            // Shopping publishes CheckoutInitiated via durable outbox → RabbitMQ → Orders.
+            // In containerized cold-start scenarios, this pipeline can take 5-10+ seconds.
+            const int maxRetries = 8;
+            const int delayMs = 1500;
 
             for (int attempt = 1; attempt <= maxRetries; attempt++)
             {
@@ -542,6 +549,31 @@ else
         finally
         {
             _isProcessing = false;
+        }
+    }
+
+    private async Task OpenAddAddressDialog()
+    {
+        var parameters = new DialogParameters<AddAddressDialog>
+        {
+            { x => x.CustomerId, _customerId }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<AddAddressDialog>("Add New Address", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            // Reload checkout to refresh saved addresses
+            await LoadCheckout();
+            Snackbar.Add("Address added successfully!", Severity.Success);
         }
     }
 

@@ -53,6 +53,29 @@ public class StubCustomerIdentityClient : ICustomerIdentityClient
         return Task.FromResult<CurrentUserResponse?>(response);
     }
 
+    public Task<Guid> AddAddressAsync(
+        Guid customerId,
+        AddAddressRequest request,
+        CancellationToken ct = default)
+    {
+        var addressId = Guid.CreateVersion7();
+        var dto = new CustomerAddressDto(
+            addressId,
+            customerId,
+            request.Nickname,
+            request.AddressLine1,
+            request.AddressLine2,
+            request.City,
+            request.StateOrProvince,
+            request.PostalCode,
+            request.Country,
+            "Shipping",
+            true,
+            $"{request.AddressLine1}, {request.City}, {request.StateOrProvince} {request.PostalCode}, {request.Country}");
+        _addresses.Add(dto);
+        return Task.FromResult(addressId);
+    }
+
     /// <summary>
     /// Clear all configured test data (for test isolation)
     /// </summary>

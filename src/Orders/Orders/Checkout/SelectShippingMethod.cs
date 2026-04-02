@@ -1,53 +1,56 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Mvc;
+using Marten;
+using Microsoft.AspNetCore.Http;
 using Wolverine.Http;
-using Wolverine.Marten;
 
 namespace Orders.Checkout;
 
-public sealed record SelectShippingMethod(
-    Guid CheckoutId,
+/// <summary>
+/// Request body for selecting a checkout shipping method.
+/// </summary>
+public sealed record SelectShippingMethodRequest(
     string ShippingMethod,
     decimal ShippingCost)
 {
-    public class SelectShippingMethodValidator : AbstractValidator<SelectShippingMethod>
+    public class SelectShippingMethodRequestValidator : AbstractValidator<SelectShippingMethodRequest>
     {
-        public SelectShippingMethodValidator()
+        public SelectShippingMethodRequestValidator()
         {
-            RuleFor(x => x.CheckoutId).NotEmpty();
             RuleFor(x => x.ShippingMethod).NotEmpty().MaximumLength(100);
             RuleFor(x => x.ShippingCost).GreaterThanOrEqualTo(0);
         }
     }
 }
 
+/// <summary>
+/// Direct Implementation pattern — see ProvideShippingAddress.cs for rationale.
+/// </summary>
 public static class SelectShippingMethodHandler
 {
-    public static ProblemDetails Before(
-        SelectShippingMethod command,
-        Checkout? checkout)
+    [WolverinePost("/api/checkouts/{checkoutId}/shipping-method")]
+    public static async Task<IResult> Handle(
+        Guid checkoutId,
+        SelectShippingMethodRequest request,
+        IDocumentSession session,
+        CancellationToken ct)
     {
+        var stream = await session.Events.FetchForWriting<Checkout>(checkoutId, ct);
+        var checkout = stream.Aggregate;
+
         if (checkout is null)
-            return new ProblemDetails { Detail = "Checkout not found", Status = 404 };
+            return Results.NotFound(new { detail = "Checkout not found" });
 
         if (checkout.IsCompleted)
-            return new ProblemDetails
-            {
-                Detail = "Cannot modify a completed checkout",
-                Status = 400
-            };
+            return Results.BadRequest(new { detail = "Cannot modify a completed checkout" });
 
-        return WolverineContinue.NoProblems;
-    }
-
-    [WolverinePost("/api/checkouts/{checkoutId}/shipping-method")]
-    public static ShippingMethodSelected Handle(
-        SelectShippingMethod command,
-        [WriteAggregate] Checkout checkout)
-    {
-        return new ShippingMethodSelected(
-            command.ShippingMethod,
-            command.ShippingCost,
+        var @event = new ShippingMethodSelected(
+            request.ShippingMethod,
+            request.ShippingCost,
             DateTimeOffset.UtcNow);
+
+        stream.AppendOne(@event);
+        await session.SaveChangesAsync(ct);
+
+        return Results.Ok(@event);
     }
 }
