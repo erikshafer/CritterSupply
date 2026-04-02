@@ -41,38 +41,48 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M37.x — Marketplaces Phase 3 (planning) |
-| **Status** | 📋 **PLANNING** — M36.1 complete; M37.x scope to be defined |
+| **Current Milestone** | M37.0 — Marketplaces Phase 3 (in progress) |
+| **Status** | 🚀 **IN PROGRESS** — Session 1 complete (debt clearance + ProductSummaryView ACL) |
 | **Recent Completion** | M36.1 — Listings BC Foundation + Marketplaces BC Foundation (2026-03-31) |
 | **Previous Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-01 (M36.1 complete, M37.x planning active, March 2026 Critter Stack feature awareness review completed)*
+*Last Updated: 2026-04-01 (M37.0 Session 1 complete — debt clearance + ProductSummaryView ACL delivered)*
 
 ---
 
 ## Active Milestone
 
-### 📋 M37.x: Marketplaces Phase 3 — Production Adapters
+### 🚀 M37.0: Marketplaces Phase 3 — Production Adapters
 
-**Status:** 📋 **PLANNING** — M36.1 complete; scope to be defined in M37.x planning session
+**Status:** 🚀 **IN PROGRESS** — Session 1 complete; Session 2 picks up production adapter work
 **Goal:** Deliver real marketplace adapter implementations (Amazon SP-API, Walmart Marketplace API, eBay Sell API), resolve `ListingApproved` message enrichment debt, and ensure E2E CI coverage for Listings + Marketplaces admin pages
 
+**Session History:**
+- [Session 1 Retrospective](./milestones/m37-0-session-1-retrospective.md) — Debt clearance + ProductSummaryView ACL (2026-04-01)
+
 **Pre-Planning Input:**
-- [M36.1 Milestone Closure Retrospective](./milestones/m36-1-milestone-closure-retrospective.md) — What M37.x inherits
-- [M37.x Planning Notes](./milestones/m37-x-planning-notes.md) — Pre-planning notes for M37.x
+- [M36.1 Milestone Closure Retrospective](./milestones/m36-1-milestone-closure-retrospective.md) — What M37.0 inherits
+- [M37.0 Planning Notes](./milestones/m37-0-planning-notes.md) — Pre-planning notes for M37.0
 - [Catalog-Listings-Marketplaces Cycle Plan](./catalog-listings-marketplaces-cycle-plan.md) — Phase 3 scope
 - [ADR 0049](../decisions/0049-category-mapping-ownership.md) — Category taxonomy coupling risk
+- [ADR 0050](../decisions/0050-marketplaces-product-summary-acl.md) — ProductSummaryView ACL decision
 
-**Known Scope (from M36.1 debt table):**
-- Replace `ListingApproved` message enrichment with `ProductSummaryView` ACL in Marketplaces BC
-- Add `@shard-3` tags to MarketplacesAdmin.feature and ListingsAdmin.feature for CI execution
-- Address category taxonomy coupling (ADR 0049 risk section)
+**M37.0 Session 1 Progress (2026-04-01):**
+- ✅ D-1: Added `@shard-3` tags to MarketplacesAdmin.feature, ListingsAdmin.feature, ListingsDetail.feature
+- ✅ D-2: Built `ProductSummaryView` ACL in Marketplaces BC — 4 Product Catalog event handlers, updated `ListingApprovedHandler` to query local view (zero message payload reads)
+- ✅ D-3: Authored ADR 0050 — Marketplaces ProductSummaryView ACL decision
+- ✅ 6 new integration tests (33 total Marketplaces, 68 total Listings+Marketplaces)
+
+**Remaining Scope (Session 2+):**
 - Real Amazon/Walmart/eBay adapter implementations replacing stubs
 - Production IVaultClient implementation
+- Resolve BasePrice gap (ADR 0050 Decision 5)
+- Async submission status polling
+- Bidirectional marketplace feedback (Listings BC consuming activation/rejection events)
 
-**Test Baseline:** 62 integration tests (35 Listings + 27 Marketplaces), 6 E2E scenarios (marketplace admin), 0 failures
-**Next ADR:** 0050
+**Test Baseline:** 68 integration tests (35 Listings + 33 Marketplaces), 6 E2E scenarios (marketplace admin), 0 failures
+**Next ADR:** 0051
 
 ---
 
@@ -92,7 +102,7 @@
 **Test Baseline:** 62 integration tests (35 Listings + 27 Marketplaces), 6 E2E scenarios, 0 failures
 **CI:** CI Run #856 (green on main), E2E Run #432 (green on main)
 
-**Inherited by M37.x:**
+**Inherited by M37.0:**
 1. `ListingApproved` message enrichment — replace with `ProductSummaryView` ACL in Marketplaces BC
 2. E2E CI execution — MarketplacesAdmin.feature and ListingsAdmin.feature missing `@shard-X` tags
 3. Category taxonomy coupling (ADR 0049) — silent break risk
@@ -128,7 +138,7 @@
 - **Root cause fix:** `AutoApplyTransactions()` added to Product Catalog — root cause of 5 projection failures misclassified as timing.
 
 **Inherited by M36.1:**
-1. VP Team Management `@wip` scenarios (13) — deferred to M37.x
+1. VP Team Management `@wip` scenarios (13) — deferred to M37.0
 2. Returns cross-BC saga tests (6 skipped) — monitor
 3. Product Catalog `SaveChangesAsync` sweep (12 calls) — address opportunistically
 
@@ -1223,7 +1233,7 @@
 
 ### Next 3-4 Milestones
 
-> ⚠️ **Updated 2026-03-31:** M36.1 complete. M37.x planning begins — Marketplaces Phase 3.
+> ⚠️ **Updated 2026-03-31:** M36.1 complete. M37.0 planning begins — Marketplaces Phase 3.
 
 - **M36.1 (complete):** Listings BC Foundation + Marketplaces BC Foundation
   - ✅ Listings BC: event-sourced aggregate, ProductSummaryView ACL, recall cascade, admin UI
@@ -1231,12 +1241,12 @@
   - ✅ 62 integration tests (35 Listings + 27 Marketplaces), 6 E2E scenarios
   - See [M36.1 Milestone Closure Retrospective](milestones/m36-1-milestone-closure-retrospective.md)
 
-- **M37.x (planning):** Marketplaces Phase 3 — Production Adapters
+- **M37.0 (planning):** Marketplaces Phase 3 — Production Adapters
   - Real Amazon/Walmart/eBay adapter implementations replacing stubs
   - ProductSummaryView ACL in Marketplaces BC (resolve ListingApproved enrichment debt)
   - Production IVaultClient for credential storage
   - E2E CI execution for marketplace and listings admin pages
-  - See [M37.x Planning Notes](milestones/m37-x-planning-notes.md)
+  - See [M37.0 Planning Notes](milestones/m37-0-planning-notes.md)
 
 - **M38.x (planned):** Variants + Compliance + Real API Calls (Phase 3)
   - ProductFamily aggregate, variant-aware listings
@@ -1246,10 +1256,10 @@
 
 > Product Catalog ES migration complete. Listings + Marketplaces BCs delivered (M36.1). Phase 3 next.
 
-**High Priority (Active in M37.x+):**
+**High Priority (Active in M37.0+):**
 - 🟢 **Listings BC** — M36.1 complete; event-sourced listing aggregate, recall cascade, OWN_WEBSITE
 - 🟢 **Marketplaces BC** — M36.1 complete; stub adapters, ListingApproved consumer
-- 🟡 **Marketplaces Phase 3** — M37.x planned; real Amazon/Walmart/eBay adapters
+- 🟡 **Marketplaces Phase 3** — M37.0 planned; real Amazon/Walmart/eBay adapters
 - 🟡 **Product Variants** — M38.x planned; ProductFamily aggregate, variant-aware listings
 
 **Medium Priority:**
@@ -1264,7 +1274,7 @@
 
 See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specifications.
 
-*Roadmap Last Updated: 2026-03-31 (M36.1 complete; M37.x is Marketplaces Phase 3)*
+*Roadmap Last Updated: 2026-03-31 (M36.1 complete; M37.0 is Marketplaces Phase 3)*
 
 ---
 
@@ -1282,5 +1292,5 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 ---
 
 *Document Last Updated: 2026-03-31*
-*Active Milestone: M37.x — Marketplaces Phase 3 (planning)*
+*Active Milestone: M37.0 — Marketplaces Phase 3 (planning)*
 *Update Policy: At milestone start, milestone end, and significant task changes*

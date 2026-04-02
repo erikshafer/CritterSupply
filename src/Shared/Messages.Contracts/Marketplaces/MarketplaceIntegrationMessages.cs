@@ -17,7 +17,7 @@ public sealed record MarketplaceDeactivated(
 
 /// <summary>
 /// Published when a listing is successfully submitted and activated on a marketplace.
-/// Listings BC consumes this (in M37.x) to transition the listing to Live.
+/// Listings BC consumes this (in M37.0) to transition the listing to Live.
 /// </summary>
 public sealed record MarketplaceListingActivated(
     Guid ListingId,

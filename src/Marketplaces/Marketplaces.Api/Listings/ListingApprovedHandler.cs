@@ -2,6 +2,7 @@ using Marten;
 using Marketplaces.Adapters;
 using Marketplaces.CategoryMappings;
 using Marketplaces.Marketplaces;
+using Marketplaces.Products;
 using Messages.Contracts.Listings;
 using Messages.Contracts.Marketplaces;
 using Wolverine;
@@ -14,8 +15,14 @@ namespace Marketplaces.Api.Listings;
 /// and publishes either <see cref="MarketplaceListingActivated"/> or
 /// <see cref="MarketplaceSubmissionRejected"/>.
 ///
+/// Product data (name, category, price) is sourced from the local
+/// <see cref="ProductSummaryView"/> ACL document — not from the message payload.
+/// This decouples Marketplaces BC from the Listings BC message enrichment.
+///
 /// Guard rails:
 /// - OWN_WEBSITE is skipped (Listings BC internal fast-path)
+/// - Missing ProductSummaryView publishes rejection
+/// - Missing category on the product publishes rejection
 /// - Missing category mapping publishes rejection (GR-NEW-2)
 /// - Inactive marketplace publishes rejection
 /// </summary>
@@ -33,20 +40,33 @@ public static class ListingApprovedHandler
         if (string.Equals(message.ChannelCode, "OWN_WEBSITE", StringComparison.OrdinalIgnoreCase))
             return outgoing;
 
-        // Guard: category must be present in the message
-        if (string.IsNullOrWhiteSpace(message.Category))
+        // Query local ProductSummaryView ACL for product data
+        var productSummary = await session.LoadAsync<ProductSummaryView>(message.Sku);
+        if (productSummary is null)
         {
             outgoing.Add(new MarketplaceSubmissionRejected(
                 message.ListingId,
                 message.Sku,
                 message.ChannelCode,
-                "Listing has no product category — cannot determine category mapping",
+                $"Product '{message.Sku}' not yet known to Marketplaces BC — ProductSummaryView missing",
                 now));
             return outgoing;
         }
 
-        // Look up category mapping
-        var categoryMappingId = $"{message.ChannelCode}:{message.Category}";
+        // Guard: category must be present on the product summary
+        if (string.IsNullOrWhiteSpace(productSummary.Category))
+        {
+            outgoing.Add(new MarketplaceSubmissionRejected(
+                message.ListingId,
+                message.Sku,
+                message.ChannelCode,
+                "Product has no category in Marketplaces ProductSummaryView — cannot determine category mapping",
+                now));
+            return outgoing;
+        }
+
+        // Look up category mapping using product summary's category
+        var categoryMappingId = $"{message.ChannelCode}:{productSummary.Category}";
         var categoryMapping = await session.LoadAsync<CategoryMapping>(categoryMappingId);
         if (categoryMapping is null)
         {
@@ -54,7 +74,7 @@ public static class ListingApprovedHandler
                 message.ListingId,
                 message.Sku,
                 message.ChannelCode,
-                $"No category mapping configured for {message.ChannelCode}:{message.Category}",
+                $"No category mapping configured for {message.ChannelCode}:{productSummary.Category}",
                 now));
             return outgoing;
         }
@@ -84,15 +104,15 @@ public static class ListingApprovedHandler
             return outgoing;
         }
 
-        // Build submission
+        // Build submission from local ProductSummaryView data — zero reads from message payload
         var submission = new ListingSubmission(
             ListingId: message.ListingId,
             Sku: message.Sku,
             ChannelCode: message.ChannelCode,
-            ProductName: message.ProductName,
+            ProductName: productSummary.ProductName,
             Description: null,
             Category: categoryMapping.MarketplaceCategoryId,
-            Price: message.Price ?? 0m);
+            Price: productSummary.BasePrice ?? 0m);
 
         // Submit to marketplace adapter
         var result = await adapter.SubmitListingAsync(submission);

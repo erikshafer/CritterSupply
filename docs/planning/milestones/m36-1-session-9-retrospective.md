@@ -165,7 +165,7 @@ Both follow the established POM pattern: constructor accepts `(IPage, string bas
 1. **ADRs finally committed** — After two deferrals (Session 7 → 8 → 9), both ADRs are documented. The three-session delay was acceptable for implementation velocity but should not recur for future architectural decisions.
 2. **StubMarketplacesApiHost follows established pattern** — Modelled after `StubListingsApiHost`, making the code consistent and the E2E infrastructure predictable for future BCs.
 3. **data-testid coverage is now comprehensive** — Both marketplace pages have full attribute coverage for every meaningful element, not just tables and rows.
-4. **Phase 2 gate passes cleanly** — All 16 criteria met across 4 sessions. The Marketplaces BC is architecturally sound and ready for Phase 3 (M37.x production adapters).
+4. **Phase 2 gate passes cleanly** — All 16 criteria met across 4 sessions. The Marketplaces BC is architecturally sound and ready for Phase 3 (M37.0 production adapters).
 
 ## What Could Be Better
 
@@ -174,9 +174,9 @@ Both follow the established POM pattern: constructor accepts `(IPage, string bas
 
 ## Risks and Follow-ups
 
-1. **Category taxonomy coupling** — Documented in ADR 0049. If Product Catalog renames internal categories, Marketplaces category mappings break silently. Mitigation planned for M37.x (ProductSummaryView ACL in Marketplaces BC).
+1. **Category taxonomy coupling** — Documented in ADR 0049. If Product Catalog renames internal categories, Marketplaces category mappings break silently. Mitigation planned for M37.0 (ProductSummaryView ACL in Marketplaces BC).
 2. **E2E tests are not executed in CI** — The 6 marketplace scenarios compile and have step definitions, but E2E test execution requires infrastructure (TestContainers + Playwright) that may not be available in all CI environments. Verify in the next CI run.
-3. **Phase 3 readiness** — The Marketplaces BC now has: entity model, CRUD, seed data, adapter interface, ListingApproved consumer, admin UI, integration tests, E2E page objects, and architectural documentation. Phase 3 (M37.x) can proceed to production adapter implementations (real Amazon/Walmart/eBay integrations).
+3. **Phase 3 readiness** — The Marketplaces BC now has: entity model, CRUD, seed data, adapter interface, ListingApproved consumer, admin UI, integration tests, E2E page objects, and architectural documentation. Phase 3 (M37.0) can proceed to production adapter implementations (real Amazon/Walmart/eBay integrations).
 
 ## Phase 2 Gate: PASS (16/16)
 

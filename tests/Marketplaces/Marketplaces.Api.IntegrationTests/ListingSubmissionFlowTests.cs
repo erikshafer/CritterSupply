@@ -1,5 +1,6 @@
 using Marketplaces.CategoryMappings;
 using Marketplaces.Marketplaces;
+using Marketplaces.Products;
 using Messages.Contracts.Listings;
 using Messages.Contracts.Marketplaces;
 
@@ -8,7 +9,7 @@ namespace Marketplaces.Api.IntegrationTests;
 /// <summary>
 /// Integration tests for the ListingApproved consumer handler.
 /// Verifies adapter invocation, OWN_WEBSITE guard, category mapping validation,
-/// and integration message publishing.
+/// ProductSummaryView ACL lookups, and integration message publishing.
 /// </summary>
 [Collection(IntegrationTestCollection.Name)]
 public sealed class ListingSubmissionFlowTests : IAsyncLifetime
@@ -34,8 +35,9 @@ public sealed class ListingSubmissionFlowTests : IAsyncLifetime
     [Fact]
     public async Task ListingApproved_AmazonChannel_CallsAdapterAndPublishesActivated()
     {
-        // Arrange: ensure marketplace and category mapping exist
+        // Arrange: ensure marketplace, category mapping, and product summary exist
         await SeedMarketplaceAndMappingAsync("AMAZON_US", "Dogs", "AMZN-PET-DOGS-001");
+        await SeedProductSummaryAsync("DOG-BOWL-001", "Premium Dog Bowl", "Dogs", 29.99m);
 
         var message = new ListingApproved(
             ListingId: Guid.NewGuid(),
@@ -66,6 +68,7 @@ public sealed class ListingSubmissionFlowTests : IAsyncLifetime
     public async Task ListingApproved_WalmartChannel_CallsAdapterAndPublishesActivated()
     {
         await SeedMarketplaceAndMappingAsync("WALMART_US", "Cats", "WMT-PET-CATS-001");
+        await SeedProductSummaryAsync("CAT-TOY-001", "Interactive Cat Toy", "Cats", 14.99m);
 
         var message = new ListingApproved(
             ListingId: Guid.NewGuid(),
@@ -117,8 +120,9 @@ public sealed class ListingSubmissionFlowTests : IAsyncLifetime
     [Fact]
     public async Task ListingApproved_MissingCategoryMapping_PublishesRejected()
     {
-        // Seed marketplace but NOT category mapping for "Exotic Pets"
+        // Seed marketplace and product summary but NOT category mapping for "Exotic Pets"
         await SeedMarketplaceAsync("AMAZON_US");
+        await SeedProductSummaryAsync("EXOTIC-001", "Exotic Pet Cage", "Exotic Pets", 89.99m);
 
         var message = new ListingApproved(
             ListingId: Guid.NewGuid(),
@@ -150,8 +154,9 @@ public sealed class ListingSubmissionFlowTests : IAsyncLifetime
     [Fact]
     public async Task ListingApproved_InactiveMarketplace_PublishesRejected()
     {
-        // Seed inactive marketplace + category mapping
+        // Seed inactive marketplace + category mapping + product summary
         await SeedMarketplaceAndMappingAsync("EBAY_US", "Dogs", "EBAY-PET-DOGS-001", isActive: false);
+        await SeedProductSummaryAsync("DOG-LEASH-001", "Premium Dog Leash", "Dogs", 34.99m);
 
         var message = new ListingApproved(
             ListingId: Guid.NewGuid(),
@@ -173,8 +178,58 @@ public sealed class ListingSubmissionFlowTests : IAsyncLifetime
     }
 
     // -------------------------------------------------------------------------
+    // Missing ProductSummaryView — publishes rejection
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ListingApproved_MissingProductSummaryView_PublishesRejected()
+    {
+        // Seed marketplace and category mapping but NOT product summary
+        await SeedMarketplaceAndMappingAsync("AMAZON_US", "Dogs", "AMZN-PET-DOGS-001");
+
+        var message = new ListingApproved(
+            ListingId: Guid.NewGuid(),
+            Sku: "UNKNOWN-SKU-001",
+            ChannelCode: "AMAZON_US",
+            ProductName: "Unknown Product",
+            Category: "Dogs",
+            Price: 19.99m,
+            OccurredAt: DateTimeOffset.UtcNow);
+
+        var tracked = await _fixture.ExecuteAndWaitAsync(message);
+
+        var rejected = tracked.Sent.MessagesOf<MarketplaceSubmissionRejected>().ToList();
+        rejected.Count.ShouldBe(1);
+        rejected[0].ListingId.ShouldBe(message.ListingId);
+        rejected[0].Sku.ShouldBe("UNKNOWN-SKU-001");
+        rejected[0].Reason.ShouldContain("ProductSummaryView missing");
+
+        var activated = tracked.Sent.MessagesOf<MarketplaceListingActivated>().ToList();
+        activated.ShouldBeEmpty();
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private async Task SeedProductSummaryAsync(
+        string sku, string productName, string category, decimal? basePrice = null)
+    {
+        await using var session = _fixture.GetDocumentSession();
+        var existing = await session.LoadAsync<ProductSummaryView>(sku);
+        if (existing is null)
+        {
+            session.Store(new ProductSummaryView
+            {
+                Id = sku,
+                ProductName = productName,
+                Category = category,
+                BasePrice = basePrice,
+                Status = ProductSummaryStatus.Active
+            });
+            await session.SaveChangesAsync();
+        }
+    }
 
     private async Task SeedMarketplaceAsync(string channelCode, bool isActive = true)
     {

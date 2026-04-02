@@ -1,3 +1,4 @@
+@shard-3
 Feature: Marketplace Administration
   As a ProductManager or SystemAdmin
   I want to view marketplace channels and category mappings

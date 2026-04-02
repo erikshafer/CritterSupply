@@ -1,8 +1,8 @@
-# M37.x Planning Notes
+# M37.0 Planning Notes
 
 **Status:** 📋 Pre-planning notes (not a formal plan)
 **Date:** 2026-03-31
-**Purpose:** Capture what is known about M37.x scope before a formal planning session begins. This prevents the M37.x planning session from starting cold.
+**Purpose:** Capture what is known about M37.0 scope before a formal planning session begins. This prevents the M37.0 planning session from starting cold.
 
 ---
 
@@ -29,7 +29,7 @@ The [Catalog-Listings-Marketplaces Cycle Plan](../catalog-listings-marketplaces-
 
 ## Debt Items Inherited from M36.1
 
-These must be resolved in M37.x, ideally in Session 1 before new feature work begins:
+These must be resolved in M37.0, ideally in Session 1 before new feature work begins:
 
 | Priority | Item | Source | Notes |
 |----------|------|--------|-------|
@@ -49,8 +49,8 @@ These must be resolved in M37.x, ideally in Session 1 before new feature work be
 - Listings: port 5246, database `listings`, schema `listings`
 - Marketplaces: port 5247, database `marketplaces`, schema `marketplaces`
 
-**Not yet consumed (available for M37.x if needed):**
-- No new BCs expected in M37.x — Phase 3 work is within the existing Marketplaces BC
+**Not yet consumed (available for M37.0 if needed):**
+- No new BCs expected in M37.0 — Phase 3 work is within the existing Marketplaces BC
 
 ---
 
@@ -58,7 +58,7 @@ These must be resolved in M37.x, ideally in Session 1 before new feature work be
 
 **0050** — the next available ADR number.
 
-Candidate ADRs for M37.x:
+Candidate ADRs for M37.0:
 - ADR 0050: Production Vault Integration Strategy (how real credentials are stored and retrieved)
 - ADR 0051: Marketplace Adapter Resilience Patterns (retry, circuit breaker, rate limiting)
 - ADR 0052: Submission Status Polling vs Webhooks (how async marketplace reviews are handled)
@@ -67,19 +67,19 @@ Candidate ADRs for M37.x:
 
 ## Open Questions for the Planning Session
 
-1. **Adapter priority order:** Should all 3 adapters (Amazon, Walmart, eBay) be delivered in M37.x, or should we start with one and iterate? Amazon SP-API is the most complex; eBay may be simplest.
+1. **Adapter priority order:** Should all 3 adapters (Amazon, Walmart, eBay) be delivered in M37.0, or should we start with one and iterate? Amazon SP-API is the most complex; eBay may be simplest.
 
-2. **Vault implementation:** Should M37.x use a real vault (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault) or a simpler encrypted-file approach for the reference architecture? The `IVaultClient` abstraction supports any backend.
+2. **Vault implementation:** Should M37.0 use a real vault (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault) or a simpler encrypted-file approach for the reference architecture? The `IVaultClient` abstraction supports any backend.
 
-3. **Submission status polling:** The `CheckSubmissionStatusAsync` method exists on `IMarketplaceAdapter` but no polling infrastructure exists. Should M37.x include a Wolverine scheduled message pattern for polling, or should this wait for M38.x?
+3. **Submission status polling:** The `CheckSubmissionStatusAsync` method exists on `IMarketplaceAdapter` but no polling infrastructure exists. Should M37.0 include a Wolverine scheduled message pattern for polling, or should this wait for M38.x?
 
 4. **ProductSummaryView in Marketplaces:** This debt item from M36.1 requires Marketplaces to consume the same 9 Product Catalog integration events that Listings already consumes. Should Marketplaces have its own `ProductSummaryView` document, or should it subscribe to a subset of events (e.g., only `ProductAdded` and `ProductCategoryChanged`)?
 
-5. **E2E scope:** M37.x will add real API interactions. Should E2E tests use the stub adapters (testing UI only) or should we build test doubles for real marketplace APIs?
+5. **E2E scope:** M37.0 will add real API interactions. Should E2E tests use the stub adapters (testing UI only) or should we build test doubles for real marketplace APIs?
 
 ---
 
-## Codebase State at M37.x Start
+## Codebase State at M37.0 Start
 
 - **Solution:** `CritterSupply.slnx` with 19 BCs
 - **Build:** 0 errors, 33 warnings (all pre-existing)

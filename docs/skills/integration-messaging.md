@@ -1529,7 +1529,7 @@ return (Results.Created($"/api/marketplaces/{marketplace.ChannelCode}", marketpl
 
 **Tradeoff:** Simpler implementation now vs. coupling to the publishing BC's data availability later. If the Listings BC stops enriching these fields, or the data shape changes, the Marketplaces BC silently receives stale or missing data.
 
-**Rule:** When enriching an integration message beyond its natural payload (event ID + correlation IDs), document the decision and the planned remediation. In this case, ADR 0049 captures the coupling risk and the M37.x plan to replace enrichment with a Marketplaces-local `ProductSummaryView` ACL query.
+**Rule:** When enriching an integration message beyond its natural payload (event ID + correlation IDs), document the decision and the planned remediation. In this case, ADR 0049 captures the coupling risk and the M37.0 plan to replace enrichment with a Marketplaces-local `ProductSummaryView` ACL query.
 
 ---
 

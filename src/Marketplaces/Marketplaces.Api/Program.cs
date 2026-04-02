@@ -3,6 +3,7 @@ using Marketplaces.Adapters;
 using Marketplaces.CategoryMappings;
 using Marketplaces.Credentials;
 using Marketplaces.Marketplaces;
+using Marketplaces.Products;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -45,6 +46,9 @@ builder.Services.AddMarten(opts =>
 
     // CategoryMapping uses composite key: "{ChannelCode}:{InternalCategory}" (D5)
     opts.Schema.For<CategoryMapping>().Identity(x => x.Id);
+
+    // ProductSummaryView ACL — product data from Product Catalog BC, keyed by SKU (D-2a)
+    opts.Schema.For<ProductSummaryView>().Identity(x => x.Id);
 })
     .UseLightweightSessions()
     .IntegrateWithWolverine();
@@ -118,6 +122,9 @@ builder.Host.UseWolverine(opts =>
 
     // Queue for consuming ListingApproved from Listings BC
     opts.ListenToRabbitQueue("marketplaces-listings-events");
+
+    // Queue for consuming Product Catalog events for ProductSummaryView ACL (D-2c)
+    opts.ListenToRabbitQueue("marketplaces-product-catalog-events");
 
     // Publish integration messages to RabbitMQ exchanges
     opts.PublishMessage<Messages.Contracts.Marketplaces.MarketplaceListingActivated>()
