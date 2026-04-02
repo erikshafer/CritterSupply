@@ -1,5 +1,4 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine.Http;
 using Wolverine.Marten;
@@ -40,7 +39,6 @@ public static class ProvidePaymentMethodHandler
     }
 
     [WolverinePost("/api/checkouts/{checkoutId}/payment-method")]
-    [Authorize]
     public static PaymentMethodProvided Handle(
         ProvidePaymentMethod command,
         [WriteAggregate] Checkout checkout)

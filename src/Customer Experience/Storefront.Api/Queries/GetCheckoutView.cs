@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Storefront.Clients;
 using Storefront.Composition;
 using Wolverine.Http;
@@ -13,7 +12,6 @@ public sealed record GetCheckoutView(Guid CheckoutId);
 public static class GetCheckoutViewHandler
 {
     [WolverineGet("/api/storefront/checkouts/{checkoutId}")]
-    [Authorize]
     public static async Task<IResult> Handle(
         Guid checkoutId,
         IOrdersClient ordersClient,

@@ -1,5 +1,4 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Authorization;
 using Storefront.Clients;
 using Wolverine.Http;
 
@@ -27,7 +26,6 @@ public sealed class AddItemToCartValidator : AbstractValidator<AddItemToCart>
 public static class AddItemToCartHandler
 {
     [WolverinePost("/api/storefront/carts/{cartId}/items")]
-    [Authorize]
     public static async Task<IResult> Handle(
         Guid cartId,
         AddItemToCartRequest request,

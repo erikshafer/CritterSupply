@@ -1,5 +1,4 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Authorization;
 using Storefront.Clients;
 using Wolverine.Http;
 
@@ -25,7 +24,6 @@ public sealed class RemoveItemFromCartValidator : AbstractValidator<RemoveItemFr
 public static class RemoveItemFromCartHandler
 {
     [WolverineDelete("/api/storefront/carts/{cartId}/items/{sku}")]
-    [Authorize]
     public static async Task<IResult> Handle(
         Guid cartId,
         string sku,

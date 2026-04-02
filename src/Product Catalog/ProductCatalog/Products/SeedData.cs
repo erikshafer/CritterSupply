@@ -12,13 +12,19 @@ public static class SeedData
     {
         await using var session = store.LightweightSession();
 
-        // Check if products already exist
+        // Step 1: Seed legacy Product documents if not already present
         var existingCount = await session.Query<Product>().CountAsync(ct);
-        if (existingCount > 0)
+        if (existingCount == 0)
         {
-            return; // Already seeded
+            await SeedLegacyProductsAsync(session, ct);
         }
 
+        // Step 2: Migrate legacy Product documents to event-sourced ProductCatalogView
+        await MigrateProductsAsync(session, ct);
+    }
+
+    private static async Task SeedLegacyProductsAsync(IDocumentSession session, CancellationToken ct)
+    {
         var products = new List<Product>
         {
             // Dog Products
@@ -438,6 +444,45 @@ public static class SeedData
         foreach (var product in products)
         {
             session.Store(product);
+        }
+
+        await session.SaveChangesAsync(ct);
+    }
+
+    // Step 2: Migrate any un-migrated Product documents into the event-sourced ProductCatalogView.
+    // ListProducts queries ProductCatalogView (event-sourced read model), not the legacy Product store.
+    // This step is idempotent — already-migrated products are skipped.
+    private static async Task MigrateProductsAsync(IDocumentSession session, CancellationToken ct)
+    {
+        var viewCount = await session.Query<ProductCatalogView>().CountAsync(ct);
+        if (viewCount > 0)
+            return;
+
+        var allProducts = await session.Query<Product>().ToListAsync(ct);
+        foreach (var product in allProducts)
+        {
+            var productId = Guid.NewGuid();
+            var migrateEvent = new ProductMigrated(
+                ProductId: productId,
+                Sku: (string)product.Sku,
+                Name: (string)product.Name,
+                Description: product.Description,
+                LongDescription: product.LongDescription,
+                Category: product.Category,
+                Subcategory: product.Subcategory,
+                Brand: product.Brand,
+                Images: product.Images,
+                Tags: product.Tags,
+                Dimensions: product.Dimensions,
+                Status: product.Status,
+                IsDeleted: product.IsDeleted,
+                VendorTenantId: product.VendorTenantId,
+                AssignedBy: product.AssignedBy,
+                AssignedAt: product.AssignedAt,
+                AddedAt: product.AddedAt,
+                MigratedAt: DateTimeOffset.UtcNow);
+
+            session.Events.StartStream<CatalogProduct>(productId, migrateEvent);
         }
 
         await session.SaveChangesAsync(ct);

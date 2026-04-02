@@ -1,5 +1,4 @@
 using Marten;
-using Microsoft.AspNetCore.Authorization;
 using Wolverine.Http;
 
 namespace Shopping.Api.Cart;
@@ -17,7 +16,6 @@ public static class GetCartEndpoint
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with CartResponse if found, 404 if not found.</returns>
     [WolverineGet("/api/carts/{cartId}")]
-    [Authorize]
     public static async Task<IResult> Get(
         Guid cartId,
         IQuerySession session,

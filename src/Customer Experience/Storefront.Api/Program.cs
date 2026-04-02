@@ -133,7 +133,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Configure multi-issuer JWT authentication
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+builder.Services.AddAuthentication("Backoffice")
     .AddJwtBearer("Backoffice", options =>
     {
         options.Authority = "https://localhost:5249"; // Backoffice Identity BC

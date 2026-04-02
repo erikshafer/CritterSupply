@@ -1,5 +1,4 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Shopping.Clients;
 using Wolverine;
@@ -124,7 +123,6 @@ public static class AddItemToCartHttpEndpoint
     }
 
     [WolverinePost("/api/carts/{cartId}/items")]
-    [Authorize]
     public static async Task<(Events, OutgoingMessages)> Handle(
         AddItemToCart command,
         IPricingClient pricingClient,

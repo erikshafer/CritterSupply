@@ -1,5 +1,4 @@
 using Marten;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Orders.Placement;
 using Wolverine;
@@ -12,7 +11,6 @@ public sealed record CancelOrderRequest(string Reason);
 public static class CancelOrderEndpoint
 {
     [WolverinePost("/api/orders/{orderId}/cancel")]
-    [Authorize(Policy = "CustomerService")]
     public static async Task<(IResult, OutgoingMessages)> Handle(
         Guid orderId,
         [FromBody] CancelOrderRequest request,

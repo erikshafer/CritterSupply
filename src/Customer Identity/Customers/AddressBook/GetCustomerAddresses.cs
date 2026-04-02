@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Wolverine.Http;
 
@@ -30,7 +29,6 @@ public sealed record AddressSummary(
 public static class GetCustomerAddressesHandler
 {
     [WolverineGet("/api/customers/{customerId}/addresses")]
-    [Authorize(Policy = "CustomerService")]
     public static async Task<IReadOnlyList<AddressSummary>> Handle(
         Guid customerId,
         AddressType? type,

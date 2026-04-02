@@ -426,6 +426,7 @@ services:
       ApiClients__OrdersApiUrl: http://orders-api:8080
       ApiClients__CatalogApiUrl: http://productcatalog-api:8080
       ApiClients__StorefrontApiUrl: http://storefront-api:8080
+      ApiClients__StorefrontHubUrl: http://localhost:5237
       ApiClients__CustomerIdentityApiUrl: http://customeridentity-api:8080
     depends_on:
       - customeridentity-api
