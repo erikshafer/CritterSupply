@@ -211,6 +211,8 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 | ✉️ **Correspondence**       | Customer email and SMS notifications                         | ✅ Complete |
 | 🔐 **Backoffice Identity**  | Staff and admin authentication                               | ✅ Complete |
 | 🖥️ **Backoffice**          | Internal operations portal (BFF + Blazor WASM)               | ✅ Complete |
+| 📋 **Listings**             | Channel listing lifecycle (event-sourced, Draft → Live)      | ✅ Complete |
+| 🏪 **Marketplaces**         | Marketplace channel config and adapter orchestration         | ✅ Complete |
 | 🔍 **Search**               | Product search and discovery                                 | 🔜 Planned |
 | 💡 **Recommendations**      | Personalized product recommendations                         | 🔜 Planned |
 | 🏦 **Store Credit**         | Store credit and refund balance management                   | 🔜 Planned |
