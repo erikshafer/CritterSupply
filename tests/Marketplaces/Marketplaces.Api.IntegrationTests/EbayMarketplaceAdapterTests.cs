@@ -228,13 +228,74 @@ public sealed class EbayMarketplaceAdapterTests : IDisposable
     }
 
     [Fact]
-    public async Task DeactivateListing_ReturnsFalse()
+    public async Task DeactivateListing_ReturnsTrue_WhenApiSucceeds()
     {
-        // Act — skeleton implementation
-        var result = await _adapter.DeactivateListingAsync("ebay-listing-456");
+        // Arrange — OAuth token response
+        EnqueueTokenResponse();
+
+        // Withdraw endpoint returns 200 with listingId
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            listingId = "LISTING-WITHDRAWN-001"
+        });
+
+        // Act
+        var result = await _adapter.DeactivateListingAsync("ebay-OFFER-WITHDRAW-001");
+
+        // Assert
+        result.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task DeactivateListing_ReturnsFalse_WhenApiFails()
+    {
+        // Arrange — OAuth token response
+        EnqueueTokenResponse();
+
+        // Withdraw endpoint returns 404 (offer not found)
+        _httpHandler.EnqueueResponse(HttpStatusCode.NotFound,
+            new { errors = new[] { new { errorId = 25001, message = "Offer not found" } } });
+
+        // Act
+        var result = await _adapter.DeactivateListingAsync("ebay-OFFER-MISSING-999");
 
         // Assert
         result.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DeactivateListing_BuildsCorrectRequest()
+    {
+        // Arrange — OAuth token response
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-ebay-deactivate-token",
+            token_type = "Bearer",
+            expires_in = 7200
+        });
+
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new { listingId = "LISTING-REQ-CHECK" });
+
+        // Act
+        await _adapter.DeactivateListingAsync("ebay-OFFER-REQ-CHECK");
+
+        // Assert — second request is the withdraw POST
+        _httpHandler.SentRequests.Count.ShouldBe(2);
+        var withdrawRequest = _httpHandler.SentRequests[1];
+
+        // Correct HTTP method and URL shape
+        withdrawRequest.Method.ShouldBe(HttpMethod.Post);
+        withdrawRequest.RequestUri!.ToString().ShouldContain("/sell/inventory/v1/offer/");
+        withdrawRequest.RequestUri!.ToString().ShouldContain("OFFER-REQ-CHECK");
+        withdrawRequest.RequestUri!.ToString().ShouldContain("/withdraw");
+        // ebay- prefix stripped correctly (not in URL)
+        withdrawRequest.RequestUri!.ToString().ShouldNotContain("ebay-");
+
+        // Required auth headers
+        withdrawRequest.Headers.Authorization!.Scheme.ShouldBe("Bearer");
+        withdrawRequest.Headers.Authorization!.Parameter.ShouldBe("test-ebay-deactivate-token");
+        withdrawRequest.Headers.TryGetValues("X-EBAY-C-MARKETPLACE-ID", out var marketplaceIds).ShouldBeTrue();
+        marketplaceIds!.First().ShouldBe("EBAY_US");
     }
 
     private void EnqueueTokenResponse()

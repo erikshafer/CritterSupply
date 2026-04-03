@@ -193,13 +193,86 @@ public sealed class AmazonMarketplaceAdapterTests : IDisposable
     }
 
     [Fact]
-    public async Task DeactivateListing_ReturnsFalse()
+    public async Task DeactivateListing_ReturnsTrue_WhenApiSucceeds()
     {
-        // Act — skeleton implementation
-        var result = await _adapter.DeactivateListingAsync("amzn-listing-456");
+        // Arrange — LWA token response
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-access-token",
+            token_type = "bearer",
+            expires_in = 3600
+        });
+
+        // SP-API PATCH returns 200 (deactivation succeeded)
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            sku = "SKU-DEACTIVATE",
+            status = "ACCEPTED"
+        });
+
+        // Act
+        var result = await _adapter.DeactivateListingAsync("amzn-SKU-DEACTIVATE");
+
+        // Assert
+        result.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task DeactivateListing_ReturnsFalse_WhenApiFails()
+    {
+        // Arrange — LWA token response
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-access-token",
+            token_type = "bearer",
+            expires_in = 3600
+        });
+
+        // SP-API PATCH returns 404 (SKU not found)
+        _httpHandler.EnqueueResponse(HttpStatusCode.NotFound,
+            new { errors = new[] { new { code = "NOT_FOUND", message = "SKU does not exist" } } });
+
+        // Act
+        var result = await _adapter.DeactivateListingAsync("amzn-SKU-MISSING");
 
         // Assert
         result.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DeactivateListing_BuildsCorrectRequest()
+    {
+        // Arrange — LWA token response
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-deactivate-token",
+            token_type = "bearer",
+            expires_in = 3600
+        });
+
+        // PATCH succeeds
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new { sku = "SKU-REQ-CHECK", status = "ACCEPTED" });
+
+        // Act
+        await _adapter.DeactivateListingAsync("amzn-SKU-REQ-CHECK");
+
+        // Assert — second request is the PATCH deactivation call
+        _httpHandler.SentRequests.Count.ShouldBe(2);
+        var deactivateRequest = _httpHandler.SentRequests[1];
+
+        // Correct HTTP method and URL shape
+        deactivateRequest.Method.ShouldBe(new HttpMethod("PATCH"));
+        deactivateRequest.RequestUri!.ToString().ShouldContain("/listings/2021-08-01/items/");
+        deactivateRequest.RequestUri!.ToString().ShouldContain("SKU-REQ-CHECK");
+        deactivateRequest.RequestUri!.ToString().ShouldContain("marketplaceIds=");
+        // amzn- prefix stripped correctly (not in URL)
+        deactivateRequest.RequestUri!.ToString().ShouldNotContain("amzn-");
+
+        // Required auth headers
+        deactivateRequest.Headers.Authorization!.Scheme.ShouldBe("Bearer");
+        deactivateRequest.Headers.Authorization!.Parameter.ShouldBe("test-deactivate-token");
+        deactivateRequest.Headers.TryGetValues("x-amz-access-token", out var xAmzTokens).ShouldBeTrue();
+        xAmzTokens!.First().ShouldBe("test-deactivate-token");
     }
 
     private static ListingSubmission CreateTestSubmission(string sku = "SKU-001") =>

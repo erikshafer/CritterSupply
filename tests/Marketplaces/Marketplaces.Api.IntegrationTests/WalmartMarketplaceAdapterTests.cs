@@ -327,14 +327,37 @@ public sealed class WalmartMarketplaceAdapterTests : IDisposable
     }
 
     [Fact]
-    public async Task DeactivateListing_ReturnsFalse()
+    public async Task DeactivateListing_ReturnsFalse_DueToSkuGap()
     {
-        // Act — skeleton implementation
-        var result = await _adapter.DeactivateListingAsync("wmrt-listing-456");
+        // Walmart RETIRE_ITEM feed requires the item SKU, but DeactivateListingAsync only
+        // receives the externalListingId in "wmrt-{feedId}" format. The feed ID cannot be
+        // reverse-mapped to the SKU at the adapter level.
+        //
+        // This is an intentional architectural limitation documented in ADR 0056.
+        // The caller (a future ListingEndedHandler in Marketplaces BC) must pass the SKU
+        // when triggering deactivation. This will be resolved in Session 3 / M38.1.
+        //
+        // Note: No HTTP requests are made — the adapter logs the gap and returns false immediately.
+
+        // Act — no HTTP setup needed; adapter returns false before making any API calls
+        var result = await _adapter.DeactivateListingAsync("wmrt-FEED-456");
 
         // Assert
         result.ShouldBeFalse();
+        _httpHandler.SentRequests.ShouldBeEmpty();
     }
+
+    // TODO (M38.1): DeactivateListing_ReturnsTrue_WhenRetireFeedSucceeds
+    // Blocked by the SKU gap: once the caller passes the SKU to DeactivateListingAsync,
+    // this test should stage a token exchange response + 200 RETIRE_ITEM feed response
+    // and assert result is true. See ADR 0056 for the design.
+    //
+    // TODO (M38.1): DeactivateListing_ReturnsFalse_WhenRetireFeedFails
+    // Stage token exchange + 4xx response; assert false.
+    //
+    // TODO (M38.1): DeactivateListing_BuildsCorrectRetireFeedRequest
+    // Verify the feed POST URL, feedType=RETIRE_ITEM, request body contains correct SKU,
+    // and Walmart auth headers (WM_SEC.ACCESS_TOKEN, WM_CONSUMER.ID, etc.).
 
     private static ListingSubmission CreateTestSubmission(string sku = "SKU-001") =>
         new(
