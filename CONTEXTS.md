@@ -153,6 +153,37 @@ Product master data — SKU, name, description, images, manufacturer info. Event
 
 ---
 
+### Listings
+
+**Folder:** `src/Listings/`
+
+Owns the channel listing lifecycle — the state machine that governs when and how a product SKU is presented on a given marketplace channel. Event-sourced via Marten with a `Listing` aggregate covering the full lifecycle (Draft → ReadyForReview → Submitted → Live → Paused → Ended).
+
+| Communicates with | Direction | Notes |
+|---|---|---|
+| Product Catalog | ← receives | 9 granular integration events populate `ProductSummaryView` ACL; `ProductDiscontinued` (IsRecall=true) triggers recall cascade |
+| Marketplaces | → publishes | `ListingApproved` triggers adapter submission in Marketplaces BC |
+| Backoffice | ← queried by | Listing list and detail views; admin lifecycle actions (approve/pause/end) |
+
+**Key decisions:** Event-sourced `Listing` aggregate ([M36.1](./milestones/m36-1-milestone-closure-retrospective.md)). UUID v5 stream IDs derived from `listing:{sku}:{channelCode}` key — deterministic and collision-resistant across channel reactivations. `ProductSummaryView` ACL decouples Listings from Product Catalog internal status values via a `ProductSummaryStatus` enum. Recall cascade reacts to `ProductDiscontinued` (IsRecall=true) via choreography — no saga; force-downs all Live and Paused listings for the affected SKU and publishes `ListingsCascadeCompleted`.
+
+---
+
+### Marketplaces
+
+**Folder:** `src/Marketplaces/`
+
+Owns marketplace channel configuration and the adapter orchestration layer that submits listings to external marketplace APIs. Uses Marten document store (not event sourcing) for configuration entities: `Marketplace` (channel config, activation state, vault credential paths) and `CategoryMapping` (composite key `{ChannelCode}:{InternalCategory}`, 18 seed mappings across 3 channels).
+
+| Communicates with | Direction | Notes |
+|---|---|---|
+| Listings | ← receives | `ListingApproved` triggers adapter submission; publishes `MarketplaceListingActivated` or `MarketplaceSubmissionRejected` back |
+| Product Catalog | ← receives | 4 granular integration events populate Marketplaces-local `ProductSummaryView` ACL |
+
+**Key decisions:** Document store for configuration data ([ADR 0048](../decisions/0048-marketplace-document-entity-design.md)). Category mapping ownership in Marketplaces BC ([ADR 0049](../decisions/0049-category-mapping-ownership.md)). `ProductSummaryView` ACL isolates Marketplaces from Listings message payload ([ADR 0050](../decisions/0050-marketplaces-product-summary-acl.md)). `IVaultClient` abstraction: `DevVaultClient` in Development, `EnvironmentVaultClient` in production ([ADR 0051](../decisions/0051-vault-implementation-strategy.md)). `IMarketplaceAdapter` interface with three production implementations: `AmazonMarketplaceAdapter` (LWA OAuth 2.0, [ADR 0052](../decisions/0052-amazon-spapi-authentication.md)), `WalmartMarketplaceAdapter` (client credentials, [ADR 0053](../decisions/0053-walmart-marketplace-api-authentication.md)), `EbayMarketplaceAdapter` (refresh token, two-step submit, [ADR 0054](../decisions/0054-ebay-sell-api-authentication.md)). `UseRealAdapters` config flag controls stub vs. real adapter registration — stubs are always active in Development/CI.
+
+---
+
 ### Vendor Identity
 
 **Folder:** `src/Vendor Identity/`
