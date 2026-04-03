@@ -47,6 +47,7 @@ This directory contains implementation patterns and best practices for building 
 
 **External Integrations:**
 - 🔌 [External Service Integration](./external-service-integration.md) - Strategy pattern, stub vs production, graceful degradation, credential management stubs, keyed DI dictionaries
+- 🌐 [HttpClient](./httpclient.md) - Named clients, IHttpClientFactory with singletons, per-request headers, timeouts, token caching, anti-patterns
 
 **AI Agent Workflows:**
 - 🤖 [Copilot Session Prompt](./copilot-session-prompt.md) - Writing structured session prompts for CritterSupply's custom Copilot agent roster (@PSA, @QAE, @UXE, etc.)
@@ -104,7 +105,8 @@ This directory contains implementation patterns and best practices for building 
 2. Need inter-service messaging? → [Integration Messaging](./integration-messaging.md)
 3. Follow coding standards → [Modern C# Coding Standards](./modern-csharp-coding-standards.md)
 4. Integrate external services? → [External Service Integration](./external-service-integration.md)
-5. Building BFF? → [BFF Real-time Patterns](./bff-realtime-patterns.md)
+5. Making outbound HTTP calls? → [HttpClient](./httpclient.md)
+6. Building BFF? → [BFF Real-time Patterns](./bff-realtime-patterns.md)
 6. Adding SignalR real-time? → [Wolverine + SignalR](./wolverine-signalr.md)
 
 ### Testing Phase
@@ -317,6 +319,8 @@ Each skill document follows this structure:
 - *"How do I add a new bounded context?"* → [Adding a New Bounded Context](./adding-new-bounded-context.md)
 - *"How do I test a Blazor component in isolation?"* → [bUnit Component Testing](./bunit-component-testing.md)
 - *"How do I write a session prompt for Copilot agents?"* → [Copilot Session Prompt](./copilot-session-prompt/SKILL.md)
+- *"How do I call an external API with HttpClient safely?"* → [HttpClient](./httpclient.md)
+- *"Should I inject HttpClient or IHttpClientFactory into my service?"* → [HttpClient](./httpclient.md)
 
 ---
 

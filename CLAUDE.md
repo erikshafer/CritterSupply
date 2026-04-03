@@ -94,6 +94,7 @@ docs/planning/CURRENT-CYCLE.md          ← Active work tracking
 | 5 | Write an integration test | `docs/skills/critterstack-testing-patterns.md` | `tests/Orders/Orders.IntegrationTests/OrdersTestFixture.cs` |
 | 6 | Add an HTTP endpoint | `docs/skills/wolverine-message-handlers.md` | `src/Shopping/Shopping.Api/Queries/GetCartQuery.cs` |
 | 7 | Integrate an external service | `docs/skills/external-service-integration.md` | `src/Payments/Payments/PaymentGateway/` |
+| 7a | Make outbound HTTP calls | `docs/skills/httpclient.md` | `src/Marketplaces/Marketplaces/Adapters/` |
 | 8 | Add real-time SignalR updates | `docs/skills/wolverine-signalr.md` | `src/Customer Experience/Storefront.Api/StorefrontHub.cs` |
 | 9 | Create a Marten projection | `docs/skills/marten-event-sourcing.md` | `src/Orders/Orders.Api/Program.cs` |
 | 10 | Add a BDD feature test | `docs/skills/reqnroll-bdd-testing.md` | `docs/features/orders/order-placement.feature` |
@@ -389,6 +390,12 @@ Covers: Three projection base classes, DbContext with Weasel migration, multi-te
 **Read:** `docs/skills/event-sourcing-projections.md`
 
 Covers: Single-stream / multi-stream / live aggregation, `MultiStreamProjection<TDoc, TId>`, `Identity<T>()`, `FetchForWriting()`, snapshot projections, inline vs async vs live lifecycles.
+
+### When Making Outbound HTTP Calls
+
+**Read:** `docs/skills/httpclient.md`
+
+Covers: Named client registration, why `IHttpClientFactory` (not `HttpClient`) belongs in singleton services, `HttpRequestMessage` for per-request headers, `JsonContent.Create` / `ReadFromJsonAsync<T>`, static `JsonSerializerOptions`, `IsSuccessStatusCode` response branching, `SemaphoreSlim` token caching, explicit `Timeout` configuration, DNS / handler rotation, and anti-patterns (socket exhaustion, stale DNS, `DefaultRequestHeaders` mutation).
 
 ### When Integrating External Services
 
