@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M38.0 — Marketplaces Phase 4: Async Lifecycle + Resilience |
-| **Status** | 🚀 **IN PROGRESS** — Planning session complete; Session 1 ready |
+| **Status** | 🚀 **IN PROGRESS** — Session 1 complete (P-1 through P-7) |
 | **Recent Completion** | M37.0 — Marketplaces Phase 3: Production Adapters (2026-04-03) |
 | **Previous Completion** | M36.1 — Listings BC Foundation + Marketplaces BC Foundation (2026-03-31) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-03 (M38.0 planning session complete — five open questions resolved, plan document committed, Session 1 ready)*
+*Last Updated: 2026-04-03 (M38.0 Session 1 complete — P-1 through P-7 delivered, 120 tests passing)*
 
 ---
 
@@ -55,16 +55,26 @@
 
 ### 🚀 M38.0: Marketplaces Phase 4 — Async Lifecycle + Resilience
 
-**Status:** 🚀 **IN PROGRESS** — Planning session complete 2026-04-03; Session 1 ready
+**Status:** 🚀 **IN PROGRESS** — Session 1 complete 2026-04-03 (P-1 through P-7); Session 2 ready
 **Goal:** Complete the production adapter lifecycle — Walmart async polling, Polly resilience on all three adapter pipelines, bidirectional marketplace feedback (Listings BC consuming marketplace outcome events), `DeactivateListingAsync` full implementations, and admin UI unblock
 
 **Planning Documents:**
 - [M38.0 Plan](./milestones/m38-0-plan.md) — Scope table, session plan, 5 decisions, test plan, definition of done
 - [M38.0 Planning Session Retrospective](./milestones/m38-0-planning-session-retrospective.md) — Phase A research findings, five decisions with rationale
+- [M38.0 Session 1 Retrospective](./milestones/m38-0-session-1-retrospective.md) — P-1 through P-7 delivered
 - [M38.x Pre-Planning Notes](./milestones/m38-x-planning-notes.md) — Pre-planning context from M37.0 closure
 
-**Scope Summary (14 items across 3 implementation sessions):**
-- **Session 1 (P-1 to P-7):** Walmart `CheckSubmissionStatusAsync`, per-submission scheduled poll messages, Listings BC bidirectional feedback handlers, ADR 0055
+**M38.0 Session 1 Progress (P-1 through P-7 — complete):**
+- ✅ P-7: ADR 0055 — Submission Status Polling Architecture
+- ✅ P-1: `WalmartMarketplaceAdapter.CheckSubmissionStatusAsync` — real feed status polling
+- ✅ P-2: `ListingApprovedHandler` Walmart path — schedules `CheckWalmartFeedStatus` instead of immediate activation
+- ✅ P-3: `CheckWalmartFeedStatusHandler` — poll loop with escalating delays and max-attempt guard (10 attempts)
+- ✅ P-4: `Listings.Api/Program.cs` — subscribed to `marketplaces-listing-activated` + `marketplaces-submission-rejected` exchanges
+- ✅ P-5: `MarketplaceListingActivatedHandler` — `Submitted → Live` with idempotency guards
+- ✅ P-6: `MarketplaceSubmissionRejectedHandler` — `Submitted → Ended (SubmissionRejected)` with idempotency guards
+- ✅ Tests: Marketplaces 70 → 79 (+9), Listings 35 → 41 (+6), Combined 105 → 120
+
+**Remaining Scope:**
 - **Session 2 (P-8 to P-12):** Polly retry policies on all 3 adapters, `DeactivateListingAsync` for Walmart/Amazon/eBay, ADR 0056
 - **Session 3 (P-13, P-14):** Admin action buttons (approve/pause/end), 3 `@wip` E2E scenarios unblocked
 - **Session 4:** Milestone closure
