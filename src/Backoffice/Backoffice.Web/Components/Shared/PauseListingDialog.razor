@@ -1,0 +1,53 @@
+@* Pause Listing reason dialog — used by ListingDetail.razor P-13c *@
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Pause" Class="mr-2" />
+            Pause Listing
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            Please provide a reason for pausing this listing.
+        </MudText>
+        <MudTextField @bind-Value="_reason"
+                      Label="Reason"
+                      Required="true"
+                      RequiredError="Reason is required."
+                      MaxLength="500"
+                      Lines="3"
+                      Counter="500"
+                      AutoFocus="true"
+                      data-testid="pause-reason-input" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel"
+                   Variant="Variant.Text"
+                   Color="Color.Secondary"
+                   data-testid="pause-dialog-cancel-btn">
+            Cancel
+        </MudButton>
+        <MudButton OnClick="Confirm"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="@string.IsNullOrWhiteSpace(_reason)"
+                   data-testid="pause-dialog-confirm-btn">
+            Pause Listing
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance? MudDialog { get; set; }
+
+    private string _reason = string.Empty;
+
+    private void Cancel() => MudDialog?.Cancel();
+
+    private void Confirm()
+    {
+        if (!string.IsNullOrWhiteSpace(_reason))
+            MudDialog?.Close(DialogResult.Ok(_reason));
+    }
+}
