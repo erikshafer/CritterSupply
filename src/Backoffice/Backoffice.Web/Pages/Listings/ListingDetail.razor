@@ -5,6 +5,8 @@
 @inject NavigationManager Navigation
 @inject SessionExpiredService SessionExpiredService
 @inject BackofficeAuthState AuthState
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <PageTitle>Listing Detail — Backoffice</PageTitle>
 
@@ -112,38 +114,41 @@ else
             </MudPaper>
         </MudItem>
 
-        @* Actions row — disabled stubs for future sessions *@
+        @* Actions row *@
         <MudItem xs="12">
             <MudPaper Elevation="2" Class="pa-4 mb-4">
                 <MudText Typo="Typo.h6" Class="mb-3">Actions</MudText>
                 <MudStack Row="true" Spacing="2">
-                    @* @wip: Approve action — blocked until action handlers are wired in a future session *@
-                    <MudTooltip Text="Coming in a future session">
+                    @* Approve: valid from ReadyForReview only → transitions to Submitted *@
+                    <MudTooltip Text="@(_listing?.Status == "ReadyForReview" ? "Approve this listing for submission" : "Only available when listing is in ReadyForReview status")">
                         <MudButton Variant="Variant.Filled"
                                    Color="Color.Success"
-                                   Disabled="true"
+                                   Disabled="@(_listing?.Status != "ReadyForReview" || _isActioning)"
+                                   OnClick="ApproveListingAsync"
                                    data-testid="listing-approve-btn">
                             <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-1" />
                             Approve
                         </MudButton>
                     </MudTooltip>
 
-                    @* @wip: Pause action — blocked until action handlers are wired in a future session *@
-                    <MudTooltip Text="Coming in a future session">
+                    @* Pause: valid from Live only → transitions to Paused *@
+                    <MudTooltip Text="@(_listing?.Status == "Live" ? "Pause this listing" : "Only available when listing is Live")">
                         <MudButton Variant="Variant.Filled"
                                    Color="Color.Warning"
-                                   Disabled="true"
+                                   Disabled="@(_listing?.Status != "Live" || _isActioning)"
+                                   OnClick="ShowPauseDialogAsync"
                                    data-testid="listing-pause-btn">
                             <MudIcon Icon="@Icons.Material.Filled.Pause" Class="mr-1" />
                             Pause
                         </MudButton>
                     </MudTooltip>
 
-                    @* @wip: End listing action — blocked until action handlers are wired in a future session *@
-                    <MudTooltip Text="Coming in a future session">
+                    @* End Listing: valid from any non-terminal state *@
+                    <MudTooltip Text="@(_listing?.Status == "Ended" ? "Listing is already ended" : "End this listing permanently")">
                         <MudButton Variant="Variant.Filled"
                                    Color="Color.Error"
-                                   Disabled="true"
+                                   Disabled="@(_listing is null || _listing.Status == "Ended" || _isActioning)"
+                                   OnClick="EndListingAsync"
                                    data-testid="listing-end-btn">
                             <MudIcon Icon="@Icons.Material.Filled.Stop" Class="mr-1" />
                             End Listing
@@ -193,6 +198,7 @@ else
 
     private ListingDto? _listing;
     private bool _isLoading = true;
+    private bool _isActioning;
     private string? _errorMessage;
 
     protected override async Task OnInitializedAsync()
@@ -207,9 +213,7 @@ else
 
         try
         {
-            var client = HttpClientFactory.CreateClient("ListingsApi");
-            client.DefaultRequestHeaders.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+            var client = CreateAuthorizedClient();
 
             var response = await client.GetAsync($"/api/listings/{ListingId}");
 
@@ -248,5 +252,135 @@ else
     private void NavigateBack()
     {
         Navigation.NavigateTo("/admin/listings");
+    }
+
+    // ─── Action Handlers ────────────────────────────────────────────────────
+
+    private async Task ApproveListingAsync()
+    {
+        if (_listing?.Status != "ReadyForReview" || _isActioning) return;
+
+        _isActioning = true;
+        try
+        {
+            var client = CreateAuthorizedClient();
+            var response = await client.PostAsync($"/api/listings/{ListingId}/approve", null);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Listing approved successfully.", Severity.Success);
+                await LoadListingAsync();
+            }
+            else
+            {
+                _errorMessage = "Failed to approve listing. Please try again.";
+            }
+        }
+        catch (Exception)
+        {
+            _errorMessage = "Error approving listing. Please try again.";
+        }
+        finally
+        {
+            _isActioning = false;
+        }
+    }
+
+    private async Task ShowPauseDialogAsync()
+    {
+        if (_listing?.Status != "Live" || _isActioning) return;
+
+        var dialog = await DialogService.ShowAsync<PauseListingDialog>("Pause Listing");
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is string reason && !string.IsNullOrWhiteSpace(reason))
+        {
+            await PauseListingAsync(reason);
+        }
+    }
+
+    private async Task PauseListingAsync(string reason)
+    {
+        _isActioning = true;
+        try
+        {
+            var client = CreateAuthorizedClient();
+            var encodedReason = Uri.EscapeDataString(reason);
+            var response = await client.PostAsync($"/api/listings/{ListingId}/pause?reason={encodedReason}", null);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Listing paused successfully.", Severity.Success);
+                await LoadListingAsync();
+            }
+            else
+            {
+                _errorMessage = "Failed to pause listing. Please try again.";
+            }
+        }
+        catch (Exception)
+        {
+            _errorMessage = "Error pausing listing. Please try again.";
+        }
+        finally
+        {
+            _isActioning = false;
+        }
+    }
+
+    private async Task EndListingAsync()
+    {
+        if (_listing is null || _listing.Status == "Ended" || _isActioning) return;
+
+        _isActioning = true;
+        try
+        {
+            var client = CreateAuthorizedClient();
+            var response = await client.PostAsync($"/api/listings/{ListingId}/end", null);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                SessionExpiredService.TriggerSessionExpired();
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Listing ended successfully.", Severity.Success);
+                await LoadListingAsync();
+            }
+            else
+            {
+                _errorMessage = "Failed to end listing. Please try again.";
+            }
+        }
+        catch (Exception)
+        {
+            _errorMessage = "Error ending listing. Please try again.";
+        }
+        finally
+        {
+            _isActioning = false;
+        }
+    }
+
+    private HttpClient CreateAuthorizedClient()
+    {
+        var client = HttpClientFactory.CreateClient("ListingsApi");
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthState.AccessToken);
+        return client;
     }
 }

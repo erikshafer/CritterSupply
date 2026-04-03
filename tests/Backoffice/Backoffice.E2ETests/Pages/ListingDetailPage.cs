@@ -140,6 +140,49 @@ public sealed class ListingDetailPage
         }
     }
 
+    // ─── Action Button Interactions ────────────────────────────────────────
+
+    public async Task ClickApproveButtonAsync()
+    {
+        await ApproveButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ApiCallTimeoutMs });
+        await ApproveButton.ClickAsync();
+    }
+
+    public async Task ClickEndButtonAsync()
+    {
+        await EndButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ApiCallTimeoutMs });
+        await EndButton.ClickAsync();
+    }
+
+    public async Task ClickPauseButtonAsync()
+    {
+        await PauseButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ApiCallTimeoutMs });
+        await PauseButton.ClickAsync();
+    }
+
+    public async Task FillPauseReasonAsync(string reason)
+    {
+        // MudDialog renders in a portal — locate directly on the page
+        var reasonInput = _page.GetByTestId("pause-reason-input");
+        await reasonInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ApiCallTimeoutMs });
+        await reasonInput.FillAsync(reason);
+    }
+
+    public async Task ClickPauseConfirmAsync()
+    {
+        var confirmButton = _page.GetByTestId("pause-dialog-confirm-btn");
+        await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ApiCallTimeoutMs });
+        await confirmButton.ClickAsync();
+    }
+
+    public async Task WaitForStatusAsync(string expectedStatus)
+    {
+        // Wait for the status badge text to change to the expected value
+        await _page.WaitForFunctionAsync(
+            $"() => document.querySelector('[data-testid=\"listing-status-badge\"]')?.textContent?.trim() === '{expectedStatus}'",
+            new PageWaitForFunctionOptions { Timeout = ApiCallTimeoutMs });
+    }
+
     // ─── Back Navigation ───────────────────────────────────────────────────
 
     public async Task ClickBackAsync()

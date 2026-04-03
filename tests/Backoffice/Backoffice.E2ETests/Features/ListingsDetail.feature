@@ -21,12 +21,10 @@ Feature: Listing Detail Page
     And I should see the listing product name
     And I should see the listing created at timestamp
     And the approve button should be disabled
-    And the pause button should be disabled
-    And the end listing button should be disabled
+    And the pause button should be enabled
+    And the end listing button should be enabled
 
-  @wip
   Scenario: Admin approves a listing from the detail page
-    # Blocked: approve action handler not yet wired to detail page button — disabled stub only
     Given admin user "Alice" exists with email "alice.detail@crittersupply.com" and role "ProductManager"
     And I am logged in as "alice.detail@crittersupply.com"
     And a listing exists in "ReadyForReview" status
@@ -34,9 +32,7 @@ Feature: Listing Detail Page
     And I click the "Approve" button
     Then the listing status should change to "Submitted"
 
-  @wip
   Scenario: Admin pauses a listing from the detail page
-    # Blocked: pause action handler not yet wired to detail page button — disabled stub only
     Given admin user "Alice" exists with email "alice.detail@crittersupply.com" and role "ProductManager"
     And I am logged in as "alice.detail@crittersupply.com"
     And a listing exists in "Live" status
@@ -45,9 +41,7 @@ Feature: Listing Detail Page
     And I provide a pause reason
     Then the listing status should change to "Paused"
 
-  @wip
   Scenario: Admin ends a listing from the detail page
-    # Blocked: end listing action handler not yet wired to detail page button — disabled stub only
     Given admin user "Alice" exists with email "alice.detail@crittersupply.com" and role "ProductManager"
     And I am logged in as "alice.detail@crittersupply.com"
     And a listing exists in "Live" status

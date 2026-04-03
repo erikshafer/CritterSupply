@@ -73,7 +73,7 @@ public sealed class ListingsDetailSteps
     {
         var listingDetailPage = new ListingDetailPage(Page, Fixture.WasmBaseUrl);
         var isDisabled = await listingDetailPage.IsApproveButtonDisabledAsync();
-        isDisabled.ShouldBeTrue("Expected approve button to be disabled (stub)");
+        isDisabled.ShouldBeTrue("Expected approve button to be disabled");
     }
 
     [Then(@"the pause button should be disabled")]
@@ -81,7 +81,7 @@ public sealed class ListingsDetailSteps
     {
         var listingDetailPage = new ListingDetailPage(Page, Fixture.WasmBaseUrl);
         var isDisabled = await listingDetailPage.IsPauseButtonDisabledAsync();
-        isDisabled.ShouldBeTrue("Expected pause button to be disabled (stub)");
+        isDisabled.ShouldBeTrue("Expected pause button to be disabled");
     }
 
     [Then(@"the end listing button should be disabled")]
@@ -89,6 +89,44 @@ public sealed class ListingsDetailSteps
     {
         var listingDetailPage = new ListingDetailPage(Page, Fixture.WasmBaseUrl);
         var isDisabled = await listingDetailPage.IsEndButtonDisabledAsync();
-        isDisabled.ShouldBeTrue("Expected end listing button to be disabled (stub)");
+        isDisabled.ShouldBeTrue("Expected end listing button to be disabled");
+    }
+
+    [Then(@"the pause button should be enabled")]
+    public async Task ThenThePauseButtonShouldBeEnabled()
+    {
+        var listingDetailPage = new ListingDetailPage(Page, Fixture.WasmBaseUrl);
+        var isDisabled = await listingDetailPage.IsPauseButtonDisabledAsync();
+        isDisabled.ShouldBeFalse("Expected pause button to be enabled (listing is Live)");
+    }
+
+    [Then(@"the end listing button should be enabled")]
+    public async Task ThenTheEndListingButtonShouldBeEnabled()
+    {
+        var listingDetailPage = new ListingDetailPage(Page, Fixture.WasmBaseUrl);
+        var isDisabled = await listingDetailPage.IsEndButtonDisabledAsync();
+        isDisabled.ShouldBeFalse("Expected end listing button to be enabled (listing is not Ended)");
+    }
+
+    // ─── Action Outcome Assertions ───────────────────────────────────────────
+
+    [Then(@"the listing status should change to ""(.*)""")]
+    public async Task ThenTheListingStatusShouldChangeTo(string expectedStatus)
+    {
+        var listingDetailPage = new ListingDetailPage(Page, Fixture.WasmBaseUrl);
+        await listingDetailPage.WaitForStatusAsync(expectedStatus);
+        var status = await listingDetailPage.GetStatusAsync();
+        status?.Trim().ShouldBe(expectedStatus,
+            $"Expected listing status badge to show '{expectedStatus}' but got '{status}'");
+    }
+
+    // ─── Dialog Interaction Steps ────────────────────────────────────────────
+
+    [When(@"I provide a pause reason")]
+    public async Task WhenIProvideAPauseReason()
+    {
+        var listingDetailPage = new ListingDetailPage(Page, Fixture.WasmBaseUrl);
+        await listingDetailPage.FillPauseReasonAsync("Temporary stock replenishment pause");
+        await listingDetailPage.ClickPauseConfirmAsync();
     }
 }

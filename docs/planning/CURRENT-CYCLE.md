@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M38.0 — Marketplaces Phase 4: Async Lifecycle + Resilience |
-| **Status** | 🚀 **IN PROGRESS** — Session 2 complete (P-8 through P-12) |
+| **Status** | 🚀 **IN PROGRESS** — Session 3 complete (P-1 through P-14) |
 | **Recent Completion** | M37.0 — Marketplaces Phase 3: Production Adapters (2026-04-03) |
 | **Previous Completion** | M36.1 — Listings BC Foundation + Marketplaces BC Foundation (2026-03-31) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-03 (M38.0 Session 2 complete — P-8 through P-12 delivered, 133 tests passing)*
+*Last Updated: 2026-04-03 (M38.0 Session 3 complete — P-13/P-14 delivered: action buttons wired, 3 E2E @wip removed, 133 integration tests passing)*
 
 ---
 
@@ -55,13 +55,15 @@
 
 ### 🚀 M38.0: Marketplaces Phase 4 — Async Lifecycle + Resilience
 
-**Status:** 🚀 **IN PROGRESS** — Session 2 complete 2026-04-03 (P-8 through P-12); Session 3 ready
+**Status:** 🚀 **IN PROGRESS** — Session 3 complete 2026-04-03 (P-13, P-14); Session 4 (closure) ready
 **Goal:** Complete the production adapter lifecycle — Walmart async polling, Polly resilience on all three adapter pipelines, bidirectional marketplace feedback (Listings BC consuming marketplace outcome events), `DeactivateListingAsync` full implementations, and admin UI unblock
 
 **Planning Documents:**
 - [M38.0 Plan](./milestones/m38-0-plan.md) — Scope table, session plan, 5 decisions, test plan, definition of done
 - [M38.0 Planning Session Retrospective](./milestones/m38-0-planning-session-retrospective.md) — Phase A research findings, five decisions with rationale
 - [M38.0 Session 1 Retrospective](./milestones/m38-0-session-1-retrospective.md) — P-1 through P-7 delivered
+- [M38.0 Session 2 Retrospective](./milestones/m38-0-session-2-retrospective.md) — P-8 through P-12 delivered
+- [M38.0 Session 3 Retrospective](./milestones/m38-0-session-3-retrospective.md) — P-13 + P-14 delivered; action buttons wired; 3 @wip E2E scenarios active
 - [M38.x Pre-Planning Notes](./milestones/m38-x-planning-notes.md) — Pre-planning context from M37.0 closure
 
 **M38.0 Session 1 Progress (P-1 through P-7 — complete):**
@@ -85,8 +87,18 @@
 - ✅ P-11 tests: 3 tests replacing skeleton (`ReturnsTrue`, `ReturnsFalse`, `BuildsCorrectRequest`)
 - ✅ Tests: Marketplaces 79 → 92 (+13), Combined 120 → 133
 
+**M38.0 Session 3 Progress (P-13, P-14 — complete):**
+- ✅ P-13a: `ListingDetail.razor` — Approve button wired (ReadyForReview → Submitted, conditional Disabled)
+- ✅ P-13b: `ListingDetail.razor` — End Listing button wired (any non-terminal → Ended, conditional Disabled)
+- ✅ P-13c: `ListingDetail.razor` — Pause button wired (Live → Paused, MudDialog reason input); `PauseListingDialog.razor` created
+- ✅ P-14a: E2E "Admin approves a listing" — step defs implemented; `@wip` removed
+- ✅ P-14b: E2E "Admin ends a listing" — step defs implemented; `@wip` removed
+- ✅ P-14c: E2E "Admin pauses a listing" — step defs + MudDialog interaction; `@wip` removed
+- ✅ `StubListingsApiHost` — POST action endpoints added (approve/pause/end); listing record made mutable
+- ✅ Existing "navigates to listing detail" scenario updated — Pause+End now asserted as `enabled` for Live listing
+- ✅ `WellKnownTestData` — `ReadyForReviewListing` added
+
 **Remaining Scope:**
-- **Session 3 (P-13, P-14):** Admin action buttons (approve/pause/end), 3 `@wip` E2E scenarios unblocked
 - **Session 4:** Milestone closure
 
 **Five Planning Decisions:**

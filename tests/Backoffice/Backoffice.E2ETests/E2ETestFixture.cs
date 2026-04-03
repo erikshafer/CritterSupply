@@ -683,6 +683,9 @@ internal sealed class WasmStaticFileHost : IAsyncDisposable
 /// Endpoints:
 ///   GET /api/listings/all?page=&amp;pageSize=&amp;status= — paginated listing list
 ///   GET /api/listings/{id} — single listing detail
+///   POST /api/listings/{id}/approve — transitions status to Submitted
+///   POST /api/listings/{id}/pause?reason= — transitions status to Paused
+///   POST /api/listings/{id}/end — transitions status to Ended
 /// </summary>
 internal sealed class StubListingsApiHost : IAsyncDisposable
 {
@@ -691,26 +694,35 @@ internal sealed class StubListingsApiHost : IAsyncDisposable
 
     public string BaseUrl { get; private set; } = string.Empty;
 
-    public sealed record StubListing(
-        Guid ListingId,
-        string Sku,
-        string ChannelCode,
-        string ProductName,
-        string? Content,
-        string Status,
-        DateTimeOffset CreatedAt,
-        DateTimeOffset? ActivatedAt,
-        DateTimeOffset? EndedAt,
-        string? EndCause,
-        string? PauseReason);
+    public sealed class StubListing
+    {
+        public Guid ListingId { get; init; }
+        public string Sku { get; init; } = string.Empty;
+        public string ChannelCode { get; init; } = string.Empty;
+        public string ProductName { get; init; } = string.Empty;
+        public string? Content { get; init; }
+        public string Status { get; set; } = string.Empty;
+        public DateTimeOffset CreatedAt { get; init; }
+        public DateTimeOffset? ActivatedAt { get; init; }
+        public DateTimeOffset? EndedAt { get; set; }
+        public string? EndCause { get; set; }
+        public string? PauseReason { get; set; }
+    }
 
     public void SeedListing(Guid id, string sku, string channel, string productName, string status,
         string? content = null, DateTimeOffset? createdAt = null, DateTimeOffset? activatedAt = null)
     {
-        _listings.Add(new StubListing(
-            id, sku, channel, productName, content, status,
-            createdAt ?? DateTimeOffset.UtcNow.AddDays(-1),
-            activatedAt, null, null, null));
+        _listings.Add(new StubListing
+        {
+            ListingId = id,
+            Sku = sku,
+            ChannelCode = channel,
+            ProductName = productName,
+            Content = content,
+            Status = status,
+            CreatedAt = createdAt ?? DateTimeOffset.UtcNow.AddDays(-1),
+            ActivatedAt = activatedAt
+        });
     }
 
     public void Clear() => _listings.Clear();
@@ -764,6 +776,40 @@ internal sealed class StubListingsApiHost : IAsyncDisposable
             return listing is not null
                 ? Results.Json(listing)
                 : Results.NotFound();
+        });
+
+        // POST /api/listings/{id}/approve — ReadyForReview → Submitted
+        _app.MapPost("/api/listings/{id:guid}/approve", (Guid id) =>
+        {
+            var listing = _listings.FirstOrDefault(l => l.ListingId == id);
+            if (listing is null) return Results.NotFound();
+            if (listing.Status != "ReadyForReview") return Results.Problem("Listing is not in ReadyForReview status.");
+            listing.Status = "Submitted";
+            return Results.Ok();
+        });
+
+        // POST /api/listings/{id}/pause?reason= — Live → Paused
+        _app.MapPost("/api/listings/{id:guid}/pause", (Guid id, string? reason) =>
+        {
+            var listing = _listings.FirstOrDefault(l => l.ListingId == id);
+            if (listing is null) return Results.NotFound();
+            if (listing.Status != "Live") return Results.Problem("Listing is not in Live status.");
+            if (string.IsNullOrWhiteSpace(reason)) return Results.Problem("Reason is required.");
+            listing.Status = "Paused";
+            listing.PauseReason = reason;
+            return Results.Ok();
+        });
+
+        // POST /api/listings/{id}/end — any non-terminal state → Ended
+        _app.MapPost("/api/listings/{id:guid}/end", (Guid id) =>
+        {
+            var listing = _listings.FirstOrDefault(l => l.ListingId == id);
+            if (listing is null) return Results.NotFound();
+            if (listing.Status == "Ended") return Results.Problem("Listing is already in a terminal state.");
+            listing.Status = "Ended";
+            listing.EndedAt = DateTimeOffset.UtcNow;
+            listing.EndCause = "ManualEnd";
+            return Results.Ok();
         });
 
         await _app.StartAsync();
