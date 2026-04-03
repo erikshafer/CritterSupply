@@ -61,11 +61,11 @@ public sealed class ListingSubmissionFlowTests : IAsyncLifetime
     }
 
     // -------------------------------------------------------------------------
-    // Happy path — Walmart
+    // Happy path — Walmart (M38.0: schedules CheckWalmartFeedStatus poll instead of immediate activation)
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task ListingApproved_WalmartChannel_CallsAdapterAndPublishesActivated()
+    public async Task ListingApproved_WalmartChannel_SchedulesPollInsteadOfPublishingActivated()
     {
         await SeedMarketplaceAndMappingAsync("WALMART_US", "Cats", "WMT-PET-CATS-001");
         await SeedProductSummaryAsync("CAT-TOY-001", "Interactive Cat Toy", "Cats", 14.99m);
@@ -81,10 +81,14 @@ public sealed class ListingSubmissionFlowTests : IAsyncLifetime
 
         var tracked = await _fixture.ExecuteAndWaitAsync(message);
 
+        // Walmart: MarketplaceListingActivated should NOT be published immediately —
+        // instead a CheckWalmartFeedStatus poll is scheduled.
         var activated = tracked.Sent.MessagesOf<MarketplaceListingActivated>().ToList();
-        activated.Count.ShouldBe(1);
-        activated[0].ChannelCode.ShouldBe("WALMART_US");
-        activated[0].ExternalListingId.ShouldStartWith("wmrt-");
+        activated.ShouldBeEmpty();
+
+        // No rejection either — the submission succeeded
+        var rejected = tracked.Sent.MessagesOf<MarketplaceSubmissionRejected>().ToList();
+        rejected.ShouldBeEmpty();
     }
 
     // -------------------------------------------------------------------------
