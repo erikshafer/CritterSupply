@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M37.0 — Marketplaces Phase 3 (in progress) |
-| **Status** | 🚀 **IN PROGRESS** — Session 2 complete (EnvironmentVaultClient + AmazonMarketplaceAdapter) |
+| **Status** | 🚀 **IN PROGRESS** — Session 3 complete (Walmart + eBay adapters delivered) |
 | **Recent Completion** | M36.1 — Listings BC Foundation + Marketplaces BC Foundation (2026-03-31) |
 | **Previous Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-03 (M37.0 Session 2 complete — production IVaultClient + Amazon SP-API adapter delivered)*
+*Last Updated: 2026-04-03 (M37.0 Session 3 complete — Walmart + eBay production adapters delivered, 105 total tests)*
 
 ---
 
@@ -55,12 +55,13 @@
 
 ### 🚀 M37.0: Marketplaces Phase 3 — Production Adapters
 
-**Status:** 🚀 **IN PROGRESS** — Session 2 complete; Session 3 picks up Walmart + eBay adapters
+**Status:** 🚀 **IN PROGRESS** — Session 3 complete; Session 4 is milestone closure
 **Goal:** Deliver real marketplace adapter implementations (Amazon SP-API, Walmart Marketplace API, eBay Sell API), resolve `ListingApproved` message enrichment debt, and ensure E2E CI coverage for Listings + Marketplaces admin pages
 
 **Session History:**
 - [Session 1 Retrospective](./milestones/m37-0-session-1-retrospective.md) — Debt clearance + ProductSummaryView ACL (2026-04-01)
 - [Session 2 Retrospective](./milestones/m37-0-session-2-retrospective.md) — Production IVaultClient + Amazon SP-API Adapter (2026-04-03)
+- [Session 3 Retrospective](./milestones/m37-0-session-3-retrospective.md) — Walmart + eBay Production Adapters (2026-04-03)
 
 **Pre-Planning Input:**
 - [M36.1 Milestone Closure Retrospective](./milestones/m36-1-milestone-closure-retrospective.md) — What M37.0 inherits
@@ -70,6 +71,8 @@
 - [ADR 0050](../decisions/0050-marketplaces-product-summary-acl.md) — ProductSummaryView ACL decision
 - [ADR 0051](../decisions/0051-vault-implementation-strategy.md) — Vault implementation strategy
 - [ADR 0052](../decisions/0052-amazon-spapi-authentication.md) — Amazon SP-API authentication patterns
+- [ADR 0053](../decisions/0053-walmart-marketplace-api-authentication.md) — Walmart Marketplace API authentication
+- [ADR 0054](../decisions/0054-ebay-sell-api-authentication.md) — eBay Sell API authentication
 
 **M37.0 Session 1 Progress (2026-04-01):**
 - ✅ D-1: Added `@shard-3` tags to MarketplacesAdmin.feature, ListingsAdmin.feature, ListingsDetail.feature
@@ -85,14 +88,25 @@
 - ✅ A-4: Authored ADR 0052 — Amazon SP-API authentication and rate limiting patterns
 - ✅ 20 new integration tests (53 total Marketplaces, 88 total Listings+Marketplaces)
 
-**Remaining Scope (Session 3+):**
-- Walmart adapter implementation (`WalmartMarketplaceAdapter`) — M38.x per D-1
-- eBay adapter implementation (`EbayMarketplaceAdapter`) — M38.x per D-1
-- Async submission status polling — M38.x per D-3
-- Bidirectional marketplace feedback (Listings BC consuming activation/rejection events)
+**M37.0 Session 3 Progress (2026-04-03):**
+- ✅ S3-0: Extracted shared test doubles to `Helpers/MarketplaceAdapterTestHelpers.cs` (FakeHttpMessageHandler with URL-keyed responses, FakeVaultClient, FakeHttpClientFactory)
+- ✅ S3-1: Authored ADR 0053 — Walmart Marketplace API authentication (client credentials grant)
+- ✅ S3-2: Implemented `WalmartMarketplaceAdapter` (client credentials OAuth 2.0, token caching, feed-based submission)
+- ✅ S3-6a: 8 Walmart adapter integration tests
+- ✅ S3-3: Authored ADR 0054 — eBay Sell API authentication (refresh token grant, two-step listing)
+- ✅ S3-4: Implemented `EbayMarketplaceAdapter` (refresh token OAuth 2.0, token caching, two-step create+publish)
+- ✅ S3-6b: 9 eBay adapter integration tests
+- ✅ S3-5: Updated Program.cs — `UseRealAdapters` now registers all 3 real adapters (Amazon + Walmart + eBay)
+- ✅ 17 new integration tests (70 total Marketplaces, 105 total Listings+Marketplaces)
 
-**Test Baseline:** 88 integration tests (35 Listings + 53 Marketplaces), 6 E2E scenarios (marketplace admin), 0 failures
-**Next ADR:** 0053
+**Remaining Scope (Session 4 — Milestone Closure):**
+- CONTEXTS.md update with Walmart/eBay adapter references
+- CURRENT-CYCLE.md milestone move (Active → Recent Completions)
+- CI baseline recording
+- M38.x pre-planning notes (polling, retry, bidirectional feedback, orphaned eBay draft cleanup)
+
+**Test Baseline:** 105 integration tests (35 Listings + 70 Marketplaces), 6 E2E scenarios (marketplace admin), 0 failures
+**Next ADR:** 0055
 
 ---
 

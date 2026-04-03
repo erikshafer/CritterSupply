@@ -3,6 +3,7 @@ using System.Text.Json;
 using Marketplaces.Adapters;
 using Marketplaces.Credentials;
 using Microsoft.Extensions.Logging.Abstractions;
+using static Marketplaces.Api.IntegrationTests.Helpers.MarketplaceAdapterTestHelpers;
 
 namespace Marketplaces.Api.IntegrationTests;
 
@@ -214,72 +215,5 @@ public sealed class AmazonMarketplaceAdapterTests : IDisposable
     public void Dispose()
     {
         _httpHandler.Dispose();
-    }
-
-    // --- Test doubles ---
-
-    /// <summary>
-    /// Fake HTTP handler that queues responses and records sent requests.
-    /// Reusable by Walmart and eBay adapter tests in M38.x.
-    /// </summary>
-    internal sealed class FakeHttpMessageHandler : HttpMessageHandler
-    {
-        private readonly Queue<HttpResponseMessage> _responses = new();
-        public List<HttpRequestMessage> SentRequests { get; } = [];
-
-        public void EnqueueResponse(HttpStatusCode statusCode, object? body = null)
-        {
-            var response = new HttpResponseMessage(statusCode);
-            if (body is not null)
-            {
-                response.Content = new StringContent(
-                    JsonSerializer.Serialize(body),
-                    System.Text.Encoding.UTF8,
-                    "application/json");
-            }
-            _responses.Enqueue(response);
-        }
-
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
-        {
-            SentRequests.Add(request);
-
-            if (_responses.Count == 0)
-            {
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)
-                {
-                    Content = new StringContent("No more queued responses in FakeHttpMessageHandler")
-                });
-            }
-
-            return Task.FromResult(_responses.Dequeue());
-        }
-    }
-
-    /// <summary>
-    /// Fake vault client for adapter tests — returns pre-configured secrets.
-    /// </summary>
-    internal sealed class FakeVaultClient : IVaultClient
-    {
-        private readonly Dictionary<string, string> _secrets = new(StringComparer.OrdinalIgnoreCase);
-
-        public void SetSecret(string path, string value) => _secrets[path] = value;
-
-        public Task<string> GetSecretAsync(string path, CancellationToken ct = default)
-        {
-            if (!_secrets.TryGetValue(path, out var value))
-                throw new InvalidOperationException($"Test vault: secret not found: {path}");
-            return Task.FromResult(value);
-        }
-    }
-
-    /// <summary>
-    /// Fake IHttpClientFactory that returns a pre-configured HttpClient.
-    /// </summary>
-    internal sealed class FakeHttpClientFactory(HttpClient client) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => client;
     }
 }

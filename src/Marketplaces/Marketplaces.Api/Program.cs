@@ -92,15 +92,19 @@ if (useRealAdapters)
 {
     builder.Services.AddHttpClient("AmazonSpApi");
     builder.Services.AddSingleton<IMarketplaceAdapter, AmazonMarketplaceAdapter>();
+
+    builder.Services.AddHttpClient("WalmartApi");
+    builder.Services.AddSingleton<IMarketplaceAdapter, WalmartMarketplaceAdapter>();
+
+    builder.Services.AddHttpClient("EbayApi");
+    builder.Services.AddSingleton<IMarketplaceAdapter, EbayMarketplaceAdapter>();
 }
 else
 {
     builder.Services.AddSingleton<IMarketplaceAdapter, StubAmazonAdapter>();
+    builder.Services.AddSingleton<IMarketplaceAdapter, StubWalmartAdapter>();
+    builder.Services.AddSingleton<IMarketplaceAdapter, StubEbayAdapter>();
 }
-
-// Walmart and eBay stubs always registered — real adapters deferred to M38.x (D-1)
-builder.Services.AddSingleton<IMarketplaceAdapter, StubWalmartAdapter>();
-builder.Services.AddSingleton<IMarketplaceAdapter, StubEbayAdapter>();
 
 builder.Services.AddSingleton<IReadOnlyDictionary<string, IMarketplaceAdapter>>(sp =>
     sp.GetServices<IMarketplaceAdapter>()
