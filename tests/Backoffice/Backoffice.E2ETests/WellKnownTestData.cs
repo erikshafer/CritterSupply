@@ -96,5 +96,11 @@ internal static class WellKnownTestData
         public const string DraftListingChannel = "OWN_WEBSITE";
         public const string DraftListingProductName = "Interactive Cat Laser";
         public const string DraftListingStatus = "Draft";
+
+        public static readonly Guid ReadyForReviewListing = Guid.Parse("77777777-7777-7777-7777-777777777779");
+        public const string ReadyForReviewListingSku = "DOG-BOWL-02";
+        public const string ReadyForReviewListingChannel = "OWN_WEBSITE";
+        public const string ReadyForReviewListingProductName = "Ceramic Dog Bowl Premium";
+        public const string ReadyForReviewListingStatus = "ReadyForReview";
     }
 }

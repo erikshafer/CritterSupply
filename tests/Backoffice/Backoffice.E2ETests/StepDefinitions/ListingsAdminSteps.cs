@@ -49,6 +49,42 @@ public sealed class ListingsAdminSteps
             content: "Interactive laser toy for cats");
     }
 
+    [Given(@"a listing exists in ""(.*)"" status")]
+    public void GivenAListingExistsInStatus(string status)
+    {
+        // Seed the appropriate well-known listing based on requested status.
+        // Also seed the live listing so the admin table has something to show.
+        Fixture.StubListingsApi.SeedListing(
+            WellKnownTestData.Listings.LiveListing,
+            WellKnownTestData.Listings.LiveListingSku,
+            WellKnownTestData.Listings.LiveListingChannel,
+            WellKnownTestData.Listings.LiveListingProductName,
+            WellKnownTestData.Listings.LiveListingStatus,
+            content: "Premium ceramic feeding bowl for dogs",
+            activatedAt: DateTimeOffset.UtcNow.AddDays(-1));
+
+        var listingId = status switch
+        {
+            "ReadyForReview" => WellKnownTestData.Listings.ReadyForReviewListing,
+            "Live" => WellKnownTestData.Listings.LiveListing,
+            _ => throw new ArgumentException($"No well-known listing for status '{status}'")
+        };
+
+        if (status == "ReadyForReview")
+        {
+            Fixture.StubListingsApi.SeedListing(
+                WellKnownTestData.Listings.ReadyForReviewListing,
+                WellKnownTestData.Listings.ReadyForReviewListingSku,
+                WellKnownTestData.Listings.ReadyForReviewListingChannel,
+                WellKnownTestData.Listings.ReadyForReviewListingProductName,
+                WellKnownTestData.Listings.ReadyForReviewListingStatus,
+                content: "Premium ceramic feeding bowl — ready for review");
+        }
+
+        // Store the listing ID for subsequent navigation steps
+        _scenarioContext[ScenarioContextKeys.ListingId] = listingId;
+    }
+
     [Given(@"I am on the listings admin page")]
     public async Task GivenIAmOnTheListingsAdminPage()
     {
@@ -74,6 +110,34 @@ public sealed class ListingsAdminSteps
     {
         var listingsAdminPage = new ListingsAdminPage(Page, Fixture.WasmBaseUrl);
         await listingsAdminPage.NavigateAsync();
+    }
+
+    [When(@"I navigate to the listing detail page")]
+    public async Task WhenINavigateToTheListingDetailPage()
+    {
+        var listingId = _scenarioContext.Get<Guid>(ScenarioContextKeys.ListingId);
+        var listingDetailPage = new ListingDetailPage(Page, Fixture.WasmBaseUrl);
+        await listingDetailPage.NavigateAsync(listingId.ToString());
+    }
+
+    [When(@"I click the ""(.*)"" button")]
+    public async Task WhenIClickTheButton(string buttonName)
+    {
+        var listingDetailPage = new ListingDetailPage(Page, Fixture.WasmBaseUrl);
+        switch (buttonName)
+        {
+            case "Approve":
+                await listingDetailPage.ClickApproveButtonAsync();
+                break;
+            case "Pause":
+                await listingDetailPage.ClickPauseButtonAsync();
+                break;
+            case "End Listing":
+                await listingDetailPage.ClickEndButtonAsync();
+                break;
+            default:
+                throw new ArgumentException($"Unknown button: '{buttonName}'");
+        }
     }
 
     [When(@"I filter listings by status ""(.*)""")]
