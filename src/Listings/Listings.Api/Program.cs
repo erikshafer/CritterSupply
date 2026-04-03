@@ -101,13 +101,19 @@ builder.Host.UseWolverine(opts =>
         rabbit.UserName = rabbitConfig["username"] ?? "guest";
         rabbit.Password = rabbitConfig["password"] ?? "guest";
     })
-    .AutoProvision();
+    .AutoProvision()
+    // Declare exchange-to-queue bindings so marketplace outcome events are routed here (M38.0)
+    .DeclareExchange("marketplaces-listing-activated", ex => ex.BindQueue("listings-marketplace-outcome-events", ""))
+    .DeclareExchange("marketplaces-submission-rejected", ex => ex.BindQueue("listings-marketplace-outcome-events", ""));
 
     // Listen to product catalog events for ProductSummaryView (Session 2)
     opts.ListenToRabbitQueue("listings-product-catalog-events");
 
     // Listen to product recall priority exchange
     opts.ListenToRabbitQueue("listings-product-recall");
+
+    // Listen for marketplace listing outcome events (M38.0 bidirectional feedback)
+    opts.ListenToRabbitQueue("listings-marketplace-outcome-events");
 });
 
 // Wolverine HTTP

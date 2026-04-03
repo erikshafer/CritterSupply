@@ -31,7 +31,8 @@ public static class ListingApprovedHandler
     public static async Task<OutgoingMessages> Handle(
         ListingApproved message,
         IDocumentSession session,
-        IReadOnlyDictionary<string, IMarketplaceAdapter> adapters)
+        IReadOnlyDictionary<string, IMarketplaceAdapter> adapters,
+        IMessageBus bus)
     {
         var outgoing = new OutgoingMessages();
         var now = DateTimeOffset.UtcNow;
@@ -119,6 +120,17 @@ public static class ListingApprovedHandler
 
         if (result.IsSuccess)
         {
+            // Walmart: feed-based async submission — schedule a status poll instead of publishing activated immediately
+            if (string.Equals(message.ChannelCode, "WALMART_US", StringComparison.OrdinalIgnoreCase))
+            {
+                var rawFeedId = result.ExternalSubmissionId!.Replace("wmrt-", "", StringComparison.OrdinalIgnoreCase);
+                await bus.ScheduleAsync(
+                    new CheckWalmartFeedStatus(message.ListingId, message.Sku, message.ChannelCode, rawFeedId, AttemptCount: 1),
+                    TimeSpan.FromMinutes(2));
+                return outgoing;
+            }
+
+            // Amazon and eBay: synchronous activation — publish immediately (unchanged)
             outgoing.Add(new MarketplaceListingActivated(
                 message.ListingId,
                 message.Sku,

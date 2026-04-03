@@ -114,23 +114,85 @@ public sealed class WalmartMarketplaceAdapter : IMarketplaceAdapter
         }
     }
 
-    public Task<SubmissionStatus> CheckSubmissionStatusAsync(
+    public async Task<SubmissionStatus> CheckSubmissionStatusAsync(
         string externalSubmissionId,
         CancellationToken ct = default)
     {
-        // Skeleton implementation — real feed status polling deferred to M38.x (D-3).
-        // Walmart feed status is checked via GET /v3/feeds/{feedId} which returns
-        // processing status (RECEIVED, INPROGRESS, PROCESSED, ERROR).
-        _logger.LogInformation(
-            "CheckSubmissionStatusAsync not yet implemented for Walmart Marketplace API. " +
-            "Returning pending status for submission {SubmissionId}.",
-            externalSubmissionId);
+        // Strip the wmrt- prefix to get the raw Walmart feed ID
+        var feedId = externalSubmissionId.StartsWith("wmrt-", StringComparison.OrdinalIgnoreCase)
+            ? externalSubmissionId["wmrt-".Length..]
+            : externalSubmissionId;
 
-        return Task.FromResult(new SubmissionStatus(
-            ExternalSubmissionId: externalSubmissionId,
-            IsLive: false,
-            IsFailed: false,
-            FailureReason: "Status polling not yet implemented — deferred to M38.x"));
+        try
+        {
+            var accessToken = await GetAccessTokenAsync(ct);
+            var sellerId = await _vault.GetSecretAsync("walmart/seller-id", ct);
+
+            var client = _httpClientFactory.CreateClient("WalmartApi");
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{FeedsBaseUrl}/{feedId}");
+            request.Headers.Add("WM_SEC.ACCESS_TOKEN", accessToken);
+            request.Headers.Add("WM_CONSUMER.ID", sellerId);
+            request.Headers.Add("WM_SVC.NAME", "Walmart Marketplace");
+            request.Headers.Add("WM_QOS.CORRELATION_ID", Guid.NewGuid().ToString());
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+            _logger.LogInformation(
+                "Polling Walmart feed status: FeedId={FeedId}, SubmissionId={SubmissionId}",
+                feedId, externalSubmissionId);
+
+            using var response = await client.SendAsync(request, ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning(
+                    "Walmart feed status poll failed: FeedId={FeedId}, StatusCode={StatusCode}, Body={Body}",
+                    feedId, (int)response.StatusCode, errorBody);
+
+                return new SubmissionStatus(
+                    ExternalSubmissionId: externalSubmissionId,
+                    IsLive: false,
+                    IsFailed: true,
+                    FailureReason: $"Walmart feed status API returned {(int)response.StatusCode}: {errorBody}");
+            }
+
+            var feedResponse = await response.Content.ReadFromJsonAsync<WalmartFeedStatusResponse>(JsonOptions, ct);
+            var feedStatus = feedResponse?.FeedStatus ?? string.Empty;
+
+            _logger.LogInformation(
+                "Walmart feed status: FeedId={FeedId}, FeedStatus={FeedStatus}",
+                feedId, feedStatus);
+
+            return feedStatus.ToUpperInvariant() switch
+            {
+                "PROCESSED" => new SubmissionStatus(
+                    ExternalSubmissionId: externalSubmissionId,
+                    IsLive: true,
+                    IsFailed: false),
+                "ERROR" => new SubmissionStatus(
+                    ExternalSubmissionId: externalSubmissionId,
+                    IsLive: false,
+                    IsFailed: true,
+                    FailureReason: "Feed processing error"),
+                // RECEIVED or INPROGRESS — still pending, reschedule
+                _ => new SubmissionStatus(
+                    ExternalSubmissionId: externalSubmissionId,
+                    IsLive: false,
+                    IsFailed: false)
+            };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex,
+                "Failed to check Walmart feed status: SubmissionId={SubmissionId}", externalSubmissionId);
+
+            return new SubmissionStatus(
+                ExternalSubmissionId: externalSubmissionId,
+                IsLive: false,
+                IsFailed: true,
+                FailureReason: $"Walmart adapter error checking feed status: {ex.Message}");
+        }
     }
 
     public Task<bool> DeactivateListingAsync(
@@ -233,6 +295,15 @@ public sealed class WalmartMarketplaceAdapter : IMarketplaceAdapter
     };
 
     // --- Walmart API DTOs (internal to adapter) ---
+
+    private sealed record WalmartFeedStatusResponse
+    {
+        [JsonPropertyName("feedId")]
+        public string? FeedId { get; init; }
+
+        [JsonPropertyName("feedStatus")]
+        public string? FeedStatus { get; init; }
+    }
 
     private sealed record WalmartTokenResponse
     {
