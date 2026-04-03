@@ -98,19 +98,10 @@ contexts where a 401 can appear are:
    Polly layer would call the endpoint again with the same stale token (Polly does not modify the
    request between retries), which would produce a second 401 before the token cache clears.
 
-**Resolution:** The retry predicate excludes `HttpStatusCode.Unauthorized` entirely:
-
-```csharp
-ShouldHandle = static args =>
-    new ValueTask<bool>(
-        args.Outcome.Exception is HttpRequestException ||
-        (args.Outcome.Result?.StatusCode is
-            HttpStatusCode.TooManyRequests or
-            HttpStatusCode.InternalServerError or
-            HttpStatusCode.BadGateway or
-            HttpStatusCode.ServiceUnavailable or
-            HttpStatusCode.GatewayTimeout))
-```
+**Resolution:** The `HttpRetryStrategyOptions` default `ShouldHandle` predicate covers HTTP 408,
+429, and 500+ status codes plus `HttpRequestException`. **HTTP 401 is not in the default set**,
+so no custom predicate is required. The default behavior is used in `Program.cs` without
+overriding `ShouldHandle`.
 
 The adapter's own 401 handling on API calls (clearing the token cache and re-fetching) runs in
 the adapter's own call path before the response propagates to Polly. This means a 401 from an
@@ -120,17 +111,23 @@ breaker threshold.
 
 ### 5. Circuit breaker configuration
 
-| Parameter | Value |
-|-----------|-------|
-| `HandledEventsAllowedBeforeBreaking` | 5 |
-| `BreakDuration` | 30 seconds |
+The `HttpCircuitBreakerStrategyOptions` uses the Polly v8 ratio-based circuit breaker
+(`Polly.Core` 8.x) — not the Polly v7 count-based API.
 
-5 consecutive handled failures (429 or 5xx) within the sampling window open the breaker. The
-30-second break duration gives a marketplace API time to recover from a brief outage. After the
-break, the circuit enters half-open state and allows a single test request before fully closing.
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `FailureRatio` | 0.5 | Break when ≥50% of requests fail within `SamplingDuration` |
+| `MinimumThroughput` | 5 | Minimum requests in `SamplingDuration` before ratio is evaluated |
+| `SamplingDuration` | 30 seconds | Rolling window for failure ratio calculation |
+| `BreakDuration` | 30 seconds | How long the circuit stays open before allowing a test request |
 
-Handled events match the same predicate as the retry strategy (`ShouldHandle`). A 401 does not
-count toward the breaker threshold.
+The circuit opens when 50% or more of the last 5+ requests (within 30 seconds) return a handled
+failure (5xx or `HttpRequestException`). The 30-second break duration gives a marketplace API time
+to recover from a brief outage. After the break, the circuit enters half-open state and allows a
+single test request before fully closing.
+
+Handled events use the default `HttpCircuitBreakerStrategyOptions.ShouldHandle` predicate, which
+covers 5xx responses and `HttpRequestException`. A 401 does not count toward the breaker threshold.
 
 ### 6. Explicit 30-second timeout
 
