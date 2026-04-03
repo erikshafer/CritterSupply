@@ -41,80 +41,67 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M38.0 — Marketplaces Phase 4: Async Lifecycle + Resilience |
-| **Status** | 🚀 **IN PROGRESS** — Session 3 complete (P-1 through P-14) |
-| **Recent Completion** | M37.0 — Marketplaces Phase 3: Production Adapters (2026-04-03) |
-| **Previous Completion** | M36.1 — Listings BC Foundation + Marketplaces BC Foundation (2026-03-31) |
+| **Current Milestone** | M38.1 — Marketplaces Phase 4b: Deactivation + Status Verification (planning) |
+| **Status** | 📋 **PLANNING** — Pre-planning notes authored; planning session next |
+| **Recent Completion** | M38.0 — Marketplaces Phase 4: Async Lifecycle + Resilience (2026-04-03) |
+| **Previous Completion** | M37.0 — Marketplaces Phase 3: Production Adapters (2026-04-03) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-03 (M38.0 Session 3 complete — P-13/P-14 delivered: action buttons wired, 3 E2E @wip removed, 133 integration tests passing)*
+*Last Updated: 2026-04-03 (M38.0 closed — 133 integration tests, 9 E2E scenarios, 0 errors; M38.1 planning notes authored)*
 
 ---
 
 ## Active Milestone
 
-### 🚀 M38.0: Marketplaces Phase 4 — Async Lifecycle + Resilience
+### 📋 M38.1: Marketplaces Phase 4b — Deactivation + Status Verification
 
-**Status:** 🚀 **IN PROGRESS** — Session 3 complete 2026-04-03 (P-13, P-14); Session 4 (closure) ready
-**Goal:** Complete the production adapter lifecycle — Walmart async polling, Polly resilience on all three adapter pipelines, bidirectional marketplace feedback (Listings BC consuming marketplace outcome events), `DeactivateListingAsync` full implementations, and admin UI unblock
+**Status:** 📋 **PLANNING** — Pre-planning notes authored; formal planning session to produce plan document
+**Goal:** Complete the deactivation and status-checking layers deferred from M38.0 — resolve the Walmart interface design limitation, implement Walmart `DeactivateListingAsync`, add Amazon/eBay `CheckSubmissionStatusAsync` real implementations, and address orphaned eBay draft cleanup
 
 **Planning Documents:**
-- [M38.0 Plan](./milestones/m38-0-plan.md) — Scope table, session plan, 5 decisions, test plan, definition of done
-- [M38.0 Planning Session Retrospective](./milestones/m38-0-planning-session-retrospective.md) — Phase A research findings, five decisions with rationale
-- [M38.0 Session 1 Retrospective](./milestones/m38-0-session-1-retrospective.md) — P-1 through P-7 delivered
-- [M38.0 Session 2 Retrospective](./milestones/m38-0-session-2-retrospective.md) — P-8 through P-12 delivered
-- [M38.0 Session 3 Retrospective](./milestones/m38-0-session-3-retrospective.md) — P-13 + P-14 delivered; action buttons wired; 3 @wip E2E scenarios active
-- [M38.x Pre-Planning Notes](./milestones/m38-x-planning-notes.md) — Pre-planning context from M37.0 closure
+- [M38.1 Planning Notes](./milestones/m38-1-planning-notes.md) — Known scope, Walmart interface design decision, open questions, codebase state
+- [M38.0 Milestone Closure Retrospective](./milestones/m38-0-milestone-closure-retrospective.md) — Section 5 (debt table) and Section 6 (inherited state)
 
-**M38.0 Session 1 Progress (P-1 through P-7 — complete):**
-- ✅ P-7: ADR 0055 — Submission Status Polling Architecture
-- ✅ P-1: `WalmartMarketplaceAdapter.CheckSubmissionStatusAsync` — real feed status polling
-- ✅ P-2: `ListingApprovedHandler` Walmart path — schedules `CheckWalmartFeedStatus` instead of immediate activation
-- ✅ P-3: `CheckWalmartFeedStatusHandler` — poll loop with escalating delays and max-attempt guard (10 attempts)
-- ✅ P-4: `Listings.Api/Program.cs` — subscribed to `marketplaces-listing-activated` + `marketplaces-submission-rejected` exchanges
-- ✅ P-5: `MarketplaceListingActivatedHandler` — `Submitted → Live` with idempotency guards
-- ✅ P-6: `MarketplaceSubmissionRejectedHandler` — `Submitted → Ended (SubmissionRejected)` with idempotency guards
-- ✅ Tests: Marketplaces 70 → 79 (+9), Listings 35 → 41 (+6), Combined 105 → 120
+**Known Scope (from M38.0 debt table):**
+- Walmart `DeactivateListingAsync` — resolve SKU gap (prerequisite gate)
+- Walmart deactivation interface design — encode SKU vs. pass separately
+- Amazon `CheckSubmissionStatusAsync` real implementation
+- eBay `CheckSubmissionStatusAsync` real implementation
+- Orphaned eBay draft offer cleanup
+- Walmart deactivation full tests (3 TODO tests)
 
-**M38.0 Session 2 Progress (P-8 through P-12 — complete):**
-- ✅ P-12: ADR 0056 — Marketplace Adapter Resilience Patterns
-- ✅ P-8: Polly retry + circuit breaker on `AmazonSpApi`, `WalmartApi`, `EbayApi` HttpClients in `Marketplaces.Api/Program.cs` (`Microsoft.Extensions.Http.Resilience` 10.4.0; 3 retries exponential backoff, 30s circuit break)
-- ✅ P-8 tests: 9 resilience tests in `AdapterResilienceTests.cs` (429 retry, 5xx retry, 401 no-retry × 3 adapters)
-- ✅ P-9: `WalmartMarketplaceAdapter.DeactivateListingAsync` — Option A: logs SKU gap (ADR 0056), returns false; TODO tests documented for M38.1
-- ✅ P-10: `AmazonMarketplaceAdapter.DeactivateListingAsync` — PATCH delete `purchasable_offer`; `amzn-{sku}` prefix stripped
-- ✅ P-10 tests: 3 tests replacing skeleton (`ReturnsTrue`, `ReturnsFalse`, `BuildsCorrectRequest`)
-- ✅ P-11: `EbayMarketplaceAdapter.DeactivateListingAsync` — POST `offer/{offerId}/withdraw`; `ebay-{offerId}` prefix stripped
-- ✅ P-11 tests: 3 tests replacing skeleton (`ReturnsTrue`, `ReturnsFalse`, `BuildsCorrectRequest`)
-- ✅ Tests: Marketplaces 79 → 92 (+13), Combined 120 → 133
-
-**M38.0 Session 3 Progress (P-13, P-14 — complete):**
-- ✅ P-13a: `ListingDetail.razor` — Approve button wired (ReadyForReview → Submitted, conditional Disabled)
-- ✅ P-13b: `ListingDetail.razor` — End Listing button wired (any non-terminal → Ended, conditional Disabled)
-- ✅ P-13c: `ListingDetail.razor` — Pause button wired (Live → Paused, MudDialog reason input); `PauseListingDialog.razor` created
-- ✅ P-14a: E2E "Admin approves a listing" — step defs implemented; `@wip` removed
-- ✅ P-14b: E2E "Admin ends a listing" — step defs implemented; `@wip` removed
-- ✅ P-14c: E2E "Admin pauses a listing" — step defs + MudDialog interaction; `@wip` removed
-- ✅ `StubListingsApiHost` — POST action endpoints added (approve/pause/end); listing record made mutable
-- ✅ Existing "navigates to listing detail" scenario updated — Pause+End now asserted as `enabled` for Live listing
-- ✅ `WellKnownTestData` — `ReadyForReviewListing` added
-
-**Remaining Scope:**
-- **Session 4:** Milestone closure
-
-**Five Planning Decisions:**
-- Q1: Marketplaces BC owns polling (adapter boundary discipline)
-- Q2: Per-submission scheduled message via `bus.ScheduleAsync()` (simplest; Walmart only)
-- Q3: Walmart polling only; Amazon and eBay are synchronous activation
-- Q4: Bidirectional feedback (S1) then deactivation (S2) — natural dependency order
-- Q5: Orphaned eBay draft deferred to M38.1 (documented edge case)
-
-**Test Baseline at M38.0 Start:** 105 integration tests (35 Listings + 70 Marketplaces), 0 failures
-**Target at M38.0 Close:** ≥ 135 integration tests + 3 additional E2E scenarios active
-**Next ADR:** 0055
+**Codebase State at M38.1 Start:**
+- Integration tests: 133 (92 Marketplaces + 41 Listings), 0 failures
+- E2E scenarios: 9 active on `@shard-3`
+- Build: 0 errors, 16 warnings (all pre-existing)
+- Next ADR: 0057
 
 ---
 
 ## Recent Completions
+
+### ✅ M38.0: Marketplaces Phase 4 — Async Lifecycle + Resilience (2026-04-03)
+
+**Status:** ✅ **Complete** — 4 sessions (3 implementation + 1 closure); all 14 plan items delivered
+**Goal:** Complete the production adapter lifecycle — Walmart async polling, Polly resilience on all three adapter pipelines, bidirectional marketplace feedback, `DeactivateListingAsync` implementations, and admin UI unblock
+
+**Key Deliverables:**
+- **Session 1:** Walmart feed status polling (`CheckSubmissionStatusAsync`), `CheckWalmartFeedStatus` scheduled poll handler, Listings BC bidirectional feedback (`MarketplaceListingActivatedHandler`, `MarketplaceSubmissionRejectedHandler`), ADR 0055. 15 new tests; 120 total.
+- **Session 2:** Polly resilience on all 3 adapter `HttpClient` pipelines (`Microsoft.Extensions.Http.Resilience`), `DeactivateListingAsync` for Amazon + eBay (real) and Walmart (Option A gap), ADR 0056. 13 new tests; 133 total.
+- **Session 3:** `ListingDetail.razor` action buttons wired (approve/pause/end), `PauseListingDialog.razor`, 3 `@wip` E2E scenarios unblocked. 9 active E2E scenarios.
+- **Session 4:** Milestone closure — CONTEXTS.md updated, M38.1 planning notes, CURRENT-CYCLE.md update.
+
+**DoD:** 6/8 green, 2 amber (Walmart deactivation SKU gap documented in ADR 0056; test count 133 vs 135 target)
+**Test Baseline:** 133 integration tests (92 Marketplaces + 41 Listings), 9 E2E scenarios (`@shard-3`), 0 failures
+**CI:** CI Run #879 (green on main), E2E Run #462 (green on main) — post-merge of PR #511
+
+**Inherited by M38.1:**
+1. Walmart `DeactivateListingAsync` SKU gap — interface design decision needed
+2. Amazon/eBay `CheckSubmissionStatusAsync` real implementations — enhancement, not correctness fix
+3. Orphaned eBay draft offer cleanup
+4. Walmart deactivation full tests (3 TODO tests)
+
+**Retrospectives:** [Planning](./milestones/m38-0-planning-session-retrospective.md) · [Session 1](./milestones/m38-0-session-1-retrospective.md) · [Session 2](./milestones/m38-0-session-2-retrospective.md) · [Session 3](./milestones/m38-0-session-3-retrospective.md) · [Milestone Closure](./milestones/m38-0-milestone-closure-retrospective.md)
 
 ### ✅ M37.0: Marketplaces Phase 3 — Production Adapters (2026-04-03)
 
