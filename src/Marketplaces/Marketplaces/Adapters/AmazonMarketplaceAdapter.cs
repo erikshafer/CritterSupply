@@ -281,19 +281,19 @@ public sealed class AmazonMarketplaceAdapter : IMarketplaceAdapter
         public int ExpiresIn { get; init; }
     }
 
-    private sealed class SpApiListingsItemPutRequest
+    private sealed record SpApiListingsItemPutRequest
     {
         [JsonPropertyName("productType")]
-        public string ProductType { get; set; } = "PRODUCT";
+        public string ProductType { get; init; } = "PRODUCT";
 
         [JsonPropertyName("requirements")]
-        public string Requirements { get; set; } = "LISTING";
+        public string Requirements { get; init; } = "LISTING";
 
         [JsonPropertyName("attributes")]
-        public Dictionary<string, object> Attributes { get; set; } = new();
+        public Dictionary<string, object> Attributes { get; init; } = new();
 
         [JsonPropertyName("marketplaceIds")]
-        public string[] MarketplaceIds { get; set; } = [];
+        public string[] MarketplaceIds { get; init; } = [];
     }
 
     private sealed record SpApiListingsResponse
