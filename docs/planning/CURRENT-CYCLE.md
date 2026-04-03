@@ -41,40 +41,43 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M38.x — Marketplaces Phase 4 (planning) |
-| **Status** | 📋 **PLANNING** — M37.0 closed; M38.x scope documented in pre-planning notes |
+| **Current Milestone** | M38.0 — Marketplaces Phase 4: Async Lifecycle + Resilience |
+| **Status** | 🚀 **IN PROGRESS** — Planning session complete; Session 1 ready |
 | **Recent Completion** | M37.0 — Marketplaces Phase 3: Production Adapters (2026-04-03) |
 | **Previous Completion** | M36.1 — Listings BC Foundation + Marketplaces BC Foundation (2026-03-31) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-03 (M37.0 closed — all 3 production adapters delivered, 105 total tests, M38.x pre-planning notes authored)*
+*Last Updated: 2026-04-03 (M38.0 planning session complete — five open questions resolved, plan document committed, Session 1 ready)*
 
 ---
 
 ## Active Milestone
 
-### 📋 M38.x: Marketplaces Phase 4 — Async Lifecycle + Resilience (Planning)
+### 🚀 M38.0: Marketplaces Phase 4 — Async Lifecycle + Resilience
 
-**Status:** 📋 **PLANNING** — M37.0 closed 2026-04-03; M38.x scope documented in pre-planning notes; formal planning session not yet started
-**Goal:** Complete the production adapter lifecycle — async submission status polling, rate limiting and retry resilience, bidirectional marketplace feedback (Listings BC consuming marketplace outcome events), and deferred cleanup items from M37.0
+**Status:** 🚀 **IN PROGRESS** — Planning session complete 2026-04-03; Session 1 ready
+**Goal:** Complete the production adapter lifecycle — Walmart async polling, Polly resilience on all three adapter pipelines, bidirectional marketplace feedback (Listings BC consuming marketplace outcome events), `DeactivateListingAsync` full implementations, and admin UI unblock
 
-**Pre-Planning Input:**
-- [M38.x Pre-Planning Notes](./milestones/m38-x-planning-notes.md) — Known scope, open questions, design considerations
-- [M37.0 Milestone Closure Retrospective](./milestones/m37-0-milestone-closure-retrospective.md) — Debt table (Section 5) and inherited state (Section 6)
-- [Catalog-Listings-Marketplaces Cycle Plan](./catalog-listings-marketplaces-cycle-plan.md) — Phase 4 scope (async lifecycle and resilience layer)
-- [ADR 0052](../decisions/0052-amazon-spapi-authentication.md) — Amazon SP-API; polling deferred note
-- [ADR 0053](../decisions/0053-walmart-marketplace-api-authentication.md) — Walmart; feed-based async submission
-- [ADR 0054](../decisions/0054-ebay-sell-api-authentication.md) — eBay; orphaned draft offer note
+**Planning Documents:**
+- [M38.0 Plan](./milestones/m38-0-plan.md) — Scope table, session plan, 5 decisions, test plan, definition of done
+- [M38.0 Planning Session Retrospective](./milestones/m38-0-planning-session-retrospective.md) — Phase A research findings, five decisions with rationale
+- [M38.x Pre-Planning Notes](./milestones/m38-x-planning-notes.md) — Pre-planning context from M37.0 closure
 
-**Known Scope (from M37.0 debt table):**
-- Async submission status polling (`CheckSubmissionStatusAsync` saga — Wolverine `bus.ScheduleAsync()`)
-- Rate limiting / retry logic (Polly delegating handler on adapter `HttpClient` pipelines)
-- `DeactivateListingAsync` full implementation (all three adapters)
-- Bidirectional marketplace feedback (Listings BC consuming `MarketplaceListingActivated` / `MarketplaceSubmissionRejected`)
-- Orphaned eBay draft offer cleanup
-- Listings admin action buttons (approve/pause/end) — disabled stubs on Backoffice detail page
+**Scope Summary (14 items across 3 implementation sessions):**
+- **Session 1 (P-1 to P-7):** Walmart `CheckSubmissionStatusAsync`, per-submission scheduled poll messages, Listings BC bidirectional feedback handlers, ADR 0055
+- **Session 2 (P-8 to P-12):** Polly retry policies on all 3 adapters, `DeactivateListingAsync` for Walmart/Amazon/eBay, ADR 0056
+- **Session 3 (P-13, P-14):** Admin action buttons (approve/pause/end), 3 `@wip` E2E scenarios unblocked
+- **Session 4:** Milestone closure
 
-**Test Baseline at M38.x Start:** 105 integration tests (35 Listings + 70 Marketplaces), 0 failures
+**Five Planning Decisions:**
+- Q1: Marketplaces BC owns polling (adapter boundary discipline)
+- Q2: Per-submission scheduled message via `bus.ScheduleAsync()` (simplest; Walmart only)
+- Q3: Walmart polling only; Amazon and eBay are synchronous activation
+- Q4: Bidirectional feedback (S1) then deactivation (S2) — natural dependency order
+- Q5: Orphaned eBay draft deferred to M38.1 (documented edge case)
+
+**Test Baseline at M38.0 Start:** 105 integration tests (35 Listings + 70 Marketplaces), 0 failures
+**Target at M38.0 Close:** ≥ 135 integration tests + 3 additional E2E scenarios active
 **Next ADR:** 0055
 
 ---
