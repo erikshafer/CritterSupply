@@ -121,3 +121,40 @@ Feature: Checkout Flow (E2E)
     When I navigate the page using only the keyboard
     Then I should be able to complete the address step using Tab and Enter
     And focus should move to the shipping method step
+
+  # ──────────────────────────────────────────────────
+  # Phase 3: Add Address During Checkout (bug-stomp-2026-04-01)
+  # ──────────────────────────────────────────────────
+
+  @checkout @wip @ignore
+  Scenario: Customer adds a new address during checkout when no saved addresses exist
+    Given I navigate to the cart page
+    And I have items in my cart
+    When I click "Proceed to Checkout"
+    Then I should see "No saved addresses. Add an address to continue."
+    When I click "Add New Address"
+    Then I should see the add address dialog
+    When I fill in the address form with:
+      | Field            | Value        |
+      | Nickname         | Home         |
+      | Address Line 1   | 123 Main St  |
+      | City             | Seattle      |
+      | State / Province | WA           |
+      | Postal Code      | 98101        |
+      | Country          | US           |
+    And I click "Add Address" in the dialog
+    Then I should see the success notification "Address added successfully!"
+    And the address dropdown should contain "Home"
+
+  @checkout @wip @ignore
+  Scenario: Customer completes full checkout with newly added address
+    Given I navigate to the cart page
+    And I have items in my cart
+    When I click "Proceed to Checkout"
+    And I add a new address "Home" via the dialog
+    And I select the address "Home" and click "Save & Continue"
+    And I select "Standard Ground" shipping and click "Save & Continue"
+    And I enter the payment token "tok_visa_test" and click "Save & Continue"
+    And I click "Place Order"
+    Then I should be on the order confirmation page
+    And the order status should be "Placed"

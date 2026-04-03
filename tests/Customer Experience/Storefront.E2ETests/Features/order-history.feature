@@ -4,13 +4,10 @@ Feature: Order History
   So that I can track past purchases and their current status
 
   # ──────────────────────────────────────────────────
-  # These scenarios are deferred to Cycle 21.
-  # The Order History page (/orders) is implemented in Storefront.Web
-  # and integrated with the Orders BC via IOrdersClient.
-  # E2E coverage is blocked on:
-  #   - Multi-order test data seeding strategy
-  #   - Order detail page (planned for Cycle 21 Product Catalog Phase 2)
-  # Tracking: Create a Cycle 21 GitHub Issue to implement these scenarios.
+  # Order History page wired up in bug-stomp-2026-04-01.
+  # BFF endpoint: GET /api/storefront/orders?customerId=...
+  # Page: /orders with MudTable (Order ID, Date, Status, Total, Items, View)
+  # E2E execution blocked on multi-order test data seeding strategy.
   # ──────────────────────────────────────────────────
 
   Background:

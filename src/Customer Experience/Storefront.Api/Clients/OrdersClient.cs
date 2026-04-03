@@ -53,6 +53,18 @@ public sealed class OrdersClient : IOrdersClient
                ?? new PagedResult<OrderDto>([], 0, page, pageSize);
     }
 
+    public async Task<IReadOnlyList<OrderSummaryDto>> GetOrderSummariesAsync(
+        Guid customerId,
+        CancellationToken ct = default)
+    {
+        var response = await _httpClient.GetAsync($"/api/orders?customerId={customerId}", ct);
+        response.EnsureSuccessStatusCode();
+
+        var content = await response.Content.ReadAsStringAsync(ct);
+        var list = JsonSerializer.Deserialize<List<OrderSummaryDto>>(content, JsonOptions);
+        return (IReadOnlyList<OrderSummaryDto>)(list ?? new List<OrderSummaryDto>());
+    }
+
     public async Task ProvideShippingAddressAsync(
         Guid checkoutId,
         string addressLine1,

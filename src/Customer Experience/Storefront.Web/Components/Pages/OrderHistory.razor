@@ -1,4 +1,10 @@
 @page "/orders"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IHttpClientFactory HttpClientFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
 
 <PageTitle>Order History - CritterSupply</PageTitle>
 
@@ -7,16 +13,95 @@
     Track your past orders and shipment status
 </MudText>
 
-<MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="0" Style="border: 1px dashed rgba(0,0,0,0.12); border-radius: 12px;">
-    <MudIcon Icon="@Icons.Material.Filled.Receipt" Color="Color.Secondary" Style="font-size: 4rem;" Class="mb-4" />
-    <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-2">No orders yet</MudText>
-    <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center" Class="mb-6">
-        Your order history will appear here once you've placed an order.
-    </MudText>
-    <MudButton Variant="Variant.Filled"
-               Color="Color.Primary"
-               Href="/products"
-               StartIcon="@Icons.Material.Filled.Storefront">
-        Start Shopping
-    </MudButton>
-</MudPaper>
+@if (_isLoading)
+{
+    <MudProgressCircular Indeterminate="true" data-testid="orders-loading" />
+}
+else if (_orders is not null && _orders.Count > 0)
+{
+    <MudTable Items="_orders" Hover="true" Striped="true" data-testid="orders-table">
+        <HeaderContent>
+            <MudTh>Order ID</MudTh>
+            <MudTh>Date</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Total</MudTh>
+            <MudTh>Items</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd data-testid="@($"order-id-{context.OrderId}")">@context.OrderId.ToString()[..8]…</MudTd>
+            <MudTd>@context.PlacedAt.LocalDateTime.ToString("MMM dd, yyyy h:mm tt")</MudTd>
+            <MudTd><MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip></MudTd>
+            <MudTd>@context.TotalAmount.ToString("C")</MudTd>
+            <MudTd>@context.ItemCount</MudTd>
+            <MudTd>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                           Href="@($"/order-confirmation/{context.OrderId}")" data-testid="@($"view-order-{context.OrderId}")">
+                    View
+                </MudButton>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+else
+{
+    <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="0" Style="border: 1px dashed rgba(0,0,0,0.12); border-radius: 12px;">
+        <MudIcon Icon="@Icons.Material.Filled.Receipt" Color="Color.Secondary" Style="font-size: 4rem;" Class="mb-4" />
+        <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-2">No orders yet</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center" Class="mb-6">
+            Your order history will appear here once you've placed an order.
+        </MudText>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Href="/products"
+                   StartIcon="@Icons.Material.Filled.Storefront">
+            Start Shopping
+        </MudButton>
+    </MudPaper>
+}
+
+@code {
+    private List<OrderSummary>? _orders;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var customerIdClaim = authState.User.FindFirst("CustomerId")?.Value;
+        if (!Guid.TryParse(customerIdClaim, out var customerId))
+            return;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("StorefrontApi");
+            _orders = await client.GetFromJsonAsync<List<OrderSummary>>(
+                $"/api/storefront/orders?customerId={customerId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load order history: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static Color GetStatusColor(string status) => status switch
+    {
+        "Placed" => Color.Info,
+        "Confirmed" => Color.Success,
+        "Shipped" => Color.Primary,
+        "Delivered" => Color.Success,
+        "Cancelled" => Color.Error,
+        _ => Color.Default
+    };
+
+    private sealed record OrderSummary(
+        Guid OrderId,
+        Guid CustomerId,
+        DateTimeOffset PlacedAt,
+        string Status,
+        decimal TotalAmount,
+        int ItemCount);
+}

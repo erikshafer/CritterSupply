@@ -14,6 +14,10 @@ public interface IOrdersClient
         int pageSize = 20,
         CancellationToken ct = default);
 
+    Task<IReadOnlyList<OrderSummaryDto>> GetOrderSummariesAsync(
+        Guid customerId,
+        CancellationToken ct = default);
+
     // Commands
     Task ProvideShippingAddressAsync(
         Guid checkoutId,
@@ -67,3 +71,14 @@ public sealed record OrderDto(
     string Status,
     DateTimeOffset PlacedAt,
     decimal Total);
+
+/// <summary>
+/// Order summary DTO matching Orders BC ListOrdersEndpoint response shape.
+/// </summary>
+public sealed record OrderSummaryDto(
+    Guid OrderId,
+    Guid CustomerId,
+    DateTimeOffset PlacedAt,
+    string Status,
+    decimal TotalAmount,
+    int ItemCount);

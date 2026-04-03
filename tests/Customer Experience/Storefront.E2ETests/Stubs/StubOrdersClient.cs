@@ -79,6 +79,17 @@ public sealed class StubOrdersClient : IOrdersClient
         return Task.FromResult(orderId);
     }
 
+    public Task<IReadOnlyList<OrderSummaryDto>> GetOrderSummariesAsync(
+        Guid customerId,
+        CancellationToken ct = default)
+    {
+        var summaries = _orders
+            .Where(o => o.CustomerId == customerId)
+            .Select(o => new OrderSummaryDto(o.Id, o.CustomerId, o.PlacedAt, o.Status, o.Total, 0))
+            .ToList();
+        return Task.FromResult<IReadOnlyList<OrderSummaryDto>>(summaries);
+    }
+
     public void Clear()
     {
         _checkouts.Clear();

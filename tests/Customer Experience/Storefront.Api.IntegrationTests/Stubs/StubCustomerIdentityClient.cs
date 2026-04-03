@@ -9,6 +9,7 @@ namespace Storefront.Api.IntegrationTests.Stubs;
 public class StubCustomerIdentityClient : ICustomerIdentityClient
 {
     private readonly List<CustomerAddressDto> _addresses = new();
+    private readonly Dictionary<Guid, System.Net.HttpStatusCode> _addAddressFailures = new();
 
     public void AddAddress(CustomerAddressDto address)
     {
@@ -58,6 +59,9 @@ public class StubCustomerIdentityClient : ICustomerIdentityClient
         AddAddressRequest request,
         CancellationToken ct = default)
     {
+        if (_addAddressFailures.TryGetValue(customerId, out var statusCode))
+            throw new HttpRequestException($"Simulated {statusCode}", null, statusCode);
+
         var addressId = Guid.CreateVersion7();
         var dto = new CustomerAddressDto(
             addressId,
@@ -77,10 +81,20 @@ public class StubCustomerIdentityClient : ICustomerIdentityClient
     }
 
     /// <summary>
+    /// Configure AddAddressAsync to throw an HttpRequestException for a specific customer.
+    /// Used to simulate 404 (customer not found) or 409 (nickname conflict) errors.
+    /// </summary>
+    public void ConfigureAddAddressFailure(Guid customerId, System.Net.HttpStatusCode statusCode)
+    {
+        _addAddressFailures[customerId] = statusCode;
+    }
+
+    /// <summary>
     /// Clear all configured test data (for test isolation)
     /// </summary>
     public void Clear()
     {
         _addresses.Clear();
+        _addAddressFailures.Clear();
     }
 }
