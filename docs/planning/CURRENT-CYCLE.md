@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M37.0 — Marketplaces Phase 3 (in progress) |
-| **Status** | 🚀 **IN PROGRESS** — Session 1 complete (debt clearance + ProductSummaryView ACL) |
+| **Status** | 🚀 **IN PROGRESS** — Session 2 complete (EnvironmentVaultClient + AmazonMarketplaceAdapter) |
 | **Recent Completion** | M36.1 — Listings BC Foundation + Marketplaces BC Foundation (2026-03-31) |
 | **Previous Completion** | M36.0 — Engineering Quality (2026-03-29) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-01 (M37.0 Session 1 complete — debt clearance + ProductSummaryView ACL delivered)*
+*Last Updated: 2026-04-03 (M37.0 Session 2 complete — production IVaultClient + Amazon SP-API adapter delivered)*
 
 ---
 
@@ -55,11 +55,12 @@
 
 ### 🚀 M37.0: Marketplaces Phase 3 — Production Adapters
 
-**Status:** 🚀 **IN PROGRESS** — Session 1 complete; Session 2 picks up production adapter work
+**Status:** 🚀 **IN PROGRESS** — Session 2 complete; Session 3 picks up Walmart + eBay adapters
 **Goal:** Deliver real marketplace adapter implementations (Amazon SP-API, Walmart Marketplace API, eBay Sell API), resolve `ListingApproved` message enrichment debt, and ensure E2E CI coverage for Listings + Marketplaces admin pages
 
 **Session History:**
 - [Session 1 Retrospective](./milestones/m37-0-session-1-retrospective.md) — Debt clearance + ProductSummaryView ACL (2026-04-01)
+- [Session 2 Retrospective](./milestones/m37-0-session-2-retrospective.md) — Production IVaultClient + Amazon SP-API Adapter (2026-04-03)
 
 **Pre-Planning Input:**
 - [M36.1 Milestone Closure Retrospective](./milestones/m36-1-milestone-closure-retrospective.md) — What M37.0 inherits
@@ -67,6 +68,8 @@
 - [Catalog-Listings-Marketplaces Cycle Plan](./catalog-listings-marketplaces-cycle-plan.md) — Phase 3 scope
 - [ADR 0049](../decisions/0049-category-mapping-ownership.md) — Category taxonomy coupling risk
 - [ADR 0050](../decisions/0050-marketplaces-product-summary-acl.md) — ProductSummaryView ACL decision
+- [ADR 0051](../decisions/0051-vault-implementation-strategy.md) — Vault implementation strategy
+- [ADR 0052](../decisions/0052-amazon-spapi-authentication.md) — Amazon SP-API authentication patterns
 
 **M37.0 Session 1 Progress (2026-04-01):**
 - ✅ D-1: Added `@shard-3` tags to MarketplacesAdmin.feature, ListingsAdmin.feature, ListingsDetail.feature
@@ -74,15 +77,22 @@
 - ✅ D-3: Authored ADR 0050 — Marketplaces ProductSummaryView ACL decision
 - ✅ 6 new integration tests (33 total Marketplaces, 68 total Listings+Marketplaces)
 
-**Remaining Scope (Session 2+):**
-- Real Amazon/Walmart/eBay adapter implementations replacing stubs
-- Production IVaultClient implementation
-- Resolve BasePrice gap (ADR 0050 Decision 5)
-- Async submission status polling
+**M37.0 Session 2 Progress (2026-04-03):**
+- ✅ A-0: Resolved 4 open questions — D-1: Amazon only in M37.0 (b), D-2: EnvironmentVaultClient (d), D-3: Polling deferred to M38.x (b), D-4: Accept 0m fallback (a)
+- ✅ A-1: Authored ADR 0051 — Vault implementation strategy (EnvironmentVaultClient, path conventions, guard behavior)
+- ✅ A-2: Implemented `EnvironmentVaultClient` (production IVaultClient) + registered in Program.cs (dev/prod split)
+- ✅ A-3: Implemented `AmazonMarketplaceAdapter` (SP-API Listings Items API, LWA OAuth 2.0, token caching) + registration switch via `Marketplaces:UseRealAdapters` config flag
+- ✅ A-4: Authored ADR 0052 — Amazon SP-API authentication and rate limiting patterns
+- ✅ 20 new integration tests (53 total Marketplaces, 88 total Listings+Marketplaces)
+
+**Remaining Scope (Session 3+):**
+- Walmart adapter implementation (`WalmartMarketplaceAdapter`) — M38.x per D-1
+- eBay adapter implementation (`EbayMarketplaceAdapter`) — M38.x per D-1
+- Async submission status polling — M38.x per D-3
 - Bidirectional marketplace feedback (Listings BC consuming activation/rejection events)
 
-**Test Baseline:** 68 integration tests (35 Listings + 33 Marketplaces), 6 E2E scenarios (marketplace admin), 0 failures
-**Next ADR:** 0051
+**Test Baseline:** 88 integration tests (35 Listings + 53 Marketplaces), 6 E2E scenarios (marketplace admin), 0 failures
+**Next ADR:** 0053
 
 ---
 
