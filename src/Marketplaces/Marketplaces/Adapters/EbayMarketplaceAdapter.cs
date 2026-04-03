@@ -165,19 +165,58 @@ public sealed class EbayMarketplaceAdapter : IMarketplaceAdapter
             FailureReason: "Status polling not yet implemented — deferred to M38.x"));
     }
 
-    public Task<bool> DeactivateListingAsync(
+    public async Task<bool> DeactivateListingAsync(
         string externalListingId,
         CancellationToken ct = default)
     {
-        // Skeleton implementation — eBay offer withdrawal uses:
-        // POST /sell/inventory/v1/offer/{offerId}/withdraw
-        // Full implementation deferred to a future session.
-        _logger.LogInformation(
-            "DeactivateListingAsync not yet implemented for eBay Sell API. " +
-            "Returning false for listing {ListingId}.",
-            externalListingId);
+        // Strip the "ebay-" prefix to get the raw offer ID.
+        var offerId = externalListingId.StartsWith("ebay-", StringComparison.OrdinalIgnoreCase)
+            ? externalListingId["ebay-".Length..]
+            : externalListingId;
 
-        return Task.FromResult(false);
+        try
+        {
+            var accessToken = await GetAccessTokenAsync(ct);
+            var marketplaceId = await _vault.GetSecretAsync("ebay/marketplace-id", ct);
+
+            var client = _httpClientFactory.CreateClient("EbayApi");
+
+            // eBay offer withdrawal — POST /sell/inventory/v1/offer/{offerId}/withdraw
+            // A 200 response contains a listingId in the body. The withdrawn offer can be
+            // republished later; this approach is correct for pause/end scenarios (not deletion).
+            // Reference: https://developer.ebay.com/api-docs/sell/inventory/resources/offer/methods/withdrawOffer
+            var withdrawUrl = $"{OfferBaseUrl}/{Uri.EscapeDataString(offerId)}/withdraw";
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, withdrawUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Headers.Add("X-EBAY-C-MARKETPLACE-ID", marketplaceId);
+
+            _logger.LogInformation(
+                "Withdrawing eBay offer: OfferId={OfferId}, Marketplace={MarketplaceId}",
+                offerId, marketplaceId);
+
+            using var response = await client.SendAsync(request, ct);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation(
+                    "eBay offer withdrawn successfully: OfferId={OfferId}",
+                    offerId);
+                return true;
+            }
+
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            _logger.LogWarning(
+                "eBay offer withdrawal failed: OfferId={OfferId}, StatusCode={StatusCode}, Body={Body}",
+                offerId, (int)response.StatusCode, errorBody);
+            return false;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to withdraw eBay offer: OfferId={OfferId}", offerId);
+            return false;
+        }
     }
 
     /// <summary>

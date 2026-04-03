@@ -5,7 +5,9 @@ using Marketplaces.Credentials;
 using Marketplaces.Marketplaces;
 using Marketplaces.Products;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.IdentityModel.Tokens;
+using Polly;
 using System.Text;
 using Wolverine;
 using Wolverine.FluentValidation;
@@ -90,13 +92,53 @@ var useRealAdapters = builder.Configuration.GetValue<bool>("Marketplaces:UseReal
 
 if (useRealAdapters)
 {
-    builder.Services.AddHttpClient("AmazonSpApi");
+    // Retry strategy: 3 attempts, exponential backoff starting at 1s.
+    // Default ShouldHandle covers 408, 429, 500+ and HttpRequestException.
+    // 401 is intentionally excluded from retry — auth failures are handled by each
+    // adapter's token-refresh path; see ADR 0056 for the full 401 design rationale.
+    var retryOptions = new HttpRetryStrategyOptions
+    {
+        MaxRetryAttempts = 3,
+        BackoffType = DelayBackoffType.Exponential,
+        Delay = TimeSpan.FromSeconds(1)
+    };
+
+    // Circuit breaker: opens after 50% failure rate across 5+ requests in 30s,
+    // stays open for 30s. Per-adapter scope (each named HttpClient has its own breaker).
+    // Default ShouldHandle covers 5xx and HttpRequestException; excludes 401.
+    var circuitBreakerOptions = new HttpCircuitBreakerStrategyOptions
+    {
+        FailureRatio = 0.5,
+        MinimumThroughput = 5,
+        SamplingDuration = TimeSpan.FromSeconds(30),
+        BreakDuration = TimeSpan.FromSeconds(30)
+    };
+
+    builder.Services.AddHttpClient("AmazonSpApi")
+        .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(30))
+        .AddResilienceHandler("amazon-resilience", pipeline =>
+        {
+            pipeline.AddRetry(retryOptions);
+            pipeline.AddCircuitBreaker(circuitBreakerOptions);
+        });
     builder.Services.AddSingleton<IMarketplaceAdapter, AmazonMarketplaceAdapter>();
 
-    builder.Services.AddHttpClient("WalmartApi");
+    builder.Services.AddHttpClient("WalmartApi")
+        .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(30))
+        .AddResilienceHandler("walmart-resilience", pipeline =>
+        {
+            pipeline.AddRetry(retryOptions);
+            pipeline.AddCircuitBreaker(circuitBreakerOptions);
+        });
     builder.Services.AddSingleton<IMarketplaceAdapter, WalmartMarketplaceAdapter>();
 
-    builder.Services.AddHttpClient("EbayApi");
+    builder.Services.AddHttpClient("EbayApi")
+        .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(30))
+        .AddResilienceHandler("ebay-resilience", pipeline =>
+        {
+            pipeline.AddRetry(retryOptions);
+            pipeline.AddCircuitBreaker(circuitBreakerOptions);
+        });
     builder.Services.AddSingleton<IMarketplaceAdapter, EbayMarketplaceAdapter>();
 }
 else
