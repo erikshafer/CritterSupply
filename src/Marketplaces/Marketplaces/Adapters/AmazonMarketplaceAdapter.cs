@@ -134,20 +134,74 @@ public sealed class AmazonMarketplaceAdapter : IMarketplaceAdapter
             FailureReason: "Status polling not yet implemented — deferred to M38.x"));
     }
 
-    public Task<bool> DeactivateListingAsync(
+    public async Task<bool> DeactivateListingAsync(
         string externalListingId,
         CancellationToken ct = default)
     {
-        // Skeleton implementation — SP-API listing deactivation uses:
-        // PATCH /listings/2021-08-01/items/{sellerId}/{sku}
-        // with patches: [{ "op": "delete", "path": "/attributes/purchasable_offer" }]
-        // Full implementation deferred to a future session.
-        _logger.LogInformation(
-            "DeactivateListingAsync not yet implemented for Amazon SP-API. " +
-            "Returning false for listing {ListingId}.",
-            externalListingId);
+        // Strip the "amzn-" prefix to get the raw SKU.
+        var sku = externalListingId.StartsWith("amzn-", StringComparison.OrdinalIgnoreCase)
+            ? externalListingId["amzn-".Length..]
+            : externalListingId;
 
-        return Task.FromResult(false);
+        try
+        {
+            var accessToken = await GetAccessTokenAsync(ct);
+            var sellerId = await _vault.GetSecretAsync("amazon/seller-id", ct);
+            var marketplaceId = await _vault.GetSecretAsync("amazon/marketplace-id", ct);
+
+            var client = _httpClientFactory.CreateClient("AmazonSpApi");
+
+            // SP-API PATCH — delete purchasable_offer to deactivate the listing.
+            // This removes the listing from the marketplace without deleting the ASIN.
+            // Reference: https://developer-docs.amazon.com/sp-api/docs/listings-items-api-v2021-08-01-reference
+            var requestUrl = $"{SpApiBaseUrl}/listings/2021-08-01/items/{sellerId}/{Uri.EscapeDataString(sku)}" +
+                             $"?marketplaceIds={Uri.EscapeDataString(marketplaceId)}";
+
+            var patchBody = new
+            {
+                productType = "PRODUCT",
+                patches = new[]
+                {
+                    new
+                    {
+                        op = "delete",
+                        path = "/attributes/purchasable_offer",
+                        value = Array.Empty<object>()
+                    }
+                }
+            };
+
+            using var request = new HttpRequestMessage(new HttpMethod("PATCH"), requestUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Headers.Add("x-amz-access-token", accessToken);
+            request.Content = JsonContent.Create(patchBody, options: JsonOptions);
+
+            _logger.LogInformation(
+                "Deactivating Amazon SP-API listing: SKU={Sku}, Seller={SellerId}, Marketplace={MarketplaceId}",
+                sku, sellerId, marketplaceId);
+
+            using var response = await client.SendAsync(request, ct);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation(
+                    "Amazon SP-API listing deactivated successfully: SKU={Sku}",
+                    sku);
+                return true;
+            }
+
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            _logger.LogWarning(
+                "Amazon SP-API listing deactivation failed: SKU={Sku}, StatusCode={StatusCode}, Body={Body}",
+                sku, (int)response.StatusCode, errorBody);
+            return false;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to deactivate Amazon SP-API listing: SKU={Sku}", sku);
+            return false;
+        }
     }
 
     /// <summary>

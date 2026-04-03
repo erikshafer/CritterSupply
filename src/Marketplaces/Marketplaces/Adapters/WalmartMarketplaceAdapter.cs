@@ -199,12 +199,22 @@ public sealed class WalmartMarketplaceAdapter : IMarketplaceAdapter
         string externalListingId,
         CancellationToken ct = default)
     {
-        // Skeleton implementation — Walmart item retirement uses a feed with
-        // lifecycleStatus: "RETIRED" or the Retire Item API.
-        // Full implementation deferred to a future session.
-        _logger.LogInformation(
-            "DeactivateListingAsync not yet implemented for Walmart Marketplace API. " +
-            "Returning false for listing {ListingId}.",
+        // Architectural gap — cannot implement Walmart RETIRE_ITEM feed without the item SKU.
+        //
+        // The RETIRE_ITEM feed payload requires the item SKU (e.g. "CritterKibble-001"), but
+        // this method only receives the externalListingId in the format "wmrt-{feedId}" — which
+        // is the submission feed ID returned by the original MP_ITEM feed submission.
+        // The feed ID cannot be reverse-mapped to the SKU without a data store lookup.
+        //
+        // Resolution (deferred to Session 3 / M38.1): the caller (a future
+        // ListingEndedHandler in Marketplaces BC) must include the SKU when triggering
+        // deactivation, either by passing it explicitly or by encoding it in the external ID.
+        // See ADR 0056 for the full discussion of this limitation.
+        _logger.LogWarning(
+            "Walmart DeactivateListingAsync cannot proceed: externalListingId '{ExternalListingId}' " +
+            "carries the submission feed ID, but Walmart RETIRE_ITEM feed requires the item SKU. " +
+            "The caller must provide the SKU to complete deactivation. " +
+            "This gap is tracked in ADR 0056 and targeted for M38.1.",
             externalListingId);
 
         return Task.FromResult(false);
