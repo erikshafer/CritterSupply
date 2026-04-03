@@ -114,6 +114,12 @@ builder.Host.UseWolverine(opts =>
 
     // Listen for marketplace listing outcome events (M38.0 bidirectional feedback)
     opts.ListenToRabbitQueue("listings-marketplace-outcome-events");
+
+    // Outbound: publish lifecycle events so downstream BCs can react (M38.0)
+    opts.PublishMessage<Messages.Contracts.Listings.ListingActivated>()
+        .ToRabbitExchange("listings-listing-activated");
+    opts.PublishMessage<Messages.Contracts.Listings.ListingEnded>()
+        .ToRabbitExchange("listings-listing-ended");
 });
 
 // Wolverine HTTP

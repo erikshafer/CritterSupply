@@ -184,15 +184,146 @@ public sealed class WalmartMarketplaceAdapterTests : IDisposable
     }
 
     [Fact]
-    public async Task CheckSubmissionStatus_ReturnsPendingStatus()
+    public async Task CheckSubmissionStatus_ReturnsLive_WhenFeedStatusIsProcessed()
     {
-        // Act — skeleton implementation, should return not-live/not-failed
+        // Arrange — token exchange
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-walmart-token",
+            token_type = "Bearer",
+            expires_in = 900
+        });
+
+        // Feed status response — PROCESSED
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            feedId = "FEED-123",
+            feedStatus = "PROCESSED"
+        });
+
+        // Act
         var status = await _adapter.CheckSubmissionStatusAsync("wmrt-FEED-123");
 
         // Assert
         status.ExternalSubmissionId.ShouldBe("wmrt-FEED-123");
+        status.IsLive.ShouldBeTrue();
+        status.IsFailed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task CheckSubmissionStatus_ReturnsFailed_WhenFeedStatusIsError()
+    {
+        // Arrange — token exchange
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-walmart-token",
+            token_type = "Bearer",
+            expires_in = 900
+        });
+
+        // Feed status response — ERROR
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            feedId = "FEED-ERROR-456",
+            feedStatus = "ERROR"
+        });
+
+        // Act
+        var status = await _adapter.CheckSubmissionStatusAsync("wmrt-FEED-ERROR-456");
+
+        // Assert
+        status.ExternalSubmissionId.ShouldBe("wmrt-FEED-ERROR-456");
+        status.IsLive.ShouldBeFalse();
+        status.IsFailed.ShouldBeTrue();
+        status.FailureReason.ShouldNotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task CheckSubmissionStatus_ReturnsPending_WhenFeedStatusIsInProgress()
+    {
+        // Arrange — token exchange
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-walmart-token",
+            token_type = "Bearer",
+            expires_in = 900
+        });
+
+        // Feed status response — INPROGRESS
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            feedId = "FEED-789",
+            feedStatus = "INPROGRESS"
+        });
+
+        // Act
+        var status = await _adapter.CheckSubmissionStatusAsync("wmrt-FEED-789");
+
+        // Assert — pending: not live, not failed
+        status.ExternalSubmissionId.ShouldBe("wmrt-FEED-789");
         status.IsLive.ShouldBeFalse();
         status.IsFailed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task CheckSubmissionStatus_ReturnsFailed_WhenApiReturns4xx()
+    {
+        // Arrange — token exchange
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-walmart-token",
+            token_type = "Bearer",
+            expires_in = 900
+        });
+
+        // Feed status returns 404
+        _httpHandler.EnqueueResponse(HttpStatusCode.NotFound,
+            new { error = "Feed not found" });
+
+        // Act
+        var status = await _adapter.CheckSubmissionStatusAsync("wmrt-FEED-MISSING");
+
+        // Assert
+        status.IsLive.ShouldBeFalse();
+        status.IsFailed.ShouldBeTrue();
+        status.FailureReason.ShouldContain("404");
+    }
+
+    [Fact]
+    public async Task CheckSubmissionStatus_BuildsCorrectRequest()
+    {
+        // Arrange — token exchange
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-walmart-token",
+            token_type = "Bearer",
+            expires_in = 900
+        });
+
+        // Feed status — PROCESSED
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            feedId = "FEED-REQ-CHECK",
+            feedStatus = "PROCESSED"
+        });
+
+        // Act
+        await _adapter.CheckSubmissionStatusAsync("wmrt-FEED-REQ-CHECK");
+
+        // Assert — second request is the feed status GET
+        _httpHandler.SentRequests.Count.ShouldBe(2);
+        var statusRequest = _httpHandler.SentRequests[1];
+        statusRequest.Method.ShouldBe(HttpMethod.Get);
+        statusRequest.RequestUri!.ToString().ShouldContain("/v3/feeds/FEED-REQ-CHECK");
+        // wmrt- prefix stripped correctly (not in URL)
+        statusRequest.RequestUri!.ToString().ShouldNotContain("wmrt-");
+
+        // Required Walmart headers
+        statusRequest.Headers.GetValues("WM_SEC.ACCESS_TOKEN").ShouldContain("test-walmart-token");
+        statusRequest.Headers.GetValues("WM_CONSUMER.ID").ShouldContain("WALMART-SELLER-123");
+        statusRequest.Headers.GetValues("WM_SVC.NAME").ShouldContain("Walmart Marketplace");
+        statusRequest.Headers.TryGetValues("WM_QOS.CORRELATION_ID", out var correlationIds).ShouldBeTrue();
+        correlationIds!.First().ShouldNotBeNullOrEmpty();
     }
 
     [Fact]
