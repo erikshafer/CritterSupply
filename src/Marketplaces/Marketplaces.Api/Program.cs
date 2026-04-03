@@ -78,12 +78,27 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// Vault client — Development only; production safety guard below
+// Vault client — DevVaultClient for Development, EnvironmentVaultClient for production (ADR 0051)
 if (builder.Environment.IsDevelopment())
     builder.Services.AddSingleton<IVaultClient, DevVaultClient>();
+else
+    builder.Services.AddSingleton<IVaultClient, EnvironmentVaultClient>();
 
-// Marketplace adapter stubs (Development) — resolved by ChannelCode at runtime
-builder.Services.AddSingleton<IMarketplaceAdapter, StubAmazonAdapter>();
+// Marketplace adapters — resolved by ChannelCode at runtime.
+// UseRealAdapters flag enables production adapters; stubs remain the default for Development/CI.
+var useRealAdapters = builder.Configuration.GetValue<bool>("Marketplaces:UseRealAdapters");
+
+if (useRealAdapters)
+{
+    builder.Services.AddHttpClient("AmazonSpApi");
+    builder.Services.AddSingleton<IMarketplaceAdapter, AmazonMarketplaceAdapter>();
+}
+else
+{
+    builder.Services.AddSingleton<IMarketplaceAdapter, StubAmazonAdapter>();
+}
+
+// Walmart and eBay stubs always registered — real adapters deferred to M38.x (D-1)
 builder.Services.AddSingleton<IMarketplaceAdapter, StubWalmartAdapter>();
 builder.Services.AddSingleton<IMarketplaceAdapter, StubEbayAdapter>();
 
