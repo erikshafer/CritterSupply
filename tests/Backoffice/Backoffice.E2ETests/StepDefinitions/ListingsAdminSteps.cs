@@ -52,8 +52,7 @@ public sealed class ListingsAdminSteps
     [Given(@"a listing exists in ""(.*)"" status")]
     public void GivenAListingExistsInStatus(string status)
     {
-        // Seed the appropriate well-known listing based on requested status.
-        // Also seed the live listing so the admin table has something to show.
+        // Always seed the Live listing so the admin table has something to show
         Fixture.StubListingsApi.SeedListing(
             WellKnownTestData.Listings.LiveListing,
             WellKnownTestData.Listings.LiveListingSku,
@@ -63,22 +62,25 @@ public sealed class ListingsAdminSteps
             content: "Premium ceramic feeding bowl for dogs",
             activatedAt: DateTimeOffset.UtcNow.AddDays(-1));
 
-        var listingId = status switch
+        // Seed and store the status-specific listing
+        Guid listingId;
+        switch (status)
         {
-            "ReadyForReview" => WellKnownTestData.Listings.ReadyForReviewListing,
-            "Live" => WellKnownTestData.Listings.LiveListing,
-            _ => throw new ArgumentException($"No well-known listing for status '{status}'")
-        };
-
-        if (status == "ReadyForReview")
-        {
-            Fixture.StubListingsApi.SeedListing(
-                WellKnownTestData.Listings.ReadyForReviewListing,
-                WellKnownTestData.Listings.ReadyForReviewListingSku,
-                WellKnownTestData.Listings.ReadyForReviewListingChannel,
-                WellKnownTestData.Listings.ReadyForReviewListingProductName,
-                WellKnownTestData.Listings.ReadyForReviewListingStatus,
-                content: "Premium ceramic feeding bowl — ready for review");
+            case "ReadyForReview":
+                Fixture.StubListingsApi.SeedListing(
+                    WellKnownTestData.Listings.ReadyForReviewListing,
+                    WellKnownTestData.Listings.ReadyForReviewListingSku,
+                    WellKnownTestData.Listings.ReadyForReviewListingChannel,
+                    WellKnownTestData.Listings.ReadyForReviewListingProductName,
+                    WellKnownTestData.Listings.ReadyForReviewListingStatus,
+                    content: "Premium ceramic feeding bowl — ready for review");
+                listingId = WellKnownTestData.Listings.ReadyForReviewListing;
+                break;
+            case "Live":
+                listingId = WellKnownTestData.Listings.LiveListing;
+                break;
+            default:
+                throw new ArgumentException($"No well-known listing for status '{status}'");
         }
 
         // Store the listing ID for subsequent navigation steps

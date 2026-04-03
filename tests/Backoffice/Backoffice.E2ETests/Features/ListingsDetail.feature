@@ -21,8 +21,8 @@ Feature: Listing Detail Page
     And I should see the listing product name
     And I should see the listing created at timestamp
     And the approve button should be disabled
-    And the pause button should be disabled
-    And the end listing button should be disabled
+    And the pause button should be enabled
+    And the end listing button should be enabled
 
   Scenario: Admin approves a listing from the detail page
     Given admin user "Alice" exists with email "alice.detail@crittersupply.com" and role "ProductManager"
