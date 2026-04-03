@@ -11,6 +11,11 @@ public interface ICustomerIdentityClient
         string? addressType = null,
         CancellationToken ct = default);
 
+    Task<Guid> AddAddressAsync(
+        Guid customerId,
+        AddAddressRequest request,
+        CancellationToken ct = default);
+
     // Authentication
     Task<LoginResponse?> LoginAsync(string email, string password, CancellationToken ct = default);
     Task LogoutAsync(CancellationToken ct = default);
@@ -43,3 +48,15 @@ public sealed record LoginResponse(Guid CustomerId, string Email, string FirstNa
 /// Response from Customer Identity BC current user endpoint
 /// </summary>
 public sealed record CurrentUserResponse(Guid CustomerId, string Email, string FirstName, string LastName);
+
+/// <summary>
+/// Request to add a new address to a customer's address book via Customer Identity BC
+/// </summary>
+public sealed record AddAddressRequest(
+    string Nickname,
+    string AddressLine1,
+    string? AddressLine2,
+    string City,
+    string StateOrProvince,
+    string PostalCode,
+    string Country);

@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -34,7 +33,6 @@ public static class RemoveItemFromCartHandler
     }
 
     [WolverineDelete("/api/carts/{cartId}/items/{sku}")]
-    [Authorize]
     public static (Events, OutgoingMessages) Handle(
         [FromRoute] Guid cartId,
         [FromRoute] string sku,

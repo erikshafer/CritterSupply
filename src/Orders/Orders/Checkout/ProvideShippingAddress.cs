@@ -1,13 +1,14 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+using Marten;
+using Microsoft.AspNetCore.Http;
 using Wolverine.Http;
-using Wolverine.Marten;
 
 namespace Orders.Checkout;
 
-public sealed record ProvideShippingAddress(
-    Guid CheckoutId,
+/// <summary>
+/// Request body for providing a checkout shipping address.
+/// </summary>
+public sealed record ProvideShippingAddressRequest(
     string AddressLine1,
     string? AddressLine2,
     string City,
@@ -15,11 +16,10 @@ public sealed record ProvideShippingAddress(
     string PostalCode,
     string Country)
 {
-    public class ProvideShippingAddressValidator : AbstractValidator<ProvideShippingAddress>
+    public class ProvideShippingAddressRequestValidator : AbstractValidator<ProvideShippingAddressRequest>
     {
-        public ProvideShippingAddressValidator()
+        public ProvideShippingAddressRequestValidator()
         {
-            RuleFor(x => x.CheckoutId).NotEmpty();
             RuleFor(x => x.AddressLine1).NotEmpty().MaximumLength(200);
             RuleFor(x => x.AddressLine2).MaximumLength(200);
             RuleFor(x => x.City).NotEmpty().MaximumLength(100);
@@ -30,38 +30,40 @@ public sealed record ProvideShippingAddress(
     }
 }
 
+/// <summary>
+/// Direct Implementation pattern — compound handler [WriteAggregate] silently fails
+/// to persist events when mixing route + body parameters (M32.3 discovery).
+/// </summary>
 public static class ProvideShippingAddressHandler
 {
-    public static ProblemDetails Before(
-        ProvideShippingAddress command,
-        Checkout? checkout)
+    [WolverinePost("/api/checkouts/{checkoutId}/shipping-address")]
+    public static async Task<IResult> Handle(
+        Guid checkoutId,
+        ProvideShippingAddressRequest request,
+        IDocumentSession session,
+        CancellationToken ct)
     {
+        var stream = await session.Events.FetchForWriting<Checkout>(checkoutId, ct);
+        var checkout = stream.Aggregate;
+
         if (checkout is null)
-            return new ProblemDetails { Detail = "Checkout not found", Status = 404 };
+            return Results.NotFound(new { detail = "Checkout not found" });
 
         if (checkout.IsCompleted)
-            return new ProblemDetails
-            {
-                Detail = "Cannot modify a completed checkout",
-                Status = 400
-            };
+            return Results.BadRequest(new { detail = "Cannot modify a completed checkout" });
 
-        return WolverineContinue.NoProblems;
-    }
-
-    [WolverinePost("/api/checkouts/{checkoutId}/shipping-address")]
-    [Authorize]
-    public static ShippingAddressProvided Handle(
-        ProvideShippingAddress command,
-        [WriteAggregate] Checkout checkout)
-    {
-        return new ShippingAddressProvided(
-            command.AddressLine1,
-            command.AddressLine2,
-            command.City,
-            command.StateOrProvince,
-            command.PostalCode,
-            command.Country,
+        var @event = new ShippingAddressProvided(
+            request.AddressLine1,
+            request.AddressLine2,
+            request.City,
+            request.StateOrProvince,
+            request.PostalCode,
+            request.Country,
             DateTimeOffset.UtcNow);
+
+        stream.AppendOne(@event);
+        await session.SaveChangesAsync(ct);
+
+        return Results.Ok(@event);
     }
 }

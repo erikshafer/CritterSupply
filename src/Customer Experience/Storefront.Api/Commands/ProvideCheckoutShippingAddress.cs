@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Storefront.Clients;
 using Wolverine.Http;
 
@@ -12,7 +11,6 @@ namespace Storefront.Api.Commands;
 public static class ProvideCheckoutShippingAddressHandler
 {
     [WolverinePost("/api/storefront/checkouts/{checkoutId}/shipping-address")]
-    [Authorize]
     public static async Task<IResult> Handle(
         Guid checkoutId,
         ProvideCheckoutShippingAddressRequest request,

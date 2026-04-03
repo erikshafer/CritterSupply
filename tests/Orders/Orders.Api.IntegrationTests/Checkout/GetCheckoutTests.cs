@@ -41,15 +41,28 @@ public class GetCheckoutTests : IAsyncLifetime
 
         await _fixture.ExecuteAndWaitAsync(checkoutInitiated);
 
-        // Progress through checkout steps
-        await _fixture.ExecuteAndWaitAsync(new ProvideShippingAddress(
-            checkoutId, "123 Main St", null, "Springfield", "IL", "62701", "USA"));
+        // Progress through checkout steps via HTTP (Direct Implementation pattern)
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(new ProvideShippingAddressRequest(
+                "123 Main St", null, "Springfield", "IL", "62701", "USA"))
+                .ToUrl($"/api/checkouts/{checkoutId}/shipping-address");
+            x.StatusCodeShouldBeOk();
+        });
 
-        await _fixture.ExecuteAndWaitAsync(new SelectShippingMethod(
-            checkoutId, "Standard", 5.99m));
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(new SelectShippingMethodRequest("Standard", 5.99m))
+                .ToUrl($"/api/checkouts/{checkoutId}/shipping-method");
+            x.StatusCodeShouldBeOk();
+        });
 
-        await _fixture.ExecuteAndWaitAsync(new ProvidePaymentMethod(
-            checkoutId, "tok_visa_4242"));
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(new ProvidePaymentMethodRequest("tok_visa_4242"))
+                .ToUrl($"/api/checkouts/{checkoutId}/payment-method");
+            x.StatusCodeShouldBeOk();
+        });
 
         // Act
         var response = await _fixture.Host.Scenario(cfg =>

@@ -1,5 +1,4 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Shopping.Clients;
 using Wolverine;
@@ -133,7 +132,6 @@ public static class ApplyCouponToCartHttpEndpoint
     }
 
     [WolverinePost("/api/carts/{cartId}/apply-coupon")]
-    [Authorize]
     public static async Task<(Events, OutgoingMessages)> Handle(
         ApplyCouponToCart command,
         IPromotionsClient promotionsClient,

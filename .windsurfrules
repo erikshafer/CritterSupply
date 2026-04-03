@@ -1,0 +1,25 @@
+# CritterSupply — Windsurf Cascade Rules
+
+## Orientation
+- Read `CLAUDE.md` for development guidelines, port allocations, project structure, and skill invocation guide.
+- Read `AGENTS.md` for quick commands, copy-paste snippets, and key file paths.
+- Read `CONTEXTS.md` for bounded context ownership and inter-BC communication directions.
+- Read `docs/planning/CURRENT-CYCLE.md` for active milestone tracking and recent completions.
+
+## Before Implementing
+- Read the relevant `docs/skills/*.md` file before implementing any pattern (handlers, sagas, projections, BFF, testing, etc.). The skill invocation guide in `CLAUDE.md` maps tasks to skill files.
+- Check existing code for patterns before creating new ones — code is the source of truth.
+
+## Coding Standards
+- `sealed record` for all commands, events, queries, DTOs.
+- `IReadOnlyList<T>` for collections on records; never `List<T>`.
+- Handlers are `static` classes returning `Events`, `OutgoingMessages`, `IStartStream`, or tuples thereof.
+- BFF endpoints delegate to domain BCs — no business logic in the BFF.
+- Mixed route + JSON body parameters require the Direct Implementation pattern (no compound handler `Before/Validate/Handle`). See `wolverine-message-handlers.md` M32.3 section.
+
+## Running the System
+- Full stack (containers): `docker-compose --profile all up --build`
+- Infrastructure only: `docker-compose --profile infrastructure up -d`
+- Fresh start (clear data): `docker-compose --profile all down -v`
+- Build: `dotnet build` (from repo root)
+- Test: `dotnet test` (from repo root)

@@ -302,6 +302,51 @@ public class AddressBookTests : IClassFixture<TestFixture>
     }
 
     [Fact]
+    public async Task GetCustomerAddresses_ReturnsFullAddressFields()
+    {
+        var customerId = Guid.CreateVersion7();
+        await SeedCustomerAsync(customerId);
+
+        var command = new AddAddress(
+            customerId,
+            AddressType.Shipping,
+            "Home",
+            "123 Main St",
+            "Apt 4B",
+            "Seattle",
+            "WA",
+            "98101",
+            "US",
+            IsDefault: true);
+
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(command).ToUrl($"/api/customers/{customerId}/addresses");
+            x.StatusCodeShouldBe(201);
+        });
+
+        var result = await _fixture.Host.Scenario(x =>
+        {
+            x.Get.Url($"/api/customers/{customerId}/addresses");
+            x.StatusCodeShouldBe(200);
+        });
+
+        var addresses = result.ReadAsJson<List<AddressSummary>>();
+        addresses.ShouldNotBeNull();
+        addresses.Count.ShouldBe(1);
+
+        var address = addresses[0];
+        address.AddressLine1.ShouldBe("123 Main St");
+        address.AddressLine2.ShouldBe("Apt 4B");
+        address.City.ShouldBe("Seattle");
+        address.StateOrProvince.ShouldBe("WA");
+        address.PostalCode.ShouldBe("98101");
+        address.Country.ShouldBe("US");
+        address.Nickname.ShouldBe("Home");
+        address.DisplayLine.ShouldContain("123 Main St");
+    }
+
+    [Fact]
     public async Task CanGetAddressSnapshot()
     {
         var customerId = Guid.CreateVersion7();

@@ -58,16 +58,14 @@ public class CheckoutWorkflowTests : IAsyncLifetime
         // Arrange - Create checkout
         var checkoutId = await CreateCheckoutWithItems();
 
-        // Act - Provide shipping address
-        var command = new ProvideShippingAddress(
-            checkoutId,
-            "123 Main St",
-            null,
-            "Seattle",
-            "WA",
-            "98101",
-            "USA");
-        await _fixture.ExecuteAndWaitAsync(command);
+        // Act - Provide shipping address via HTTP (Direct Implementation pattern)
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(new ProvideShippingAddressRequest(
+                "123 Main St", null, "Seattle", "WA", "98101", "USA"))
+                .ToUrl($"/api/checkouts/{checkoutId}/shipping-address");
+            x.StatusCodeShouldBeOk();
+        });
 
         // Assert - Verify address stored
         using var session = _fixture.GetDocumentSession();
@@ -88,9 +86,13 @@ public class CheckoutWorkflowTests : IAsyncLifetime
         // Arrange - Create checkout
         var checkoutId = await CreateCheckoutWithItems();
 
-        // Act - Select shipping method
-        var command = new SelectShippingMethod(checkoutId, "Standard Ground", 5.99m);
-        await _fixture.ExecuteAndWaitAsync(command);
+        // Act - Select shipping method via HTTP
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(new SelectShippingMethodRequest("Standard Ground", 5.99m))
+                .ToUrl($"/api/checkouts/{checkoutId}/shipping-method");
+            x.StatusCodeShouldBeOk();
+        });
 
         // Assert - Verify shipping method stored
         using var session = _fixture.GetDocumentSession();
@@ -108,9 +110,13 @@ public class CheckoutWorkflowTests : IAsyncLifetime
         // Arrange - Create checkout
         var checkoutId = await CreateCheckoutWithItems();
 
-        // Act - Provide payment method
-        var command = new ProvidePaymentMethod(checkoutId, "tok_visa_4242");
-        await _fixture.ExecuteAndWaitAsync(command);
+        // Act - Provide payment method via HTTP
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(new ProvidePaymentMethodRequest("tok_visa_4242"))
+                .ToUrl($"/api/checkouts/{checkoutId}/payment-method");
+            x.StatusCodeShouldBeOk();
+        });
 
         // Assert - Verify payment token stored
         using var session = _fixture.GetDocumentSession();
@@ -123,17 +129,16 @@ public class CheckoutWorkflowTests : IAsyncLifetime
     [Fact]
     public async Task CompleteCheckout_WithAllRequiredInfo_CompletesCheckout()
     {
-        // Arrange - Create checkout with all required info
+        // Arrange - Create checkout with all required info via HTTP
         var checkoutId = await CreateCheckoutWithItems();
+        await ProvideAllCheckoutStepsViaHttp(checkoutId);
 
-        await _fixture.ExecuteAndWaitAsync(new ProvideShippingAddress(
-            checkoutId, "123 Main St", null, "Seattle", "WA", "98101", "USA"));
-        await _fixture.ExecuteAndWaitAsync(new SelectShippingMethod(checkoutId, "Standard", 5.99m));
-        await _fixture.ExecuteAndWaitAsync(new ProvidePaymentMethod(checkoutId, "tok_visa_4242"));
-
-        // Act - Complete checkout
-        var command = new CompleteCheckout(checkoutId);
-        await _fixture.ExecuteAndWaitAsync(command);
+        // Act - Complete checkout via HTTP
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(new { }).ToUrl($"/api/checkouts/{checkoutId}/complete");
+            x.StatusCodeShouldBeOk();
+        });
 
         // Assert - Verify checkout completed
         using var session = _fixture.GetDocumentSession();
@@ -146,22 +151,18 @@ public class CheckoutWorkflowTests : IAsyncLifetime
     [Fact]
     public async Task CompleteCheckout_WithAllStepsCompleted_VerifiesAllData()
     {
-        // Arrange - Create checkout and complete all steps
+        // Arrange - Create checkout and complete all steps via HTTP
         var checkoutId = await CreateCheckoutWithItems();
+        await ProvideAllCheckoutStepsViaHttp(checkoutId);
 
-        await _fixture.ExecuteAndWaitAsync(new ProvideShippingAddress(
-            checkoutId, "123 Main St", null, "Seattle", "WA", "98101", "USA"));
-        await _fixture.ExecuteAndWaitAsync(new SelectShippingMethod(checkoutId, "Standard", 5.99m));
-        await _fixture.ExecuteAndWaitAsync(new ProvidePaymentMethod(checkoutId, "tok_visa_4242"));
-
-        // Act - Complete checkout
-        var command = new CompleteCheckout(checkoutId);
-        await _fixture.ExecuteAndWaitAsync(command);
+        // Act - Complete checkout via HTTP
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(new { }).ToUrl($"/api/checkouts/{checkoutId}/complete");
+            x.StatusCodeShouldBeOk();
+        });
 
         // Assert - Verify checkout is marked complete with all required data
-        // Note: Integration message (CheckoutCompleted) is published back to Shopping BC but we don't
-        // verify outgoing messages in integration tests since DisableAllExternalWolverineTransports()
-        // prevents actual message routing. Message handling would be verified in a full system integration test.
         using var session = _fixture.GetDocumentSession();
         var checkout = await session.LoadAsync<Orders.Checkout.Checkout>(checkoutId);
 
@@ -195,5 +196,30 @@ public class CheckoutWorkflowTests : IAsyncLifetime
         await _fixture.ExecuteAndWaitAsync(message);
 
         return checkoutId;
+    }
+
+    private async Task ProvideAllCheckoutStepsViaHttp(Guid checkoutId)
+    {
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(new ProvideShippingAddressRequest(
+                "123 Main St", null, "Seattle", "WA", "98101", "USA"))
+                .ToUrl($"/api/checkouts/{checkoutId}/shipping-address");
+            x.StatusCodeShouldBeOk();
+        });
+
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(new SelectShippingMethodRequest("Standard", 5.99m))
+                .ToUrl($"/api/checkouts/{checkoutId}/shipping-method");
+            x.StatusCodeShouldBeOk();
+        });
+
+        await _fixture.Host.Scenario(x =>
+        {
+            x.Post.Json(new ProvidePaymentMethodRequest("tok_visa_4242"))
+                .ToUrl($"/api/checkouts/{checkoutId}/payment-method");
+            x.StatusCodeShouldBeOk();
+        });
     }
 }

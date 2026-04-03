@@ -49,7 +49,7 @@ public sealed class CatalogClient : ICatalogClient
         if (catalogResponse is null)
             return new PagedResult<ProductDto>([], 0, page, pageSize);
 
-        var products = catalogResponse.Products
+        var products = catalogResponse.Items
             .Select(MapToProductDto)
             .ToList();
 
@@ -70,7 +70,7 @@ public sealed class CatalogClient : ICatalogClient
 
     // Response types matching Product Catalog BC API
     private sealed record CatalogProductListResponse(
-        IReadOnlyList<CatalogProductResponse> Products,
+        IReadOnlyList<CatalogProductResponse> Items,
         int Page,
         int PageSize,
         int TotalCount);

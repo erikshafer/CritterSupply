@@ -1,5 +1,4 @@
 using Marten;
-using Microsoft.AspNetCore.Authorization;
 using Orders.Placement;
 using Wolverine.Http;
 
@@ -21,7 +20,6 @@ public static class SearchOrdersEndpoint
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with SearchOrdersResponse (may contain 0 results).</returns>
     [WolverineGet("/api/orders/search")]
-    [Authorize(Policy = "CustomerService")]
     public static async Task<SearchOrdersResponse> Search(
         string? query,
         IQuerySession session,

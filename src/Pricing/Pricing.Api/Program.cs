@@ -192,7 +192,65 @@ app.MapGet("/", (HttpResponse response) =>
     response.StatusCode = StatusCodes.Status301MovedPermanently;
 }).ExcludeFromDescription();
 
+// Seed prices for demo (development only)
+if (app.Environment.IsDevelopment())
+{
+    var store = app.Services.GetRequiredService<IDocumentStore>();
+    await SeedPricesAsync(store);
+}
+
 return await app.RunJasperFxCommands(args);
+
+static async Task SeedPricesAsync(IDocumentStore store)
+{
+    await using var session = store.LightweightSession();
+    var existing = await session.Query<CurrentPriceView>().CountAsync();
+    if (existing > 0) return; // idempotent
+
+    var now = DateTimeOffset.UtcNow;
+    var systemId = Guid.Empty;
+
+    var seedPrices = new Dictionary<string, decimal>
+    {
+        ["DOG-BOWL-001"]      = 12.99m,
+        ["DOG-TOY-ROPE"]      = 8.99m,
+        ["DOG-COLLAR-LED"]    = 24.99m,
+        ["DOG-BED-ORTHO"]     = 59.99m,
+        ["DOG-TREATS-CHK"]    = 14.99m,
+        ["CAT-TREE-5FT"]      = 89.99m,
+        ["CAT-LITTER-CLM"]    = 22.99m,
+        ["CAT-TOY-LASER"]     = 9.99m,
+        ["CAT-FOUNTAIN-2L"]   = 34.99m,
+        ["CAT-CARRIER-SM"]    = 44.99m,
+        ["BIRD-CAGE-MED"]     = 49.99m,
+        ["BIRD-SEED-MIX"]     = 15.99m,
+        ["BIRD-TOY-SWING"]    = 7.99m,
+        ["FISH-TANK-20G"]     = 79.99m,
+        ["FISH-FOOD-FLAKE"]   = 8.99m,
+        ["FISH-DECOR-CAVE"]   = 12.99m,
+        ["HAMSTER-CAGE-LG"]   = 39.99m,
+        ["RABBIT-HAY-5LB"]    = 19.99m,
+        ["GUINEA-PIG-HIDEY"]  = 14.99m,
+        ["REPTILE-TANK-40G"]  = 99.99m,
+        ["REPTILE-LAMP-UVB"]  = 29.99m,
+        ["REPTILE-SUBSTRATE"] = 17.99m,
+        ["PET-GROOMING-KIT"]  = 29.99m,
+        ["PET-GATE-WIDE"]     = 54.99m,
+        ["PET-CAMERA-WIFI"]   = 149.99m,
+        ["PET-FIRST-AID"]     = 24.99m,
+        ["XMAS-PET-SWEATER"]  = 19.99m,
+    };
+
+    foreach (var (sku, amount) in seedPrices)
+    {
+        var streamId = ProductPrice.StreamId(sku);
+        session.Events.StartStream<ProductPrice>(streamId,
+            new ProductRegistered(streamId, sku, now),
+            new InitialPriceSet(streamId, sku, Money.Of(amount), null, null, systemId, now));
+    }
+
+    await session.SaveChangesAsync();
+}
 
 [ExcludeFromCodeCoverage]
 public partial class Program { }

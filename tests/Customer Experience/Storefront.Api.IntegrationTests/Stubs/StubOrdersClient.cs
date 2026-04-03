@@ -10,6 +10,7 @@ public class StubOrdersClient : IOrdersClient
 {
     private readonly Dictionary<Guid, CheckoutDto> _checkouts = new();
     private readonly List<OrderDto> _orders = new();
+    private readonly List<OrderSummaryDto> _orderSummaries = new();
 
     public void AddCheckout(Guid checkoutId, Guid customerId, params CheckoutItemDto[] items)
     {
@@ -19,6 +20,11 @@ public class StubOrdersClient : IOrdersClient
     public void AddOrder(OrderDto order)
     {
         _orders.Add(order);
+    }
+
+    public void AddOrderSummary(OrderSummaryDto summary)
+    {
+        _orderSummaries.Add(summary);
     }
 
     public Task<CheckoutDto> GetCheckoutAsync(Guid checkoutId, CancellationToken ct = default)
@@ -116,6 +122,17 @@ public class StubOrdersClient : IOrdersClient
         return Task.FromResult(orderId);
     }
 
+    public Task<IReadOnlyList<OrderSummaryDto>> GetOrderSummariesAsync(
+        Guid customerId,
+        CancellationToken ct = default)
+    {
+        var summaries = _orderSummaries
+            .Where(o => o.CustomerId == customerId)
+            .ToList();
+
+        return Task.FromResult<IReadOnlyList<OrderSummaryDto>>(summaries);
+    }
+
     /// <summary>
     /// Clear all configured test data (for test isolation)
     /// </summary>
@@ -123,5 +140,6 @@ public class StubOrdersClient : IOrdersClient
     {
         _checkouts.Clear();
         _orders.Clear();
+        _orderSummaries.Clear();
     }
 }

@@ -1,5 +1,4 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Wolverine.Http;
@@ -114,7 +113,6 @@ public static class AddAddressHandler
     }
 
     [WolverinePost("/api/customers/{customerId}/addresses")]
-    [Authorize]
     public static async Task<CreationResponse<Guid>> Handle(
         AddAddress command,
         CustomerIdentityDbContext dbContext,

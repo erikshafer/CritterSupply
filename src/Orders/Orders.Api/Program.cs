@@ -131,7 +131,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddWolverineHttp();
 
 // Configure multi-issuer JWT authentication (ADR 0032)
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+builder.Services.AddAuthentication("Backoffice")
     .AddJwtBearer("Backoffice", options =>
     {
         options.Authority = "https://localhost:5249"; // Backoffice Identity BC

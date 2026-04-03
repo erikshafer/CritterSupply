@@ -1,79 +1,52 @@
-using FluentValidation;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+using Marten;
+using Microsoft.AspNetCore.Http;
+using Wolverine;
 using Wolverine.Http;
-using Wolverine.Marten;
 using Messages.Contracts.CustomerIdentity;
 using ShoppingContracts = Messages.Contracts.Shopping;
 
 namespace Orders.Checkout;
 
-public sealed record CompleteCheckout(
-    Guid CheckoutId)
-{
-    public class CompleteCheckoutValidator : AbstractValidator<CompleteCheckout>
-    {
-        public CompleteCheckoutValidator()
-        {
-            RuleFor(x => x.CheckoutId).NotEmpty();
-        }
-    }
-}
-
+/// <summary>
+/// Direct Implementation pattern — compound handler [WriteAggregate] silently fails
+/// to persist events when mixing route + body parameters (M32.3 discovery).
+/// This handler also publishes a CartCheckoutCompleted integration message via OutgoingMessages.
+/// </summary>
 public static class CompleteCheckoutHandler
 {
-    public static ProblemDetails Before(
-        CompleteCheckout command,
-        Checkout? checkout)
+    [WolverinePost("/api/checkouts/{checkoutId}/complete")]
+    public static async Task<(IResult, OutgoingMessages)> Handle(
+        Guid checkoutId,
+        IDocumentSession session,
+        CancellationToken ct)
     {
+        var stream = await session.Events.FetchForWriting<Checkout>(checkoutId, ct);
+        var checkout = stream.Aggregate;
+
         if (checkout is null)
-            return new ProblemDetails { Detail = "Checkout not found", Status = 404 };
+            return (Results.NotFound(new { detail = "Checkout not found" }), new OutgoingMessages());
 
         if (checkout.IsCompleted)
-            return new ProblemDetails
-            {
-                Detail = "Checkout has already been completed",
-                Status = 400
-            };
+            return (Results.BadRequest(new { detail = "Checkout has already been completed" }), new OutgoingMessages());
 
         if (checkout.ShippingAddress is null)
-            return new ProblemDetails
-            {
-                Detail = "Shipping address is required to complete checkout",
-                Status = 400
-            };
+            return (Results.BadRequest(new { detail = "Shipping address is required to complete checkout" }), new OutgoingMessages());
 
         if (string.IsNullOrWhiteSpace(checkout.ShippingMethod))
-            return new ProblemDetails
-            {
-                Detail = "Shipping method is required to complete checkout",
-                Status = 400
-            };
+            return (Results.BadRequest(new { detail = "Shipping method is required to complete checkout" }), new OutgoingMessages());
 
         if (string.IsNullOrWhiteSpace(checkout.PaymentMethodToken))
-            return new ProblemDetails
-            {
-                Detail = "Payment method is required to complete checkout",
-                Status = 400
-            };
+            return (Results.BadRequest(new { detail = "Payment method is required to complete checkout" }), new OutgoingMessages());
 
-        return WolverineContinue.NoProblems;
-    }
-
-    [WolverinePost("/api/checkouts/{checkoutId}/complete")]
-    [Authorize]
-    public static (OrderCreated, ShoppingContracts.CartCheckoutCompleted) Handle(
-        CompleteCheckout command,
-        [WriteAggregate] Checkout checkout)
-    {
         var orderId = Guid.CreateVersion7();
         var now = DateTimeOffset.UtcNow;
 
         // Terminal event for Checkout stream
         var checkoutEvent = new OrderCreated(orderId, now);
+        stream.AppendOne(checkoutEvent);
+        await session.SaveChangesAsync(ct);
 
-        // Prepare integration message to start Order saga
-        // Wolverine will automatically cascade this message (no OutgoingMessages wrapper needed)
+        // Publish integration message to start Order saga
         var integrationMessage = new ShoppingContracts.CartCheckoutCompleted(
             orderId,
             checkout.Id,
@@ -94,7 +67,9 @@ public static class CompleteCheckoutHandler
             checkout.PaymentMethodToken!,
             now);
 
-        // Wolverine cascades both the domain event and integration message
-        return (checkoutEvent, integrationMessage);
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(integrationMessage);
+
+        return (Results.Ok(new { orderId }), outgoing);
     }
 }

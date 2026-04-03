@@ -1,5 +1,4 @@
 using FluentValidation;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
@@ -93,7 +92,6 @@ public static class RemoveCouponFromCartHttpEndpoint
     }
 
     [WolverineDelete("/api/carts/{cartId}/apply-coupon")]
-    [Authorize]
     public static (Events, OutgoingMessages) Handle(
         Guid cartId,
         [WriteAggregate] Cart cart)

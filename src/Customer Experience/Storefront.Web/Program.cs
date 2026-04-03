@@ -33,10 +33,13 @@ builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 
 // Add HttpClient for Storefront.Api BFF
+// Increase timeout to handle cold-start scenarios where checkout completion
+// involves outbox → RabbitMQ → Orders saga pipeline (can take 10+ seconds)
 builder.Services.AddHttpClient("StorefrontApi", client =>
 {
     var url = builder.Configuration["ApiClients:StorefrontApiUrl"] ?? "http://localhost:5237";
     client.BaseAddress = new Uri(url);
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
 
 // Add HttpClient for Customer Identity API (for authentication)
