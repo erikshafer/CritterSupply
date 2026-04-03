@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M38.0 — Marketplaces Phase 4: Async Lifecycle + Resilience |
-| **Status** | 🚀 **IN PROGRESS** — Session 1 complete (P-1 through P-7) |
+| **Status** | 🚀 **IN PROGRESS** — Session 2 complete (P-8 through P-12) |
 | **Recent Completion** | M37.0 — Marketplaces Phase 3: Production Adapters (2026-04-03) |
 | **Previous Completion** | M36.1 — Listings BC Foundation + Marketplaces BC Foundation (2026-03-31) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-03 (M38.0 Session 1 complete — P-1 through P-7 delivered, 120 tests passing)*
+*Last Updated: 2026-04-03 (M38.0 Session 2 complete — P-8 through P-12 delivered, 133 tests passing)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 🚀 M38.0: Marketplaces Phase 4 — Async Lifecycle + Resilience
 
-**Status:** 🚀 **IN PROGRESS** — Session 1 complete 2026-04-03 (P-1 through P-7); Session 2 ready
+**Status:** 🚀 **IN PROGRESS** — Session 2 complete 2026-04-03 (P-8 through P-12); Session 3 ready
 **Goal:** Complete the production adapter lifecycle — Walmart async polling, Polly resilience on all three adapter pipelines, bidirectional marketplace feedback (Listings BC consuming marketplace outcome events), `DeactivateListingAsync` full implementations, and admin UI unblock
 
 **Planning Documents:**
@@ -74,8 +74,18 @@
 - ✅ P-6: `MarketplaceSubmissionRejectedHandler` — `Submitted → Ended (SubmissionRejected)` with idempotency guards
 - ✅ Tests: Marketplaces 70 → 79 (+9), Listings 35 → 41 (+6), Combined 105 → 120
 
+**M38.0 Session 2 Progress (P-8 through P-12 — complete):**
+- ✅ P-12: ADR 0056 — Marketplace Adapter Resilience Patterns
+- ✅ P-8: Polly retry + circuit breaker on `AmazonSpApi`, `WalmartApi`, `EbayApi` HttpClients in `Marketplaces.Api/Program.cs` (`Microsoft.Extensions.Http.Resilience` 10.4.0; 3 retries exponential backoff, 30s circuit break)
+- ✅ P-8 tests: 9 resilience tests in `AdapterResilienceTests.cs` (429 retry, 5xx retry, 401 no-retry × 3 adapters)
+- ✅ P-9: `WalmartMarketplaceAdapter.DeactivateListingAsync` — Option A: logs SKU gap (ADR 0056), returns false; TODO tests documented for M38.1
+- ✅ P-10: `AmazonMarketplaceAdapter.DeactivateListingAsync` — PATCH delete `purchasable_offer`; `amzn-{sku}` prefix stripped
+- ✅ P-10 tests: 3 tests replacing skeleton (`ReturnsTrue`, `ReturnsFalse`, `BuildsCorrectRequest`)
+- ✅ P-11: `EbayMarketplaceAdapter.DeactivateListingAsync` — POST `offer/{offerId}/withdraw`; `ebay-{offerId}` prefix stripped
+- ✅ P-11 tests: 3 tests replacing skeleton (`ReturnsTrue`, `ReturnsFalse`, `BuildsCorrectRequest`)
+- ✅ Tests: Marketplaces 79 → 92 (+13), Combined 120 → 133
+
 **Remaining Scope:**
-- **Session 2 (P-8 to P-12):** Polly retry policies on all 3 adapters, `DeactivateListingAsync` for Walmart/Amazon/eBay, ADR 0056
 - **Session 3 (P-13, P-14):** Admin action buttons (approve/pause/end), 3 `@wip` E2E scenarios unblocked
 - **Session 4:** Milestone closure
 
