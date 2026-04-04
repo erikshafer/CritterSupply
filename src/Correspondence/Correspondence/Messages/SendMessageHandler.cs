@@ -1,7 +1,7 @@
 using Correspondence.Providers;
-using Marten;
 using Messages.Contracts.Correspondence;
 using Wolverine;
+using Wolverine.Marten;
 
 namespace Correspondence.Messages;
 
@@ -9,57 +9,43 @@ namespace Correspondence.Messages;
 /// Handler for SendMessage command. Implements retry logic with exponential backoff.
 /// Retry schedule: 3 attempts (5 min, 30 min, 2 hr)
 /// </summary>
-public sealed class SendMessageHandler
+public static class SendMessageHandler
 {
-    public async Task<OutgoingMessages> Handle(
-        SendMessage command,
-        IDocumentSession session,
-        IEmailProvider emailProvider)
+    public static HandlerContinuation Before(SendMessage command, Message? message)
     {
-        var message = await session.Events.AggregateStreamAsync<Message>(command.MessageId);
+        if (message is null) return HandlerContinuation.Stop;
+        if (message.Status == MessageStatus.Delivered) return HandlerContinuation.Stop;
+        if (message.Status == MessageStatus.Skipped) return HandlerContinuation.Stop;
+        return HandlerContinuation.Continue;
+    }
 
-        if (message is null)
-        {
-            // Message doesn't exist - this shouldn't happen
-            return [];
-        }
-
-        if (message.Status == MessageStatus.Delivered)
-        {
-            // Idempotency: already sent
-            return [];
-        }
-
-        if (message.Status == MessageStatus.Skipped)
-        {
-            // Message was skipped (customer opted out)
-            return [];
-        }
+    public static async Task<(Events, OutgoingMessages)> Handle(
+        SendMessage command,
+        [WriteAggregate] Message message,
+        IEmailProvider emailProvider,
+        CancellationToken ct)
+    {
+        var emailMessage = new EmailMessage(
+            ToEmail: "customer@example.com", // TODO: will be populated from CustomerIdentity query in integration handlers
+            ToName: "Customer",
+            Subject: message.Subject,
+            HtmlBody: message.Body,
+            CorrespondenceMessageId: message.Id.ToString());
 
         try
         {
-            // Send via email provider
-            var emailMessage = new EmailMessage(
-                ToEmail: "customer@example.com", // TODO: will be populated from CustomerIdentity query in integration handlers
-                ToName: "Customer",
-                Subject: message.Subject,
-                HtmlBody: message.Body,
-                CorrespondenceMessageId: message.Id.ToString()
-            );
-
-            var result = await emailProvider.SendEmailAsync(emailMessage, CancellationToken.None);
+            var result = await emailProvider.SendEmailAsync(emailMessage, ct);
 
             if (result.Success)
             {
-                // Success - record delivery
                 var delivered = new MessageDelivered(
                     message.Id,
                     DateTimeOffset.UtcNow,
                     message.AttemptCount + 1,
-                    result.ProviderId ?? "unknown"
-                );
+                    result.ProviderId ?? "unknown");
 
-                session.Events.Append(message.Id, delivered);
+                var events = new Events();
+                events.Add(delivered);
 
                 var outgoing = new OutgoingMessages();
                 outgoing.Add(new CorrespondenceDelivered(
@@ -67,88 +53,56 @@ public sealed class SendMessageHandler
                     message.CustomerId,
                     message.Channel,
                     delivered.DeliveredAt,
-                    delivered.AttemptNumber
-                ));
-                return outgoing;
+                    delivered.AttemptNumber));
+
+                return (events, outgoing);
             }
-            else
-            {
-                // Provider returned failure
-                var failed = new DeliveryFailed(
-                    message.Id,
-                    message.AttemptCount + 1,
-                    DateTimeOffset.UtcNow,
-                    result.FailureReason ?? "Unknown error",
-                    "Provider error"
-                );
 
-                session.Events.Append(message.Id, failed);
-
-                // Retry logic: exponential backoff
-                if (failed.AttemptNumber < 3 && result.IsRetriable)
-                {
-                    var delay = failed.AttemptNumber switch
-                    {
-                        1 => TimeSpan.FromMinutes(5),
-                        2 => TimeSpan.FromMinutes(30),
-                        _ => TimeSpan.FromHours(2)
-                    };
-
-                    var outgoing = new OutgoingMessages();
-                    outgoing.Add(new SendMessage(message.Id).DelayedFor(delay));
-                    return outgoing;
-                }
-
-                // Permanent failure after 3 attempts or non-retriable error
-                var failureOutgoing = new OutgoingMessages();
-                failureOutgoing.Add(new CorrespondenceFailed(
-                    message.Id,
-                    message.CustomerId,
-                    message.Channel,
-                    failed.ErrorMessage,
-                    failed.FailedAt
-                ));
-                return failureOutgoing;
-            }
+            return BuildFailureResult(message, message.AttemptCount + 1,
+                result.FailureReason ?? "Unknown error", result.IsRetriable);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Exception during send (network error, etc.)
-            var failed = new DeliveryFailed(
-                message.Id,
-                message.AttemptCount + 1,
-                DateTimeOffset.UtcNow,
-                ex.Message,
-                ex.ToString()
-            );
+            return BuildFailureResult(message, message.AttemptCount + 1,
+                ex.Message, isRetriable: true);
+        }
+    }
 
-            session.Events.Append(message.Id, failed);
+    private static (Events, OutgoingMessages) BuildFailureResult(
+        Message message, int attemptNumber, string reason, bool isRetriable)
+    {
+        var failed = new DeliveryFailed(
+            message.Id,
+            attemptNumber,
+            DateTimeOffset.UtcNow,
+            reason,
+            string.Empty);
 
-            // Retry logic
-            if (failed.AttemptNumber < 3)
+        var events = new Events();
+        events.Add(failed);
+
+        var outgoing = new OutgoingMessages();
+
+        if (attemptNumber < 3 && isRetriable)
+        {
+            var delay = attemptNumber switch
             {
-                var delay = failed.AttemptNumber switch
-                {
-                    1 => TimeSpan.FromMinutes(5),
-                    2 => TimeSpan.FromMinutes(30),
-                    _ => TimeSpan.FromHours(2)
-                };
-
-                var outgoing = new OutgoingMessages();
-                outgoing.Add(new SendMessage(message.Id).DelayedFor(delay));
-                return outgoing;
-            }
-
-            // Permanent failure after 3 attempts
-            var failureOutgoing = new OutgoingMessages();
-            failureOutgoing.Add(new CorrespondenceFailed(
+                1 => TimeSpan.FromMinutes(5),
+                2 => TimeSpan.FromMinutes(30),
+                _ => TimeSpan.FromHours(2)
+            };
+            outgoing.Add(new SendMessage(message.Id).DelayedFor(delay));
+        }
+        else
+        {
+            outgoing.Add(new CorrespondenceFailed(
                 message.Id,
                 message.CustomerId,
                 message.Channel,
-                failed.ErrorMessage,
-                failed.FailedAt
-            ));
-            return failureOutgoing;
+                reason,
+                failed.FailedAt));
         }
+
+        return (events, outgoing);
     }
 }
