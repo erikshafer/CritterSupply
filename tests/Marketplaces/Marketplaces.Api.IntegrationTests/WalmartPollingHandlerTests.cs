@@ -33,7 +33,7 @@ public sealed class WalmartPollingHandlerTests
         activated[0].ListingId.ShouldBe(_listingId);
         activated[0].Sku.ShouldBe(Sku);
         activated[0].ChannelCode.ShouldBe(ChannelCode);
-        activated[0].ExternalListingId.ShouldBe($"wmrt-{FeedId}");
+        activated[0].ExternalListingId.ShouldBe($"wmrt-{Sku}");
         bus.ScheduledMessages.ShouldBeEmpty();
         outgoing.OfType<MarketplaceSubmissionRejected>().ShouldBeEmpty();
     }
