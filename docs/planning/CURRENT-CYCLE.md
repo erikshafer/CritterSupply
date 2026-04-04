@@ -41,19 +41,26 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | TBD — M39.x (next milestone to be planned) |
-| **Status** | 📋 **PLANNING** — M38.1 closed; next milestone TBD |
-| **Recent Completion** | M38.1 — Marketplaces Phase 4b: Deactivation + Status Verification (2026-04-04) |
-| **Previous Completion** | M38.0 — Marketplaces Phase 4: Async Lifecycle + Resilience (2026-04-03) |
+| **Current Milestone** | TBD — M39.x planning session complete, awaiting Erik's decision |
+| **Status** | 📋 **AWAITING DECISION** — M39.x planning audit complete; 3 scoping options presented to Erik |
+| **Recent Completion** | M39.x Planning Session — Critter Stack Idiom Audit + Refresh Priorities (2026-04-04) |
+| **Previous Completion** | M38.1 — Marketplaces Phase 4b: Deactivation + Status Verification (2026-04-04) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-04 (M38.1 closed — 139 integration tests, 9 E2E scenarios, 0 errors)*
+*Last Updated: 2026-04-04 (M39.x planning session complete — audit findings at [m39-x-planning-session.md](./milestones/m39-x-planning-session.md))*
 
 ---
 
 ## Active Milestone
 
-No active milestone. Next milestone (M39.x) to be planned — likely Product Variants or a skills refresh pass.
+No active milestone. M39.x planning session complete (2026-04-04). Audit findings and three scoping options presented to Erik at [m39-x-planning-session.md](./milestones/m39-x-planning-session.md).
+
+**Options for Erik:**
+- **Option A (Recommended): Targeted BC Refresh** — Correspondence + Pricing + Orders Checkout (4-6 sessions)
+- **Option B: Broad Idiom Sweep** — All flagged issues across all BCs (8-12 sessions)
+- **Option C: Opportunistic Only** — Fix idiom issues only when touching BCs for feature work
+
+**Key findings:** Correspondence BC has 9 `StartStream` violations (most concentrated drift). Pricing has 3 fat endpoints. Orders Checkout has an outbox consistency risk. 14 redundant `SaveChangesAsync()` in EF Core BCs.
 
 ---
 
