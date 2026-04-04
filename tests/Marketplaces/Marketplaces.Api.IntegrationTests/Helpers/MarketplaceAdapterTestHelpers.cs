@@ -21,6 +21,7 @@ public static class MarketplaceAdapterTestHelpers
         private readonly Queue<HttpResponseMessage> _responses = new();
         private readonly Dictionary<string, Queue<HttpResponseMessage>> _urlResponses = new(StringComparer.OrdinalIgnoreCase);
         public List<HttpRequestMessage> SentRequests { get; } = [];
+        public List<string?> SentRequestBodies { get; } = [];
 
         /// <summary>
         /// Enqueue a response that will be dequeued in FIFO order regardless of URL.
@@ -62,11 +63,19 @@ public static class MarketplaceAdapterTestHelpers
             queue.Enqueue(response);
         }
 
-        protected override Task<HttpResponseMessage> SendAsync(
+        protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             SentRequests.Add(request);
+
+            // Capture body before the caller disposes the content
+            string? body = null;
+            if (request.Content is not null)
+            {
+                body = await request.Content.ReadAsStringAsync(cancellationToken);
+            }
+            SentRequestBodies.Add(body);
 
             // Check URL-keyed responses first
             var requestUrl = request.RequestUri?.ToString() ?? string.Empty;
@@ -74,20 +83,20 @@ public static class MarketplaceAdapterTestHelpers
             {
                 if (requestUrl.Contains(urlPrefix, StringComparison.OrdinalIgnoreCase) && queue.Count > 0)
                 {
-                    return Task.FromResult(queue.Dequeue());
+                    return queue.Dequeue();
                 }
             }
 
             // Fall back to generic FIFO queue
             if (_responses.Count == 0)
             {
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)
+                return new HttpResponseMessage(HttpStatusCode.InternalServerError)
                 {
                     Content = new StringContent("No more queued responses in FakeHttpMessageHandler")
-                });
+                };
             }
 
-            return Task.FromResult(_responses.Dequeue());
+            return _responses.Dequeue();
         }
     }
 
