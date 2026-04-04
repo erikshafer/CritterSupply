@@ -90,8 +90,6 @@ public static class ChangeBackofficeUserRoleHandler
         var previousRole = user.Role;
         user.Role = command.NewRole;
 
-        await db.SaveChangesAsync(ct);
-
         var response = new ChangeBackofficeUserRoleResponse(
             user.Id,
             user.Email,

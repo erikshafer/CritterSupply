@@ -38,7 +38,6 @@ public static class DeactivateMarketplaceEndpoint
         marketplace.UpdatedAt = DateTimeOffset.UtcNow;
 
         session.Store(marketplace);
-        await session.SaveChangesAsync(ct);
 
         // Only publish when actually transitioning from active → inactive
         if (wasActive)

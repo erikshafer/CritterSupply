@@ -95,8 +95,6 @@ public static class RefreshTokenHandler
         user.RefreshToken = newRefreshToken;
         user.RefreshTokenExpiresAt = refreshTokenExpiresAt;
 
-        await db.SaveChangesAsync(ct);
-
         var response = new RefreshTokenResponse(
             AccessToken: accessToken,
             RefreshToken: newRefreshToken,

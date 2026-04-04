@@ -30,7 +30,7 @@ public static class MigrateProductHandler
         if (alreadyMigrated)
             return Results.Ok(new { Message = "Product already migrated", Sku = command.Sku });
 
-        var productId = Guid.NewGuid();
+        var productId = Guid.CreateVersion7();
         var @event = new ProductMigrated(
             ProductId: productId,
             Sku: (string)existing.Sku,

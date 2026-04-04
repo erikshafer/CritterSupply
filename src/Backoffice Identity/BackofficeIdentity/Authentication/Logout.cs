@@ -55,8 +55,6 @@ public static class LogoutHandler
         user.RefreshToken = null;
         user.RefreshTokenExpiresAt = null;
 
-        await db.SaveChangesAsync(ct);
-
         return true;
     }
 }

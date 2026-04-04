@@ -168,7 +168,6 @@ public static class AddAddressHandler
         }
 
         dbContext.Addresses.Add(address);
-        await dbContext.SaveChangesAsync(ct);
 
         return new CreationResponse<Guid>($"/api/customers/{command.CustomerId}/addresses/{address.Id}", address.Id);
     }
