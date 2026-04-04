@@ -23,7 +23,8 @@ public sealed record SelectShippingMethodRequest(
 }
 
 /// <summary>
-/// Direct Implementation pattern — see ProvideShippingAddress.cs for rationale.
+/// Mixed route + body parameter handler — uses FetchForWriting pattern.
+/// AutoApplyTransactions() in Orders.Api handles SaveChangesAsync automatically.
 /// </summary>
 public static class SelectShippingMethodHandler
 {
@@ -49,7 +50,6 @@ public static class SelectShippingMethodHandler
             DateTimeOffset.UtcNow);
 
         stream.AppendOne(@event);
-        await session.SaveChangesAsync(ct);
 
         return Results.Ok(@event);
     }

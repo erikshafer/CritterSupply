@@ -31,8 +31,8 @@ public sealed record ProvideShippingAddressRequest(
 }
 
 /// <summary>
-/// Direct Implementation pattern — compound handler [WriteAggregate] silently fails
-/// to persist events when mixing route + body parameters (M32.3 discovery).
+/// Mixed route + body parameter handler — uses FetchForWriting pattern.
+/// AutoApplyTransactions() in Orders.Api handles SaveChangesAsync automatically.
 /// </summary>
 public static class ProvideShippingAddressHandler
 {
@@ -62,7 +62,6 @@ public static class ProvideShippingAddressHandler
             DateTimeOffset.UtcNow);
 
         stream.AppendOne(@event);
-        await session.SaveChangesAsync(ct);
 
         return Results.Ok(@event);
     }
