@@ -77,8 +77,6 @@
 - Connection string key: `"marten"` → `"postgres"` in `Program.cs` + `appsettings.json`
 - Correspondence integration tests: 5/5 passing throughout
 
-**Session 2 (pending):** `SendMessageHandler` decomposition, `Message` snapshot configuration, connection string standardization. See [session 1 retrospective](./milestones/m39-0-session-1-retrospective.md) for Session 2 verification items.
-
 ---
 
 ## Recent Completions
