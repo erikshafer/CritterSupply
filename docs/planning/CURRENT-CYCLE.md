@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M39.0 — Critter Stack Idiom Refresh: Correspondence BC |
-| **Status** | 🟡 **IN PROGRESS** — S0 + S1 complete; S2 (SendMessageHandler + snapshot + connection string) pending |
-| **Recent Completion** | M39.0 S1 — Correspondence handlers IStartStream + static class (2026-04-04) |
-| **Previous Completion** | M39.0 S0 — EF Core SaveChangesAsync sweep + Guid.CreateVersion7() (2026-04-04, PR #516) |
+| **Status** | 🟡 **IN PROGRESS** — S0 + S1 + S2 complete; Correspondence BC idiomatically clean |
+| **Recent Completion** | M39.0 S2 — SendMessageHandler decomposition + snapshot + connection string (2026-04-04) |
+| **Previous Completion** | M39.0 S1 — Correspondence handlers IStartStream + static class (2026-04-04) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-04 (M39.0 Session 1 complete — [retrospective](./milestones/m39-0-session-1-retrospective.md))*
+*Last Updated: 2026-04-04 (M39.0 Session 2 complete — [retrospective](./milestones/m39-0-session-2-retrospective.md))*
 
 ---
 
@@ -67,7 +67,15 @@
 - Build warnings reduced from 19 → 11 (eliminated 8 CS1998 warnings)
 - Correspondence integration tests: 5/5 passing before and after
 
-**Session 2 (pending):** `SendMessageHandler` decomposition, `Message` snapshot configuration, connection string standardization. See [session 1 retrospective](./milestones/m39-0-session-1-retrospective.md) for Session 2 verification items.
+**Session 2 (this session):** Decomposed `SendMessageHandler`, added snapshot, standardized connection string:
+- `SendMessageHandler` → static class with `Before()` (`HandlerContinuation`) + `Handle()` (`[WriteAggregate]`)
+- Removed `IDocumentSession` injection, `session.Events.Append()`, `session.Events.AggregateStreamAsync()`
+- Extracted `BuildFailureResult` private static helper (eliminated duplicate failure logic)
+- Fixed `OperationCanceledException` guard: bare `catch` → `catch (Exception ex) when (ex is not OperationCanceledException)`
+- Return type: `OutgoingMessages` → `(Events, OutgoingMessages)`
+- Added `Snapshot<Message>(SnapshotLifecycle.Inline)` to `Program.cs`
+- Connection string key: `"marten"` → `"postgres"` in `Program.cs` + `appsettings.json`
+- Correspondence integration tests: 5/5 passing throughout
 
 ---
 

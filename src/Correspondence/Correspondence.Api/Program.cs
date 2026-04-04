@@ -8,6 +8,7 @@ using JasperFx.Core;
 using JasperFx.Events.Daemon;
 using JasperFx.Resources;
 using Marten;
+using Marten.Events.Projections;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Weasel.Core;
@@ -26,8 +27,8 @@ builder.AddServiceDefaults();
 
 builder.Host.ApplyJasperFxExtensions();
 
-var connectionString = builder.Configuration.GetConnectionString("marten")
-                            ?? throw new Exception("The connection string 'marten' was not found");
+var connectionString = builder.Configuration.GetConnectionString("postgres")
+                            ?? throw new Exception("The connection string 'postgres' was not found");
 
 builder.Services.AddMarten(opts =>
     {
@@ -37,6 +38,9 @@ builder.Services.AddMarten(opts =>
 
         opts.DatabaseSchemaName = Constants.Correspondence.ToLowerInvariant();
         opts.DisableNpgsqlLogging = true;
+
+        // Configure Message aggregate snapshot for efficient delivery handler reads
+        opts.Projections.Snapshot<Message>(SnapshotLifecycle.Inline);
 
         // Register inline projection for customer message history queries
         opts.Projections.Add<MessageListViewProjection>(JasperFx.Events.Projections.ProjectionLifecycle.Inline);
