@@ -1,7 +1,7 @@
-using Marten;
 using Messages.Contracts.Correspondence;
 using Messages.Contracts.Orders;
 using Wolverine;
+using Wolverine.Marten;
 
 namespace Correspondence.Messages;
 
@@ -9,12 +9,9 @@ namespace Correspondence.Messages;
 /// Handles OrderPlaced integration events to send order confirmation emails.
 /// Choreography pattern: subscribes to OrderPlaced, creates Message aggregate, publishes CorrespondenceQueued.
 /// </summary>
-public sealed class OrderPlacedHandler
+public static class OrderPlacedHandler
 {
-    public async Task<OutgoingMessages> Handle(
-        OrderPlaced @event,
-        IDocumentSession session,
-        CancellationToken ct)
+    public static (IStartStream, OutgoingMessages) Handle(OrderPlaced @event)
     {
         // TODO: Query Customer Identity BC for customer preferences
         // For now, assume customer has email notifications enabled
@@ -42,8 +39,8 @@ public sealed class OrderPlacedHandler
             body: body
         );
 
-        // Persist event stream
-        session.Events.StartStream<Message>(message.Id, messageQueued);
+        // Wolverine handles stream creation transactionally via IStartStream return
+        var stream = MartenOps.StartStream<Message>(message.Id, messageQueued);
 
         // Build outgoing messages
         var outgoing = new OutgoingMessages();
@@ -59,6 +56,6 @@ public sealed class OrderPlacedHandler
         // Trigger send command (will be executed by SendMessageHandler)
         outgoing.Add(new SendMessage(message.Id));
 
-        return outgoing;
+        return (stream, outgoing);
     }
 }

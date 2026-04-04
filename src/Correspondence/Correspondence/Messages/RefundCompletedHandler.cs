@@ -1,7 +1,7 @@
-using Marten;
 using Messages.Contracts.Correspondence;
 using Messages.Contracts.Payments;
 using Wolverine;
+using Wolverine.Marten;
 
 namespace Correspondence.Messages;
 
@@ -9,12 +9,9 @@ namespace Correspondence.Messages;
 /// Handles RefundCompleted integration events to notify customers when their refund has been processed.
 /// Choreography pattern: subscribes to RefundCompleted, creates Message aggregate, publishes CorrespondenceQueued.
 /// </summary>
-public sealed class RefundCompletedHandler
+public static class RefundCompletedHandler
 {
-    public async Task<OutgoingMessages> Handle(
-        RefundCompleted @event,
-        IDocumentSession session,
-        CancellationToken ct)
+    public static (IStartStream, OutgoingMessages) Handle(RefundCompleted @event)
     {
         // TODO: Query Orders BC to get CustomerId for this OrderId
         // For Phase 2, we'll add cross-BC queries. Phase 1 uses placeholder.
@@ -51,8 +48,8 @@ public sealed class RefundCompletedHandler
             body: body
         );
 
-        // Persist event stream
-        session.Events.StartStream<Message>(message.Id, messageQueued);
+        // Wolverine handles stream creation transactionally via IStartStream return
+        var stream = MartenOps.StartStream<Message>(message.Id, messageQueued);
 
         // Build outgoing messages
         var outgoing = new OutgoingMessages();
@@ -68,6 +65,6 @@ public sealed class RefundCompletedHandler
         // Trigger send command
         outgoing.Add(new SendMessage(message.Id));
 
-        return outgoing;
+        return (stream, outgoing);
     }
 }
