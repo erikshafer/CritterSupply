@@ -143,7 +143,5 @@ public static class UpdateAddressHandler
             postalCode: finalAddress.PostalCode,
             country: finalAddress.Country,
             isVerified: verificationResult.Status is VerificationStatus.Verified or VerificationStatus.Corrected);
-
-        await dbContext.SaveChangesAsync(ct);
     }
 }

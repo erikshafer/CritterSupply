@@ -80,7 +80,5 @@ public static class SetDefaultAddressHandler
 
         // Set this address as default
         address.SetAsDefault();
-
-        await dbContext.SaveChangesAsync(ct);
     }
 }

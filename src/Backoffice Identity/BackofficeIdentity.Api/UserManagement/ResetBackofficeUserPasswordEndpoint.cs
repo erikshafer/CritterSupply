@@ -61,8 +61,6 @@ public static class ResetBackofficeUserPasswordEndpoint
         user.RefreshToken = null;
         user.RefreshTokenExpiresAt = null;
 
-        await db.SaveChangesAsync(ct);
-
         var response = new ResetPasswordResponse(
             user.Id,
             DateTimeOffset.UtcNow);

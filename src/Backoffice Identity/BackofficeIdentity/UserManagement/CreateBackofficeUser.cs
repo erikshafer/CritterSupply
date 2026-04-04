@@ -102,7 +102,6 @@ public static class CreateBackofficeUserHandler
         user.PasswordHash = PasswordHasher.HashPassword(user, command.Password);
 
         db.Users.Add(user);
-        await db.SaveChangesAsync(ct);
 
         var response = new CreateBackofficeUserResponse(
             user.Id,

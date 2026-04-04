@@ -37,15 +37,12 @@ public static class GetAddressSnapshotHandler
 
     [WolverineGet("/api/addresses/{addressId}/snapshot")]
     [Authorize]
-    public static async Task<AddressSnapshot> Handle(
+    public static AddressSnapshot Handle(
         Guid addressId,
-        CustomerAddress address,
-        CustomerIdentityDbContext dbContext,
-        CancellationToken ct)
+        CustomerAddress address)
     {
         // Update LastUsedAt timestamp
         address.UpdateLastUsedAt(DateTimeOffset.UtcNow);
-        await dbContext.SaveChangesAsync(ct);
 
         return new AddressSnapshot(
             address.AddressLine1,

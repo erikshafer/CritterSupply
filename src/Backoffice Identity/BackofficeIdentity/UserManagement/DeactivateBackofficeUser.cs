@@ -87,8 +87,6 @@ public static class DeactivateBackofficeUserHandler
         user.RefreshToken = null;
         user.RefreshTokenExpiresAt = null;
 
-        await db.SaveChangesAsync(ct);
-
         var response = new DeactivateBackofficeUserResponse(
             user.Id,
             user.Email,

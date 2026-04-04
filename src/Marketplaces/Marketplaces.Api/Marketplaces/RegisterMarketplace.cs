@@ -78,7 +78,6 @@ public static class RegisterMarketplaceEndpoint
         };
 
         session.Store(marketplace);
-        await session.SaveChangesAsync(ct);
 
         outgoing.Add(new MarketplaceRegistered(
             marketplace.Id,

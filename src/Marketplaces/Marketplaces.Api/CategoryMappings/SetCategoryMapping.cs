@@ -55,7 +55,6 @@ public static class SetCategoryMappingEndpoint
             existing.MarketplaceCategoryPath = command.MarketplaceCategoryPath;
             existing.LastVerifiedAt = now;
             session.Store(existing);
-            await session.SaveChangesAsync(ct);
             return Results.Ok(existing);
         }
 
@@ -70,7 +69,6 @@ public static class SetCategoryMappingEndpoint
         };
 
         session.Store(mapping);
-        await session.SaveChangesAsync(ct);
 
         return Results.Created($"/api/category-mappings/{command.ChannelCode}/{command.InternalCategory}", mapping);
     }

@@ -35,7 +35,7 @@ public static class GenerateCouponBatchHandler
                 "Coupons can only be generated for Draft or Active promotions.");
         }
 
-        var batchId = Guid.NewGuid();
+        var batchId = Guid.CreateVersion7();
         var timestamp = DateTimeOffset.UtcNow;
         var outgoing = new OutgoingMessages();
 

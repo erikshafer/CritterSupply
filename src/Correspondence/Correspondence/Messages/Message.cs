@@ -70,7 +70,7 @@ public static class MessageFactory
         string subject,
         string body)
     {
-        var messageId = Guid.NewGuid();
+        var messageId = Guid.CreateVersion7();
         var @event = new MessageQueued(
             messageId,
             customerId,
@@ -102,7 +102,7 @@ public static class MessageFactory
         Guid customerId,
         string reason)
     {
-        var messageId = Guid.NewGuid();
+        var messageId = Guid.CreateVersion7();
         var @event = new MessageSkipped(messageId, reason);
 
         var message = new Message
