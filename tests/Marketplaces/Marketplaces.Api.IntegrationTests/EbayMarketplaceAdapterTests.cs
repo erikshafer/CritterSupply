@@ -216,15 +216,67 @@ public sealed class EbayMarketplaceAdapterTests : IDisposable
     }
 
     [Fact]
-    public async Task CheckSubmissionStatus_ReturnsPendingStatus()
+    public async Task CheckSubmissionStatus_ReturnsLive_WhenOfferIsPublished()
     {
-        // Act — skeleton implementation, should return not-live/not-failed
-        var status = await _adapter.CheckSubmissionStatusAsync("ebay-OFFER-123");
+        // Arrange — OAuth token response
+        EnqueueTokenResponse();
+
+        // eBay GET offer returns PUBLISHED status
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            status = "PUBLISHED"
+        });
+
+        // Act
+        var status = await _adapter.CheckSubmissionStatusAsync("ebay-OFFER-PUB-001");
 
         // Assert
-        status.ExternalSubmissionId.ShouldBe("ebay-OFFER-123");
-        status.IsLive.ShouldBeFalse();
+        status.ExternalSubmissionId.ShouldBe("ebay-OFFER-PUB-001");
+        status.IsLive.ShouldBeTrue();
         status.IsFailed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task CheckSubmissionStatus_ReturnsFailed_WhenOfferIsUnpublished()
+    {
+        // Arrange — OAuth token response
+        EnqueueTokenResponse();
+
+        // eBay GET offer returns UNPUBLISHED — orphaned draft from failed publish step
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            status = "UNPUBLISHED"
+        });
+
+        // Act
+        var status = await _adapter.CheckSubmissionStatusAsync("ebay-OFFER-ORPHAN-001");
+
+        // Assert — UNPUBLISHED surfaced as failed with descriptive reason
+        status.ExternalSubmissionId.ShouldBe("ebay-OFFER-ORPHAN-001");
+        status.IsLive.ShouldBeFalse();
+        status.IsFailed.ShouldBeTrue();
+        status.FailureReason.ShouldContain("UNPUBLISHED");
+        status.FailureReason.ShouldContain("OFFER-ORPHAN-001"); // offerId included for discoverability
+    }
+
+    [Fact]
+    public async Task CheckSubmissionStatus_ReturnsFailed_WhenApiReturnsError()
+    {
+        // Arrange — OAuth token response
+        EnqueueTokenResponse();
+
+        // eBay GET offer returns 500 Internal Server Error
+        _httpHandler.EnqueueResponse(HttpStatusCode.InternalServerError,
+            new { errors = new[] { new { errorId = 99999, message = "Internal error" } } });
+
+        // Act
+        var status = await _adapter.CheckSubmissionStatusAsync("ebay-OFFER-ERR-001");
+
+        // Assert
+        status.ExternalSubmissionId.ShouldBe("ebay-OFFER-ERR-001");
+        status.IsLive.ShouldBeFalse();
+        status.IsFailed.ShouldBeTrue();
+        status.FailureReason.ShouldContain("500");
     }
 
     [Fact]

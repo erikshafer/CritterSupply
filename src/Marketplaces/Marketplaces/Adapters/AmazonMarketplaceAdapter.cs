@@ -113,25 +113,87 @@ public sealed class AmazonMarketplaceAdapter : IMarketplaceAdapter
         }
     }
 
-    public Task<SubmissionStatus> CheckSubmissionStatusAsync(
+    public async Task<SubmissionStatus> CheckSubmissionStatusAsync(
         string externalSubmissionId,
         CancellationToken ct = default)
     {
-        // Skeleton implementation — real status polling deferred to M38.x (D-3).
-        // SP-API uses the Feeds API for async submission; the Listings Items API PUT
-        // returns immediate validation results. A full implementation would call
-        // GET /listings/2021-08-01/items/{sellerId}/{sku} to verify the listing
-        // is active on the marketplace.
-        _logger.LogInformation(
-            "CheckSubmissionStatusAsync not yet implemented for Amazon SP-API. " +
-            "Returning pending status for submission {SubmissionId}.",
-            externalSubmissionId);
+        // externalSubmissionId format: amzn-{sku}
+        var sku = externalSubmissionId.StartsWith("amzn-", StringComparison.OrdinalIgnoreCase)
+            ? externalSubmissionId["amzn-".Length..]
+            : externalSubmissionId;
 
-        return Task.FromResult(new SubmissionStatus(
-            ExternalSubmissionId: externalSubmissionId,
-            IsLive: false,
-            IsFailed: false,
-            FailureReason: "Status polling not yet implemented — deferred to M38.x"));
+        try
+        {
+            var accessToken = await GetAccessTokenAsync(ct);
+            var sellerId = await _vault.GetSecretAsync("amazon/seller-id", ct);
+            var marketplaceId = await _vault.GetSecretAsync("amazon/marketplace-id", ct);
+
+            var client = _httpClientFactory.CreateClient("AmazonSpApi");
+
+            // GET /listings/2021-08-01/items/{sellerId}/{sku}?marketplaceIds=...&includedData=summaries
+            var requestUrl = $"{SpApiBaseUrl}/listings/2021-08-01/items/{sellerId}/{Uri.EscapeDataString(sku)}" +
+                             $"?marketplaceIds={Uri.EscapeDataString(marketplaceId)}&includedData=summaries";
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Headers.Add("x-amz-access-token", accessToken);
+
+            _logger.LogInformation(
+                "Checking Amazon SP-API listing status: SKU={Sku}, Seller={SellerId}",
+                sku, sellerId);
+
+            using var response = await client.SendAsync(request, ct);
+
+            // 404 = listing not yet visible on marketplace — still pending, not failed
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _logger.LogInformation(
+                    "Amazon SP-API listing not yet found (404): SKU={Sku} — treating as pending",
+                    sku);
+                return new SubmissionStatus(
+                    ExternalSubmissionId: externalSubmissionId,
+                    IsLive: false,
+                    IsFailed: false);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning(
+                    "Amazon SP-API listing status check failed: SKU={Sku}, StatusCode={StatusCode}, Body={Body}",
+                    sku, (int)response.StatusCode, errorBody);
+                return new SubmissionStatus(
+                    ExternalSubmissionId: externalSubmissionId,
+                    IsLive: false,
+                    IsFailed: true,
+                    FailureReason: $"SP-API status check returned {(int)response.StatusCode}: {errorBody}");
+            }
+
+            var listing = await response.Content.ReadFromJsonAsync<SpApiListingStatusResponse>(JsonOptions, ct);
+            var status = listing?.Summaries?.FirstOrDefault()?.Status ?? string.Empty;
+
+            _logger.LogInformation(
+                "Amazon SP-API listing status: SKU={Sku}, Status={Status}",
+                sku, status);
+
+            return status.Equals("BUYABLE", StringComparison.OrdinalIgnoreCase)
+                ? new SubmissionStatus(ExternalSubmissionId: externalSubmissionId, IsLive: true, IsFailed: false)
+                : new SubmissionStatus(
+                    ExternalSubmissionId: externalSubmissionId,
+                    IsLive: false,
+                    IsFailed: !string.IsNullOrEmpty(status), // non-empty non-BUYABLE = known bad state
+                    FailureReason: string.IsNullOrEmpty(status) ? null : $"Listing status is {status}");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to check Amazon SP-API listing status: SKU={Sku}", sku);
+            return new SubmissionStatus(
+                ExternalSubmissionId: externalSubmissionId,
+                IsLive: false,
+                IsFailed: true,
+                FailureReason: $"Amazon adapter error checking status: {ex.Message}");
+        }
     }
 
     public async Task<bool> DeactivateListingAsync(
@@ -360,5 +422,17 @@ public sealed class AmazonMarketplaceAdapter : IMarketplaceAdapter
 
         [JsonPropertyName("submissionId")]
         public string? SubmissionId { get; init; }
+    }
+
+    private sealed record SpApiListingStatusResponse
+    {
+        [JsonPropertyName("summaries")]
+        public SpApiListingSummary[]? Summaries { get; init; }
+    }
+
+    private sealed record SpApiListingSummary
+    {
+        [JsonPropertyName("status")]
+        public string? Status { get; init; }
     }
 }

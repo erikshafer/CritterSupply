@@ -181,13 +181,88 @@ public sealed class AmazonMarketplaceAdapterTests : IDisposable
     }
 
     [Fact]
-    public async Task CheckSubmissionStatus_ReturnsPendingStatus()
+    public async Task CheckSubmissionStatus_ReturnsLive_WhenListingIsBuyable()
     {
-        // Act — skeleton implementation, should return not-live/not-failed
-        var status = await _adapter.CheckSubmissionStatusAsync("amzn-sub-123");
+        // Arrange — LWA token response
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-access-token",
+            token_type = "bearer",
+            expires_in = 3600
+        });
+
+        // SP-API GET listing status — BUYABLE means live on marketplace
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            summaries = new[] { new { status = "BUYABLE" } }
+        });
+
+        // Act
+        var status = await _adapter.CheckSubmissionStatusAsync("amzn-SKU-LIVE");
 
         // Assert
-        status.ExternalSubmissionId.ShouldBe("amzn-sub-123");
+        status.ExternalSubmissionId.ShouldBe("amzn-SKU-LIVE");
+        status.IsLive.ShouldBeTrue();
+        status.IsFailed.ShouldBeFalse();
+
+        // Verify request URL includes includedData=summaries and correct auth headers
+        var getRequest = _httpHandler.SentRequests[1];
+        getRequest.Method.ShouldBe(HttpMethod.Get);
+        getRequest.RequestUri!.ToString().ShouldContain("/listings/2021-08-01/items/A1B2C3SELLER/SKU-LIVE");
+        getRequest.RequestUri!.ToString().ShouldContain("includedData=summaries");
+        getRequest.Headers.Authorization!.Scheme.ShouldBe("Bearer");
+        getRequest.Headers.GetValues("x-amz-access-token").ShouldContain("test-access-token");
+    }
+
+    [Fact]
+    public async Task CheckSubmissionStatus_ReturnsFailed_WhenListingIsInactive()
+    {
+        // Arrange — LWA token response
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-access-token",
+            token_type = "bearer",
+            expires_in = 3600
+        });
+
+        // SP-API GET listing status — INACTIVE is a non-BUYABLE state
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            summaries = new[] { new { status = "INACTIVE" } }
+        });
+
+        // Act
+        var status = await _adapter.CheckSubmissionStatusAsync("amzn-SKU-INACTIVE");
+
+        // Assert
+        status.ExternalSubmissionId.ShouldBe("amzn-SKU-INACTIVE");
+        status.IsLive.ShouldBeFalse();
+        status.IsFailed.ShouldBeTrue();
+        status.FailureReason.ShouldContain("INACTIVE");
+    }
+
+    [Fact]
+    public async Task CheckSubmissionStatus_ReturnsPending_WhenListingNotFound()
+    {
+        // Arrange — LWA token response
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-access-token",
+            token_type = "bearer",
+            expires_in = 3600
+        });
+
+        // SP-API returns 404 — listing not yet visible on marketplace; treat as pending, not failed
+        _httpHandler.EnqueueResponse(HttpStatusCode.NotFound, new
+        {
+            errors = new[] { new { code = "NOT_FOUND", message = "Listings item not found" } }
+        });
+
+        // Act
+        var status = await _adapter.CheckSubmissionStatusAsync("amzn-SKU-PENDING");
+
+        // Assert — guard rail: 404 is pending, not failed
+        status.ExternalSubmissionId.ShouldBe("amzn-SKU-PENDING");
         status.IsLive.ShouldBeFalse();
         status.IsFailed.ShouldBeFalse();
     }

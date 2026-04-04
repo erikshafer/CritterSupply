@@ -41,53 +41,44 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M38.1 — Marketplaces Phase 4b: Deactivation + Status Verification (in progress) |
-| **Status** | 🚀 **IN PROGRESS** — Session 1 complete (Walmart deactivation delivered) |
-| **Recent Completion** | M38.0 — Marketplaces Phase 4: Async Lifecycle + Resilience (2026-04-03) |
-| **Previous Completion** | M37.0 — Marketplaces Phase 3: Production Adapters (2026-04-03) |
+| **Current Milestone** | TBD — M39.x (next milestone to be planned) |
+| **Status** | 📋 **PLANNING** — M38.1 closed; next milestone TBD |
+| **Recent Completion** | M38.1 — Marketplaces Phase 4b: Deactivation + Status Verification (2026-04-04) |
+| **Previous Completion** | M38.0 — Marketplaces Phase 4: Async Lifecycle + Resilience (2026-04-03) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-03 (M38.1 Session 1 complete — 135 integration tests, 9 E2E scenarios, 0 errors)*
+*Last Updated: 2026-04-04 (M38.1 closed — 139 integration tests, 9 E2E scenarios, 0 errors)*
 
 ---
 
 ## Active Milestone
 
-### 🚀 M38.1: Marketplaces Phase 4b — Deactivation + Status Verification
-
-**Status:** 🚀 **IN PROGRESS** — Session 1 complete; Session 2 needed for Amazon/eBay `CheckSubmissionStatusAsync` + closure
-**Goal:** Complete the deactivation and status-checking layers deferred from M38.0 — resolve the Walmart interface design limitation, implement Walmart `DeactivateListingAsync`, add Amazon/eBay `CheckSubmissionStatusAsync` real implementations, and address orphaned eBay draft cleanup
-
-**Planning Documents:**
-- [M38.1 Planning Notes](./milestones/m38-1-planning-notes.md) — Known scope, Walmart interface design decision, open questions, codebase state
-- [M38.0 Milestone Closure Retrospective](./milestones/m38-0-milestone-closure-retrospective.md) — Section 5 (debt table) and Section 6 (inherited state)
-
-**M38.1 Session 1 Progress (2026-04-03):**
-- ✅ A-0: Decision log — Q1: refined Option (a) `wmrt-{sku}` in handler; Q2-Q4 deferred
-- ✅ A-1: ADR 0057 — Walmart deactivation identifier design (two-identifier distinction)
-- ✅ A-2: `CheckWalmartFeedStatusHandler` publishes `wmrt-{Sku}` in `MarketplaceListingActivated`
-- ✅ A-3: `WalmartMarketplaceAdapter.DeactivateListingAsync` — RETIRE_ITEM feed implementation
-- ✅ A-4: 3 Walmart deactivation tests (replaced TODO comments + gap test)
-- ✅ A-5: `WalmartPollingHandlerTests` assert `wmrt-{sku}` format in activated message
-- **Integration tests:** 135 (94 Marketplaces + 41 Listings), 0 failures
-- **Build:** 0 errors, 16 warnings (pre-existing)
-- **Retrospective:** [Session 1](./milestones/m38-1-session-1-retrospective.md)
-
-**Remaining for Session 2:**
-- Amazon `CheckSubmissionStatusAsync` real implementation
-- eBay `CheckSubmissionStatusAsync` real implementation
-- Orphaned eBay draft offer cleanup (background sweep design)
-- Milestone closure
-
-**Codebase State at M38.1 Start:**
-- Integration tests: 133 (92 Marketplaces + 41 Listings), 0 failures
-- E2E scenarios: 9 active on `@shard-3`
-- Build: 0 errors, 16 warnings (all pre-existing)
-- Next ADR: 0057
+No active milestone. Next milestone (M39.x) to be planned — likely Product Variants or a skills refresh pass.
 
 ---
 
 ## Recent Completions
+
+### ✅ M38.1: Marketplaces Phase 4b — Deactivation + Status Verification (2026-04-04)
+
+**Status:** ✅ **Complete** — 2 implementation sessions; all DoD criteria met (8/8 green)
+**Goal:** Complete the deactivation and status-checking layers deferred from M38.0 — resolve the Walmart interface design limitation, implement Walmart `DeactivateListingAsync`, add Amazon/eBay `CheckSubmissionStatusAsync` real implementations, and surface orphaned eBay drafts
+
+**Key Deliverables:**
+- **Session 1:** ADR 0057 (Walmart deactivation identifier design), `CheckWalmartFeedStatusHandler` fix (`wmrt-{sku}`), `WalmartMarketplaceAdapter.DeactivateListingAsync` (RETIRE_ITEM feed), 3 Walmart deactivation tests, `WalmartPollingHandlerTests` assertion update. 135 tests.
+- **Session 2:** `AmazonMarketplaceAdapter.CheckSubmissionStatusAsync` (GET SP-API listing status — BUYABLE/404/other), `EbayMarketplaceAdapter.CheckSubmissionStatusAsync` (GET offer status — PUBLISHED/UNPUBLISHED orphaned draft detection), 6 new tests (3 Amazon + 3 eBay). 139 tests.
+
+**DoD:** 8/8 green
+**Test Baseline:** 139 integration tests (98 Marketplaces + 41 Listings), 9 E2E scenarios (`@shard-3`), 0 failures
+**Final ADR:** 0057 (next: 0058)
+**CI:** Latest main CI run #881 (green)
+
+**Inherited by M39.x:**
+1. eBay orphaned draft background sweep — detection in place, cleanup deferred
+2. `SemaphoreSlim` base class extraction — deferred until fourth adapter
+3. Rate limiting / 429 marketplace-specific handling
+
+**Retrospectives:** [Session 1](./milestones/m38-1-session-1-retrospective.md) · [Milestone Closure](./milestones/m38-1-milestone-closure-retrospective.md)
 
 ### ✅ M38.0: Marketplaces Phase 4 — Async Lifecycle + Resilience (2026-04-03)
 
