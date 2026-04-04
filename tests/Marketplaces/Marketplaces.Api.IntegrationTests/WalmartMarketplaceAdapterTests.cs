@@ -327,37 +327,94 @@ public sealed class WalmartMarketplaceAdapterTests : IDisposable
     }
 
     [Fact]
-    public async Task DeactivateListing_ReturnsFalse_DueToSkuGap()
+    public async Task DeactivateListing_ReturnsTrue_WhenRetireFeedSucceeds()
     {
-        // Walmart RETIRE_ITEM feed requires the item SKU, but DeactivateListingAsync only
-        // receives the externalListingId in "wmrt-{feedId}" format. The feed ID cannot be
-        // reverse-mapped to the SKU at the adapter level.
-        //
-        // This is an intentional architectural limitation documented in ADR 0056.
-        // The caller (a future ListingEndedHandler in Marketplaces BC) must pass the SKU
-        // when triggering deactivation. This will be resolved in Session 3 / M38.1.
-        //
-        // Note: No HTTP requests are made — the adapter logs the gap and returns false immediately.
+        // Arrange — OAuth token response
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-walmart-token",
+            token_type = "Bearer",
+            expires_in = 900
+        });
 
-        // Act — no HTTP setup needed; adapter returns false before making any API calls
-        var result = await _adapter.DeactivateListingAsync("wmrt-FEED-456");
+        // RETIRE_ITEM feed accepted
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            feedId = "RETIRE-FEED-001"
+        });
+
+        // Act — wmrt-{sku} format (after A-2 fix in CheckWalmartFeedStatusHandler)
+        var result = await _adapter.DeactivateListingAsync("wmrt-CritterKibble-001");
+
+        // Assert
+        result.ShouldBeTrue();
+        _httpHandler.SentRequests.Count.ShouldBe(2); // token + retire feed
+    }
+
+    [Fact]
+    public async Task DeactivateListing_ReturnsFalse_WhenRetireFeedFails()
+    {
+        // Arrange — OAuth token response
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-walmart-token",
+            token_type = "Bearer",
+            expires_in = 900
+        });
+
+        // RETIRE_ITEM feed rejected
+        _httpHandler.EnqueueResponse(HttpStatusCode.BadRequest, new
+        {
+            errors = new[] { new { code = "INVALID_REQUEST", description = "Item not found" } }
+        });
+
+        // Act
+        var result = await _adapter.DeactivateListingAsync("wmrt-UNKNOWN-SKU");
 
         // Assert
         result.ShouldBeFalse();
-        _httpHandler.SentRequests.ShouldBeEmpty();
     }
 
-    // TODO (M38.1): DeactivateListing_ReturnsTrue_WhenRetireFeedSucceeds
-    // Blocked by the SKU gap: once the caller passes the SKU to DeactivateListingAsync,
-    // this test should stage a token exchange response + 200 RETIRE_ITEM feed response
-    // and assert result is true. See ADR 0056 for the design.
-    //
-    // TODO (M38.1): DeactivateListing_ReturnsFalse_WhenRetireFeedFails
-    // Stage token exchange + 4xx response; assert false.
-    //
-    // TODO (M38.1): DeactivateListing_BuildsCorrectRetireFeedRequest
-    // Verify the feed POST URL, feedType=RETIRE_ITEM, request body contains correct SKU,
-    // and Walmart auth headers (WM_SEC.ACCESS_TOKEN, WM_CONSUMER.ID, etc.).
+    [Fact]
+    public async Task DeactivateListing_BuildsCorrectRetireFeedRequest()
+    {
+        // Arrange — OAuth token response
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            access_token = "test-walmart-token",
+            token_type = "Bearer",
+            expires_in = 900
+        });
+
+        // RETIRE_ITEM feed accepted
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new
+        {
+            feedId = "RETIRE-FEED-002"
+        });
+
+        // Act
+        await _adapter.DeactivateListingAsync("wmrt-CritterKibble-002");
+
+        // Assert — verify the RETIRE_ITEM feed request (second request; first is token exchange)
+        _httpHandler.SentRequests.Count.ShouldBe(2);
+
+        var retireRequest = _httpHandler.SentRequests[1];
+        retireRequest.Method.ShouldBe(HttpMethod.Post);
+        retireRequest.RequestUri!.ToString().ShouldContain("/v3/feeds?feedType=RETIRE_ITEM");
+
+        // Required Walmart headers
+        retireRequest.Headers.GetValues("WM_SEC.ACCESS_TOKEN").ShouldContain("test-walmart-token");
+        retireRequest.Headers.GetValues("WM_CONSUMER.ID").ShouldContain("WALMART-SELLER-123");
+        retireRequest.Headers.GetValues("WM_SVC.NAME").ShouldContain("Walmart Marketplace");
+        retireRequest.Headers.TryGetValues("WM_QOS.CORRELATION_ID", out var correlationIds).ShouldBeTrue();
+        correlationIds!.First().ShouldNotBeNullOrEmpty();
+
+        // Verify request body contains the SKU (wmrt- prefix stripped)
+        var body = _httpHandler.SentRequestBodies[1]; // second request is the retire feed
+        body.ShouldNotBeNull();
+        body.ShouldContain("CritterKibble-002");
+        body.ShouldNotContain("wmrt-");
+    }
 
     private static ListingSubmission CreateTestSubmission(string sku = "SKU-001") =>
         new(

@@ -39,11 +39,15 @@ public static class CheckWalmartFeedStatusHandler
 
         if (status.IsLive)
         {
+            // ExternalListingId uses the SKU (not the feed ID) because downstream consumers
+            // (e.g. DeactivateListingAsync) need the SKU for Walmart RETIRE_ITEM feeds.
+            // The feed ID is a transient processing artifact used only for polling.
+            // See ADR 0057 for the full two-identifier design rationale.
             outgoing.Add(new MarketplaceListingActivated(
                 message.ListingId,
                 message.Sku,
                 message.ChannelCode,
-                externalSubmissionId,
+                $"wmrt-{message.Sku}",
                 now));
             return outgoing;
         }
