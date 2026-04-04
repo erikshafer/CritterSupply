@@ -195,29 +195,59 @@ public sealed class WalmartMarketplaceAdapter : IMarketplaceAdapter
         }
     }
 
-    public Task<bool> DeactivateListingAsync(
+    public async Task<bool> DeactivateListingAsync(
         string externalListingId,
         CancellationToken ct = default)
     {
-        // Architectural gap — cannot implement Walmart RETIRE_ITEM feed without the item SKU.
-        //
-        // The RETIRE_ITEM feed payload requires the item SKU (e.g. "CritterKibble-001"), but
-        // this method only receives the externalListingId in the format "wmrt-{feedId}" — which
-        // is the submission feed ID returned by the original MP_ITEM feed submission.
-        // The feed ID cannot be reverse-mapped to the SKU without a data store lookup.
-        //
-        // Resolution (deferred to Session 3 / M38.1): the caller (a future
-        // ListingEndedHandler in Marketplaces BC) must include the SKU when triggering
-        // deactivation, either by passing it explicitly or by encoding it in the external ID.
-        // See ADR 0056 for the full discussion of this limitation.
-        _logger.LogWarning(
-            "Walmart DeactivateListingAsync cannot proceed: externalListingId '{ExternalListingId}' " +
-            "carries the submission feed ID, but Walmart RETIRE_ITEM feed requires the item SKU. " +
-            "The caller must provide the SKU to complete deactivation. " +
-            "This gap is tracked in ADR 0056 and targeted for M38.1.",
-            externalListingId);
+        // externalListingId format: wmrt-{sku} (see ADR 0057 for the two-identifier design)
+        var sku = externalListingId.StartsWith("wmrt-", StringComparison.OrdinalIgnoreCase)
+            ? externalListingId["wmrt-".Length..]
+            : externalListingId;
 
-        return Task.FromResult(false);
+        try
+        {
+            var accessToken = await GetAccessTokenAsync(ct);
+            var sellerId = await _vault.GetSecretAsync("walmart/seller-id", ct);
+
+            var client = _httpClientFactory.CreateClient("WalmartApi");
+
+            var requestUrl = $"{FeedsBaseUrl}?feedType=RETIRE_ITEM";
+
+            var feedBody = BuildRetireFeedBody(sku);
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, requestUrl);
+            request.Headers.Add("WM_SEC.ACCESS_TOKEN", accessToken);
+            request.Headers.Add("WM_CONSUMER.ID", sellerId);
+            request.Headers.Add("WM_SVC.NAME", "Walmart Marketplace");
+            request.Headers.Add("WM_QOS.CORRELATION_ID", Guid.NewGuid().ToString());
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Content = JsonContent.Create(feedBody, options: JsonOptions);
+
+            _logger.LogInformation(
+                "Submitting RETIRE_ITEM feed to Walmart Marketplace API: SKU={Sku}, ExternalListingId={ExternalListingId}",
+                sku, externalListingId);
+
+            using var response = await client.SendAsync(request, ct);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation(
+                    "Walmart RETIRE_ITEM feed accepted: SKU={Sku}",
+                    sku);
+                return true;
+            }
+
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            _logger.LogWarning(
+                "Walmart RETIRE_ITEM feed failed: SKU={Sku}, StatusCode={StatusCode}, Body={Body}",
+                sku, (int)response.StatusCode, errorBody);
+            return false;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to submit RETIRE_ITEM feed to Walmart Marketplace API: SKU={Sku}", sku);
+            return false;
+        }
     }
 
     /// <summary>
@@ -297,6 +327,18 @@ public sealed class WalmartMarketplaceAdapter : IMarketplaceAdapter
         };
     }
 
+    /// <summary>
+    /// Builds the Walmart RETIRE_ITEM feed body for a single item.
+    /// The RETIRE_ITEM feed requires only the SKU to identify the item to retire.
+    /// </summary>
+    private static WalmartRetireFeed BuildRetireFeedBody(string sku)
+    {
+        return new WalmartRetireFeed
+        {
+            Items = [new WalmartRetireItem { Sku = sku }]
+        };
+    }
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -337,6 +379,18 @@ public sealed class WalmartMarketplaceAdapter : IMarketplaceAdapter
     {
         [JsonPropertyName("items")]
         public WalmartFeedItem[] Items { get; init; } = [];
+    }
+
+    private sealed record WalmartRetireFeed
+    {
+        [JsonPropertyName("items")]
+        public WalmartRetireItem[] Items { get; init; } = [];
+    }
+
+    private sealed record WalmartRetireItem
+    {
+        [JsonPropertyName("sku")]
+        public string Sku { get; init; } = string.Empty;
     }
 
     private sealed record WalmartFeedItem
