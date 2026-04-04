@@ -49,7 +49,6 @@ public static class UpdateMarketplaceEndpoint
         marketplace.UpdatedAt = DateTimeOffset.UtcNow;
 
         session.Store(marketplace);
-        await session.SaveChangesAsync(ct);
 
         return Results.Ok(marketplace);
     }

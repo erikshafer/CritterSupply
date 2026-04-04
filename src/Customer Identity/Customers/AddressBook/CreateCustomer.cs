@@ -98,7 +98,6 @@ public static class CreateCustomerHandler
             command.LastName);
 
         dbContext.Customers.Add(customer);
-        await dbContext.SaveChangesAsync(ct);
 
         return new CreationResponse<Guid>($"/api/customers/{customer.Id}", customer.Id);
     }

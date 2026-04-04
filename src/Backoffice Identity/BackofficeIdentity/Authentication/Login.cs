@@ -120,8 +120,6 @@ public static class LoginHandler
         user.RefreshTokenExpiresAt = refreshTokenExpiresAt;
         user.LastLoginAt = DateTimeOffset.UtcNow;
 
-        await db.SaveChangesAsync(ct);
-
         var response = new LoginResponse(
             AccessToken: accessToken,
             RefreshToken: refreshToken,

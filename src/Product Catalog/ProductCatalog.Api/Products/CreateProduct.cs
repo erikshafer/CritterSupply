@@ -57,7 +57,7 @@ public static class CreateProductHandler
         if (existing)
             return (Results.Conflict(new { Message = "Product with SKU already exists" }), outgoing);
 
-        var productId = Guid.NewGuid();
+        var productId = Guid.CreateVersion7();
         var images = command.Images?
             .Select(dto => ProductImage.Create(dto.Url, dto.AltText, dto.SortOrder))
             .ToList()
