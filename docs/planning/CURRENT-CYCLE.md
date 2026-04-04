@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M39.0 — Critter Stack Idiom Refresh: Correspondence + Pricing BCs |
-| **Status** | 🟡 **IN PROGRESS** — S0 + S1 + S2 (Correspondence) + S3 (Pricing) complete |
-| **Recent Completion** | M39.0 S3 — Pricing BC fat endpoints → command+handler (Load() pattern); snapshot configured (2026-04-04) |
-| **Previous Completion** | M39.0 S2 — SendMessageHandler decomposition + snapshot + connection string (2026-04-04) |
+| **Current Milestone** | M39.0 — Critter Stack Idiom Refresh: Correspondence + Pricing + Orders BCs |
+| **Status** | 🟡 **IN PROGRESS** — S0 + S1 + S2 (Correspondence) + S3 (Pricing) + S4 (Orders Checkout) complete |
+| **Recent Completion** | M39.0 S4 — Orders Checkout `[WriteAggregate]` spike succeeded; outbox risk eliminated; 3 redundant `SaveChangesAsync` removed (2026-04-04) |
+| **Previous Completion** | M39.0 S3 — Pricing BC fat endpoints → command+handler (Load() pattern); snapshot configured (2026-04-04) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-04 (M39.0 Session 3 complete — [retrospective](./milestones/m39-0-session-3-retrospective.md))*
+*Last Updated: 2026-04-04 (M39.0 Session 4 complete — [retrospective](./milestones/m39-0-session-4-retrospective.md))*
 
 ---
 
@@ -84,6 +84,14 @@
 - All `Guid.NewGuid()` placeholders replaced with `Guid.Empty` + `// TODO: Extract from JWT claim`
 - `Snapshot<ProductPrice>(SnapshotLifecycle.Inline)` added to `Pricing.Api/Program.cs`
 - Pricing integration tests: 25/25 passing throughout; 0 errors
+
+**Session 4 (this session):** Orders Checkout — outbox risk eliminated + redundant `SaveChangesAsync` removed:
+- `CompleteCheckout` fully refactored: `Before(Checkout? checkout)` + `Handle(Guid, [WriteAggregate] Checkout)` compound pattern; returns `(IResult, Events, OutgoingMessages)`
+- Outbox risk eliminated: `[WriteAggregate]` ensures event append + `CartCheckoutCompleted` outbox enrollment happen in one transactional middleware cycle (no two-phase commit gap)
+- `[WriteAggregate]` spike confirmed: `(IResult, Events, OutgoingMessages)` triple-tuple is a valid Wolverine HTTP return type
+- M32.3 "Direct Implementation" comment removed from `CompleteCheckout`; updated on 3 mixed handlers
+- Redundant `await session.SaveChangesAsync(ct)` removed from `ProvideShippingAddressHandler`, `SelectShippingMethodHandler`, `ProvidePaymentMethodHandler` (all covered by `AutoApplyTransactions()`)
+- Orders integration tests: 48/48 passing throughout; 0 errors
 
 ## Recent Completions
 
