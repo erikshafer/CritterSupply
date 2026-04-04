@@ -146,23 +146,95 @@ public sealed class EbayMarketplaceAdapter : IMarketplaceAdapter
         }
     }
 
-    public Task<SubmissionStatus> CheckSubmissionStatusAsync(
+    public async Task<SubmissionStatus> CheckSubmissionStatusAsync(
         string externalSubmissionId,
         CancellationToken ct = default)
     {
-        // Skeleton implementation — real status checking deferred to M38.x (D-3).
-        // A full implementation would call GET /sell/inventory/v1/offer/{offerId}
-        // to check the offer status and listing details.
-        _logger.LogInformation(
-            "CheckSubmissionStatusAsync not yet implemented for eBay Sell API. " +
-            "Returning pending status for submission {SubmissionId}.",
-            externalSubmissionId);
+        // externalSubmissionId format: ebay-{offerId}
+        var offerId = externalSubmissionId.StartsWith("ebay-", StringComparison.OrdinalIgnoreCase)
+            ? externalSubmissionId["ebay-".Length..]
+            : externalSubmissionId;
 
-        return Task.FromResult(new SubmissionStatus(
-            ExternalSubmissionId: externalSubmissionId,
-            IsLive: false,
-            IsFailed: false,
-            FailureReason: "Status polling not yet implemented — deferred to M38.x"));
+        try
+        {
+            var accessToken = await GetAccessTokenAsync(ct);
+            var marketplaceId = await _vault.GetSecretAsync("ebay/marketplace-id", ct);
+
+            var client = _httpClientFactory.CreateClient("EbayApi");
+
+            // GET /sell/inventory/v1/offer/{offerId}
+            var requestUrl = $"{OfferBaseUrl}/{Uri.EscapeDataString(offerId)}";
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Headers.Add("X-EBAY-C-MARKETPLACE-ID", marketplaceId);
+
+            _logger.LogInformation(
+                "Checking eBay offer status: OfferId={OfferId}",
+                offerId);
+
+            using var response = await client.SendAsync(request, ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning(
+                    "eBay offer status check failed: OfferId={OfferId}, StatusCode={StatusCode}, Body={Body}",
+                    offerId, (int)response.StatusCode, errorBody);
+                return new SubmissionStatus(
+                    ExternalSubmissionId: externalSubmissionId,
+                    IsLive: false,
+                    IsFailed: true,
+                    FailureReason: $"eBay offer status check returned {(int)response.StatusCode}: {errorBody}");
+            }
+
+            var offer = await response.Content.ReadFromJsonAsync<EbayOfferStatusResponse>(JsonOptions, ct);
+            var status = offer?.Status ?? string.Empty;
+
+            _logger.LogInformation(
+                "eBay offer status: OfferId={OfferId}, Status={Status}",
+                offerId, status);
+
+            if (status.Equals("PUBLISHED", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SubmissionStatus(
+                    ExternalSubmissionId: externalSubmissionId,
+                    IsLive: true,
+                    IsFailed: false);
+            }
+
+            // UNPUBLISHED = orphaned draft — offer was created but publish failed.
+            // Log a warning with the offerId for discoverability. A future background sweep
+            // will clean these up. Surface as failed so callers know this submission needs attention.
+            if (status.Equals("UNPUBLISHED", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "eBay offer is UNPUBLISHED (orphaned draft): OfferId={OfferId}. " +
+                    "Publish may have failed after offer creation. A background sweep will clean this up.",
+                    offerId);
+                return new SubmissionStatus(
+                    ExternalSubmissionId: externalSubmissionId,
+                    IsLive: false,
+                    IsFailed: true,
+                    FailureReason: $"eBay offer '{offerId}' is UNPUBLISHED — orphaned draft from failed publish step");
+            }
+
+            // Unknown status — treat as still pending
+            return new SubmissionStatus(
+                ExternalSubmissionId: externalSubmissionId,
+                IsLive: false,
+                IsFailed: false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to check eBay offer status: OfferId={OfferId}", offerId);
+            return new SubmissionStatus(
+                ExternalSubmissionId: externalSubmissionId,
+                IsLive: false,
+                IsFailed: true,
+                FailureReason: $"eBay adapter error checking status: {ex.Message}");
+        }
     }
 
     public async Task<bool> DeactivateListingAsync(
@@ -372,5 +444,11 @@ public sealed class EbayMarketplaceAdapter : IMarketplaceAdapter
     {
         [JsonPropertyName("listingId")]
         public string? ListingId { get; init; }
+    }
+
+    private sealed record EbayOfferStatusResponse
+    {
+        [JsonPropertyName("status")]
+        public string? Status { get; init; }
     }
 }
