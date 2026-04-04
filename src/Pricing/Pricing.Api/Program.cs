@@ -8,6 +8,7 @@ using JasperFx.Events.Daemon;
 using JasperFx.Events.Projections;
 using JasperFx.Resources;
 using Marten;
+using Marten.Events.Projections;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Pricing;
@@ -42,6 +43,9 @@ builder.Services.AddMarten(opts =>
 
         // Configure ProductPrice as an event-sourced aggregate
         opts.Events.StreamIdentity = StreamIdentity.AsGuid;
+
+        // Configure ProductPrice aggregate snapshot for efficient event-replay reads
+        opts.Projections.Snapshot<ProductPrice>(SnapshotLifecycle.Inline);
 
         // Configure CurrentPriceView inline projection for hot-path queries
         opts.Projections.Add<CurrentPriceViewProjection>(ProjectionLifecycle.Inline);

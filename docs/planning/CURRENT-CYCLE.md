@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M39.0 — Critter Stack Idiom Refresh: Correspondence BC |
-| **Status** | 🟡 **IN PROGRESS** — S0 + S1 + S2 complete; Correspondence BC idiomatically clean |
-| **Recent Completion** | M39.0 S2 — SendMessageHandler decomposition + snapshot + connection string (2026-04-04) |
-| **Previous Completion** | M39.0 S1 — Correspondence handlers IStartStream + static class (2026-04-04) |
+| **Current Milestone** | M39.0 — Critter Stack Idiom Refresh: Correspondence + Pricing BCs |
+| **Status** | 🟡 **IN PROGRESS** — S0 + S1 + S2 (Correspondence) + S3 (Pricing) complete |
+| **Recent Completion** | M39.0 S3 — Pricing BC fat endpoints → command+handler (Load() pattern); snapshot configured (2026-04-04) |
+| **Previous Completion** | M39.0 S2 — SendMessageHandler decomposition + snapshot + connection string (2026-04-04) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-04 (M39.0 Session 2 complete — [retrospective](./milestones/m39-0-session-2-retrospective.md))*
+*Last Updated: 2026-04-04 (M39.0 Session 3 complete — [retrospective](./milestones/m39-0-session-3-retrospective.md))*
 
 ---
 
@@ -77,7 +77,13 @@
 - Connection string key: `"marten"` → `"postgres"` in `Program.cs` + `appsettings.json`
 - Correspondence integration tests: 5/5 passing throughout
 
----
+**Session 3 (this session):** Pricing BC — 3 fat endpoints in `Pricing.Api` decomposed to command+handler in `Pricing` domain project:
+- `SetBasePriceEndpoint.cs` → `SetBasePrice.cs` in `Pricing/Products/` — Load() pattern (not `[WriteAggregate]`; UUID v5 stream ID)
+- `SchedulePriceChangeEndpoint.cs` → `SchedulePriceChange.cs` — Load()/Before()/Handle() for both HTTP handler and `ActivateScheduledPriceChange` internal message handler; `IMessageBus.ScheduleAsync()` preserved
+- `CancelScheduledPriceChangeEndpoint.cs` → `CancelScheduledPriceChange.cs` — single-method async handler (DELETE verb; no body; compound pattern incompatible with `LoadAsync` + no-body DELETE)
+- All `Guid.NewGuid()` placeholders replaced with `Guid.Empty` + `// TODO: Extract from JWT claim`
+- `Snapshot<ProductPrice>(SnapshotLifecycle.Inline)` added to `Pricing.Api/Program.cs`
+- Pricing integration tests: 25/25 passing throughout; 0 errors
 
 ## Recent Completions
 
