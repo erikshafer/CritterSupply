@@ -41,26 +41,33 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | TBD — M39.x planning session complete, awaiting Erik's decision |
-| **Status** | 📋 **AWAITING DECISION** — M39.x planning audit complete; 3 scoping options presented to Erik |
-| **Recent Completion** | M39.x Planning Session — Critter Stack Idiom Audit + Refresh Priorities (2026-04-04) |
-| **Previous Completion** | M38.1 — Marketplaces Phase 4b: Deactivation + Status Verification (2026-04-04) |
+| **Current Milestone** | M39.0 — Critter Stack Idiom Refresh: Correspondence BC |
+| **Status** | 🟡 **IN PROGRESS** — S0 + S1 complete; S2 (SendMessageHandler + snapshot + connection string) pending |
+| **Recent Completion** | M39.0 S1 — Correspondence handlers IStartStream + static class (2026-04-04) |
+| **Previous Completion** | M39.0 S0 — EF Core SaveChangesAsync sweep + Guid.CreateVersion7() (2026-04-04, PR #516) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-04 (M39.x planning session complete — audit findings at [m39-x-planning-session.md](./milestones/m39-x-planning-session.md))*
+*Last Updated: 2026-04-04 (M39.0 Session 1 complete — [retrospective](./milestones/m39-0-session-1-retrospective.md))*
 
 ---
 
 ## Active Milestone
 
-No active milestone. M39.x planning session complete (2026-04-04). Audit findings and three scoping options presented to Erik at [m39-x-planning-session.md](./milestones/m39-x-planning-session.md).
+### M39.0 — Critter Stack Idiom Refresh: Correspondence BC
 
-**Options for Erik:**
-- **Option A (Recommended): Targeted BC Refresh** — Correspondence + Pricing + Orders Checkout (4-6 sessions)
-- **Option B: Broad Idiom Sweep** — All flagged issues across all BCs (8-12 sessions)
-- **Option C: Opportunistic Only** — Fix idiom issues only when touching BCs for feature work
+**Goal:** Bring Correspondence BC up to current Critter Stack idioms — eliminate Anti-Pattern #9 (`session.Events.StartStream` → `MartenOps.StartStream`), convert handlers to static classes, decompose `SendMessageHandler`, configure snapshots, standardize connection strings.
 
-**Key findings:** Correspondence BC has 9 `StartStream` violations (most concentrated drift). Pricing has 3 fat endpoints. Orders Checkout has an outbox consistency risk. 14 redundant `SaveChangesAsync()` in EF Core BCs.
+**Session 0 (PR #516, merged):** Mechanical sweep — removed redundant `SaveChangesAsync()` calls from EF Core BCs (Customer Identity, Backoffice Identity) and Marketplaces document-store handlers; converted `Guid.NewGuid()` → `Guid.CreateVersion7()` in stream-creation paths. +7/-34 lines. No retrospective produced (reasonable for sweep size).
+
+**Session 1 (this session):** Refactored all 9 Correspondence integration event handlers:
+- `session.Events.StartStream<Message>()` → `MartenOps.StartStream<Message>()` (returns `IStartStream`)
+- Instance classes → static classes
+- Removed `IDocumentSession`, `CancellationToken`, `async` keyword from all 9 handlers
+- Return type: `async Task<OutgoingMessages>` → `(IStartStream, OutgoingMessages)`
+- Build warnings reduced from 19 → 11 (eliminated 8 CS1998 warnings)
+- Correspondence integration tests: 5/5 passing before and after
+
+**Session 2 (pending):** `SendMessageHandler` decomposition, `Message` snapshot configuration, connection string standardization. See [session 1 retrospective](./milestones/m39-0-session-1-retrospective.md) for Session 2 verification items.
 
 ---
 

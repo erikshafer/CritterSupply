@@ -1,7 +1,7 @@
-using Marten;
 using Messages.Contracts.Correspondence;
 using Messages.Contracts.Fulfillment;
 using Wolverine;
+using Wolverine.Marten;
 
 namespace Correspondence.Messages;
 
@@ -9,12 +9,9 @@ namespace Correspondence.Messages;
 /// Handles ShipmentDeliveryFailed integration events to alert customers about delivery issues.
 /// Choreography pattern: subscribes to ShipmentDeliveryFailed, creates Message aggregate, publishes CorrespondenceQueued.
 /// </summary>
-public sealed class ShipmentDeliveryFailedHandler
+public static class ShipmentDeliveryFailedHandler
 {
-    public async Task<OutgoingMessages> Handle(
-        ShipmentDeliveryFailed @event,
-        IDocumentSession session,
-        CancellationToken ct)
+    public static (IStartStream, OutgoingMessages) Handle(ShipmentDeliveryFailed @event)
     {
         // TODO: Query Orders BC to get CustomerId for this OrderId
         // For Phase 2, we'll add cross-BC queries. Phase 1 uses placeholder.
@@ -49,8 +46,8 @@ public sealed class ShipmentDeliveryFailedHandler
             body: body
         );
 
-        // Persist event stream
-        session.Events.StartStream<Message>(message.Id, messageQueued);
+        // Wolverine handles stream creation transactionally via IStartStream return
+        var stream = MartenOps.StartStream<Message>(message.Id, messageQueued);
 
         // Build outgoing messages
         var outgoing = new OutgoingMessages();
@@ -66,6 +63,6 @@ public sealed class ShipmentDeliveryFailedHandler
         // Trigger send command
         outgoing.Add(new SendMessage(message.Id));
 
-        return outgoing;
+        return (stream, outgoing);
     }
 }

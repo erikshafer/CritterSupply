@@ -1,7 +1,7 @@
-using Marten;
 using Messages.Contracts.Correspondence;
 using Messages.Contracts.Returns;
 using Wolverine;
+using Wolverine.Marten;
 
 namespace Correspondence.Messages;
 
@@ -9,12 +9,9 @@ namespace Correspondence.Messages;
 /// Handles ReturnApproved integration events to send return label emails.
 /// Choreography pattern: subscribes to ReturnApproved, creates Message aggregate, publishes CorrespondenceQueued.
 /// </summary>
-public sealed class ReturnApprovedHandler
+public static class ReturnApprovedHandler
 {
-    public async Task<OutgoingMessages> Handle(
-        ReturnApproved @event,
-        IDocumentSession session,
-        CancellationToken ct)
+    public static (IStartStream, OutgoingMessages) Handle(ReturnApproved @event)
     {
         // TODO: Query Customer Identity BC for customer preferences
         // For now, assume customer has email notifications enabled
@@ -50,8 +47,8 @@ public sealed class ReturnApprovedHandler
             body: body
         );
 
-        // Persist event stream
-        session.Events.StartStream<Message>(message.Id, messageQueued);
+        // Wolverine handles stream creation transactionally via IStartStream return
+        var stream = MartenOps.StartStream<Message>(message.Id, messageQueued);
 
         // Build outgoing messages
         var outgoing = new OutgoingMessages();
@@ -67,6 +64,6 @@ public sealed class ReturnApprovedHandler
         // Trigger send command
         outgoing.Add(new SendMessage(message.Id));
 
-        return outgoing;
+        return (stream, outgoing);
     }
 }

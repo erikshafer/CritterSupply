@@ -1,7 +1,7 @@
-using Marten;
 using Messages.Contracts.Correspondence;
 using Messages.Contracts.Returns;
 using Wolverine;
+using Wolverine.Marten;
 
 namespace Correspondence.Messages;
 
@@ -9,12 +9,9 @@ namespace Correspondence.Messages;
 /// Handles ReturnDenied integration events to notify customers when their return request is rejected.
 /// Choreography pattern: subscribes to ReturnDenied, creates Message aggregate, publishes CorrespondenceQueued.
 /// </summary>
-public sealed class ReturnDeniedHandler
+public static class ReturnDeniedHandler
 {
-    public async Task<OutgoingMessages> Handle(
-        ReturnDenied @event,
-        IDocumentSession session,
-        CancellationToken ct)
+    public static (IStartStream, OutgoingMessages) Handle(ReturnDenied @event)
     {
         // Template rendering will be enhanced with proper template system
         var subject = $"Return Request Update - Decision Required";
@@ -48,8 +45,8 @@ public sealed class ReturnDeniedHandler
             body: body
         );
 
-        // Persist event stream
-        session.Events.StartStream<Message>(message.Id, messageQueued);
+        // Wolverine handles stream creation transactionally via IStartStream return
+        var stream = MartenOps.StartStream<Message>(message.Id, messageQueued);
 
         // Build outgoing messages
         var outgoing = new OutgoingMessages();
@@ -65,6 +62,6 @@ public sealed class ReturnDeniedHandler
         // Trigger send command
         outgoing.Add(new SendMessage(message.Id));
 
-        return outgoing;
+        return (stream, outgoing);
     }
 }

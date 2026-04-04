@@ -1,7 +1,7 @@
-using Marten;
 using Messages.Contracts.Correspondence;
 using Messages.Contracts.Returns;
 using Wolverine;
+using Wolverine.Marten;
 
 namespace Correspondence.Messages;
 
@@ -9,12 +9,9 @@ namespace Correspondence.Messages;
 /// Handles ReturnExpired integration events to notify customers when their return window has closed.
 /// Choreography pattern: subscribes to ReturnExpired, creates Message aggregate, publishes CorrespondenceQueued.
 /// </summary>
-public sealed class ReturnExpiredHandler
+public static class ReturnExpiredHandler
 {
-    public async Task<OutgoingMessages> Handle(
-        ReturnExpired @event,
-        IDocumentSession session,
-        CancellationToken ct)
+    public static (IStartStream, OutgoingMessages) Handle(ReturnExpired @event)
     {
         // Template rendering will be enhanced with proper template system
         var subject = $"Return Window Expired - No Action Taken";
@@ -43,8 +40,8 @@ public sealed class ReturnExpiredHandler
             body: body
         );
 
-        // Persist event stream
-        session.Events.StartStream<Message>(message.Id, messageQueued);
+        // Wolverine handles stream creation transactionally via IStartStream return
+        var stream = MartenOps.StartStream<Message>(message.Id, messageQueued);
 
         // Build outgoing messages
         var outgoing = new OutgoingMessages();
@@ -60,6 +57,6 @@ public sealed class ReturnExpiredHandler
         // Trigger send command
         outgoing.Add(new SendMessage(message.Id));
 
-        return outgoing;
+        return (stream, outgoing);
     }
 }

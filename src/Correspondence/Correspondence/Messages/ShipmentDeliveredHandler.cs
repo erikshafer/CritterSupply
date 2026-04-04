@@ -1,7 +1,7 @@
-using Marten;
 using Messages.Contracts.Correspondence;
 using Messages.Contracts.Fulfillment;
 using Wolverine;
+using Wolverine.Marten;
 
 namespace Correspondence.Messages;
 
@@ -9,12 +9,9 @@ namespace Correspondence.Messages;
 /// Handles ShipmentDelivered integration events to send delivery confirmation emails.
 /// Choreography pattern: subscribes to ShipmentDelivered, creates Message aggregate, publishes CorrespondenceQueued.
 /// </summary>
-public sealed class ShipmentDeliveredHandler
+public static class ShipmentDeliveredHandler
 {
-    public async Task<OutgoingMessages> Handle(
-        ShipmentDelivered @event,
-        IDocumentSession session,
-        CancellationToken ct)
+    public static (IStartStream, OutgoingMessages) Handle(ShipmentDelivered @event)
     {
         // TODO: Query Orders BC to get CustomerId for this OrderId
         // For Phase 2, we'll add cross-BC queries. Phase 1 uses placeholder.
@@ -53,8 +50,8 @@ public sealed class ShipmentDeliveredHandler
             body: body
         );
 
-        // Persist event stream
-        session.Events.StartStream<Message>(message.Id, messageQueued);
+        // Wolverine handles stream creation transactionally via IStartStream return
+        var stream = MartenOps.StartStream<Message>(message.Id, messageQueued);
 
         // Build outgoing messages
         var outgoing = new OutgoingMessages();
@@ -70,6 +67,6 @@ public sealed class ShipmentDeliveredHandler
         // Trigger send command
         outgoing.Add(new SendMessage(message.Id));
 
-        return outgoing;
+        return (stream, outgoing);
     }
 }
