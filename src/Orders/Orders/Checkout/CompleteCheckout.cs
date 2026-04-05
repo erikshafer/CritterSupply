@@ -1,52 +1,41 @@
-using Marten;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
+using Wolverine.Marten;
 using Messages.Contracts.CustomerIdentity;
 using ShoppingContracts = Messages.Contracts.Shopping;
 
 namespace Orders.Checkout;
 
-/// <summary>
-/// Direct Implementation pattern — compound handler [WriteAggregate] silently fails
-/// to persist events when mixing route + body parameters (M32.3 discovery).
-/// This handler also publishes a CartCheckoutCompleted integration message via OutgoingMessages.
-/// </summary>
 public static class CompleteCheckoutHandler
 {
-    [WolverinePost("/api/checkouts/{checkoutId}/complete")]
-    public static async Task<(IResult, OutgoingMessages)> Handle(
-        Guid checkoutId,
-        IDocumentSession session,
-        CancellationToken ct)
+    public static ProblemDetails Before(Checkout? checkout)
     {
-        var stream = await session.Events.FetchForWriting<Checkout>(checkoutId, ct);
-        var checkout = stream.Aggregate;
-
         if (checkout is null)
-            return (Results.NotFound(new { detail = "Checkout not found" }), new OutgoingMessages());
-
+            return new ProblemDetails { Detail = "Checkout not found", Status = 404 };
         if (checkout.IsCompleted)
-            return (Results.BadRequest(new { detail = "Checkout has already been completed" }), new OutgoingMessages());
-
+            return new ProblemDetails { Detail = "Checkout has already been completed", Status = 400 };
         if (checkout.ShippingAddress is null)
-            return (Results.BadRequest(new { detail = "Shipping address is required to complete checkout" }), new OutgoingMessages());
-
+            return new ProblemDetails { Detail = "Shipping address is required to complete checkout", Status = 400 };
         if (string.IsNullOrWhiteSpace(checkout.ShippingMethod))
-            return (Results.BadRequest(new { detail = "Shipping method is required to complete checkout" }), new OutgoingMessages());
-
+            return new ProblemDetails { Detail = "Shipping method is required to complete checkout", Status = 400 };
         if (string.IsNullOrWhiteSpace(checkout.PaymentMethodToken))
-            return (Results.BadRequest(new { detail = "Payment method is required to complete checkout" }), new OutgoingMessages());
+            return new ProblemDetails { Detail = "Payment method is required to complete checkout", Status = 400 };
+        return WolverineContinue.NoProblems;
+    }
 
+    [WolverinePost("/api/checkouts/{checkoutId}/complete")]
+    public static (IResult, Events, OutgoingMessages) Handle(
+        Guid checkoutId,
+        [WriteAggregate] Checkout checkout)
+    {
         var orderId = Guid.CreateVersion7();
         var now = DateTimeOffset.UtcNow;
 
-        // Terminal event for Checkout stream
-        var checkoutEvent = new OrderCreated(orderId, now);
-        stream.AppendOne(checkoutEvent);
-        await session.SaveChangesAsync(ct);
+        var events = new Events();
+        events.Add(new OrderCreated(orderId, now));
 
-        // Publish integration message to start Order saga
         var integrationMessage = new ShoppingContracts.CartCheckoutCompleted(
             orderId,
             checkout.Id,
@@ -70,6 +59,6 @@ public static class CompleteCheckoutHandler
         var outgoing = new OutgoingMessages();
         outgoing.Add(integrationMessage);
 
-        return (Results.Ok(new { orderId }), outgoing);
+        return (Results.Ok(new { orderId }), events, outgoing);
     }
 }

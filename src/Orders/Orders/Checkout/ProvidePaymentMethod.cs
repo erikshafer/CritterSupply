@@ -21,7 +21,8 @@ public sealed record ProvidePaymentMethodRequest(
 }
 
 /// <summary>
-/// Direct Implementation pattern — see ProvideShippingAddress.cs for rationale.
+/// Mixed route + body parameter handler — uses FetchForWriting pattern.
+/// AutoApplyTransactions() in Orders.Api handles SaveChangesAsync automatically.
 /// </summary>
 public static class ProvidePaymentMethodHandler
 {
@@ -46,7 +47,6 @@ public static class ProvidePaymentMethodHandler
             DateTimeOffset.UtcNow);
 
         stream.AppendOne(@event);
-        await session.SaveChangesAsync(ct);
 
         return Results.Ok(@event);
     }
