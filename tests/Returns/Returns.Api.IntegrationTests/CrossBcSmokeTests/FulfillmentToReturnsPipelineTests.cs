@@ -13,7 +13,7 @@ public class FulfillmentToReturnsPipelineTests(CrossBcTestFixture fixture)
 {
     private readonly CrossBcTestFixture _fixture = fixture;
 
-    [Fact(Skip = "Blocked by Wolverine saga persistence issue — saga created via InvokeAsync() is not found by subsequent handlers in multi-host tests. See docs/wolverine-saga-persistence-issue.md")]
+    [Fact]
     public async Task ShipmentDelivered_Creates_ReturnEligibilityWindow_In_Returns_BC()
     {
         // Arrange
