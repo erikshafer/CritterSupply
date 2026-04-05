@@ -79,7 +79,7 @@ for full details on what was delivered and what was inherited by the next milest
 **BCs Touched:** Correspondence, Pricing, Orders, Fulfillment, Listings, Promotions, Vendor Portal, Customer Identity, Backoffice Identity, Marketplaces, Product Catalog
 
 **Inherited by next milestone:**
-1. Returns cross-BC saga tests (6 skipped since M36.0) — re-evaluation overdue
+1. Returns cross-BC saga tests (6 skipped since M36.0) — ⏳ **still blocked** on Wolverine 5.27.0 (re-evaluated 2026-04-05, both `InvokeAsync()` and `TrackActivity()` approaches failed; see `docs/wolverine-saga-persistence-issue.md`; re-evaluate at Wolverine 6.x)
 2. `ActivatePromotionHandler` return type — returns single event, should return `Events` collection
 3. Vendor Portal cold-start test flakes (56/86 fail on first container run, all pass on retry)
 4. eBay orphaned draft background sweep (detection in place, cleanup deferred)
