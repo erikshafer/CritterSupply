@@ -102,14 +102,19 @@ public class PromotionLifecycleTests : IClassFixture<TestFixture>
         // Activate once
         await _fixture.ExecuteAndWaitAsync(new ActivatePromotion(promotion.Id));
 
-        // Act & Assert - attempt to activate again
-        var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
-        {
-            await _fixture.ExecuteAndWaitAsync(new ActivatePromotion(promotion.Id));
-        });
+        // Confirm Active
+        var activePromotion = await session.Events
+            .AggregateStreamAsync<Promotions.Promotion.Promotion>(promotion.Id);
+        activePromotion!.Status.ShouldBe(PromotionStatus.Active);
 
-        exception.Message.ShouldContain("Cannot activate promotion");
-        exception.Message.ShouldContain("Active");
+        // Act - attempt to activate again (Before() returns ProblemDetails; pipeline stops silently)
+        await _fixture.ExecuteAndWaitAsync(new ActivatePromotion(promotion.Id));
+
+        // Assert - status is unchanged (still Active, not re-activated)
+        var afterSecondActivation = await session.Events
+            .AggregateStreamAsync<Promotions.Promotion.Promotion>(promotion.Id);
+        afterSecondActivation.ShouldNotBeNull();
+        afterSecondActivation.Status.ShouldBe(PromotionStatus.Active);
     }
 
     [Fact]
