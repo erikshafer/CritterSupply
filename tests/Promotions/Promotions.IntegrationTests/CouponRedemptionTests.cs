@@ -104,20 +104,20 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
 
         await _fixture.ExecuteAndWaitAsync(firstRedemption);
 
-        // Act & Assert - Attempt second redemption
+        // Act: attempt second redemption — Before() returns ProblemDetails, pipeline stops
         var secondRedemption = new RedeemCoupon(
             CouponCode: "DOUBLE10",
             OrderId: Guid.NewGuid(),
             CustomerId: Guid.NewGuid(),
             RedeemedAt: DateTimeOffset.UtcNow);
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
-        {
-            await _fixture.ExecuteAndWaitAsync(secondRedemption);
-        });
+        await _fixture.ExecuteAndWaitAsync(secondRedemption);
 
-        exception.Message.ShouldContain("Cannot redeem coupon");
-        exception.Message.ShouldContain("Redeemed");
+        // Assert: coupon should still be Redeemed (second redemption was rejected by Before())
+        var coupon = await session.Events.AggregateStreamAsync<Promotions.Coupon.Coupon>(
+            Promotions.Coupon.Coupon.StreamId("DOUBLE10"));
+        coupon.ShouldNotBeNull();
+        coupon.Status.ShouldBe(CouponStatus.Redeemed);
     }
 
     [Fact]
@@ -234,14 +234,14 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
         // Revoke once
         await _fixture.ExecuteAndWaitAsync(new RevokeCoupon("DOUBLEREVOKE", "First revoke"));
 
-        // Act & Assert - Attempt second revocation
-        var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
-        {
-            await _fixture.ExecuteAndWaitAsync(new RevokeCoupon("DOUBLEREVOKE", "Second revoke"));
-        });
+        // Act: attempt second revocation — Before() returns ProblemDetails, pipeline stops
+        await _fixture.ExecuteAndWaitAsync(new RevokeCoupon("DOUBLEREVOKE", "Second revoke"));
 
-        exception.Message.ShouldContain("Cannot revoke coupon");
-        exception.Message.ShouldContain("already revoked");
+        // Assert: coupon should still be Revoked (second revocation was rejected by Before())
+        var coupon = await session.Events.AggregateStreamAsync<Promotions.Coupon.Coupon>(
+            Promotions.Coupon.Coupon.StreamId("DOUBLEREVOKE"));
+        coupon.ShouldNotBeNull();
+        coupon.Status.ShouldBe(CouponStatus.Revoked);
     }
 
     [Fact]
@@ -319,7 +319,7 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
             "CAP40-B",
             DateTimeOffset.UtcNow));
 
-        // Act & Assert - Attempt third redemption (should fail)
+        // Act: attempt third redemption — Before() returns ProblemDetails, pipeline stops
         var thirdRedemption = new RecordPromotionRedemption(
             promotion.Id,
             Guid.NewGuid(),
@@ -327,13 +327,12 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
             "CAP40-C",
             DateTimeOffset.UtcNow);
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
-        {
-            await _fixture.ExecuteAndWaitAsync(thirdRedemption);
-        });
+        await _fixture.ExecuteAndWaitAsync(thirdRedemption);
 
-        exception.Message.ShouldContain("usage limit");
-        exception.Message.ShouldContain("has been reached");
+        // Assert: promotion should still have only 2 redemptions (third was rejected by Before())
+        var updatedPromotion = await session.Events.AggregateStreamAsync<Promotions.Promotion.Promotion>(promotion.Id);
+        updatedPromotion.ShouldNotBeNull();
+        updatedPromotion.CurrentRedemptionCount.ShouldBe(2);
     }
 
     [Fact]
@@ -365,14 +364,14 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
             "DRAFT10",
             DateTimeOffset.UtcNow);
 
-        // Act & Assert
-        var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
-        {
-            await _fixture.ExecuteAndWaitAsync(recordCmd);
-        });
+        // Act: attempt redemption on draft promotion — Before() returns ProblemDetails, pipeline stops
+        await _fixture.ExecuteAndWaitAsync(recordCmd);
 
-        exception.Message.ShouldContain("Cannot record redemption");
-        exception.Message.ShouldContain("Draft");
+        // Assert: promotion should still be Draft with 0 redemptions
+        var updatedPromotion = await session.Events.AggregateStreamAsync<Promotions.Promotion.Promotion>(promotion.Id);
+        updatedPromotion.ShouldNotBeNull();
+        updatedPromotion.Status.ShouldBe(PromotionStatus.Draft);
+        updatedPromotion.CurrentRedemptionCount.ShouldBe(0);
     }
 
     [Fact]
