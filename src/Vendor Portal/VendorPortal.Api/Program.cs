@@ -91,6 +91,9 @@ builder.Host.UseWolverine(opts =>
     // Include the domain assembly (message handlers: VendorProductAssociatedHandler, analytics handlers, etc.)
     opts.Discovery.IncludeAssembly(typeof(VendorProductCatalogEntry).Assembly);
 
+    // Wolverine policies: auto-commit Marten changes at handler completion
+    opts.Policies.AutoApplyTransactions();
+
     // Configure SignalR transport for server→client push (Phase 3).
     // Phase 4 will upgrade to WolverineHub for bidirectional client→server routing.
     opts.UseSignalR();
