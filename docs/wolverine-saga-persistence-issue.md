@@ -559,3 +559,84 @@ This behavior is inconsistent with `InvokeAsync()` being documented as a synchro
 ---
 
 *This document will be updated as we discover more information or find a solution.*
+
+---
+
+## Update: 2026-04-05 — Re-Evaluation Against Wolverine 5.27.0
+
+### Context
+
+This re-evaluation was inherited from M36.0 and flagged as overdue during M39.x planning.
+It was documented as item #1 in M39.0's "Inherited by next milestone" list. The goal was
+to determine whether Wolverine version advances since 5.17.0 resolved the saga persistence
+issue in multi-host integration tests.
+
+### Wolverine Version Tested
+
+| Package | Original Version | Current Version |
+|---------|-----------------|-----------------|
+| WolverineFx.* | 5.17.0 | 5.27.0 |
+| Marten | 8.22.2 | (current, see Directory.Packages.props) |
+
+### Step 2 Result: Unskip and Run As-Is
+
+Removed `Skip` from `ShipmentDelivered_Creates_ReturnEligibilityWindow_In_Returns_BC` and
+ran it with the original `CreateOrderSagaAsync()` implementation (scoped `IMessageBus.InvokeAsync()`).
+
+**Result: FAILED** — Same `UnknownSagaException`:
+
+```
+Wolverine.Persistence.Sagas.UnknownSagaException:
+Could not find an expected saga document of type Orders.Placement.Order for id '019d5f11-e008-7fc3-9e2a-7c5a0c5ed018'.
+Note: new Sagas will not be available in storage until the first message succeeds.
+
+  at Internal.Generated.WolverineHandlers.ShipmentDeliveredHandler1543603913.HandleAsync(...)
+  at Wolverine.Runtime.Handlers.Executor.InvokeAsync(...)
+  at Wolverine.Tracking.TrackedSession.ExecuteAndTrackAsync()
+```
+
+The failure occurs at the `ShipmentDelivered` execution step (line 39 of the test), not at
+`CreateOrderSagaAsync()` (line 30). The saga creation completes without error, but the saga
+document is not visible to subsequent handlers on the same Orders host.
+
+### Step 4 Result: TrackActivity() Alternative
+
+Modified `CreateOrderSagaAsync()` to use `TrackActivity()` with `DoNotAssertOnExceptionsDetected()`:
+
+```csharp
+await OrdersHost.TrackActivity(TimeSpan.FromSeconds(15))
+    .DoNotAssertOnExceptionsDetected()
+    .ExecuteAndWaitAsync(ctx => ctx.InvokeAsync(checkoutCompleted));
+```
+
+**Result: FAILED** — Same `UnknownSagaException` with identical error message and stack trace.
+
+The `TrackActivity()` wrapper ensures the tracking session completes, but the saga document
+is still not persisted to Marten in a way that subsequent handlers can find it. This confirms
+the issue is in Wolverine's saga lifecycle management for `InvokeAsync()`, not a timing/flush
+problem.
+
+### Conclusion
+
+**The saga persistence issue persists on Wolverine 5.27.0.** Both the original approach
+(scoped `InvokeAsync()`) and the `TrackActivity()` alternative fail with the same error.
+All 6 cross-BC smoke tests remain skipped.
+
+### Next Steps
+
+- **Re-evaluate at Wolverine 6.x** — The next major version may include saga lifecycle changes
+  that resolve this issue. Re-evaluation should be triggered by a major Wolverine version bump.
+- **Monitor Wolverine changelog** — Watch for saga-related fixes in minor releases.
+- **No code changes made** — `CrossBcTestFixture.CreateOrderSagaAsync()` and all 6 tests
+  remain in their original state with `Skip` annotations.
+
+### Tests Remain Skipped
+
+All 6 tests continue to carry `[Fact(Skip = "Blocked by Wolverine saga persistence issue ...")]`:
+
+1. `FulfillmentToReturnsPipelineTests.ShipmentDelivered_Creates_ReturnEligibilityWindow_In_Returns_BC`
+2. `FulfillmentToReturnsPipelineTests.ShipmentDelivered_Is_Idempotent_When_Redelivered`
+3. `ReturnsToOrdersPipelineTests.ReturnCompleted_Updates_Order_Saga_And_Emits_RefundRequested`
+4. `ReturnsToOrdersPipelineTests.ReturnCompleted_Closes_Saga_When_Return_Window_Already_Expired`
+5. `ReturnsToInventoryPipelineTests.ReturnCompleted_Is_Delivered_To_Inventory_BC_Queue`
+6. `ReturnsToInventoryPipelineTests.ReturnCompleted_With_Non_Restockable_Items_Still_Routes_To_Inventory`
