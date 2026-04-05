@@ -297,7 +297,7 @@ Owns promotional campaigns and coupon codes — creation, activation, issuance, 
 | Shopping | ← queries | ValidateCoupon and CalculateDiscount HTTP queries for cart coupon application (M30.1) |
 | Pricing (planned) | → queries | Will check MAP floor to prevent below-minimum discounts (M30.2+) |
 
-**Key decisions:** M30.0 implemented complete redemption workflow. M30.1 integrated with Shopping BC for real-time cart coupon application. Event-sourced aggregates (Promotion, Coupon) with inline projections (`CouponLookupView` for O(1) validation). Coupons use deterministic UUID v5 stream IDs from code strings. Batch generation uses fan-out pattern via `OutgoingMessages`. Handlers manually append events via `session.Events.Append()` (not tuple returns).
+**Key decisions:** M30.0 implemented complete redemption workflow. M30.1 integrated with Shopping BC for real-time cart coupon application. Event-sourced aggregates (Promotion, Coupon) with inline projections (`CouponLookupView` for O(1) validation). Coupons use deterministic UUID v5 stream IDs from code strings. Batch generation uses fan-out pattern via `OutgoingMessages`.
 
 ---
 
