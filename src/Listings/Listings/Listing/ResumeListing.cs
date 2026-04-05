@@ -1,5 +1,8 @@
 using FluentValidation;
-using Marten;
+using Microsoft.AspNetCore.Mvc;
+using Wolverine;
+using Wolverine.Http;
+using Wolverine.Marten;
 
 namespace Listings.Listing;
 
@@ -15,19 +18,21 @@ public sealed class ResumeListingValidator : AbstractValidator<ResumeListing>
 
 public static class ResumeListingHandler
 {
-    public static async Task Handle(
-        ResumeListing command,
-        IDocumentSession session)
+    public static ProblemDetails Before(ResumeListing cmd, Listing? listing)
     {
-        var listing = await session.Events.AggregateStreamAsync<Listing>(command.ListingId);
         if (listing is null)
-            throw new InvalidOperationException($"Listing '{command.ListingId}' not found.");
-
+            return new ProblemDetails { Detail = $"Listing '{cmd.ListingId}' not found", Status = 404 };
         if (listing.Status != ListingStatus.Paused)
-            throw new InvalidOperationException(
-                $"Cannot resume listing in '{listing.Status}' state. Listing must be 'Paused' to resume.");
+            return new ProblemDetails { Detail = $"Cannot resume listing in '{listing.Status}' state. Listing must be 'Paused' to resume.", Status = 409 };
+        return WolverineContinue.NoProblems;
+    }
 
-        var @event = new ListingResumed(command.ListingId, DateTimeOffset.UtcNow);
-        session.Events.Append(command.ListingId, @event);
+    public static Events Handle(
+        ResumeListing cmd,
+        [WriteAggregate] Listing listing)
+    {
+        var events = new Events();
+        events.Add(new ListingResumed(cmd.ListingId, DateTimeOffset.UtcNow));
+        return events;
     }
 }

@@ -3,6 +3,7 @@ using Listings.ProductSummary;
 using Listings.Projections;
 using Marten;
 using Wolverine;
+using Wolverine.Marten;
 using IntegrationMessages = Messages.Contracts.Listings;
 
 namespace Listings.Listing;
@@ -28,9 +29,9 @@ public sealed class CreateListingValidator : AbstractValidator<CreateListing>
 
 public static class CreateListingHandler
 {
-    public static async Task<(CreateListingResponse, OutgoingMessages)> Handle(
+    public static async Task<(CreateListingResponse, IStartStream, OutgoingMessages)> Handle(
         CreateListing command,
-        IDocumentSession session)
+        IQuerySession session)
     {
         var now = DateTimeOffset.UtcNow;
 
@@ -59,7 +60,7 @@ public static class CreateListingHandler
             command.InitialContent,
             now);
 
-        session.Events.StartStream<Listing>(listingId, @event);
+        var stream = MartenOps.StartStream<Listing>(listingId, @event);
 
         var outgoing = new OutgoingMessages();
         outgoing.Add(new IntegrationMessages.ListingCreated(
@@ -68,6 +69,6 @@ public static class CreateListingHandler
             command.ChannelCode,
             now));
 
-        return (new CreateListingResponse(listingId, command.Sku, command.ChannelCode), outgoing);
+        return (new CreateListingResponse(listingId, command.Sku, command.ChannelCode), stream, outgoing);
     }
 }

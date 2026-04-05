@@ -1,43 +1,46 @@
 using Marten;
+using Microsoft.AspNetCore.Mvc;
+using Wolverine;
+using Wolverine.Http;
 
 namespace Promotions.Coupon;
 
 public static class RevokeCouponHandler
 {
     /// <summary>
-    /// Revokes a coupon (admin action).
-    /// Can revoke coupons in Issued or Redeemed status.
-    /// Cannot revoke already-revoked or expired coupons.
+    /// Loads the coupon aggregate by deterministic UUID v5 stream ID from the coupon code.
+    /// Same Load() pattern as RedeemCouponHandler — Wolverine cannot compute the hash.
     /// </summary>
-    public static async Task Handle(
+    public static async Task<Coupon?> LoadAsync(
         RevokeCoupon cmd,
-        IDocumentSession session,
+        IQuerySession session,
         CancellationToken ct)
     {
-        // Load coupon by deterministic UUID v5 from code
         var streamId = Coupon.StreamId(cmd.CouponCode);
-        var coupon = await session.Events.AggregateStreamAsync<Coupon>(streamId, token: ct);
+        return await session.Events.AggregateStreamAsync<Coupon>(streamId, token: ct);
+    }
 
+    public static ProblemDetails Before(RevokeCoupon cmd, Coupon? coupon)
+    {
         if (coupon is null)
-        {
-            throw new InvalidOperationException(
-                $"Coupon with code '{cmd.CouponCode}' not found");
-        }
-
-        // Invariant: Cannot revoke an already-revoked or expired coupon
+            return new ProblemDetails { Detail = $"Coupon with code '{cmd.CouponCode}' not found", Status = 404 };
         if (coupon.Status == CouponStatus.Revoked)
-        {
-            throw new InvalidOperationException(
-                $"Cannot revoke coupon {coupon.Code} — it is already revoked.");
-        }
-
+            return new ProblemDetails { Detail = $"Cannot revoke coupon '{coupon.Code}' — it is already revoked.", Status = 409 };
         if (coupon.Status == CouponStatus.Expired)
-        {
-            throw new InvalidOperationException(
-                $"Cannot revoke coupon {coupon.Code} — it is already expired.");
-        }
+            return new ProblemDetails { Detail = $"Cannot revoke coupon '{coupon.Code}' — it is already expired.", Status = 409 };
+        return WolverineContinue.NoProblems;
+    }
 
-        // Create domain event
+    /// <summary>
+    /// Revokes a coupon (admin action).
+    /// Can revoke coupons in Issued or Redeemed status.
+    /// void return — no OutgoingMessages.
+    /// </summary>
+    public static void Handle(
+        RevokeCoupon cmd,
+        Coupon coupon,
+        IDocumentSession session)
+    {
         var evt = new CouponRevoked(
             coupon.Id,
             coupon.Code,
@@ -45,7 +48,6 @@ public static class RevokeCouponHandler
             cmd.Reason,
             DateTimeOffset.UtcNow);
 
-        // Manually append event to stream (optimistic concurrency via Marten)
-        session.Events.Append(streamId, evt);
+        session.Events.Append(Coupon.StreamId(cmd.CouponCode), evt);
     }
 }

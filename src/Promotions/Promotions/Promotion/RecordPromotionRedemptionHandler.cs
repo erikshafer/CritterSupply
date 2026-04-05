@@ -1,4 +1,7 @@
-using Marten;
+using Microsoft.AspNetCore.Mvc;
+using Wolverine;
+using Wolverine.Http;
+using Wolverine.Marten;
 
 namespace Promotions.Promotion;
 
@@ -9,7 +12,7 @@ namespace Promotions.Promotion;
 /// Phase 2 (M30.1): OrderPlacedHandler will fan out to this command.
 ///
 /// Concurrency Strategy:
-/// Uses Marten's optimistic concurrency via tuple return pattern.
+/// Uses Marten's optimistic concurrency via [WriteAggregate] (FetchForWriting under the hood).
 /// If two redemptions arrive simultaneously and UsageLimit is reached,
 /// Marten will throw ConcurrencyException on second commit.
 /// Wolverine's retry policy handles the exception:
@@ -19,47 +22,28 @@ namespace Promotions.Promotion;
 /// </summary>
 public static class RecordPromotionRedemptionHandler
 {
-    public static async Task Handle(
-        RecordPromotionRedemption cmd,
-        IDocumentSession session,
-        CancellationToken ct)
+    public static ProblemDetails Before(RecordPromotionRedemption cmd, Promotion? promotion)
     {
-        // Load promotion by ID
-        var promotion = await session.Events.AggregateStreamAsync<Promotion>(cmd.PromotionId, token: ct);
-
         if (promotion is null)
-        {
-            throw new InvalidOperationException(
-                $"Promotion {cmd.PromotionId} not found");
-        }
-
-        // Invariant: Cannot record redemption on non-active promotion
+            return new ProblemDetails { Detail = $"Promotion '{cmd.PromotionId}' not found", Status = 404 };
         if (promotion.Status != PromotionStatus.Active)
-        {
-            throw new InvalidOperationException(
-                $"Cannot record redemption for promotion {promotion.Id} — " +
-                $"current status is {promotion.Status}. " +
-                "Redemptions can only be recorded for Active promotions.");
-        }
+            return new ProblemDetails { Detail = $"Cannot record redemption for promotion '{promotion.Id}' — status is {promotion.Status}. Only Active promotions accept redemptions.", Status = 409 };
+        if (promotion.UsageLimit.HasValue && promotion.CurrentRedemptionCount >= promotion.UsageLimit.Value)
+            return new ProblemDetails { Detail = $"Promotion '{promotion.Id}' usage limit of {promotion.UsageLimit.Value} has been reached.", Status = 409 };
+        return WolverineContinue.NoProblems;
+    }
 
-        // Invariant: Usage limit enforcement
-        if (promotion.UsageLimit.HasValue &&
-            promotion.CurrentRedemptionCount >= promotion.UsageLimit.Value)
-        {
-            throw new InvalidOperationException(
-                $"Cannot record redemption for promotion {promotion.Id} — " +
-                $"usage limit of {promotion.UsageLimit.Value} has been reached.");
-        }
-
-        // Record redemption (increment handled by Apply method)
-        var evt = new PromotionRedemptionRecorded(
+    public static Events Handle(
+        RecordPromotionRedemption cmd,
+        [WriteAggregate] Promotion promotion)
+    {
+        var events = new Events();
+        events.Add(new PromotionRedemptionRecorded(
             promotion.Id,
             cmd.OrderId,
             cmd.CustomerId,
             cmd.CouponCode,
-            cmd.RedeemedAt);
-
-        // Manually append event to stream (optimistic concurrency via Marten)
-        session.Events.Append(cmd.PromotionId, evt);
+            cmd.RedeemedAt));
+        return events;
     }
 }

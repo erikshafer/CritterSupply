@@ -1,7 +1,7 @@
 using FluentValidation;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Wolverine.Http;
+using Wolverine.Marten;
 
 namespace Fulfillment.Shipments;
 
@@ -29,9 +29,7 @@ public static class RequestFulfillmentHandler
 {
     [WolverinePost("/api/fulfillment/shipments")]
     [Authorize]
-    public static CreationResponse Handle(
-        RequestFulfillment command,
-        IDocumentSession session)
+    public static (CreationResponse, IStartStream) Handle(RequestFulfillment command)
     {
         var shipmentId = Guid.CreateVersion7();
 
@@ -43,8 +41,8 @@ public static class RequestFulfillmentHandler
             command.ShippingMethod,
             DateTimeOffset.UtcNow);
 
-        session.Events.StartStream<Shipment>(shipmentId, @event);
+        var stream = MartenOps.StartStream<Shipment>(shipmentId, @event);
 
-        return new CreationResponse($"/api/fulfillment/shipments/{shipmentId}");
+        return (new CreationResponse($"/api/fulfillment/shipments/{shipmentId}"), stream);
     }
 }

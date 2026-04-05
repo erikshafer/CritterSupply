@@ -1,38 +1,46 @@
 using Marten;
+using Microsoft.AspNetCore.Mvc;
+using Wolverine;
+using Wolverine.Http;
 
 namespace Promotions.Coupon;
 
 public static class RedeemCouponHandler
 {
     /// <summary>
-    /// Redeems a coupon for an order.
-    /// Enforces single-use constraint: coupon must be in Issued status.
-    /// Uses optimistic concurrency (Marten) to prevent double-redemption.
+    /// Loads the coupon aggregate by deterministic UUID v5 stream ID from the coupon code.
+    /// Wolverine cannot compute this hash from the command's CouponCode property,
+    /// so [WriteAggregate] cannot be used — manual Load/Before/Handle is required.
     /// </summary>
-    public static async Task Handle(
+    public static async Task<Coupon?> LoadAsync(
         RedeemCoupon cmd,
-        IDocumentSession session,
+        IQuerySession session,
         CancellationToken ct)
     {
-        // Load coupon by deterministic UUID v5 from code
         var streamId = Coupon.StreamId(cmd.CouponCode);
-        var coupon = await session.Events.AggregateStreamAsync<Coupon>(streamId, token: ct);
+        return await session.Events.AggregateStreamAsync<Coupon>(streamId, token: ct);
+    }
 
+    public static ProblemDetails Before(RedeemCoupon cmd, Coupon? coupon)
+    {
         if (coupon is null)
-        {
-            throw new InvalidOperationException(
-                $"Coupon with code '{cmd.CouponCode}' not found");
-        }
-
-        // Invariant: Coupon must be in Issued status to redeem
+            return new ProblemDetails { Detail = $"Coupon with code '{cmd.CouponCode}' not found", Status = 404 };
         if (coupon.Status != CouponStatus.Issued)
-        {
-            throw new InvalidOperationException(
-                $"Cannot redeem coupon {coupon.Code} — current status is {coupon.Status}. " +
-                "Only coupons in Issued status can be redeemed.");
-        }
+            return new ProblemDetails { Detail = $"Cannot redeem coupon '{coupon.Code}' — current status is {coupon.Status}. Only Issued coupons can be redeemed.", Status = 409 };
+        return WolverineContinue.NoProblems;
+    }
 
-        // Create domain event
+    /// <summary>
+    /// Redeems a coupon for an order.
+    /// Uses optimistic concurrency (Marten) to prevent double-redemption.
+    /// void return — no OutgoingMessages; the integration message is published
+    /// by the handler that invokes this command.
+    /// </summary>
+    public static void Handle(
+        RedeemCoupon cmd,
+        Coupon coupon,
+        IDocumentSession session)
+    {
         var evt = new CouponRedeemed(
             coupon.Id,
             coupon.Code,
@@ -41,7 +49,6 @@ public static class RedeemCouponHandler
             cmd.CustomerId,
             cmd.RedeemedAt);
 
-        // Manually append event to stream (optimistic concurrency via Marten)
-        session.Events.Append(streamId, evt);
+        session.Events.Append(Coupon.StreamId(cmd.CouponCode), evt);
     }
 }
