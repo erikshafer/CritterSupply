@@ -69,13 +69,10 @@ public sealed class ReviewWorkflowTests
         var listingId = ListingStreamId.Compute(sku, "OWN_WEBSITE");
         await _fixture.ExecuteAndWaitAsync(new ActivateListing(listingId));
 
-        // Act & Assert
-        await Should.ThrowAsync<InvalidOperationException>(async () =>
-        {
-            await _fixture.ExecuteAndWaitAsync(new SubmitListingForReview(listingId));
-        });
+        // Act: attempt invalid transition — Before() returns ProblemDetails, pipeline stops
+        await _fixture.ExecuteAndWaitAsync(new SubmitListingForReview(listingId));
 
-        // Verify listing is still Live
+        // Assert: listing should still be Live (transition was rejected)
         using var session = _fixture.GetDocumentSession();
         var listing = await session.Events.AggregateStreamAsync<Listing.Listing>(listingId);
         listing.ShouldNotBeNull();
@@ -115,13 +112,10 @@ public sealed class ReviewWorkflowTests
         await _fixture.ExecuteAndWaitAsync(new CreateListing(sku, "AMAZON_US", null));
         var listingId = ListingStreamId.Compute(sku, "AMAZON_US");
 
-        // Act & Assert
-        await Should.ThrowAsync<InvalidOperationException>(async () =>
-        {
-            await _fixture.ExecuteAndWaitAsync(new ApproveListing(listingId));
-        });
+        // Act: attempt invalid transition — Before() returns ProblemDetails, pipeline stops
+        await _fixture.ExecuteAndWaitAsync(new ApproveListing(listingId));
 
-        // Verify listing is still Draft
+        // Assert: listing should still be Draft (transition was rejected)
         using var session = _fixture.GetDocumentSession();
         var listing = await session.Events.AggregateStreamAsync<Listing.Listing>(listingId);
         listing.ShouldNotBeNull();

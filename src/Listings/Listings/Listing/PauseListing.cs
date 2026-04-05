@@ -1,5 +1,8 @@
 using FluentValidation;
-using Marten;
+using Microsoft.AspNetCore.Mvc;
+using Wolverine;
+using Wolverine.Http;
+using Wolverine.Marten;
 
 namespace Listings.Listing;
 
@@ -16,19 +19,21 @@ public sealed class PauseListingValidator : AbstractValidator<PauseListing>
 
 public static class PauseListingHandler
 {
-    public static async Task Handle(
-        PauseListing command,
-        IDocumentSession session)
+    public static ProblemDetails Before(PauseListing cmd, Listing? listing)
     {
-        var listing = await session.Events.AggregateStreamAsync<Listing>(command.ListingId);
         if (listing is null)
-            throw new InvalidOperationException($"Listing '{command.ListingId}' not found.");
-
+            return new ProblemDetails { Detail = $"Listing '{cmd.ListingId}' not found", Status = 404 };
         if (listing.Status != ListingStatus.Live)
-            throw new InvalidOperationException(
-                $"Cannot pause listing in '{listing.Status}' state. Listing must be 'Live' to pause.");
+            return new ProblemDetails { Detail = $"Cannot pause listing in '{listing.Status}' state. Listing must be 'Live' to pause.", Status = 409 };
+        return WolverineContinue.NoProblems;
+    }
 
-        var @event = new ListingPaused(command.ListingId, command.Reason, DateTimeOffset.UtcNow);
-        session.Events.Append(command.ListingId, @event);
+    public static Events Handle(
+        PauseListing cmd,
+        [WriteAggregate] Listing listing)
+    {
+        var events = new Events();
+        events.Add(new ListingPaused(cmd.ListingId, cmd.Reason, DateTimeOffset.UtcNow));
+        return events;
     }
 }

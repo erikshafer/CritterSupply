@@ -1,6 +1,8 @@
 using FluentValidation;
-using Marten;
+using Microsoft.AspNetCore.Mvc;
 using Wolverine;
+using Wolverine.Http;
+using Wolverine.Marten;
 using IntegrationMessages = Messages.Contracts.Listings;
 
 namespace Listings.Listing;
@@ -17,37 +19,37 @@ public sealed class EndListingValidator : AbstractValidator<EndListing>
 
 public static class EndListingHandler
 {
-    public static async Task<OutgoingMessages> Handle(
-        EndListing command,
-        IDocumentSession session)
+    public static ProblemDetails Before(EndListing cmd, Listing? listing)
+    {
+        if (listing is null)
+            return new ProblemDetails { Detail = $"Listing '{cmd.ListingId}' not found", Status = 404 };
+        if (listing.IsTerminal)
+            return new ProblemDetails { Detail = $"Cannot end listing in '{listing.Status}' state. Listing is already in a terminal state.", Status = 409 };
+        return WolverineContinue.NoProblems;
+    }
+
+    public static (Events, OutgoingMessages) Handle(
+        EndListing cmd,
+        [WriteAggregate] Listing listing)
     {
         var now = DateTimeOffset.UtcNow;
 
-        var listing = await session.Events.AggregateStreamAsync<Listing>(command.ListingId);
-        if (listing is null)
-            throw new InvalidOperationException($"Listing '{command.ListingId}' not found.");
-
-        if (listing.IsTerminal)
-            throw new InvalidOperationException(
-                $"Cannot end listing in '{listing.Status}' state. Listing is already in a terminal state.");
-
-        var @event = new ListingEnded(
-            command.ListingId,
+        var events = new Events();
+        events.Add(new ListingEnded(
+            cmd.ListingId,
             listing.Sku,
             listing.ChannelCode,
             EndedCause.ManualEnd,
-            now);
-
-        session.Events.Append(command.ListingId, @event);
+            now));
 
         var outgoing = new OutgoingMessages();
         outgoing.Add(new IntegrationMessages.ListingEnded(
-            command.ListingId,
+            cmd.ListingId,
             listing.Sku,
             listing.ChannelCode,
             EndedCause.ManualEnd.ToString(),
             now));
 
-        return outgoing;
+        return (events, outgoing);
     }
 }

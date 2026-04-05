@@ -252,13 +252,10 @@ public sealed class ListingLifecycleTests
         await _fixture.ExecuteAndWaitAsync(new ActivateListing(listingId));
         await _fixture.ExecuteAndWaitAsync(new EndListing(listingId));
 
-        // Act & Assert: try to activate an ended listing — should throw
-        await Should.ThrowAsync<InvalidOperationException>(async () =>
-        {
-            await _fixture.ExecuteAndWaitAsync(new ActivateListing(listingId));
-        });
+        // Act: attempt invalid transition — Before() returns ProblemDetails, pipeline stops
+        await _fixture.ExecuteAndWaitAsync(new ActivateListing(listingId));
 
-        // Assert: listing should still be ended
+        // Assert: listing should still be ended (transition was rejected)
         using var session = _fixture.GetDocumentSession();
         var listing = await session.Events.AggregateStreamAsync<Listing.Listing>(listingId);
         listing.ShouldNotBeNull();

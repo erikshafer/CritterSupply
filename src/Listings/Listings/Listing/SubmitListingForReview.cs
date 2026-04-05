@@ -1,5 +1,8 @@
 using FluentValidation;
-using Marten;
+using Microsoft.AspNetCore.Mvc;
+using Wolverine;
+using Wolverine.Http;
+using Wolverine.Marten;
 
 namespace Listings.Listing;
 
@@ -15,19 +18,21 @@ public sealed class SubmitListingForReviewValidator : AbstractValidator<SubmitLi
 
 public static class SubmitListingForReviewHandler
 {
-    public static async Task Handle(
-        SubmitListingForReview command,
-        IDocumentSession session)
+    public static ProblemDetails Before(SubmitListingForReview cmd, Listing? listing)
     {
-        var listing = await session.Events.AggregateStreamAsync<Listing>(command.ListingId);
         if (listing is null)
-            throw new InvalidOperationException($"Listing '{command.ListingId}' not found.");
-
+            return new ProblemDetails { Detail = $"Listing '{cmd.ListingId}' not found", Status = 404 };
         if (listing.Status != ListingStatus.Draft)
-            throw new InvalidOperationException(
-                $"Cannot submit listing for review in '{listing.Status}' state. Listing must be in 'Draft' state.");
+            return new ProblemDetails { Detail = $"Cannot submit listing for review in '{listing.Status}' state. Must be Draft.", Status = 409 };
+        return WolverineContinue.NoProblems;
+    }
 
-        var @event = new ListingSubmittedForReview(command.ListingId, DateTimeOffset.UtcNow);
-        session.Events.Append(command.ListingId, @event);
+    public static Events Handle(
+        SubmitListingForReview cmd,
+        [WriteAggregate] Listing listing)
+    {
+        var events = new Events();
+        events.Add(new ListingSubmittedForReview(cmd.ListingId, DateTimeOffset.UtcNow));
+        return events;
     }
 }

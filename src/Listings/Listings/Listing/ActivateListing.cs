@@ -1,6 +1,8 @@
 using FluentValidation;
-using Marten;
+using Microsoft.AspNetCore.Mvc;
 using Wolverine;
+using Wolverine.Http;
+using Wolverine.Marten;
 using IntegrationMessages = Messages.Contracts.Listings;
 
 namespace Listings.Listing;
@@ -17,15 +19,10 @@ public sealed class ActivateListingValidator : AbstractValidator<ActivateListing
 
 public static class ActivateListingHandler
 {
-    public static async Task<OutgoingMessages> Handle(
-        ActivateListing command,
-        IDocumentSession session)
+    public static ProblemDetails Before(ActivateListing cmd, Listing? listing)
     {
-        var now = DateTimeOffset.UtcNow;
-
-        var listing = await session.Events.AggregateStreamAsync<Listing>(command.ListingId);
         if (listing is null)
-            throw new InvalidOperationException($"Listing '{command.ListingId}' not found.");
+            return new ProblemDetails { Detail = $"Listing '{cmd.ListingId}' not found", Status = 404 };
 
         // Valid transitions to Live:
         // - Submitted → Live (normal marketplace flow)
@@ -34,19 +31,30 @@ public static class ActivateListingHandler
             && string.Equals(listing.ChannelCode, "OWN_WEBSITE", StringComparison.OrdinalIgnoreCase);
 
         if (listing.Status != ListingStatus.Submitted && !isOwnWebsiteFastPath)
-            throw new InvalidOperationException(
-                $"Cannot activate listing in '{listing.Status}' state. " +
-                "Listing must be in 'Submitted' state (or 'Draft' for OWN_WEBSITE channel).");
+            return new ProblemDetails
+            {
+                Detail = $"Cannot activate listing in '{listing.Status}' state. " +
+                    "Listing must be in 'Submitted' state (or 'Draft' for OWN_WEBSITE channel).",
+                Status = 409
+            };
 
-        var @event = new ListingActivated(command.ListingId, listing.ChannelCode, now);
-        session.Events.Append(command.ListingId, @event);
+        return WolverineContinue.NoProblems;
+    }
+
+    public static (Events, OutgoingMessages) Handle(
+        ActivateListing cmd,
+        [WriteAggregate] Listing listing)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var events = new Events();
+        events.Add(new ListingActivated(cmd.ListingId, listing.ChannelCode, now));
 
         var outgoing = new OutgoingMessages();
         outgoing.Add(new IntegrationMessages.ListingActivated(
-            command.ListingId,
+            cmd.ListingId,
             listing.ChannelCode,
             now));
 
-        return outgoing;
+        return (events, outgoing);
     }
 }
