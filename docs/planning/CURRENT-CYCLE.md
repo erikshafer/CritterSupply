@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M39.0 — Critter Stack Idiom Refresh: Correspondence + Pricing + Orders BCs |
-| **Status** | 🟡 **IN PROGRESS** — S0 + S1 + S2 (Correspondence) + S3 (Pricing) + S4 (Orders Checkout) complete |
-| **Recent Completion** | M39.0 S4 — Orders Checkout `[WriteAggregate]` spike succeeded; outbox risk eliminated; 3 redundant `SaveChangesAsync` removed (2026-04-04) |
-| **Previous Completion** | M39.0 S3 — Pricing BC fat endpoints → command+handler (Load() pattern); snapshot configured (2026-04-04) |
+| **Current Milestone** | M39.0 — Critter Stack Idiom Refresh: Correspondence + Pricing + Orders + Quick Wins |
+| **Status** | 🟡 **IN PROGRESS** — S0 + S1 + S2 (Correspondence) + S3 (Pricing) + S4 (Orders Checkout) + S5 (Quick Wins) complete |
+| **Recent Completion** | M39.0 S5 — Quick Wins: Fulfillment/Listings IStartStream, 6 Listings [WriteAggregate], Promotions Load/Before/Handle + [WriteAggregate], Vendor Portal AutoApplyTransactions (2026-04-05) |
+| **Previous Completion** | M39.0 S4 — Orders Checkout `[WriteAggregate]` spike succeeded; outbox risk eliminated; 3 redundant `SaveChangesAsync` removed (2026-04-04) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-04 (M39.0 Session 4 complete — [retrospective](./milestones/m39-0-session-4-retrospective.md))*
+*Last Updated: 2026-04-05 (M39.0 Session 5 complete — [retrospective](./milestones/m39-0-session-5-retrospective.md))*
 
 ---
 
@@ -92,6 +92,18 @@
 - M32.3 "Direct Implementation" comment removed from `CompleteCheckout`; updated on 3 mixed handlers
 - Redundant `await session.SaveChangesAsync(ct)` removed from `ProvideShippingAddressHandler`, `SelectShippingMethodHandler`, `ProvidePaymentMethodHandler` (all covered by `AutoApplyTransactions()`)
 - Orders integration tests: 48/48 passing throughout; 0 errors
+
+**Session 5 (this session):** Quick Wins — Fulfillment, Listings, Promotions, Vendor Portal idiom cleanup:
+- **D-1:** Fulfillment `RequestFulfillmentHandler` → `MartenOps.StartStream<Shipment>()` + `(CreationResponse, IStartStream)` return; removed `IDocumentSession`
+- **D-2:** Listings `CreateListingHandler` → `MartenOps.StartStream<Listing>()` + `(CreateListingResponse, IStartStream, OutgoingMessages)` return; `IDocumentSession` → `IQuerySession`
+- **D-3:** 6 Listings write handlers (ApproveListing, ActivateListing, PauseListing, ResumeListing, EndListing, SubmitListingForReview) → `[WriteAggregate]` compound handlers with `Before()` returning `ProblemDetails`; removed `IDocumentSession`; ApproveListing uses Option A (IQuerySession for ProductSummaryView lookup)
+- **D-4:** Promotions `RedeemCouponHandler` + `RevokeCouponHandler` → `Load()` + `Before()` + `Handle()` compound pattern (UUID v5 stream ID — same reason as Pricing)
+- **D-5:** Promotions `RecordPromotionRedemptionHandler` → `[WriteAggregate]` compound handler (natural UUID v7)
+- **D-6:** Vendor Portal `AutoApplyTransactions()` added; no redundant `SaveChangesAsync` found
+- 7 integration tests updated: 3 Listings + 4 Promotions (exception assertions → state verification for ProblemDetails behavior)
+- All BCs: 173/173 tests passing; 0 errors, 19 warnings unchanged
+
+**Remaining:** Session 6 (documentation-only milestone closure) — retrospective, CONTEXTS.md assessment, CURRENT-CYCLE.md milestone move.
 
 ## Recent Completions
 
