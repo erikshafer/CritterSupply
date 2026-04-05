@@ -566,7 +566,7 @@ This behavior is inconsistent with `InvokeAsync()` being documented as a synchro
 
 ### Context
 
-This re-evaluation was inherited from M36.0 and flagged as overdue during M39.x planning.
+This re-evaluation was inherited from M36.0 and flagged as overdue during M39.0 planning.
 It was documented as item #1 in M39.0's "Inherited by next milestone" list. The goal was
 to determine whether Wolverine version advances since 5.17.0 resolved the saga persistence
 issue in multi-host integration tests.
@@ -576,7 +576,7 @@ issue in multi-host integration tests.
 | Package | Original Version | Current Version |
 |---------|-----------------|-----------------|
 | WolverineFx.* | 5.17.0 | 5.27.0 |
-| Marten | 8.22.2 | (current, see Directory.Packages.props) |
+| Marten | 8.22.2 | 8.28.0 |
 
 ### Step 2 Result: Unskip and Run As-Is
 
