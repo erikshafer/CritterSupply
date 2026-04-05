@@ -41,71 +41,50 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M39.0 — Critter Stack Idiom Refresh: Correspondence + Pricing + Orders + Quick Wins |
-| **Status** | 🟡 **IN PROGRESS** — S0 + S1 + S2 (Correspondence) + S3 (Pricing) + S4 (Orders Checkout) + S5 (Quick Wins) complete |
-| **Recent Completion** | M39.0 S5 — Quick Wins: Fulfillment/Listings IStartStream, 6 Listings [WriteAggregate], Promotions Load/Before/Handle + [WriteAggregate], Vendor Portal AutoApplyTransactions (2026-04-05) |
-| **Previous Completion** | M39.0 S4 — Orders Checkout `[WriteAggregate]` spike succeeded; outbox risk eliminated; 3 redundant `SaveChangesAsync` removed (2026-04-04) |
+| **Current Milestone** | None — next milestone TBD (pending decisions with Erik) |
+| **Status** | ⚪ **BETWEEN MILESTONES** — M39.0 closed 2026-04-05 |
+| **Recent Completion** | M39.0 — Critter Stack Idiom Refresh: 11 BCs updated, 30+ handlers refactored, 10 anti-pattern categories eliminated (2026-04-05) |
+| **Previous Completion** | M38.1 — Marketplaces Phase 4b: Deactivation + Status Verification (2026-04-04) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-05 (M39.0 Session 5 complete — [retrospective](./milestones/m39-0-session-5-retrospective.md))*
+*Last Updated: 2026-04-05 (M39.0 closed — [milestone closure retrospective](./milestones/m39-0-milestone-closure-retrospective.md))*
 
 ---
 
 ## Active Milestone
 
-### M39.0 — Critter Stack Idiom Refresh: Correspondence BC
+No active milestone. M39.0 closed on 2026-04-05 after 6 implementation sessions (S0–S5)
+and 1 documentation session (S6). Next milestone is TBD — decisions pending with Erik.
 
-**Goal:** Bring Correspondence BC up to current Critter Stack idioms — eliminate Anti-Pattern #9 (`session.Events.StartStream` → `MartenOps.StartStream`), convert handlers to static classes, decompose `SendMessageHandler`, configure snapshots, standardize connection strings.
-
-**Session 0 (PR #516, merged):** Mechanical sweep — removed redundant `SaveChangesAsync()` calls from EF Core BCs (Customer Identity, Backoffice Identity) and Marketplaces document-store handlers; converted `Guid.NewGuid()` → `Guid.CreateVersion7()` in stream-creation paths. +7/-34 lines. No retrospective produced (reasonable for sweep size).
-
-**Session 1 (this session):** Refactored all 9 Correspondence integration event handlers:
-- `session.Events.StartStream<Message>()` → `MartenOps.StartStream<Message>()` (returns `IStartStream`)
-- Instance classes → static classes
-- Removed `IDocumentSession`, `CancellationToken`, `async` keyword from all 9 handlers
-- Return type: `async Task<OutgoingMessages>` → `(IStartStream, OutgoingMessages)`
-- Build warnings reduced from 19 → 11 (eliminated 8 CS1998 warnings)
-- Correspondence integration tests: 5/5 passing before and after
-
-**Session 2 (this session):** Decomposed `SendMessageHandler`, added snapshot, standardized connection string:
-- `SendMessageHandler` → static class with `Before()` (`HandlerContinuation`) + `Handle()` (`[WriteAggregate]`)
-- Removed `IDocumentSession` injection, `session.Events.Append()`, `session.Events.AggregateStreamAsync()`
-- Extracted `BuildFailureResult` private static helper (eliminated duplicate failure logic)
-- Fixed `OperationCanceledException` guard: bare `catch` → `catch (Exception ex) when (ex is not OperationCanceledException)`
-- Return type: `OutgoingMessages` → `(Events, OutgoingMessages)`
-- Added `Snapshot<Message>(SnapshotLifecycle.Inline)` to `Program.cs`
-- Connection string key: `"marten"` → `"postgres"` in `Program.cs` + `appsettings.json`
-- Correspondence integration tests: 5/5 passing throughout
-
-**Session 3 (this session):** Pricing BC — 3 fat endpoints in `Pricing.Api` decomposed to command+handler in `Pricing` domain project:
-- `SetBasePriceEndpoint.cs` → `SetBasePrice.cs` in `Pricing/Products/` — Load() pattern (not `[WriteAggregate]`; UUID v5 stream ID)
-- `SchedulePriceChangeEndpoint.cs` → `SchedulePriceChange.cs` — Load()/Before()/Handle() for both HTTP handler and `ActivateScheduledPriceChange` internal message handler; `IMessageBus.ScheduleAsync()` preserved
-- `CancelScheduledPriceChangeEndpoint.cs` → `CancelScheduledPriceChange.cs` — single-method async handler (DELETE verb; no body; compound pattern incompatible with `LoadAsync` + no-body DELETE)
-- All `Guid.NewGuid()` placeholders replaced with `Guid.Empty` + `// TODO: Extract from JWT claim`
-- `Snapshot<ProductPrice>(SnapshotLifecycle.Inline)` added to `Pricing.Api/Program.cs`
-- Pricing integration tests: 25/25 passing throughout; 0 errors
-
-**Session 4 (this session):** Orders Checkout — outbox risk eliminated + redundant `SaveChangesAsync` removed:
-- `CompleteCheckout` fully refactored: `Before(Checkout? checkout)` + `Handle(Guid, [WriteAggregate] Checkout)` compound pattern; returns `(IResult, Events, OutgoingMessages)`
-- Outbox risk eliminated: `[WriteAggregate]` ensures event append + `CartCheckoutCompleted` outbox enrollment happen in one transactional middleware cycle (no two-phase commit gap)
-- `[WriteAggregate]` spike confirmed: `(IResult, Events, OutgoingMessages)` triple-tuple is a valid Wolverine HTTP return type
-- M32.3 "Direct Implementation" comment removed from `CompleteCheckout`; updated on 3 mixed handlers
-- Redundant `await session.SaveChangesAsync(ct)` removed from `ProvideShippingAddressHandler`, `SelectShippingMethodHandler`, `ProvidePaymentMethodHandler` (all covered by `AutoApplyTransactions()`)
-- Orders integration tests: 48/48 passing throughout; 0 errors
-
-**Session 5 (this session):** Quick Wins — Fulfillment, Listings, Promotions, Vendor Portal idiom cleanup:
-- **D-1:** Fulfillment `RequestFulfillmentHandler` → `MartenOps.StartStream<Shipment>()` + `(CreationResponse, IStartStream)` return; removed `IDocumentSession`
-- **D-2:** Listings `CreateListingHandler` → `MartenOps.StartStream<Listing>()` + `(CreateListingResponse, IStartStream, OutgoingMessages)` return; `IDocumentSession` → `IQuerySession`
-- **D-3:** 6 Listings write handlers (ApproveListing, ActivateListing, PauseListing, ResumeListing, EndListing, SubmitListingForReview) → `[WriteAggregate]` compound handlers with `Before()` returning `ProblemDetails`; removed `IDocumentSession`; ApproveListing uses Option A (IQuerySession for ProductSummaryView lookup)
-- **D-4:** Promotions `RedeemCouponHandler` + `RevokeCouponHandler` → `Load()` + `Before()` + `Handle()` compound pattern (UUID v5 stream ID — same reason as Pricing)
-- **D-5:** Promotions `RecordPromotionRedemptionHandler` → `[WriteAggregate]` compound handler (natural UUID v7)
-- **D-6:** Vendor Portal `AutoApplyTransactions()` added; no redundant `SaveChangesAsync` found
-- 7 integration tests updated: 3 Listings + 4 Promotions (exception assertions → state verification for ProblemDetails behavior)
-- All BCs: 173/173 tests passing; 0 errors, 19 warnings unchanged
-
-**Remaining:** Session 6 (documentation-only milestone closure) — retrospective, CONTEXTS.md assessment, CURRENT-CYCLE.md milestone move.
+See [M39.0 Milestone Closure Retrospective](./milestones/m39-0-milestone-closure-retrospective.md)
+for full details on what was delivered and what was inherited by the next milestone.
 
 ## Recent Completions
+
+### ✅ M39.0: Critter Stack Idiom Refresh (2026-04-05)
+
+**Status:** ✅ **Complete** — 6 implementation sessions (S0–S5) + 1 documentation session (S6)
+**Goal:** Bring all BCs up to current Critter Stack idioms — eliminate anti-patterns identified in the M39.x full-codebase audit
+
+**Key Deliverables:**
+- **S0 (PR #516):** Mechanical sweep — removed 14 redundant `SaveChangesAsync()` from EF Core BCs (Customer Identity, Backoffice Identity) and Marketplaces; converted `Guid.NewGuid()` → `Guid.CreateVersion7()` in stream-creation paths
+- **S1 (PR #517):** Correspondence — 9 integration handlers → `IStartStream` + static classes; eliminated 8 CS1998 warnings
+- **S2 (PR #518):** Correspondence — `SendMessageHandler` decomposed to `[WriteAggregate]` compound handler; `Message` snapshot added; connection string `"marten"` → `"postgres"`; `OperationCanceledException` bug fixed
+- **S3 (PR #519):** Pricing — 3 fat endpoints decomposed to `Load()/Before()/Handle()` command+handlers in domain project; `ProductPrice` snapshot added; DELETE + compound handler limitation discovered
+- **S4 (PR #520):** Orders Checkout — `CompleteCheckout` refactored to `[WriteAggregate]` returning `(IResult, Events, OutgoingMessages)`; outbox two-phase commit gap eliminated; 3 redundant `SaveChangesAsync` removed from mixed handlers
+- **S5 (PR #521):** Quick wins — Fulfillment + Listings `IStartStream`; 6 Listings `[WriteAggregate]` compound handlers; Promotions `Load()/Before()/Handle()` + `[WriteAggregate]`; Vendor Portal `AutoApplyTransactions()` added
+
+**DoD:** Build 0 errors, 19 warnings (unchanged from M38.1 baseline). All per-BC integration tests passing (no regressions). 0 new tests added; 7 existing tests updated for `ProblemDetails` behavior.
+
+**BCs Touched:** Correspondence, Pricing, Orders, Fulfillment, Listings, Promotions, Vendor Portal, Customer Identity, Backoffice Identity, Marketplaces, Product Catalog
+
+**Inherited by next milestone:**
+1. Returns cross-BC saga tests (6 skipped since M36.0) — re-evaluation overdue
+2. `ActivatePromotionHandler` return type — returns single event, should return `Events` collection
+3. Vendor Portal cold-start test flakes (56/86 fail on first container run, all pass on retry)
+4. eBay orphaned draft background sweep (detection in place, cleanup deferred)
+
+**Retrospectives:** [S1](./milestones/m39-0-session-1-retrospective.md) · [S2](./milestones/m39-0-session-2-retrospective.md) · [S3](./milestones/m39-0-session-3-retrospective.md) · [S4](./milestones/m39-0-session-4-retrospective.md) · [S5](./milestones/m39-0-session-5-retrospective.md) · [Milestone Closure](./milestones/m39-0-milestone-closure-retrospective.md)
 
 ### ✅ M38.1: Marketplaces Phase 4b — Deactivation + Status Verification (2026-04-04)
 
@@ -1317,39 +1296,27 @@
 > **Contains:** Next 3-4 milestones + future BCs (high-level only).
 > **Purpose:** Forward-looking planning without excessive detail.
 
-### Next 3-4 Milestones
+### Next Milestones
 
-> ⚠️ **Updated 2026-03-31:** M36.1 complete. M37.0 planning begins — Marketplaces Phase 3.
+> ⚠️ **Updated 2026-04-05:** M39.0 complete. Next milestone TBD — decisions pending with Erik.
 
-- **M36.1 (complete):** Listings BC Foundation + Marketplaces BC Foundation
-  - ✅ Listings BC: event-sourced aggregate, ProductSummaryView ACL, recall cascade, admin UI
-  - ✅ Marketplaces BC: document store, stub adapters, ListingApproved consumer, admin UI
-  - ✅ 62 integration tests (35 Listings + 27 Marketplaces), 6 E2E scenarios
-  - See [M36.1 Milestone Closure Retrospective](milestones/m36-1-milestone-closure-retrospective.md)
+- **M37.0 through M39.0 (complete):** The Catalog–Listings–Marketplaces arc (M37.0–M38.1) and the Critter Stack idiom refresh (M39.0) are finished. All 19 BCs are now at current Critter Stack idiom standards.
 
-- **M37.0 (planning):** Marketplaces Phase 3 — Production Adapters
-  - Real Amazon/Walmart/eBay adapter implementations replacing stubs
-  - ProductSummaryView ACL in Marketplaces BC (resolve ListingApproved enrichment debt)
-  - Production IVaultClient for credential storage
-  - E2E CI execution for marketplace and listings admin pages
-  - See [M37.0 Planning Notes](milestones/m37-0-planning-notes.md)
+- **Next milestone (TBD):** Priorities under consideration include:
+  - Product Variants — ProductFamily aggregate, variant-aware listings
+  - Search BC — Full-text product search, faceted navigation
+  - Test reliability — Returns cross-BC saga tests, Vendor Portal cold-start flakes
+  - eBay orphaned draft cleanup mechanism
 
-- **M38.x (planned):** Variants + Compliance + Real API Calls (Phase 3)
-  - ProductFamily aggregate, variant-aware listings
-  - Full compliance metadata, real marketplace API calls
+### Future BCs (Priority Roadmap)
 
-### Future BCs (Priority Roadmap — Post M36.1)
+> All existing BCs are implemented and idiomatic as of M39.0. Next new BC work is greenfield.
 
-> Product Catalog ES migration complete. Listings + Marketplaces BCs delivered (M36.1). Phase 3 next.
-
-**High Priority (Active in M37.0+):**
-- 🟢 **Listings BC** — M36.1 complete; event-sourced listing aggregate, recall cascade, OWN_WEBSITE
-- 🟢 **Marketplaces BC** — M36.1 complete; stub adapters, ListingApproved consumer
-- 🟡 **Marketplaces Phase 3** — M37.0 planned; real Amazon/Walmart/eBay adapters
-- 🟡 **Product Variants** — M38.x planned; ProductFamily aggregate, variant-aware listings
+**High Priority:**
+- 🟡 **Product Variants** — ProductFamily aggregate, variant-aware listings
+- 🟡 **Search BC** — Full-text product search, faceted navigation
 
 **Medium Priority:**
-- 🟡 **Search BC** — Full-text product search, faceted navigation
 - 🟡 **Recommendations BC** — Personalized product recommendations
 
 **Lower Priority (Strategic/Retention):**
@@ -1360,7 +1327,7 @@
 
 See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specifications.
 
-*Roadmap Last Updated: 2026-03-31 (M36.1 complete; M37.0 is Marketplaces Phase 3)*
+*Roadmap Last Updated: 2026-04-05 (M39.0 complete; next milestone TBD)*
 
 ---
 
@@ -1377,6 +1344,6 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Document Last Updated: 2026-03-31*
-*Active Milestone: M37.0 — Marketplaces Phase 3 (planning)*
+*Document Last Updated: 2026-04-05*
+*Active Milestone: None — M39.0 closed; next TBD*
 *Update Policy: At milestone start, milestone end, and significant task changes*
