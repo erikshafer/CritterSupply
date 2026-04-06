@@ -41,8 +41,8 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | None — M40.0 closed; next TBD |
-| **Status** | ⏸️ **BETWEEN MILESTONES** |
+| **Current Milestone** | M41.0 — Fulfillment BC Remaster: S1 (P0 Slices 1–15) |
+| **Status** | 🟢 **IN PROGRESS** |
 | **Recent Completion** | M40.0 — Dynamic Consistency Boundary: Promotions BC — DCB pattern introduced, 31/31 tests, ADR 0058 (2026-04-06) |
 | **Previous Completion** | M39.0 — Critter Stack Idiom Refresh: 11 BCs updated, 30+ handlers refactored, 10 anti-pattern categories eliminated (2026-04-05) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
@@ -53,7 +53,29 @@
 
 ## Active Milestone
 
-No active milestone. M40.0 closed 2026-04-06. Next milestone TBD — decisions pending with Erik.
+### M41.0: Fulfillment BC Remaster — S1 (P0 Slices 1–15)
+
+**Status:** 🟢 **In Progress**
+**Start Date:** 2026-04-06
+**ADR:** [0059 — Fulfillment BC Remaster Rationale](../decisions/0059-fulfillment-bc-remaster-rationale.md)
+**Event Modeling:** [Fulfillment Remaster Slices](../planning/fulfillment-remaster-slices.md)
+
+**Goal:** Implement all 15 P0 slices from the Fulfillment BC remaster event modeling session. Two aggregates (`WorkOrder` + `Shipment`), stub routing engine, complete warehouse operations (pick/pack), carrier dispatch through delivery, dual-publish migration for backward compatibility with Orders saga.
+
+**Key Deliverables — S1:**
+- Two new aggregates: `WorkOrder` (warehouse ops) + restructured `Shipment` (routing + carrier lifecycle)
+- `IFulfillmentRoutingEngine` interface with `StubFulfillmentRoutingEngine` (geographic routing)
+- Track A (Slices 1–9): FulfillmentRequested intake → FC assignment → WorkOrder creation → Wave → Pick → Pack
+- Track B (Slices 10–15): Label generation → Manifest → Staging → Carrier pickup → In-transit → Delivered
+- `ShipmentStatusView` inline projection (customer-facing tracking)
+- Carrier webhook handler (generic carrier scan payload → domain events)
+- Dual-publish: `ShipmentHandedToCarrier` + legacy `ShipmentDispatched` for Orders saga compatibility
+- New integration contracts: `ShipmentHandedToCarrier`, `TrackingNumberAssigned`, `ReturnToSenderInitiated`
+- 25 integration tests, 25 unit tests
+
+**DoD:** Build 0 errors, 19 warnings. Fulfillment integration tests: 25/25. Fulfillment unit tests: 25/25. Orders integration tests: 48/48 (unchanged).
+
+**Retrospective:** [S1](./milestones/fulfillment-remaster-s1-retrospective.md)
 
 ## Recent Completions
 
