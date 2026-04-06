@@ -528,6 +528,27 @@ var rounded = Math.Round(6.825m, 2, MidpointRounding.AwayFromZero); // → 6.83
 
 ---
 
+## .NET Version-Specific Behaviors
+
+### `Guid.Variant` and `Guid.Version` in .NET 10 ⭐ *M40.0 Addition*
+
+In .NET 10, `System.Guid` gained `Variant` and `Version` as **public instance properties**. This breaks any code that assumed `Guid` has zero public instance properties.
+
+**Impact on Marten DCB tag types:** Marten's `ValueTypeInfo` validation requires exactly one public instance property for tag type records. Raw `Guid` cannot be used as a tag type because it now has two (`Variant` and `Version`). The solution is a single-property wrapper record:
+
+```csharp
+// ❌ WRONG — Guid has 2 public instance properties in .NET 10
+opts.Events.RegisterTagType<Guid>("coupon"); // ValueTypeInfo validation fails
+
+// ✅ CORRECT — wrapper record with exactly one property
+public sealed record CouponStreamId(Guid Value);
+opts.Events.RegisterTagType<CouponStreamId>("coupon").ForAggregate<Coupon>();
+```
+
+This is the same wrapper-record pattern used for value objects throughout CritterSupply, but the motivation here is a framework constraint, not domain modeling.
+
+---
+
 ## Naming Conventions
 
 | Type | Convention | Example |
