@@ -1,6 +1,6 @@
 # [BC Name] Remaster — Event Modeling Session
 
-> **Template version:** 0.1
+> **Template version:** 0.2
 > **Skill:** `docs/skills/bc-remaster.md`
 > **Instructions:** Replace all `[FILL IN: ...]` blocks with BC-specific content.
 > Sections marked 📋 are boilerplate — copy as-is.
@@ -58,7 +58,9 @@ Every persona reads all of these before the session begins. No exceptions.
 ### 2. Feature files
 
 These files describe what the `[BC Name]` domain *should* be. They are almost entirely
-unimplemented. Treat them as domain expert input, not as a design constraint.
+unimplemented. **Treat them as domain expert input, not as a design constraint.** Read
+them completely — they often represent significant prior analysis that the implementation
+never absorbed.
 
 - `docs/features/[bc]/[feature-file-1].feature` — **read completely.** [One-line summary.]
 
@@ -75,8 +77,8 @@ unimplemented. Treat them as domain expert input, not as a design constraint.
 
 ### 4. Workshop skills
 
-- `docs/skills/bc-remaster.md` — **read completely.** Particularly: what a remaster is,
-  how it differs from greenfield modeling, and the Adjacent BC Gap Register.
+- `docs/skills/bc-remaster.md` — **read completely.** Particularly: feature files as
+  domain input, scope complexity signals, and the standard questions to always ask.
 
 - `docs/skills/event-modeling-workshop.md` — **read completely.** All five phases, the
   multi-persona guidance table, and the "Common Mistakes to Catch" quick reference.
@@ -115,8 +117,9 @@ Call out any event that represents a meaningful business fact in this domain.
 
 ### Seed Events
 
-✏️ *Group seed events by domain area. These are starting points only — not exhaustive.
-The Facilitator reads them aloud to prime the session. Target 40–80 total after brain dump.*
+✏️ *Group seed events by domain area. Derive these primarily from the feature files — they
+contain domain expert knowledge. These are starting points only, not exhaustive. The
+Facilitator reads them aloud to prime the session. Target 40–80 total after brain dump.*
 
 The Facilitator reads these aloud to prime the session. Personas should surface additional events.
 
@@ -166,6 +169,11 @@ The Facilitator must push through these in Phase 2:
 
    - Option A: [Approach and tradeoffs]
    - Option B: [Alternative and tradeoffs]
+
+   **If two or more aggregates are proposed:** immediately ask what the coordination
+   mechanism is. Which aggregate holds boundary-crossing events? What triggers the
+   second aggregate's lifecycle? Can it be created independently, or does it depend
+   on the first? Document the answer in the ADR.
 
    The @principal-architect owns this argument. The @product-owner provides the
    business tiebreaker.
@@ -242,9 +250,12 @@ in a single session.
 
 ### Slice Table Format
 
-| # | Slice Name | Command | Events | View | BC | Priority |
-|---|---|---|---|---|---|---|
-| 1 | ... | ... | ... | ... | [BC Name] | P0 |
+| # | Slice Name | Command | Events | View | Aggregate | BC | Priority |
+|---|---|---|---|---|---|---|---|
+| 1 | ... | ... | ... | ... | [Aggregate] | [BC Name] | P0 |
+
+*Note: Include the Aggregate column — if the remaster introduces multiple aggregates,
+tracking which slice touches which aggregate is important for implementation sequencing.*
 
 ### Required Slices to Identify
 
@@ -262,8 +273,10 @@ in a single session.
 - [Compensation workflow]
 - [Advanced scenario]
 
-**P3+ (optional — may be deferred to follow-on):**
-- [Scope area] — model but don't commit to implementing in this milestone
+**P3+ (optional — may need dedicated sub-session):**
+✏️ *If P3+ scope involves international shipping, trade compliance, regulatory requirements,
+or 3PL integration, explicitly note it requires a dedicated sub-session and explain why.*
+- [Scope area] — [reason this needs its own session, or "model now, implement later"]
 
 ### Phase 4 Output
 
@@ -335,8 +348,34 @@ in the retrospective.
 
 5. **[Routing/responsibility decision]** [Which BC owns which decision]
 
-6. **What are the `[Adjacent BC]` gaps surfaced?** The session must produce a list of
-   gaps that will feed the `[Adjacent BC]` Remaster.
+6. **What are the `[Adjacent BC]` gaps surfaced?** The session must produce a severity-rated
+   list of gaps that will feed the `[Adjacent BC]` Remaster.
+
+---
+
+## Standard Questions — Ask in Every Remaster
+
+📋 *These apply to all remasters. Do not skip them.*
+
+The Facilitator raises these before the session closes, regardless of domain.
+
+**Notification ownership:** When customer or operator notifications appear in the model,
+who owns them? Does this BC publish a domain event that Correspondence consumes? Does the
+Customer Experience BFF push via SignalR? Or does this BC trigger notifications directly?
+Resolve this explicitly — leaving it ambiguous causes implementation-time confusion.
+
+**Multi-aggregate coordination:** If two or more aggregates were proposed, what is the
+coordination mechanism? Which events live on which stream? What policy handler or integration
+message bridges them? Is it possible for the second aggregate's stream to be created
+without the first?
+
+**P3+ scope deferral:** Does any P3+ scope require specialized domain knowledge (trade
+compliance, regulatory, 3PL integration patterns) that warrants its own focused sub-session?
+If yes, note it explicitly in the session retrospective with the reason.
+
+**Cross-BC integration test gate:** Which adjacent BCs have integration tests that must stay
+green during the implementation milestone? Document this — it becomes a mandatory gate in
+the S1 implementation prompt.
 
 ---
 
@@ -355,6 +394,7 @@ contracts would change.
 **Questions the session must answer:**
 - Does `[Adjacent BC]`'s saga/handler need new message handlers for `[NewEvent]`?
 - Does `[ExistingEvent]` get renamed or replaced?
+- What is the proposed migration strategy? (dual-publish, versioned events, hard cutover?)
 - [additional contract change questions]
 
 Do not change any contracts during this session. Document implications only.
@@ -372,18 +412,32 @@ All outputs are committed to the repository by end of session.
 1. **Updated feature files** under `docs/features/[bc]/`
 
 2. **Slice table** at `docs/planning/[bc]-remaster-slices.md`
+   Include the Aggregate column if the remaster introduces multiple aggregates.
 
 3. **Session retrospective** at `docs/planning/milestones/[bc]-remaster-event-modeling-retrospective.md`
-   Must answer all mandatory open questions. Must include the Adjacent BC gap list.
+   Must answer all mandatory open questions and all standard questions. Must include
+   the severity-rated Adjacent BC gap list.
 
 4. **ADR** at `docs/decisions/[XXXX]-[bc]-remaster-rationale.md` (Next ADR: [XXXX+1])
+   If multiple aggregates were introduced, the ADR must document the coordination
+   mechanism and the arguments considered.
 
 5. **CONTEXTS.md update** for the `[BC Name]` entry
 
+### Recommended
+
+6. **Implementation Pre-Decisions** — a short section in the retrospective (or a standalone
+   note) capturing three things the S1 implementation prompt will need to resolve:
+   - *Stub infrastructure strategy:* What external dependencies need stub implementations
+     for the implementation milestone? (routing engines, carrier APIs, 3PL adapters, etc.)
+   - *Integration contract migration strategy:* How will contract changes be introduced
+     without breaking existing consumers? (dual-publish, feature flags, versioned schemas)
+   - *P3+ scope confirmation:* Which P3+ slices are explicitly deferred, and to what?
+
 ### Optional
 
-6. Preliminary aggregate sketches in pseudocode
-7. Integration contract delta document
+7. Preliminary aggregate sketches in pseudocode
+8. Integration contract delta document (side-by-side of current vs. proposed)
 
 ---
 
@@ -400,19 +454,27 @@ All outputs are committed to the repository by end of session.
 
 ## Adjacent BC Gap Register
 
-✏️ *Fill in which BCs this remaster is expected to surface gaps in, and seed with known gaps.*
+✏️ *Fill in which BCs this remaster is expected to surface gaps in, and seed with known gaps.
+Use severity ratings — they make the register actionable for the next remaster session.*
 
 Throughout the session, the **@principal-architect** maintains a running list of gaps
-in adjacent BCs.
+in adjacent BCs using the severity-rated format below.
+
+**Severity:**
+- 🔴 **Critical** — blocks implementation of the remastered BC or a P0/P1 slice
+- 🟡 **Medium** — required for P2 or full realism; known workaround exists for now
+- 🟠 **Low** — quality improvement; doesn't block anything
 
 **Expected adjacent BCs:**
 - `[BC Name]` — [why this BC will likely surface during modeling]
 
-**Known gaps entering the session:**
-- `[Adjacent BC]`: [Gap description from pre-session analysis]
+**Known gaps entering the session (seed the register with pre-session analysis):**
 
-Add to this list as the session proceeds. The final list becomes the charter for the
-next BC Remaster.
+| # | Gap | Severity | Current State | Required State | Surfaced During |
+|---|---|---|---|---|---|
+| 1 | [Gap from pre-session analysis] | 🔴/🟡/🟠 | [Current] | [Required] | Pre-session |
+
+Add rows as the session proceeds. The final register becomes the charter for the next BC Remaster.
 
 ---
 
