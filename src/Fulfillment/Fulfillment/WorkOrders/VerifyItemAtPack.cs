@@ -1,6 +1,8 @@
 using FluentValidation;
+using Fulfillment.Shipments;
 using Marten;
 using Microsoft.AspNetCore.Mvc;
+using Wolverine;
 using Wolverine.Http;
 
 namespace Fulfillment.WorkOrders;
@@ -24,6 +26,7 @@ public sealed record VerifyItemAtPack(
 /// <summary>
 /// Handler for verifying an item at the pack station. Automatically detects pack completion.
 /// When all items are verified, appends DIMWeightCalculated, CartonSelected, and PackingCompleted.
+/// On packing completion, cascades GenerateShippingLabel to automatically trigger label generation.
 /// </summary>
 public static class VerifyItemAtPackHandler
 {
@@ -56,6 +59,7 @@ public static class VerifyItemAtPackHandler
     public static async Task Handle(
         VerifyItemAtPack command,
         IDocumentSession session,
+        IMessageBus bus,
         CancellationToken ct)
     {
         var wo = await session.LoadAsync<WorkOrder>(command.WorkOrderId, ct);
@@ -94,6 +98,12 @@ public static class VerifyItemAtPackHandler
             var packingCompleted = new PackingCompleted(billableWeight, cartonSize, now);
 
             session.Events.Append(command.WorkOrderId, dimWeight, carton, packingCompleted);
+
+            // PackingCompleted → GenerateShippingLabel cascading policy.
+            // Carrier and service are defaulted (stub) — in production,
+            // the routing engine would determine the optimal carrier/service.
+            await bus.InvokeAsync(
+                new GenerateShippingLabel(wo.ShipmentId, "UPS", "Ground"), ct);
         }
     }
 }
