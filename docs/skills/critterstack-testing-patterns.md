@@ -598,6 +598,31 @@ public class CapturePaymentTests
 }
 ```
 
+### `ProblemDetails` Assertion in Non-HTTP Handlers ⭐ *M39.0 Addition*
+
+When `Before()` returns `ProblemDetails` in a non-HTTP message handler context, Wolverine stops the pipeline **without throwing an exception**. Tests must verify that state is unchanged, not that an exception was thrown.
+
+**Context matters for assertions:**
+
+| Handler Context | `ProblemDetails` Behavior | Test Assertion |
+|-----------------|---------------------------|----------------|
+| HTTP endpoint | Returns 400-family status code | Assert on `StatusCodeShouldBe(400)` |
+| Message handler (RabbitMQ, local queue) | Stops pipeline silently — no exception | Assert aggregate state is unchanged |
+
+```csharp
+// ❌ WRONG — message handler context, no exception thrown
+await Should.ThrowAsync<InvalidOperationException>(async () =>
+    await _fixture.ExecuteAndWaitAsync(new RedeemCoupon(expiredCode, promotionId)));
+
+// ✅ CORRECT — verify the aggregate was not modified
+await _fixture.ExecuteAndWaitAsync(new RedeemCoupon(expiredCode, promotionId));
+using var session = _fixture.GetDocumentSession();
+var coupon = await session.Events.AggregateStreamAsync<Coupon>(streamId);
+coupon!.Status.ShouldBe(CouponStatus.Expired); // unchanged — Before() rejected the command
+```
+
+See also `docs/skills/marten-event-sourcing.md` Anti-Pattern #10 for the Marten-side documentation.
+
 ## TestFixture Helper Methods
 
 ### GetDocumentSession() / GetDbContext()
@@ -886,6 +911,45 @@ public async Task GenerateCouponBatch_Creates100Coupons()
 | Single command | 0ms (use `ExecuteAndWaitAsync`) | Wolverine waits for completion |
 | Fan-out (N < 10) | 500ms | Small batch |
 | Fan-out (N ≥ 10) | 1000ms | Larger batch, multiple DB ops |
+
+### DCB Concurrency Testing ⭐ *M40.0 Addition*
+
+DCB (Dynamic Consistency Boundary) concurrency tests prove that cross-stream optimistic concurrency actually rejects conflicting writes. Unlike standard optimistic concurrency tests (which check single-stream version conflicts), DCB concurrency tests verify that the **tag-based boundary** detects interleaved writes across multiple streams.
+
+**Test structure:**
+
+1. **Seed:** Issue a coupon and create an active promotion (two separate streams)
+2. **First command:** Redeem the coupon — succeeds, appends `CouponRedeemed`
+3. **Second command:** Attempt to redeem the same coupon — `Before()` rejects because boundary state shows `CouponStatus.Redeemed`
+4. **Assert:** Verify the coupon is redeemed exactly once; the second redemption's effect is absent
+
+```csharp
+[Fact]
+public async Task RedeemCoupon_ConcurrentRedemption_SecondIsRejectedByDcb()
+{
+    // Arrange — coupon and promotion exist
+    var promotionId = await CreateActivePromotion();
+    var couponCode = await IssueCoupon(promotionId);
+
+    // Act — first redemption succeeds
+    await _fixture.ExecuteAndWaitAsync(
+        new RedeemCoupon(couponCode, promotionId, Guid.CreateVersion7(), Guid.CreateVersion7()));
+
+    // Act — second redemption rejected by boundary state
+    await _fixture.ExecuteAndWaitAsync(
+        new RedeemCoupon(couponCode, promotionId, Guid.CreateVersion7(), Guid.CreateVersion7()));
+
+    // Assert — coupon redeemed exactly once
+    using var session = _fixture.GetDocumentSession();
+    var coupon = await session.Events.AggregateStreamAsync<Coupon>(
+        Coupon.StreamId(couponCode));
+    coupon!.Status.ShouldBe(CouponStatus.Redeemed);
+}
+```
+
+**What makes this different from standard concurrency tests:** Standard tests verify that two concurrent writes to the *same stream* trigger a version conflict. DCB tests verify that the *boundary state* (projected from tagged events across multiple streams) correctly reflects the first write before the second write is attempted, even though the writes target different streams.
+
+**Reference:** `tests/Promotions/Promotions.IntegrationTests/CouponRedemptionTests.cs`
 
 ---
 
