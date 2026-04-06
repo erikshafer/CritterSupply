@@ -74,3 +74,65 @@ public sealed record ReturnToSenderInitiated(
 public sealed record ReturnReceivedAtWarehouse(
     DateTimeOffset ReceivedAt,
     string WarehouseId);
+
+// --- Failure Mode Events (P1) ---
+
+/// <summary>Domain event when a shipment is rerouted to a different fulfillment center.</summary>
+public sealed record ShipmentRerouted(
+    string OriginalFulfillmentCenter,
+    string NewFulfillmentCenter,
+    DateTimeOffset ReroutedAt);
+
+/// <summary>Domain event when a shipment is backordered due to no stock anywhere.</summary>
+public sealed record BackorderCreated(
+    string Reason,
+    DateTimeOffset CreatedAt);
+
+/// <summary>Domain event when shipping label generation fails.</summary>
+public sealed record ShippingLabelGenerationFailed(
+    string Carrier,
+    string FailureReason,
+    DateTimeOffset FailedAt);
+
+/// <summary>Domain event when a carrier missed the scheduled pickup window.</summary>
+public sealed record CarrierPickupMissed(
+    string Carrier,
+    string PickupWindow,
+    DateTimeOffset DetectedAt);
+
+/// <summary>Domain event when carrier relations are escalated due to missed pickup.</summary>
+public sealed record CarrierRelationsEscalated(
+    string Carrier,
+    string Reason,
+    DateTimeOffset EscalatedAt);
+
+/// <summary>Domain event when an alternate carrier is arranged after a missed pickup.</summary>
+public sealed record AlternateCarrierArranged(
+    string OriginalCarrier,
+    string NewCarrier,
+    DateTimeOffset ArrangedAt);
+
+/// <summary>Domain event when a shipping label is voided (e.g., carrier change).</summary>
+public sealed record ShippingLabelVoided(
+    string Carrier,
+    string Reason,
+    DateTimeOffset VoidedAt);
+
+/// <summary>Domain event when a ghost shipment is detected (no scan 24h after handoff).</summary>
+public sealed record GhostShipmentDetected(
+    string TrackingNumber,
+    TimeSpan TimeSinceHandoff,
+    DateTimeOffset DetectedAt);
+
+/// <summary>Domain event when a shipment is determined lost in transit.</summary>
+public sealed record ShipmentLostInTransit(
+    string Carrier,
+    TimeSpan TimeSinceHandoff,
+    DateTimeOffset DetectedAt);
+
+/// <summary>Domain event when a carrier trace is opened for a lost shipment.</summary>
+public sealed record CarrierTraceOpened(
+    string Carrier,
+    int TraceWindowDays,
+    string TraceReferenceId,
+    DateTimeOffset OpenedAt);

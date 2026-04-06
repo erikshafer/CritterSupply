@@ -19,6 +19,7 @@ public sealed record WorkOrder(
     IReadOnlyDictionary<string, int> VerifiedQuantities,
     decimal BillableWeightLbs,
     string? CartonSize,
+    ImmutableHashSet<int> EscalationThresholdsMet,
     DateTimeOffset CreatedAt,
     DateTimeOffset? WaveReleasedAt,
     DateTimeOffset? PickListAssignedAt,
@@ -76,6 +77,7 @@ public sealed record WorkOrder(
             ImmutableDictionary<string, int>.Empty,
             0m,
             null,
+            ImmutableHashSet<int>.Empty,
             @event.CreatedAt,
             null, null, null, null, null, null);
 
@@ -143,4 +145,25 @@ public sealed record WorkOrder(
             CartonSize = @event.CartonSize,
             PackingCompletedAt = @event.CompletedAt
         };
+
+    public WorkOrder Apply(ItemNotFoundAtBin _) => this;
+
+    public WorkOrder Apply(ShortPickDetected _) =>
+        this with { Status = WorkOrderStatus.ShortPickPending };
+
+    public WorkOrder Apply(PickResumed _) =>
+        this with { Status = WorkOrderStatus.PickStarted };
+
+    public WorkOrder Apply(PickExceptionRaised _) =>
+        this with { Status = WorkOrderStatus.PickExceptionClosed };
+
+    public WorkOrder Apply(WrongItemScannedAtPack _) => this;
+
+    public WorkOrder Apply(PackDiscrepancyDetected _) =>
+        this with { Status = WorkOrderStatus.PackDiscrepancyPending };
+
+    public WorkOrder Apply(SLAEscalationRaised @event) =>
+        this with { EscalationThresholdsMet = EscalationThresholdsMet.Add(@event.Threshold) };
+
+    public WorkOrder Apply(SLABreached _) => this;
 }

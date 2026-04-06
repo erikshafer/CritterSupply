@@ -110,6 +110,10 @@ builder.Host.UseWolverine(opts =>
         .ToRabbitQueue("orders-fulfillment-events");
     opts.PublishMessage<Messages.Contracts.Fulfillment.TrackingNumberAssigned>()
         .ToRabbitQueue("orders-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.BackorderCreated>()
+        .ToRabbitQueue("orders-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentLostInTransit>()
+        .ToRabbitQueue("orders-fulfillment-events");
 
     // Also publish to Storefront for real-time customer updates
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDispatched>()

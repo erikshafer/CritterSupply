@@ -68,3 +68,54 @@ public sealed record PackingCompleted(
     decimal BillableWeightLbs,
     string CartonSize,
     DateTimeOffset CompletedAt);
+
+// --- Failure Mode Events (P1) ---
+
+/// <summary>Domain event when an item is not found at its expected bin during picking.</summary>
+public sealed record ItemNotFoundAtBin(
+    string Sku,
+    string BinLocation,
+    DateTimeOffset DetectedAt);
+
+/// <summary>Domain event when a short pick is detected — expected quantity not available.</summary>
+public sealed record ShortPickDetected(
+    string Sku,
+    int ExpectedQuantity,
+    int ShortageQuantity,
+    DateTimeOffset DetectedAt);
+
+/// <summary>Domain event when picking resumes after a short pick, using an alternative bin.</summary>
+public sealed record PickResumed(
+    string Sku,
+    string AlternativeBinLocation,
+    DateTimeOffset ResumedAt);
+
+/// <summary>Domain event when a pick exception is raised and the work order is closed.</summary>
+public sealed record PickExceptionRaised(
+    string Reason,
+    DateTimeOffset RaisedAt);
+
+/// <summary>Domain event when a wrong item is scanned at the pack station.</summary>
+public sealed record WrongItemScannedAtPack(
+    string ExpectedSku,
+    string ScannedSku,
+    DateTimeOffset DetectedAt);
+
+/// <summary>Domain event when a pack discrepancy is detected (wrong item or weight mismatch).</summary>
+public sealed record PackDiscrepancyDetected(
+    string DiscrepancyType,
+    string Description,
+    DateTimeOffset DetectedAt);
+
+/// <summary>Domain event when an SLA escalation threshold is reached.</summary>
+public sealed record SLAEscalationRaised(
+    int Threshold,
+    TimeSpan ElapsedTime,
+    TimeSpan SlaWindow,
+    DateTimeOffset RaisedAt);
+
+/// <summary>Domain event when the SLA window is fully breached.</summary>
+public sealed record SLABreached(
+    TimeSpan ElapsedTime,
+    TimeSpan SlaWindow,
+    DateTimeOffset BreachedAt);

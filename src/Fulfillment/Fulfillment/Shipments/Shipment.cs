@@ -111,6 +111,7 @@ public sealed record Shipment(
     public Shipment Apply(ShipmentInTransit @event) =>
         this with
         {
+            // ShipmentInTransit resolves GhostShipmentInvestigation if a scan arrives
             Status = ShipmentStatus.InTransit,
             LastScanLocation = @event.ScanLocation
         };
@@ -141,4 +142,34 @@ public sealed record Shipment(
 
     public Shipment Apply(ReturnReceivedAtWarehouse _) =>
         this with { Status = ShipmentStatus.ReturnReceived };
+
+    public Shipment Apply(ShipmentRerouted @event) =>
+        this with
+        {
+            Status = ShipmentStatus.Assigned,
+            AssignedFulfillmentCenter = @event.NewFulfillmentCenter
+        };
+
+    public Shipment Apply(BackorderCreated _) =>
+        this with { Status = ShipmentStatus.Backordered };
+
+    public Shipment Apply(ShippingLabelGenerationFailed _) =>
+        this with { Status = ShipmentStatus.LabelGenerationFailed };
+
+    public Shipment Apply(CarrierPickupMissed _) => this;
+
+    public Shipment Apply(CarrierRelationsEscalated _) => this;
+
+    public Shipment Apply(AlternateCarrierArranged @event) =>
+        this with { Carrier = @event.NewCarrier };
+
+    public Shipment Apply(ShippingLabelVoided _) => this;
+
+    public Shipment Apply(GhostShipmentDetected _) =>
+        this with { Status = ShipmentStatus.GhostShipmentInvestigation };
+
+    public Shipment Apply(ShipmentLostInTransit _) =>
+        this with { Status = ShipmentStatus.LostInTransit };
+
+    public Shipment Apply(CarrierTraceOpened _) => this;
 }

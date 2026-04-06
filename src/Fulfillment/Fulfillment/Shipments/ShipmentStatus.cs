@@ -39,6 +39,24 @@ public enum ShipmentStatus
     /// <summary>Returned package received back at FC.</summary>
     ReturnReceived,
 
+    /// <summary>Shipment rerouted to a different fulfillment center.</summary>
+    Rerouted,
+
+    /// <summary>No stock available anywhere — shipment is backordered.</summary>
+    Backordered,
+
+    /// <summary>Shipping label generation failed (carrier API error or invalid address).</summary>
+    LabelGenerationFailed,
+
+    /// <summary>Ghost shipment detected — no carrier scan 24h after handoff.</summary>
+    GhostShipmentInvestigation,
+
+    /// <summary>All delivery attempts exhausted, awaiting return-to-sender.</summary>
+    AllAttemptsExhausted,
+
+    /// <summary>Shipment lost in transit — carrier trace opened.</summary>
+    LostInTransit,
+
     /// <summary>Shipment cancelled before dispatch.</summary>
     Cancelled,
 
