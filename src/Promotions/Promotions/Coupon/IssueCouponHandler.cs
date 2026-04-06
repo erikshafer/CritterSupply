@@ -48,9 +48,11 @@ public static class IssueCouponHandler
             PromotionId: command.PromotionId,
             IssuedAt: now);
 
-        // Tag the event for DCB tag table population
+        // Tag the event and create the stream via Append.
+        // StartStream may not preserve tags on pre-wrapped IEvent objects,
+        // so we use Append which handles IEvent objects correctly.
         var wrapped = session.Events.BuildEvent(evt);
         wrapped.AddTag(new CouponStreamId(streamId));
-        session.Events.StartStream<Promotions.Coupon.Coupon>(streamId, wrapped);
+        session.Events.Append(streamId, wrapped);
     }
 }

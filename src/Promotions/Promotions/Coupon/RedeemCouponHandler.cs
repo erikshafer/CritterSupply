@@ -25,11 +25,15 @@ public static class RedeemCouponHandler
     /// <summary>
     /// DCB load: EventTagQuery spanning both the Coupon and Promotion streams.
     /// Marten uses this to load all matching tagged events and project CouponRedemptionState.
+    /// Each .For()/.Or() MUST be followed by .AndEventsOfType&lt;...&gt;() to create a condition.
     /// </summary>
     public static EventTagQuery Load(RedeemCoupon cmd)
         => EventTagQuery
             .For(new CouponStreamId(Coupon.StreamId(cmd.CouponCode)))
-            .Or(new PromotionStreamId(cmd.PromotionId));
+            .AndEventsOfType<CouponIssued, CouponRedeemed, CouponRevoked, CouponExpired>()
+            .Or(new PromotionStreamId(cmd.PromotionId))
+            .AndEventsOfType<PromotionCreated, PromotionActivated, PromotionPaused, PromotionResumed, PromotionCancelled, PromotionExpired>()
+            .AndEventsOfType<PromotionRedemptionRecorded>();
 
     /// <summary>
     /// Validates all redemption invariants against the projected boundary state.
@@ -101,10 +105,11 @@ public static class RedeemCouponHandler
             cmd.CustomerId,
             cmd.RedeemedAt);
 
-        // Tag the event and append via boundary for DCB concurrency
+        // Tag the event and append via boundary for DCB concurrency.
+        // boundary.AppendOne() handles routing to the correct stream via tag registration.
         var wrapped = session.Events.BuildEvent(evt);
         wrapped.AddTag(new CouponStreamId(couponStreamId));
-        session.Events.Append(couponStreamId, wrapped);
+        boundary.AppendOne(wrapped);
 
         // Cascade CouponRedeemed for choreography → RecordPromotionRedemptionHandler
         var outgoing = new OutgoingMessages();

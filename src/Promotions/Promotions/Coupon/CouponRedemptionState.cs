@@ -12,6 +12,9 @@ namespace Promotions.Coupon;
 /// </summary>
 public sealed class CouponRedemptionState
 {
+    /// <summary>Marten document identity (required for DCB boundary model storage).</summary>
+    public Guid Id { get; set; }
+
     // --- Coupon state (projected from Coupon stream events) ---
 
     /// <summary>Whether the coupon exists.</summary>

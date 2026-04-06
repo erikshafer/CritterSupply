@@ -21,9 +21,11 @@ public static class CreatePromotionHandler
             UsageLimit: command.UsageLimit,
             CreatedAt: now);
 
-        // Tag the event for DCB tag table population
+        // Tag the event and create the stream via Append.
+        // StartStream may not preserve tags on pre-wrapped IEvent objects,
+        // so we use Append which handles IEvent objects correctly.
         var wrapped = session.Events.BuildEvent(evt);
         wrapped.AddTag(new PromotionStreamId(promotionId));
-        session.Events.StartStream<Promotions.Promotion.Promotion>(promotionId, wrapped);
+        session.Events.Append(promotionId, wrapped);
     }
 }
