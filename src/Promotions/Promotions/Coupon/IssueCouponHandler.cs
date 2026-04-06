@@ -1,11 +1,10 @@
 using Marten;
-using Wolverine.Marten;
 
 namespace Promotions.Coupon;
 
 public static class IssueCouponHandler
 {
-    public static async Task<IStartStream> Handle(
+    public static async Task Handle(
         IssueCoupon command,
         IDocumentSession session,
         CancellationToken ct)
@@ -49,7 +48,11 @@ public static class IssueCouponHandler
             PromotionId: command.PromotionId,
             IssuedAt: now);
 
-        // Start new event stream for the coupon
-        return MartenOps.StartStream<Promotions.Coupon.Coupon>(streamId, evt);
+        // Tag the event and create the stream via Append.
+        // StartStream may not preserve tags on pre-wrapped IEvent objects,
+        // so we use Append which handles IEvent objects correctly.
+        var wrapped = session.Events.BuildEvent(evt);
+        wrapped.AddTag(new CouponStreamId(streamId));
+        session.Events.Append(streamId, wrapped);
     }
 }

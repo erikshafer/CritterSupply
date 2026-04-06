@@ -3,25 +3,22 @@ using Promotions.Promotion;
 namespace Promotions.Coupon;
 
 /// <summary>
-/// DCB boundary state spanning both Coupon and Promotion aggregates.
-/// Used by RedeemCouponHandler to enforce coupon validity + promotion status + redemption cap
-/// as a single atomic consistency decision.
+/// DCB boundary state spanning Coupon and Promotion event streams.
+/// Marten projects this via Apply() methods from all events matching the EventTagQuery.
+/// Used by RedeemCouponHandler to enforce all redemption invariants in one atomic decision.
 ///
-/// Projected from existing Coupon and Promotion aggregates via ProjectFromCoupon/ProjectFromPromotion
-/// helper methods. The LoadAsync method in RedeemCouponHandler loads both aggregates and
-/// populates this state before Before() validation.
-///
-/// M40.0: CritterSupply's first DCB boundary state implementation.
+/// M40.0 S1B: Rewritten from ProjectFromCoupon/ProjectFromPromotion helpers to standard
+/// Apply() methods, enabling real EventTagQuery + [BoundaryModel] + IEventBoundary&lt;T&gt;.
 /// </summary>
 public sealed class CouponRedemptionState
 {
-    // --- Coupon state ---
+    /// <summary>Marten document identity (required for DCB boundary model storage).</summary>
+    public Guid Id { get; set; }
+
+    // --- Coupon state (projected from Coupon stream events) ---
 
     /// <summary>Whether the coupon exists.</summary>
     public bool CouponExists { get; private set; }
-
-    /// <summary>Current status of the coupon.</summary>
-    public CouponStatus CouponStatus { get; private set; }
 
     /// <summary>The coupon's stream ID (UUID v5 from code).</summary>
     public Guid CouponId { get; private set; }
@@ -29,10 +26,10 @@ public sealed class CouponRedemptionState
     /// <summary>The coupon code.</summary>
     public string CouponCode { get; private set; } = string.Empty;
 
-    /// <summary>The promotion ID associated with the coupon.</summary>
-    public Guid CouponPromotionId { get; private set; }
+    /// <summary>Current status of the coupon.</summary>
+    public CouponStatus CouponStatus { get; private set; }
 
-    // --- Promotion state ---
+    // --- Promotion state (projected from Promotion stream events) ---
 
     /// <summary>Whether the promotion exists.</summary>
     public bool PromotionExists { get; private set; }
@@ -46,26 +43,33 @@ public sealed class CouponRedemptionState
     /// <summary>Current redemption count for the promotion.</summary>
     public int CurrentRedemptionCount { get; private set; }
 
-    /// <summary>
-    /// Projects state from a loaded Coupon aggregate.
-    /// </summary>
-    public void ProjectFromCoupon(Coupon coupon)
+    // --- Coupon stream event Apply methods ---
+
+    public void Apply(CouponIssued e)
     {
         CouponExists = true;
-        CouponStatus = coupon.Status;
-        CouponId = coupon.Id;
-        CouponCode = coupon.Code;
-        CouponPromotionId = coupon.PromotionId;
+        CouponId = Coupon.StreamId(e.CouponCode);
+        CouponCode = e.CouponCode;
+        CouponStatus = CouponStatus.Issued;
     }
 
-    /// <summary>
-    /// Projects state from a loaded Promotion aggregate.
-    /// </summary>
-    public void ProjectFromPromotion(Promotions.Promotion.Promotion promotion)
+    public void Apply(CouponRedeemed e) => CouponStatus = CouponStatus.Redeemed;
+    public void Apply(CouponRevoked e) => CouponStatus = CouponStatus.Revoked;
+    public void Apply(CouponExpired e) => CouponStatus = CouponStatus.Expired;
+
+    // --- Promotion stream event Apply methods ---
+
+    public void Apply(PromotionCreated e)
     {
         PromotionExists = true;
-        PromotionStatus = promotion.Status;
-        UsageLimit = promotion.UsageLimit;
-        CurrentRedemptionCount = promotion.CurrentRedemptionCount;
+        PromotionStatus = PromotionStatus.Draft;
+        UsageLimit = e.UsageLimit;
     }
+
+    public void Apply(PromotionActivated e) => PromotionStatus = PromotionStatus.Active;
+    public void Apply(PromotionPaused e) => PromotionStatus = PromotionStatus.Paused;
+    public void Apply(PromotionResumed e) => PromotionStatus = PromotionStatus.Active;
+    public void Apply(PromotionCancelled e) => PromotionStatus = PromotionStatus.Cancelled;
+    public void Apply(PromotionExpired e) => PromotionStatus = PromotionStatus.Expired;
+    public void Apply(PromotionRedemptionRecorded e) => CurrentRedemptionCount++;
 }

@@ -1,10 +1,10 @@
-using Wolverine.Marten;
+using Marten;
 
 namespace Promotions.Promotion;
 
 public static class CreatePromotionHandler
 {
-    public static IStartStream Handle(CreatePromotion command)
+    public static void Handle(CreatePromotion command, IDocumentSession session)
     {
         // Phase 1: Using Guid.CreateVersion7() for time-ordered IDs
         var promotionId = Guid.CreateVersion7();
@@ -21,7 +21,11 @@ public static class CreatePromotionHandler
             UsageLimit: command.UsageLimit,
             CreatedAt: now);
 
-        // Start new event stream for the promotion
-        return MartenOps.StartStream<Promotions.Promotion.Promotion>(promotionId, evt);
+        // Tag the event and create the stream via Append.
+        // StartStream may not preserve tags on pre-wrapped IEvent objects,
+        // so we use Append which handles IEvent objects correctly.
+        var wrapped = session.Events.BuildEvent(evt);
+        wrapped.AddTag(new PromotionStreamId(promotionId));
+        session.Events.Append(promotionId, wrapped);
     }
 }

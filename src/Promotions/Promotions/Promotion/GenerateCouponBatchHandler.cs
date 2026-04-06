@@ -57,8 +57,10 @@ public static class GenerateCouponBatchHandler
             cmd.Count,
             timestamp);
 
-        // Manually append event to promotion stream
-        session.Events.Append(cmd.PromotionId, batchEvent);
+        // Tag the event for DCB tag table population
+        var wrapped = session.Events.BuildEvent(batchEvent);
+        wrapped.AddTag(new PromotionStreamId(cmd.PromotionId));
+        session.Events.Append(cmd.PromotionId, wrapped);
 
         // Return outgoing messages for fan-out
         return outgoing;
