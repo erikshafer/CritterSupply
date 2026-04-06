@@ -118,17 +118,18 @@ jobs:
 
       - name: Run Unit Tests
         run: |
-          find tests -name "*.UnitTests.csproj" -print0 |
-            while IFS= read -r -d '' project; do
-              name=$(basename "$project" .csproj)
-              echo "::group::$name"
-              dotnet test "$project" \
-                --no-build \
-                --configuration Release \
-                --logger "console;verbosity=normal" \
-                --logger "trx;LogFileName=${name}-results.trx"
-              echo "::endgroup::"
-            done
+          exit_code=0
+          while IFS= read -r -d '' project; do
+            name=$(basename "$project" .csproj)
+            echo "::group::$name"
+            dotnet test "$project" \
+              --no-build \
+              --configuration Release \
+              --logger "console;verbosity=normal" \
+              --logger "trx;LogFileName=${name}-results.trx" || exit_code=$?
+            echo "::endgroup::"
+          done < <(find tests -name "*.UnitTests.csproj" -print0)
+          exit $exit_code
 
       - name: Upload Unit Test Results
         if: always()
@@ -173,17 +174,18 @@ jobs:
 
       - name: Run Integration Tests
         run: |
-          find tests -name "*.IntegrationTests.csproj" -print0 |
-            while IFS= read -r -d '' project; do
-              name=$(basename "$project" .csproj)
-              echo "::group::$name"
-              dotnet test "$project" \
-                --no-build \
-                --configuration Release \
-                --logger "console;verbosity=normal" \
-                --logger "trx;LogFileName=${name}-results.trx"
-              echo "::endgroup::"
-            done
+          exit_code=0
+          while IFS= read -r -d '' project; do
+            name=$(basename "$project" .csproj)
+            echo "::group::$name"
+            dotnet test "$project" \
+              --no-build \
+              --configuration Release \
+              --logger "console;verbosity=normal" \
+              --logger "trx;LogFileName=${name}-results.trx" || exit_code=$?
+            echo "::endgroup::"
+          done < <(find tests -name "*.IntegrationTests.csproj" -print0)
+          exit $exit_code
         env:
           DOCKER_HOST: unix:///var/run/docker.sock
           TESTCONTAINERS_RYUK_DISABLED: false

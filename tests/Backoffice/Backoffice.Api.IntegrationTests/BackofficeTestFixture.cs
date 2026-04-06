@@ -128,9 +128,16 @@ public class BackofficeTestFixture : IAsyncLifetime
         {
             try
             {
-                await Host.StopAsync();
+                // Give the host a generous timeout for graceful shutdown.
+                // Without a timeout, Wolverine background agents (HighWaterAgent, etc.)
+                // may throw OperationCanceledException during disposal, which xUnit
+                // surfaces as a [Test Collection Cleanup Failure] and causes the test
+                // runner to exit with code 1 — even when all tests have passed.
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await Host.StopAsync(cts.Token);
                 await Host.DisposeAsync();
             }
+            catch (OperationCanceledException) { }
             catch (ObjectDisposedException) { }
             catch (AggregateException ex) when (ex.InnerExceptions.All(e =>
                 e is OperationCanceledException or ObjectDisposedException)) { }
