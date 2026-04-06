@@ -64,7 +64,7 @@ No active milestone. M40.0 closed 2026-04-06. Next milestone TBD — decisions p
 
 **Key Deliverables:**
 - **S1 (Implementation):** DCB architecture with `CouponRedemptionState` boundary model; `RedeemCouponHandler` with `Load()`/`Before()`/`Handle()` compound pattern; `RecordPromotionRedemptionHandler` converted to `CouponRedeemed` choreography; 30/30 tests; ADR 0058 written
-- **S1B (Real DCB API):** Replaced manual `LoadAsync` with Marten's native `EventTagQuery` + `[BoundaryModel]` + `IEventBoundary<T>`; all 6 write handlers tag events; `DcbConcurrencyException` retry policy; 31/31 tests (+1 DCB concurrency test); research doc committed
+- **S1B (Real DCB API):** Replaced manual `LoadAsync` with Marten's native `EventTagQuery` + `[BoundaryModel]` + `IEventBoundary<T>`; all 7 write handlers tag events; `DcbConcurrencyException` retry policy; 31/31 tests (+1 DCB concurrency test); research doc committed
 - **S2 (Documentation Closure):** `dynamic-consistency-boundary.md` skill doc rewritten with canonical example, implementation checklist, and gotchas; CONTEXTS.md verified (no changes); README accuracy pass + Mermaid diagram updates (Shopping→Promotions, Correspondence integrations, Backoffice→Listings/Marketplaces/Returns); milestone closure retrospective
 
 **DoD:** Build 0 errors, 19 warnings (unchanged from M39.0 baseline). 31/31 Promotions integration tests passing. 0 new warnings.

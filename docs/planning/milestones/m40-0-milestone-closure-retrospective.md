@@ -37,7 +37,7 @@ One atomic redemption decision replaced the two-command fan-out pattern. Key del
 S1B replaced S1's manual `LoadAsync` workaround with Marten 8.28.0's real tag-based DCB API:
 
 - **Strong-typed tag IDs:** `CouponStreamId(Guid Value)` and `PromotionStreamId(Guid Value)` — wrapper records required because `Guid` has 2 public instance properties in .NET 10
-- **All 6 write handlers tag events at write time:** `BuildEvent()` + `AddTag()` + `Append()` in IssueCoupon, RevokeCoupon, RedeemCoupon, CreatePromotion, ActivatePromotion, GenerateCouponBatch, and RecordPromotionRedemption
+- **All 7 write handlers tag events at write time:** `BuildEvent()` + `AddTag()` + `Append()` in IssueCoupon, RevokeCoupon, RedeemCoupon, CreatePromotion, ActivatePromotion, GenerateCouponBatch, and RecordPromotionRedemption
 - **`EventTagQuery` spanning two streams:** Queries `CouponStreamId` for Coupon events and `PromotionStreamId` for Promotion events
 - **`[BoundaryModel] IEventBoundary<CouponRedemptionState>`:** Cross-stream optimistic concurrency via `AssertDcbConsistency`
 - **`DcbConcurrencyException` retry policy:** Added alongside `ConcurrencyException` (they are siblings, not parent-child)
