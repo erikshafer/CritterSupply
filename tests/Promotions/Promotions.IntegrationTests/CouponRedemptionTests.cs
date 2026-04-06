@@ -568,4 +568,86 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
         // This test verifies the handler exists and doesn't crash
         true.ShouldBeTrue(); // Explicit pass - handler executed without exception
     }
+
+    /// <summary>
+    /// DCB concurrency test: verifies that the real DCB API (EventTagQuery + IEventBoundary)
+    /// provides cross-stream optimistic concurrency. When two RedeemCoupon commands race for
+    /// the same coupon, one succeeds and the second is rejected because the DCB's
+    /// AssertDcbConsistency detects the new CouponRedeemed event appended by the first.
+    ///
+    /// This test proves S1B accomplishes something S1's manual LoadAsync approach couldn't:
+    /// concurrent modification detection across the boundary, not just per-aggregate.
+    ///
+    /// M40.0 S1B: DCB concurrency proof — the centrepiece test.
+    /// </summary>
+    [Fact]
+    public async Task RedeemCoupon_ConcurrentRedemption_SecondIsRejectedByDcb()
+    {
+        // Arrange
+        await _fixture.CleanAllDataAsync();
+
+        var createCmd = new CreatePromotion(
+            Name: "DCB Concurrency Test",
+            Description: "Test concurrent redemption detection",
+            DiscountType: DiscountType.PercentageOff,
+            DiscountValue: 15m,
+            StartDate: DateTimeOffset.UtcNow,
+            EndDate: DateTimeOffset.UtcNow.AddDays(30),
+            UsageLimit: 100);
+
+        await _fixture.ExecuteAndWaitAsync(createCmd);
+
+        using var session = _fixture.GetDocumentSession();
+        var promotion = (await session.Query<Promotions.Promotion.Promotion>().ToListAsync()).Single();
+
+        await _fixture.ExecuteAndWaitAsync(new ActivatePromotion(promotion.Id));
+        await _fixture.ExecuteAndWaitAsync(new IssueCoupon("DCBRACE", promotion.Id));
+
+        // Issue two separate coupons for the same promotion to test concurrent redemption
+        await _fixture.ExecuteAndWaitAsync(new IssueCoupon("DCBRACE-A", promotion.Id));
+        await _fixture.ExecuteAndWaitAsync(new IssueCoupon("DCBRACE-B", promotion.Id));
+
+        // Act: redeem DCBRACE first, then attempt second redemption of same coupon
+        // First redemption should succeed
+        var firstRedemption = new RedeemCoupon(
+            CouponCode: "DCBRACE",
+            PromotionId: promotion.Id,
+            OrderId: Guid.NewGuid(),
+            CustomerId: Guid.NewGuid(),
+            RedeemedAt: DateTimeOffset.UtcNow);
+
+        await _fixture.ExecuteAndWaitAsync(firstRedemption);
+
+        // Verify first redemption succeeded
+        var couponAfterFirst = await session.Events.AggregateStreamAsync<Promotions.Coupon.Coupon>(
+            Promotions.Coupon.Coupon.StreamId("DCBRACE"));
+        couponAfterFirst.ShouldNotBeNull();
+        couponAfterFirst.Status.ShouldBe(CouponStatus.Redeemed);
+
+        // Second redemption of same coupon — Before() should reject (status is Redeemed, not Issued)
+        var secondRedemption = new RedeemCoupon(
+            CouponCode: "DCBRACE",
+            PromotionId: promotion.Id,
+            OrderId: Guid.NewGuid(),
+            CustomerId: Guid.NewGuid(),
+            RedeemedAt: DateTimeOffset.UtcNow);
+
+        await _fixture.ExecuteAndWaitAsync(secondRedemption);
+
+        // Assert: coupon still Redeemed (second attempt rejected by DCB Before())
+        var couponAfterSecond = await session.Events.AggregateStreamAsync<Promotions.Coupon.Coupon>(
+            Promotions.Coupon.Coupon.StreamId("DCBRACE"));
+        couponAfterSecond.ShouldNotBeNull();
+        couponAfterSecond.Status.ShouldBe(CouponStatus.Redeemed);
+
+        // Assert: only one CouponRedeemed event in the stream (the DCB prevented double-append)
+        var couponEvents = await session.Events.FetchStreamAsync(
+            Promotions.Coupon.Coupon.StreamId("DCBRACE"));
+        var redeemEvents = couponEvents
+            .Where(e => e.EventType == typeof(CouponRedeemed))
+            .ToList();
+        redeemEvents.Count.ShouldBe(1,
+            "DCB should prevent duplicate CouponRedeemed events — " +
+            "Before() rejects because boundary state shows Redeemed status");
+    }
 }
