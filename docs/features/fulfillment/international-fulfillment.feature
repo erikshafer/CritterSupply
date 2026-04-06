@@ -3,6 +3,13 @@ Feature: International Fulfillment
   I want to correctly route, document, and ship international orders to Canada and the UK
   So that customers outside the US receive their orders with accurate customs handling and duties
 
+  # Remaster Note (ADR 0059): International routing and customs events live on the
+  # Shipment stream. International routing uses InternationalRoutingDetermined and
+  # FulfillmentCenterAssigned to select the appropriate hub (Toronto or Birmingham).
+  # Customs documentation events (CustomsDocumentationPrepared, USMCACertificateOfOriginIssued)
+  # are appended between PackingCompleted and ShippingLabelGenerated.
+  # International slices are P3 priority and may be deferred to a follow-on milestone.
+
   Background:
     Given the fulfillment system is operational
     And the following international hubs are active:

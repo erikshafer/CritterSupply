@@ -3,6 +3,13 @@ Feature: Warehouse Picking and Packing
   I want to correctly pick, verify, and pack customer orders
   So that shipments leave the fulfillment center accurately and on time
 
+  # Remaster Note (ADR 0059): Warehouse operations use the WorkOrder aggregate.
+  # Events in this file (WorkOrderCreated through PackingCompleted) live on the
+  # WorkOrder stream. The Shipment aggregate owns routing (FulfillmentCenterAssigned)
+  # and carrier lifecycle (ShippingLabelGenerated through ShipmentDelivered).
+  # PackingCompleted on the WorkOrder stream triggers a policy handler that
+  # initiates the labeling/dispatch flow on the Shipment stream.
+
   Background:
     Given the fulfillment system is operational
     And the following fulfillment centers are active:
