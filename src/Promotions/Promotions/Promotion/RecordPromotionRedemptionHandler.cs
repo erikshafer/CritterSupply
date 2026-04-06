@@ -1,4 +1,7 @@
+using Microsoft.AspNetCore.Mvc;
 using Promotions.Coupon;
+using Wolverine;
+using Wolverine.Http;
 using Wolverine.Marten;
 
 namespace Promotions.Promotion;
@@ -23,6 +26,10 @@ namespace Promotions.Promotion;
 /// </summary>
 public static class RecordPromotionRedemptionHandler
 {
+    /// <summary>
+    /// Choreography: reacts to CouponRedeemed events emitted by the DCB RedeemCouponHandler.
+    /// M40.0: Primary path for recording promotion redemptions.
+    /// </summary>
     public static Events Handle(
         CouponRedeemed evt,
         [WriteAggregate] Promotion promotion)
@@ -34,6 +41,40 @@ public static class RecordPromotionRedemptionHandler
             evt.CustomerId,
             evt.CouponCode,
             evt.RedeemedAt));
+        return events;
+    }
+}
+
+/// <summary>
+/// Legacy command handler for RecordPromotionRedemption.
+/// SUPERSEDED (M40.0): The DCB RedeemCouponHandler now emits CouponRedeemed,
+/// and RecordPromotionRedemptionHandler reacts to that event via choreography.
+/// This handler is retained for backward compatibility with existing command invocations.
+/// </summary>
+public static class LegacyRecordPromotionRedemptionHandler
+{
+    public static ProblemDetails Before(RecordPromotionRedemption cmd, Promotion? promotion)
+    {
+        if (promotion is null)
+            return new ProblemDetails { Detail = $"Promotion '{cmd.PromotionId}' not found", Status = 404 };
+        if (promotion.Status != PromotionStatus.Active)
+            return new ProblemDetails { Detail = $"Cannot record redemption for promotion '{promotion.Id}' — status is {promotion.Status}. Only Active promotions accept redemptions.", Status = 409 };
+        if (promotion.UsageLimit.HasValue && promotion.CurrentRedemptionCount >= promotion.UsageLimit.Value)
+            return new ProblemDetails { Detail = $"Promotion '{promotion.Id}' usage limit of {promotion.UsageLimit.Value} has been reached.", Status = 409 };
+        return WolverineContinue.NoProblems;
+    }
+
+    public static Events Handle(
+        RecordPromotionRedemption cmd,
+        [WriteAggregate] Promotion promotion)
+    {
+        var events = new Events();
+        events.Add(new PromotionRedemptionRecorded(
+            promotion.Id,
+            cmd.OrderId,
+            cmd.CustomerId,
+            cmd.CouponCode,
+            cmd.RedeemedAt));
         return events;
     }
 }

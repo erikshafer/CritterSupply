@@ -167,6 +167,7 @@ public sealed class DiscountCalculationTests : IClassFixture<TestFixture>
         // Redeem the coupon
         await _fixture.ExecuteAndWaitAsync(new RedeemCoupon(
             "USED25",
+            promotion.Id,
             Guid.NewGuid(),
             Guid.NewGuid(),
             DateTimeOffset.UtcNow));
