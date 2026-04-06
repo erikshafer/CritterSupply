@@ -1,6 +1,6 @@
 # ADR 0058 — Dynamic Consistency Boundary: Promotions Coupon Redemption
 
-**Status:** Accepted
+**Status:** Accepted (Updated S1B — Real DCB API)
 **Date:** 2026-04-06
 **Milestone:** M40.0 — Dynamic Consistency Boundary: Promotions BC
 
@@ -19,58 +19,106 @@ The two-command pattern also required callers to coordinate two messages for wha
 
 ## Decision
 
-Implement the **Dynamic Consistency Boundary (DCB)** pattern for coupon redemption:
+Implement the **Dynamic Consistency Boundary (DCB)** pattern for coupon redemption using Marten's native `EventTagQuery` + `[BoundaryModel]` + `IEventBoundary<T>` API:
 
-1. **Single decision point:** `RedeemCouponHandler` loads both the Coupon and Promotion aggregates into a single `CouponRedemptionState` boundary state, validating all invariants (coupon exists, coupon is Issued, promotion exists, promotion is Active, usage cap not exceeded) in one `Before()` method.
+1. **Single decision point:** `RedeemCouponHandler` uses `EventTagQuery` to load all tagged events from both the Coupon and Promotion streams, projecting them into `CouponRedemptionState` via standard `Apply()` methods. All invariants (coupon exists, coupon is Issued, promotion exists, promotion is Active, usage cap not exceeded) are checked in one `Before()` method.
 
-2. **Choreography for downstream effects:** After `CouponRedeemed` is emitted, `RecordPromotionRedemptionHandler` reacts to it via choreography (event handler, not command handler) to update the Promotion's `CurrentRedemptionCount`. The promotion update is a consequence of the committed fact, not a parallel orchestrated step.
+2. **Cross-stream optimistic concurrency:** `IEventBoundary<CouponRedemptionState>` provides `AssertDcbConsistency` at `SaveChangesAsync` time. If any matching tagged event was appended since the boundary was loaded, `DcbConcurrencyException` is thrown — preventing concurrent double-redemption across the boundary, not just per-aggregate.
 
-3. **`PromotionId` on `RedeemCoupon` command:** The command now includes `PromotionId` so the handler can load the Promotion aggregate alongside the Coupon aggregate.
+3. **Choreography for downstream effects:** After `CouponRedeemed` is emitted, `RecordPromotionRedemptionHandler` reacts to it via choreography (event handler) to update the Promotion's `CurrentRedemptionCount`. The promotion update is a consequence of the committed fact, not a parallel orchestrated step.
+
+4. **`PromotionId` on `RedeemCoupon` command:** The command includes `PromotionId` so the handler can construct the `EventTagQuery` spanning both streams.
 
 ### Implementation approach
 
-The handler uses Wolverine's compound lifecycle (`LoadAsync` / `Before` / `Handle`) with multi-stream aggregation:
+The handler uses Wolverine's compound lifecycle (`Load` / `Before` / `Handle`) with Marten's DCB API:
 
-- **`LoadAsync`**: Loads both the `Coupon` and `Promotion` aggregates via `IQuerySession.Events.AggregateStreamAsync()` and projects them into `CouponRedemptionState`
-- **`Before`**: Validates all invariants against the boundary state, returning `ProblemDetails` on failure
-- **`Handle`**: Appends `CouponRedeemed` to the Coupon stream and cascades it via `OutgoingMessages` for choreography
+- **`Load`**: Returns `EventTagQuery` spanning both Coupon and Promotion streams. Marten loads all matching tagged events and projects `CouponRedemptionState` via `Apply()` methods.
+- **`Before`**: Validates all invariants against the boundary state, returning `ProblemDetails` on failure. Note: `[BoundaryModel]` is NOT used on `Before()` — adding it to both `Before()` and `Handle()` causes CS0128 in Wolverine's codegen.
+- **`Handle`**: Receives `[BoundaryModel] IEventBoundary<CouponRedemptionState>`. Appends `CouponRedeemed` via `boundary.AppendOne()` with explicit tagging. Cascades the event via `OutgoingMessages` for choreography.
 
-### Why not Marten's tag-based DCB API (`EventTagQuery` / `[BoundaryModel]`)
+### Tag type registration
 
-Marten 8.28.0's `EventTagQuery` and `IEventBoundary<T>` API requires:
-1. Strong-typed tag IDs (e.g., `CouponStreamTag(Guid Value)`) registered via `RegisterTagType<T>()`
-2. Events tagged at write time — either via `IEventBoundary.AppendOne()` (which auto-infers tags from event properties) or explicit `WithTag()` on `IEvent`
-3. Tag tables (`mt_event_tag_*`) populated at event insertion time
+Strong-typed tag IDs are required because `Guid` has 2 public instance properties in .NET 10 (`Variant`, `Version`), causing `ValueTypeInfo` validation to fail:
 
-CritterSupply uses raw `Guid` stream IDs throughout. Existing events (`CouponIssued`, `PromotionCreated`, `PromotionActivated`, etc.) are appended via `session.Events.Append()` or Wolverine's `[WriteAggregate]` pattern — neither of which populates tag tables. Adopting the tag-based API would require:
-- Modifying all upstream handlers to tag events with strong-typed IDs
-- Or running a backfill migration to populate tag tables for existing events
-- Or adding strong-typed tag properties to all event records (breaking event schema compatibility)
+```csharp
+public sealed record CouponStreamId(Guid Value);
+public sealed record PromotionStreamId(Guid Value);
+```
 
-The manual multi-stream approach achieves the same architectural goal (one decision spanning two streams) without requiring changes to upstream event patterns. It can be evolved to the tag-based API in a future milestone if CritterSupply standardizes on strong-typed IDs across all BCs.
+Registered in `Program.cs`:
+```csharp
+opts.Events.RegisterTagType<CouponStreamId>("coupon").ForAggregate<Coupon>();
+opts.Events.RegisterTagType<PromotionStreamId>("promotion").ForAggregate<Promotion>();
+```
+
+### Event tagging
+
+All handlers that append to Coupon or Promotion streams use `BuildEvent()` + `AddTag()`:
+
+```csharp
+var wrapped = session.Events.BuildEvent(evt);
+wrapped.AddTag(new CouponStreamId(streamId));
+session.Events.Append(streamId, wrapped);
+```
+
+This populates `mt_event_tag_coupon` and `mt_event_tag_promotion` tables, enabling `EventTagQuery` to find events.
+
+### EventTagQuery construction
+
+Each `.For()` / `.Or()` clause MUST be followed by `.AndEventsOfType<>()` to create a valid condition:
+
+```csharp
+EventTagQuery
+    .For(new CouponStreamId(Coupon.StreamId(cmd.CouponCode)))
+    .AndEventsOfType<CouponIssued, CouponRedeemed, CouponRevoked, CouponExpired>()
+    .Or(new PromotionStreamId(cmd.PromotionId))
+    .AndEventsOfType<PromotionCreated, PromotionActivated, ...>()
+```
+
+### DcbConcurrencyException handling
+
+`DcbConcurrencyException` extends `MartenException`, NOT `ConcurrencyException` (which is `JasperFx.ConcurrencyException`). A separate retry policy is required:
+
+```csharp
+opts.OnException<DcbConcurrencyException>()
+    .RetryOnce()
+    .Then.RetryWithCooldown(100.Milliseconds(), 250.Milliseconds())
+    .Then.Discard();
+```
+
+### Evolution from S1 to S1B
+
+S1 implemented a manual multi-stream approach using `LoadAsync` to load both aggregates. This achieved the same business outcome (single decision spanning two streams) but:
+- Lacked cross-stream optimistic concurrency (only single-stream via Coupon aggregate)
+- Did not demonstrate the real Marten DCB API
+- Required `ProjectFromCoupon()`/`ProjectFromPromotion()` helper methods instead of standard `Apply()`
+
+S1B replaces the manual approach entirely with Marten's native DCB API.
 
 ## Consequences
 
 ### Positive
 
-- **Single atomic decision:** All redemption invariants (coupon validity + promotion status + usage cap) are checked in one handler invocation, eliminating the race window between separate handler calls
-- **Simplified caller contract:** `OrderPlacedHandler` needs to fan out only one command (`RedeemCoupon` with `PromotionId`), not two separate commands
-- **Self-contained choreography:** `CouponRedeemed` contains `PromotionId`, so `RecordPromotionRedemptionHandler` can react without needing additional context
-- **Backward compatible:** `RecordPromotionRedemption` command and its legacy handler are retained for backward compatibility
+- **Cross-stream optimistic concurrency:** `IEventBoundary<T>` provides `AssertDcbConsistency` across the tag query boundary — if any matching tagged event is appended between load and commit, `DcbConcurrencyException` is thrown
+- **Single atomic decision:** All redemption invariants checked in one handler invocation
+- **Standard Marten patterns:** Uses `Apply()` methods on `CouponRedemptionState` (same as any Marten projection), not custom projection helpers
+- **Reference architecture value:** Demonstrates the complete tag-based DCB API (`RegisterTagType` → `BuildEvent` + `AddTag` → `EventTagQuery.For().AndEventsOfType()` → `[BoundaryModel] IEventBoundary<T>` → `boundary.AppendOne()`)
 
 ### Negative
 
-- **No cross-stream optimistic concurrency:** Unlike the tag-based DCB API which provides `AssertDcbConsistency` across the tag query boundary, the manual approach relies on single-stream optimistic concurrency on the Coupon stream only. Concurrent modifications to the Promotion (e.g., cancellation between `LoadAsync` and commit) are not detected — though this is a narrow window since both are within the same handler invocation
-- **Eventually consistent promotion count:** The Promotion's `CurrentRedemptionCount` is updated via choreography (async), not inline. Between the `CouponRedeemed` commit and the `PromotionRedemptionRecorded` append, the count may be stale. However, this does not create a cap enforcement gap: each subsequent `RedeemCoupon` invocation loads a fresh Promotion aggregate with the latest `CurrentRedemptionCount`, and the choreography handler updates the count before the next redemption can complete its `LoadAsync` (since the durable local queue processes messages sequentially by default)
+- **All handlers must tag events:** Every handler appending to Coupon or Promotion streams must use `BuildEvent()` + `AddTag()` instead of raw `session.Events.Append()`. This is additional ceremony but ensures tag tables are populated.
+- **StartStream doesn't preserve tags:** `session.Events.StartStream<T>(id, wrappedEvent)` does NOT preserve tags on pre-wrapped `IEvent` objects. The workaround is to use `session.Events.Append(id, wrappedEvent)` instead, which handles `IEvent` correctly.
+- **Eventually consistent promotion count:** The Promotion's `CurrentRedemptionCount` is updated via choreography (async). Between `CouponRedeemed` commit and `PromotionRedemptionRecorded` append, the count may be stale. However, each subsequent `RedeemCoupon` loads fresh boundary state.
 
 ### Pattern note
 
-This is CritterSupply's first DCB implementation and serves as the reference example for cross-aggregate consistency boundaries. The manual multi-stream aggregation pattern is a pragmatic starting point; evolving to Marten's tag-based DCB API is a candidate for a future milestone. Next ADR: 0059.
+This is CritterSupply's first production DCB implementation using Marten's native API and serves as the reference example for cross-aggregate consistency boundaries. Next ADR: 0059.
 
 ## Alternatives Considered
 
-1. **Tag-based DCB API (`EventTagQuery` + `[BoundaryModel]`):** Maximum correctness but required pervasive changes to upstream handlers and event schemas. Deferred to future milestone.
+1. **Manual multi-stream aggregation (S1 approach):** Pragmatic starting point but lacked cross-stream concurrency detection. Superseded by S1B.
 
-2. **Keep two separate handlers:** The existing pattern with `RedeemCoupon` + `RecordPromotionRedemption` fan-out. Rejected because the race window between the two handler invocations creates a real consistency gap.
+2. **Keep two separate handlers:** The existing pattern with `RedeemCoupon` + `RecordPromotionRedemption` fan-out. Rejected because the race window creates a real consistency gap.
 
 3. **Saga-based orchestration:** An `OrderRedemptionSaga` coordinating both steps with compensation. Rejected as over-engineering for a two-step process that should be a single decision.

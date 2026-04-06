@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M40.0 — Dynamic Consistency Boundary: Promotions BC |
-| **Status** | 🟡 **IN PROGRESS** — S1 complete, S2 (documentation closure) pending |
+| **Status** | 🟡 **IN PROGRESS** — S1 + S1B complete, S2 (documentation closure) pending |
 | **Recent Completion** | M39.0 — Critter Stack Idiom Refresh: 11 BCs updated, 30+ handlers refactored, 10 anti-pattern categories eliminated (2026-04-05) |
 | **Previous Completion** | M38.1 — Marketplaces Phase 4b: Deactivation + Status Verification (2026-04-04) |
 | **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-06 (M40.0 S1 complete — [session 1 retrospective](./milestones/m40-0-session-1-retrospective.md))*
+*Last Updated: 2026-04-06 (M40.0 S1B complete — [session 1B retrospective](./milestones/m40-0-session-1b-retrospective.md))*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### M40.0 — Dynamic Consistency Boundary: Promotions BC
 
-**Status:** 🟡 **IN PROGRESS** — S1 complete, S2 pending
+**Status:** 🟡 **IN PROGRESS** — S1 + S1B complete, S2 pending
 **Goal:** Introduce the DCB pattern to CritterSupply via coupon redemption — a single atomic decision spanning Coupon + Promotion aggregates, replacing the two-command fan-out pattern
 
 **Sessions:**
@@ -66,15 +66,26 @@
   - 30/30 integration tests passing (3 new DCB tests)
   - ADR 0058 written
   - Build: 0 errors, 19 warnings
+- **S1B (Real DCB API):** ✅ Complete (2026-04-06)
+  - Replaced manual `LoadAsync` with Marten's native `EventTagQuery` + `[BoundaryModel]` + `IEventBoundary<T>`
+  - All 6 write handlers now tag events with `CouponStreamId` / `PromotionStreamId`
+  - `CouponRedemptionState` rewritten with standard `Apply()` methods
+  - `LegacyRecordPromotionRedemptionHandler` deleted
+  - `DcbConcurrencyException` retry policy added
+  - 31/31 integration tests passing (+1 DCB concurrency test)
+  - ADR 0058 updated to real implementation
+  - Research doc: `docs/research/marten-dcb-tagging-mechanics.md`
+  - Build: 0 errors, 19 warnings
 - **S2 (Documentation Closure):** ⏳ Pending
   - Update `docs/skills/dynamic-consistency-boundary.md` with CritterSupply implementation notes
   - Update CONTEXTS.md if integration patterns changed
   - Milestone closure retrospective
 
-**Key Decision:** Manual multi-stream aggregation (LoadAsync) instead of Marten's tag-based DCB API (`EventTagQuery`/`[BoundaryModel]`) — see ADR 0058 for rationale. Tag-based API requires pre-tagged events at write time; CritterSupply uses raw Guid stream IDs without tags.
+**Key Decision:** S1B replaced S1's manual `LoadAsync` approach with Marten's native tag-based DCB API (`EventTagQuery` + `[BoundaryModel]` + `IEventBoundary<T>`) — see ADR 0058 for details. All handlers now tag events at write time using `BuildEvent()` + `AddTag()`.
 
 **ADR:** [0058 — DCB Promotions Coupon Redemption](../decisions/0058-dcb-promotions-coupon-redemption.md)
-**Retrospective:** [S1](./milestones/m40-0-session-1-retrospective.md)
+**Retrospectives:** [S1](./milestones/m40-0-session-1-retrospective.md), [S1B](./milestones/m40-0-session-1b-retrospective.md)
+**Research:** [Marten DCB Tagging Mechanics](../research/marten-dcb-tagging-mechanics.md)
 
 ## Recent Completions
 
