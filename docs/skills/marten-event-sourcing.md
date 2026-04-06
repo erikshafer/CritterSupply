@@ -940,6 +940,32 @@ public static (CreationResponse, IStartStream) Handle(InitializeCart cmd)
 
 ---
 
+## Tagged Event Writes (DCB) ⭐ *M40.0 Addition*
+
+When using Marten's Dynamic Consistency Boundary (DCB) pattern, events must be **tagged at write time** to populate `mt_event_tag_*` tables. Standard write paths — `[WriteAggregate]`, `IStartStream` from `MartenOps.StartStream()`, and raw `session.Events.Append(streamId, rawObject)` — do NOT populate tag tables.
+
+### Three-Step Tagged Write Pattern
+
+Every handler that appends events to a DCB-managed stream must use this sequence:
+
+```csharp
+var wrapped = session.Events.BuildEvent(evt);       // 1. Wrap event in IEvent
+wrapped.AddTag(new CouponStreamId(streamId));        // 2. Tag with stream identity
+session.Events.Append(streamId, wrapped);            // 3. Append pre-wrapped IEvent
+```
+
+### Why `StartStream` Does Not Work for Tagged Events
+
+`session.Events.StartStream<T>(id, wrappedIEvent)` internally re-wraps the object, creating a new `IEvent` without the original tags. Use `Append` instead — Marten creates the stream implicitly on first append and correctly preserves pre-wrapped `IEvent` objects.
+
+### Why `[WriteAggregate]` Does Not Work for Tagged Events
+
+`[WriteAggregate]` returns raw event objects (not `IEvent` wrappers). Wolverine appends them without tags. When a stream is managed by DCB, all write handlers must use the explicit `BuildEvent()` + `AddTag()` + `Append()` path.
+
+**Reference:** `docs/research/marten-dcb-tagging-mechanics.md` for the source-confirmed analysis of Marten's tagging internals. See `docs/skills/dynamic-consistency-boundary.md` for the complete DCB implementation checklist.
+
+---
+
 ## Testing Event-Sourced Systems
 
 ### The Race Condition Problem (L5 from Cycle 26)
@@ -1794,6 +1820,44 @@ public async Task ProductPrice_WithAllEventTypes_LoadsCorrectly()
 
 **Reference:** [M32.1 Retrospective - Session 4 Debugging](../../planning/milestones/m32.1-retrospective.md)
 
+### ❌ 10. `ProblemDetails` in Non-HTTP Handlers Stops Pipeline Silently ⭐ *M39.0 Addition*
+
+**Problem:** When `Before()` returns `ProblemDetails` in a non-HTTP message handler context (e.g., a Wolverine handler consuming an integration event from RabbitMQ), Wolverine stops the handler pipeline **without throwing an exception**. The handler silently short-circuits — no event is appended, no state changes.
+
+**Why this matters for tests:** Tests that assert on `InvalidOperationException` or `ShouldThrowAsync` in non-HTTP handler contexts will pass compilation but fail at runtime. The correct pattern is to verify that state is unchanged (the event was not appended, the aggregate was not modified).
+
+```csharp
+// ❌ WRONG — expects exception that never comes
+await Should.ThrowAsync<InvalidOperationException>(async () =>
+    await _fixture.ExecuteAndWaitAsync(invalidCommand));
+
+// ✅ CORRECT — verify state unchanged
+await _fixture.ExecuteAndWaitAsync(invalidCommand);
+using var session = _fixture.GetDocumentSession();
+var aggregate = await session.Events.AggregateStreamAsync<Coupon>(streamId);
+aggregate!.Status.ShouldBe(CouponStatus.Issued); // unchanged — command was rejected
+```
+
+Seven tests were updated across Listings (3) and Promotions (4) during M39.0 to follow this pattern. See also `docs/skills/critterstack-testing-patterns.md` for the corresponding test assertion guidance.
+
+**Key distinction:** In HTTP context, `ProblemDetails` returns a 400-family status code that tests can assert on. In message handler context, the pipeline stops silently — assert on aggregate state instead.
+
+### ❌ 11. DCB Boundary State Missing `Id` Property ⭐ *M40.0 Addition*
+
+**Problem:** Marten registers DCB boundary state classes as document types. Without a `public Guid Id { get; set; }` property, `DeleteAllDocumentsAsync()` throws `InvalidDocumentException` during test cleanup, causing cascading test failures.
+
+**Fix:** Always include `Id` on boundary state classes:
+
+```csharp
+public sealed class CouponRedemptionState
+{
+    public Guid Id { get; set; } // Required — Marten treats this as a document
+    // ... Apply() methods
+}
+```
+
+This is non-obvious because boundary state classes are conceptually projections, not documents — but Marten's DCB internals register them in the document store.
+
 ---
 
 ## Lessons Learned from Production
@@ -1934,5 +1998,5 @@ public async Task ProductPrice_WithAllEventTypes_LoadsCorrectly()
 
 ---
 
-*Last updated: 2026-03-31*
-*Reflects lessons learned through M36.1 (Listings + Marketplaces)*
+*Last updated: 2026-04-06*
+*Reflects lessons learned through M40.0 (DCB, Idiom Refresh)*
