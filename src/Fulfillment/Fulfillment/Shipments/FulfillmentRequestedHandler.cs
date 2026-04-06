@@ -1,4 +1,5 @@
-using System.Security.Cryptography;
+using Fulfillment.Routing;
+using Fulfillment.WorkOrders;
 using Marten;
 using IntegrationMessages = Messages.Contracts.Fulfillment;
 
@@ -6,12 +7,15 @@ namespace Fulfillment.Shipments;
 
 /// <summary>
 /// Integration handler for FulfillmentRequested from Orders BC.
+/// Creates the Shipment stream, invokes the routing engine for FC assignment,
+/// and creates a WorkOrder at the assigned FC.
 /// Choreography pattern: Fulfillment autonomously reacts to create a shipment.
 /// </summary>
 public static class FulfillmentRequestedHandler
 {
     public static async Task Handle(
         IntegrationMessages.FulfillmentRequested message,
+        IFulfillmentRoutingEngine routingEngine,
         IDocumentSession session,
         CancellationToken cancellationToken)
     {
@@ -28,8 +32,17 @@ public static class FulfillmentRequestedHandler
             .Select(item => new FulfillmentLineItem(item.Sku, item.Quantity))
             .ToList();
 
+        // Create a deterministic UUID v5 from the OrderId to ensure idempotency.
+        var shipmentId = Shipment.StreamId(message.OrderId);
+
+        // Idempotency guard: if the stream already exists (at-least-once delivery duplicate),
+        // skip to avoid ExistingStreamIdCollisionException.
+        var existingState = await session.Events.FetchStreamStateAsync(shipmentId, cancellationToken);
+        if (existingState is not null)
+            return;
+
         // Create the domain event
-        var domainEvent = new FulfillmentRequested(
+        var fulfillmentRequested = new FulfillmentRequested(
             message.OrderId,
             message.CustomerId,
             shippingAddress,
@@ -37,38 +50,28 @@ public static class FulfillmentRequestedHandler
             message.ShippingMethod,
             message.RequestedAt);
 
-        // Create a deterministic UUID v5 from the OrderId to ensure idempotency.
-        // Multiple FulfillmentRequested messages for the same OrderId always create the same stream.
-        var shipmentId = CreateVersion5Guid(message.OrderId);
+        // Route to FC
+        var fc = await routingEngine.SelectFulfillmentCenterAsync(
+            shippingAddress, lineItems, cancellationToken);
 
-        // Idempotency guard: if the stream already exists (at-least-once delivery duplicate),
-        // skip StartStream to avoid ExistingStreamIdCollisionException.
-        var existingState = await session.Events.FetchStreamStateAsync(shipmentId, cancellationToken);
-        if (existingState is not null)
-            return;
+        var fcAssigned = new FulfillmentCenterAssigned(fc, DateTimeOffset.UtcNow);
 
-        session.Events.StartStream<Shipment>(shipmentId, domainEvent);
-    }
+        // Start the Shipment stream with both events
+        session.Events.StartStream<Shipment>(shipmentId, fulfillmentRequested, fcAssigned);
 
-    /// <summary>
-    /// Creates a deterministic UUID v5 from an input Guid using the RFC 4122 DNS namespace UUID.
-    /// Ensures idempotency: the same OrderId always produces the same ShipmentId.
-    /// A domain-specific namespace could be substituted per ADR if cross-domain collision avoidance is needed.
-    /// </summary>
-    private static Guid CreateVersion5Guid(Guid orderId)
-    {
-        // RFC 4122 DNS namespace UUID used as the hashing namespace for deterministic ID generation
-        var namespaceId = new Guid("6ba7b812-9dad-11d1-80b4-00c04fd430c8"); // RFC 4122 DNS namespace
-        var nameBytes = orderId.ToByteArray();
-        var namespaceBytes = namespaceId.ToByteArray();
+        // Create WorkOrder stream at the assigned FC
+        var workOrderId = WorkOrder.StreamId(shipmentId, fc);
+        var workOrderLineItems = lineItems
+            .Select(item => new WorkOrderLineItem(item.Sku, item.Quantity))
+            .ToList();
 
-        using var sha1 = SHA1.Create();
-        var combined = namespaceBytes.Concat(nameBytes).ToArray();
-        var hash = sha1.ComputeHash(combined);
+        var workOrderCreated = new WorkOrderCreated(
+            workOrderId,
+            shipmentId,
+            fc,
+            workOrderLineItems,
+            DateTimeOffset.UtcNow);
 
-        hash[6] = (byte)((hash[6] & 0x0F) | 0x50); // Version 5
-        hash[8] = (byte)((hash[8] & 0x3F) | 0x80); // Variant
-
-        return new Guid(hash.Take(16).ToArray());
+        session.Events.StartStream<WorkOrder>(workOrderId, workOrderCreated);
     }
 }

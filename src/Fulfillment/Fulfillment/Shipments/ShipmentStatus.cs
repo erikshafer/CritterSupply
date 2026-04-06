@@ -2,32 +2,49 @@ namespace Fulfillment.Shipments;
 
 /// <summary>
 /// Represents the lifecycle status of a shipment.
-/// Follows the CONTEXTS.md specification for Fulfillment BC.
+/// Expanded for the Fulfillment BC remaster (ADR 0059).
 /// </summary>
 public enum ShipmentStatus
 {
-    /// <summary>
-    /// Fulfillment request received, awaiting warehouse assignment.
-    /// </summary>
+    /// <summary>Fulfillment request received, awaiting FC assignment.</summary>
     Pending,
 
-    /// <summary>
-    /// Routed to a specific warehouse/fulfillment center.
-    /// </summary>
+    /// <summary>Routed to a fulfillment center, work order created.</summary>
     Assigned,
 
-    /// <summary>
-    /// Handed to carrier, tracking number assigned.
-    /// </summary>
-    Shipped,
+    /// <summary>Shipping label generated, tracking number assigned.</summary>
+    Labeled,
 
-    /// <summary>
-    /// Carrier confirmed delivery.
-    /// </summary>
+    /// <summary>Package manifested and staged for carrier pickup.</summary>
+    Staged,
+
+    /// <summary>Physical custody transferred to carrier.</summary>
+    HandedToCarrier,
+
+    /// <summary>First carrier facility scan received — package in transit.</summary>
+    InTransit,
+
+    /// <summary>Carrier last-mile out-for-delivery scan.</summary>
+    OutForDelivery,
+
+    /// <summary>Carrier confirmed delivery (terminal — happy path).</summary>
     Delivered,
 
-    /// <summary>
-    /// Delivery attempted but unsuccessful.
-    /// </summary>
-    DeliveryFailed
+    /// <summary>One or more delivery attempts failed, carrier will retry.</summary>
+    DeliveryAttemptFailed,
+
+    /// <summary>Carrier returning package after exhausting delivery attempts.</summary>
+    ReturningToSender,
+
+    /// <summary>Returned package received back at FC.</summary>
+    ReturnReceived,
+
+    /// <summary>Shipment cancelled before dispatch.</summary>
+    Cancelled,
+
+    /// <summary>Original shipment lost — replacement shipped (terminal).</summary>
+    LostReplacementShipped,
+
+    /// <summary>Package returned and is eligible for reshipment (terminal).</summary>
+    ReturnedReshippable
 }

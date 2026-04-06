@@ -15,11 +15,11 @@ public sealed record ShipmentResponse(
     ShipmentStatus Status,
     string? Carrier,
     string? TrackingNumber,
-    string? WarehouseId,
+    string? AssignedFulfillmentCenter,
     DateTimeOffset RequestedAt,
-    DateTimeOffset? DispatchedAt,
+    DateTimeOffset? HandedToCarrierAt,
     DateTimeOffset? DeliveredAt,
-    string? FailureReason);
+    int DeliveryAttemptCount);
 
 /// <summary>
 /// HTTP GET endpoint to retrieve shipments for a specific order.
@@ -45,11 +45,11 @@ public sealed class GetShipmentsForOrder
                 s.Status,
                 s.Carrier,
                 s.TrackingNumber,
-                s.WarehouseId,
+                s.AssignedFulfillmentCenter,
                 s.RequestedAt,
-                s.DispatchedAt,
+                s.HandedToCarrierAt,
                 s.DeliveredAt,
-                s.FailureReason))
+                s.DeliveryAttemptCount))
             .ToListAsync(ct);
 
         return TypedResults.Ok<IReadOnlyList<ShipmentResponse>>(shipments);
