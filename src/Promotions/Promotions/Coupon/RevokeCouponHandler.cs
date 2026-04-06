@@ -48,6 +48,9 @@ public static class RevokeCouponHandler
             cmd.Reason,
             DateTimeOffset.UtcNow);
 
-        session.Events.Append(Coupon.StreamId(cmd.CouponCode), evt);
+        // Tag the event for DCB tag table population
+        var wrapped = session.Events.BuildEvent(evt);
+        wrapped.AddTag(new CouponStreamId(Coupon.StreamId(cmd.CouponCode)));
+        session.Events.Append(Coupon.StreamId(cmd.CouponCode), wrapped);
     }
 }

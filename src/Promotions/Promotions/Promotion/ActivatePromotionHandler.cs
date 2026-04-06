@@ -1,12 +1,20 @@
+using Marten;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
-using Wolverine.Marten;
 
 namespace Promotions.Promotion;
 
 public static class ActivatePromotionHandler
 {
+    public static async Task<Promotion?> LoadAsync(
+        ActivatePromotion command,
+        IQuerySession session,
+        CancellationToken ct)
+    {
+        return await session.Events.AggregateStreamAsync<Promotion>(command.PromotionId, token: ct);
+    }
+
     public static ProblemDetails Before(
         ActivatePromotion command,
         Promotion? promotion)
@@ -29,14 +37,22 @@ public static class ActivatePromotionHandler
         return WolverineContinue.NoProblems;
     }
 
-    public static Events Handle(
+    public static async Task Handle(
         ActivatePromotion command,
-        [WriteAggregate] Promotion promotion)
+        Promotion promotion,
+        IDocumentSession session,
+        CancellationToken ct)
     {
-        var events = new Events();
-        events.Add(new PromotionActivated(
+        // FetchForWriting provides optimistic concurrency
+        await session.Events.FetchForWriting<Promotion>(command.PromotionId, ct);
+
+        var evt = new PromotionActivated(
             PromotionId: command.PromotionId,
-            ActivatedAt: DateTimeOffset.UtcNow));
-        return events;
+            ActivatedAt: DateTimeOffset.UtcNow);
+
+        // Tag the event for DCB tag table population
+        var wrapped = session.Events.BuildEvent(evt);
+        wrapped.AddTag(new PromotionStreamId(command.PromotionId));
+        session.Events.Append(command.PromotionId, wrapped);
     }
 }

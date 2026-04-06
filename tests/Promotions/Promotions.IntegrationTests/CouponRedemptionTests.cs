@@ -8,13 +8,12 @@ namespace Promotions.Api.IntegrationTests;
 
 /// <summary>
 /// Tests for coupon redemption workflow:
-/// - RedeemCoupon happy path (DCB handler, M40.0)
+/// - RedeemCoupon happy path (DCB handler, M40.0 S1B — real EventTagQuery + IEventBoundary)
 /// - RedeemCoupon double-redemption (DCB Before() rejects)
 /// - RedeemCoupon against non-active promotion (DCB Before() rejects)
 /// - RedeemCoupon against promotion at usage cap (DCB Before() rejects)
 /// - RedeemCoupon triggers choreography (PromotionRedemptionRecorded via CouponRedeemed)
 /// - RevokeCoupon for issued/redeemed coupons
-/// - RecordPromotionRedemption legacy command path (kept for backward compatibility)
 /// - GenerateCouponBatch fan-out pattern
 /// - OrderPlacedHandler skeleton (no coupon data yet)
 /// </summary>
@@ -251,19 +250,19 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
     }
 
     /// <summary>
-    /// Legacy command path: RecordPromotionRedemption command still works.
-    /// M40.0: This command is superseded by the DCB choreography pattern,
-    /// but retained for backward compatibility.
+    /// DCB choreography test: verifies that RedeemCoupon → CouponRedeemed →
+    /// RecordPromotionRedemptionHandler updates the Promotion's redemption count.
+    /// This replaces the legacy RecordPromotionRedemption command path test (M40.0 S1B).
     /// </summary>
     [Fact]
-    public async Task RecordPromotionRedemption_WithinUsageLimit_RecordsSuccessfully()
+    public async Task RedeemCoupon_IncrementsPromotionRedemptionCount()
     {
         // Arrange
         await _fixture.CleanAllDataAsync();
 
         var createCmd = new CreatePromotion(
             Name: "Limited Usage Test",
-            Description: "Test usage limit enforcement",
+            Description: "Test usage limit enforcement via DCB choreography",
             DiscountType: DiscountType.PercentageOff,
             DiscountValue: 30m,
             StartDate: DateTimeOffset.UtcNow,
@@ -276,18 +275,19 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
         var promotion = (await session.Query<Promotions.Promotion.Promotion>().ToListAsync()).Single();
 
         await _fixture.ExecuteAndWaitAsync(new ActivatePromotion(promotion.Id));
+        await _fixture.ExecuteAndWaitAsync(new IssueCoupon("LIMITED30", promotion.Id));
 
-        var recordCmd = new RecordPromotionRedemption(
+        var redeemCmd = new RedeemCoupon(
+            CouponCode: "LIMITED30",
             PromotionId: promotion.Id,
             OrderId: Guid.NewGuid(),
             CustomerId: Guid.NewGuid(),
-            CouponCode: "LIMITED30",
             RedeemedAt: DateTimeOffset.UtcNow);
 
         // Act
-        await _fixture.ExecuteAndWaitAsync(recordCmd);
+        await _fixture.ExecuteAndWaitAsync(redeemCmd);
 
-        // Assert - Verify redemption count incremented
+        // Assert - Verify redemption count incremented via choreography
         var updated = await session.Events.AggregateStreamAsync<Promotions.Promotion.Promotion>(promotion.Id);
         updated.ShouldNotBeNull();
         updated.CurrentRedemptionCount.ShouldBe(1);

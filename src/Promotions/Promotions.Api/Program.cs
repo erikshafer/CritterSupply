@@ -7,6 +7,7 @@ using JasperFx.Events.Daemon;
 using JasperFx.Events.Projections;
 using JasperFx.Resources;
 using Marten;
+using Marten.Events.Dcb;
 using Marten.Events.Projections;
 using Promotions;
 using Promotions.Coupon;
@@ -48,6 +49,12 @@ builder.Services.AddMarten(opts =>
 
         // Configure CouponLookupView inline projection for hot-path queries
         opts.Projections.Add<CouponLookupViewProjection>(ProjectionLifecycle.Inline);
+
+        // DCB tag type registration: strong-typed tag IDs for cross-stream consistency
+        opts.Events.RegisterTagType<CouponStreamId>("coupon")
+            .ForAggregate<Promotions.Coupon.Coupon>();
+        opts.Events.RegisterTagType<PromotionStreamId>("promotion")
+            .ForAggregate<Promotion>();
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()
@@ -71,6 +78,12 @@ builder.Host.UseWolverine(opts =>
     opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
 
     opts.OnException<ConcurrencyException>()
+        .RetryOnce()
+        .Then.RetryWithCooldown(100.Milliseconds(), 250.Milliseconds())
+        .Then.Discard();
+
+    // DCB concurrency: DcbConcurrencyException extends MartenException (not ConcurrencyException)
+    opts.OnException<DcbConcurrencyException>()
         .RetryOnce()
         .Then.RetryWithCooldown(100.Milliseconds(), 250.Milliseconds())
         .Then.Discard();

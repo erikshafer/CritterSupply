@@ -1,11 +1,10 @@
 using Marten;
-using Wolverine.Marten;
 
 namespace Promotions.Coupon;
 
 public static class IssueCouponHandler
 {
-    public static async Task<IStartStream> Handle(
+    public static async Task Handle(
         IssueCoupon command,
         IDocumentSession session,
         CancellationToken ct)
@@ -49,7 +48,9 @@ public static class IssueCouponHandler
             PromotionId: command.PromotionId,
             IssuedAt: now);
 
-        // Start new event stream for the coupon
-        return MartenOps.StartStream<Promotions.Coupon.Coupon>(streamId, evt);
+        // Tag the event for DCB tag table population
+        var wrapped = session.Events.BuildEvent(evt);
+        wrapped.AddTag(new CouponStreamId(streamId));
+        session.Events.StartStream<Promotions.Coupon.Coupon>(streamId, wrapped);
     }
 }
