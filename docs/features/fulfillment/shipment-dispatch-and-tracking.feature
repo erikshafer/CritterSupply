@@ -3,6 +3,15 @@ Feature: Shipment Dispatch and Tracking
   I want to correctly dispatch shipments to carriers and track them to delivery
   So that customers receive their orders and are informed at every meaningful step
 
+  # Remaster Note (ADR 0059): Dispatch and tracking events use the Shipment aggregate.
+  # Events in this file (ShippingLabelGenerated through ShipmentDelivered) live on the
+  # Shipment stream. ShipmentDispatched is replaced by the more precise
+  # ShipmentHandedToCarrier event (physical custody transfer to carrier).
+  # ShipmentDeliveryFailed is replaced by the explicit delivery attempt chain:
+  # DeliveryAttemptFailed(1/2/3) → ReturnToSenderInitiated.
+  # The Shipment stream also holds routing events (FulfillmentRequested,
+  # FulfillmentCenterAssigned) from the intake flow.
+
   Background:
     Given the fulfillment system is operational
     And the carrier integration APIs are available:

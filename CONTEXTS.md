@@ -76,15 +76,15 @@ Tracks stock levels and manages soft reservations (holds) until commitment or re
 
 **Folder:** `src/Fulfillment/`
 
-Manages physical order fulfillment — pick, pack, ship, and delivery tracking.
+Manages physical order fulfillment — warehouse routing, pick, pack, ship, carrier lifecycle, and delivery tracking. Uses two aggregates: `WorkOrder` (warehouse operations) and `Shipment` (routing + carrier lifecycle).
 
 | Communicates with | Direction | Notes |
 |---|---|---|
-| Orders | ↔ bidirectional | Receives fulfillment requests; publishes shipment/delivery updates |
-| Inventory | → publishes | Shipment dispatch adjusts stock |
+| Orders | ↔ bidirectional | Receives fulfillment requests; publishes `ShipmentHandedToCarrier`, `TrackingNumberAssigned`, `DeliveryAttemptFailed`, `ShipmentDelivered`, `ReturnToSenderInitiated`, `ReshipmentCreated` |
+| Inventory | ↔ bidirectional | Queries stock availability for routing; publishes `ItemPicked` for bin reconciliation, stock adjustment on carrier handoff |
 | Returns | ↔ bidirectional | Receives approved returns; publishes when return shipment arrives |
 
-**Constraint:** Currently a single fulfillment center (stub). Multi-warehouse routing is planned — see `docs/planning/fulfillment-evolution-plan.md`.
+**Constraint:** Multi-warehouse routing modeled in remaster ([ADR 0059](docs/decisions/0059-fulfillment-bc-remaster-rationale.md)) — implementation pending. Current code has single FC stub. Integration contracts pending remaster implementation: `ShipmentDispatched` → `ShipmentHandedToCarrier`, `ShipmentDeliveryFailed` → `ReturnToSenderInitiated`.
 
 ---
 
