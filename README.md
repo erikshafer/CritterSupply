@@ -33,8 +33,9 @@ This isn't a reference architecture padded with unnecessary layers, abstractions
 
 A non-exhaustive list of the patterns, paradigms, and principles demonstrated in this codebase, in no particular order:
 
-- Event Sourcing (Orders, Payments, Inventory, Fulfillment, Product Catalog)
+- Event Sourcing (Orders, Payments, Inventory, Fulfillment, Product Catalog, Returns, Listings, Pricing, Promotions, Correspondence, Shopping)
 - Command Query Responsibility Segregation (CQRS)
+- Dynamic Consistency Boundary (DCB) — cross-stream atomic decisions (Promotions)
 - Stateful Sagas (Order orchestration)
 - Inbox Pattern (guaranteed message processing)
 - Outbox Pattern (reliable message publishing)
@@ -114,9 +115,12 @@ graph TB
     %% Data enrichment
     Shopping -.->|Product Details| Catalog
     Shopping -.->|Pricing Data| Pricing
+    Shopping -.->|Coupon Validation| Promotions
     Orders -.->|Customer Snapshot| CustomerID
     Orders -.->|Order Confirmed| Correspondence
-    Fulfillment -.->|Order Shipped| Correspondence
+    Fulfillment -.->|Shipment Updates| Correspondence
+    Returns -.->|Return Updates| Correspondence
+    Payments -.->|Refund Completed| Correspondence
 
     %% Real-time notifications
     Shopping -.->|Cart Updated| CE
@@ -154,6 +158,10 @@ graph TB
     Orders["📨 Orders<br/>Checkout & Order Orchestration"]
     Pricing["💰 Pricing<br/>Server-Authoritative Pricing"]
     Promotions["🏷️ Promotions<br/>Coupons & Discounts"]
+    Returns["🔄 Returns<br/>Return Authorization"]
+    Listings["📋 Listings<br/>Channel Listing Lifecycle"]
+    Marketplaces["🏪 Marketplaces<br/>Channel Config & Adapters"]
+    Correspondence["✉️ Correspondence<br/>Email & SMS"]
 
     %% Vendor Portal interactions
     VP -->|Authenticate| VendorID
@@ -166,6 +174,10 @@ graph TB
     BO -->|Configure Pricing| Pricing
     BO -->|Configure Promotions| Promotions
     BO -->|Review Orders| Orders
+    BO -->|Manage Returns| Returns
+    BO -->|Manage Listings| Listings
+    BO -->|Manage Channels| Marketplaces
+    BO -->|View Correspondence| Correspondence
 
     classDef vendor fill:#fff8e1,stroke:#f57f17,stroke-width:2px
     classDef identity fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
@@ -175,7 +187,7 @@ graph TB
 
     class VP vendor
     class VendorID,BackofficeID identity
-    class Catalog,Inventory,Orders,Pricing,Promotions core
+    class Catalog,Inventory,Orders,Pricing,Promotions,Returns,Listings,Marketplaces,Correspondence core
     class BO ops
 ```
 
@@ -207,7 +219,7 @@ Below is a table of each contexts' focused responsibilities, along with their cu
 | 🏪 **Vendor Portal**        | Vendor analytics, insights, change requests                  | ✅ Complete |
 | 🔄 **Returns**              | Return authorization, exchanges (same-SKU and cross-product) | ✅ Complete |
 | 💰 **Pricing**              | Server-authoritative pricing and scheduled price changes     | ✅ Complete |
-| 🏷️ **Promotions**          | Coupon codes and discount rules                              | ✅ Complete |
+| 🏷️ **Promotions**          | Coupon codes, discount rules, and DCB-based redemption       | ✅ Complete |
 | ✉️ **Correspondence**       | Customer email and SMS notifications                         | ✅ Complete |
 | 🔐 **Backoffice Identity**  | Staff and admin authentication                               | ✅ Complete |
 | 🖥️ **Backoffice**          | Internal operations portal (BFF + Blazor WASM)               | ✅ Complete |
