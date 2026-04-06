@@ -13,7 +13,7 @@ namespace Promotions.Coupon;
 ///
 /// M40.0: CritterSupply's first DCB boundary state implementation.
 /// </summary>
-public class CouponRedemptionState
+public sealed class CouponRedemptionState
 {
     // --- Coupon state ---
 

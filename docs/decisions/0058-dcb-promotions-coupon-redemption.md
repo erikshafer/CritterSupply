@@ -60,8 +60,8 @@ The manual multi-stream approach achieves the same architectural goal (one decis
 
 ### Negative
 
-- **No cross-stream optimistic concurrency:** Unlike the tag-based DCB API which provides `AssertDcbConsistency` across the tag query boundary, the manual approach relies on single-stream optimistic concurrency on the Coupon stream only. Concurrent modifications to the Promotion (e.g., cancellation) between the `LoadAsync` and `SaveChangesAsync` are not detected
-- **Eventually consistent promotion count:** The Promotion's `CurrentRedemptionCount` is updated via choreography (async), not inline. Between the `CouponRedeemed` commit and the `PromotionRedemptionRecorded` append, the count may be stale — this creates a small window where an additional redemption could slip past the cap check
+- **No cross-stream optimistic concurrency:** Unlike the tag-based DCB API which provides `AssertDcbConsistency` across the tag query boundary, the manual approach relies on single-stream optimistic concurrency on the Coupon stream only. Concurrent modifications to the Promotion (e.g., cancellation between `LoadAsync` and commit) are not detected — though this is a narrow window since both are within the same handler invocation
+- **Eventually consistent promotion count:** The Promotion's `CurrentRedemptionCount` is updated via choreography (async), not inline. Between the `CouponRedeemed` commit and the `PromotionRedemptionRecorded` append, the count may be stale. However, this does not create a cap enforcement gap: each subsequent `RedeemCoupon` invocation loads a fresh Promotion aggregate with the latest `CurrentRedemptionCount`, and the choreography handler updates the count before the next redemption can complete its `LoadAsync` (since the durable local queue processes messages sequentially by default)
 
 ### Pattern note
 
