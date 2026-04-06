@@ -41,13 +41,13 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M41.0 — Fulfillment BC Remaster: S2 (P1 Slices 16–29 + debt clearance) |
-| **Status** | 🟢 **IN PROGRESS** |
-| **Recent Completion** | M41.0 S1 — Fulfillment BC Remaster P0 complete: 15 slices, 2 aggregates, 50 tests, PR #530 (2026-04-06) |
-| **Previous Completion** | M40.0 — Dynamic Consistency Boundary: Promotions BC — DCB pattern introduced, 31/31 tests, ADR 0058 (2026-04-06) |
+| **Current Milestone** | None — M41.0 S2 complete |
+| **Status** | ✅ **Complete** |
+| **Recent Completion** | M41.0 S2 — Fulfillment BC Remaster P1 complete: 14 slices, 51 integration + 40 unit tests (2026-04-06) |
+| **Previous Completion** | M41.0 S1 — Fulfillment BC Remaster P0 complete: 15 slices, 2 aggregates, 50 tests, PR #530 (2026-04-06) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-06 (M41.0 S1 complete — PR #530 merged; S2 starting)*
+*Last Updated: 2026-04-06 (M41.0 S2 complete)*
 
 ---
 
@@ -55,26 +55,22 @@
 
 ### M41.0: Fulfillment BC Remaster — S2 (P1 Slices 16–29 + Debt Clearance)
 
-**Status:** 🟢 **In Progress**
+**Status:** ✅ **Complete**
 **Start Date:** 2026-04-06
 **ADR:** [0059 — Fulfillment BC Remaster Rationale](../decisions/0059-fulfillment-bc-remaster-rationale.md)
 **Event Modeling:** [Fulfillment Remaster Slices](../planning/fulfillment-remaster-slices.md)
 **PR (S1):** https://github.com/erikshafer/CritterSupply/pull/530 ✅ Merged
 
-**Goal:** Clear S1 vertical slice debt, implement P1 failure mode slices (16–29), and wire the two deferred S1 items (HTTP carrier webhook endpoint + PackingCompleted → label generation policy).
-
 **Key Deliverables — S2:**
-- **Debt clearance (first act):** Split `WorkOrderHandlers.cs` into 6 vertical slice files per convention
-- **Deferred from S1:** HTTP endpoint `POST /api/fulfillment/carrier-webhook`
-- **Deferred from S1:** `PackingCompleted` → `GenerateShippingLabel` cascading policy handler
-- **P1 Slices 16–29:** All failure modes — short pick, reroute, backorder, wrong item at pack,
-  carrier pickup missed, delivery attempt chain (1/2/3), ghost shipment, lost in transit,
-  return to sender initiated + received, SLA escalation
-
-**DoD:** Build 0 errors, 19 warnings. Fulfillment integration tests: baseline + new P1 tests. Orders integration tests: 48/48 (unchanged).
+- **Debt clearance:** `WorkOrderHandlers.cs` split into 6 vertical slice files (ReleaseWave, AssignPickList, StartPicking, RecordItemPick, StartPacking, VerifyItemAtPack)
+- **Deferred S1 items:** HTTP endpoint `POST /api/fulfillment/carrier-webhook`, `PackingCompleted → GenerateShippingLabel` cascading policy
+- **P1 Slices 16–29:** All 14 failure mode handlers implemented with integration + unit tests
+- **New aggregate features:** WorkOrderStatus.ShortPickPending, PackDiscrepancyPending, PickExceptionClosed; ShipmentStatus.Rerouted, Backordered, LabelGenerationFailed, GhostShipmentInvestigation, AllAttemptsExhausted, LostInTransit
+- **Integration events:** BackorderCreated, ShipmentLostInTransit contracts added
+- **Final counts:** Build 0 errors/19 warnings, Fulfillment integration 51, Fulfillment unit 40, Orders 48 (unchanged)
 
 **S1 Retrospective:** [S1](./milestones/fulfillment-remaster-s1-retrospective.md)
-**S2 Retrospective:** TBD
+**S2 Retrospective:** [S2](./milestones/fulfillment-remaster-s2-retrospective.md)
 
 ## Recent Completions
 
