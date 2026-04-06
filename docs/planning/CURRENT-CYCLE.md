@@ -41,53 +41,37 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M40.0 — Dynamic Consistency Boundary: Promotions BC |
-| **Status** | 🟡 **IN PROGRESS** — S1 + S1B complete, S2 (documentation closure) pending |
-| **Recent Completion** | M39.0 — Critter Stack Idiom Refresh: 11 BCs updated, 30+ handlers refactored, 10 anti-pattern categories eliminated (2026-04-05) |
-| **Previous Completion** | M38.1 — Marketplaces Phase 4b: Deactivation + Status Verification (2026-04-04) |
-| **Active BCs** | 19 total (Listings + Marketplaces BCs added in M36.1) |
+| **Current Milestone** | None — M40.0 closed; next TBD |
+| **Status** | ⏸️ **BETWEEN MILESTONES** |
+| **Recent Completion** | M40.0 — Dynamic Consistency Boundary: Promotions BC — DCB pattern introduced, 31/31 tests, ADR 0058 (2026-04-06) |
+| **Previous Completion** | M39.0 — Critter Stack Idiom Refresh: 11 BCs updated, 30+ handlers refactored, 10 anti-pattern categories eliminated (2026-04-05) |
+| **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-06 (M40.0 S1B complete — [session 1B retrospective](./milestones/m40-0-session-1b-retrospective.md))*
+*Last Updated: 2026-04-06 (M40.0 S2 complete — [milestone closure retrospective](./milestones/m40-0-milestone-closure-retrospective.md))*
 
 ---
 
 ## Active Milestone
 
-### M40.0 — Dynamic Consistency Boundary: Promotions BC
-
-**Status:** 🟡 **IN PROGRESS** — S1 + S1B complete, S2 pending
-**Goal:** Introduce the DCB pattern to CritterSupply via coupon redemption — a single atomic decision spanning Coupon + Promotion aggregates, replacing the two-command fan-out pattern
-
-**Sessions:**
-- **S1 (Implementation):** ✅ Complete (2026-04-06)
-  - DCB `RedeemCouponHandler` with multi-stream boundary state (`CouponRedemptionState`)
-  - `RecordPromotionRedemptionHandler` converted to `CouponRedeemed` choreography
-  - `RedeemCoupon` command extended with `PromotionId`
-  - 30/30 integration tests passing (3 new DCB tests)
-  - ADR 0058 written
-  - Build: 0 errors, 19 warnings
-- **S1B (Real DCB API):** ✅ Complete (2026-04-06)
-  - Replaced manual `LoadAsync` with Marten's native `EventTagQuery` + `[BoundaryModel]` + `IEventBoundary<T>`
-  - All 6 write handlers now tag events with `CouponStreamId` / `PromotionStreamId`
-  - `CouponRedemptionState` rewritten with standard `Apply()` methods
-  - `LegacyRecordPromotionRedemptionHandler` deleted
-  - `DcbConcurrencyException` retry policy added
-  - 31/31 integration tests passing (+1 DCB concurrency test)
-  - ADR 0058 updated to real implementation
-  - Research doc: `docs/research/marten-dcb-tagging-mechanics.md`
-  - Build: 0 errors, 19 warnings
-- **S2 (Documentation Closure):** ⏳ Pending
-  - Update `docs/skills/dynamic-consistency-boundary.md` with CritterSupply implementation notes
-  - Update CONTEXTS.md if integration patterns changed
-  - Milestone closure retrospective
-
-**Key Decision:** S1B replaced S1's manual `LoadAsync` approach with Marten's native tag-based DCB API (`EventTagQuery` + `[BoundaryModel]` + `IEventBoundary<T>`) — see ADR 0058 for details. All handlers now tag events at write time using `BuildEvent()` + `AddTag()`.
-
-**ADR:** [0058 — DCB Promotions Coupon Redemption](../decisions/0058-dcb-promotions-coupon-redemption.md)
-**Retrospectives:** [S1](./milestones/m40-0-session-1-retrospective.md), [S1B](./milestones/m40-0-session-1b-retrospective.md)
-**Research:** [Marten DCB Tagging Mechanics](../research/marten-dcb-tagging-mechanics.md)
+No active milestone. M40.0 closed 2026-04-06. Next milestone TBD — decisions pending with Erik.
 
 ## Recent Completions
+
+### ✅ M40.0: Dynamic Consistency Boundary — Promotions BC (2026-04-06)
+
+**Status:** ✅ **Complete** — 2 implementation sessions (S1, S1B) + 1 documentation session (S2)
+**Goal:** Introduce Marten's DCB pattern to CritterSupply via coupon redemption — a single atomic decision spanning Coupon + Promotion aggregates, replacing the two-command fan-out pattern
+
+**Key Deliverables:**
+- **S1 (Implementation):** DCB architecture with `CouponRedemptionState` boundary model; `RedeemCouponHandler` with `Load()`/`Before()`/`Handle()` compound pattern; `RecordPromotionRedemptionHandler` converted to `CouponRedeemed` choreography; 30/30 tests; ADR 0058 written
+- **S1B (Real DCB API):** Replaced manual `LoadAsync` with Marten's native `EventTagQuery` + `[BoundaryModel]` + `IEventBoundary<T>`; all 6 write handlers tag events; `DcbConcurrencyException` retry policy; 31/31 tests (+1 DCB concurrency test); research doc committed
+- **S2 (Documentation Closure):** `dynamic-consistency-boundary.md` skill doc rewritten with canonical example, implementation checklist, and gotchas; CONTEXTS.md verified (no changes); README accuracy pass + Mermaid diagram updates (Shopping→Promotions, Correspondence integrations, Backoffice→Listings/Marketplaces/Returns); milestone closure retrospective
+
+**DoD:** Build 0 errors, 19 warnings (unchanged from M39.0 baseline). 31/31 Promotions integration tests passing. 0 new warnings.
+
+**ADR:** [0058 — DCB Promotions Coupon Redemption](../decisions/0058-dcb-promotions-coupon-redemption.md)
+**Retrospectives:** [S1](./milestones/m40-0-session-1-retrospective.md) · [S1B](./milestones/m40-0-session-1b-retrospective.md) · [Milestone Closure](./milestones/m40-0-milestone-closure-retrospective.md)
+**Research:** [Marten DCB Tagging Mechanics](../research/marten-dcb-tagging-mechanics.md)
 
 ### ✅ M39.0: Critter Stack Idiom Refresh (2026-04-05)
 
@@ -1326,9 +1310,9 @@
 
 ### Next Milestones
 
-> ⚠️ **Updated 2026-04-05:** M39.0 complete. Next milestone TBD — decisions pending with Erik.
+> ⚠️ **Updated 2026-04-06:** M40.0 complete. Next milestone TBD — decisions pending with Erik.
 
-- **M37.0 through M39.0 (complete):** The Catalog–Listings–Marketplaces arc (M37.0–M38.1) and the Critter Stack idiom refresh (M39.0) are finished. All 19 BCs are now at current Critter Stack idiom standards.
+- **M37.0 through M40.0 (complete):** The Catalog–Listings–Marketplaces arc (M37.0–M38.1), the Critter Stack idiom refresh (M39.0), and the Dynamic Consistency Boundary introduction (M40.0) are finished. All 18 BCs are now at current Critter Stack idiom standards with a working DCB reference implementation in Promotions.
 
 - **Next milestone (TBD):** Priorities under consideration include:
   - Product Variants — ProductFamily aggregate, variant-aware listings
@@ -1338,7 +1322,7 @@
 
 ### Future BCs (Priority Roadmap)
 
-> All existing BCs are implemented and idiomatic as of M39.0. Next new BC work is greenfield.
+> All existing BCs are implemented and idiomatic as of M40.0. Next new BC work is greenfield.
 
 **High Priority:**
 - 🟡 **Product Variants** — ProductFamily aggregate, variant-aware listings
@@ -1355,7 +1339,7 @@
 
 See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specifications.
 
-*Roadmap Last Updated: 2026-04-05 (M39.0 complete; next milestone TBD)*
+*Roadmap Last Updated: 2026-04-06 (M40.0 complete; next milestone TBD)*
 
 ---
 
@@ -1372,6 +1356,6 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Document Last Updated: 2026-04-05*
-*Active Milestone: None — M39.0 closed; next TBD*
+*Document Last Updated: 2026-04-06*
+*Active Milestone: None — M40.0 closed; next TBD*
 *Update Policy: At milestone start, milestone end, and significant task changes*
