@@ -1,10 +1,13 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using Fulfillment;
+using Fulfillment.Routing;
 using Fulfillment.Shipments;
+using Fulfillment.WorkOrders;
 using JasperFx;
 using JasperFx.Core;
 using JasperFx.Events.Daemon;
+using JasperFx.Events.Projections;
 using JasperFx.Resources;
 using Marten;
 using Marten.Events.Projections;
@@ -38,8 +41,12 @@ builder.Services.AddMarten(opts =>
         opts.DatabaseSchemaName = Constants.Fulfillment.ToLowerInvariant();
         opts.DisableNpgsqlLogging = true;
 
-        // Register Shipment aggregate for event sourcing
+        // Register aggregates for event sourcing
         opts.Projections.Snapshot<Shipment>(SnapshotLifecycle.Inline);
+        opts.Projections.Snapshot<WorkOrder>(SnapshotLifecycle.Inline);
+
+        // ShipmentStatusView projection (customer-facing tracking)
+        opts.Projections.Add<ShipmentStatusViewProjection>(ProjectionLifecycle.Inline);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()
@@ -50,6 +57,10 @@ builder.Services.AddMarten(opts =>
 
 builder.Services.AddResourceSetupOnStartup();
 
+// Routing engine registration
+// TODO: Replace StubFulfillmentRoutingEngine after Inventory BC Remaster (Gap #2: multi-warehouse allocation)
+builder.Services.AddScoped<IFulfillmentRoutingEngine, StubFulfillmentRoutingEngine>();
+
 builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(opts =>
 {
     opts.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -58,7 +69,7 @@ builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(opts =>
 
 builder.Host.UseWolverine(opts =>
 {
-    // Discover handlers from the Fulfillment assembly
+    // Discover handlers from the Fulfillment assembly (both Shipments and WorkOrders)
     opts.Discovery.IncludeAssembly(typeof(Fulfillment.Shipments.ShipmentStatus).Assembly);
 
     opts.Policies.AutoApplyTransactions();
@@ -87,32 +98,38 @@ builder.Host.UseWolverine(opts =>
     opts.ListenToRabbitQueue("fulfillment-requests").ProcessInline();
 
     // Publish fulfillment integration messages to Orders BC
+    // MIGRATION: ShipmentDispatched dual-published alongside ShipmentHandedToCarrier
+    // Remove ShipmentDispatched after Orders saga gains ShipmentHandedToCarrier handler.
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDispatched>()
+        .ToRabbitQueue("orders-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentHandedToCarrier>()
         .ToRabbitQueue("orders-fulfillment-events");
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
         .ToRabbitQueue("orders-fulfillment-events");
-    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDeliveryFailed>()
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ReturnToSenderInitiated>()
+        .ToRabbitQueue("orders-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.TrackingNumberAssigned>()
         .ToRabbitQueue("orders-fulfillment-events");
 
     // Also publish to Storefront for real-time customer updates
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDispatched>()
         .ToRabbitQueue("storefront-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentHandedToCarrier>()
+        .ToRabbitQueue("storefront-fulfillment-events");
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
         .ToRabbitQueue("storefront-fulfillment-events");
-    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDeliveryFailed>()
+    opts.PublishMessage<Messages.Contracts.Fulfillment.TrackingNumberAssigned>()
         .ToRabbitQueue("storefront-fulfillment-events");
 
     // Publish to Returns BC for return eligibility window establishment
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
         .ToRabbitQueue("returns-fulfillment-events");
 
-    // Publish to Backoffice BC for fulfillment pipeline metrics (M33.0 Session 2)
+    // Publish to Backoffice BC for fulfillment pipeline metrics
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDispatched>()
         .ToRabbitQueue("backoffice-shipment-dispatched");
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
         .ToRabbitQueue("backoffice-shipment-delivered");
-    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDeliveryFailed>()
-        .ToRabbitQueue("backoffice-shipment-delivery-failed");
 });
 
 builder.Services.AddEndpointsApiExplorer();

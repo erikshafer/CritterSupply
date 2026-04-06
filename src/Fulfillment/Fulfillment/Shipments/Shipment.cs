@@ -1,8 +1,12 @@
+using System.Security.Cryptography;
+
 namespace Fulfillment.Shipments;
 
 /// <summary>
-/// Event-sourced aggregate representing a shipment fulfillment workflow.
-/// Follows immutable pattern with pure functions for applying events.
+/// Event-sourced aggregate representing a shipment's routing decision and carrier lifecycle.
+/// Restructured for the Fulfillment BC remaster (ADR 0059).
+/// Holds routing events (FulfillmentRequested, FulfillmentCenterAssigned) and all carrier
+/// lifecycle events. Does NOT hold warehouse operations (those live on WorkOrder).
 /// </summary>
 public sealed record Shipment(
     Guid Id,
@@ -12,21 +16,48 @@ public sealed record Shipment(
     IReadOnlyList<FulfillmentLineItem> LineItems,
     string ShippingMethod,
     ShipmentStatus Status,
-    string? WarehouseId,
-    string? Carrier,
+    string? AssignedFulfillmentCenter,
     string? TrackingNumber,
+    string? Carrier,
+    int DeliveryAttemptCount,
     DateTimeOffset RequestedAt,
-    DateTimeOffset? AssignedAt,
-    DateTimeOffset? DispatchedAt,
+    DateTimeOffset? FulfillmentCenterAssignedAt,
+    DateTimeOffset? LabelGeneratedAt,
+    DateTimeOffset? HandedToCarrierAt,
     DateTimeOffset? DeliveredAt,
-    string? FailureReason)
+    string? LastScanLocation,
+    DateTimeOffset? EstimatedDelivery)
 {
     /// <summary>
-    /// Create initial state from FulfillmentRequested event.
-    /// This is used by Marten to create the aggregate from the first event in the stream.
+    /// Whether the shipment is in a terminal state.
     /// </summary>
+    public bool IsTerminal => Status is
+        ShipmentStatus.Delivered or ShipmentStatus.Cancelled or
+        ShipmentStatus.LostReplacementShipped or ShipmentStatus.ReturnedReshippable;
+
+    /// <summary>
+    /// Creates a deterministic UUID v5 from an OrderId.
+    /// Ensures idempotency: the same OrderId always produces the same ShipmentId.
+    /// </summary>
+    public static Guid StreamId(Guid orderId)
+    {
+        // RFC 4122 DNS namespace UUID used as the hashing namespace
+        var namespaceId = new Guid("6ba7b812-9dad-11d1-80b4-00c04fd430c8");
+        var nameBytes = orderId.ToByteArray();
+        var namespaceBytes = namespaceId.ToByteArray();
+
+        using var sha1 = SHA1.Create();
+        var combined = namespaceBytes.Concat(nameBytes).ToArray();
+        var hash = sha1.ComputeHash(combined);
+
+        hash[6] = (byte)((hash[6] & 0x0F) | 0x50); // Version 5
+        hash[8] = (byte)((hash[8] & 0x3F) | 0x80); // Variant
+
+        return new Guid(hash.Take(16).ToArray());
+    }
+
     public static Shipment Create(FulfillmentRequested @event) =>
-        new(Guid.Empty,  // Marten will populate Id from the stream key
+        new(Guid.Empty,
             @event.OrderId,
             @event.CustomerId,
             @event.ShippingAddress,
@@ -36,38 +67,61 @@ public sealed record Shipment(
             null,
             null,
             null,
+            0,
             @event.RequestedAt,
-            null,
-            null,
-            null,
-            null);
+            null, null, null, null, null, null);
 
-    /// <summary>
-    /// Apply warehouse assignment event.
-    /// </summary>
-    public Shipment Apply(WarehouseAssigned @event) =>
+    public Shipment Apply(FulfillmentCenterAssigned @event) =>
         this with
         {
             Status = ShipmentStatus.Assigned,
-            WarehouseId = @event.WarehouseId,
-            AssignedAt = @event.AssignedAt
+            AssignedFulfillmentCenter = @event.FulfillmentCenterId,
+            FulfillmentCenterAssignedAt = @event.AssignedAt
         };
 
-    /// <summary>
-    /// Apply shipment dispatched event.
-    /// </summary>
-    public Shipment Apply(ShipmentDispatched @event) =>
+    public Shipment Apply(ShippingLabelGenerated @event) =>
         this with
         {
-            Status = ShipmentStatus.Shipped,
+            Status = ShipmentStatus.Labeled,
             Carrier = @event.Carrier,
-            TrackingNumber = @event.TrackingNumber,
-            DispatchedAt = @event.DispatchedAt
+            LabelGeneratedAt = @event.GeneratedAt
         };
 
-    /// <summary>
-    /// Apply shipment delivered event.
-    /// </summary>
+    public Shipment Apply(TrackingNumberAssigned @event) =>
+        this with
+        {
+            TrackingNumber = @event.TrackingNumber,
+            Carrier = @event.Carrier
+        };
+
+    public Shipment Apply(ShipmentManifested _) =>
+        this with { Status = ShipmentStatus.Staged };
+
+    public Shipment Apply(PackageStagedForPickup _) => this;
+
+    public Shipment Apply(CarrierPickupConfirmed _) => this;
+
+    public Shipment Apply(ShipmentHandedToCarrier @event) =>
+        this with
+        {
+            Status = ShipmentStatus.HandedToCarrier,
+            HandedToCarrierAt = @event.HandedAt
+        };
+
+    public Shipment Apply(ShipmentInTransit @event) =>
+        this with
+        {
+            Status = ShipmentStatus.InTransit,
+            LastScanLocation = @event.ScanLocation
+        };
+
+    public Shipment Apply(OutForDelivery @event) =>
+        this with
+        {
+            Status = ShipmentStatus.OutForDelivery,
+            EstimatedDelivery = @event.EstimatedDelivery
+        };
+
     public Shipment Apply(ShipmentDelivered @event) =>
         this with
         {
@@ -75,13 +129,16 @@ public sealed record Shipment(
             DeliveredAt = @event.DeliveredAt
         };
 
-    /// <summary>
-    /// Apply delivery failure event.
-    /// </summary>
-    public Shipment Apply(ShipmentDeliveryFailed @event) =>
+    public Shipment Apply(DeliveryAttemptFailed @event) =>
         this with
         {
-            Status = ShipmentStatus.DeliveryFailed,
-            FailureReason = @event.Reason
+            Status = ShipmentStatus.DeliveryAttemptFailed,
+            DeliveryAttemptCount = @event.AttemptNumber
         };
+
+    public Shipment Apply(ReturnToSenderInitiated _) =>
+        this with { Status = ShipmentStatus.ReturningToSender };
+
+    public Shipment Apply(ReturnReceivedAtWarehouse _) =>
+        this with { Status = ShipmentStatus.ReturnReceived };
 }
