@@ -42,6 +42,12 @@ builder.Services.AddMarten(opts =>
         // Configure Promotion and Coupon as event-sourced aggregates
         opts.Events.StreamIdentity = StreamIdentity.AsGuid;
 
+        // Register DCB tag types for cross-stream consistency boundaries (M40.0)
+        // CouponStreamTag: wraps the UUID v5 coupon stream ID for tag queries
+        // PromotionTag: wraps the UUID v7 promotion stream ID for tag queries
+        opts.Events.RegisterTagType<CouponStreamTag>().ForAggregate<Promotions.Coupon.Coupon>();
+        opts.Events.RegisterTagType<PromotionTag>().ForAggregate<Promotions.Promotion.Promotion>();
+
         // Configure snapshots for queryable aggregates
         opts.Projections.Snapshot<Promotions.Promotion.Promotion>(SnapshotLifecycle.Inline);
         opts.Projections.Snapshot<Promotions.Coupon.Coupon>(SnapshotLifecycle.Inline);
