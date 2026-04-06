@@ -17,12 +17,21 @@ public enum WorkOrderStatus
     /// <summary>Picker has started picking items.</summary>
     PickStarted,
 
+    /// <summary>Short pick detected — item not found at bin, awaiting resolution.</summary>
+    ShortPickPending,
+
     /// <summary>All items successfully picked.</summary>
     PickCompleted,
 
     /// <summary>Items arrived at pack station, packing in progress.</summary>
     PackingStarted,
 
+    /// <summary>Pack station discrepancy detected — wrong item or weight mismatch.</summary>
+    PackDiscrepancyPending,
+
     /// <summary>All items verified, carton sealed, ready for labeling.</summary>
-    PackingCompleted
+    PackingCompleted,
+
+    /// <summary>Pick exception raised — work order closed (rerouted or backordered).</summary>
+    PickExceptionClosed
 }

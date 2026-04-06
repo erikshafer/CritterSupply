@@ -25,9 +25,10 @@ public class CarrierDispatchAndDeliveryTests : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     /// <summary>
-    /// Creates a shipment with a completed work order (ready for labeling).
+    /// Creates a shipment with a completed work order. The PackingCompleted → GenerateShippingLabel
+    /// cascading policy will automatically label the shipment.
     /// </summary>
-    private async Task<(Guid shipmentId, Guid orderId)> CreateReadyForLabelingAsync()
+    private async Task<(Guid shipmentId, Guid orderId)> CreateLabeledShipmentAsync()
     {
         var orderId = Guid.NewGuid();
         var message = new IntegrationContracts.FulfillmentRequested(
@@ -52,7 +53,7 @@ public class CarrierDispatchAndDeliveryTests : IAsyncLifetime
         var fc = shipment.AssignedFulfillmentCenter!;
         var workOrderId = WorkOrder.StreamId(shipment.Id, fc);
 
-        // Complete the work order
+        // Complete the work order — PackingCompleted cascades to GenerateShippingLabel
         await _fixture.ExecuteAndWaitAsync(new ReleaseWave(workOrderId, "WAVE-CARRIER"));
         await _fixture.ExecuteAndWaitAsync(new AssignPickList(workOrderId, "P-Carrier"));
         await _fixture.ExecuteAndWaitAsync(new RecordItemPick(workOrderId, "SKU-SHIP-001", 1, "A-01-01"));
@@ -62,45 +63,67 @@ public class CarrierDispatchAndDeliveryTests : IAsyncLifetime
         return (shipment.Id, orderId);
     }
 
-    /// <summary>Slice 10: Generate shipping label and tracking number.</summary>
+    /// <summary>Slice 10: Cascading policy generates shipping label and tracking number automatically.</summary>
     [Fact]
-    public async Task GenerateShippingLabel_Creates_Label_And_Tracking()
+    public async Task PackingCompleted_Cascade_Creates_Label_And_Tracking()
     {
-        var (shipmentId, _) = await CreateReadyForLabelingAsync();
-
-        await _fixture.ExecuteAndWaitAsync(
-            new GenerateShippingLabel(shipmentId, "UPS", "Ground"));
+        var (shipmentId, _) = await CreateLabeledShipmentAsync();
 
         await using var session = _fixture.GetDocumentSession();
         var shipment = await session.LoadAsync<Shipment>(shipmentId);
         shipment.ShouldNotBeNull();
         shipment.Status.ShouldBe(ShipmentStatus.Labeled);
-        shipment.Carrier.ShouldBe("UPS");
+        shipment.Carrier.ShouldNotBeNullOrEmpty();
         shipment.TrackingNumber.ShouldNotBeNullOrEmpty();
     }
 
-    /// <summary>Slice 10: Label generation publishes TrackingNumberAssigned integration event.</summary>
+    /// <summary>Slice 10: Label generation publishes TrackingNumberAssigned integration event via cascade.</summary>
     [Fact]
-    public async Task GenerateShippingLabel_Publishes_TrackingNumberAssigned()
+    public async Task PackingCompleted_Cascade_Publishes_TrackingNumberAssigned()
     {
-        var (shipmentId, orderId) = await CreateReadyForLabelingAsync();
+        var orderId = Guid.NewGuid();
+        var message = new IntegrationContracts.FulfillmentRequested(
+            orderId,
+            Guid.NewGuid(),
+            new SharedShippingAddress
+            {
+                AddressLine1 = "200 Carrier Way",
+                City = "Newark",
+                StateProvince = "NJ",
+                PostalCode = "07102",
+                Country = "USA"
+            },
+            new List<IntegrationContracts.FulfillmentLineItem> { new("SKU-SHIP-001", 1) },
+            "Ground",
+            DateTimeOffset.UtcNow);
 
+        await _fixture.ExecuteAndWaitAsync(message);
+
+        await using var session = _fixture.GetDocumentSession();
+        var shipment = await session.Query<Shipment>().FirstAsync(s => s.OrderId == orderId);
+        var fc = shipment.AssignedFulfillmentCenter!;
+        var workOrderId = WorkOrder.StreamId(shipment.Id, fc);
+
+        await _fixture.ExecuteAndWaitAsync(new ReleaseWave(workOrderId, "WAVE-TRACK"));
+        await _fixture.ExecuteAndWaitAsync(new AssignPickList(workOrderId, "P-Track"));
+        await _fixture.ExecuteAndWaitAsync(new RecordItemPick(workOrderId, "SKU-SHIP-001", 1, "A-01-01"));
+        await _fixture.ExecuteAndWaitAsync(new StartPacking(workOrderId));
+
+        // VerifyItemAtPack completes packing → cascades to GenerateShippingLabel
         var tracked = await _fixture.ExecuteAndWaitAsync(
-            new GenerateShippingLabel(shipmentId, "UPS", "Ground"));
+            new VerifyItemAtPack(workOrderId, "SKU-SHIP-001", 1));
 
         var sent = tracked.Sent.MessagesOf<IntegrationContracts.TrackingNumberAssigned>().ToList();
-        sent.ShouldNotBeEmpty("TrackingNumberAssigned should be published");
+        sent.ShouldNotBeEmpty("TrackingNumberAssigned should be published via cascade");
         sent.First().OrderId.ShouldBe(orderId);
-        sent.First().Carrier.ShouldBe("UPS");
     }
 
     /// <summary>Slice 11: Manifest and stage package.</summary>
     [Fact]
     public async Task Manifest_And_Stage_Package()
     {
-        var (shipmentId, _) = await CreateReadyForLabelingAsync();
+        var (shipmentId, _) = await CreateLabeledShipmentAsync();
 
-        await _fixture.ExecuteAndWaitAsync(new GenerateShippingLabel(shipmentId, "FedEx", "Express"));
         await _fixture.ExecuteAndWaitAsync(new ManifestShipment(shipmentId, "MANIFEST-001"));
         await _fixture.ExecuteAndWaitAsync(new StagePackage(shipmentId, "Lane-A", "2:00-3:00 PM"));
 
@@ -113,9 +136,8 @@ public class CarrierDispatchAndDeliveryTests : IAsyncLifetime
     [Fact]
     public async Task ConfirmCarrierPickup_Publishes_DualMessages()
     {
-        var (shipmentId, orderId) = await CreateReadyForLabelingAsync();
+        var (shipmentId, orderId) = await CreateLabeledShipmentAsync();
 
-        await _fixture.ExecuteAndWaitAsync(new GenerateShippingLabel(shipmentId, "UPS", "Ground"));
         await _fixture.ExecuteAndWaitAsync(new ManifestShipment(shipmentId, "M-001"));
         await _fixture.ExecuteAndWaitAsync(new StagePackage(shipmentId, "Lane-B", "1:00-2:00 PM"));
 
@@ -141,11 +163,9 @@ public class CarrierDispatchAndDeliveryTests : IAsyncLifetime
     [Fact]
     public async Task CarrierWebhook_Delivery_Happy_Path()
     {
-        var (shipmentId, orderId) = await CreateReadyForLabelingAsync();
+        var (shipmentId, orderId) = await CreateLabeledShipmentAsync();
 
-        await _fixture.ExecuteAndWaitAsync(new GenerateShippingLabel(shipmentId, "UPS", "Ground"));
-
-        // Get tracking number
+        // Get tracking number (assigned via cascade)
         await using var session1 = _fixture.GetDocumentSession();
         var labeledShipment = await session1.LoadAsync<Shipment>(shipmentId);
         var trackingNumber = labeledShipment!.TrackingNumber!;
@@ -190,9 +210,7 @@ public class CarrierDispatchAndDeliveryTests : IAsyncLifetime
     [Fact]
     public async Task CarrierWebhook_DeliveryAttemptFailed_Three_Times_Triggers_RTS()
     {
-        var (shipmentId, orderId) = await CreateReadyForLabelingAsync();
-
-        await _fixture.ExecuteAndWaitAsync(new GenerateShippingLabel(shipmentId, "UPS", "Ground"));
+        var (shipmentId, orderId) = await CreateLabeledShipmentAsync();
 
         await using var sessionLabel = _fixture.GetDocumentSession();
         var labeledShipment = await sessionLabel.LoadAsync<Shipment>(shipmentId);
@@ -231,9 +249,7 @@ public class CarrierDispatchAndDeliveryTests : IAsyncLifetime
     [Fact]
     public async Task CarrierWebhook_Duplicate_AttemptNumber_Is_Idempotent()
     {
-        var (shipmentId, _) = await CreateReadyForLabelingAsync();
-
-        await _fixture.ExecuteAndWaitAsync(new GenerateShippingLabel(shipmentId, "UPS", "Ground"));
+        var (shipmentId, _) = await CreateLabeledShipmentAsync();
 
         await using var sessionLabel = _fixture.GetDocumentSession();
         var labeledShipment = await sessionLabel.LoadAsync<Shipment>(shipmentId);
@@ -264,9 +280,7 @@ public class CarrierDispatchAndDeliveryTests : IAsyncLifetime
     [Fact]
     public async Task ShipmentStatusView_Tracks_Full_Lifecycle()
     {
-        var (shipmentId, _) = await CreateReadyForLabelingAsync();
-
-        await _fixture.ExecuteAndWaitAsync(new GenerateShippingLabel(shipmentId, "UPS", "Ground"));
+        var (shipmentId, _) = await CreateLabeledShipmentAsync();
 
         await using var session1 = _fixture.GetDocumentSession();
         var view = await session1.LoadAsync<ShipmentStatusView>(shipmentId);
@@ -281,10 +295,7 @@ public class CarrierDispatchAndDeliveryTests : IAsyncLifetime
     [Fact]
     public async Task Complete_Fulfillment_Lifecycle_Slices_1_Through_15()
     {
-        var (shipmentId, orderId) = await CreateReadyForLabelingAsync();
-
-        // Slice 10: Label
-        await _fixture.ExecuteAndWaitAsync(new GenerateShippingLabel(shipmentId, "FedEx", "Express"));
+        var (shipmentId, orderId) = await CreateLabeledShipmentAsync();
 
         await using var sessionLabel = _fixture.GetDocumentSession();
         var labeledShipment = await sessionLabel.LoadAsync<Shipment>(shipmentId);
@@ -295,7 +306,7 @@ public class CarrierDispatchAndDeliveryTests : IAsyncLifetime
         await _fixture.ExecuteAndWaitAsync(new StagePackage(shipmentId, "Lane-F", "4:00-5:00 PM"));
 
         // Slice 12: Carrier pickup
-        await _fixture.ExecuteAndWaitAsync(new ConfirmCarrierPickup(shipmentId, "FedEx", true));
+        await _fixture.ExecuteAndWaitAsync(new ConfirmCarrierPickup(shipmentId, "UPS", true));
 
         // Slice 13: In-transit
         await _fixture.ExecuteAndWaitAsync(new CarrierWebhookPayload(

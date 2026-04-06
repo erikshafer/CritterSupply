@@ -86,6 +86,7 @@ public sealed record CarrierWebhookPayload(
 /// <summary>
 /// Handler for generating a shipping label and assigning a tracking number.
 /// Triggered after PackingCompleted (Track A → Track B bridge).
+/// Catches carrier API failures and appends ShippingLabelGenerationFailed instead.
 /// </summary>
 public static class GenerateShippingLabelHandler
 {
@@ -98,10 +99,10 @@ public static class GenerateShippingLabelHandler
         if (shipment is null)
             return new ProblemDetails { Detail = "Shipment not found", Status = 404 };
 
-        if (shipment.Status != ShipmentStatus.Assigned)
+        if (shipment.Status is not (ShipmentStatus.Assigned or ShipmentStatus.LabelGenerationFailed))
             return new ProblemDetails
             {
-                Detail = $"Cannot generate label for shipment in {shipment.Status} status. Must be Assigned first.",
+                Detail = $"Cannot generate label for shipment in {shipment.Status} status. Must be Assigned or LabelGenerationFailed.",
                 Status = 400
             };
 
@@ -118,27 +119,41 @@ public static class GenerateShippingLabelHandler
         if (shipment is null) return;
 
         var now = DateTimeOffset.UtcNow;
-        // Stub: generate a mock tracking number
-        var trackingNumber = $"1Z{command.Carrier.ToUpperInvariant()[..3]}{Guid.NewGuid():N}"[..24];
 
-        var labelGenerated = new ShippingLabelGenerated(
-            command.Carrier, command.Service,
-            0m, // BillableWeight comes from WorkOrder via PackingCompleted
-            null, // LabelZPL — stub, no real ZPL data
-            now);
+        try
+        {
+            // Stub: generate a mock tracking number
+            // In production, this would call the carrier API and could throw on failure
+            var trackingNumber = $"1Z{command.Carrier.ToUpperInvariant()[..3]}{Guid.NewGuid():N}"[..24];
 
-        var trackingAssigned = new TrackingNumberAssigned(
-            trackingNumber, command.Carrier, now);
+            var labelGenerated = new ShippingLabelGenerated(
+                command.Carrier, command.Service,
+                0m, // BillableWeight comes from WorkOrder via PackingCompleted
+                null, // LabelZPL — stub, no real ZPL data
+                now);
 
-        session.Events.Append(command.ShipmentId, labelGenerated, trackingAssigned);
+            var trackingAssigned = new TrackingNumberAssigned(
+                trackingNumber, command.Carrier, now);
 
-        // Publish TrackingNumberAssigned integration event
-        await bus.PublishAsync(new IntegrationMessages.TrackingNumberAssigned(
-            shipment.OrderId,
-            command.ShipmentId,
-            trackingNumber,
-            command.Carrier,
-            now));
+            session.Events.Append(command.ShipmentId, labelGenerated, trackingAssigned);
+
+            // Publish TrackingNumberAssigned integration event
+            await bus.PublishAsync(new IntegrationMessages.TrackingNumberAssigned(
+                shipment.OrderId,
+                command.ShipmentId,
+                trackingNumber,
+                command.Carrier,
+                now));
+        }
+        catch (Exception ex)
+        {
+            // Carrier API failure — append failure event instead of propagating
+            session.Events.Append(command.ShipmentId,
+                new ShippingLabelGenerationFailed(
+                    command.Carrier,
+                    ex.Message,
+                    now));
+        }
     }
 }
 
@@ -352,6 +367,27 @@ public static class CarrierWebhookHandler
                         7,
                         payload.Timestamp));
                 }
+                break;
+
+            case "RETURN_TO_SENDER":
+                // Slice 27: Carrier initiates return-to-sender
+                if (shipment.Status == ShipmentStatus.ReturningToSender) return; // Idempotency
+
+                var returnRtsEvent = new ReturnToSenderInitiated(
+                    shipment.Carrier ?? "Unknown",
+                    shipment.DeliveryAttemptCount,
+                    payload.AttemptNumber ?? 7, // EstimatedReturnDays
+                    payload.Timestamp);
+                session.Events.Append(shipmentId, returnRtsEvent);
+
+                // Publish ReturnToSenderInitiated integration event
+                await bus.PublishAsync(new IntegrationMessages.ReturnToSenderInitiated(
+                    shipment.OrderId,
+                    shipmentId,
+                    shipment.Carrier ?? "Unknown",
+                    shipment.DeliveryAttemptCount,
+                    payload.AttemptNumber ?? 7,
+                    payload.Timestamp));
                 break;
         }
     }
