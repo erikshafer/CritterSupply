@@ -13,14 +13,15 @@ Patterns and practices for building message handlers and HTTP endpoints with Wol
 5. [Entity and Document Loading](#entity-and-document-loading)
 6. [Handler Return Patterns](#handler-return-patterns)
    - [Pattern 7: HTTP Endpoint with Integration Messages](#pattern-7-http-endpoint-with-integration-messages--m361-addition) ⭐ *M36.1 Addition*
-   - [Pattern 8: Async vs Sync Return Types](#pattern-8-async-vs-sync-return-types-m320-lesson) ⭐ *M32 Addition*
+   - [Pattern 8: HTTP Endpoint with Events and Integration Messages](#pattern-8-http-endpoint-with-events-and-integration-messages--m390-addition) ⭐ *M39.0 Addition*
 7. [Railway Programming in Handlers](#railway-programming-in-handlers)
 8. [HTTP Endpoints](#http-endpoints)
 9. [Handler Discovery](#handler-discovery)
 10. [Error Handling](#error-handling)
 11. [Multi-Tenancy](#multi-tenancy)
-12. [Anti-Patterns to Avoid](#anti-patterns-to-avoid)
-13. [File Organization and Naming](#file-organization-and-naming)
+12. [DCB Handler Patterns](#dcb-handler-patterns--m400-addition) ⭐ *M40.0 Addition*
+13. [Anti-Patterns to Avoid](#anti-patterns-to-avoid)
+14. [File Organization and Naming](#file-organization-and-naming)
 
 ---
 
@@ -558,6 +559,7 @@ Wolverine interprets return values from `Handle()` methods to determine what to 
 | `IEnumerable<object>` or `Events` | Append all events to stream |
 | `OutgoingMessages` | Publish integration messages |
 | `(Events, OutgoingMessages)` | Append events + publish messages |
+| `(IResult, Events, OutgoingMessages)` | HTTP response + append events + publish messages |
 | `IStartStream` | Start a new event stream |
 | `(CreationResponse, IStartStream)` | HTTP 201 + start stream |
 | `UpdatedAggregate` or `UpdatedAggregate<T>` | Return updated aggregate state |
@@ -696,6 +698,26 @@ public static async Task<(IResult, OutgoingMessages)> Handle(
 
 **⚠️ CRITICAL:** Do NOT use `IMessageBus.PublishAsync()` for integration events in HTTP endpoints. See Anti-Pattern #11 below.
 
+### Pattern 8: HTTP Endpoint with Events and Integration Messages ⭐ *M39.0 Addition*
+
+Wolverine HTTP endpoints can return the full triple-tuple `(IResult, Events, OutgoingMessages)`. `IResult` sets the HTTP response, `Events` are appended to the aggregate stream via `[WriteAggregate]`, and `OutgoingMessages` are enrolled in the transactional outbox. All three are committed atomically — the event append and the outbox enrollment happen in a single Marten transaction.
+
+```csharp
+[WolverinePost("/api/checkouts/{checkoutId}/complete")]
+public static (IResult, Events, OutgoingMessages) Handle(
+    CompleteCheckout command,
+    [WriteAggregate] Checkout checkout)
+{
+    var completed = new CheckoutCompleted(checkout.Id, DateTimeOffset.UtcNow);
+    var outgoing = new OutgoingMessages();
+    outgoing.Add(new CartCheckoutCompleted(checkout.Id, checkout.CartId));
+
+    return (Results.Ok(), new Events(completed), outgoing);
+}
+```
+
+This pattern eliminates the two-phase gap that existed when `SaveChangesAsync()` was called before returning `OutgoingMessages` — if the process failed between save and return, the event was committed but the integration message never reached the outbox. See `src/Orders/Orders/Checkout/CompleteCheckout.cs` for the canonical example.
+
 ### Summary Table
 
 | Scenario | Return Type | Stream Creation | Example |
@@ -705,6 +727,7 @@ public static async Task<(IResult, OutgoingMessages)> Handle(
 | Start new stream (message handler) | `IStartStream` or `OutgoingMessages` | `MartenOps.StartStream<T>()` or `session.Events.StartStream<T>()` | StartPayment |
 | Start new stream (HTTP endpoint) | `(CreationResponse, IStartStream)` | `MartenOps.StartStream<T>()` | InitializeCart |
 | HTTP response + integration messages | `(IResult, OutgoingMessages)` | N/A | RegisterMarketplace |
+| HTTP response + events + integration | `(IResult, Events, OutgoingMessages)` | N/A — `[WriteAggregate]` | CompleteCheckout |
 | Multi-transport dispatch | `IEnumerable<object>` | N/A | DescriptionChangeApproved |
 
 ---
@@ -1663,6 +1686,59 @@ public static Events Handle(PlaceOrder cmd, IMessageContext context)
 
 ---
 
+## DCB Handler Patterns ⭐ *M40.0 Addition*
+
+Wolverine supports the **Dynamic Consistency Boundary (DCB)** pattern via Marten's tag-based API. DCB allows a single handler to enforce invariants across multiple event streams — no saga required. For the full pattern (tag registration, boundary state design, implementation checklist), see `docs/skills/dynamic-consistency-boundary.md`.
+
+This section covers the four Wolverine-specific behaviors that DCB introduces to the compound handler workflow.
+
+### `Load()` Returning `EventTagQuery`
+
+When `Load()` returns an `EventTagQuery`, Wolverine activates the DCB pipeline instead of loading a single aggregate stream. Marten loads all events matching the tag query and projects them into the boundary state.
+
+```csharp
+public static EventTagQuery Load(RedeemCoupon command)
+    => EventTagQuery
+        .For(new CouponStreamId(Coupon.StreamId(command.CouponCode)))
+        .AndEventsOfType<CouponIssued, CouponRedeemed, CouponRevoked, CouponExpired>()
+        .Or(new PromotionStreamId(command.PromotionId))
+        .AndEventsOfType<PromotionCreated, PromotionActivated, PromotionPaused, PromotionResumed, PromotionCancelled, PromotionExpired>()
+        .AndEventsOfType<PromotionRedemptionRecorded>();
+```
+
+### `[BoundaryModel]` Attribute Placement
+
+`[BoundaryModel]` goes on `Handle()` only. Adding it to `Before()` causes Wolverine codegen error CS0128 (duplicate local variable). `Before()` receives the projected boundary state as a plain parameter — no attribute needed.
+
+```csharp
+// Before() — plain parameter, no attribute
+public static ProblemDetails Before(RedeemCoupon command, CouponRedemptionState state) { /* ... */ }
+
+// Handle() — [BoundaryModel] on IEventBoundary<T>
+public static void Handle(
+    RedeemCoupon command,
+    [BoundaryModel] IEventBoundary<CouponRedemptionState> boundary) { /* ... */ }
+```
+
+### `IEventBoundary<T>` in `Handle()`
+
+`IEventBoundary<T>` provides the projected state via `boundary.Aggregate` and the atomic append path via `boundary.AppendOne()`. At `SaveChangesAsync`, Marten runs `AssertDcbConsistency` — if any new matching tagged event was appended since the boundary was loaded, it throws `DcbConcurrencyException`.
+
+### `DcbConcurrencyException` Retry Policy
+
+`DcbConcurrencyException` extends `Marten.Exceptions.MartenException` — it is **not** a subclass of `JasperFx.ConcurrencyException`. A standard `opts.OnException<ConcurrencyException>()` retry policy will not catch it. Add a separate entry:
+
+```csharp
+opts.OnException<ConcurrencyException>()
+    .RetryWithCooldown(100.Milliseconds(), 250.Milliseconds());
+opts.OnException<DcbConcurrencyException>()
+    .RetryWithCooldown(100.Milliseconds(), 250.Milliseconds());
+```
+
+**Reference:** `docs/skills/dynamic-consistency-boundary.md` for the full pattern including tag registration, boundary state design, tagged write handlers, and the implementation checklist.
+
+---
+
 ## Anti-Patterns to Avoid
 
 ### 1. ❌ Putting Business Logic in `Before/Load` Methods
@@ -2285,6 +2361,10 @@ public static async Task<IResult> Handle(
 - Railway programming with async validation (see anti-pattern #4)
 
 **Reference:** [M32.3 Session 10 Retrospective - Wolverine Pattern Limitations](../../planning/milestones/m32-3-session-10-retrospective.md)
+
+> ⭐ *M39.0 Clarification:* The Anti-Pattern #10 limitation is specifically about **mixed route + JSON body** parameters. **Route-only** POST endpoints with `[WriteAggregate]` work perfectly — the compound handler has no body to deserialize, so the lifecycle proceeds normally. `CompleteCheckout` (`POST /checkouts/{checkoutId}/complete`) is the canonical example: route-only input, `[WriteAggregate]`, `Before()/Handle()` compound handler returning `(IResult, Events, OutgoingMessages)`.
+
+> ⭐ *M39.0 Addition:* **DELETE + compound handler limitation.** The DELETE verb with a compound handler pattern (`Load()/Before()/Handle()`) triggers body deserialization regardless of HTTP verb, which causes failures for DELETE endpoints with no request body. For DELETE endpoints with route-only inputs and a computed stream ID (where `[WriteAggregate]` cannot be used), use a single-method async handler instead of the compound pattern. Discovered during the Pricing `CancelScheduledPriceChange` refactor — see `src/Pricing/Pricing/Products/CancelScheduledPriceChange.cs`.
 
 ### 11. ❌ Using `bus.PublishAsync()` for Integration Events in HTTP Endpoints ⭐ *M36.0 Addition*
 
