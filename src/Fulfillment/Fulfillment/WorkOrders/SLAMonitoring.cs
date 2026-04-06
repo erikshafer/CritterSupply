@@ -1,5 +1,4 @@
 using Marten;
-using Fulfillment.WorkOrders;
 
 namespace Fulfillment.WorkOrders;
 
