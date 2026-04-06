@@ -9,6 +9,7 @@ This directory contains implementation patterns and best practices for building 
 **Starting from Scratch:**
 - 🏗️ [Adding a New Bounded Context](./adding-new-bounded-context.md) - Complete checklist: projects, Docker, Postgres database, Aspire, CONTEXTS.md, tests
 - 🎨 [Event Modeling Workshop](./event-modeling-workshop.md) - Collaborative design technique: brain dump, storytelling, slicing, scenarios, multi-persona facilitation
+- 🔁 [BC Remaster](./bc-remaster.md) - Full event modeling refresh of an existing BC: when to remaster, the Adjacent BC Gap Register, remaster vs. refactor
 - ✅ [Final QA/UX Review](./final-qa-ux-review.md) - End-of-session sign-off using the QA Engineer and UX Engineer personas
 
 **Creating Commands & Handlers:**
@@ -90,9 +91,10 @@ This directory contains implementation patterns and best practices for building 
 ### Planning Phase
 1. **New BC?** → Start with [Adding a New Bounded Context](./adding-new-bounded-context.md) for the full checklist
 2. **Design session?** → Use [Event Modeling Workshop](./event-modeling-workshop.md) for collaborative system design
-3. Review [Vertical Slice Organization](./vertical-slice-organization.md) for file structure
-4. Write Gherkin features (see [Reqnroll BDD Testing](./reqnroll-bdd-testing.md) and [Event Modeling Scenarios](./references/scenarios.md))
-5. Choose persistence strategy:
+3. **Remastering an existing BC?** → Use [BC Remaster](./bc-remaster.md) + the template at `docs/planning/templates/bc-remaster-event-modeling-template.md`
+4. Review [Vertical Slice Organization](./vertical-slice-organization.md) for file structure
+5. Write Gherkin features (see [Reqnroll BDD Testing](./reqnroll-bdd-testing.md) and [Event Modeling Scenarios](./references/scenarios.md))
+6. Choose persistence strategy:
    - Event sourcing? → [Event-Sourced Aggregate Design](./marten-event-sourcing.md)
    - Document store? → [Marten Document Store](./marten-document-store.md)
    - Traditional relational? → [EF Core + Wolverine Integration](./efcore-wolverine-integration.md)
@@ -306,6 +308,7 @@ Each skill document follows this structure:
 **Common Questions:**
 
 - *"How do I design a new system or feature?"* → [Event Modeling Workshop](./event-modeling-workshop.md)
+- *"How do I remaster an existing BC?"* → [BC Remaster](./bc-remaster.md) + `docs/planning/templates/bc-remaster-event-modeling-template.md`
 - *"How do I write Given/When/Then scenarios?"* → [Event Modeling Scenarios](./references/scenarios.md)
 - *"How do I build a real-time hub with SignalR and Wolverine?"* → [Wolverine + SignalR](./wolverine-signalr.md)
 - *"How do I create a new command handler?"* → [Wolverine Message Handlers](./wolverine-message-handlers.md)
@@ -324,4 +327,4 @@ Each skill document follows this structure:
 
 ---
 
-**Last Updated:** 2026-03-31
+**Last Updated:** 2026-04-06
