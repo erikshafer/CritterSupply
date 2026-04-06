@@ -155,110 +155,115 @@ That said, unit tests are only part of the story. A real DCB implementation shou
 
 ## CritterSupply Usage
 
-After reviewing the DCB specification/examples and the current CritterSupply codebase, the current **best-first spike guidance** is:
+### When DCB Is Appropriate
 
-- DCB is a good fit for **one immediate business decision inside one bounded context** when the invariant spans multiple event streams
-- DCB is **not** a replacement for CritterSupply's long-running orchestration sagas (for example, the Orders saga coordinating Payments, Inventory, and Fulfillment)
-- The best first DCB candidate is **Promotions**, where one redemption decision currently spans both `Coupon` and `Promotion`
+Use the simplest option that matches the business problem:
 
-### Why DCB Matters in CritterSupply
+- **Single aggregate stream, single invariant boundary** → use a normal event-sourced aggregate handler
+- **Multiple event streams inside one bounded context, one immediate decision** → consider DCB
+- **Long-running workflow, cross-BC coordination, retries, external side effects, or delayed completion** → use a saga/process manager
 
-In CritterSupply terms, DCB matters when the traditional event-sourced approach would otherwise force you to:
+DCB is for **one atomic decision inside one BC** when the invariant spans two or more streams. It is not a replacement for CritterSupply's long-running orchestration sagas (e.g., Orders coordinating Payments, Inventory, and Fulfillment).
 
-- split one business fact across two aggregate streams
-- coordinate those writes with a saga or multi-step handler flow
-- emit compensating events to repair an artificial partial success
+### CritterSupply's Canonical Example
 
-That is valuable for cases like **"can this redemption happen now?"** or **"can this approval still be applied right now?"** It is not the right tool for workflows that are naturally long-running, cross-BC, or side-effect heavy.
+**Promotions BC — coupon redemption spanning Coupon + Promotion streams.**
 
-### Recommended DCB Candidates
+**The problem:** Before M40.0, redeeming a coupon required two sequential commands — `RedeemCoupon` (updates the Coupon aggregate) and `RecordPromotionRedemption` (updates the Promotion aggregate). Between those two commands, a race window existed: the coupon could be marked redeemed while the promotion's usage cap was already exceeded, or another concurrent redemption could slip through before the promotion's count was incremented.
 
-#### 1. Promotions — coupon redemption + promotion cap boundary
+**What DCB enforces in one decision:** The `RedeemCouponHandler` loads a `CouponRedemptionState` boundary model that spans both the Coupon stream and the Promotion stream via `EventTagQuery`. In a single atomic operation, it validates:
+- Coupon exists and is in `Issued` status
+- Promotion exists and is in `Active` status
+- Promotion usage cap has not been reached
 
-**Best first candidate.**
+If all invariants pass, `CouponRedeemed` is appended via `IEventBoundary<CouponRedemptionState>`, which enforces cross-stream optimistic concurrency through `AssertDcbConsistency`. If any matching tagged event was appended since the boundary was loaded, Marten throws `DcbConcurrencyException`.
 
-Why it fits:
+**The choreography consequence:** After `CouponRedeemed` is appended, `RecordPromotionRedemptionHandler` reacts to it as a choreography consumer — loading the Promotion aggregate via `FetchForWriting` and appending `PromotionRedemptionRecorded` with proper tags. This keeps the promotion's redemption count eventually consistent without requiring a saga.
 
-- `Coupon` and `Promotion` are separate event-sourced concepts
-- a successful redemption is logically **one fact**, but today's design splits validation between both models
-- the DCB boundary can enforce coupon validity, promotion activity, redemption caps, and future per-customer limits in one decision
+**Where to find the code:**
+- `src/Promotions/Promotions/Coupon/RedeemCouponHandler.cs` — complete DCB handler
+- `src/Promotions/Promotions/Coupon/CouponRedemptionState.cs` — boundary state with `Apply()` methods
+- `src/Promotions/Promotions/CouponStreamId.cs` — tag ID definition pattern
+- `src/Promotions/Promotions/PromotionStreamId.cs` — tag ID definition pattern
+- `src/Promotions/Promotions/Promotion/RecordPromotionRedemptionHandler.cs` — choreography consequence
+- `src/Promotions/Promotions.Api/Program.cs` — tag type registration + retry policies
 
-Relevant repository areas:
+### Implementation Checklist
 
-- `src/Promotions/Promotions/Coupon/`
-- `src/Promotions/Promotions/Promotion/`
-- `src/Promotions/Promotions/OrderIntegration/`
-- `docs/planning/promotions-event-modeling.md`
+Follow these steps when introducing DCB to a new BC. Drawn from the actual implementation in M40.0 S1B.
 
-Why DCB is better than the likely alternative:
+1. **Define strong-typed tag ID records** — one per stream type, `sealed record` with a single `Guid Value` property. Must NOT use raw `Guid` — .NET 10 added `Variant` and `Version` as public instance properties, breaking Marten's `ValueTypeInfo` validation which requires exactly one public instance property.
 
-- avoids a mini-saga or dual-write flow for redemption bookkeeping
-- reduces "coupon was valid, then later lost the race" behavior under concurrency
-- maps closely to the DCB creators' `opt-in-token` and `course-subscriptions` examples
+   ```csharp
+   public sealed record CouponStreamId(Guid Value);
+   public sealed record PromotionStreamId(Guid Value);
+   ```
 
-#### 2. Pricing — approve a vendor price suggestion against current price rules
+2. **Register tag types in `Program.cs`** — one `RegisterTagType<T>()` call per tag ID record, with a table suffix and aggregate binding.
 
-**Strong second candidate.**
+   ```csharp
+   opts.Events.RegisterTagType<CouponStreamId>("coupon").ForAggregate<Coupon>();
+   opts.Events.RegisterTagType<PromotionStreamId>("promotion").ForAggregate<Promotion>();
+   ```
 
-Why it fits:
+3. **Add `DcbConcurrencyException` retry policy** — `DcbConcurrencyException` extends `MartenException`, NOT `JasperFx.ConcurrencyException`. They are siblings, not parent-child. A separate `opts.OnException<DcbConcurrencyException>()` entry is required alongside `ConcurrencyException`.
 
-- the business decision spans a pending `VendorPriceSuggestion` and the authoritative `ProductPrice` stream
-- operators care about one immediate truth: **can this suggestion still be approved right now?**
-- DCB can prevent split outcomes like "suggestion approved but price change rejected"
+   ```csharp
+   opts.OnException<ConcurrencyException>()
+       .RetryWithCooldown(100.Milliseconds(), 250.Milliseconds());
+   opts.OnException<DcbConcurrencyException>()
+       .RetryWithCooldown(100.Milliseconds(), 250.Milliseconds());
+   ```
 
-Relevant repository areas:
+4. **Update every write handler that appends to DCB-managed streams** to tag events explicitly. `[WriteAggregate]`, `IStartStream`, and raw `session.Events.Append(streamId, rawObject)` do NOT populate tag tables.
 
-- `docs/planning/pricing-event-modeling.md`
-- `docs/features/pricing/vendor-price-suggestions.feature`
-- `src/Pricing/Pricing/Products/`
-- `src/Shared/Messages.Contracts/Pricing/VendorPriceSuggestionSubmitted.cs`
+   ```csharp
+   var wrapped = session.Events.BuildEvent(evt);
+   wrapped.AddTag(new CouponStreamId(streamId));
+   session.Events.Append(streamId, wrapped);
+   ```
 
-#### 3. Inventory — reserve all order lines or reserve none
+5. **Define the boundary state class** with `Apply()` methods for all event types from both streams. Include `public Guid Id { get; set; }` — Marten registers boundary models as documents; without `Id`, `DeleteAllDocumentsAsync()` throws during test cleanup.
 
-**Viable, but only after durability/idempotency hardening.**
+6. **Write the DCB handler** with three methods:
+   - `Load()` returning `EventTagQuery` — the fluent query spanning both streams
+   - `Before()` with the boundary state as a plain parameter (no `[BoundaryModel]` attribute)
+   - `Handle()` with `[BoundaryModel] IEventBoundary<TState>` — use `boundary.AppendOne()` for the atomic append with cross-stream concurrency
 
-Why it fits:
+### Gotchas and Non-Obvious Behavior
 
-- one order-level reservation decision may span multiple inventory streams
-- DCB could model **reserve-all-or-fail** without partial reservations and compensating releases
+**`StartStream` does not preserve tags.** When passing a pre-tagged `IEvent` to `StartStream`, Marten re-wraps the object and drops the tags. Use `Append` instead — it correctly preserves pre-wrapped `IEvent` objects. Streams are created implicitly on first append.
 
-Why it is not the first move:
+**`AndEventsOfType` is required, not optional.** Calling `.For(tagValue)` or `.Or(tagValue)` alone creates no query condition. Each tag arm must be followed by `.AndEventsOfType<T1, T2, ...>()`. Without it, `FetchForWritingByTags` throws `ArgumentException` at runtime.
 
-- the current inventory pain is still more about message durability, idempotency, and reservation lifecycle hardening than DCB specifically
-- the Orders saga remains the correct pattern for the broader payment/inventory/fulfillment workflow
+**`[BoundaryModel]` on `Handle()` only.** Adding it to `Before()` as well causes Wolverine codegen error CS0128 (duplicate local variable `eventBoundaryOfCouponRedemptionState` in generated code). `Before()` receives the projected state as a plain parameter automatically.
 
-Relevant repository areas:
+**`DcbConcurrencyException` vs `ConcurrencyException` are separate types.** `DcbConcurrencyException` inherits from `Marten.Exceptions.MartenException`. `ConcurrencyException` is `JasperFx.ConcurrencyException`. Catching one does not catch the other. Add both to the retry policy in `Program.cs`.
 
-- `src/Inventory/Inventory/Management/`
-- `src/Orders/Orders/Placement/`
-- `docs/workflows/inventory-workflows.md`
-- `docs/decisions/0029-order-saga-design-decisions.md`
+**Tag tables are strictly opt-in at write time.** `[WriteAggregate]`, `IStartStream`, and raw `session.Events.Append(streamId, rawObject)` do NOT populate `mt_event_tag_*` tables. Every handler appending to a DCB-managed stream must use `BuildEvent()` + `AddTag()` + `Append()` (or `boundary.AppendOne()` in the DCB handler itself).
 
-#### 4. Product Catalog — family/variant membership after the event-sourcing migration
+**Boundary models need a `Guid Id` property.** Marten treats DCB boundary models as documents. Without an `Id` property, `DeleteAllDocumentsAsync()` throws `InvalidDocumentException` during test cleanup, causing cascading test failures.
 
-**Possible future candidate, but not a priority.**
+### Future DCB Candidates
 
-Why it fits:
-
-- once Product Catalog is event-sourced, some family/variant membership rules may span a family boundary plus one or more variant/product streams
-
-Why it is lower priority:
-
-- Product Catalog is still a Marten document store today
-- the immediate value is getting the event-sourced migration and variant model in place first
-- some family/variant workflows may still be adequately handled without DCB
-
-Relevant repository areas:
-
-- `src/Product Catalog/ProductCatalog/Products/Product.cs`
-- `docs/planning/catalog-listings-marketplaces-evolution-plan.md`
-- `docs/planning/catalog-variant-model.md`
+- **Pricing** — approve a vendor price suggestion against current price rules (one decision spanning `VendorPriceSuggestion` + `ProductPrice` streams)
+- **Inventory** — reserve all order lines or reserve none (one decision spanning multiple inventory streams)
+- **Product Catalog** — family/variant membership rules after the event-sourcing migration
 
 ### Non-Candidates / Guardrails
 
 - **Orders overall** should stay saga-driven; it coordinates long-running cross-BC work and is not a single synchronous decision boundary
-- **single-stream aggregate decisions** should remain normal event-sourced handlers — DCB should earn its complexity
+- **Single-stream aggregate decisions** should remain normal event-sourced handlers — DCB should earn its complexity
 - **BFF/query-only contexts** like Customer Experience are not natural DCB targets because they do not own the underlying invariants
+
+### Reference Files
+
+- `src/Promotions/Promotions/CouponStreamId.cs` — tag ID definition pattern
+- `src/Promotions/Promotions/PromotionStreamId.cs` — tag ID definition pattern
+- `src/Promotions/Promotions/Coupon/CouponRedemptionState.cs` — boundary state
+- `src/Promotions/Promotions/Coupon/RedeemCouponHandler.cs` — complete DCB handler
+- `src/Promotions/Promotions.Api/Program.cs` — tag type registration + retry policies
+- `docs/research/marten-dcb-tagging-mechanics.md` — Marten source analysis
 
 ## Reference
 
