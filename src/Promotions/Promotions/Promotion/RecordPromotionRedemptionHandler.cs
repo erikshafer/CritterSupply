@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Promotions.Coupon;
 using Wolverine;
 using Wolverine.Http;
 using Wolverine.Marten;
@@ -6,21 +7,51 @@ using Wolverine.Marten;
 namespace Promotions.Promotion;
 
 /// <summary>
-/// Handler to record a redemption on the Promotion aggregate.
-/// Enforces usage limit via optimistic concurrency (Marten expected version check).
-/// Phase 1 (M30.0): Command defined but not yet invoked (Shopping BC integration pending).
-/// Phase 2 (M30.1): OrderPlacedHandler will fan out to this command.
+/// Choreography handler: reacts to CouponRedeemed events to record the redemption
+/// on the Promotion aggregate. This was converted from a command handler
+/// (RecordPromotionRedemption) to an event handler (CouponRedeemed) in M40.0
+/// as part of the DCB pattern implementation.
+///
+/// The DCB RedeemCouponHandler has already enforced all invariants (promotion active,
+/// cap not exceeded) before CouponRedeemed was emitted. This handler is a consequence
+/// that updates the count as a result of the committed fact.
+///
+/// [WriteAggregate] resolves the Promotion aggregate by convention from
+/// CouponRedeemed.PromotionId (matches {AggregateName}Id).
 ///
 /// Concurrency Strategy:
-/// Uses Marten's optimistic concurrency via [WriteAggregate] (FetchForWriting under the hood).
-/// If two redemptions arrive simultaneously and UsageLimit is reached,
-/// Marten will throw ConcurrencyException on second commit.
-/// Wolverine's retry policy handles the exception:
-///   - RetryOnce
-///   - Then RetryWithCooldown(100ms, 250ms)
-///   - Then Discard (order proceeds but without promotion discount)
+/// Uses Marten's optimistic concurrency via [WriteAggregate].
+/// The DCB handler prevents the root cause of double-redemption.
+/// This handler only records the count update as a downstream consequence.
 /// </summary>
 public static class RecordPromotionRedemptionHandler
+{
+    /// <summary>
+    /// Choreography: reacts to CouponRedeemed events emitted by the DCB RedeemCouponHandler.
+    /// M40.0: Primary path for recording promotion redemptions.
+    /// </summary>
+    public static Events Handle(
+        CouponRedeemed evt,
+        [WriteAggregate] Promotion promotion)
+    {
+        var events = new Events();
+        events.Add(new PromotionRedemptionRecorded(
+            promotion.Id,
+            evt.OrderId,
+            evt.CustomerId,
+            evt.CouponCode,
+            evt.RedeemedAt));
+        return events;
+    }
+}
+
+/// <summary>
+/// Legacy command handler for RecordPromotionRedemption.
+/// SUPERSEDED (M40.0): The DCB RedeemCouponHandler now emits CouponRedeemed,
+/// and RecordPromotionRedemptionHandler reacts to that event via choreography.
+/// This handler is retained for backward compatibility with existing command invocations.
+/// </summary>
+public static class LegacyRecordPromotionRedemptionHandler
 {
     public static ProblemDetails Before(RecordPromotionRedemption cmd, Promotion? promotion)
     {

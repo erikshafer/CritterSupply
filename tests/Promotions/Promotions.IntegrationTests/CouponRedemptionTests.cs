@@ -7,12 +7,14 @@ using Shouldly;
 namespace Promotions.Api.IntegrationTests;
 
 /// <summary>
-/// Tests for M30.0 coupon redemption workflow:
-/// - RedeemCoupon happy path
-/// - RedeemCoupon double-redemption (optimistic concurrency)
+/// Tests for coupon redemption workflow:
+/// - RedeemCoupon happy path (DCB handler, M40.0)
+/// - RedeemCoupon double-redemption (DCB Before() rejects)
+/// - RedeemCoupon against non-active promotion (DCB Before() rejects)
+/// - RedeemCoupon against promotion at usage cap (DCB Before() rejects)
+/// - RedeemCoupon triggers choreography (PromotionRedemptionRecorded via CouponRedeemed)
 /// - RevokeCoupon for issued/redeemed coupons
-/// - RecordPromotionRedemption usage limit enforcement
-/// - RecordPromotionRedemption optimistic concurrency
+/// - RecordPromotionRedemption legacy command path (kept for backward compatibility)
 /// - GenerateCouponBatch fan-out pattern
 /// - OrderPlacedHandler skeleton (no coupon data yet)
 /// </summary>
@@ -52,6 +54,7 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
 
         var redeemCmd = new RedeemCoupon(
             CouponCode: "REDEEM15",
+            PromotionId: promotion.Id,
             OrderId: Guid.NewGuid(),
             CustomerId: Guid.NewGuid(),
             RedeemedAt: DateTimeOffset.UtcNow);
@@ -98,6 +101,7 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
         // Redeem once
         var firstRedemption = new RedeemCoupon(
             CouponCode: "DOUBLE10",
+            PromotionId: promotion.Id,
             OrderId: Guid.NewGuid(),
             CustomerId: Guid.NewGuid(),
             RedeemedAt: DateTimeOffset.UtcNow);
@@ -107,6 +111,7 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
         // Act: attempt second redemption — Before() returns ProblemDetails, pipeline stops
         var secondRedemption = new RedeemCoupon(
             CouponCode: "DOUBLE10",
+            PromotionId: promotion.Id,
             OrderId: Guid.NewGuid(),
             CustomerId: Guid.NewGuid(),
             RedeemedAt: DateTimeOffset.UtcNow);
@@ -188,6 +193,7 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
         // Redeem first
         var redeemCmd = new RedeemCoupon(
             CouponCode: "REVOKEUSED",
+            PromotionId: promotion.Id,
             OrderId: Guid.NewGuid(),
             CustomerId: Guid.NewGuid(),
             RedeemedAt: DateTimeOffset.UtcNow);
@@ -244,6 +250,11 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
         coupon.Status.ShouldBe(CouponStatus.Revoked);
     }
 
+    /// <summary>
+    /// Legacy command path: RecordPromotionRedemption command still works.
+    /// M40.0: This command is superseded by the DCB choreography pattern,
+    /// but retained for backward compatibility.
+    /// </summary>
     [Fact]
     public async Task RecordPromotionRedemption_WithinUsageLimit_RecordsSuccessfully()
     {
@@ -282,15 +293,20 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
         updated.CurrentRedemptionCount.ShouldBe(1);
     }
 
+    /// <summary>
+    /// DCB boundary test: RedeemCoupon against a promotion that has reached its usage cap.
+    /// The DCB Before() rejects the redemption because the boundary state shows
+    /// CurrentRedemptionCount >= UsageLimit. Coupon stays in Issued status.
+    /// </summary>
     [Fact]
-    public async Task RecordPromotionRedemption_ExceedingUsageLimit_Fails()
+    public async Task RedeemCoupon_WhenPromotionCapExceeded_Fails()
     {
         // Arrange
         await _fixture.CleanAllDataAsync();
 
         var createCmd = new CreatePromotion(
-            Name: "Cap Test Promo",
-            Description: "Test cap enforcement",
+            Name: "DCB Cap Test",
+            Description: "Test DCB cap enforcement",
             DiscountType: DiscountType.PercentageOff,
             DiscountValue: 40m,
             StartDate: DateTimeOffset.UtcNow,
@@ -304,46 +320,43 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
 
         await _fixture.ExecuteAndWaitAsync(new ActivatePromotion(promotion.Id));
 
-        // Record two redemptions (reaching the limit)
-        await _fixture.ExecuteAndWaitAsync(new RecordPromotionRedemption(
-            promotion.Id,
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "CAP40-A",
-            DateTimeOffset.UtcNow));
+        // Issue 3 coupons
+        await _fixture.ExecuteAndWaitAsync(new IssueCoupon("DCBCAP-A", promotion.Id));
+        await _fixture.ExecuteAndWaitAsync(new IssueCoupon("DCBCAP-B", promotion.Id));
+        await _fixture.ExecuteAndWaitAsync(new IssueCoupon("DCBCAP-C", promotion.Id));
 
-        await _fixture.ExecuteAndWaitAsync(new RecordPromotionRedemption(
-            promotion.Id,
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "CAP40-B",
-            DateTimeOffset.UtcNow));
+        // Redeem first two coupons (reaching the limit)
+        await _fixture.ExecuteAndWaitAsync(new RedeemCoupon(
+            "DCBCAP-A", promotion.Id, Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow));
 
-        // Act: attempt third redemption — Before() returns ProblemDetails, pipeline stops
-        var thirdRedemption = new RecordPromotionRedemption(
-            promotion.Id,
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "CAP40-C",
-            DateTimeOffset.UtcNow);
+        await _fixture.ExecuteAndWaitAsync(new RedeemCoupon(
+            "DCBCAP-B", promotion.Id, Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow));
 
-        await _fixture.ExecuteAndWaitAsync(thirdRedemption);
+        // Act: attempt third redemption — DCB Before() rejects (cap exceeded)
+        await _fixture.ExecuteAndWaitAsync(new RedeemCoupon(
+            "DCBCAP-C", promotion.Id, Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow));
 
-        // Assert: promotion should still have only 2 redemptions (third was rejected by Before())
-        var updatedPromotion = await session.Events.AggregateStreamAsync<Promotions.Promotion.Promotion>(promotion.Id);
-        updatedPromotion.ShouldNotBeNull();
-        updatedPromotion.CurrentRedemptionCount.ShouldBe(2);
+        // Assert: third coupon should still be Issued (redemption rejected)
+        var coupon = await session.Events.AggregateStreamAsync<Promotions.Coupon.Coupon>(
+            Promotions.Coupon.Coupon.StreamId("DCBCAP-C"));
+        coupon.ShouldNotBeNull();
+        coupon.Status.ShouldBe(CouponStatus.Issued);
     }
 
+    /// <summary>
+    /// DCB boundary test: RedeemCoupon against a promotion that is not active (Draft).
+    /// The DCB Before() rejects the redemption because the boundary state shows
+    /// PromotionStatus != Active. Coupon stays in Issued status.
+    /// </summary>
     [Fact]
-    public async Task RecordPromotionRedemption_ForDraftPromotion_Fails()
+    public async Task RedeemCoupon_WhenPromotionIsNotActive_Fails()
     {
         // Arrange
         await _fixture.CleanAllDataAsync();
 
         var createCmd = new CreatePromotion(
-            Name: "Draft Promo",
-            Description: "Test",
+            Name: "DCB Draft Test",
+            Description: "Test DCB rejects Draft promotion",
             DiscountType: DiscountType.PercentageOff,
             DiscountValue: 10m,
             StartDate: DateTimeOffset.UtcNow,
@@ -355,23 +368,72 @@ public sealed class CouponRedemptionTests : IClassFixture<TestFixture>
         using var session = _fixture.GetDocumentSession();
         var promotion = (await session.Query<Promotions.Promotion.Promotion>().ToListAsync()).Single();
 
-        // Don't activate - leave in Draft status
+        // Activate to issue coupon, then test against a different draft promotion
+        // Actually: issue coupon on Draft (allowed), don't activate, try to redeem
+        await _fixture.ExecuteAndWaitAsync(new IssueCoupon("DCBDRAFT", promotion.Id));
 
-        var recordCmd = new RecordPromotionRedemption(
-            promotion.Id,
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "DRAFT10",
-            DateTimeOffset.UtcNow);
+        // Don't activate — promotion stays in Draft status
 
-        // Act: attempt redemption on draft promotion — Before() returns ProblemDetails, pipeline stops
-        await _fixture.ExecuteAndWaitAsync(recordCmd);
+        // Act: attempt redemption — DCB Before() rejects (promotion not Active)
+        await _fixture.ExecuteAndWaitAsync(new RedeemCoupon(
+            "DCBDRAFT", promotion.Id, Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow));
 
-        // Assert: promotion should still be Draft with 0 redemptions
+        // Assert: coupon should still be Issued (redemption rejected by DCB)
+        var coupon = await session.Events.AggregateStreamAsync<Promotions.Coupon.Coupon>(
+            Promotions.Coupon.Coupon.StreamId("DCBDRAFT"));
+        coupon.ShouldNotBeNull();
+        coupon.Status.ShouldBe(CouponStatus.Issued);
+
+        // Assert: promotion should still have 0 redemptions
         var updatedPromotion = await session.Events.AggregateStreamAsync<Promotions.Promotion.Promotion>(promotion.Id);
         updatedPromotion.ShouldNotBeNull();
         updatedPromotion.Status.ShouldBe(PromotionStatus.Draft);
         updatedPromotion.CurrentRedemptionCount.ShouldBe(0);
+    }
+
+    /// <summary>
+    /// DCB choreography test: after RedeemCouponHandler (DCB) emits CouponRedeemed,
+    /// RecordPromotionRedemptionHandler reacts via choreography and increments
+    /// the Promotion's CurrentRedemptionCount.
+    /// </summary>
+    [Fact]
+    public async Task RedeemCoupon_CausesPromotionRedemptionRecorded()
+    {
+        // Arrange
+        await _fixture.CleanAllDataAsync();
+
+        var createCmd = new CreatePromotion(
+            Name: "DCB Choreography Test",
+            Description: "Test choreography fires",
+            DiscountType: DiscountType.PercentageOff,
+            DiscountValue: 20m,
+            StartDate: DateTimeOffset.UtcNow,
+            EndDate: DateTimeOffset.UtcNow.AddDays(30),
+            UsageLimit: 10);
+
+        await _fixture.ExecuteAndWaitAsync(createCmd);
+
+        using var session = _fixture.GetDocumentSession();
+        var promotion = (await session.Query<Promotions.Promotion.Promotion>().ToListAsync()).Single();
+
+        await _fixture.ExecuteAndWaitAsync(new ActivatePromotion(promotion.Id));
+        await _fixture.ExecuteAndWaitAsync(new IssueCoupon("DCBCHOR", promotion.Id));
+
+        // Act: redeem coupon via DCB handler
+        await _fixture.ExecuteAndWaitAsync(new RedeemCoupon(
+            "DCBCHOR", promotion.Id, Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow));
+
+        // Assert: coupon is redeemed
+        var coupon = await session.Events.AggregateStreamAsync<Promotions.Coupon.Coupon>(
+            Promotions.Coupon.Coupon.StreamId("DCBCHOR"));
+        coupon.ShouldNotBeNull();
+        coupon.Status.ShouldBe(CouponStatus.Redeemed);
+
+        // Assert: promotion redemption count incremented via choreography
+        // RecordPromotionRedemptionHandler reacts to CouponRedeemed event
+        var updatedPromotion = await session.Events.AggregateStreamAsync<Promotions.Promotion.Promotion>(promotion.Id);
+        updatedPromotion.ShouldNotBeNull();
+        updatedPromotion.CurrentRedemptionCount.ShouldBe(1);
     }
 
     [Fact]

@@ -10,6 +10,10 @@ public sealed class RedeemCouponValidator : AbstractValidator<RedeemCoupon>
             .NotEmpty()
             .WithMessage("Coupon code is required");
 
+        RuleFor(x => x.PromotionId)
+            .NotEmpty()
+            .WithMessage("Promotion ID is required");
+
         RuleFor(x => x.OrderId)
             .NotEmpty()
             .WithMessage("Order ID is required");
