@@ -47,6 +47,12 @@ builder.Services.AddMarten(opts =>
 
         // ShipmentStatusView projection (customer-facing tracking)
         opts.Projections.Add<ShipmentStatusViewProjection>(ProjectionLifecycle.Inline);
+
+        // CarrierPerformanceView projection (carrier metrics)
+        opts.Projections.Add<CarrierPerformanceViewProjection>(ProjectionLifecycle.Inline);
+
+        // MultiShipmentView projection (split orders + reshipments)
+        opts.Projections.Add<MultiShipmentViewProjection>(ProjectionLifecycle.Inline);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()
@@ -119,6 +125,12 @@ builder.Host.UseWolverine(opts =>
     opts.PublishMessage<Messages.Contracts.Fulfillment.BackorderCreated>()
         .ToRabbitQueue("orders-fulfillment-events");
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentLostInTransit>()
+        .ToRabbitQueue("orders-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ReshipmentCreated>()
+        .ToRabbitQueue("orders-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.OrderSplitIntoShipments>()
+        .ToRabbitQueue("orders-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.FulfillmentCancelled>()
         .ToRabbitQueue("orders-fulfillment-events");
 
     // Also publish to Storefront for real-time customer updates

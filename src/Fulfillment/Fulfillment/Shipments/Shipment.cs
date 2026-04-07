@@ -33,7 +33,8 @@ public sealed record Shipment(
     /// </summary>
     public bool IsTerminal => Status is
         ShipmentStatus.Delivered or ShipmentStatus.Cancelled or
-        ShipmentStatus.LostReplacementShipped or ShipmentStatus.ReturnedReshippable;
+        ShipmentStatus.LostReplacementShipped or ShipmentStatus.ReturnedReshippable or
+        ShipmentStatus.ReturnedReplacementShipped or ShipmentStatus.FulfillmentCancelled;
 
     /// <summary>
     /// Creates a deterministic UUID v5 from an OrderId.
@@ -172,4 +173,33 @@ public sealed record Shipment(
         this with { Status = ShipmentStatus.LostInTransit };
 
     public Shipment Apply(CarrierTraceOpened _) => this;
+
+    public Shipment Apply(ReshipmentCreated @event) =>
+        this with
+        {
+            // Terminal state depends on the reason for reshipment
+            Status = @event.Reason switch
+            {
+                "LostInTransit" => ShipmentStatus.LostReplacementShipped,
+                "ReturnReceived" => ShipmentStatus.ReturnedReplacementShipped,
+                _ => ShipmentStatus.LostReplacementShipped // Default for dispute-based reshipments
+            }
+        };
+
+    public Shipment Apply(DeliveryDisputed _) =>
+        this with { Status = ShipmentStatus.DeliveryDisputed };
+
+    public Shipment Apply(CarrierClaimFiled _) => this;
+
+    public Shipment Apply(CarrierClaimResolved _) => this;
+
+    public Shipment Apply(FulfillmentCancelled _) =>
+        this with { Status = ShipmentStatus.FulfillmentCancelled };
+
+    public Shipment Apply(RateDisputeRaised _) => this;
+
+    public Shipment Apply(RateDisputeResolved _) => this;
+
+    public Shipment Apply(ThirdPartyLogisticsHandoff _) =>
+        this with { Status = ShipmentStatus.HandedToThirdParty };
 }

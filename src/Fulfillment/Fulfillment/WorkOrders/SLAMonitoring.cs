@@ -29,7 +29,8 @@ public static class CheckWorkOrderSLAHandler
         if (wo is null) return;
 
         // Only check non-terminal statuses
-        if (wo.Status is WorkOrderStatus.PackingCompleted or WorkOrderStatus.PickExceptionClosed)
+        if (wo.Status is WorkOrderStatus.PackingCompleted or WorkOrderStatus.PickExceptionClosed
+            or WorkOrderStatus.Cancelled)
             return;
 
         var elapsed = clock.UtcNow - wo.CreatedAt;

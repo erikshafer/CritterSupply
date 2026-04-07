@@ -119,3 +119,27 @@ public sealed record SLABreached(
     TimeSpan ElapsedTime,
     TimeSpan SlaWindow,
     DateTimeOffset BreachedAt);
+
+// --- P2 Events ---
+
+/// <summary>Domain event when a work order is cancelled (e.g., fulfillment cancellation).</summary>
+public sealed record WorkOrderCancelled(
+    string Reason,
+    DateTimeOffset CancelledAt);
+
+/// <summary>Domain event when cold pack special handling is applied during packing.</summary>
+public sealed record ColdPackApplied(
+    IReadOnlyList<string> ItemsSkus,
+    string PackType,
+    DateTimeOffset AppliedAt);
+
+/// <summary>Domain event when a hazmat item is flagged in a work order.</summary>
+public sealed record HazmatItemFlagged(
+    string Sku,
+    string HazmatClass,
+    DateTimeOffset FlaggedAt);
+
+/// <summary>Domain event when a hazmat shipping restriction is applied.</summary>
+public sealed record HazmatShippingRestrictionApplied(
+    string RestrictedService,
+    DateTimeOffset AppliedAt);
