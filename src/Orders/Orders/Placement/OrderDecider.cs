@@ -504,9 +504,9 @@ public static class OrderDecider
         Order current,
         FulfillmentMessages.ShipmentHandedToCarrier message)
     {
-        // Idempotency: already Shipped or beyond
+        // Idempotency: already Shipped or in terminal state
         if (current.Status is OrderStatus.Shipped or OrderStatus.Delivered
-            or OrderStatus.Closed or OrderStatus.Reshipping)
+            or OrderStatus.Closed)
             return new OrderDecision();
 
         return new OrderDecision { Status = OrderStatus.Shipped };
