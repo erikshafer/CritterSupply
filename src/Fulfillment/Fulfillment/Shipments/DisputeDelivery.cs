@@ -63,6 +63,6 @@ public static class DisputeDeliveryHandler
         // Cascade to CreateReshipment — same inline invoke approach as
         // PackingCompleted → GenerateShippingLabel (S2 deviation #1)
         await bus.InvokeAsync(
-            new CreateReshipment(command.ShipmentId, "DeliveryDisputed"), ct);
+            new CreateReshipment(command.ShipmentId, ReshipmentReasons.DeliveryDisputed), ct);
     }
 }

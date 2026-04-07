@@ -3,6 +3,16 @@ using System.Security.Cryptography;
 namespace Fulfillment.Shipments;
 
 /// <summary>
+/// Constants for reshipment reason values used in CreateReshipment commands.
+/// </summary>
+public static class ReshipmentReasons
+{
+    public const string LostInTransit = "LostInTransit";
+    public const string ReturnReceived = "ReturnReceived";
+    public const string DeliveryDisputed = "DeliveryDisputed";
+}
+
+/// <summary>
 /// Event-sourced aggregate representing a shipment's routing decision and carrier lifecycle.
 /// Restructured for the Fulfillment BC remaster (ADR 0059).
 /// Holds routing events (FulfillmentRequested, FulfillmentCenterAssigned) and all carrier
@@ -180,8 +190,8 @@ public sealed record Shipment(
             // Terminal state depends on the reason for reshipment
             Status = @event.Reason switch
             {
-                "LostInTransit" => ShipmentStatus.LostReplacementShipped,
-                "ReturnReceived" => ShipmentStatus.ReturnedReplacementShipped,
+                ReshipmentReasons.LostInTransit => ShipmentStatus.LostReplacementShipped,
+                ReshipmentReasons.ReturnReceived => ShipmentStatus.ReturnedReplacementShipped,
                 _ => ShipmentStatus.LostReplacementShipped // Default for dispute-based reshipments
             }
         };

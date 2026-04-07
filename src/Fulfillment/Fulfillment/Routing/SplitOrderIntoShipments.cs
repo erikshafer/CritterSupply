@@ -94,6 +94,7 @@ public static class SplitOrderIntoShipmentsHandler
 
     /// <summary>
     /// Generates a deterministic UUID v5 from (OrderId, SplitIndex).
+    /// Uses SHA1 per the UUID v5 specification (RFC 9562) — this is a non-cryptographic use.
     /// </summary>
     private static Guid GenerateSplitShipmentId(Guid orderId, int splitIndex)
     {

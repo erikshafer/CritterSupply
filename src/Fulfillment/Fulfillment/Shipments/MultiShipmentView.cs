@@ -31,9 +31,9 @@ public sealed class MultiShipmentViewProjection : MultiStreamProjection<MultiShi
     public MultiShipmentViewProjection()
     {
         Identity<FulfillmentRequested>(e => e.OrderId);
-        Identity<TrackingNumberAssigned>(_ => Guid.Empty); // Resolved via ViewProjection below
-        Identity<ShipmentDelivered>(_ => Guid.Empty);
-        Identity<ReshipmentCreated>(_ => Guid.Empty);
+        Identity<TrackingNumberAssigned>(_ => Guid.Empty); // Simplified — does not carry OrderId directly
+        Identity<ShipmentDelivered>(_ => Guid.Empty); // Simplified — does not carry OrderId directly
+        Identity<ReshipmentCreated>(_ => Guid.Empty); // Simplified — does not carry OrderId directly
     }
 
     public MultiShipmentView Create(FulfillmentRequested @event) =>

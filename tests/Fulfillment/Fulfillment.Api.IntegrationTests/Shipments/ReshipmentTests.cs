@@ -114,7 +114,7 @@ public class ReshipmentTests : IAsyncLifetime
         var (shipmentId, orderId) = await CreateLostInTransitShipmentAsync();
 
         var tracked = await _fixture.ExecuteAndWaitAsync(
-            new CreateReshipment(shipmentId, "LostInTransit"));
+            new CreateReshipment(shipmentId, ReshipmentReasons.LostInTransit));
 
         // Original shipment should be in LostReplacementShipped
         await using var session = _fixture.GetDocumentSession();
@@ -148,7 +148,7 @@ public class ReshipmentTests : IAsyncLifetime
         var shipment = await session.Query<Shipment>().FirstAsync(s => s.OrderId == orderId);
 
         // Assigned status — should be rejected
-        await _fixture.ExecuteAndWaitAsync(new CreateReshipment(shipment.Id, "LostInTransit"));
+        await _fixture.ExecuteAndWaitAsync(new CreateReshipment(shipment.Id, ReshipmentReasons.LostInTransit));
 
         await using var session2 = _fixture.GetDocumentSession();
         var unchanged = await session2.LoadAsync<Shipment>(shipment.Id);

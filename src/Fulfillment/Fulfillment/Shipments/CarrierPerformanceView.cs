@@ -27,12 +27,7 @@ public sealed class CarrierPerformanceViewProjection : MultiStreamProjection<Car
     public CarrierPerformanceViewProjection()
     {
         Identity<ShipmentHandedToCarrier>(e => e.Carrier);
-        Identity<GhostShipmentDetected>(e =>
-        {
-            // GhostShipmentDetected doesn't carry Carrier directly — we derive from tracking number prefix
-            // Stub: use "Unknown" as carrier key
-            return "Unknown";
-        });
+        Identity<GhostShipmentDetected>(_ => "Unknown");
         Identity<ShipmentLostInTransit>(e => e.Carrier);
         Identity<CarrierClaimFiled>(e => e.Carrier);
         Identity<CarrierClaimResolved>(_ => "Unknown"); // Will be resolved from the stream
