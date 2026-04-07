@@ -136,9 +136,9 @@ public class CarrierDispatchAndDeliveryTests : IAsyncLifetime
         shipment!.Status.ShouldBe(ShipmentStatus.Staged);
     }
 
-    /// <summary>Slice 12: Carrier pickup confirmation publishes dual messages.</summary>
+    /// <summary>Slice 12: Carrier pickup confirmation publishes ShipmentHandedToCarrier.</summary>
     [Fact]
-    public async Task ConfirmCarrierPickup_Publishes_DualMessages()
+    public async Task ConfirmCarrierPickup_Publishes_ShipmentHandedToCarrier()
     {
         var (shipmentId, orderId) = await CreateLabeledShipmentAsync();
 
@@ -152,15 +152,14 @@ public class CarrierDispatchAndDeliveryTests : IAsyncLifetime
         var shipment = await session.LoadAsync<Shipment>(shipmentId);
         shipment!.Status.ShouldBe(ShipmentStatus.HandedToCarrier);
 
-        // Should publish new ShipmentHandedToCarrier
+        // Should publish ShipmentHandedToCarrier (legacy ShipmentDispatched dual-publish removed in S4)
         var newMsg = tracked.Sent.MessagesOf<IntegrationContracts.ShipmentHandedToCarrier>().ToList();
         newMsg.ShouldNotBeEmpty("ShipmentHandedToCarrier should be published");
         newMsg.First().OrderId.ShouldBe(orderId);
 
-        // MIGRATION: Should also publish legacy ShipmentDispatched
+        // Legacy ShipmentDispatched should no longer be published
         var legacyMsg = tracked.Sent.MessagesOf<IntegrationContracts.ShipmentDispatched>().ToList();
-        legacyMsg.ShouldNotBeEmpty("Legacy ShipmentDispatched should be dual-published");
-        legacyMsg.First().OrderId.ShouldBe(orderId);
+        legacyMsg.ShouldBeEmpty("Legacy ShipmentDispatched should not be published after S4 migration");
     }
 
     /// <summary>Slices 13-15: Carrier webhook events (in-transit → out-for-delivery → delivered).</summary>
