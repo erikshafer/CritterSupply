@@ -110,10 +110,6 @@ builder.Host.UseWolverine(opts =>
     opts.ListenToRabbitQueue("fulfillment-requests").ProcessInline();
 
     // Publish fulfillment integration messages to Orders BC
-    // MIGRATION: ShipmentDispatched dual-published alongside ShipmentHandedToCarrier
-    // Remove ShipmentDispatched after Orders saga gains ShipmentHandedToCarrier handler.
-    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDispatched>()
-        .ToRabbitQueue("orders-fulfillment-events");
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentHandedToCarrier>()
         .ToRabbitQueue("orders-fulfillment-events");
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
@@ -134,8 +130,6 @@ builder.Host.UseWolverine(opts =>
         .ToRabbitQueue("orders-fulfillment-events");
 
     // Also publish to Storefront for real-time customer updates
-    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDispatched>()
-        .ToRabbitQueue("storefront-fulfillment-events");
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentHandedToCarrier>()
         .ToRabbitQueue("storefront-fulfillment-events");
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
@@ -147,8 +141,12 @@ builder.Host.UseWolverine(opts =>
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
         .ToRabbitQueue("returns-fulfillment-events");
 
+    // Publish to Correspondence BC for customer notifications
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ReturnToSenderInitiated>()
+        .ToRabbitQueue("correspondence-fulfillment-events");
+
     // Publish to Backoffice BC for fulfillment pipeline metrics
-    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDispatched>()
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentHandedToCarrier>()
         .ToRabbitQueue("backoffice-shipment-dispatched");
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
         .ToRabbitQueue("backoffice-shipment-delivered");

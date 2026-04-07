@@ -92,10 +92,11 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Integration test: Order transitions to Shipped when ShipmentDispatched received from Fulfillment.
+    /// Integration test: Order transitions to Shipped when ShipmentHandedToCarrier received from Fulfillment.
+    /// (Migrated from ShipmentDispatched in S4)
     /// </summary>
     [Fact]
-    public async Task Order_Transitions_To_Shipped_When_Shipment_Dispatched()
+    public async Task Order_Transitions_To_Shipped_When_Shipment_HandedToCarrier()
     {
         // Arrange: Create order
         var customerId = Guid.NewGuid();
@@ -130,9 +131,9 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         await _fixture.ExecuteAndWaitAsync(new Messages.Contracts.Inventory.ReservationCommitted(
             order.Id, Guid.NewGuid(), reservationId, "SKU-FUL-002", "WH-01", 1, DateTimeOffset.UtcNow));
 
-        // Act: Simulate ShipmentDispatched from Fulfillment BC
+        // Act: Simulate ShipmentHandedToCarrier from Fulfillment BC
         var shipmentId = Guid.NewGuid();
-        await _fixture.ExecuteAndWaitAsync(new ShipmentDispatched(
+        await _fixture.ExecuteAndWaitAsync(new ShipmentHandedToCarrier(
             order.Id,
             shipmentId,
             "FedEx",
@@ -191,7 +192,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
             order.Id, Guid.NewGuid(), reservationId, "SKU-FUL-003", "WH-01", 3, DateTimeOffset.UtcNow));
 
         var shipmentId = Guid.NewGuid();
-        await _fixture.ExecuteAndWaitAsync(new ShipmentDispatched(
+        await _fixture.ExecuteAndWaitAsync(new ShipmentHandedToCarrier(
             order.Id, shipmentId, "UPS", "1Z999AA10123456785", DateTimeOffset.UtcNow));
 
         // Verify order is in Shipped status before delivery
@@ -216,66 +217,6 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
         deliveredOrder.ShouldNotBeNull();
         deliveredOrder.Status.ShouldBe(OrderStatus.Delivered);
         deliveredOrder.TotalAmount.ShouldBe(35.96m); // 29.97 + 5.99 shipping
-    }
-
-    /// <summary>
-    /// Integration test: Order status remains Shipped when delivery fails.
-    /// Validates that delivery failure doesn't cause backward state transition.
-    /// </summary>
-    [Fact]
-    public async Task Order_Remains_Shipped_When_Delivery_Fails()
-    {
-        // Arrange: Create order and get it to Shipped status
-        var customerId = Guid.NewGuid();
-        var cartId = Guid.NewGuid();
-        var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
-            Guid.CreateVersion7(), // OrderId
-            Guid.CreateVersion7(), // CheckoutId
-            customerId,
-            [new CheckoutLineItem("SKU-FUL-004", 1, 49.99m)],
-            new OrdersShippingAddress("321 Pine St", "Apt 5B", "Austin", "TX", "78701", "USA"),
-            "Express",
-            5.99m, // ShippingCost
-            "tok_visa",
-            DateTimeOffset.UtcNow);
-
-        await _fixture.ExecuteAndWaitAsync(checkoutCompleted);
-
-        await using var getSession = _fixture.GetDocumentSession();
-        var order = (await getSession.Query<Order>()
-            .Where(o => o.CustomerId == customerId)
-            .ToListAsync()).FirstOrDefault();
-        order.ShouldNotBeNull();
-
-        // Simulate payment + inventory + dispatch flow
-        await _fixture.ExecuteAndWaitAsync(new Messages.Contracts.Payments.PaymentCaptured(
-            Guid.NewGuid(), order.Id, 49.99m, "txn_xyz789", DateTimeOffset.UtcNow));
-
-        var reservationId = Guid.NewGuid();
-        await _fixture.ExecuteAndWaitAsync(new Messages.Contracts.Inventory.ReservationConfirmed(
-            order.Id, Guid.NewGuid(), reservationId, "SKU-FUL-004", "WH-01", 1, DateTimeOffset.UtcNow));
-
-        await _fixture.ExecuteAndWaitAsync(new Messages.Contracts.Inventory.ReservationCommitted(
-            order.Id, Guid.NewGuid(), reservationId, "SKU-FUL-004", "WH-01", 1, DateTimeOffset.UtcNow));
-
-        var shipmentId = Guid.NewGuid();
-        await _fixture.ExecuteAndWaitAsync(new ShipmentDispatched(
-            order.Id, shipmentId, "USPS", "9400111899562537986459", DateTimeOffset.UtcNow));
-
-        // Act: Simulate delivery failure from Fulfillment BC
-        await _fixture.ExecuteAndWaitAsync(new ShipmentDeliveryFailed(
-            order.Id,
-            shipmentId,
-            "Recipient unavailable - notice left",
-            DateTimeOffset.UtcNow));
-
-        // Assert: Verify order remains in Shipped status
-        await using var session = _fixture.GetDocumentSession();
-        var shippedOrder = await session.LoadAsync<Order>(order.Id);
-        shippedOrder!.Status.ShouldBe(OrderStatus.Shipped);
-        shippedOrder.TotalAmount.ShouldBe(55.98m); // 49.99 + 5.99 shipping
-
-        // Future enhancement: Verify delivery failure metadata is tracked
     }
 
     /// <summary>
@@ -322,7 +263,7 @@ public class FulfillmentIntegrationTests : IAsyncLifetime
             order.Id, Guid.NewGuid(), reservationId, "SKU-FUL-005", "WH-01", 1, DateTimeOffset.UtcNow));
 
         var shipmentId = Guid.NewGuid();
-        await _fixture.ExecuteAndWaitAsync(new ShipmentDispatched(
+        await _fixture.ExecuteAndWaitAsync(new ShipmentHandedToCarrier(
             order.Id, shipmentId, "FedEx", "774899172137", DateTimeOffset.UtcNow));
 
         // Act: Send ShipmentDelivered twice (duplicate)

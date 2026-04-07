@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc;
 using Wolverine;
 using Wolverine.Http;
 using IntegrationMessages = Messages.Contracts.Fulfillment;
-using LegacyMessages = Messages.Contracts.Fulfillment;
 
 namespace Fulfillment.Shipments;
 
@@ -222,7 +221,7 @@ public static class StagePackageHandler
 /// <summary>
 /// Handler for confirming carrier pickup.
 /// Appends CarrierPickupConfirmed and ShipmentHandedToCarrier events.
-/// Publishes ShipmentHandedToCarrier integration event + legacy ShipmentDispatched (dual-publish).
+/// Publishes ShipmentHandedToCarrier integration event.
 /// </summary>
 public static class ConfirmCarrierPickupHandler
 {
@@ -267,15 +266,6 @@ public static class ConfirmCarrierPickupHandler
 
         // Publish new integration event
         await bus.PublishAsync(new IntegrationMessages.ShipmentHandedToCarrier(
-            shipment.OrderId,
-            command.ShipmentId,
-            command.Carrier,
-            shipment.TrackingNumber ?? "",
-            now));
-
-        // MIGRATION: Dual-publish for backward compatibility with Orders saga.
-        // Remove after Orders saga gains ShipmentHandedToCarrier handler.
-        await bus.PublishAsync(new LegacyMessages.ShipmentDispatched(
             shipment.OrderId,
             command.ShipmentId,
             command.Carrier,

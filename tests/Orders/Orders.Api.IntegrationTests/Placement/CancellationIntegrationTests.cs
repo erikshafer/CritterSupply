@@ -121,12 +121,14 @@ public class CancellationIntegrationTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Integration test: Cancellation guard prevents cancelling a shipped order.
+    /// Integration test: Cancellation guard prevents cancelling a delivered order.
+    /// Shipped orders ARE now cancellable (FulfillmentCancelled may arrive pre-handoff),
+    /// but Delivered orders are terminal and cannot be cancelled.
     /// </summary>
     [Fact]
-    public async Task Order_Cannot_Be_Cancelled_After_Shipped()
+    public async Task Order_Cannot_Be_Cancelled_After_Delivered()
     {
-        // Arrange: Create an order and get it to Shipped status
+        // Arrange: Create an order and get it to Delivered status
         var customerId = Guid.NewGuid();
         var checkoutCompleted = TestFixture.CreateCheckoutCompletedMessage(
             Guid.CreateVersion7(),
@@ -146,7 +148,7 @@ public class CancellationIntegrationTests : IAsyncLifetime
             .Where(o => o.CustomerId == customerId)
             .SingleAsync();
 
-        // Simulate full flow to Shipped
+        // Simulate full flow to Delivered
         await _fixture.ExecuteAndWaitAsync(new PaymentCaptured(
             Guid.NewGuid(), order.Id, 55.98m, "txn_nocancel", DateTimeOffset.UtcNow));
 
@@ -157,25 +159,27 @@ public class CancellationIntegrationTests : IAsyncLifetime
         await _fixture.ExecuteAndWaitAsync(new ReservationCommitted(
             order.Id, Guid.NewGuid(), reservationId, "SKU-NOCANCEL-001", "WH-01", 1, DateTimeOffset.UtcNow));
 
-        await _fixture.ExecuteAndWaitAsync(new Messages.Contracts.Fulfillment.ShipmentDispatched(
+        await _fixture.ExecuteAndWaitAsync(new Messages.Contracts.Fulfillment.ShipmentHandedToCarrier(
             order.Id, Guid.NewGuid(), "FedEx", "TRACKING_NUM", DateTimeOffset.UtcNow));
 
-        // Verify the order is Shipped
-        await using var shippedSession = _fixture.GetDocumentSession();
-        var shippedOrder = await shippedSession.LoadAsync<Order>(order.Id);
-        shippedOrder!.Status.ShouldBe(OrderStatus.Shipped);
+        // Deliver the order
+        await _fixture.ExecuteAndWaitAsync(new Messages.Contracts.Fulfillment.ShipmentDelivered(
+            order.Id, Guid.NewGuid(), DateTimeOffset.UtcNow, "John Doe"));
+
+        // Verify the order is Delivered
+        await using var deliveredSession = _fixture.GetDocumentSession();
+        var deliveredOrder = await deliveredSession.LoadAsync<Order>(order.Id);
+        deliveredOrder!.Status.ShouldBe(OrderStatus.Delivered);
 
         // Act: Attempt to cancel — saga handler silently ignores invalid state transitions.
-        // The HTTP endpoint would return 409, but here we test saga-level idempotency by
-        // publishing the command directly (bypassing the HTTP layer).
         await _fixture.ExecuteAndWaitAsync(new CancelOrder(order.Id, "Too late to cancel"));
 
-        // Assert: Order status is still Shipped (cancellation was rejected)
+        // Assert: Order status is still Delivered (cancellation was rejected)
         await using var session = _fixture.GetDocumentSession();
         var unchangedOrder = await session.LoadAsync<Order>(order.Id);
 
         unchangedOrder.ShouldNotBeNull();
-        unchangedOrder.Status.ShouldBe(OrderStatus.Shipped);
+        unchangedOrder.Status.ShouldBe(OrderStatus.Delivered);
     }
 
     /// <summary>

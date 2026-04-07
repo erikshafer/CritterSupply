@@ -6,9 +6,14 @@ namespace Orders.UnitTests.Placement;
 /// <summary>
 /// Unit tests for shipment-related <see cref="OrderDecider"/> methods:
 /// <list type="bullet">
-///   <item><see cref="OrderDecider.HandleShipmentDispatched"/></item>
+///   <item><see cref="OrderDecider.HandleShipmentHandedToCarrier"/></item>
 ///   <item><see cref="OrderDecider.HandleShipmentDelivered"/></item>
-///   <item><see cref="OrderDecider.HandleShipmentDeliveryFailed"/></item>
+///   <item><see cref="OrderDecider.HandleTrackingNumberAssigned"/></item>
+///   <item><see cref="OrderDecider.HandleReturnToSenderInitiated"/></item>
+///   <item><see cref="OrderDecider.HandleReshipmentCreated"/></item>
+///   <item><see cref="OrderDecider.HandleBackorderCreated"/></item>
+///   <item><see cref="OrderDecider.HandleFulfillmentCancelled"/></item>
+///   <item><see cref="OrderDecider.HandleOrderSplitIntoShipments"/></item>
 /// </list>
 /// Note: <see cref="ReturnWindowExpired"/> scheduling is performed by the saga handler using
 /// <c>OutgoingMessages.Delay()</c> and is therefore tested via integration tests, not unit tests.
@@ -34,7 +39,7 @@ public class OrderDeciderFulfillmentTests
         };
     }
 
-    private static FulfillmentContracts.ShipmentDispatched BuildDispatched(Guid? orderId = null) =>
+    private static FulfillmentContracts.ShipmentHandedToCarrier BuildHandedToCarrier(Guid? orderId = null) =>
         new(orderId ?? Guid.NewGuid(),
             Guid.NewGuid(),
             "FedEx",
@@ -49,38 +54,69 @@ public class OrderDeciderFulfillmentTests
             DateTimeOffset.UtcNow,
             recipientName);
 
-    private static FulfillmentContracts.ShipmentDeliveryFailed BuildDeliveryFailed(
+    private static FulfillmentContracts.TrackingNumberAssigned BuildTrackingNumberAssigned(
         Guid? orderId = null,
-        string reason = "Address not found") =>
+        string trackingNumber = "1Z999AA10123456784") =>
         new(orderId ?? Guid.NewGuid(),
             Guid.NewGuid(),
-            reason,
+            trackingNumber,
+            "UPS",
+            DateTimeOffset.UtcNow);
+
+    private static FulfillmentContracts.ReturnToSenderInitiated BuildReturnToSender(Guid? orderId = null) =>
+        new(orderId ?? Guid.NewGuid(),
+            Guid.NewGuid(),
+            "FedEx",
+            3,
+            7,
             DateTimeOffset.UtcNow);
 
     // ===========================================================================
-    // HandleShipmentDispatched
+    // HandleShipmentHandedToCarrier
     // ===========================================================================
 
-    /// <summary>HandleShipmentDispatched must set Status to Shipped.</summary>
+    /// <summary>HandleShipmentHandedToCarrier must set Status to Shipped.</summary>
     [Fact]
-    public void HandleShipmentDispatched_SetsStatus_ToShipped()
+    public void HandleShipmentHandedToCarrier_SetsStatus_ToShipped()
     {
         var order = BuildOrder(OrderStatus.Fulfilling);
 
-        var decision = OrderDecider.HandleShipmentDispatched(order, BuildDispatched(order.Id));
+        var decision = OrderDecider.HandleShipmentHandedToCarrier(order, BuildHandedToCarrier(order.Id));
 
         decision.Status.ShouldBe(OrderStatus.Shipped);
     }
 
-    /// <summary>HandleShipmentDispatched must emit no messages (pure status transition).</summary>
+    /// <summary>HandleShipmentHandedToCarrier must emit no messages (pure status transition).</summary>
     [Fact]
-    public void HandleShipmentDispatched_EmitsNoMessages()
+    public void HandleShipmentHandedToCarrier_EmitsNoMessages()
     {
         var order = BuildOrder(OrderStatus.Fulfilling);
 
-        var decision = OrderDecider.HandleShipmentDispatched(order, BuildDispatched(order.Id));
+        var decision = OrderDecider.HandleShipmentHandedToCarrier(order, BuildHandedToCarrier(order.Id));
 
         decision.Messages.ShouldBeEmpty();
+    }
+
+    /// <summary>HandleShipmentHandedToCarrier is idempotent when already Shipped.</summary>
+    [Fact]
+    public void HandleShipmentHandedToCarrier_AlreadyShipped_ReturnsNoOp()
+    {
+        var order = BuildOrder(OrderStatus.Shipped);
+
+        var decision = OrderDecider.HandleShipmentHandedToCarrier(order, BuildHandedToCarrier(order.Id));
+
+        decision.Status.ShouldBeNull();
+    }
+
+    /// <summary>HandleShipmentHandedToCarrier transitions from Reshipping to Shipped (reshipment dispatched).</summary>
+    [Fact]
+    public void HandleShipmentHandedToCarrier_FromReshipping_TransitionsToShipped()
+    {
+        var order = BuildOrder(OrderStatus.Reshipping);
+
+        var decision = OrderDecider.HandleShipmentHandedToCarrier(order, BuildHandedToCarrier(order.Id));
+
+        decision.Status.ShouldBe(OrderStatus.Shipped);
     }
 
     // ===========================================================================
@@ -137,58 +173,151 @@ public class OrderDeciderFulfillmentTests
     }
 
     // ===========================================================================
-    // HandleShipmentDeliveryFailed
+    // HandleTrackingNumberAssigned
     // ===========================================================================
 
-    /// <summary>
-    /// HandleShipmentDeliveryFailed must not change order status.
-    /// The order remains Shipped so the carrier can retry delivery.
-    /// </summary>
+    /// <summary>HandleTrackingNumberAssigned stores tracking number with no status change.</summary>
     [Fact]
-    public void HandleShipmentDeliveryFailed_DoesNotChangeStatus()
+    public void HandleTrackingNumberAssigned_StoresTrackingNumber()
+    {
+        var order = BuildOrder(OrderStatus.Fulfilling);
+
+        var decision = OrderDecider.HandleTrackingNumberAssigned(
+            order, BuildTrackingNumberAssigned(order.Id, "1Z999BB20456789012"));
+
+        decision.TrackingNumber.ShouldBe("1Z999BB20456789012");
+        decision.Status.ShouldBeNull();
+    }
+
+    // ===========================================================================
+    // HandleReturnToSenderInitiated
+    // ===========================================================================
+
+    /// <summary>HandleReturnToSenderInitiated transitions from Shipped to DeliveryFailed.</summary>
+    [Fact]
+    public void HandleReturnToSenderInitiated_SetsStatus_ToDeliveryFailed()
     {
         var order = BuildOrder(OrderStatus.Shipped);
 
-        var decision = OrderDecider.HandleShipmentDeliveryFailed(order, BuildDeliveryFailed(order.Id));
+        var decision = OrderDecider.HandleReturnToSenderInitiated(order, BuildReturnToSender(order.Id));
+
+        decision.Status.ShouldBe(OrderStatus.DeliveryFailed);
+    }
+
+    /// <summary>HandleReturnToSenderInitiated is idempotent when already DeliveryFailed.</summary>
+    [Fact]
+    public void HandleReturnToSenderInitiated_AlreadyDeliveryFailed_ReturnsNoOp()
+    {
+        var order = BuildOrder(OrderStatus.DeliveryFailed);
+
+        var decision = OrderDecider.HandleReturnToSenderInitiated(order, BuildReturnToSender(order.Id));
 
         decision.Status.ShouldBeNull();
     }
 
-    /// <summary>HandleShipmentDeliveryFailed must emit no messages.</summary>
+    // ===========================================================================
+    // HandleReshipmentCreated
+    // ===========================================================================
+
+    /// <summary>HandleReshipmentCreated transitions to Reshipping and sets the new shipment ID.</summary>
     [Fact]
-    public void HandleShipmentDeliveryFailed_EmitsNoMessages()
+    public void HandleReshipmentCreated_SetsStatus_ToReshipping()
     {
-        var order = BuildOrder(OrderStatus.Shipped);
+        var order = BuildOrder(OrderStatus.DeliveryFailed);
+        var newShipmentId = Guid.NewGuid();
 
-        var decision = OrderDecider.HandleShipmentDeliveryFailed(order, BuildDeliveryFailed(order.Id));
+        var decision = OrderDecider.HandleReshipmentCreated(order,
+            new FulfillmentContracts.ReshipmentCreated(order.Id, Guid.NewGuid(), newShipmentId, "Reship", DateTimeOffset.UtcNow));
 
-        decision.Messages.ShouldBeEmpty();
+        decision.Status.ShouldBe(OrderStatus.Reshipping);
+        decision.ActiveReshipmentShipmentId.ShouldBe(newShipmentId);
     }
 
-    /// <summary>HandleShipmentDeliveryFailed must not signal saga completion.</summary>
+    // ===========================================================================
+    // HandleBackorderCreated
+    // ===========================================================================
+
+    /// <summary>HandleBackorderCreated transitions to Backordered.</summary>
     [Fact]
-    public void HandleShipmentDeliveryFailed_DoesNotSignalCompletion()
+    public void HandleBackorderCreated_SetsStatus_ToBackordered()
     {
-        var order = BuildOrder(OrderStatus.Shipped);
+        var order = BuildOrder(OrderStatus.Fulfilling);
 
-        var decision = OrderDecider.HandleShipmentDeliveryFailed(order, BuildDeliveryFailed());
+        var decision = OrderDecider.HandleBackorderCreated(order,
+            new FulfillmentContracts.BackorderCreated(order.Id, Guid.NewGuid(), "No stock", DateTimeOffset.UtcNow));
 
-        decision.ShouldComplete.ShouldBeFalse();
+        decision.Status.ShouldBe(OrderStatus.Backordered);
     }
 
-    /// <summary>Delivery failures for different reasons must all return empty decisions.</summary>
+    // ===========================================================================
+    // HandleFulfillmentCancelled
+    // ===========================================================================
+
+    /// <summary>HandleFulfillmentCancelled cancels order and triggers refund when payment captured.</summary>
+    [Fact]
+    public void HandleFulfillmentCancelled_WithPayment_TriggersRefund()
+    {
+        var order = BuildOrder(OrderStatus.Fulfilling);
+        order.IsPaymentCaptured = true;
+        order.TotalAmount = 100.00m;
+
+        var decision = OrderDecider.HandleFulfillmentCancelled(order,
+            new FulfillmentContracts.FulfillmentCancelled(order.Id, Guid.NewGuid(), "FC closed", DateTimeOffset.UtcNow),
+            DateTimeOffset.UtcNow);
+
+        decision.Status.ShouldBe(OrderStatus.Cancelled);
+        decision.Messages.ShouldContain(m => m is Messages.Contracts.Payments.RefundRequested);
+        decision.Messages.ShouldContain(m => m is Messages.Contracts.Orders.OrderCancelled);
+    }
+
+    /// <summary>HandleFulfillmentCancelled does not trigger refund when payment not captured.</summary>
+    [Fact]
+    public void HandleFulfillmentCancelled_WithoutPayment_NoRefund()
+    {
+        var order = BuildOrder(OrderStatus.Fulfilling);
+        order.IsPaymentCaptured = false;
+
+        var decision = OrderDecider.HandleFulfillmentCancelled(order,
+            new FulfillmentContracts.FulfillmentCancelled(order.Id, Guid.NewGuid(), "FC closed", DateTimeOffset.UtcNow),
+            DateTimeOffset.UtcNow);
+
+        decision.Status.ShouldBe(OrderStatus.Cancelled);
+        decision.Messages.ShouldNotContain(m => m is Messages.Contracts.Payments.RefundRequested);
+        decision.Messages.ShouldContain(m => m is Messages.Contracts.Orders.OrderCancelled);
+    }
+
+    /// <summary>HandleFulfillmentCancelled is a no-op for terminal states.</summary>
     [Theory]
-    [InlineData("Address not found")]
-    [InlineData("Recipient unavailable")]
-    [InlineData("Access denied")]
-    public void HandleShipmentDeliveryFailed_VariousReasons_AlwaysReturnsNoOp(string reason)
+    [InlineData(OrderStatus.Delivered)]
+    [InlineData(OrderStatus.Closed)]
+    [InlineData(OrderStatus.Cancelled)]
+    public void HandleFulfillmentCancelled_TerminalState_ReturnsNoOp(OrderStatus status)
     {
-        var order = BuildOrder(OrderStatus.Shipped);
+        var order = BuildOrder(status);
 
-        var decision = OrderDecider.HandleShipmentDeliveryFailed(order, BuildDeliveryFailed(reason: reason));
+        var decision = OrderDecider.HandleFulfillmentCancelled(order,
+            new FulfillmentContracts.FulfillmentCancelled(order.Id, Guid.NewGuid(), "FC closed", DateTimeOffset.UtcNow),
+            DateTimeOffset.UtcNow);
 
         decision.Status.ShouldBeNull();
         decision.Messages.ShouldBeEmpty();
+    }
+
+    // ===========================================================================
+    // HandleOrderSplitIntoShipments
+    // ===========================================================================
+
+    /// <summary>HandleOrderSplitIntoShipments stores shipment count with no status change.</summary>
+    [Fact]
+    public void HandleOrderSplitIntoShipments_StoresShipmentCount()
+    {
+        var order = BuildOrder(OrderStatus.Fulfilling);
+
+        var decision = OrderDecider.HandleOrderSplitIntoShipments(order,
+            new FulfillmentContracts.OrderSplitIntoShipments(order.Id, 3, DateTimeOffset.UtcNow));
+
+        decision.ShipmentCount.ShouldBe(3);
+        decision.Status.ShouldBeNull();
     }
 
     // ===========================================================================

@@ -34,7 +34,7 @@ Owns commercial commitment — the checkout aggregate and the order lifecycle sa
 | Shopping | ← receives | Checkout handoff |
 | Payments | ↔ bidirectional | Requests payment; receives capture/failure/refund results |
 | Inventory | ↔ bidirectional | Requests reservation; receives confirmation/failure |
-| Fulfillment | ↔ bidirectional | Requests fulfillment; receives shipment/delivery updates |
+| Fulfillment | ↔ bidirectional | Requests fulfillment; receives `ShipmentHandedToCarrier`, `TrackingNumberAssigned`, `ShipmentDelivered`, `ReturnToSenderInitiated`, `ReshipmentCreated`, `BackorderCreated`, `FulfillmentCancelled`, `OrderSplitIntoShipments` |
 | Returns | ← receives | Return approval, completion, and rejection outcomes |
 | Customer Identity | → queries | Address snapshots at checkout completion |
 | Correspondence | → publishes | Order lifecycle events consumed for transactional emails |
@@ -80,11 +80,12 @@ Manages physical order fulfillment — warehouse routing, pick, pack, ship, carr
 
 | Communicates with | Direction | Notes |
 |---|---|---|
-| Orders | ↔ bidirectional | Receives fulfillment requests; publishes `ShipmentHandedToCarrier`, `TrackingNumberAssigned`, `DeliveryAttemptFailed`, `ShipmentDelivered`, `ReturnToSenderInitiated`, `ReshipmentCreated` |
+| Orders | ↔ bidirectional | Receives fulfillment requests; publishes `ShipmentHandedToCarrier`, `TrackingNumberAssigned`, `DeliveryAttemptFailed`, `ShipmentDelivered`, `ReturnToSenderInitiated`, `ReshipmentCreated`, `BackorderCreated`, `FulfillmentCancelled`, `OrderSplitIntoShipments` |
 | Inventory | ↔ bidirectional | Queries stock availability for routing; publishes `ItemPicked` for bin reconciliation, stock adjustment on carrier handoff |
 | Returns | ↔ bidirectional | Receives approved returns; publishes when return shipment arrives |
+| Correspondence | → publishes | Publishes `ReturnToSenderInitiated` for customer delivery failure notification |
 
-**Constraint:** Multi-warehouse routing modeled in remaster ([ADR 0059](docs/decisions/0059-fulfillment-bc-remaster-rationale.md)) — implementation pending. Current code has single FC stub. Integration contracts pending remaster implementation: `ShipmentDispatched` → `ShipmentHandedToCarrier`, `ShipmentDeliveryFailed` → `ReturnToSenderInitiated`.
+**Constraint:** Multi-warehouse routing modeled in remaster ([ADR 0059](docs/decisions/0059-fulfillment-bc-remaster-rationale.md)) — implementation pending. Current code has single FC stub. Legacy `ShipmentDispatched` and `ShipmentDeliveryFailed` contracts retired in M41.0 S4; replaced by `ShipmentHandedToCarrier` and `ReturnToSenderInitiated`.
 
 ---
 
@@ -241,7 +242,7 @@ Owns transactional customer communication — email and SMS messages triggered b
 | Communicates with | Direction | Notes |
 |---|---|---|
 | Orders | ← receives | OrderPlaced for order confirmations |
-| Fulfillment | ← receives | ShipmentDispatched, ShipmentDelivered, ShipmentDeliveryFailed for tracking and delivery notifications |
+| Fulfillment | ← receives | `ShipmentDispatched`, `ShipmentDelivered`, `ReturnToSenderInitiated` for tracking and delivery notifications. Note: `ShipmentDeliveryFailed` retired in M41.0 S4; replaced by `ReturnToSenderInitiated`. |
 | Returns | ← receives | ReturnApproved, ReturnDenied, ReturnCompleted, ReturnExpired for return workflow updates |
 | Payments | ← receives | RefundCompleted for refund confirmations |
 | Customer Identity | → queries | Customer email, phone, notification preferences (Phase 2+) |

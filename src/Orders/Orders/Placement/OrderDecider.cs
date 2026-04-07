@@ -91,13 +91,14 @@ public static class OrderDecider
     /// <summary>
     /// Returns true if the order is in a state that allows cancellation.
     /// Used by the HTTP endpoint for pre-flight validation and by the saga handler for idempotency.
-    /// Orders in self-compensating terminal states (OutOfStock, PaymentFailed) are excluded to
-    /// prevent duplicate compensation messages (e.g., double RefundRequested).
+    /// Orders in terminal states are excluded to prevent duplicate compensation messages.
+    /// Note: Shipped is cancellable since FulfillmentCancelled won't fire post-carrier-handoff,
+    /// and DeliveryFailed/Reshipping/Backordered are cancellable as fulfillment has not succeeded.
     /// </summary>
     public static bool CanBeCancelled(OrderStatus status) =>
-        status is not (OrderStatus.Shipped or OrderStatus.Delivered
-            or OrderStatus.Closed or OrderStatus.Cancelled
-            or OrderStatus.OutOfStock or OrderStatus.PaymentFailed);
+        status is not (OrderStatus.Delivered or OrderStatus.Closed
+            or OrderStatus.Cancelled or OrderStatus.OutOfStock
+            or OrderStatus.PaymentFailed);
 
     /// <summary>
     /// Decides how to handle an order cancellation request.
@@ -453,20 +454,6 @@ public static class OrderDecider
     }
 
     /// <summary>
-    /// Decides how to handle shipment dispatch.
-    /// Pure function - returns new state.
-    /// </summary>
-    public static OrderDecision HandleShipmentDispatched(
-        Order current,
-        FulfillmentMessages.ShipmentDispatched message)
-    {
-        return new OrderDecision
-        {
-            Status = OrderStatus.Shipped
-        };
-    }
-
-    /// <summary>
     /// Decides how to handle shipment delivery.
     /// Transitions to Delivered. The saga remains open after delivery to allow returns;
     /// the ReturnWindowExpired message is scheduled by the saga handler via OutgoingMessages.Delay().
@@ -484,15 +471,130 @@ public static class OrderDecider
     }
 
     /// <summary>
-    /// Decides how to handle shipment delivery failure.
-    /// Pure function - maintains Shipped status (carrier will retry delivery).
+    /// Decides how to handle carrier custody transfer (replaces ShipmentDispatched).
+    /// Pure function - transitions to Shipped when carrier takes possession.
     /// </summary>
-    public static OrderDecision HandleShipmentDeliveryFailed(
+    public static OrderDecision HandleShipmentHandedToCarrier(
         Order current,
-        FulfillmentMessages.ShipmentDeliveryFailed message)
+        FulfillmentMessages.ShipmentHandedToCarrier message)
     {
-        // Order remains in Shipped status - carrier retries delivery
-        return new OrderDecision();
+        // Idempotency: already Shipped or in terminal state
+        if (current.Status is OrderStatus.Shipped or OrderStatus.Delivered
+            or OrderStatus.Closed)
+            return new OrderDecision();
+
+        return new OrderDecision { Status = OrderStatus.Shipped };
+    }
+
+    /// <summary>
+    /// Decides how to handle tracking number assignment.
+    /// Pure function - stores tracking number, no status change.
+    /// </summary>
+    public static OrderDecision HandleTrackingNumberAssigned(
+        Order current,
+        FulfillmentMessages.TrackingNumberAssigned message)
+    {
+        return new OrderDecision { TrackingNumber = message.TrackingNumber };
+    }
+
+    /// <summary>
+    /// Decides how to handle return-to-sender initiation.
+    /// All delivery attempts exhausted; carrier returning package.
+    /// Transitions to DeliveryFailed. Saga stays open for potential reshipment.
+    /// </summary>
+    public static OrderDecision HandleReturnToSenderInitiated(
+        Order current,
+        FulfillmentMessages.ReturnToSenderInitiated message)
+    {
+        // Idempotency: already in DeliveryFailed or beyond
+        if (current.Status is OrderStatus.DeliveryFailed or OrderStatus.Reshipping
+            or OrderStatus.Closed or OrderStatus.Cancelled)
+            return new OrderDecision();
+
+        return new OrderDecision { Status = OrderStatus.DeliveryFailed };
+    }
+
+    /// <summary>
+    /// Decides how to handle reshipment creation.
+    /// A replacement shipment has been created. Transitions to Reshipping.
+    /// </summary>
+    public static OrderDecision HandleReshipmentCreated(
+        Order current,
+        FulfillmentMessages.ReshipmentCreated message)
+    {
+        return new OrderDecision
+        {
+            Status = OrderStatus.Reshipping,
+            ActiveReshipmentShipmentId = message.NewShipmentId
+        };
+    }
+
+    /// <summary>
+    /// Decides how to handle backorder creation.
+    /// Stock unavailable at all FCs. Fulfillment paused pending replenishment.
+    /// </summary>
+    public static OrderDecision HandleBackorderCreated(
+        Order current,
+        FulfillmentMessages.BackorderCreated message)
+    {
+        return new OrderDecision { Status = OrderStatus.Backordered };
+    }
+
+    /// <summary>
+    /// Decides how to handle fulfillment cancellation.
+    /// Triggers compensation: refund if payment captured, release inventory.
+    /// </summary>
+    public static OrderDecision HandleFulfillmentCancelled(
+        Order current,
+        FulfillmentMessages.FulfillmentCancelled message,
+        DateTimeOffset timestamp)
+    {
+        // Guard: only cancel if not already in a terminal state
+        if (!CanBeCancelled(current.Status))
+            return new OrderDecision();
+
+        var messages = new List<object>();
+
+        if (current.IsPaymentCaptured)
+        {
+            messages.Add(new Messages.Contracts.Payments.RefundRequested(
+                current.Id,
+                current.TotalAmount,
+                $"Fulfillment cancelled: {message.Reason}",
+                timestamp));
+        }
+
+        foreach (var reservationId in current.ReservationIds.Keys)
+        {
+            messages.Add(new IntegrationMessages.ReservationReleaseRequested(
+                current.Id,
+                reservationId,
+                $"Fulfillment cancelled: {message.Reason}",
+                timestamp));
+        }
+
+        messages.Add(new IntegrationMessages.OrderCancelled(
+            current.Id,
+            current.CustomerId,
+            $"Fulfillment cancelled: {message.Reason}",
+            timestamp));
+
+        return new OrderDecision
+        {
+            Status = OrderStatus.Cancelled,
+            Messages = messages
+        };
+    }
+
+    /// <summary>
+    /// Decides how to handle order split notification.
+    /// Informational — stores shipment count for customer-facing display.
+    /// </summary>
+    public static OrderDecision HandleOrderSplitIntoShipments(
+        Order current,
+        FulfillmentMessages.OrderSplitIntoShipments message)
+    {
+        return new OrderDecision { ShipmentCount = message.ShipmentCount };
     }
 }
 
@@ -510,4 +612,7 @@ public sealed record OrderDecision
     public HashSet<Guid>? CommittedReservationIds { get; init; }
     public bool ShouldComplete { get; init; }
     public IReadOnlyList<object> Messages { get; init; } = [];
+    public string? TrackingNumber { get; init; }
+    public Guid? ActiveReshipmentShipmentId { get; init; }
+    public int? ShipmentCount { get; init; }
 }
