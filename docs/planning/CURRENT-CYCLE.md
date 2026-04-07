@@ -41,36 +41,39 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | None — M41.0 S2 complete |
-| **Status** | ✅ **Complete** |
+| **Current Milestone** | M41.0 — Fulfillment BC Remaster: S3 (P2 Slices 30–39 + test improvements) |
+| **Status** | 🟢 **IN PROGRESS** |
 | **Recent Completion** | M41.0 S2 — Fulfillment BC Remaster P1 complete: 14 slices, 51 integration + 40 unit tests (2026-04-06) |
 | **Previous Completion** | M41.0 S1 — Fulfillment BC Remaster P0 complete: 15 slices, 2 aggregates, 50 tests, PR #530 (2026-04-06) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-06 (M41.0 S2 complete)*
+*Last Updated: 2026-04-07 (M41.0 S3 in progress)*
 
 ---
 
 ## Active Milestone
 
-### M41.0: Fulfillment BC Remaster — S2 (P1 Slices 16–29 + Debt Clearance)
+### M41.0: Fulfillment BC Remaster — S3 (P2 Slices 30–39 + Test Improvements)
 
-**Status:** ✅ **Complete**
-**Start Date:** 2026-04-06
+**Status:** 🟢 **In Progress**
 **ADR:** [0059 — Fulfillment BC Remaster Rationale](../decisions/0059-fulfillment-bc-remaster-rationale.md)
-**Event Modeling:** [Fulfillment Remaster Slices](../planning/fulfillment-remaster-slices.md)
-**PR (S1):** https://github.com/erikshafer/CritterSupply/pull/530 ✅ Merged
+**Slice Table:** [Fulfillment Remaster Slices](../planning/fulfillment-remaster-slices.md)
 
-**Key Deliverables — S2:**
-- **Debt clearance:** `WorkOrderHandlers.cs` split into 6 vertical slice files (ReleaseWave, AssignPickList, StartPicking, RecordItemPick, StartPacking, VerifyItemAtPack)
-- **Deferred S1 items:** HTTP endpoint `POST /api/fulfillment/carrier-webhook`, `PackingCompleted → GenerateShippingLabel` cascading policy
-- **P1 Slices 16–29:** All 14 failure mode handlers implemented with integration + unit tests
-- **New aggregate features:** WorkOrderStatus.ShortPickPending, PackDiscrepancyPending, PickExceptionClosed; ShipmentStatus.Rerouted, Backordered, LabelGenerationFailed, GhostShipmentInvestigation, AllAttemptsExhausted, LostInTransit
-- **Integration events:** BackorderCreated, ShipmentLostInTransit contracts added
-- **Final counts:** Build 0 errors/19 warnings, Fulfillment integration 51, Fulfillment unit 40, Orders 48 (unchanged)
+**Goal:** Improve test coverage for three P1 slices with time/stub dependencies, then
+implement all P2 compensation and advanced slices (reshipment, delivery dispute, multi-FC
+split order, carrier claims, cancellation, special handling, rate disputes, 3PL handoff).
+
+**Key Deliverables — S3:**
+- `ICarrierLabelService` + `ISystemClock` injectable abstractions for time/failure tests
+- Integration tests for Slices 22, 26, 29 (previously unit-test-only or untestable)
+- Slices 30–39: all P2 compensation and advanced flows
+- Two new projections: `CarrierPerformanceView`, `MultiShipmentView`
+- New integration contracts: `ReshipmentCreated`, `OrderSplitIntoShipments`, `FulfillmentCancelled`
+- Orders saga update deferred to S4
 
 **S1 Retrospective:** [S1](./milestones/fulfillment-remaster-s1-retrospective.md)
 **S2 Retrospective:** [S2](./milestones/fulfillment-remaster-s2-retrospective.md)
+**S3 Retrospective:** TBD
 
 ## Recent Completions
 
