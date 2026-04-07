@@ -274,6 +274,20 @@ Recommended additional output:
 These don't need to be fully designed during the event modeling session, but surfacing them
 prevents the S1 implementation prompt from needing to re-open design questions.
 
+**Migration Closure (mandatory when integration contracts are retired):**
+
+Any session that retires integration contracts must be followed by a closure step that:
+1. Runs `grep -r "RetiredEventName" src/` to find all consumers of the retired contract
+2. Classifies each as: **active** (needs migration) or **dead** (publisher removed)
+3. Migrates or removes all dead handlers before the milestone closes
+4. Adds Correspondence notifications for any new domain events that represent
+   customer-meaningful moments (delivery failures, backorders, lost shipments, etc.)
+5. Updates projections and BFF views to consume the new event surface
+
+This can be a separate closure session (as in the Fulfillment Remaster S5) or a track within
+the retirement session itself. The key is that no milestone closes with dead handlers — they
+compile but serve no purpose and confuse future maintainers.
+
 ### Step 5: Iterate on This Skill
 
 After each remaster, add a version history entry to this skill file documenting what
@@ -303,5 +317,6 @@ Related skills to load alongside this one:
 |---|---|---|
 | 0.1 | 2026-04-06 | Initial version — extracted from Fulfillment Remaster prompt |
 | 0.2 | 2026-04-06 | Post-Fulfillment event modeling session — added: feature files as domain input, scope complexity signals, standard questions (notification ownership, multi-aggregate coordination, P3 deferral, cross-BC test gate), severity ratings for gap register, Implementation Pre-Decisions output |
+| 0.3 | 2026-04-07 | Post-Fulfillment Remaster (M41.0 S1–S5) — added: dead handler cleanup as a mandatory closure step (Track A pattern); Correspondence enrichment as a standard follow-on to contract migration; Migration Closure Pattern section in Step 4; noted that HazmatPolicy inline invocation is the established pattern when Wolverine cascading doesn't work with session.Events.Append() workflows |
 
-*Next update planned after Fulfillment BC Remaster implementation (S1) completes.*
+*Next update planned after Inventory BC Remaster event modeling session completes.*
