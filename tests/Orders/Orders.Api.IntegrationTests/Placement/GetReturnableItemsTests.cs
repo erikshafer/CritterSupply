@@ -73,7 +73,7 @@ public class GetReturnableItemsTests : IAsyncLifetime
 
         // Shipped
         var shipmentId = Guid.NewGuid();
-        await _fixture.ExecuteAndWaitAsync(new ShipmentDispatched(
+        await _fixture.ExecuteAndWaitAsync(new ShipmentHandedToCarrier(
             order.Id, shipmentId, "FedEx", "FEDEX-RET-001", DateTimeOffset.UtcNow));
 
         // Delivered

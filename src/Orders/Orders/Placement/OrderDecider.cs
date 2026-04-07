@@ -454,20 +454,6 @@ public static class OrderDecider
     }
 
     /// <summary>
-    /// Decides how to handle shipment dispatch.
-    /// Pure function - returns new state.
-    /// </summary>
-    public static OrderDecision HandleShipmentDispatched(
-        Order current,
-        FulfillmentMessages.ShipmentDispatched message)
-    {
-        return new OrderDecision
-        {
-            Status = OrderStatus.Shipped
-        };
-    }
-
-    /// <summary>
     /// Decides how to handle shipment delivery.
     /// Transitions to Delivered. The saga remains open after delivery to allow returns;
     /// the ReturnWindowExpired message is scheduled by the saga handler via OutgoingMessages.Delay().
@@ -482,18 +468,6 @@ public static class OrderDecider
             // Note: ReturnWindowExpired is scheduled in the saga handler using OutgoingMessages.Delay()
             // to keep the Decider free of infrastructure concerns (scheduling duration, delivery mechanism).
         };
-    }
-
-    /// <summary>
-    /// Decides how to handle shipment delivery failure.
-    /// Pure function - maintains Shipped status (carrier will retry delivery).
-    /// </summary>
-    public static OrderDecision HandleShipmentDeliveryFailed(
-        Order current,
-        FulfillmentMessages.ShipmentDeliveryFailed message)
-    {
-        // Order remains in Shipped status - carrier retries delivery
-        return new OrderDecision();
     }
 
     /// <summary>

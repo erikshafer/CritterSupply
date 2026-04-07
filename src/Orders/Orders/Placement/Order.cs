@@ -346,19 +346,6 @@ public sealed class Order : Saga
     }
 
     /// <summary>
-    /// Saga handler for shipment dispatch from Fulfillment BC.
-    /// Transitions order to Shipped status when carrier takes possession.
-    /// **Validates: Requirement 3.2 - Order status reflects shipment progress**
-    /// </summary>
-    /// <param name="message">Shipment dispatched integration message from Fulfillment BC.</param>
-    public void Handle(FulfillmentMessages.ShipmentDispatched message)
-    {
-        var decision = OrderDecider.HandleShipmentDispatched(this, message);
-
-        if (decision.Status.HasValue) Status = decision.Status.Value;
-    }
-
-    /// <summary>
     /// Saga handler for successful delivery from Fulfillment BC.
     /// Transitions order to Delivered status and schedules a ReturnWindowExpired message.
     /// The saga remains open during the return window to handle potential return requests.
@@ -388,19 +375,6 @@ public sealed class Order : Saga
         outgoing.Delay(new ReturnWindowExpired(Id), OrderDecider.ReturnWindowDuration);
 
         return outgoing;
-    }
-
-    /// <summary>
-    /// Saga handler for delivery failure from Fulfillment BC.
-    /// Tracks delivery issues - order remains in Shipped status (carrier will retry).
-    /// **Validates: Requirement 3.4 - Order tracks delivery failures**
-    /// </summary>
-    /// <param name="message">Shipment delivery failed integration message from Fulfillment BC.</param>
-    public void Handle(FulfillmentMessages.ShipmentDeliveryFailed message)
-    {
-        var decision = OrderDecider.HandleShipmentDeliveryFailed(this, message);
-
-        if (decision.Status.HasValue) Status = decision.Status.Value;
     }
 
     /// <summary>

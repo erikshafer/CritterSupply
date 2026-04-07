@@ -52,6 +52,10 @@ public class OrderDeciderCancellationTests
     [InlineData(OrderStatus.InventoryCommitted)]
     [InlineData(OrderStatus.OnHold)]
     [InlineData(OrderStatus.Fulfilling)]
+    [InlineData(OrderStatus.Shipped)]
+    [InlineData(OrderStatus.DeliveryFailed)]
+    [InlineData(OrderStatus.Reshipping)]
+    [InlineData(OrderStatus.Backordered)]
     public void CanBeCancelled_ReturnsTrue_ForCancellableStatuses(OrderStatus status)
     {
         OrderDecider.CanBeCancelled(status).ShouldBeTrue();
@@ -62,7 +66,6 @@ public class OrderDeciderCancellationTests
     // ---------------------------------------------------------------------------
 
     [Theory]
-    [InlineData(OrderStatus.Shipped)]
     [InlineData(OrderStatus.Delivered)]
     [InlineData(OrderStatus.Closed)]
     [InlineData(OrderStatus.Cancelled)]

@@ -112,7 +112,9 @@ builder.Host.UseWolverine(opts =>
     opts.PublishMessage<Messages.Contracts.Fulfillment.FulfillmentRequested>()
         .ToRabbitQueue("fulfillment-requests");
 
-    // Listen for Fulfillment BC integration messages (ShipmentDispatched, ShipmentDelivered, ShipmentDeliveryFailed)
+    // Listen for Fulfillment BC integration messages (ShipmentHandedToCarrier, TrackingNumberAssigned,
+    // ShipmentDelivered, ReturnToSenderInitiated, ReshipmentCreated, BackorderCreated,
+    // FulfillmentCancelled, OrderSplitIntoShipments)
     opts.ListenToRabbitQueue("orders-fulfillment-events")
         .ProcessInline();
 

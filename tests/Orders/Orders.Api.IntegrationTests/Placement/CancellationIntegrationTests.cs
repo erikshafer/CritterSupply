@@ -159,7 +159,7 @@ public class CancellationIntegrationTests : IAsyncLifetime
         await _fixture.ExecuteAndWaitAsync(new ReservationCommitted(
             order.Id, Guid.NewGuid(), reservationId, "SKU-NOCANCEL-001", "WH-01", 1, DateTimeOffset.UtcNow));
 
-        await _fixture.ExecuteAndWaitAsync(new Messages.Contracts.Fulfillment.ShipmentDispatched(
+        await _fixture.ExecuteAndWaitAsync(new Messages.Contracts.Fulfillment.ShipmentHandedToCarrier(
             order.Id, Guid.NewGuid(), "FedEx", "TRACKING_NUM", DateTimeOffset.UtcNow));
 
         // Deliver the order
