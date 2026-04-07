@@ -10,6 +10,7 @@ namespace Backoffice.AlertManagement;
 /// Multi-stream projection aggregating alert events from multiple BCs.
 /// Each integration message creates a separate AlertFeedView document.
 /// Inline lifecycle ensures zero-lag visibility for operations dashboard.
+/// Updated in M41.0 S5 to consume new Fulfillment event surface.
 /// </summary>
 public sealed class AlertFeedViewProjection : MultiStreamProjection<AlertFeedView, Guid>
 {
@@ -17,7 +18,9 @@ public sealed class AlertFeedViewProjection : MultiStreamProjection<AlertFeedVie
     {
         // Map each integration message type to its own document (stream ID)
         Identity<LowStockDetected>(x => Guid.NewGuid()); // Generate new ID for each low stock alert
-        Identity<ShipmentDeliveryFailed>(x => Guid.NewGuid()); // Generate new ID for each delivery failure
+        Identity<ReturnToSenderInitiated>(x => Guid.NewGuid()); // Replaces ShipmentDeliveryFailed
+        Identity<GhostShipmentDetected>(x => Guid.NewGuid()); // Ghost shipment — no scan after handoff
+        Identity<ShipmentLostInTransit>(x => Guid.NewGuid()); // Shipment lost in transit
         Identity<PaymentFailed>(x => Guid.NewGuid()); // Generate new ID for each payment failure
         Identity<ReturnExpired>(x => Guid.NewGuid()); // Generate new ID for each return expiration
     }
@@ -47,24 +50,75 @@ public sealed class AlertFeedViewProjection : MultiStreamProjection<AlertFeedVie
     }
 
     /// <summary>
-    /// Create alert from ShipmentDeliveryFailed integration message.
+    /// Create alert from ReturnToSenderInitiated integration message.
     /// Severity: Critical (customer impact, requires immediate attention).
+    /// Replaces ShipmentDeliveryFailed handler (retired in M41.0 S5).
     /// </summary>
-    public AlertFeedView Create(ShipmentDeliveryFailed evt)
+    public AlertFeedView Create(ReturnToSenderInitiated evt)
     {
         return new AlertFeedView
         {
             Id = Guid.NewGuid(),
             AlertType = AlertType.DeliveryFailed,
             Severity = AlertSeverity.Critical,
-            CreatedAt = evt.FailedAt,
+            CreatedAt = evt.InitiatedAt,
             OrderId = evt.OrderId,
-            Message = $"Delivery failed for order {evt.OrderId}: {evt.Reason}",
+            Message = $"Return-to-sender initiated for order {evt.OrderId} after {evt.TotalAttempts} delivery attempt(s) via {evt.Carrier}",
             ContextData = System.Text.Json.JsonSerializer.Serialize(new
             {
                 evt.OrderId,
                 evt.ShipmentId,
-                evt.Reason
+                evt.Carrier,
+                evt.TotalAttempts,
+                evt.EstimatedReturnDays
+            })
+        };
+    }
+
+    /// <summary>
+    /// Create alert from GhostShipmentDetected integration message.
+    /// Severity: Critical (no carrier scan detected — shipment may be lost at handoff).
+    /// </summary>
+    public AlertFeedView Create(GhostShipmentDetected evt)
+    {
+        return new AlertFeedView
+        {
+            Id = Guid.NewGuid(),
+            AlertType = AlertType.GhostShipment,
+            Severity = AlertSeverity.Critical,
+            CreatedAt = evt.DetectedAt,
+            OrderId = evt.OrderId,
+            Message = $"Ghost shipment detected: tracking {evt.TrackingNumber} has no carrier scan after {evt.TimeSinceHandoff.TotalHours:F0}h",
+            ContextData = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                evt.OrderId,
+                evt.ShipmentId,
+                evt.TrackingNumber,
+                TimeSinceHandoffHours = evt.TimeSinceHandoff.TotalHours
+            })
+        };
+    }
+
+    /// <summary>
+    /// Create alert from ShipmentLostInTransit integration message.
+    /// Severity: Critical (customer impact — triggers automatic reshipment per policy).
+    /// </summary>
+    public AlertFeedView Create(ShipmentLostInTransit evt)
+    {
+        return new AlertFeedView
+        {
+            Id = Guid.NewGuid(),
+            AlertType = AlertType.ShipmentLost,
+            Severity = AlertSeverity.Critical,
+            CreatedAt = evt.DetectedAt,
+            OrderId = evt.OrderId,
+            Message = $"Shipment lost in transit for order {evt.OrderId} via {evt.Carrier} — no scan for {evt.TimeSinceHandoff.TotalDays:F0} days",
+            ContextData = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                evt.OrderId,
+                evt.ShipmentId,
+                evt.Carrier,
+                TimeSinceHandoffDays = evt.TimeSinceHandoff.TotalDays
             })
         };
     }

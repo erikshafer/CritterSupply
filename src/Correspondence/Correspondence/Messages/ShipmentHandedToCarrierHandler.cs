@@ -6,20 +6,17 @@ using Wolverine.Marten;
 namespace Correspondence.Messages;
 
 /// <summary>
-/// Handles ShipmentDispatched integration events to send tracking emails.
-/// Choreography pattern: subscribes to ShipmentDispatched, creates Message aggregate, publishes CorrespondenceQueued.
+/// Handles ShipmentHandedToCarrier integration events to send tracking emails.
+/// Choreography pattern: subscribes to ShipmentHandedToCarrier, creates Message aggregate, publishes CorrespondenceQueued.
+/// Replaces ShipmentDispatchedHandler (retired in M41.0 S5).
 /// </summary>
-public static class ShipmentDispatchedHandler
+public static class ShipmentHandedToCarrierHandler
 {
-    public static (IStartStream, OutgoingMessages) Handle(ShipmentDispatched @event)
+    public static (IStartStream, OutgoingMessages) Handle(ShipmentHandedToCarrier @event)
     {
         // TODO: Query Orders BC to get CustomerId for this OrderId
         // For Phase 1, we'll use a placeholder. Phase 2 will add cross-BC queries.
         var customerId = Guid.Empty; // Placeholder - will be queried from Orders API
-
-        // TODO: Query Customer Identity BC for customer preferences
-        // For now, assume customer has email notifications enabled
-        var customerEmail = "customer@example.com"; // Will be populated from CustomerIdentity query
 
         // Template rendering will be enhanced in Phase 2
         var subject = $"Your order has shipped - Tracking #{@event.TrackingNumber}";

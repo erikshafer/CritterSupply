@@ -136,20 +136,44 @@ builder.Host.UseWolverine(opts =>
         .ToRabbitQueue("storefront-fulfillment-events");
     opts.PublishMessage<Messages.Contracts.Fulfillment.TrackingNumberAssigned>()
         .ToRabbitQueue("storefront-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ReturnToSenderInitiated>()
+        .ToRabbitQueue("storefront-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.DeliveryAttemptFailed>()
+        .ToRabbitQueue("storefront-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.BackorderCreated>()
+        .ToRabbitQueue("storefront-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentLostInTransit>()
+        .ToRabbitQueue("storefront-fulfillment-events");
 
     // Publish to Returns BC for return eligibility window establishment
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
         .ToRabbitQueue("returns-fulfillment-events");
 
     // Publish to Correspondence BC for customer notifications
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentHandedToCarrier>()
+        .ToRabbitQueue("correspondence-fulfillment-events");
     opts.PublishMessage<Messages.Contracts.Fulfillment.ReturnToSenderInitiated>()
         .ToRabbitQueue("correspondence-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.DeliveryAttemptFailed>()
+        .ToRabbitQueue("correspondence-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.BackorderCreated>()
+        .ToRabbitQueue("correspondence-fulfillment-events");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentLostInTransit>()
+        .ToRabbitQueue("correspondence-fulfillment-events");
 
-    // Publish to Backoffice BC for fulfillment pipeline metrics
+    // Publish to Backoffice BC for fulfillment pipeline metrics and alerts
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentHandedToCarrier>()
         .ToRabbitQueue("backoffice-shipment-dispatched");
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentDelivered>()
         .ToRabbitQueue("backoffice-shipment-delivered");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ReturnToSenderInitiated>()
+        .ToRabbitQueue("backoffice-shipment-delivery-failed");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.BackorderCreated>()
+        .ToRabbitQueue("backoffice-fulfillment-alerts");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentLostInTransit>()
+        .ToRabbitQueue("backoffice-fulfillment-alerts");
+    opts.PublishMessage<Messages.Contracts.Fulfillment.GhostShipmentDetected>()
+        .ToRabbitQueue("backoffice-fulfillment-alerts");
 });
 
 builder.Services.AddEndpointsApiExplorer();

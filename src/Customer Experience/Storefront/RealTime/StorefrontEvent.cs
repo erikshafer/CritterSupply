@@ -11,7 +11,6 @@ namespace Storefront.RealTime;
 [JsonDerivedType(typeof(CartUpdated), typeDiscriminator: "cart-updated")]
 [JsonDerivedType(typeof(OrderStatusChanged), typeDiscriminator: "order-status-changed")]
 [JsonDerivedType(typeof(ShipmentStatusChanged), typeDiscriminator: "shipment-status-changed")]
-[JsonDerivedType(typeof(ShipmentDeliveryFailed), typeDiscriminator: "shipment-delivery-failed")]
 [JsonDerivedType(typeof(ReturnStatusChanged), typeDiscriminator: "return-status-changed")]
 public abstract record StorefrontEvent(DateTimeOffset OccurredAt);
 
@@ -43,16 +42,6 @@ public sealed record ShipmentStatusChanged(
     Guid CustomerId,
     string NewStatus,
     string? TrackingNumber,
-    DateTimeOffset OccurredAt) : StorefrontEvent(OccurredAt), IStorefrontWebSocketMessage;
-
-/// <summary>
-/// Shipment delivery failed (address issue, recipient unavailable, etc.).
-/// </summary>
-public sealed record ShipmentDeliveryFailed(
-    Guid ShipmentId,
-    Guid OrderId,
-    Guid CustomerId,
-    string Reason,
     DateTimeOffset OccurredAt) : StorefrontEvent(OccurredAt), IStorefrontWebSocketMessage;
 
 /// <summary>

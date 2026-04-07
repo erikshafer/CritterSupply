@@ -229,10 +229,11 @@ builder.Host.UseWolverine(opts =>
     // Subscribe to Inventory BC events for alerts
     opts.ListenToRabbitQueue("backoffice-low-stock-detected").ProcessInline();
 
-    // Subscribe to Fulfillment BC events for alerts and pipeline metrics (M33.0 Session 2)
-    opts.ListenToRabbitQueue("backoffice-shipment-dispatched").ProcessInline();
+    // Subscribe to Fulfillment BC events for alerts and pipeline metrics (M41.0 S5: migrated to new event surface)
+    opts.ListenToRabbitQueue("backoffice-shipment-dispatched").ProcessInline(); // Receives ShipmentHandedToCarrier
     opts.ListenToRabbitQueue("backoffice-shipment-delivered").ProcessInline();
-    opts.ListenToRabbitQueue("backoffice-shipment-delivery-failed").ProcessInline();
+    opts.ListenToRabbitQueue("backoffice-shipment-delivery-failed").ProcessInline(); // Receives ReturnToSenderInitiated
+    opts.ListenToRabbitQueue("backoffice-fulfillment-alerts").ProcessInline(); // BackorderCreated, ShipmentLostInTransit, GhostShipmentDetected
 
     // Subscribe to Returns BC events for alerts and metrics
     opts.ListenToRabbitQueue("backoffice-return-expired").ProcessInline();

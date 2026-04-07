@@ -214,32 +214,35 @@ public class EventDrivenProjectionTests
     }
 
     /// <summary>
-    /// Tests ShipmentDeliveryFailed event creates alert for operations team.
-    /// ShipmentDeliveryFailed (Fulfillment BC) → AlertFeedViewProjection → AlertFeedView.
+    /// Tests ReturnToSenderInitiated event creates alert for operations team.
+    /// ReturnToSenderInitiated (Fulfillment BC) → AlertFeedViewProjection → AlertFeedView.
+    /// Replaces ShipmentDeliveryFailed test (retired in M41.0 S5).
     /// </summary>
     [Fact]
-    public async Task ShipmentDeliveryFailedEvent_CreatesAlert_ForOperationsTeam()
+    public async Task ReturnToSenderInitiatedEvent_CreatesAlert_ForOperationsTeam()
     {
         // Arrange
         await _fixture.CleanAllDocumentsAsync();
 
         var orderId = Guid.NewGuid();
         var shipmentId = Guid.NewGuid();
-        var failedAt = new DateTimeOffset(2026, 3, 16, 13, 0, 0, TimeSpan.Zero);
-        var deliveryFailed = new ShipmentDeliveryFailed(
-            orderId, // OrderId (parameter 1)
-            shipmentId, // ShipmentId (parameter 2)
-            "Address not found",
-            failedAt);
+        var initiatedAt = new DateTimeOffset(2026, 3, 16, 13, 0, 0, TimeSpan.Zero);
+        var returnToSender = new ReturnToSenderInitiated(
+            orderId,
+            shipmentId,
+            "UPS",
+            3,
+            7,
+            initiatedAt);
 
         // Act: Append event
         using (var session = _fixture.GetDocumentSession())
         {
-            session.Events.Append(Guid.NewGuid(), deliveryFailed);
+            session.Events.Append(Guid.NewGuid(), returnToSender);
             await session.SaveChangesAsync();
         }
 
-        // Assert: Query alert (ShipmentDeliveryFailed becomes DeliveryFailed in AlertType enum)
+        // Assert: Query alert (ReturnToSenderInitiated becomes DeliveryFailed in AlertType enum)
         using (var session = _fixture.GetDocumentSession())
         {
             var alerts = await session.Query<AlertFeedView>()
@@ -249,7 +252,7 @@ public class EventDrivenProjectionTests
             alerts.ShouldNotBeEmpty();
             var alert = alerts.First();
             alert.Severity.ShouldBe(AlertSeverity.Critical);
-            alert.Message.ShouldContain("Address not found");
+            alert.Message.ShouldContain("UPS");
         }
     }
 
@@ -650,26 +653,26 @@ public class EventDrivenProjectionTests
     // ====================================================================================
 
     [Fact]
-    public async Task ShipmentDispatchedEvent_IncrementsInTransitCount_InPipelineView()
+    public async Task ShipmentHandedToCarrierEvent_IncrementsInTransitCount_InPipelineView()
     {
         // Arrange
         await _fixture.CleanAllDocumentsAsync();
 
         var orderId = Guid.NewGuid();
         var shipmentId = Guid.NewGuid();
-        var dispatchedAt = new DateTimeOffset(2026, 3, 21, 14, 0, 0, TimeSpan.Zero);
+        var handedAt = new DateTimeOffset(2026, 3, 21, 14, 0, 0, TimeSpan.Zero);
 
-        var shipmentDispatched = new ShipmentDispatched(
+        var shipmentHandedToCarrier = new ShipmentHandedToCarrier(
             orderId,
             shipmentId,
             "FedEx",
             "1234567890",
-            dispatchedAt);
+            handedAt);
 
         // Act: Append event to Marten (simulates RabbitMQ handler)
         using (var session = _fixture.GetDocumentSession())
         {
-            session.Events.Append(Guid.NewGuid(), shipmentDispatched);
+            session.Events.Append(Guid.NewGuid(), shipmentHandedToCarrier);
             await session.SaveChangesAsync();
         }
 
@@ -685,7 +688,7 @@ public class EventDrivenProjectionTests
     }
 
     /// <summary>
-    /// Test full shipment lifecycle: dispatched → delivered (success path) and dispatched → failed (failure path)
+    /// Test full shipment lifecycle: handed to carrier → delivered (success path) and handed to carrier → return-to-sender (failure path)
     /// </summary>
     [Fact]
     public async Task ShipmentLifecycle_UpdatesPipelineCorrectly_ForSuccessAndFailurePaths()
@@ -699,20 +702,20 @@ public class EventDrivenProjectionTests
         var failureShipmentId = Guid.NewGuid();
         var baseTime = new DateTimeOffset(2026, 3, 21, 14, 0, 0, TimeSpan.Zero);
 
-        var dispatchedSuccess = new ShipmentDispatched(successOrderId, successShipmentId, "FedEx", "1111111111", baseTime);
-        var dispatchedFailure = new ShipmentDispatched(failureOrderId, failureShipmentId, "UPS", "2222222222", baseTime.AddMinutes(5));
+        var handedToCarrierSuccess = new ShipmentHandedToCarrier(successOrderId, successShipmentId, "FedEx", "1111111111", baseTime);
+        var handedToCarrierFailure = new ShipmentHandedToCarrier(failureOrderId, failureShipmentId, "UPS", "2222222222", baseTime.AddMinutes(5));
         var delivered = new ShipmentDelivered(successOrderId, successShipmentId, baseTime.AddDays(2), "John Doe");
-        var failed = new ShipmentDeliveryFailed(failureOrderId, failureShipmentId, "Address not found", baseTime.AddDays(3));
+        var returnToSender = new ReturnToSenderInitiated(failureOrderId, failureShipmentId, "UPS", 3, 7, baseTime.AddDays(3));
 
-        // Act: Dispatch two shipments
+        // Act: Hand two shipments to carrier
         using (var session = _fixture.GetDocumentSession())
         {
-            session.Events.Append(Guid.NewGuid(), dispatchedSuccess);
-            session.Events.Append(Guid.NewGuid(), dispatchedFailure);
+            session.Events.Append(Guid.NewGuid(), handedToCarrierSuccess);
+            session.Events.Append(Guid.NewGuid(), handedToCarrierFailure);
             await session.SaveChangesAsync();
         }
 
-        // After dispatching: in-transit=2
+        // After carrier handoff: in-transit=2
         using (var session = _fixture.GetDocumentSession())
         {
             var pipeline = await session.LoadAsync<FulfillmentPipelineView>("current");
@@ -735,14 +738,14 @@ public class EventDrivenProjectionTests
             pipeline.ShipmentsDelivered.ShouldBeGreaterThanOrEqualTo(1);
         }
 
-        // Fail second shipment (failure path)
+        // Return-to-sender for second shipment (failure path)
         using (var session = _fixture.GetDocumentSession())
         {
-            session.Events.Append(Guid.NewGuid(), failed);
+            session.Events.Append(Guid.NewGuid(), returnToSender);
             await session.SaveChangesAsync();
         }
 
-        // After failure: in-transit decreased again, delivery failures increased
+        // After return-to-sender: in-transit decreased again, delivery failures increased
         using (var session = _fixture.GetDocumentSession())
         {
             var pipeline = await session.LoadAsync<FulfillmentPipelineView>("current");
