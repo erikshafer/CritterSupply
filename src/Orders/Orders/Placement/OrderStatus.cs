@@ -45,5 +45,23 @@ public enum OrderStatus
     Cancelled,
 
     /// <summary>Terminal state — return window expired or return fully resolved.</summary>
-    Closed
+    Closed,
+
+    /// <summary>
+    /// All delivery attempts exhausted; carrier is returning package to sender.
+    /// Order may transition to Reshipping if a reshipment is created.
+    /// </summary>
+    DeliveryFailed,
+
+    /// <summary>
+    /// A reshipment has been created; new fulfillment is in progress.
+    /// Order will return to Shipped when the replacement shipment is handed to carrier.
+    /// </summary>
+    Reshipping,
+
+    /// <summary>
+    /// Fulfillment is waiting for stock replenishment. A reshipment or
+    /// cancellation with refund may follow.
+    /// </summary>
+    Backordered
 }

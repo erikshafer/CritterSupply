@@ -130,6 +130,23 @@ public sealed class Order : Saga
     /// </summary>
     public DateTimeOffset? DeliveredAt { get; set; }
 
+    /// <summary>
+    /// Tracking number assigned by Fulfillment BC once a shipping label is generated.
+    /// </summary>
+    public string? TrackingNumber { get; set; }
+
+    /// <summary>
+    /// Number of shipments this order has been split into (multi-FC split orders).
+    /// Populated when OrderSplitIntoShipments is received.
+    /// </summary>
+    public int ShipmentCount { get; set; } = 1;
+
+    /// <summary>
+    /// The shipment ID of the active reshipment (if any).
+    /// Set when ReshipmentCreated is received.
+    /// </summary>
+    public Guid? ActiveReshipmentShipmentId { get; set; }
+
     // NOTE: Saga initialization is performed in PlaceOrderHandler.cs, which constructs the initial
     // Order state and corresponding OrderPlaced event and returns them as a tuple (Order, OrderPlaced)
     // to start the saga. This keeps the saga class focused on state transitions, not initialization logic.
@@ -384,6 +401,99 @@ public sealed class Order : Saga
         var decision = OrderDecider.HandleShipmentDeliveryFailed(this, message);
 
         if (decision.Status.HasValue) Status = decision.Status.Value;
+    }
+
+    /// <summary>
+    /// Saga handler for carrier custody transfer from Fulfillment BC.
+    /// Replaces legacy ShipmentDispatched — transitions order to Shipped.
+    /// </summary>
+    public void Handle(FulfillmentMessages.ShipmentHandedToCarrier message)
+    {
+        var decision = OrderDecider.HandleShipmentHandedToCarrier(this, message);
+
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+    }
+
+    /// <summary>
+    /// Saga handler for tracking number assignment from Fulfillment BC.
+    /// Stores the tracking number on the saga for customer-facing queries.
+    /// </summary>
+    public void Handle(FulfillmentMessages.TrackingNumberAssigned message)
+    {
+        var decision = OrderDecider.HandleTrackingNumberAssigned(this, message);
+
+        if (decision.TrackingNumber != null) TrackingNumber = decision.TrackingNumber;
+    }
+
+    /// <summary>
+    /// Saga handler for return-to-sender from Fulfillment BC.
+    /// All delivery attempts exhausted; carrier returning package. Order transitions to DeliveryFailed.
+    /// </summary>
+    public void Handle(FulfillmentMessages.ReturnToSenderInitiated message)
+    {
+        var decision = OrderDecider.HandleReturnToSenderInitiated(this, message);
+
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+    }
+
+    /// <summary>
+    /// Saga handler for reshipment creation from Fulfillment BC.
+    /// A replacement shipment has been created. Transitions order to Reshipping.
+    /// </summary>
+    public void Handle(FulfillmentMessages.ReshipmentCreated message)
+    {
+        var decision = OrderDecider.HandleReshipmentCreated(this, message);
+
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+        if (decision.ActiveReshipmentShipmentId.HasValue)
+            ActiveReshipmentShipmentId = decision.ActiveReshipmentShipmentId;
+    }
+
+    /// <summary>
+    /// Saga handler for backorder creation from Fulfillment BC.
+    /// Stock unavailable at all FCs; fulfillment paused pending replenishment.
+    /// </summary>
+    public void Handle(FulfillmentMessages.BackorderCreated message)
+    {
+        var decision = OrderDecider.HandleBackorderCreated(this, message);
+
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+    }
+
+    /// <summary>
+    /// Saga handler for fulfillment cancellation from Fulfillment BC.
+    /// Triggers compensation: refund if payment captured, release inventory reservations.
+    /// </summary>
+    public OutgoingMessages Handle(FulfillmentMessages.FulfillmentCancelled message)
+    {
+        // Guard: only cancel if not already in a terminal state
+        if (!OrderDecider.CanBeCancelled(Status))
+            return new OutgoingMessages();
+
+        var decision = OrderDecider.HandleFulfillmentCancelled(this, message, DateTimeOffset.UtcNow);
+
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+
+        // If no payment was captured, there is no RefundCompleted to await.
+        // Close the saga immediately.
+        if (!IsPaymentCaptured)
+            MarkCompleted();
+
+        return outgoing;
+    }
+
+    /// <summary>
+    /// Saga handler for order split notification from Fulfillment BC.
+    /// Informational — stores the shipment count for customer-facing display.
+    /// </summary>
+    public void Handle(FulfillmentMessages.OrderSplitIntoShipments message)
+    {
+        var decision = OrderDecider.HandleOrderSplitIntoShipments(this, message);
+
+        if (decision.ShipmentCount.HasValue) ShipmentCount = decision.ShipmentCount.Value;
     }
 
     /// <summary>
