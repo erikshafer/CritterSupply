@@ -6,33 +6,30 @@ using Wolverine.Marten;
 namespace Correspondence.Messages;
 
 /// <summary>
-/// Handles ShipmentDeliveryFailed integration events to alert customers about delivery issues.
-/// Choreography pattern: subscribes to ShipmentDeliveryFailed, creates Message aggregate, publishes CorrespondenceQueued.
+/// Handles ReturnToSenderInitiated integration events from Fulfillment BC.
+/// Sends customer notification: "Your package is being returned — we'll be in touch."
+/// Choreography pattern: subscribes to ReturnToSenderInitiated, creates Message aggregate, publishes CorrespondenceQueued.
+/// Replaces ShipmentDeliveryFailedHandler (retired in M41.0 S4).
 /// </summary>
-public static class ShipmentDeliveryFailedHandler
+public static class ReturnToSenderInitiatedHandler
 {
-    public static (IStartStream, OutgoingMessages) Handle(ShipmentDeliveryFailed @event)
+    public static (IStartStream, OutgoingMessages) Handle(ReturnToSenderInitiated @event)
     {
         // TODO: Query Orders BC to get CustomerId for this OrderId
         // For Phase 2, we'll add cross-BC queries. Phase 1 uses placeholder.
         var customerId = Guid.Empty; // Placeholder - will be queried from Orders API
 
-        // TODO: Query Customer Identity BC for customer preferences
-        // For now, assume customer has email notifications enabled
-        var customerEmail = "customer@example.com"; // Will be populated from CustomerIdentity query
-
         // Template rendering will be enhanced with proper template system
-        var subject = $"Action required: Delivery issue with your order";
+        var subject = "Your package is being returned to us";
         var body = $@"
             <html>
             <body>
-                <h1>Delivery Issue Alert</h1>
-                <p>We're sorry, but there was an issue delivering your order.</p>
+                <h1>Delivery Update</h1>
+                <p>After {@event.TotalAttempts} delivery attempt(s), the carrier is returning your package to us.</p>
                 <p><strong>Order ID:</strong> {@event.OrderId}</p>
-                <p><strong>Issue:</strong> {@event.Reason}</p>
-                <p><strong>Failed At:</strong> {@event.FailedAt:f}</p>
-                <p>Our customer service team will contact you shortly to resolve this issue.</p>
-                <p>In the meantime, if you have any questions, please reach out to us at support@crittersupply.com.</p>
+                <p><strong>Carrier:</strong> {@event.Carrier}</p>
+                <p>We'll contact you shortly about reshipping or issuing a refund.</p>
+                <p>If you have any questions, please reach out to us at support@crittersupply.com.</p>
             </body>
             </html>
         ";
@@ -41,7 +38,7 @@ public static class ShipmentDeliveryFailedHandler
         var (message, messageQueued) = MessageFactory.Create(
             customerId: customerId,
             channel: "Email",
-            templateId: "delivery-failed",
+            templateId: "return-to-sender",
             subject: subject,
             body: body
         );
