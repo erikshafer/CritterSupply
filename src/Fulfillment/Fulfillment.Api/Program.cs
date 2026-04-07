@@ -61,6 +61,12 @@ builder.Services.AddResourceSetupOnStartup();
 // TODO: Replace StubFulfillmentRoutingEngine after Inventory BC Remaster (Gap #2: multi-warehouse allocation)
 builder.Services.AddScoped<IFulfillmentRoutingEngine, StubFulfillmentRoutingEngine>();
 
+// Carrier label service registration
+builder.Services.AddScoped<ICarrierLabelService, StubCarrierLabelService>();
+
+// System clock registration — injectable for time-based testing
+builder.Services.AddSingleton<ISystemClock, SystemClock>();
+
 builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(opts =>
 {
     opts.SerializerOptions.Converters.Add(new JsonStringEnumConverter());

@@ -22,6 +22,7 @@ public static class CheckWorkOrderSLAHandler
     public static async Task Handle(
         CheckWorkOrderSLA command,
         IDocumentSession session,
+        ISystemClock clock,
         CancellationToken ct)
     {
         var wo = await session.LoadAsync<WorkOrder>(command.WorkOrderId, ct);
@@ -31,11 +32,11 @@ public static class CheckWorkOrderSLAHandler
         if (wo.Status is WorkOrderStatus.PackingCompleted or WorkOrderStatus.PickExceptionClosed)
             return;
 
-        var elapsed = DateTimeOffset.UtcNow - wo.CreatedAt;
+        var elapsed = clock.UtcNow - wo.CreatedAt;
         var slaWindow = StandardSlaWindow;
         var percentElapsed = elapsed.TotalMilliseconds / slaWindow.TotalMilliseconds * 100;
 
-        var now = DateTimeOffset.UtcNow;
+        var now = clock.UtcNow;
         var eventsToAppend = new List<object>();
 
         // 50% threshold

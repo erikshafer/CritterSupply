@@ -1,7 +1,9 @@
 using CritterSupply.TestUtilities;
+using Fulfillment;
 using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.Tracking;
@@ -23,6 +25,12 @@ public class TestFixture : IAsyncLifetime
     private string? _connectionString;
 
     public IAlbaHost Host { get; private set; } = null!;
+
+    /// <summary>
+    /// Frozen clock used for time-based tests (Slices 26, 29).
+    /// Advance with FrozenClock.Advance() to simulate elapsed time.
+    /// </summary>
+    public FrozenSystemClock FrozenClock { get; } = new();
 
     public async Task InitializeAsync()
     {
@@ -52,6 +60,10 @@ public class TestFixture : IAsyncLifetime
                 services.AddTestAuthentication(
                     roles: ["CustomerService", "WarehouseClerk", "OperationsManager", "SystemAdmin", "VendorAdmin"],
                     schemes: ["Backoffice", "Vendor"]);
+
+                // Override system clock with frozen clock for time-based tests
+                services.RemoveAll<ISystemClock>();
+                services.AddSingleton<ISystemClock>(FrozenClock);
             });
         });
 

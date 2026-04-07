@@ -21,7 +21,11 @@ public class PackFailureTests : IAsyncLifetime
         _fixture = fixture;
     }
 
-    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+    public Task InitializeAsync()
+    {
+        _fixture.FrozenClock.SetUtcNow(DateTimeOffset.UtcNow);
+        return _fixture.CleanAllDocumentsAsync();
+    }
     public Task DisposeAsync() => Task.CompletedTask;
 
     private async Task<(Guid shipmentId, Guid workOrderId)> CreatePackingWorkOrderAsync()
