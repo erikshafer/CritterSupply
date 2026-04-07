@@ -64,5 +64,17 @@ public enum ShipmentStatus
     LostReplacementShipped,
 
     /// <summary>Package returned and is eligible for reshipment (terminal).</summary>
-    ReturnedReshippable
+    ReturnedReshippable,
+
+    /// <summary>Package returned — replacement shipped after return received (terminal).</summary>
+    ReturnedReplacementShipped,
+
+    /// <summary>Fulfillment cancelled before carrier handoff (terminal).</summary>
+    FulfillmentCancelled,
+
+    /// <summary>Delivery disputed — under investigation.</summary>
+    DeliveryDisputed,
+
+    /// <summary>Shipment handed off to a third-party logistics provider.</summary>
+    HandedToThirdParty
 }

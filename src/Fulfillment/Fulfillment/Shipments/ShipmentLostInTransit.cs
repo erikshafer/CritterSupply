@@ -25,6 +25,7 @@ public static class CheckForLostShipmentHandler
         CheckForLostShipment command,
         IDocumentSession session,
         IMessageBus bus,
+        ISystemClock clock,
         CancellationToken ct)
     {
         var shipment = await session.LoadAsync<Shipment>(command.ShipmentId, ct);
@@ -34,14 +35,14 @@ public static class CheckForLostShipmentHandler
         if (shipment.Status is not (ShipmentStatus.HandedToCarrier or ShipmentStatus.GhostShipmentInvestigation))
             return;
 
-        var timeSinceHandoff = DateTimeOffset.UtcNow - (shipment.HandedToCarrierAt ?? DateTimeOffset.UtcNow);
+        var timeSinceHandoff = clock.UtcNow - (shipment.HandedToCarrierAt ?? clock.UtcNow);
 
         // Idempotency: if already lost, skip
         if (shipment.Status == ShipmentStatus.LostInTransit) return;
 
         if (timeSinceHandoff >= LostThreshold)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = clock.UtcNow;
             var carrier = shipment.Carrier ?? "Unknown";
             var traceRef = $"TRACE-{shipment.TrackingNumber ?? "UNK"}-{Guid.NewGuid():N}"[..30];
 

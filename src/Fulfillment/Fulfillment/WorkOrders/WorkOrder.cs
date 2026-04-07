@@ -166,4 +166,13 @@ public sealed record WorkOrder(
         this with { EscalationThresholdsMet = EscalationThresholdsMet.Add(@event.Threshold) };
 
     public WorkOrder Apply(SLABreached _) => this;
+
+    public WorkOrder Apply(WorkOrderCancelled _) =>
+        this with { Status = WorkOrderStatus.Cancelled };
+
+    public WorkOrder Apply(ColdPackApplied _) => this;
+
+    public WorkOrder Apply(HazmatItemFlagged _) => this;
+
+    public WorkOrder Apply(HazmatShippingRestrictionApplied _) => this;
 }

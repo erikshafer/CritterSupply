@@ -20,7 +20,12 @@ public class ReturnAndSLATests : IAsyncLifetime
         _fixture = fixture;
     }
 
-    public Task InitializeAsync() => _fixture.CleanAllDocumentsAsync();
+    public Task InitializeAsync()
+    {
+        // Reset frozen clock to real time for non-time-dependent tests
+        _fixture.FrozenClock.SetUtcNow(DateTimeOffset.UtcNow);
+        return _fixture.CleanAllDocumentsAsync();
+    }
     public Task DisposeAsync() => Task.CompletedTask;
 
     // --- Slice 28: Receive Return at Warehouse ---

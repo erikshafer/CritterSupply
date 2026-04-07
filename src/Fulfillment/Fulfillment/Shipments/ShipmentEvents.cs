@@ -136,3 +136,59 @@ public sealed record CarrierTraceOpened(
     int TraceWindowDays,
     string TraceReferenceId,
     DateTimeOffset OpenedAt);
+
+// --- P2 Events ---
+
+/// <summary>Domain event when a reshipment is created for a lost, returned, or disputed shipment.</summary>
+public sealed record ReshipmentCreated(
+    Guid NewShipmentId,
+    Guid OriginalShipmentId,
+    string Reason,
+    DateTimeOffset CreatedAt);
+
+/// <summary>Domain event when a customer disputes a delivery.</summary>
+public sealed record DeliveryDisputed(
+    Guid CustomerId,
+    int OffenseNumber,
+    string Resolution,
+    DateTimeOffset DisputedAt);
+
+/// <summary>Domain event when a carrier claim is filed for a lost shipment.</summary>
+public sealed record CarrierClaimFiled(
+    string Carrier,
+    string ClaimType,
+    Guid ShipmentId,
+    string? TrackingNumber,
+    DateTimeOffset FiledAt);
+
+/// <summary>Domain event when a carrier claim is resolved.</summary>
+public sealed record CarrierClaimResolved(
+    string Resolution,
+    decimal? AmountUSD,
+    DateTimeOffset ResolvedAt);
+
+/// <summary>Domain event when fulfillment is cancelled before carrier handoff.</summary>
+public sealed record FulfillmentCancelled(
+    DateTimeOffset CancelledAt,
+    string Reason);
+
+/// <summary>Domain event when a rate dispute is raised with a carrier.</summary>
+public sealed record RateDisputeRaised(
+    string DisputeId,
+    decimal OriginalBillableWeight,
+    decimal ClaimedWeight,
+    string Carrier,
+    DateTimeOffset RaisedAt);
+
+/// <summary>Domain event when a rate dispute is resolved.</summary>
+public sealed record RateDisputeResolved(
+    string DisputeId,
+    string Resolution,
+    decimal? AdjustedAmountUSD,
+    DateTimeOffset ResolvedAt);
+
+/// <summary>Domain event when a shipment is handed off to a third-party logistics provider.</summary>
+public sealed record ThirdPartyLogisticsHandoff(
+    string PartnerName,
+    string ExternalOrderId,
+    DateTimeOffset HandedOffAt);

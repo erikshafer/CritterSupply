@@ -113,6 +113,7 @@ public static class GenerateShippingLabelHandler
         GenerateShippingLabel command,
         IDocumentSession session,
         IMessageBus bus,
+        ICarrierLabelService carrierLabelService,
         CancellationToken ct)
     {
         var shipment = await session.LoadAsync<Shipment>(command.ShipmentId, ct);
@@ -122,18 +123,17 @@ public static class GenerateShippingLabelHandler
 
         try
         {
-            // Stub: generate a mock tracking number
-            // In production, this would call the carrier API and could throw on failure
-            var trackingNumber = $"1Z{command.Carrier.ToUpperInvariant()[..3]}{Guid.NewGuid():N}"[..24];
+            var result = await carrierLabelService.GenerateLabelAsync(
+                command.Carrier, command.Service, 0m, ct);
 
             var labelGenerated = new ShippingLabelGenerated(
                 command.Carrier, command.Service,
                 0m, // BillableWeight comes from WorkOrder via PackingCompleted
-                null, // LabelZPL — stub, no real ZPL data
+                result.LabelZpl,
                 now);
 
             var trackingAssigned = new TrackingNumberAssigned(
-                trackingNumber, command.Carrier, now);
+                result.TrackingNumber, command.Carrier, now);
 
             session.Events.Append(command.ShipmentId, labelGenerated, trackingAssigned);
 
@@ -141,7 +141,7 @@ public static class GenerateShippingLabelHandler
             await bus.PublishAsync(new IntegrationMessages.TrackingNumberAssigned(
                 shipment.OrderId,
                 command.ShipmentId,
-                trackingNumber,
+                result.TrackingNumber,
                 command.Carrier,
                 now));
         }

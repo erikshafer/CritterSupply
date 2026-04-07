@@ -33,5 +33,8 @@ public enum WorkOrderStatus
     PackingCompleted,
 
     /// <summary>Pick exception raised — work order closed (rerouted or backordered).</summary>
-    PickExceptionClosed
+    PickExceptionClosed,
+
+    /// <summary>Work order cancelled — associated shipment fulfillment cancelled.</summary>
+    Cancelled
 }
