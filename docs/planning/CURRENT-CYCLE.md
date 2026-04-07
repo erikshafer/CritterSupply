@@ -41,39 +41,42 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M41.0 — Fulfillment BC Remaster: S3 (P2 Slices 30–39 + test improvements) |
+| **Current Milestone** | M41.0 — Fulfillment BC Remaster: S4 (Orders saga migration + legacy contract retirement) |
 | **Status** | 🟢 **IN PROGRESS** |
-| **Recent Completion** | M41.0 S2 — Fulfillment BC Remaster P1 complete: 14 slices, 51 integration + 40 unit tests (2026-04-06) |
-| **Previous Completion** | M41.0 S1 — Fulfillment BC Remaster P0 complete: 15 slices, 2 aggregates, 50 tests, PR #530 (2026-04-06) |
+| **Recent Completion** | M41.0 S3 — Fulfillment BC Remaster P2 complete: 10 slices, 78 integration tests, ISystemClock + ICarrierLabelService (2026-04-07) |
+| **Previous Completion** | M41.0 S2 — Fulfillment BC Remaster P1 complete: 14 slices, 51 integration + 40 unit tests (2026-04-06) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-07 (M41.0 S3 in progress)*
+*Last Updated: 2026-04-07 (M41.0 S4 in progress)*
 
 ---
 
 ## Active Milestone
 
-### M41.0: Fulfillment BC Remaster — S3 (P2 Slices 30–39 + Test Improvements)
+### M41.0: Fulfillment BC Remaster — S4 (Orders Saga Migration)
 
 **Status:** 🟢 **In Progress**
 **ADR:** [0059 — Fulfillment BC Remaster Rationale](../decisions/0059-fulfillment-bc-remaster-rationale.md)
-**Slice Table:** [Fulfillment Remaster Slices](../planning/fulfillment-remaster-slices.md)
 
-**Goal:** Improve test coverage for three P1 slices with time/stub dependencies, then
-implement all P2 compensation and advanced slices (reshipment, delivery dispute, multi-FC
-split order, carrier claims, cancellation, special handling, rate disputes, 3PL handoff).
+**Goal:** Retire the dual-publish migration strategy from S1. Wire the Orders saga to the
+new Fulfillment contract surface (ShipmentHandedToCarrier, TrackingNumberAssigned,
+ReturnToSenderInitiated, ReshipmentCreated, BackorderCreated, FulfillmentCancelled,
+OrderSplitIntoShipments). Remove legacy ShipmentDispatched and ShipmentDeliveryFailed
+handlers and contracts. Update Correspondence BC.
 
-**Key Deliverables — S3:**
-- `ICarrierLabelService` + `ISystemClock` injectable abstractions for time/failure tests
-- Integration tests for Slices 22, 26, 29 (previously unit-test-only or untestable)
-- Slices 30–39: all P2 compensation and advanced flows
-- Two new projections: `CarrierPerformanceView`, `MultiShipmentView`
-- New integration contracts: `ReshipmentCreated`, `OrderSplitIntoShipments`, `FulfillmentCancelled`
-- Orders saga update deferred to S4
+**Key Deliverables — S4:**
+- 7 new Orders saga handlers + Decider methods
+- 3 new OrderStatus values: Backordered, DeliveryFailed, Reshipping
+- Legacy handler removal (ShipmentDispatched, ShipmentDeliveryFailed)
+- Dual-publish removal from Fulfillment
+- Correspondence BC: ShipmentDeliveryFailedHandler → ReturnToSenderInitiatedHandler
+- CONTEXTS.md update for Fulfillment, Orders, and Correspondence
+- 8+ new Orders integration tests
 
 **S1 Retrospective:** [S1](./milestones/fulfillment-remaster-s1-retrospective.md)
 **S2 Retrospective:** [S2](./milestones/fulfillment-remaster-s2-retrospective.md)
-**S3 Retrospective:** TBD
+**S3 Retrospective:** [S3](./milestones/fulfillment-remaster-s3-retrospective.md)
+**S4 Retrospective:** [S4](./milestones/fulfillment-remaster-s4-retrospective.md)
 
 ## Recent Completions
 
