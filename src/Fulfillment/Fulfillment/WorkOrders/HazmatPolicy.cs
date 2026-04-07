@@ -4,9 +4,9 @@ namespace Fulfillment.WorkOrders;
 
 /// <summary>
 /// Slice 37: Hazmat flagging policy.
-/// When WorkOrderCreated is appended, this handler checks line items against
-/// a stub hazmat registry. If any match, it appends HazmatItemFlagged and
-/// HazmatShippingRestrictionApplied events.
+/// Checks work order line items against a stub hazmat registry.
+/// If any match, appends HazmatItemFlagged and HazmatShippingRestrictionApplied events.
+/// Called inline after WorkOrderCreated is appended.
 /// </summary>
 public static class HazmatPolicy
 {
@@ -14,18 +14,18 @@ public static class HazmatPolicy
     private static readonly string[] HazmatPrefixes = ["FLEA-", "REPTILE-HEAT-"];
 
     /// <summary>
-    /// Wolverine cascading handler for WorkOrderCreated.
-    /// Returns events to append to the work order stream if hazmat items are detected.
+    /// Checks line items against the hazmat registry and appends flagging events
+    /// to the work order stream if any hazmat items are detected.
     /// </summary>
-    public static async Task Handle(
-        WorkOrderCreated @event,
-        IDocumentSession session,
-        CancellationToken ct)
+    public static void CheckAndApply(
+        Guid workOrderId,
+        IReadOnlyList<WorkOrderLineItem> lineItems,
+        IDocumentSession session)
     {
         var now = DateTimeOffset.UtcNow;
         var eventsToAppend = new List<object>();
 
-        foreach (var lineItem in @event.LineItems)
+        foreach (var lineItem in lineItems)
         {
             if (IsHazmat(lineItem.Sku))
             {
@@ -42,7 +42,7 @@ public static class HazmatPolicy
             // Downgrade: air shipping blocked, ground only
             eventsToAppend.Add(new HazmatShippingRestrictionApplied("AirShipping", now));
 
-            session.Events.Append(@event.WorkOrderId, eventsToAppend.ToArray());
+            session.Events.Append(workOrderId, eventsToAppend.ToArray());
         }
     }
 

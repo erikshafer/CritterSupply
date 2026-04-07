@@ -73,5 +73,8 @@ public static class FulfillmentRequestedHandler
             DateTimeOffset.UtcNow);
 
         session.Events.StartStream<WorkOrder>(workOrderId, workOrderCreated);
+
+        // Slice 37: Check for hazmat items and flag if needed
+        HazmatPolicy.CheckAndApply(workOrderId, workOrderLineItems, session);
     }
 }

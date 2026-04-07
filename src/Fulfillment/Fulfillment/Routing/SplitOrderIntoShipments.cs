@@ -86,6 +86,9 @@ public static class SplitOrderIntoShipmentsHandler
                 workOrderId, splitShipmentId, split.FulfillmentCenterId,
                 workOrderLineItems, now);
             session.Events.StartStream<WorkOrders.WorkOrder>(workOrderId, workOrderCreated);
+
+            // Slice 37: Check for hazmat items
+            WorkOrders.HazmatPolicy.CheckAndApply(workOrderId, workOrderLineItems, session);
         }
     }
 

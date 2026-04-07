@@ -91,6 +91,9 @@ public static class CreateReshipmentHandler
             workOrderId, newShipmentId, fc, workOrderLineItems, now);
         session.Events.StartStream<WorkOrder>(workOrderId, workOrderCreated);
 
+        // Slice 37: Check for hazmat items
+        HazmatPolicy.CheckAndApply(workOrderId, workOrderLineItems, session);
+
         // 4. Publish ReshipmentCreated integration event
         await bus.PublishAsync(new IntegrationMessages.ReshipmentCreated(
             shipment.OrderId,
