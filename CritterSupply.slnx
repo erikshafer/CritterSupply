@@ -12,57 +12,34 @@
     <File Path="LICENSE" />
     <File Path="README.md" />
   </Folder>
-  <Folder Name="/.SolutionItems/Documentation/Planning/Cycles/">
-    <File Path="docs/planning/cycles/cycle-16-phase-3-fixes.md" />
-    <File Path="docs/planning/cycles/cycle-16-phase-3-manual-testing.md" />
-    <File Path="docs\planning\cycles\cycle-16-customer-experience.md" />
-    <File Path="docs/planning/cycles/cycle-17-customer-identity-integration.md" />
-    <File Path="docs/planning/cycles/cycle-18-customer-experience-phase-2.md" />
-    <File Path="docs/planning/cycles/CYCLE-18-QUICKSTART.md" />
-  </Folder>
-  <Folder Name="/.SolutionItems/Documentation/Planning/Infrastructure/" />
-  <Folder Name="/.SolutionItems/Documentation/Planning/Infrastructure/CI-CD/">
-    <File Path="docs/planning/infrastructure/ci-cd/implementation-guide.md" />
-    <File Path="docs/planning/infrastructure/ci-cd/README.md" />
-    <File Path="docs/planning/infrastructure/ci-cd/roadmap.md" />
-    <File Path="docs/planning/infrastructure/ci-cd/visual-guide.md" />
-  </Folder>
-  <Folder Name="/.SolutionItems/Documentation/Planning/Spikes/">
-    <File Path="docs/planning/spikes/payment-gateway-comparison.md" />
-    <File Path="docs/planning/spikes/polecat-candidates.md" />
-    <File Path="docs/planning/spikes/pricing-promotions-domain-spike.md" />
-    <File Path="docs/planning/spikes/stripe-api-integration.md" />
-  </Folder>
   <Folder Name="/.SolutionItems/Documentation/Skills/">
+    <File Path="docs/skills/adding-new-bounded-context.md" />
+    <File Path="docs/skills/bc-remaster.md" />
     <File Path="docs/skills/bff-realtime-patterns.md" />
+    <File Path="docs/skills/copilot-session-prompt.md" />
     <File Path="docs/skills/critterstack-testing-patterns.md" />
+    <File Path="docs/skills/dynamic-consistency-boundary.md" />
+    <File Path="docs/skills/e2e-playwright-testing.md" />
+    <File Path="docs/skills/efcore-marten-projections.md" />
     <File Path="docs/skills/efcore-wolverine-integration.md" />
+    <File Path="docs/skills/event-modeling-workshop.md" />
+    <File Path="docs/skills/event-sourcing-projections.md" />
     <File Path="docs/skills/external-service-integration.md" />
+    <File Path="docs/skills/final-qa-ux-review.md" />
+    <File Path="docs/skills/httpclient.md" />
+    <File Path="docs/skills/integration-messaging.md" />
     <File Path="docs/skills/marten-document-store.md" />
     <File Path="docs/skills/marten-event-sourcing.md" />
     <File Path="docs/skills/modern-csharp-coding-standards.md" />
+    <File Path="docs/skills/README.md" />
     <File Path="docs/skills/reqnroll-bdd-testing.md" />
     <File Path="docs/skills/testcontainers-integration-tests.md" />
     <File Path="docs/skills/vertical-slice-organization.md" />
     <File Path="docs/skills/wolverine-message-handlers.md" />
     <File Path="docs/skills/blazor-wasm-jwt.md" />
     <File Path="docs/skills/bunit-component-testing.md" />
-  </Folder>
-  <Folder Name="/.SolutionItems/Documentation/Workflows/">
-    <File Path="docs/workflows/customer-experience-workflows.md" />
-    <File Path="docs/workflows/customer-identity-workflows.md" />
-    <File Path="docs/workflows/DEVOPS-EXECUTIVE-SUMMARY.md" />
-    <File Path="docs/workflows/DEVOPS-INFRASTRUCTURE-REVIEW.md" />
-    <File Path="docs/workflows/fulfillment-workflows.md" />
-    <File Path="docs/workflows/inventory-workflows.md" />
-    <File Path="docs/workflows/orders-workflows.md" />
-    <File Path="docs/workflows/payments-workflows.md" />
-    <File Path="docs/workflows/PO-DECISIONS.md" />
-    <File Path="docs/workflows/PO-REVIEW-SUMMARY.md" />
-    <File Path="docs/workflows/product-catalog-workflows.md" />
-    <File Path="docs/workflows/README.md" />
-    <File Path="docs/workflows/shopping-workflows.md" />
-    <File Path="docs/workflows/WORKFLOW-AUDIT.md" />
+    <File Path="docs/skills/wolverine-sagas.md" />
+    <File Path="docs/skills/wolverine-signalr.md" />
   </Folder>
   <Folder Name="/.SolutionItems/Documentation/">
     <File Path="docs/QUICK-START.md" />
@@ -71,7 +48,6 @@
     <File Path="docs\README.md" />
     <File Path="docs\RUN-CONFIGURATIONS.md" />
   </Folder>
-  <Folder Name="/.SolutionItems/Documentation/Planning/" />
   <Folder Name="/.SolutionItems/Documentation/Decisions/">
     <File Path="docs/decisions/0007-github-workflow-improvements.md" />
     <File Path="docs/decisions/0008-rabbitmq-configuration-consistency.md" />
@@ -101,6 +77,16 @@
     <File Path="docs/decisions/0043-storefront-web-technology-options.md" />
     <File Path="docs/decisions/0048-marketplace-document-entity-design.md" />
     <File Path="docs/decisions/0049-category-mapping-ownership.md" />
+    <File Path="docs/decisions/0050-marketplaces-product-summary-acl.md" />
+    <File Path="docs/decisions/0051-vault-implementation-strategy.md" />
+    <File Path="docs/decisions/0052-amazon-spapi-authentication.md" />
+    <File Path="docs/decisions/0053-walmart-marketplace-api-authentication.md" />
+    <File Path="docs/decisions/0054-ebay-sell-api-authentication.md" />
+    <File Path="docs/decisions/0055-submission-status-polling-architecture.md" />
+    <File Path="docs/decisions/0056-marketplace-adapter-resilience-patterns.md" />
+    <File Path="docs/decisions/0057-walmart-deactivation-identifier-design.md" />
+    <File Path="docs/decisions/0058-dcb-promotions-coupon-redemption.md" />
+    <File Path="docs/decisions/0059-fulfillment-bc-remaster-rationale.md" />
     <File Path="docs\decisions\0004-sse-over-signalr.md" />
     <File Path="docs\decisions\0005-mudblazor-ui-framework.md" />
     <File Path="docs\decisions\0006-reqnroll-bdd-framework.md" />
@@ -110,11 +96,6 @@
     <File Path="docs/decisions/0023-feature-based-organization-for-ef-core-bcs.md" />
     <File Path="docs/decisions/0024-sha256-token-hashing-vendor-invitations.md" />
     <File Path="docs/decisions/0025-blazor-wasm-poc-learnings.md" />
-  </Folder>
-  <Folder Name="/.SolutionItems/Documentation/Features/">
-    <File Path="docs\features\customer-experience\cart-real-time-updates.feature" />
-    <File Path="docs\features\customer-experience\checkout-flow.feature" />
-    <File Path="docs\features\customer-experience\product-browsing.feature" />
   </Folder>
   <Folder Name="/Listings/">
     <Project Path="src/Listings/Listings.Api/Listings.Api.csproj" />

@@ -238,6 +238,7 @@ public sealed class AmazonMarketplaceAdapterTests : IDisposable
         status.ExternalSubmissionId.ShouldBe("amzn-SKU-INACTIVE");
         status.IsLive.ShouldBeFalse();
         status.IsFailed.ShouldBeTrue();
+        status.FailureReason.ShouldNotBeNullOrEmpty();
         status.FailureReason.ShouldContain("INACTIVE");
     }
 

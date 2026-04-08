@@ -255,6 +255,7 @@ public sealed class EbayMarketplaceAdapterTests : IDisposable
         status.ExternalSubmissionId.ShouldBe("ebay-OFFER-ORPHAN-001");
         status.IsLive.ShouldBeFalse();
         status.IsFailed.ShouldBeTrue();
+        status.FailureReason.ShouldNotBeNullOrEmpty();
         status.FailureReason.ShouldContain("UNPUBLISHED");
         status.FailureReason.ShouldContain("OFFER-ORPHAN-001"); // offerId included for discoverability
     }
@@ -276,6 +277,7 @@ public sealed class EbayMarketplaceAdapterTests : IDisposable
         status.ExternalSubmissionId.ShouldBe("ebay-OFFER-ERR-001");
         status.IsLive.ShouldBeFalse();
         status.IsFailed.ShouldBeTrue();
+        status.FailureReason.ShouldNotBeNullOrEmpty();
         status.FailureReason.ShouldContain("500");
     }
 
