@@ -286,6 +286,7 @@ public sealed class WalmartMarketplaceAdapterTests : IDisposable
         // Assert
         status.IsLive.ShouldBeFalse();
         status.IsFailed.ShouldBeTrue();
+        status.FailureReason.ShouldNotBeNullOrEmpty();
         status.FailureReason.ShouldContain("404");
     }
 

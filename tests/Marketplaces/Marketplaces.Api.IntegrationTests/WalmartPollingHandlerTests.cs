@@ -159,13 +159,13 @@ public sealed class WalmartPollingHandlerTests
 
         ValueTask IMessageBus.SendAsync<T>(T message, DeliveryOptions? options)
         {
-            _sent.Add((message, options));
+            _sent.Add((message, options)!);
             return ValueTask.CompletedTask;
         }
 
         ValueTask IMessageBus.PublishAsync<T>(T message, DeliveryOptions? options)
         {
-            _sent.Add((message, options));
+            _sent.Add((message, options)!);
             return ValueTask.CompletedTask;
         }
 
