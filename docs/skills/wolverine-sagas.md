@@ -835,10 +835,14 @@ The cancellation eligibility rule is shared between the HTTP endpoint (pre-fligh
 
 ```csharp
 // In OrderDecider — single source of truth
+// M41.0 S4: Shipped removed from exclusion list.
+// FulfillmentCancelled can arrive pre-handoff (order is Shipped but carrier hasn't
+// taken possession yet). DeliveryFailed, Reshipping, and Backordered are also
+// cancellable — they are non-terminal fulfillment states, not post-delivery.
 public static bool CanBeCancelled(OrderStatus status) =>
-    status is not (OrderStatus.Shipped or OrderStatus.Delivered
-        or OrderStatus.Closed or OrderStatus.Cancelled
-        or OrderStatus.OutOfStock or OrderStatus.PaymentFailed);
+    status is not (OrderStatus.Delivered or OrderStatus.Closed
+        or OrderStatus.Cancelled or OrderStatus.OutOfStock
+        or OrderStatus.PaymentFailed);
 ```
 
 ```csharp
@@ -865,6 +869,132 @@ public OutgoingMessages Handle(CancelOrder command)
 
 **Why the saga also checks:** The HTTP endpoint validates before publishing, but Wolverine's at-least-once delivery means the handler may process the same `CancelOrder` message twice. Both guards are necessary.
 
+## New OrderStatus Values and Saga Properties (M41.0 S4)
+
+⭐ *M41.0 S4 Addition*
+
+The Fulfillment Remaster introduced new lifecycle states and saga properties when the Orders
+saga was migrated to the new Fulfillment contract surface.
+
+### New OrderStatus Values
+
+```csharp
+/// <summary>Carrier returned the shipment (failed delivery attempts exhausted)</summary>
+DeliveryFailed,
+
+/// <summary>Replacement shipment created; awaiting carrier handoff</summary>
+Reshipping,
+
+/// <summary>Item(s) backordered; fulfillment deferred until restock</summary>
+Backordered,
+```
+
+### New Saga Properties
+
+```csharp
+/// <summary>Carrier tracking number (set by TrackingNumberAssigned)</summary>
+public string? TrackingNumber { get; set; }
+
+/// <summary>Number of shipments in a split order (default 1)</summary>
+public int ShipmentCount { get; set; } = 1;
+
+/// <summary>Shipment ID of the active reshipment (set by ReshipmentCreated)</summary>
+public Guid? ActiveReshipmentShipmentId { get; set; }
+```
+
+### Pattern for Adding Nullable OrderDecision Fields
+
+When new messages introduce new saga state, follow the consistent nullable field pattern:
+
+**1. Add the field to `OrderDecision`:**
+```csharp
+public sealed record OrderDecision
+{
+    // ... existing fields ...
+    public string? TrackingNumber { get; init; }
+    public Guid? ActiveReshipmentShipmentId { get; init; }
+    public int? ShipmentCount { get; init; }
+}
+```
+
+**2. Return the new state from the Decider pure function:**
+```csharp
+public static OrderDecision HandleTrackingNumberAssigned(
+    Order current,
+    FulfillmentMessages.TrackingNumberAssigned message)
+{
+    return new OrderDecision { TrackingNumber = message.TrackingNumber };
+}
+```
+
+**3. Apply in the saga handler with a null check:**
+```csharp
+public void Handle(FulfillmentMessages.TrackingNumberAssigned message)
+{
+    var decision = OrderDecider.HandleTrackingNumberAssigned(this, message);
+    if (decision.TrackingNumber != null) TrackingNumber = decision.TrackingNumber;
+}
+```
+
+The null check (`if (decision.Field != null) Field = decision.Field`) preserves the existing
+value when the Decider signals no change. This pattern is consistent throughout the entire
+Order saga.
+
+---
+
+## ⚠️ Non-Terminal Mid-Lifecycle States and Idempotency Guards
+
+⭐ *M41.0 S4 Critical Discovery*
+
+When a saga can cycle through states (e.g., `DeliveryFailed` → `Reshipping` → `Shipped` →
+`Delivered` for a reshipment scenario), be careful about which statuses appear in idempotency
+guards for the events that drive those transitions.
+
+**The Reshipping trap:** `ShipmentHandedToCarrier` transitions the Order saga to `Shipped`.
+A naive idempotency guard might exclude `Reshipping`:
+
+```csharp
+// ❌ WRONG — this permanently traps the saga in Reshipping
+public static OrderDecision HandleShipmentHandedToCarrier(
+    Order current,
+    FulfillmentMessages.ShipmentHandedToCarrier message)
+{
+    if (current.Status is OrderStatus.Shipped or OrderStatus.Delivered
+        or OrderStatus.Closed or OrderStatus.Reshipping) // ← DO NOT include Reshipping
+        return new OrderDecision();
+
+    return new OrderDecision { Status = OrderStatus.Shipped };
+}
+```
+
+**Why this is wrong:** The reshipment lifecycle requires:
+1. `ReturnToSenderInitiated` → `DeliveryFailed`
+2. `ReshipmentCreated` → `Reshipping`
+3. `ShipmentHandedToCarrier` → **must transition to `Shipped`**
+
+If `Reshipping` is in the guard for step 3, the saga can never escape that state.
+
+**Rule:** Only include truly terminal states (or states where the event is genuinely a
+duplicate) in idempotency guards. `Reshipping` is a non-terminal mid-lifecycle state that
+**must** be able to receive `ShipmentHandedToCarrier` to make forward progress.
+
+**Verify with the full lifecycle test:**
+
+```csharp
+[Fact]
+public async Task Full_Lifecycle_With_Reshipment()
+{
+    // Place → inventory → payment → FulfillmentRequested
+    // → ShipmentHandedToCarrier (Shipped)
+    // → ReturnToSenderInitiated (DeliveryFailed)
+    // → ReshipmentCreated (Reshipping)
+    // → ShipmentHandedToCarrier again (Shipped) ← the critical transition
+    // → ShipmentDelivered (Delivered)
+}
+```
+
+This test only passes if `Reshipping` is NOT in the `ShipmentHandedToCarrier` guard.
+
 ## DOs and DO NOTs
 
 ⭐ *M32-M34 Addition*
@@ -888,6 +1018,7 @@ public OutgoingMessages Handle(CancelOrder command)
 | 13 | **DO** share cancellation eligibility rules between HTTP endpoint and saga handler | Both paths need the same business rule |
 | 14 | **DO** use `OutgoingMessages.Delay()` for scheduled messages (not in-memory timers) | Survives restarts, deployments, and scaling |
 | 15 | **DO** track `ReturnWindowFired` + `ActiveReturnIds` for post-delivery return coordination | Prevents premature saga closure while returns are in progress |
+| 16 | **DO** be careful about non-terminal mid-lifecycle states in idempotency guards | States like `Reshipping` must be able to receive the event that advances them (e.g., `ShipmentHandedToCarrier`); including them in guards permanently traps the saga |
 
 ### ❌ DO NOTs
 
@@ -903,6 +1034,7 @@ public OutgoingMessages Handle(CancelOrder command)
 | 8 | **DO NOT** use `List<Guid>` for saga tracking fields | Use `IReadOnlyList<Guid>` + immutable update pattern for Marten change detection |
 | 9 | **DO NOT** mix `IMessageBus.InvokeAsync()` with manual `session.Events.Append()` | Two competing persistence strategies — one silently loses |
 | 10 | **DO NOT** put initialization logic in the saga class | Use a separate `PlaceOrderHandler` class |
+| 11 | **DO NOT** include non-terminal mid-lifecycle states (like `Reshipping`) in idempotency guards for the event that advances them | The saga will be permanently stuck; the full reshipment lifecycle test will fail |
 
 ## File Organization
 
@@ -1156,9 +1288,14 @@ public async Task Order_ReachesPaymentConfirmed_WhenPaymentCapturedAfterInventor
 | `Handle(ReservationFailed)` | Inventory BC | `OutgoingMessages` | `OutOfStock` compensation |
 | `Handle(ReservationCommitted)` | Inventory BC | `OutgoingMessages` | Fulfillment request when all committed |
 | `Handle(ReservationReleased)` | Inventory BC | `void` | Compensation acknowledgement |
-| `Handle(ShipmentDispatched)` | Fulfillment BC | `void` | `Shipped` status |
+| `Handle(ShipmentHandedToCarrier)` | Fulfillment BC | `void` | `Shipped` status *(replaces ShipmentDispatched — M41.0 S4)* |
+| `Handle(TrackingNumberAssigned)` | Fulfillment BC | `void` | Stores tracking number; no status change |
 | `Handle(ShipmentDelivered)` | Fulfillment BC | `OutgoingMessages` | `Delivered` + schedules return window |
-| `Handle(ShipmentDeliveryFailed)` | Fulfillment BC | `void` | Delivery failure tracking |
+| `Handle(ReturnToSenderInitiated)` | Fulfillment BC | `void` | `DeliveryFailed` status *(replaces ShipmentDeliveryFailed — M41.0 S4)* |
+| `Handle(ReshipmentCreated)` | Fulfillment BC | `void` | `Reshipping` status; stores `ActiveReshipmentShipmentId` |
+| `Handle(BackorderCreated)` | Fulfillment BC | `void` | `Backordered` status |
+| `Handle(FulfillmentCancelled)` | Fulfillment BC | `OutgoingMessages` | Refund + release inventory + `Cancelled` |
+| `Handle(OrderSplitIntoShipments)` | Fulfillment BC | `void` | Stores `ShipmentCount`; no status change |
 | `Handle(ReturnWindowExpired)` | Scheduled | `void` | Closes if no active returns |
 | `Handle(ReturnRequested)` | Returns BC | `void` | Adds to `ActiveReturnIds` |
 | `Handle(ReturnCompleted)` | Returns BC | `OutgoingMessages` | Refund request + conditional close |

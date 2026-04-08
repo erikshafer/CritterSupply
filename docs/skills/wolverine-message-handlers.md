@@ -20,8 +20,9 @@ Patterns and practices for building message handlers and HTTP endpoints with Wol
 10. [Error Handling](#error-handling)
 11. [Multi-Tenancy](#multi-tenancy)
 12. [DCB Handler Patterns](#dcb-handler-patterns--m400-addition) ⭐ *M40.0 Addition*
-13. [Anti-Patterns to Avoid](#anti-patterns-to-avoid)
-14. [File Organization and Naming](#file-organization-and-naming)
+13. [Anti-Pattern #13: Inline Cascade for `session.Events.Append()` Workflows](#13--inline-cascade-for-sessioneventsappend-workflows--m410-addition) ⭐ *M41.0 Addition*
+14. [Anti-Patterns to Avoid](#anti-patterns-to-avoid)
+15. [File Organization and Naming](#file-organization-and-naming)
 
 ---
 
@@ -2454,6 +2455,99 @@ session.Events.Append(sku, evt);
 **Evidence:** INV-3 fix in M33.0 Session 1 — `AdjustInventoryEndpoint` mixed both patterns, causing silent event publishing failures. The `LowStockDetected` → `AlertFeedView` chain broke because manual-path events were not reaching the outbox.
 
 **Reference:** [M33.0 Milestone Closure Retrospective — Cross-Cutting Learning 1](../../docs/planning/milestones/m33-0-milestone-closure-retrospective.md)
+
+**Important distinction — cross-stream inline cascade (acceptable, see Anti-Pattern #13):**
+
+Anti-Pattern #12 targets the case where `InvokeAsync()` and `session.Events.Append()` both
+operate on the **same aggregate/stream** in the same request — two competing persistence
+strategies for the same thing.
+
+A related but distinct pattern is acceptable: using `bus.InvokeAsync()` to cascade to a
+**different** downstream aggregate/stream from within a handler that uses
+`session.Events.Append()` for its own stream. This is the "inline policy invocation" pattern
+documented in Anti-Pattern #13.
+
+**The rule:** don't mix strategies for the same stream. Cascading to a *different* stream
+inline is fine and is sometimes the only option when Wolverine's automatic cascading doesn't
+apply.
+
+---
+
+### 13. ❌ Expecting Wolverine to Cascade Events Appended via `session.Events.Append()` ⭐ *M41.0 Addition*
+
+**Problem:** When a handler uses the `Load()/Before()/Handle()` compound pattern and appends
+events via `session.Events.Append(streamId, evt)` or `session.Events.StartStream<T>(...)`,
+Wolverine **cannot cascade** those events to downstream handlers. Wolverine cascades from
+messages *returned* from `Handle()` — not from events written directly to a Marten session
+stream.
+
+**Where this bites you:** Any handler that writes events to the stream and also needs a
+downstream policy handler or follow-on command to react to those events. The downstream
+handler simply never fires — no error, no warning.
+
+**❌ WRONG — expecting cascade from session-written event:**
+
+```csharp
+public static class FulfillmentRequestedHandler
+{
+    public static OutgoingMessages Handle(
+        RequestFulfillment cmd,
+        IDocumentSession session)
+    {
+        // WorkOrderCreated is appended to the stream...
+        session.Events.StartStream           (workOrderId, new WorkOrderCreated(...));
+
+        // ...but Wolverine CANNOT trigger HazmatPolicyHandler here.
+        // WorkOrderCreated is not in the return value — it's in the session.
+        // HazmatPolicyHandler.Handle(WorkOrderCreated) will NEVER be invoked.
+
+        return outgoing;
+    }
+}
+```
+
+**Why it doesn't work:**
+- Wolverine's cascade mechanism inspects the *return value* of `Handle()` for outgoing messages
+- Events appended via `session.Events.Append()` or `session.Events.StartStream()` go directly
+  to Marten's unit-of-work — they are invisible to Wolverine's cascade pipeline
+- This is a fundamental architectural constraint, not a configuration issue
+
+**✅ CORRECT — call the policy inline:**
+
+```csharp
+public static class FulfillmentRequestedHandler
+{
+    public static async Task                   Handle(
+        RequestFulfillment cmd,
+        IDocumentSession session,
+        IMessageBus bus)   // Inject IMessageBus for inline dispatch
+    {
+        session.Events.StartStream           (workOrderId, new WorkOrderCreated(...));
+
+        // Policy logic invoked inline — don't wait for Wolverine to cascade
+        await HazmatPolicy.CheckAndApply(workOrderId, cmd.LineItems, session, bus);
+
+        return outgoing;
+    }
+}
+```
+
+**Rules for the inline cascade pattern:**
+- Use `bus.InvokeAsync()` (not `bus.PublishAsync()`) — synchronous within the handler's context
+- `bus.ScheduleAsync()` remains valid for delayed/scheduled delivery
+- Call the inline policy in **every handler** that creates the relevant stream, not just one.
+  In the Fulfillment Remaster, three handlers all call `HazmatPolicy.CheckAndApply()`:
+  `FulfillmentRequestedHandler`, `CreateReshipmentHandler`, and
+  `SplitOrderIntoShipmentsHandler` — because all three create WorkOrder streams
+- This is NOT a violation of Anti-Pattern #12, which targets mixing strategies for the
+  **same** stream. Here the inline `InvokeAsync()` targets a **different** downstream aggregate
+
+**CritterSupply reference examples:**
+- `src/Fulfillment/Fulfillment/WorkOrders/HazmatPolicy.cs` — inline static method pattern (S3)
+- `src/Fulfillment/Fulfillment/Shipments/GenerateShippingLabel.cs` — invoked inline from
+  `PackingCompletedHandler` when label cascade couldn't be expressed as a return value (S2)
+
+**Reference:** [Fulfillment Remaster S3 Retrospective — Deviation #1](../../planning/milestones/fulfillment-remaster-s3-retrospective.md)
 
 ---
 
