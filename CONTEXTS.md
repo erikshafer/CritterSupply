@@ -61,14 +61,16 @@ Owns financial transaction lifecycle — authorization, capture, failure handlin
 
 **Folder:** `src/Inventory/`
 
-Tracks stock levels and manages soft reservations (holds) until commitment or release. Entirely message-driven — no HTTP endpoints.
+Tracks per-warehouse stock levels and manages the reservation lifecycle (soft hold → commit → picked → shipped). Uses two aggregates: `ProductInventory` (per-SKU per-warehouse stock tracking) and `InventoryTransfer` (inter-warehouse transfer lifecycle). Exposes stock availability via HTTP for Fulfillment's routing engine.
 
 | Communicates with | Direction | Notes |
 |---|---|---|
-| Orders | ↔ bidirectional | Receives reservation requests; publishes confirmation/failure |
-| Fulfillment | ← receives | Shipment dispatch triggers stock adjustment |
+| Orders | ↔ bidirectional | Receives `ReservationCommitRequested`, `ReservationReleaseRequested`; publishes `ReservationConfirmed`, `ReservationFailed`, `ReservationCommitted`, `ReservationReleased` |
+| Fulfillment | ↔ bidirectional | Receives `StockReservationRequested` (routing-informed), `ItemPicked` (bin reconciliation), `ShipmentHandedToCarrier` (TotalOnHand decrement), `BackorderCreated`; publishes `BackorderStockAvailable`; exposes `StockAvailabilityView` via HTTP query |
+| Backoffice | ← queried by | Stock levels, adjustments, low-stock alerts, cycle counts |
+| Vendor Portal | → publishes | `InventoryAdjusted`, `LowStockDetected`, `StockReplenished` for vendor dashboard |
 
-**Constraint:** No HTTP layer exists today. Any UI integration (e.g., Backoffice) requires adding endpoints first.
+**Key decisions:** Remastered in M42.0 ([ADR 0060](docs/decisions/0060-inventory-bc-remaster-rationale.md)). `OrderPlacedHandler` (hardcoded WH-01) retired; replaced by Fulfillment-initiated `StockReservationRequested` with routing-informed WarehouseId. UUID v5 stream IDs replace MD5 `CombinedGuid()`. `StockReceived`, `StockRestocked`, and `TransferReceived` confirmed as three distinct events. Physical pick/ship tracking via `StockPicked` and `StockShipped` events.
 
 ---
 
