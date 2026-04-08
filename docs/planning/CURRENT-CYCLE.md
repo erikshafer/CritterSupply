@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M42.0 — Inventory BC Remaster: Event Modeling Session |
-| **Status** | 🔵 **PLANNED** |
+| **Status** | ✅ **COMPLETE** |
 | **Recent Completion** | M41.0 — Fulfillment BC Remaster: complete (S1–S5), 39 slices, 5 sessions (2026-04-07) |
 | **Previous Completion** | M40.0 — Dynamic Consistency Boundary: Promotions BC (2026-04-06) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-07 (M41.0 closed, M42.0 planned)*
+*Last Updated: 2026-04-08 (M42.0 event modeling session complete)*
 
 ---
 
@@ -55,31 +55,33 @@
 
 ### M42.0: Inventory BC Remaster — Event Modeling Session
 
-**Status:** 🔵 **Planned**
+**Status:** ✅ **Complete** (2026-04-08)
 **Charter:** [Inventory Gap Register](./milestones/fulfillment-remaster-event-modeling-retrospective.md)
             (9 gaps identified during Fulfillment Remaster event modeling, severity-rated)
 **Skill:** `docs/skills/bc-remaster.md`
-**Template:** `docs/planning/templates/bc-remaster-event-modeling-template.md`
+**ADR:** [0060 — Inventory BC Remaster Rationale](../decisions/0060-inventory-bc-remaster-rationale.md)
+**Retrospective:** [Inventory Remaster Event Modeling Retrospective](./milestones/inventory-remaster-event-modeling-retrospective.md)
 
-The Inventory BC Remaster begins with a full event modeling session (same methodology as
-the Fulfillment Remaster). The 9-gap Inventory Gap Register from the Fulfillment event
-modeling session is the charter for this session. Hardcoded WH-01 (🔴 Critical) and no
-multi-warehouse allocation (🔴 Critical) are the two blockers for the StubFulfillmentRoutingEngine
-replacement.
+Full five-phase event modeling session completed. All 9 gaps resolved (2 deferred to P3).
+42 slices (12 P0, 12 P1, 11 P2, 7 P3). 55 scenarios across 4 feature files created from scratch.
+2 aggregates: `ProductInventory` (remastered) + `InventoryTransfer` (new).
 
-**Gap Register:**
+**Key Decisions:**
+- `OrderPlacedHandler` retired; replaced by Fulfillment-initiated `StockReservationRequested`
+- `StockAvailabilityView` inline multi-stream projection for routing queries
+- `StockReceived`/`StockRestocked`/`TransferReceived` confirmed as 3 distinct events
+- `ItemPicked` + `ShipmentHandedToCarrier` integration from Fulfillment for physical tracking
+- UUID v5 stream IDs (clean slate migration)
+- Backorder tracking: subscribe to `BackorderCreated`, publish `BackorderStockAvailable`
 
-| Priority | Gap |
-|---|---|
-| 🔴 Critical | Hardcoded `WH-01` — blocks real routing |
-| 🔴 Critical | No multi-warehouse allocation — single aggregate per SKU |
-| 🟡 Medium | `StockReceived` vs `StockRestocked` redundancy |
-| 🟡 Medium | No `InventoryTransferred` event |
-| 🟡 Medium | Reservation commit timing (ItemPicked vs. ReservationCommitted) |
-| 🟡 Medium | No bin-level tracking |
-| 🟡 Medium | No backorder notification to Inventory |
-| 🟠 Low | MD5 stream ID (should be UUID v5) |
-| 🟠 Low | No capacity data exposure |
+**Artifacts:**
+- Slice table: `docs/planning/inventory-remaster-slices.md`
+- Feature files: `docs/features/inventory/` (4 files, 55 scenarios)
+- ADR 0060: `docs/decisions/0060-inventory-bc-remaster-rationale.md`
+- Retrospective: `docs/planning/milestones/inventory-remaster-event-modeling-retrospective.md`
+- CONTEXTS.md: Inventory entry updated
+
+**Next:** M42.1+ — Inventory BC Remaster implementation sessions (S1–S5)
 
 ## Recent Completions
 
