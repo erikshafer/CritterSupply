@@ -1,7 +1,7 @@
 # BC Remaster Skill
 
-> **Version:** 0.2 (updated after Fulfillment BC Remaster event modeling session)
-> **Status:** Active — Fulfillment Remaster implementation in progress (M41.x)
+> **Version:** 0.3 (updated after Fulfillment BC Remaster implementation M41.0 S1–S5)
+> **Status:** Active — Inventory BC Remaster next (M42.x)
 > **Template:** `docs/planning/templates/bc-remaster-event-modeling-template.md`
 
 ---
@@ -75,7 +75,9 @@ redesigning an existing bounded context**. It adds:
 - The **Adjacent BC Gap Register** — a running list of gaps in neighboring BCs surfaced
   during the remaster session (becomes the charter for the next remaster)
 - How to handle integration contract implications without breaking existing contracts
-- The v0.1 → v1.0 iteration model for the skill itself
+- The **Dual-Publish Migration Strategy** for retiring contracts safely across sessions
+- The **Inline Policy Invocation Pattern** for when Wolverine cascading doesn't work
+- The **Migration Closure Pattern** for ensuring dead consumers are cleaned up
 
 **Always read `event-modeling-workshop.md` before running a remaster session.** This skill
 assumes familiarity with all five phases.
@@ -187,12 +189,19 @@ When customer-facing or operator-facing notifications appear in the model (custo
 SMS, real-time push), ask: **Who owns the notification?**
 
 - Does this BC publish a domain event that **Correspondence consumes** (choreography)?
+  Correspondence owns customer-facing transactional emails and SMS — order confirmations,
+  delivery notifications, return updates. If a new event is customer-meaningful, it should
+  drive a new Correspondence handler.
 - Does this BC **trigger the notification directly** (tight coupling)?
 - Does the **Customer Experience BFF** push the event to the UI via SignalR?
 
-If this is not resolved during the session, the implementation prompt will need to decide.
-The Fulfillment Remaster left this ambiguous — it produced scenarios describing customer
-emails but didn't resolve the ownership question.
+**Established CritterSupply pattern (Fulfillment Remaster):** Fulfillment publishes integration
+events. Correspondence consumes them and generates customer emails. Customer Experience BFF
+consumes them and pushes SignalR updates for the real-time tracking page. These are separate
+handlers on separate queues — Correspondence owns emails, Customer Experience owns UI push.
+
+If this is not resolved during the session, the implementation prompt needs to decide. Add a
+"Notification Ownership" section to the session retrospective if unresolved.
 
 ### 2. Multi-Aggregate Coordination Mechanism
 
@@ -207,6 +216,12 @@ In the Fulfillment Remaster, `PackingCompleted` on the `WorkOrder` stream trigge
 labeling flow on the `Shipment` stream via a policy handler. This was the correct decision,
 but the coordination overhead wasn't fully appreciated during the session. Surface it
 explicitly so the ADR documents it.
+
+**Important Wolverine constraint:** When a handler creates a new event stream via
+`session.Events.StartStream()` or appends events via `session.Events.Append()`, Wolverine
+**cannot automatically cascade** those stream-written events to downstream handlers. Policy
+handlers that are supposed to react to stream-written events must instead be called **inline**
+within the creating handler. See "Inline Policy Invocation Pattern" below.
 
 ### 3. P3+ Scope Deferral Decision
 
@@ -225,6 +240,122 @@ throughout the implementation milestone?**
 This becomes a mandatory bookend in the S1 implementation prompt. Example: the Fulfillment
 Remaster required the Orders integration test suite to stay green throughout because the
 dual-publish migration touched the Orders saga's existing message handlers.
+
+### 5. Integration Contract Retirement Plan
+
+When the remaster redesigns existing integration contracts (renames events, splits events,
+adds new events alongside old ones), ask: **What is the contract migration strategy?**
+
+The recommended approach is the **dual-publish strategy**: the publisher temporarily emits
+both the old and new event in parallel, allowing consumers to be migrated in a coordinated
+follow-on session before the legacy contract is retired. See "Dual-Publish Migration Strategy"
+below for the full pattern. Deciding this in the event modeling session (rather than in S1)
+means the S1 prompt already has the strategy confirmed and can include the migration comment
+boilerplate.
+
+---
+
+## Dual-Publish Migration Strategy
+
+When a remaster renames or replaces integration contracts, a hard cutover (removing the old
+event and adding the new one in the same session) risks breaking consumers mid-implementation.
+The **dual-publish strategy** maintains backward compatibility through the migration period.
+
+### The Pattern
+
+**S1 (implementation session — adds new events):**
+The publisher temporarily emits both the old contract and the new contract. A migration
+comment marks the temporary dual-publish clearly:
+
+```csharp
+// MIGRATION: Dual-publish for backward compatibility with Orders saga.
+// Remove after Orders saga gains ShipmentHandedToCarrier handler (M41.0 S4).
+outgoing.Add(new LegacyMessages.ShipmentDispatched(shipmentId, orderId, carrier, trackingNumber, at));
+// New contract:
+outgoing.Add(new ShipmentHandedToCarrier(shipmentId, orderId, carrier, trackingNumber, at));
+```
+
+This keeps all existing consumers working without modification, allowing S1 to focus on
+adding the new event surface rather than simultaneously migrating all consumers.
+
+**Migration session (the "coordinated migration" — S4 in the Fulfillment Remaster):**
+Once the new event surface is established, a dedicated session:
+1. Adds new handlers in all consumers (**add first**, verify before removing anything)
+2. Verifies all consumer test suites pass with the new handlers
+3. Removes legacy handlers from consumers
+4. Removes the dual-publish from the publisher
+5. Runs the full test suite as the final gate
+
+**Strict sequencing: add → verify → remove. Never remove before adding.**
+
+### What the Migration Comment Should Contain
+
+- What the dual-publish maintains compatibility with: `// Orders saga`
+- When it can be removed: `// Remove after Orders saga gains ShipmentHandedToCarrier handler`
+- The milestone/session where retirement happens: `// M41.0 S4`
+
+### When to Use Dual-Publish
+
+- Renaming an integration event (`ShipmentDispatched` → `ShipmentHandedToCarrier`)
+- Splitting one event into multiple (adding `TrackingNumberAssigned` alongside the dispatch event)
+- Replacing a generic event with a richer one (`ShipmentDeliveryFailed` → `ReturnToSenderInitiated` + `DeliveryAttemptFailed`)
+
+### When NOT to Use Dual-Publish
+
+- Adding a brand-new event with no existing consumers (just add it)
+- Greenfield integrations (no legacy to maintain)
+
+---
+
+## Inline Policy Invocation Pattern
+
+When a handler creates a new event stream via `session.Events.StartStream()` or appends
+events via `session.Events.Append()`, Wolverine **cannot automatically cascade** those
+stream-written events to downstream handlers. Wolverine cascades from messages *returned*
+by `Handle()` — not from events written directly to a Marten session stream.
+
+When a cascade is needed from a stream-written event, call the policy logic **inline** within
+the `Handle()` method using `bus.InvokeAsync()`:
+
+```csharp
+// S2 example: PackingCompleted triggers label generation inline
+public static async Task<OutgoingMessages> Handle(
+    CompletePacking command, IDocumentSession session, IMessageBus bus)
+{
+    session.Events.Append(workOrderId, new PackingCompleted(...));
+
+    // Wolverine cannot cascade from session-written events.
+    // Invoke the label generation logic inline instead.
+    await bus.InvokeAsync(new GenerateShippingLabel(shipmentId));
+
+    return outgoing;
+}
+
+// S3 example: HazmatPolicy called inline when WorkOrders are created
+public static async Task<OutgoingMessages> Handle(
+    RequestFulfillment command, IDocumentSession session, IMessageBus bus)
+{
+    session.Events.StartStream<WorkOrder>(...);
+
+    // HazmatPolicy cannot receive WorkOrderCreated as a cascade.
+    // Apply the policy inline in every handler that creates WorkOrder streams.
+    await HazmatPolicy.CheckAndApply(workOrderId, command.LineItems, session, bus);
+
+    return outgoing;
+}
+```
+
+**Key rules for this pattern:**
+- Use `bus.InvokeAsync()` (not `bus.PublishAsync()`) — synchronous within the handler's context
+- `bus.ScheduleAsync()` remains valid for delayed/scheduled messages
+- Call the policy in **every handler** that creates the relevant stream — not just one.
+  In the Fulfillment Remaster, `FulfillmentRequestedHandler`, `CreateReshipmentHandler`, and
+  `SplitOrderIntoShipmentsHandler` all call `HazmatPolicy.CheckAndApply()` because all three
+  create WorkOrder streams.
+- This is a recognized exception to the general caution against mixing `bus.InvokeAsync()`
+  with `session.Events.Append()`. The distinction: the inline call targets a **different**
+  aggregate/stream than the one being written to. See `docs/skills/wolverine-message-handlers.md`
+  Anti-Pattern #13 for the full treatment.
 
 ---
 
@@ -268,7 +399,7 @@ Recommended additional output:
 - **Implementation Pre-Decisions** — a short document (or section in the retrospective)
   recording three decisions that the S1 implementation prompt will need:
   1. Stub infrastructure strategy (what needs a stub — routing engines, external APIs, etc.)
-  2. Integration contract migration strategy (dual-publish, versioned events, hard cutover)
+  2. Integration contract migration strategy (dual-publish recommended — see above)
   3. P3+ scope deferral confirmation
 
 These don't need to be fully designed during the event modeling session, but surfacing them
@@ -288,7 +419,20 @@ This can be a separate closure session (as in the Fulfillment Remaster S5) or a 
 the retirement session itself. The key is that no milestone closes with dead handlers — they
 compile but serve no purpose and confuse future maintainers.
 
-### Step 5: Iterate on This Skill
+### Step 5: Plan the Implementation Sessions
+
+| Session | Focus | Key Risk |
+|---|---|---|
+| S1 | P0 slices (foundation, aggregates, core events) | New aggregate design; dual-publish activated |
+| S2 | P1 slices (failure modes, compensation) | Test infrastructure for time/external service dependencies |
+| S3 | P2 slices (advanced flows, specialized handling) | Inline policy invocation if Wolverine cascading insufficient |
+| Sn | Coordinated migration (retire legacy contracts) | Highest-risk session; strict add→verify→remove sequencing |
+| Sn+1 | Milestone closure (dead consumers, Correspondence enrichment) | Dead handler cleanup; new notification handlers |
+
+The coordinated migration session is always the highest-risk. Plan it as a standalone session
+with its own bookend test counts separate from the P0/P1/P2 sessions.
+
+### Step 6: Iterate on This Skill
 
 After each remaster, add a version history entry to this skill file documenting what
 was learned and what changed.
@@ -308,6 +452,7 @@ Related skills to load alongside this one:
 - `event-modeling-workshop.md` — the underlying methodology
 - `marten-event-sourcing.md` — for aggregate design decisions in Phase 4
 - `wolverine-sagas.md` — if the remaster surfaces saga design questions
+- `integration-messaging.md` — for contract migration and dual-publish patterns
 
 ---
 
@@ -317,6 +462,6 @@ Related skills to load alongside this one:
 |---|---|---|
 | 0.1 | 2026-04-06 | Initial version — extracted from Fulfillment Remaster prompt |
 | 0.2 | 2026-04-06 | Post-Fulfillment event modeling session — added: feature files as domain input, scope complexity signals, standard questions (notification ownership, multi-aggregate coordination, P3 deferral, cross-BC test gate), severity ratings for gap register, Implementation Pre-Decisions output |
-| 0.3 | 2026-04-07 | Post-Fulfillment Remaster (M41.0 S1–S5) — added: dead handler cleanup as a mandatory closure step (Track A pattern); Correspondence enrichment as a standard follow-on to contract migration; Migration Closure Pattern section in Step 4; noted that HazmatPolicy inline invocation is the established pattern when Wolverine cascading doesn't work with session.Events.Append() workflows |
+| 0.3 | 2026-04-07 | Post-Fulfillment Remaster (M41.0 S1–S5) — added: Migration Closure mandatory step in Step 4 (grep/classify/migrate/notify checklist); Dual-Publish Migration Strategy section with code example and sequencing rules; Inline Policy Invocation Pattern section (Wolverine cascade limitation with session.Events.Append()); Standard Question #5 (integration contract retirement plan); Notification Ownership question updated with established CritterSupply resolution; Standard Question #2 updated with cascade limitation note; Step 5 implementation session progression table; updated Skill Invocation to include integration-messaging.md; updated "How This Skill Relates" bullet list |
 
 *Next update planned after Inventory BC Remaster event modeling session completes.*
