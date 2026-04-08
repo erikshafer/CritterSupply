@@ -20,7 +20,9 @@ Patterns for testing Wolverine and Marten applications in CritterSupply.
 12. [Test Organization](#test-organization)
 13. [Testing Async Patterns](#testing-async-patterns)
 14. [Multi-BC BFF Testing](#multi-bc-bff-testing)
-15. [Key Principles](#key-principles)
+15. [Testing Time-Dependent Handlers — ISystemClock Pattern](#testing-time-dependent-handlers--isystemclock-pattern) ⭐ *M41.0 Addition*
+16. [Testing Failure Paths — Injectable Failure Stub Pattern](#testing-failure-paths--injectable-failure-stub-pattern) ⭐ *M41.0 Addition*
+17. [Key Principles](#key-principles)
 
 ---
 
@@ -1113,6 +1115,314 @@ _fixture.OrdersClient.AddOrderDetail(new OrderDetailDto(orderId, ...));
 ❌ **Don't use when:**
 - Testing single-BC logic (use domain BC's own tests)
 - Simple HTTP proxying (unnecessary complexity)
+
+---
+
+## Testing Time-Dependent Handlers — ISystemClock Pattern
+
+⭐ *M41.0 S3 Addition*
+
+Handlers that check elapsed time (scheduled jobs, SLA monitoring, lost-in-transit detection)
+cannot use `DateTimeOffset.UtcNow` directly — tests would need to wait real time or introduce
+race conditions. The solution is an injectable clock abstraction.
+
+### The Infrastructure
+
+**`ISystemClock` interface (domain project — production code):**
+
+```csharp
+public interface ISystemClock
+{
+    DateTimeOffset UtcNow { get; }
+}
+
+/// 
+public class SystemClock : ISystemClock
+{
+    public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+}
+```
+
+**`FrozenSystemClock` (integration test project — test infrastructure only):**
+
+```csharp
+/// <summary>Test implementation — settable for time-based scenario control.</summary>
+public class FrozenSystemClock : ISystemClock
+{
+    public DateTimeOffset UtcNow { get; set; } = DateTimeOffset.UtcNow;
+}
+```
+
+**In `Program.cs` (production):**
+```csharp
+builder.Services.AddSingleton<ISystemClock, SystemClock>();
+```
+
+**In `TestFixture.cs` (test infrastructure):**
+```csharp
+// Expose the clock as a public property so test classes can advance it
+public FrozenSystemClock Clock { get; private set; } = new FrozenSystemClock();
+
+// During host initialization:
+Host = await AlbaHost.For<Program>(builder =>
+{
+    builder.ConfigureServices(services =>
+    {
+        services.RemoveAll<ISystemClock>();
+        services.AddSingleton<ISystemClock>(Clock); // Share the fixture's instance
+    });
+});
+```
+
+### Usage in Tests
+
+**Reset the clock in `InitializeAsync()` of each test class** — the `FrozenSystemClock` is
+a singleton shared across the entire xUnit collection. One class advancing the clock by 8
+days will affect subsequent classes unless they reset it.
+
+```csharp
+public class TimeBasedMonitoringTests : IAsyncLifetime
+{
+    private readonly TestFixture _fixture;
+
+    public TimeBasedMonitoringTests(TestFixture fixture) => _fixture = fixture;
+
+    public async Task InitializeAsync()
+    {
+        await _fixture.CleanAllDocumentsAsync();
+        _fixture.Clock.UtcNow = DateTimeOffset.UtcNow; // Reset to real "now"
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task CheckForLostShipment_After_8_Days_Detects_Lost()
+    {
+        var shipmentId = await SeedInTransitShipment();
+
+        _fixture.Clock.UtcNow = DateTimeOffset.UtcNow.AddDays(8); // Advance past threshold
+        await _fixture.ExecuteAndWaitAsync(new CheckForLostShipment(shipmentId));
+
+        using var session = _fixture.GetDocumentSession();
+        var shipment = await session.Events.AggregateStreamAsync<Shipment>(shipmentId);
+        shipment!.Status.ShouldBe(ShipmentStatus.LostInTransit);
+    }
+
+    [Fact]
+    public async Task CheckForLostShipment_At_5_Days_Does_Not_Detect_Lost()
+    {
+        var shipmentId = await SeedInTransitShipment();
+
+        _fixture.Clock.UtcNow = DateTimeOffset.UtcNow.AddDays(5); // Below threshold
+        await _fixture.ExecuteAndWaitAsync(new CheckForLostShipment(shipmentId));
+
+        using var session = _fixture.GetDocumentSession();
+        var shipment = await session.Events.AggregateStreamAsync<Shipment>(shipmentId);
+        shipment!.Status.ShouldBe(ShipmentStatus.InTransit); // Unchanged
+    }
+}
+```
+
+### Handler Pattern Using ISystemClock
+
+```csharp
+public static class CheckForLostShipmentHandler
+{
+    public static async Task<OutgoingMessages?> Handle(
+        CheckForLostShipment message,
+        IDocumentSession session,
+        ISystemClock clock)  // Injected — never DateTimeOffset.UtcNow directly
+    {
+        var shipment = await session.Events.AggregateStreamAsync<Shipment>(message.ShipmentId);
+        if (shipment is null || shipment.Status != ShipmentStatus.InTransit)
+            return null;
+
+        var daysSinceLastScan = (clock.UtcNow - shipment.LastCarrierScanAt).TotalDays;
+        if (daysSinceLastScan < 7) return null;
+
+        session.Events.Append(shipment.Id, new ShipmentLostInTransit(shipment.Id, clock.UtcNow));
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new Messages.Contracts.Fulfillment.ShipmentLostInTransit(...));
+        return outgoing;
+    }
+}
+```
+
+**CritterSupply reference:**
+- `src/Fulfillment/Fulfillment/ISystemClock.cs`
+- `tests/Fulfillment/Fulfillment.Api.IntegrationTests/FrozenSystemClock.cs`
+- `tests/Fulfillment/Fulfillment.Api.IntegrationTests/Shipments/TimeBasedMonitoringTests.cs`
+
+**Reference:** [Fulfillment Remaster S3 Retrospective — Part 1B](../../planning/milestones/fulfillment-remaster-s3-retrospective.md)
+
+---
+
+## Testing Failure Paths — Injectable Failure Stub Pattern
+
+⭐ *M41.0 S3 Addition*
+
+When a handler wraps an external service and the default test fixture uses a stub that always
+succeeds, testing failure paths requires injecting a failing implementation without affecting
+the happy-path test classes.
+
+### The Pattern
+
+**Step 1: Extract the interface (production code in the domain project):**
+
+```csharp
+public interface ICarrierLabelService
+{
+    Task<LabelResult> GenerateLabelAsync(ShipmentDetails details, CancellationToken ct);
+}
+
+/// <summary>Default stub — always succeeds in Development and CI.</summary>
+public class StubCarrierLabelService : ICarrierLabelService
+{
+    public Task<LabelResult> GenerateLabelAsync(ShipmentDetails details, CancellationToken ct)
+        => Task.FromResult(new LabelResult(
+            TrackingNumber: $"STUB-{Guid.NewGuid():N}",
+            LabelUrl: "https://stub.example.com/label.pdf",
+            Success: true));
+}
+```
+
+**Step 2: Register the stub in `Program.cs`:**
+```csharp
+builder.Services.AddSingleton<ICarrierLabelService, StubCarrierLabelService>();
+```
+
+**Step 3: Create the always-failing stub (test infrastructure only):**
+
+```csharp
+/// <summary>
+/// Always-failing stub. Only used in <see cref="LabelFailureTestFixture"/>.
+/// Never register in the main TestFixture.
+/// </summary>
+public class AlwaysFailingCarrierLabelService : ICarrierLabelService
+{
+    public Task<LabelResult> GenerateLabelAsync(ShipmentDetails details, CancellationToken ct)
+        => Task.FromResult(new LabelResult(
+            TrackingNumber: null,
+            LabelUrl: null,
+            Success: false,
+            ErrorMessage: "Carrier API unavailable (test stub)"));
+}
+```
+
+**Step 4: Create a dedicated test fixture with its own xUnit collection:**
+
+```csharp
+[CollectionDefinition(Name)]
+public class LabelFailureTestCollection : ICollectionFixture<LabelFailureTestFixture>
+{
+    public const string Name = "Label Failure Tests";
+}
+
+public class LabelFailureTestFixture : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
+        .WithDatabase("fulfillment_failure_test_db") // Different DB name from main fixture
+        .WithName($"fulfillment-failure-postgres-{Guid.NewGuid():N}")
+        .WithCleanUp(true)
+        .Build();
+
+    public IAlbaHost Host { get; private set; } = null!;
+
+    public async Task InitializeAsync()
+    {
+        await _postgres.StartAsync();
+        var connectionString = _postgres.GetConnectionString();
+
+        Host = await AlbaHost.For<Program>(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                services.ConfigureMarten(opts => opts.Connection(connectionString));
+                services.DisableAllExternalWolverineTransports();
+
+                // Swap the default stub for the always-failing version
+                services.RemoveAll<ICarrierLabelService>();
+                services.AddSingleton<ICarrierLabelService, AlwaysFailingCarrierLabelService>();
+            });
+        });
+    }
+
+    public async Task DisposeAsync()
+    {
+        // Standard DisposeAsync pattern — see TestFixture template
+    }
+
+    public IDocumentSession GetDocumentSession() =>
+        Host.Services.GetRequiredService<IDocumentStore>().LightweightSession();
+
+    public async Task CleanAllDocumentsAsync()
+    {
+        var store = Host.Services.GetRequiredService<IDocumentStore>();
+        await store.Advanced.Clean.DeleteAllDocumentsAsync();
+    }
+
+    public async Task<ITrackedSession> ExecuteAndWaitAsync<T>(T message, int timeoutSeconds = 15)
+        where T : class
+    {
+        return await Host.TrackActivity(TimeSpan.FromSeconds(timeoutSeconds))
+            .DoNotAssertOnExceptionsDetected()
+            .AlsoTrack(Host)
+            .ExecuteAndWaitAsync(async ctx => await ctx.InvokeAsync(message));
+    }
+}
+```
+
+**Step 5: Write failure-path tests bound to the dedicated collection:**
+
+```csharp
+[Collection(LabelFailureTestCollection.Name)] // NOT the main collection
+public class LabelGenerationFailureTests : IAsyncLifetime
+{
+    private readonly LabelFailureTestFixture _fixture;
+
+    public LabelGenerationFailureTests(LabelFailureTestFixture fixture) => _fixture = fixture;
+
+    public async Task InitializeAsync() => await _fixture.CleanAllDocumentsAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task GenerateShippingLabel_WhenCarrierFails_AppendsLabelGenerationFailed()
+    {
+        var shipmentId = await SeedShipmentReadyForLabel();
+
+        await _fixture.ExecuteAndWaitAsync(new GenerateShippingLabel(shipmentId));
+
+        using var session = _fixture.GetDocumentSession();
+        var shipment = await session.Events.AggregateStreamAsync<Shipment>(shipmentId);
+        shipment!.Status.ShouldBe(ShipmentStatus.LabelGenerationFailed);
+    }
+}
+```
+
+### Why a Separate xUnit Collection?
+
+xUnit collections share a single fixture instance. Injecting `AlwaysFailingCarrierLabelService`
+into the main fixture would break every label-related test in every class in that collection.
+
+A separate `[CollectionDefinition]` creates a fully isolated fixture with its own Postgres
+container and DI configuration. The cost is a second container startup, acceptable for a
+small targeted set of failure-path tests.
+
+### Decision Guide
+
+| Situation | Approach |
+|---|---|
+| Main stub "never fails"; need failure-path coverage | Separate fixture + separate xUnit collection |
+| Stub has a conditional failure mode (toggle flag) | `RemoveAll + AddSingleton` within main fixture per test class |
+| Time advancement needed across tests | `FrozenSystemClock` singleton on main fixture; reset in `InitializeAsync()` |
+
+**CritterSupply reference:**
+- `src/Fulfillment/Fulfillment/Shipments/ICarrierLabelService.cs`
+- `tests/Fulfillment/Fulfillment.Api.IntegrationTests/AlwaysFailingCarrierLabelService.cs`
+- `tests/Fulfillment/Fulfillment.Api.IntegrationTests/LabelFailureTestFixture.cs`
+- `tests/Fulfillment/Fulfillment.Api.IntegrationTests/Shipments/LabelGenerationFailureTests.cs`
+
+**Reference:** [Fulfillment Remaster S3 Retrospective — Part 1A](../../planning/milestones/fulfillment-remaster-s3-retrospective.md)
 
 ---
 

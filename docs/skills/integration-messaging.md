@@ -784,7 +784,23 @@ public class ShoppingToOrdersPipelineTests : IClassFixture<CrossBcTestFixture>
 5. **Implement the handler** in `<ConsumerBc>/<Feature>/<MessageName>Handler.cs`
 6. **Verify queue naming** follows convention: `<consumer-bc>-<publisher-bc>-<category>`
 7. **Write cross-BC smoke test** to verify RabbitMQ pipeline end-to-end
-8. **Update `CONTEXTS.md`** only if new BC integration is introduced (not for additional messages in existing integration)
+8. **When retiring a contract:** Run `grep -r "RetiredEventName" src/` for every message
+   type being removed. Classify every result as:
+   - **Active** — still has a publisher; not being retired
+   - **Dead-needs-migration** — should consume the replacement event; update the handler
+   - **Dead-no-publisher** — no publisher emits this anymore; delete or add `[Obsolete]`
+   Never close a milestone with unresolved dead handlers — they compile silently but serve
+   no purpose and mislead future sessions.
+9. **Update `CONTEXTS.md`** when:
+   - A **new BC-to-BC integration direction** is introduced (e.g., first-ever message from
+     Pricing to Inventory)
+   - **Contract names change** — retiring `ShipmentDispatched` in favour of
+     `ShipmentHandedToCarrier` updates the Fulfillment entry even though the direction
+     (Fulfillment → Orders) hasn't changed
+   - **Legacy contracts are retired** — remove them from the relevant BC entry
+
+   Do NOT update for adding new messages to an existing integration direction with no
+   naming changes.
 
 ### Example: Add `ReturnShipmentReceived` Integration
 
@@ -1533,6 +1549,63 @@ return (Results.Created($"/api/marketplaces/{marketplace.ChannelCode}", marketpl
 
 ---
 
+### Lesson 16: Dual-Publish Migration Strategy for Contract Retirement (M41.0)
+
+**Use Case:** Retiring or renaming an integration contract when multiple consumers depend on it.
+
+**Problem:** A hard cutover (removing the old event and publishing only the new one in the
+same session) requires all consumers to migrate simultaneously. For a remaster series spanning
+multiple sessions, this is impractical and high-risk — especially when one of the consumers
+is the Orders saga, which coordinates payments, inventory, and fulfillment.
+
+**Pattern — Dual-Publish during the migration period:**
+
+The publisher temporarily emits both the old and new event. A migration comment marks the
+temporary dual-publish clearly:
+
+```csharp
+// MIGRATION: Dual-publish for backward compatibility with Orders saga.
+// Remove after Orders saga gains ShipmentHandedToCarrier handler (M41.0 S4).
+outgoing.Add(new LegacyMessages.ShipmentDispatched(shipmentId, orderId, carrier, trackingNumber, at));
+// New contract:
+outgoing.Add(new ShipmentHandedToCarrier(shipmentId, orderId, carrier, trackingNumber, at));
+```
+
+This keeps all existing consumers working without modification. The S1 session activates
+the dual-publish. A later coordinated migration session retires it.
+
+**The coordinated migration session (S4 in the Fulfillment Remaster):**
+1. Add new handlers in all consumers — **add first**
+2. Verify all consumer test suites pass with the new handlers
+3. Remove legacy handlers from consumers — **remove second**
+4. Remove the dual-publish from the publisher
+5. Run the full cross-BC test suite as the final gate
+
+**Strict sequencing: add → verify → remove. Never remove before adding.**
+
+**What the migration comment must contain:**
+- What it maintains compatibility with: `// Orders saga`
+- When it can be removed: `// Remove after Orders saga gains ShipmentHandedToCarrier handler`
+- The session where retirement happens: `// M41.0 S4`
+
+**After the dual-publish is removed — dead consumer verification:**
+
+Run `grep -r "ShipmentDispatched" src/` (and equivalent for every retired contract name).
+Classify each result as active vs. dead. Dead handlers must be migrated to the replacement
+event or deleted before the milestone closes. See the "Adding a New Integration" checklist
+Step 8 for the classification process.
+
+**CritterSupply example (M41.0):**
+- `ShipmentDispatched` → `ShipmentHandedToCarrier`: S1 dual-publish, S4 retirement
+- `ShipmentDeliveryFailed` → `ReturnToSenderInitiated`: S1 dual-publish, S4 retirement
+- Consumer BCs affected: Orders, Correspondence, Customer Experience, Backoffice
+- Dead consumers found post-S4: 8 handlers/projections (Customer Experience + Backoffice)
+- Cleaned up in: M41.0 S5 (milestone closure session)
+
+**Reference:** [Fulfillment Remaster S1 Retrospective](../../planning/milestones/fulfillment-remaster-s1-retrospective.md) · [S4 Retrospective](../../planning/milestones/fulfillment-remaster-s4-retrospective.md)
+
+---
+
 ## Appendix
 
 ### Cross-References to Related Skills
@@ -1574,6 +1647,6 @@ return (Results.Created($"/api/marketplaces/{marketplace.ChannelCode}", marketpl
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2026-03-15
+**Document Version:** 1.1
+**Last Updated:** 2026-04-07
 **Author:** Claude (based on comprehensive CritterSupply codebase analysis)
