@@ -5,22 +5,25 @@ namespace Backoffice.DashboardReporting;
 
 /// <summary>
 /// Inline projection that builds FulfillmentPipelineView from Fulfillment BC integration messages.
-/// Tracks active shipments in transit, delivered shipments, and failed delivery attempts.
+/// Tracks active shipments in transit, delivered, failed, backordered, and lost.
+/// Updated in M41.0 S5 to consume new Fulfillment event surface.
 /// </summary>
 public sealed class FulfillmentPipelineViewProjection : MultiStreamProjection<FulfillmentPipelineView, string>
 {
     public FulfillmentPipelineViewProjection()
     {
         // All Fulfillment events update the singleton "current" document
-        Identity<ShipmentDispatched>(_ => "current");
+        Identity<ShipmentHandedToCarrier>(_ => "current");
         Identity<ShipmentDelivered>(_ => "current");
-        Identity<ShipmentDeliveryFailed>(_ => "current");
+        Identity<ReturnToSenderInitiated>(_ => "current");
+        Identity<BackorderCreated>(_ => "current");
+        Identity<ShipmentLostInTransit>(_ => "current");
     }
 
     /// <summary>
-    /// Initialize the view when the first ShipmentDispatched event arrives.
+    /// Initialize the view when the first ShipmentHandedToCarrier event arrives.
     /// </summary>
-    public FulfillmentPipelineView Create(ShipmentDispatched evt)
+    public FulfillmentPipelineView Create(ShipmentHandedToCarrier evt)
     {
         return new FulfillmentPipelineView
         {
@@ -28,19 +31,21 @@ public sealed class FulfillmentPipelineViewProjection : MultiStreamProjection<Fu
             ShipmentsInTransit = 1,
             ShipmentsDelivered = 0,
             DeliveryFailures = 0,
-            LastUpdatedAt = evt.DispatchedAt
+            Backorders = 0,
+            ShipmentsLostInTransit = 0,
+            LastUpdatedAt = evt.HandedAt
         };
     }
 
     /// <summary>
-    /// Increment in-transit count when a shipment is dispatched.
+    /// Increment in-transit count when a shipment is handed to carrier.
     /// </summary>
-    public static FulfillmentPipelineView Apply(FulfillmentPipelineView current, ShipmentDispatched evt)
+    public static FulfillmentPipelineView Apply(FulfillmentPipelineView current, ShipmentHandedToCarrier evt)
     {
         return current with
         {
             ShipmentsInTransit = current.ShipmentsInTransit + 1,
-            LastUpdatedAt = evt.DispatchedAt
+            LastUpdatedAt = evt.HandedAt
         };
     }
 
@@ -58,15 +63,40 @@ public sealed class FulfillmentPipelineViewProjection : MultiStreamProjection<Fu
     }
 
     /// <summary>
-    /// Move shipment from in-transit to failed when delivery fails.
+    /// Move shipment from in-transit to failed when return-to-sender is initiated.
     /// </summary>
-    public static FulfillmentPipelineView Apply(FulfillmentPipelineView current, ShipmentDeliveryFailed evt)
+    public static FulfillmentPipelineView Apply(FulfillmentPipelineView current, ReturnToSenderInitiated evt)
     {
         return current with
         {
             ShipmentsInTransit = current.ShipmentsInTransit - 1,
             DeliveryFailures = current.DeliveryFailures + 1,
-            LastUpdatedAt = evt.FailedAt
+            LastUpdatedAt = evt.InitiatedAt
+        };
+    }
+
+    /// <summary>
+    /// Increment backorder count when a shipment is backordered.
+    /// </summary>
+    public static FulfillmentPipelineView Apply(FulfillmentPipelineView current, BackorderCreated evt)
+    {
+        return current with
+        {
+            Backorders = current.Backorders + 1,
+            LastUpdatedAt = evt.CreatedAt
+        };
+    }
+
+    /// <summary>
+    /// Increment lost-in-transit count (shipment moves from in-transit to lost).
+    /// </summary>
+    public static FulfillmentPipelineView Apply(FulfillmentPipelineView current, ShipmentLostInTransit evt)
+    {
+        return current with
+        {
+            ShipmentsInTransit = current.ShipmentsInTransit - 1,
+            ShipmentsLostInTransit = current.ShipmentsLostInTransit + 1,
+            LastUpdatedAt = evt.DetectedAt
         };
     }
 }

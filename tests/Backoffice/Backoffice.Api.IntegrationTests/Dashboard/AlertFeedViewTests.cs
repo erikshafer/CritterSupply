@@ -97,25 +97,27 @@ public class AlertFeedViewTests
     }
 
     [Fact]
-    public async Task ShipmentDeliveryFailed_CreatesAlert_WithCriticalSeverity()
+    public async Task ReturnToSenderInitiated_CreatesAlert_WithCriticalSeverity()
     {
         // Arrange
         await _fixture.CleanAllDocumentsAsync();
 
         var orderId = Guid.NewGuid();
         var shipmentId = Guid.NewGuid();
-        var failedAt = new DateTimeOffset(2026, 3, 16, 12, 15, 0, TimeSpan.Zero);
+        var initiatedAt = new DateTimeOffset(2026, 3, 16, 12, 15, 0, TimeSpan.Zero);
 
-        var deliveryFailed = new ShipmentDeliveryFailed(
+        var returnToSender = new ReturnToSenderInitiated(
             orderId,
             shipmentId,
-            "Address not found",
-            failedAt);
+            "UPS",
+            3,
+            7,
+            initiatedAt);
 
         // Act
         using (var session = _fixture.GetDocumentSession())
         {
-            session.Events.Append(Guid.NewGuid(), deliveryFailed);
+            session.Events.Append(Guid.NewGuid(), returnToSender);
             await session.SaveChangesAsync();
         }
 
@@ -128,10 +130,10 @@ public class AlertFeedViewTests
             var alert = alerts[0];
             alert.AlertType.ShouldBe(AlertType.DeliveryFailed);
             alert.Severity.ShouldBe(AlertSeverity.Critical);
-            alert.CreatedAt.ShouldBe(failedAt);
+            alert.CreatedAt.ShouldBe(initiatedAt);
             alert.OrderId.ShouldBe(orderId);
             alert.Message.ShouldContain(orderId.ToString());
-            alert.Message.ShouldContain("Address not found");
+            alert.Message.ShouldContain("UPS");
             alert.ContextData.ShouldNotBeNull();
             alert.ContextData.ShouldContain(shipmentId.ToString());
         }
@@ -264,7 +266,7 @@ public class AlertFeedViewTests
         var baseTime = new DateTimeOffset(2026, 3, 16, 10, 0, 0, TimeSpan.Zero);
 
         var lowStock = new LowStockDetected("SKU-001", "warehouse-central", 5, 20, baseTime.AddHours(1));
-        var deliveryFailed = new ShipmentDeliveryFailed(Guid.NewGuid(), Guid.NewGuid(), "Address issue", baseTime.AddHours(2));
+        var returnToSender = new ReturnToSenderInitiated(Guid.NewGuid(), Guid.NewGuid(), "UPS", 3, 7, baseTime.AddHours(2));
         var paymentFailed = new PaymentFailed(Guid.NewGuid(), Guid.NewGuid(), "Card declined", true, baseTime.AddHours(3));
         var returnExpired = new ReturnExpired(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), baseTime.AddHours(4));
 
@@ -272,7 +274,7 @@ public class AlertFeedViewTests
         using (var session = _fixture.GetDocumentSession())
         {
             session.Events.Append(Guid.NewGuid(), lowStock);
-            session.Events.Append(Guid.NewGuid(), deliveryFailed);
+            session.Events.Append(Guid.NewGuid(), returnToSender);
             session.Events.Append(Guid.NewGuid(), paymentFailed);
             session.Events.Append(Guid.NewGuid(), returnExpired);
             await session.SaveChangesAsync();
@@ -414,7 +416,7 @@ public class AlertFeedViewTests
 
         // Critical severity
         var lowStockCritical = new LowStockDetected("SKU-002", "warehouse-2", 0, 15, baseTime.AddHours(4));
-        var deliveryFailed = new ShipmentDeliveryFailed(Guid.NewGuid(), Guid.NewGuid(), "Address issue", baseTime.AddHours(5));
+        var returnToSender = new ReturnToSenderInitiated(Guid.NewGuid(), Guid.NewGuid(), "UPS", 3, 7, baseTime.AddHours(5));
         var paymentFailedNonRetriable = new PaymentFailed(Guid.NewGuid(), Guid.NewGuid(), "Fraud", false, baseTime.AddHours(6));
 
         using (var session = _fixture.GetDocumentSession())
@@ -423,7 +425,7 @@ public class AlertFeedViewTests
             session.Events.Append(Guid.NewGuid(), lowStockWarning);
             session.Events.Append(Guid.NewGuid(), paymentFailedRetriable);
             session.Events.Append(Guid.NewGuid(), lowStockCritical);
-            session.Events.Append(Guid.NewGuid(), deliveryFailed);
+            session.Events.Append(Guid.NewGuid(), returnToSender);
             session.Events.Append(Guid.NewGuid(), paymentFailedNonRetriable);
             await session.SaveChangesAsync();
         }

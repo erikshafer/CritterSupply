@@ -41,44 +41,82 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M41.0 — Fulfillment BC Remaster: S4 (Orders saga migration + legacy contract retirement) |
-| **Status** | 🟢 **IN PROGRESS** |
-| **Recent Completion** | M41.0 S3 — Fulfillment BC Remaster P2 complete: 10 slices, 78 integration tests, ISystemClock + ICarrierLabelService (2026-04-07) |
-| **Previous Completion** | M41.0 S2 — Fulfillment BC Remaster P1 complete: 14 slices, 51 integration + 40 unit tests (2026-04-06) |
+| **Current Milestone** | M42.0 — Inventory BC Remaster: Event Modeling Session |
+| **Status** | 🔵 **PLANNED** |
+| **Recent Completion** | M41.0 — Fulfillment BC Remaster: complete (S1–S5), 39 slices, 5 sessions (2026-04-07) |
+| **Previous Completion** | M40.0 — Dynamic Consistency Boundary: Promotions BC (2026-04-06) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-07 (M41.0 S4 in progress)*
+*Last Updated: 2026-04-07 (M41.0 closed, M42.0 planned)*
 
 ---
 
 ## Active Milestone
 
-### M41.0: Fulfillment BC Remaster — S4 (Orders Saga Migration)
+### M42.0: Inventory BC Remaster — Event Modeling Session
 
-**Status:** 🟢 **In Progress**
-**ADR:** [0059 — Fulfillment BC Remaster Rationale](../decisions/0059-fulfillment-bc-remaster-rationale.md)
+**Status:** 🔵 **Planned**
+**Charter:** [Inventory Gap Register](./milestones/fulfillment-remaster-event-modeling-retrospective.md)
+            (9 gaps identified during Fulfillment Remaster event modeling, severity-rated)
+**Skill:** `docs/skills/bc-remaster.md`
+**Template:** `docs/planning/templates/bc-remaster-event-modeling-template.md`
 
-**Goal:** Retire the dual-publish migration strategy from S1. Wire the Orders saga to the
-new Fulfillment contract surface (ShipmentHandedToCarrier, TrackingNumberAssigned,
-ReturnToSenderInitiated, ReshipmentCreated, BackorderCreated, FulfillmentCancelled,
-OrderSplitIntoShipments). Remove legacy ShipmentDispatched and ShipmentDeliveryFailed
-handlers and contracts. Update Correspondence BC.
+The Inventory BC Remaster begins with a full event modeling session (same methodology as
+the Fulfillment Remaster). The 9-gap Inventory Gap Register from the Fulfillment event
+modeling session is the charter for this session. Hardcoded WH-01 (🔴 Critical) and no
+multi-warehouse allocation (🔴 Critical) are the two blockers for the StubFulfillmentRoutingEngine
+replacement.
 
-**Key Deliverables — S4:**
-- 7 new Orders saga handlers + Decider methods
-- 3 new OrderStatus values: Backordered, DeliveryFailed, Reshipping
-- Legacy handler removal (ShipmentDispatched, ShipmentDeliveryFailed)
-- Dual-publish removal from Fulfillment
-- Correspondence BC: ShipmentDeliveryFailedHandler → ReturnToSenderInitiatedHandler
-- CONTEXTS.md update for Fulfillment, Orders, and Correspondence
-- 8+ new Orders integration tests
+**Gap Register:**
 
-**S1 Retrospective:** [S1](./milestones/fulfillment-remaster-s1-retrospective.md)
-**S2 Retrospective:** [S2](./milestones/fulfillment-remaster-s2-retrospective.md)
-**S3 Retrospective:** [S3](./milestones/fulfillment-remaster-s3-retrospective.md)
-**S4 Retrospective:** [S4](./milestones/fulfillment-remaster-s4-retrospective.md)
+| Priority | Gap |
+|---|---|
+| 🔴 Critical | Hardcoded `WH-01` — blocks real routing |
+| 🔴 Critical | No multi-warehouse allocation — single aggregate per SKU |
+| 🟡 Medium | `StockReceived` vs `StockRestocked` redundancy |
+| 🟡 Medium | No `InventoryTransferred` event |
+| 🟡 Medium | Reservation commit timing (ItemPicked vs. ReservationCommitted) |
+| 🟡 Medium | No bin-level tracking |
+| 🟡 Medium | No backorder notification to Inventory |
+| 🟠 Low | MD5 stream ID (should be UUID v5) |
+| 🟠 Low | No capacity data exposure |
 
 ## Recent Completions
+
+### ✅ M41.0: Fulfillment BC Remaster (2026-04-07)
+
+**Status:** ✅ **Complete** — 5 implementation sessions
+**Goal:** Replace the monolithic Shipment aggregate with WorkOrder + Shipment, implement
+39 domain model slices across P0/P1/P2, retire legacy integration contracts, and update
+all consumer BCs.
+
+**Key Deliverables:**
+- **S1 (P0 — Foundation):** WorkOrder + Shipment aggregates, StubFulfillmentRoutingEngine,
+  Track A (intake → wave → pick → pack) + Track B (label → carrier → delivery),
+  ShipmentStatusView projection, dual-publish migration strategy. 15 slices. 50 tests.
+- **S2 (P1 — Failure Modes):** WorkOrderHandlers.cs vertical slice debt cleared; HTTP carrier
+  webhook endpoint; PackingCompleted → label cascade; 14 failure mode slices (short pick,
+  pack discrepancy, missed pickup, delivery attempts, ghost shipment, lost in transit, RTS,
+  SLA escalation). ICarrierLabelService + ISystemClock test infrastructure. 78 tests.
+- **S3 (P2 — Compensation + Advanced):** 10 compensation slices (reshipment, delivery dispute,
+  multi-FC split, carrier claims, cancellation, cold pack, hazmat, rate dispute, 3PL).
+  CarrierPerformanceView + MultiShipmentView projections. 3 new integration contracts.
+- **S4 (Orders Saga Migration):** 7 new saga handlers + Decider methods; 3 new OrderStatus
+  values; legacy ShipmentDispatched + ShipmentDeliveryFailed retired; dual-publish removed;
+  Correspondence ShipmentDeliveryFailedHandler replaced. Orders: 55 integration + 144 unit.
+- **S5 (Milestone Closure):** Dead handler cleanup (Customer Experience, Backoffice,
+  Correspondence); 3 new Correspondence notification handlers (DeliveryAttemptFailed,
+  BackorderCreated, ShipmentLostInTransit); milestone closure retrospective.
+
+**DoD:** 0 errors, 17 warnings. All BC test suites green.
+**ADR:** [0059 — Fulfillment BC Remaster Rationale](../decisions/0059-fulfillment-bc-remaster-rationale.md)
+**Retrospectives:** [S1](./milestones/fulfillment-remaster-s1-retrospective.md) · [S2](./milestones/fulfillment-remaster-s2-retrospective.md) · [S3](./milestones/fulfillment-remaster-s3-retrospective.md) · [S4](./milestones/fulfillment-remaster-s4-retrospective.md) · [S5](./milestones/fulfillment-remaster-s5-retrospective.md) · [Milestone Closure](./milestones/fulfillment-remaster-milestone-closure-retrospective.md)
+
+**Inherited by next milestone:**
+1. P3 international slices — explicitly deferred; warrants dedicated sub-session
+2. MultiShipmentView production identity resolution (S3 debt)
+3. CarrierPerformanceView carrier resolution (S3 debt)
+4. Inventory BC Remaster — Gap Register from the event modeling session is the charter
 
 ### ✅ M40.0: Dynamic Consistency Boundary — Promotions BC (2026-04-06)
 

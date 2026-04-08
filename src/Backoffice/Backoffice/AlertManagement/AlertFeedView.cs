@@ -62,7 +62,9 @@ public enum AlertType
     LowStock,
     DeliveryFailed,
     PaymentFailed,
-    ReturnExpired
+    ReturnExpired,
+    GhostShipment,
+    ShipmentLost
 }
 
 /// <summary>

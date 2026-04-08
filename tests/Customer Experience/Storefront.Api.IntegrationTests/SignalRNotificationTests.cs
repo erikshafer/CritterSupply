@@ -33,7 +33,7 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
 {
     /// <summary>
     /// Stub customer ID used for handlers that have not yet implemented the Orders BC lookup
-    /// (PaymentAuthorized, ReservationConfirmed, ShipmentDispatched).
+    /// (PaymentAuthorized, ReservationConfirmed, ShipmentHandedToCarrier).
     /// TODO: Replace with real customerId lookup from Orders BC when implemented.
     /// </summary>
     private static readonly Guid StubCustomerId = Guid.Empty;
@@ -272,13 +272,13 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
     }
 
     [Fact]
-    public void ShipmentDispatched_Handler_ReturnsGroupScopedShipmentStatusChangedMessage()
+    public void ShipmentHandedToCarrier_Handler_ReturnsGroupScopedShipmentStatusChangedMessage()
     {
         // Arrange
         var shipmentId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
-        var message = new Messages.Contracts.Fulfillment.ShipmentDispatched(
+        var message = new Messages.Contracts.Fulfillment.ShipmentHandedToCarrier(
             orderId,
             shipmentId,
             "UPS",
@@ -286,14 +286,14 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
             DateTimeOffset.UtcNow);
 
         // Act
-        var result = ShipmentDispatchedHandler.Handle(message);
+        var result = ShipmentHandedToCarrierHandler.Handle(message);
 
         // Assert
         result.ShouldNotBeNull();
         result.Locator.ToString()!.ShouldContain($"customer:{StubCustomerId}"); // Stub
         result.Message.ShipmentId.ShouldBe(shipmentId);
         result.Message.OrderId.ShouldBe(orderId);
-        result.Message.NewStatus.ShouldBe("Dispatched");
+        result.Message.NewStatus.ShouldBe("Shipped");
         result.Message.TrackingNumber.ShouldBe("TRACK123");
     }
 
