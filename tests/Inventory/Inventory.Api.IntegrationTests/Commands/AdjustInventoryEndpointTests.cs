@@ -27,12 +27,12 @@ public sealed class AdjustInventoryEndpointTests : IAsyncLifetime
         await using var session = _fixture.GetDocumentSession();
         var sku = "CAT-TOY-001";
         var warehouseId = "main";
-        var inventoryId = ProductInventory.CombinedGuid(sku, warehouseId);
+        var inventoryId = InventoryStreamId.Compute(sku, warehouseId);
 
         session.Events.StartStream<ProductInventory>(
             inventoryId,
             new InventoryInitialized(sku, warehouseId, 0, DateTimeOffset.UtcNow.AddDays(-1)),
-            new StockReceived(50, "Initial stock", DateTimeOffset.UtcNow.AddDays(-1)));
+            new StockReceived(sku, warehouseId, "Initial stock", null, 50, DateTimeOffset.UtcNow.AddDays(-1)));
 
         await session.SaveChangesAsync();
 
@@ -60,12 +60,12 @@ public sealed class AdjustInventoryEndpointTests : IAsyncLifetime
         await using var session = _fixture.GetDocumentSession();
         var sku = "DOG-TREAT-002";
         var warehouseId = "main";
-        var inventoryId = ProductInventory.CombinedGuid(sku, warehouseId);
+        var inventoryId = InventoryStreamId.Compute(sku, warehouseId);
 
         session.Events.StartStream<ProductInventory>(
             inventoryId,
             new InventoryInitialized(sku, warehouseId, 0, DateTimeOffset.UtcNow.AddDays(-1)),
-            new StockReceived(100, "Initial stock", DateTimeOffset.UtcNow.AddDays(-1)));
+            new StockReceived(sku, warehouseId, "Initial stock", null, 100, DateTimeOffset.UtcNow.AddDays(-1)));
 
         await session.SaveChangesAsync();
 
@@ -107,12 +107,12 @@ public sealed class AdjustInventoryEndpointTests : IAsyncLifetime
         await using var session = _fixture.GetDocumentSession();
         var sku = "BIRD-SEED-003";
         var warehouseId = "main";
-        var inventoryId = ProductInventory.CombinedGuid(sku, warehouseId);
+        var inventoryId = InventoryStreamId.Compute(sku, warehouseId);
 
         session.Events.StartStream<ProductInventory>(
             inventoryId,
             new InventoryInitialized(sku, warehouseId, 0, DateTimeOffset.UtcNow.AddDays(-1)),
-            new StockReceived(10, "Initial stock", DateTimeOffset.UtcNow.AddDays(-1)));
+            new StockReceived(sku, warehouseId, "Initial stock", null, 10, DateTimeOffset.UtcNow.AddDays(-1)));
 
         await session.SaveChangesAsync();
 
@@ -134,12 +134,12 @@ public sealed class AdjustInventoryEndpointTests : IAsyncLifetime
         await using var session = _fixture.GetDocumentSession();
         var sku = "FISH-FOOD-004";
         var warehouseId = "main";
-        var inventoryId = ProductInventory.CombinedGuid(sku, warehouseId);
+        var inventoryId = InventoryStreamId.Compute(sku, warehouseId);
 
         session.Events.StartStream<ProductInventory>(
             inventoryId,
             new InventoryInitialized(sku, warehouseId, 0, DateTimeOffset.UtcNow.AddDays(-1)),
-            new StockReceived(100, "Initial stock", DateTimeOffset.UtcNow.AddDays(-1)));
+            new StockReceived(sku, warehouseId, "Initial stock", null, 100, DateTimeOffset.UtcNow.AddDays(-1)));
 
         await session.SaveChangesAsync();
 

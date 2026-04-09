@@ -39,8 +39,8 @@ public class ProductInventoryScenarioTests
         var reservationId = Guid.NewGuid();
 
         var inventory = BuildInventory(initialQuantity: 100)
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 30, Now))
-            .Apply(new ReservationCommitted(reservationId, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 30, Now))
+            .Apply(new ReservationCommitted(reservationId, DefaultSku, DefaultWarehouseId, Now));
 
         inventory.AvailableQuantity.ShouldBe(70);          // decremented on reserve, stays on commit
         inventory.ReservedQuantity.ShouldBe(0);            // removed from Reservations
@@ -64,8 +64,8 @@ public class ProductInventoryScenarioTests
         var reservationId = Guid.NewGuid();
 
         var inventory = BuildInventory(initialQuantity: 100)
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 40, Now))
-            .Apply(new ReservationReleased(reservationId, Quantity: 40, Reason: "cancelled", Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 40, Now))
+            .Apply(new ReservationReleased(reservationId, DefaultSku, DefaultWarehouseId, Quantity: 40, Reason: "cancelled", Now));
 
         inventory.AvailableQuantity.ShouldBe(100);
         inventory.ReservedQuantity.ShouldBe(0);
@@ -90,8 +90,8 @@ public class ProductInventoryScenarioTests
         var resId2 = Guid.NewGuid();
 
         var inventory = BuildInventory(initialQuantity: 100)
-            .Apply(new StockReserved(Guid.NewGuid(), resId1, Quantity: 20, Now))
-            .Apply(new StockReserved(Guid.NewGuid(), resId2, Quantity: 35, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), resId1, DefaultSku, DefaultWarehouseId, Quantity: 20, Now))
+            .Apply(new StockReserved(Guid.NewGuid(), resId2, DefaultSku, DefaultWarehouseId, Quantity: 35, Now));
 
         inventory.AvailableQuantity.ShouldBe(45);   // 100 - 20 - 35
         inventory.ReservedQuantity.ShouldBe(55);    // 20 + 35
@@ -115,8 +115,8 @@ public class ProductInventoryScenarioTests
         var reservationId = Guid.NewGuid();
 
         var inventory = BuildInventory(initialQuantity: 50)
-            .Apply(new StockReceived(Quantity: 50, Source: "Supplier-A", Now))
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 30, Now));
+            .Apply(new StockReceived(DefaultSku, DefaultWarehouseId, "Supplier-A", null, Quantity: 50, Now))
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 30, Now));
 
         inventory.AvailableQuantity.ShouldBe(70);    // (50 + 50) - 30
         inventory.ReservedQuantity.ShouldBe(30);
@@ -139,14 +139,14 @@ public class ProductInventoryScenarioTests
 
         var inventory = BuildInventory(initialQuantity: 100)
             // Add more stock via a return
-            .Apply(new StockRestocked(Guid.NewGuid(), Quantity: 20, Now))       // available = 120
+            .Apply(new StockRestocked(DefaultSku, DefaultWarehouseId, Guid.NewGuid(), Quantity: 20, Now))       // available = 120
             // Reserve two separate orders
-            .Apply(new StockReserved(Guid.NewGuid(), resId1, Quantity: 30, Now))  // available = 90
-            .Apply(new StockReserved(Guid.NewGuid(), resId2, Quantity: 10, Now))  // available = 80
+            .Apply(new StockReserved(Guid.NewGuid(), resId1, DefaultSku, DefaultWarehouseId, Quantity: 30, Now))  // available = 90
+            .Apply(new StockReserved(Guid.NewGuid(), resId2, DefaultSku, DefaultWarehouseId, Quantity: 10, Now))  // available = 80
             // Commit the first reservation (order goes to fulfillment)
-            .Apply(new ReservationCommitted(resId1, Now))
+            .Apply(new ReservationCommitted(resId1, DefaultSku, DefaultWarehouseId, Now))
             // Release the second reservation (order was cancelled)
-            .Apply(new ReservationReleased(resId2, Quantity: 10, Reason: "cancelled", Now)); // available = 90
+            .Apply(new ReservationReleased(resId2, DefaultSku, DefaultWarehouseId, Quantity: 10, Reason: "cancelled", Now)); // available = 90
 
         inventory.AvailableQuantity.ShouldBe(90);    // 80 restored by release of resId2
         inventory.ReservedQuantity.ShouldBe(0);      // resId2 released
@@ -174,7 +174,7 @@ public class ProductInventoryScenarioTests
         var inventory = BuildInventory(initialQuantity);
         var before = inventory.TotalOnHand;
 
-        var after = inventory.Apply(new StockReserved(Guid.NewGuid(), Guid.NewGuid(), reserveQuantity, Now));
+        var after = inventory.Apply(new StockReserved(Guid.NewGuid(), Guid.NewGuid(), DefaultSku, DefaultWarehouseId, reserveQuantity, Now));
 
         return after.TotalOnHand == before;
     }
@@ -191,11 +191,11 @@ public class ProductInventoryScenarioTests
 
         var reservationId = Guid.NewGuid();
         var inventory = BuildInventory(initialQuantity)
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, reserveQuantity, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, reserveQuantity, Now));
 
         var before = inventory.TotalOnHand;
 
-        var after = inventory.Apply(new ReservationCommitted(reservationId, Now));
+        var after = inventory.Apply(new ReservationCommitted(reservationId, DefaultSku, DefaultWarehouseId, Now));
 
         return after.TotalOnHand == before;
     }
@@ -212,12 +212,12 @@ public class ProductInventoryScenarioTests
 
         var reservationId = Guid.NewGuid();
         var inventory = BuildInventory(initialQuantity)
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, reserveQuantity, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, reserveQuantity, Now));
 
         var before = inventory.TotalOnHand;
 
         var after = inventory.Apply(
-            new ReservationReleased(reservationId, reserveQuantity, "test-release", Now));
+            new ReservationReleased(reservationId, DefaultSku, DefaultWarehouseId, reserveQuantity, "test-release", Now));
 
         return after.TotalOnHand == before;
     }
@@ -235,8 +235,8 @@ public class ProductInventoryScenarioTests
         var inventory = BuildInventory(initialQuantity);
         var before = inventory.TotalOnHand;
 
-        var afterReceive   = inventory.Apply(new StockReceived(receivedQuantity, "Supplier", Now));
-        var afterRestock   = inventory.Apply(new StockRestocked(Guid.NewGuid(), receivedQuantity, Now));
+        var afterReceive   = inventory.Apply(new StockReceived(DefaultSku, DefaultWarehouseId, "Supplier", null, receivedQuantity, Now));
+        var afterRestock   = inventory.Apply(new StockRestocked(DefaultSku, DefaultWarehouseId, Guid.NewGuid(), receivedQuantity, Now));
 
         return afterReceive.TotalOnHand == before + receivedQuantity
             && afterRestock.TotalOnHand  == before + receivedQuantity;
@@ -255,9 +255,9 @@ public class ProductInventoryScenarioTests
         var inventory    = BuildInventory(initialQuantity);
         var unknownId    = Guid.NewGuid();
 
-        var afterCommit  = inventory.Apply(new ReservationCommitted(unknownId, Now));
+        var afterCommit  = inventory.Apply(new ReservationCommitted(unknownId, DefaultSku, DefaultWarehouseId, Now));
         var afterRelease = inventory.Apply(
-            new ReservationReleased(unknownId, 0, "ghost", Now));
+            new ReservationReleased(unknownId, DefaultSku, DefaultWarehouseId, 0, "ghost", Now));
 
         return ReferenceEquals(afterCommit, inventory)
             && ReferenceEquals(afterRelease, inventory);
