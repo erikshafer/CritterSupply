@@ -6,8 +6,10 @@ using JasperFx;
 using JasperFx.Core;
 using JasperFx.Events.Daemon;
 using JasperFx.Resources;
+using JasperFx.Events.Projections;
 using Marten;
 using Marten.Events.Projections;
+using Messages.Contracts.Fulfillment;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Weasel.Core;
@@ -17,6 +19,7 @@ using Wolverine.FluentValidation;
 using Wolverine.Http;
 using Wolverine.Http.FluentValidation;
 using Wolverine.Marten;
+using Wolverine.RabbitMQ;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,6 +42,11 @@ builder.Services.AddMarten(opts =>
 
         // Register ProductInventory aggregate for event sourcing
         opts.Projections.Snapshot<ProductInventory>(SnapshotLifecycle.Inline);
+
+        // StockAvailabilityView — multi-stream projection keyed by SKU.
+        // Inline because the routing engine is on the critical checkout path;
+        // stale data leads to double-booking.
+        opts.Projections.Add<StockAvailabilityViewProjection>(ProjectionLifecycle.Inline);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()
@@ -70,6 +78,10 @@ builder.Host.UseWolverine(opts =>
         .Then.Discard();
 
     opts.UseFluentValidation();
+
+    // RabbitMQ subscription: Fulfillment → Inventory (routing-aware reservations)
+    opts.ListenToRabbitQueue("inventory-fulfillment-events")
+        .UseDurableInbox();
 });
 
 builder.Services.AddEndpointsApiExplorer();
