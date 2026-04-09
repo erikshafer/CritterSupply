@@ -135,14 +135,14 @@ public class ProductInventoryCreateTests
     }
 
     /// <summary>
-    /// Create assigns Id equal to CombinedGuid(sku, warehouseId).
+    /// Create assigns Id equal to InventoryStreamId.Compute(sku, warehouseId).
     /// </summary>
     [Fact]
-    public void Create_Sets_Id_To_CombinedGuid_Of_Sku_And_WarehouseId()
+    public void Create_Sets_Id_To_InventoryStreamId_Of_Sku_And_WarehouseId()
     {
         var inventory = BuildInventory(sku: DefaultSku, warehouseId: DefaultWarehouseId);
 
-        var expectedId = ProductInventory.CombinedGuid(DefaultSku, DefaultWarehouseId);
+        var expectedId = InventoryStreamId.Compute(DefaultSku, DefaultWarehouseId);
         inventory.Id.ShouldBe(expectedId);
     }
 

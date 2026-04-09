@@ -21,7 +21,7 @@ public sealed record ProductInventory(
     public int TotalOnHand => AvailableQuantity + ReservedQuantity + CommittedQuantity;
 
     public static ProductInventory Create(InventoryInitialized @event) =>
-        new(CombinedGuid(@event.Sku, @event.WarehouseId),
+        new(InventoryStreamId.Compute(@event.Sku, @event.WarehouseId),
             @event.Sku,
             @event.WarehouseId,
             @event.InitialQuantity,
@@ -30,6 +30,10 @@ public sealed record ProductInventory(
             new Dictionary<Guid, Guid>(),
             @event.InitializedAt);
 
+    /// <summary>
+    /// Generates a deterministic GUID from SKU and WarehouseId using MD5.
+    /// </summary>
+    [Obsolete("Use InventoryStreamId.Compute() instead. MD5-based IDs are replaced by UUID v5 per ADR 0060.")]
     public static Guid CombinedGuid(string sku, string warehouseId)
     {
         var combined = $"{sku}:{warehouseId}";

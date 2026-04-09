@@ -1,6 +1,7 @@
 using FluentValidation;
 using Marten;
 using Microsoft.AspNetCore.Mvc;
+using Wolverine;
 using Wolverine.Http;
 
 namespace Inventory.Management;
@@ -8,7 +9,8 @@ namespace Inventory.Management;
 public sealed record ReceiveStock(
     Guid InventoryId,
     int Quantity,
-    string Source)
+    string SupplierId,
+    string? PurchaseOrderId)
 {
     public class ReceiveStockValidator : AbstractValidator<ReceiveStock>
     {
@@ -16,7 +18,8 @@ public sealed record ReceiveStock(
         {
             RuleFor(x => x.InventoryId).NotEmpty();
             RuleFor(x => x.Quantity).GreaterThan(0);
-            RuleFor(x => x.Source).NotEmpty().MaximumLength(100);
+            RuleFor(x => x.SupplierId).NotEmpty().MaximumLength(100);
+            RuleFor(x => x.PurchaseOrderId).MaximumLength(100);
         }
     }
 }
@@ -45,15 +48,31 @@ public static class ReceiveStockHandler
         return WolverineContinue.NoProblems;
     }
 
-    public static void Handle(
+    public static OutgoingMessages Handle(
         ReceiveStock command,
         ProductInventory inventory,
         IDocumentSession session)
     {
         var receivedAt = DateTimeOffset.UtcNow;
 
-        var domainEvent = new StockReceived(command.Quantity, command.Source, receivedAt);
+        var domainEvent = new StockReceived(
+            inventory.Sku,
+            inventory.WarehouseId,
+            command.SupplierId,
+            command.PurchaseOrderId,
+            command.Quantity,
+            receivedAt);
 
         session.Events.Append(inventory.Id, domainEvent);
+
+        var outgoing = new OutgoingMessages();
+        outgoing.Add(new Messages.Contracts.Inventory.StockReplenished(
+            inventory.Sku,
+            inventory.WarehouseId,
+            command.Quantity,
+            inventory.AvailableQuantity + command.Quantity,
+            receivedAt));
+
+        return outgoing;
     }
 }

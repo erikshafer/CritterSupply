@@ -62,7 +62,7 @@ public static class ReceiveInboundStockEndpoint
         // Inventory uses SKU + WarehouseId as composite key
         // For simplicity, assume "main" warehouse for now
         var warehouseId = "main";
-        var inventoryId = ProductInventory.CombinedGuid(sku, warehouseId);
+        var inventoryId = InventoryStreamId.Compute(sku, warehouseId);
 
         // Load the aggregate
         var inventory = await session.LoadAsync<ProductInventory>(inventoryId, ct);
@@ -94,8 +94,11 @@ public static class ReceiveInboundStockEndpoint
 
         // Append event
         var domainEvent = new StockReceived(
-            request.Quantity,
+            inventory.Sku,
+            inventory.WarehouseId,
             request.Source,
+            null,
+            request.Quantity,
             DateTimeOffset.UtcNow);
 
         session.Events.Append(inventoryId, domainEvent);

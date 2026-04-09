@@ -74,7 +74,7 @@ public static class AdjustInventoryEndpoint
         // Inventory uses SKU + WarehouseId as composite key
         // For simplicity, assume "main" warehouse for now
         var warehouseId = "main";
-        var inventoryId = ProductInventory.CombinedGuid(sku, warehouseId);
+        var inventoryId = InventoryStreamId.Compute(sku, warehouseId);
 
         // Load inventory
         var inventory = await session.LoadAsync<ProductInventory>(inventoryId, ct);
@@ -100,6 +100,8 @@ public static class AdjustInventoryEndpoint
 
         // Append domain event — Wolverine's auto-transaction handles SaveChangesAsync
         var domainEvent = new InventoryAdjusted(
+            inventory.Sku,
+            inventory.WarehouseId,
             request.AdjustmentQuantity,
             request.Reason,
             request.AdjustedBy,
@@ -116,13 +118,23 @@ public static class AdjustInventoryEndpoint
             adjustedAt));
 
         // Check if low stock threshold crossed downward
-        if (AdjustInventoryHandler.CrossedLowStockThreshold(previousQuantity, newQuantity))
+        if (LowStockPolicy.CrossedThresholdDownward(previousQuantity, newQuantity))
         {
+            var breachedEvent = new LowStockThresholdBreached(
+                inventory.Sku,
+                inventory.WarehouseId,
+                previousQuantity,
+                newQuantity,
+                LowStockPolicy.DefaultThreshold,
+                adjustedAt);
+
+            session.Events.Append(inventoryId, breachedEvent);
+
             outgoing.Add(new Messages.Contracts.Inventory.LowStockDetected(
                 inventory.Sku,
                 inventory.WarehouseId,
                 newQuantity,
-                AdjustInventoryHandler.LowStockThreshold,
+                LowStockPolicy.DefaultThreshold,
                 adjustedAt));
         }
 

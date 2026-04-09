@@ -34,7 +34,7 @@ public sealed class GetStockLevel
         var warehouse = warehouseId ?? "WH-01";
 
         // Load ProductInventory from snapshot projection
-        var aggregateId = Management.ProductInventory.CombinedGuid(sku, warehouse);
+        var aggregateId = Management.InventoryStreamId.Compute(sku, warehouse);
         var inventory = await session.LoadAsync<Management.ProductInventory>(aggregateId, ct);
 
         if (inventory is null)

@@ -62,7 +62,7 @@ public static class CommitReservationHandler
         var quantity = inventory.Reservations[command.ReservationId];
         var orderId = inventory.ReservationOrderIds[command.ReservationId];
 
-        var domainEvent = new ReservationCommitted(command.ReservationId, committedAt);
+        var domainEvent = new ReservationCommitted(command.ReservationId, inventory.Sku, inventory.WarehouseId, committedAt);
 
         session.Events.Append(inventory.Id, domainEvent);
 
