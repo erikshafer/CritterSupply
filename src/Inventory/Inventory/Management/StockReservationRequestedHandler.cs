@@ -77,6 +77,11 @@ public static class StockReservationRequestedHandler
             message.Quantity,
             reservedAt));
 
+        // Schedule reservation expiry — if not committed within timeout, stock returns to pool
+        outgoing.Delay(
+            new ExpireReservation(message.ReservationId, inventory.Id),
+            ExpireReservationHandler.ExpiryTimeout);
+
         return outgoing;
     }
 }

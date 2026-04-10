@@ -74,11 +74,17 @@ public static class CreateBackorderHandler
         var shipment = await session.LoadAsync<Shipment>(wo.ShipmentId, ct);
         if (shipment is null) return;
 
-        // Publish integration event
+        // Publish integration event (enriched with Items for Inventory BC — Gap #10)
+        var backorderItems = wo.LineItems
+            .Select(li => new IntegrationMessages.BackorderedItem(
+                li.Sku, wo.FulfillmentCenterId, li.Quantity))
+            .ToList();
+
         await bus.PublishAsync(new IntegrationMessages.BackorderCreated(
             shipment.OrderId,
             wo.ShipmentId,
             command.Reason,
+            backorderItems,
             now));
     }
 }

@@ -21,8 +21,14 @@ public class StockAvailabilityViewProjection : MultiStreamProjection<StockAvaila
         Identity<StockReceived>(e => e.Sku);
         Identity<StockRestocked>(e => e.Sku);
         Identity<InventoryAdjusted>(e => e.Sku);
+        Identity<StockShipped>(e => e.Sku);
+        Identity<ReservationExpired>(e => e.Sku);
         // LowStockThresholdBreached does not affect available quantity — no Identity needed
-        // StockShipped added in S2 when physical tracking is implemented
+        // StockPicked does not change available quantity (Committed → Picked) — no view update
+        // StockDiscrepancyFound is audit-only — no view update
+        // BackorderRegistered/BackorderCleared do not affect available quantity
+        // CycleCountInitiated/CycleCountCompleted are audit-only — adjustments via InventoryAdjusted
+        // DamageRecorded/StockWrittenOff are audit-only — adjustments via InventoryAdjusted
     }
 
     public void Apply(StockAvailabilityView view, InventoryInitialized e)
@@ -66,6 +72,29 @@ public class StockAvailabilityViewProjection : MultiStreamProjection<StockAvaila
     {
         var current = GetWarehouseQuantity(view, e.WarehouseId);
         SetWarehouse(view, e.WarehouseId, current + e.AdjustmentQuantity);
+    }
+
+    /// <summary>
+    /// StockShipped removes stock that has physically left the building.
+    /// The AvailableQuantity was already decremented at reservation time; this decrements
+    /// the view to reflect that the stock is no longer on-hand at the warehouse.
+    /// NOTE: StockAvailabilityView tracks *available* quantity, not total on-hand.
+    /// Shipped stock was never available (it was reserved/committed/picked), so
+    /// no change to available quantity here.
+    /// </summary>
+    public void Apply(StockAvailabilityView view, StockShipped e)
+    {
+        // No change: stock was already unavailable (Reserved → Committed → Picked → Shipped).
+        // Available quantity was decremented when StockReserved was applied.
+    }
+
+    /// <summary>
+    /// ReservationExpired returns stock to the available pool (same as ReservationReleased).
+    /// </summary>
+    public void Apply(StockAvailabilityView view, ReservationExpired e)
+    {
+        var current = GetWarehouseQuantity(view, e.WarehouseId);
+        SetWarehouse(view, e.WarehouseId, current + e.Quantity);
     }
 
     // --- helpers ---

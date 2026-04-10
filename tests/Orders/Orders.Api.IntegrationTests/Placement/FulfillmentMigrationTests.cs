@@ -184,7 +184,9 @@ public class FulfillmentMigrationTests : IAsyncLifetime
 
         // Act
         await _fixture.ExecuteAndWaitAsync(new BackorderCreated(
-            order.Id, Guid.NewGuid(), "No stock at any FC", DateTimeOffset.UtcNow));
+            order.Id, Guid.NewGuid(), "No stock at any FC",
+            [new BackorderedItem("DOG-FOOD-40LB", "NJ-FC", 1)],
+            DateTimeOffset.UtcNow));
 
         // Assert
         await using var session = _fixture.GetDocumentSession();

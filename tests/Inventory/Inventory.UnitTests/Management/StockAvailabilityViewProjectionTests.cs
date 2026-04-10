@@ -133,4 +133,35 @@ public class StockAvailabilityViewProjectionTests
         view.Warehouses.Count.ShouldBe(3);
         view.TotalAvailable.ShouldBe(205); // (100-20) + 50 + 75
     }
+
+    // ---------------------------------------------------------------------------
+    // S2 events — StockShipped, ReservationExpired
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void StockShipped_Does_Not_Change_Available_Quantity()
+    {
+        var view = EmptyView();
+        _projection.Apply(view, new InventoryInitialized("CAT-FOOD-001", "NJ-FC", 100, Now));
+        _projection.Apply(view, new StockReserved(Guid.NewGuid(), Guid.NewGuid(), "CAT-FOOD-001", "NJ-FC", 20, Now));
+
+        var quantityBefore = view.Warehouses[0].AvailableQuantity;
+        _projection.Apply(view, new StockShipped("CAT-FOOD-001", "NJ-FC", Guid.NewGuid(), 20, Guid.NewGuid(), Now));
+
+        // Available was already decremented by StockReserved; StockShipped is a no-op for available qty
+        view.Warehouses[0].AvailableQuantity.ShouldBe(quantityBefore);
+    }
+
+    [Fact]
+    public void ReservationExpired_Restores_Available_Quantity()
+    {
+        var view = EmptyView();
+        _projection.Apply(view, new InventoryInitialized("CAT-FOOD-001", "NJ-FC", 100, Now));
+        _projection.Apply(view, new StockReserved(Guid.NewGuid(), Guid.NewGuid(), "CAT-FOOD-001", "NJ-FC", 25, Now));
+
+        _projection.Apply(view, new ReservationExpired(Guid.NewGuid(), "CAT-FOOD-001", "NJ-FC", 25, "Expired", Now));
+
+        view.Warehouses[0].AvailableQuantity.ShouldBe(100);
+        view.TotalAvailable.ShouldBe(100);
+    }
 }
