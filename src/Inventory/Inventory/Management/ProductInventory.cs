@@ -2,7 +2,7 @@ namespace Inventory.Management;
 
 /// <summary>
 /// Event-sourced aggregate representing inventory for a specific SKU at a warehouse.
-/// Tracks available, reserved, and committed quantities to prevent overselling.
+/// Tracks available, reserved, committed, and picked quantities to prevent overselling.
 /// Write-only model: contains only state and Apply() methods for event application.
 /// Business logic resides in handlers using the Decider pattern.
 /// </summary>
@@ -14,11 +14,14 @@ public sealed record ProductInventory(
     Dictionary<Guid, int> Reservations,
     Dictionary<Guid, int> CommittedAllocations,
     Dictionary<Guid, Guid> ReservationOrderIds,
+    Dictionary<Guid, int> PickedAllocations,
+    bool HasPendingBackorders,
     DateTimeOffset InitializedAt)
 {
     public int ReservedQuantity => Reservations.Values.Sum();
     public int CommittedQuantity => CommittedAllocations.Values.Sum();
-    public int TotalOnHand => AvailableQuantity + ReservedQuantity + CommittedQuantity;
+    public int PickedQuantity => PickedAllocations.Values.Sum();
+    public int TotalOnHand => AvailableQuantity + ReservedQuantity + CommittedQuantity + PickedQuantity;
 
     public static ProductInventory Create(InventoryInitialized @event) =>
         new(InventoryStreamId.Compute(@event.Sku, @event.WarehouseId),
@@ -28,6 +31,8 @@ public sealed record ProductInventory(
             new Dictionary<Guid, int>(),
             new Dictionary<Guid, int>(),
             new Dictionary<Guid, Guid>(),
+            new Dictionary<Guid, int>(),
+            false,
             @event.InitializedAt);
 
     /// <summary>
@@ -105,4 +110,83 @@ public sealed record ProductInventory(
 
     public ProductInventory Apply(InventoryAdjusted @event) =>
         this with { AvailableQuantity = AvailableQuantity + @event.AdjustmentQuantity };
+
+    // ---------------------------------------------------------------------------
+    // S2 — Physical pick/ship tracking, failure modes, physical operations
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// StockPicked: moves quantity from CommittedAllocations → PickedAllocations.
+    /// TotalOnHand is preserved (item is still in the building).
+    /// </summary>
+    public ProductInventory Apply(StockPicked @event)
+    {
+        var newCommitted = new Dictionary<Guid, int>(CommittedAllocations);
+        newCommitted.Remove(@event.ReservationId);
+
+        var newPicked = new Dictionary<Guid, int>(PickedAllocations)
+        {
+            [@event.ReservationId] = @event.Quantity
+        };
+
+        return this with
+        {
+            CommittedAllocations = newCommitted,
+            PickedAllocations = newPicked
+        };
+    }
+
+    /// <summary>
+    /// StockShipped: removes quantity from PickedAllocations. TotalOnHand decrements
+    /// (stock has physically left the building).
+    /// </summary>
+    public ProductInventory Apply(StockShipped @event)
+    {
+        var newPicked = new Dictionary<Guid, int>(PickedAllocations);
+        newPicked.Remove(@event.ReservationId);
+
+        var newReservationOrderIds = new Dictionary<Guid, Guid>(ReservationOrderIds);
+        newReservationOrderIds.Remove(@event.ReservationId);
+
+        return this with
+        {
+            PickedAllocations = newPicked,
+            ReservationOrderIds = newReservationOrderIds
+        };
+    }
+
+    /// <summary>
+    /// StockDiscrepancyFound: no state change on aggregate — serves as an audit/alert record.
+    /// </summary>
+    public ProductInventory Apply(StockDiscrepancyFound @event) => this;
+
+    /// <summary>
+    /// ReservationExpired: same logic as ReservationReleased — stock returns to available pool.
+    /// </summary>
+    public ProductInventory Apply(ReservationExpired @event)
+    {
+        if (!Reservations.TryGetValue(@event.ReservationId, out var quantity))
+            return this;
+
+        var newReservations = new Dictionary<Guid, int>(Reservations);
+        newReservations.Remove(@event.ReservationId);
+
+        return this with
+        {
+            AvailableQuantity = AvailableQuantity + quantity,
+            Reservations = newReservations
+        };
+    }
+
+    public ProductInventory Apply(BackorderRegistered @event) =>
+        this with { HasPendingBackorders = true };
+
+    public ProductInventory Apply(BackorderCleared @event) =>
+        this with { HasPendingBackorders = false };
+
+    public ProductInventory Apply(CycleCountInitiated @event) => this;
+    public ProductInventory Apply(CycleCountCompleted @event) => this;
+
+    public ProductInventory Apply(DamageRecorded @event) => this;
+    public ProductInventory Apply(StockWrittenOff @event) => this;
 }

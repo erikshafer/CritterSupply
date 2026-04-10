@@ -135,6 +135,28 @@ public class ProductInventoryCreateTests
     }
 
     /// <summary>
+    /// Create initializes PickedAllocations as an empty dictionary.
+    /// </summary>
+    [Fact]
+    public void Create_Initializes_PickedAllocations_As_Empty()
+    {
+        var inventory = BuildInventory();
+
+        inventory.PickedAllocations.ShouldBeEmpty();
+    }
+
+    /// <summary>
+    /// Create initializes HasPendingBackorders as false.
+    /// </summary>
+    [Fact]
+    public void Create_Initializes_HasPendingBackorders_As_False()
+    {
+        var inventory = BuildInventory();
+
+        inventory.HasPendingBackorders.ShouldBeFalse();
+    }
+
+    /// <summary>
     /// Create assigns Id equal to InventoryStreamId.Compute(sku, warehouseId).
     /// </summary>
     [Fact]
@@ -280,6 +302,8 @@ public class ProductInventoryCreateTests
             Reservations: reservations,
             CommittedAllocations: new Dictionary<Guid, int>(),
             ReservationOrderIds: new Dictionary<Guid, Guid>(),
+            PickedAllocations: new Dictionary<Guid, int>(),
+            HasPendingBackorders: false,
             InitializedAt: DefaultInitializedAt);
 
         inventory.ReservedQuantity.ShouldBe(40);  // 10 + 25 + 5
@@ -303,6 +327,8 @@ public class ProductInventoryCreateTests
             Reservations: new Dictionary<Guid, int>(),
             CommittedAllocations: committed,
             ReservationOrderIds: new Dictionary<Guid, Guid>(),
+            PickedAllocations: new Dictionary<Guid, int>(),
+            HasPendingBackorders: false,
             InitializedAt: DefaultInitializedAt);
 
         inventory.CommittedQuantity.ShouldBe(20);  // 8 + 12
@@ -323,6 +349,8 @@ public class ProductInventoryCreateTests
             Reservations: reservations,
             CommittedAllocations: committed,
             ReservationOrderIds: new Dictionary<Guid, Guid>(),
+            PickedAllocations: new Dictionary<Guid, int>(),
+            HasPendingBackorders: false,
             InitializedAt: DefaultInitializedAt);
 
         // 50 available + 15 reserved + 10 committed = 75
