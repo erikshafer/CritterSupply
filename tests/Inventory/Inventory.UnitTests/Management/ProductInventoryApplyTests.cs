@@ -425,4 +425,233 @@ public class ProductInventoryApplyTests
         result.ReservedQuantity.ShouldBe(reservedBefore);
         result.CommittedQuantity.ShouldBe(committedBefore);
     }
+
+    // ---------------------------------------------------------------------------
+    // Apply(StockPicked) — S2: Committed → Picked
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// StockPicked removes entry from CommittedAllocations and adds to PickedAllocations.
+    /// </summary>
+    [Fact]
+    public void Apply_StockPicked_Moves_From_Committed_To_Picked()
+    {
+        var reservationId = Guid.NewGuid();
+        var inventory = BuildInventory(availableQuantity: 80)
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 20, Now))
+            .Apply(new ReservationCommitted(reservationId, DefaultSku, DefaultWarehouseId, Now));
+
+        var result = inventory.Apply(new StockPicked(DefaultSku, DefaultWarehouseId, reservationId, 20, Now));
+
+        result.CommittedAllocations.ShouldNotContainKey(reservationId);
+        result.PickedAllocations.ShouldContainKey(reservationId);
+        result.PickedAllocations[reservationId].ShouldBe(20);
+    }
+
+    /// <summary>
+    /// StockPicked does not change AvailableQuantity or TotalOnHand (item is still in building).
+    /// </summary>
+    [Fact]
+    public void Apply_StockPicked_Preserves_TotalOnHand()
+    {
+        var reservationId = Guid.NewGuid();
+        var inventory = BuildInventory(availableQuantity: 80)
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 20, Now))
+            .Apply(new ReservationCommitted(reservationId, DefaultSku, DefaultWarehouseId, Now));
+
+        var totalBefore = inventory.TotalOnHand;
+        var availableBefore = inventory.AvailableQuantity;
+
+        var result = inventory.Apply(new StockPicked(DefaultSku, DefaultWarehouseId, reservationId, 20, Now));
+
+        result.TotalOnHand.ShouldBe(totalBefore);
+        result.AvailableQuantity.ShouldBe(availableBefore);
+        result.PickedQuantity.ShouldBe(20);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Apply(StockShipped) — S2: Picked removed, TotalOnHand decrements
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// StockShipped removes entry from PickedAllocations and ReservationOrderIds.
+    /// TotalOnHand decrements (stock has left the building).
+    /// </summary>
+    [Fact]
+    public void Apply_StockShipped_Removes_From_Picked_And_Decrements_TotalOnHand()
+    {
+        var reservationId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var inventory = BuildInventory(availableQuantity: 100)
+            .Apply(new StockReserved(orderId, reservationId, DefaultSku, DefaultWarehouseId, Quantity: 20, Now))
+            .Apply(new ReservationCommitted(reservationId, DefaultSku, DefaultWarehouseId, Now))
+            .Apply(new StockPicked(DefaultSku, DefaultWarehouseId, reservationId, 20, Now));
+
+        var totalBefore = inventory.TotalOnHand;
+
+        var result = inventory.Apply(new StockShipped(DefaultSku, DefaultWarehouseId, reservationId, 20, Guid.NewGuid(), Now));
+
+        result.PickedAllocations.ShouldNotContainKey(reservationId);
+        result.ReservationOrderIds.ShouldNotContainKey(reservationId);
+        result.TotalOnHand.ShouldBe(totalBefore - 20);
+        result.AvailableQuantity.ShouldBe(80); // unchanged — was decremented on reserve, not ship
+    }
+
+    // ---------------------------------------------------------------------------
+    // Apply(StockDiscrepancyFound) — S2: no state change
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// StockDiscrepancyFound does not change any aggregate state.
+    /// </summary>
+    [Fact]
+    public void Apply_StockDiscrepancyFound_Returns_Unchanged()
+    {
+        var inventory = BuildInventory(availableQuantity: 100);
+
+        var result = inventory.Apply(new StockDiscrepancyFound(
+            DefaultSku, DefaultWarehouseId, 10, 7, DiscrepancyType.ShortPick, "test", Now));
+
+        result.ShouldBeSameAs(inventory);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Apply(ReservationExpired) — S2: same as ReservationReleased
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// ReservationExpired restores AvailableQuantity and removes from Reservations.
+    /// </summary>
+    [Fact]
+    public void Apply_ReservationExpired_Restores_AvailableQuantity()
+    {
+        var reservationId = Guid.NewGuid();
+        var inventory = BuildInventory(availableQuantity: 100)
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 30, Now));
+
+        var result = inventory.Apply(new ReservationExpired(
+            reservationId, DefaultSku, DefaultWarehouseId, 30, "Expired", Now));
+
+        result.AvailableQuantity.ShouldBe(100);
+        result.Reservations.ShouldNotContainKey(reservationId);
+    }
+
+    /// <summary>
+    /// ReservationExpired with unknown ID returns unchanged (idempotent).
+    /// </summary>
+    [Fact]
+    public void Apply_ReservationExpired_Unknown_Id_Returns_Unchanged()
+    {
+        var inventory = BuildInventory();
+
+        var result = inventory.Apply(new ReservationExpired(
+            Guid.NewGuid(), DefaultSku, DefaultWarehouseId, 10, "Expired", Now));
+
+        result.ShouldBeSameAs(inventory);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Apply(BackorderRegistered/BackorderCleared) — S2
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// BackorderRegistered sets HasPendingBackorders to true.
+    /// </summary>
+    [Fact]
+    public void Apply_BackorderRegistered_Sets_HasPendingBackorders_True()
+    {
+        var inventory = BuildInventory();
+
+        var result = inventory.Apply(new BackorderRegistered(
+            DefaultSku, DefaultWarehouseId, Guid.NewGuid(), Guid.NewGuid(), 5, Now));
+
+        result.HasPendingBackorders.ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// BackorderCleared sets HasPendingBackorders to false.
+    /// </summary>
+    [Fact]
+    public void Apply_BackorderCleared_Sets_HasPendingBackorders_False()
+    {
+        var inventory = BuildInventory();
+        var withBackorder = inventory.Apply(new BackorderRegistered(
+            DefaultSku, DefaultWarehouseId, Guid.NewGuid(), Guid.NewGuid(), 5, Now));
+
+        var result = withBackorder.Apply(new BackorderCleared(DefaultSku, DefaultWarehouseId, Now));
+
+        result.HasPendingBackorders.ShouldBeFalse();
+    }
+
+    // ---------------------------------------------------------------------------
+    // Apply(CycleCountInitiated/CycleCountCompleted) — S2: no state change
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void Apply_CycleCountInitiated_Returns_Unchanged()
+    {
+        var inventory = BuildInventory();
+        var result = inventory.Apply(new CycleCountInitiated(DefaultSku, DefaultWarehouseId, "clerk", Now));
+        result.ShouldBeSameAs(inventory);
+    }
+
+    [Fact]
+    public void Apply_CycleCountCompleted_Returns_Unchanged()
+    {
+        var inventory = BuildInventory();
+        var result = inventory.Apply(new CycleCountCompleted(DefaultSku, DefaultWarehouseId, 100, 100, "clerk", Now));
+        result.ShouldBeSameAs(inventory);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Apply(DamageRecorded/StockWrittenOff) — S2: no state change (via InventoryAdjusted)
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void Apply_DamageRecorded_Returns_Unchanged()
+    {
+        var inventory = BuildInventory();
+        var result = inventory.Apply(new DamageRecorded(DefaultSku, DefaultWarehouseId, 2, "water damage", "clerk", Now));
+        result.ShouldBeSameAs(inventory);
+    }
+
+    [Fact]
+    public void Apply_StockWrittenOff_Returns_Unchanged()
+    {
+        var inventory = BuildInventory();
+        var result = inventory.Apply(new StockWrittenOff(DefaultSku, DefaultWarehouseId, 10, "recall", "ops", Now));
+        result.ShouldBeSameAs(inventory);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Full lifecycle scenario: Reserve → Commit → Pick → Ship
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Full lifecycle: TotalOnHand is conserved until StockShipped, then decrements.
+    /// </summary>
+    [Fact]
+    public void Scenario_Reserve_Commit_Pick_Ship_Correctly_Tracks_TotalOnHand()
+    {
+        var reservationId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var shipmentId = Guid.NewGuid();
+
+        var inventory = BuildInventory(availableQuantity: 100)
+            .Apply(new StockReserved(orderId, reservationId, DefaultSku, DefaultWarehouseId, 20, Now));
+
+        inventory.TotalOnHand.ShouldBe(100); // Available 80 + Reserved 20
+
+        inventory = inventory.Apply(new ReservationCommitted(reservationId, DefaultSku, DefaultWarehouseId, Now));
+        inventory.TotalOnHand.ShouldBe(100); // Available 80 + Committed 20
+
+        inventory = inventory.Apply(new StockPicked(DefaultSku, DefaultWarehouseId, reservationId, 20, Now));
+        inventory.TotalOnHand.ShouldBe(100); // Available 80 + Picked 20
+
+        inventory = inventory.Apply(new StockShipped(DefaultSku, DefaultWarehouseId, reservationId, 20, shipmentId, Now));
+        inventory.TotalOnHand.ShouldBe(80); // Available 80 only — shipped stock is gone
+        inventory.PickedAllocations.ShouldBeEmpty();
+        inventory.CommittedAllocations.ShouldBeEmpty();
+        inventory.AvailableQuantity.ShouldBe(80);
+    }
 }
