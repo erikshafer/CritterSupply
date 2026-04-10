@@ -6,5 +6,7 @@ namespace Inventory.Management;
 public sealed record StockReserved(
     Guid OrderId,
     Guid ReservationId,
+    string Sku,
+    string WarehouseId,
     int Quantity,
     DateTimeOffset ReservedAt);

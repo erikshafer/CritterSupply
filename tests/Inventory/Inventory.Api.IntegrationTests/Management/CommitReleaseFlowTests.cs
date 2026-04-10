@@ -170,7 +170,7 @@ public class CommitReleaseFlowTests : IAsyncLifetime
             .FirstAsync(i => i.Sku == sku && i.WarehouseId == warehouseId);
 
         // Act: Receive new stock
-        var receiveCommand = new ReceiveStock(inventory.Id, 100, "Supplier ABC");
+        var receiveCommand = new ReceiveStock(inventory.Id, 100, "Supplier ABC", null);
         await _fixture.ExecuteAndWaitAsync(receiveCommand);
 
         // Assert: Verify quantity increased

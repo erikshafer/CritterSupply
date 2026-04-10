@@ -64,7 +64,7 @@ public static class ReleaseReservationHandler
         var quantity = inventory.Reservations[command.ReservationId];
         var orderId = inventory.ReservationOrderIds[command.ReservationId];
 
-        var domainEvent = new ReservationReleased(command.ReservationId, quantity, command.Reason, releasedAt);
+        var domainEvent = new ReservationReleased(command.ReservationId, inventory.Sku, inventory.WarehouseId, quantity, command.Reason, releasedAt);
 
         session.Events.Append(inventory.Id, domainEvent);
 

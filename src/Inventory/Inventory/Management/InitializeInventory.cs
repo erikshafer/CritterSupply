@@ -29,7 +29,7 @@ public static class InitializeInventoryHandler
             command.InitialQuantity,
             DateTimeOffset.UtcNow);
 
-        var inventoryId = ProductInventory.CombinedGuid(command.Sku, command.WarehouseId);
+        var inventoryId = InventoryStreamId.Compute(command.Sku, command.WarehouseId);
 
         return MartenOps.StartStream<ProductInventory>(inventoryId, @event);
     }

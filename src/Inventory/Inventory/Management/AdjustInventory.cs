@@ -1,6 +1,7 @@
 using FluentValidation;
 using Marten;
 using Microsoft.AspNetCore.Mvc;
+using Wolverine;
 using Wolverine.Http;
 
 namespace Inventory.Management;
@@ -66,30 +67,58 @@ public static class AdjustInventoryHandler
         return WolverineContinue.NoProblems;
     }
 
-    public static void Handle(
+    public static OutgoingMessages Handle(
         AdjustInventory command,
         ProductInventory inventory,
         IDocumentSession session)
     {
         var adjustedAt = DateTimeOffset.UtcNow;
+        var previousQuantity = inventory.AvailableQuantity;
+        var newQuantity = previousQuantity + command.AdjustmentQuantity;
 
         var domainEvent = new InventoryAdjusted(
+            inventory.Sku,
+            inventory.WarehouseId,
             command.AdjustmentQuantity,
             command.Reason,
             command.AdjustedBy,
             adjustedAt);
 
         session.Events.Append(inventory.Id, domainEvent);
+
+        var outgoing = new OutgoingMessages();
+
+        // Check if low stock threshold crossed downward
+        if (LowStockPolicy.CrossedThresholdDownward(previousQuantity, newQuantity))
+        {
+            var breachedEvent = new LowStockThresholdBreached(
+                inventory.Sku,
+                inventory.WarehouseId,
+                previousQuantity,
+                newQuantity,
+                LowStockPolicy.DefaultThreshold,
+                adjustedAt);
+
+            session.Events.Append(inventory.Id, breachedEvent);
+
+            outgoing.Add(new Messages.Contracts.Inventory.LowStockDetected(
+                inventory.Sku,
+                inventory.WarehouseId,
+                newQuantity,
+                LowStockPolicy.DefaultThreshold,
+                adjustedAt));
+        }
+
+        return outgoing;
     }
 
     /// <summary>
     /// Helper to determine if low stock threshold was crossed downward.
     /// Used by endpoint to conditionally publish LowStockDetected integration message.
     /// </summary>
+    [Obsolete("Use LowStockPolicy.CrossedThresholdDownward() instead.")]
     public static bool CrossedLowStockThreshold(int previousQuantity, int newQuantity)
     {
-        var wasAboveThreshold = previousQuantity >= LowStockThreshold;
-        var isNowBelowThreshold = newQuantity < LowStockThreshold;
-        return wasAboveThreshold && isNowBelowThreshold;
+        return LowStockPolicy.CrossedThresholdDownward(previousQuantity, newQuantity);
     }
 }

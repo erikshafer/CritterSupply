@@ -37,7 +37,7 @@ public class ProductInventoryApplyTests
     public void Apply_StockReserved_Decrements_AvailableQuantity()
     {
         var inventory = BuildInventory(availableQuantity: 100);
-        var @event = new StockReserved(Guid.NewGuid(), Guid.NewGuid(), Quantity: 30, Now);
+        var @event = new StockReserved(Guid.NewGuid(), Guid.NewGuid(), DefaultSku, DefaultWarehouseId, Quantity: 30, Now);
 
         var result = inventory.Apply(@event);
 
@@ -52,7 +52,7 @@ public class ProductInventoryApplyTests
     {
         var inventory = BuildInventory();
         var reservationId = Guid.NewGuid();
-        var @event = new StockReserved(Guid.NewGuid(), reservationId, Quantity: 20, Now);
+        var @event = new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 20, Now);
 
         var result = inventory.Apply(@event);
 
@@ -69,7 +69,7 @@ public class ProductInventoryApplyTests
         var inventory = BuildInventory();
         var orderId = Guid.NewGuid();
         var reservationId = Guid.NewGuid();
-        var @event = new StockReserved(orderId, reservationId, Quantity: 10, Now);
+        var @event = new StockReserved(orderId, reservationId, DefaultSku, DefaultWarehouseId, Quantity: 10, Now);
 
         var result = inventory.Apply(@event);
 
@@ -84,7 +84,7 @@ public class ProductInventoryApplyTests
     public void Apply_StockReserved_Does_Not_Modify_CommittedAllocations()
     {
         var inventory = BuildInventory();
-        var @event = new StockReserved(Guid.NewGuid(), Guid.NewGuid(), Quantity: 5, Now);
+        var @event = new StockReserved(Guid.NewGuid(), Guid.NewGuid(), DefaultSku, DefaultWarehouseId, Quantity: 5, Now);
 
         var result = inventory.Apply(@event);
 
@@ -103,8 +103,8 @@ public class ProductInventoryApplyTests
         var resId2 = Guid.NewGuid();
 
         var result = inventory
-            .Apply(new StockReserved(Guid.NewGuid(), resId1, Quantity: 15, Now))
-            .Apply(new StockReserved(Guid.NewGuid(), resId2, Quantity: 25, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), resId1, DefaultSku, DefaultWarehouseId, Quantity: 15, Now))
+            .Apply(new StockReserved(Guid.NewGuid(), resId2, DefaultSku, DefaultWarehouseId, Quantity: 25, Now));
 
         result.AvailableQuantity.ShouldBe(60);
         result.Reservations.ShouldContainKey(resId1);
@@ -125,9 +125,9 @@ public class ProductInventoryApplyTests
     {
         var reservationId = Guid.NewGuid();
         var inventory = BuildInventory()
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 20, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 20, Now));
 
-        var result = inventory.Apply(new ReservationCommitted(reservationId, Now));
+        var result = inventory.Apply(new ReservationCommitted(reservationId, DefaultSku, DefaultWarehouseId, Now));
 
         result.Reservations.ShouldNotContainKey(reservationId);
     }
@@ -140,9 +140,9 @@ public class ProductInventoryApplyTests
     {
         var reservationId = Guid.NewGuid();
         var inventory = BuildInventory()
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 20, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 20, Now));
 
-        var result = inventory.Apply(new ReservationCommitted(reservationId, Now));
+        var result = inventory.Apply(new ReservationCommitted(reservationId, DefaultSku, DefaultWarehouseId, Now));
 
         result.CommittedAllocations.ShouldContainKey(reservationId);
         result.CommittedAllocations[reservationId].ShouldBe(20);
@@ -156,10 +156,10 @@ public class ProductInventoryApplyTests
     {
         var reservationId = Guid.NewGuid();
         var inventory = BuildInventory(availableQuantity: 100)
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 30, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 30, Now));
 
         // AvailableQuantity is 70 after reserve
-        var result = inventory.Apply(new ReservationCommitted(reservationId, Now));
+        var result = inventory.Apply(new ReservationCommitted(reservationId, DefaultSku, DefaultWarehouseId, Now));
 
         result.AvailableQuantity.ShouldBe(70);
     }
@@ -173,7 +173,7 @@ public class ProductInventoryApplyTests
         var inventory = BuildInventory(availableQuantity: 100);
         var unknownId = Guid.NewGuid();
 
-        var result = inventory.Apply(new ReservationCommitted(unknownId, Now));
+        var result = inventory.Apply(new ReservationCommitted(unknownId, DefaultSku, DefaultWarehouseId, Now));
 
         // Returns the exact same instance (ReferenceEquals guard for the 'return this' branch)
         result.ShouldBeSameAs(inventory);
@@ -188,10 +188,10 @@ public class ProductInventoryApplyTests
         var resId1 = Guid.NewGuid();
         var resId2 = Guid.NewGuid();
         var inventory = BuildInventory(availableQuantity: 100)
-            .Apply(new StockReserved(Guid.NewGuid(), resId1, Quantity: 10, Now))
-            .Apply(new StockReserved(Guid.NewGuid(), resId2, Quantity: 20, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), resId1, DefaultSku, DefaultWarehouseId, Quantity: 10, Now))
+            .Apply(new StockReserved(Guid.NewGuid(), resId2, DefaultSku, DefaultWarehouseId, Quantity: 20, Now));
 
-        var result = inventory.Apply(new ReservationCommitted(resId1, Now));
+        var result = inventory.Apply(new ReservationCommitted(resId1, DefaultSku, DefaultWarehouseId, Now));
 
         result.Reservations.ShouldNotContainKey(resId1);
         result.Reservations.ShouldContainKey(resId2);
@@ -210,10 +210,10 @@ public class ProductInventoryApplyTests
     {
         var reservationId = Guid.NewGuid();
         var inventory = BuildInventory()
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 15, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 15, Now));
 
         var result = inventory.Apply(
-            new ReservationReleased(reservationId, Quantity: 15, Reason: "cancelled", Now));
+            new ReservationReleased(reservationId, DefaultSku, DefaultWarehouseId, Quantity: 15, Reason: "cancelled", Now));
 
         result.Reservations.ShouldNotContainKey(reservationId);
     }
@@ -227,11 +227,11 @@ public class ProductInventoryApplyTests
     {
         var reservationId = Guid.NewGuid();
         var inventory = BuildInventory(availableQuantity: 100)
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 40, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 40, Now));
 
         // AvailableQuantity is 60 after reserve
         var result = inventory.Apply(
-            new ReservationReleased(reservationId, Quantity: 40, Reason: "abandoned", Now));
+            new ReservationReleased(reservationId, DefaultSku, DefaultWarehouseId, Quantity: 40, Reason: "abandoned", Now));
 
         result.AvailableQuantity.ShouldBe(100);
     }
@@ -244,10 +244,10 @@ public class ProductInventoryApplyTests
     {
         var reservationId = Guid.NewGuid();
         var inventory = BuildInventory()
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 10, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 10, Now));
 
         var result = inventory.Apply(
-            new ReservationReleased(reservationId, Quantity: 10, Reason: "cancelled", Now));
+            new ReservationReleased(reservationId, DefaultSku, DefaultWarehouseId, Quantity: 10, Reason: "cancelled", Now));
 
         result.CommittedAllocations.ShouldBeEmpty();
     }
@@ -262,7 +262,7 @@ public class ProductInventoryApplyTests
         var unknownId = Guid.NewGuid();
 
         var result = inventory.Apply(
-            new ReservationReleased(unknownId, Quantity: 10, Reason: "ghost", Now));
+            new ReservationReleased(unknownId, DefaultSku, DefaultWarehouseId, Quantity: 10, Reason: "ghost", Now));
 
         result.ShouldBeSameAs(inventory);
     }
@@ -276,11 +276,11 @@ public class ProductInventoryApplyTests
         var resId1 = Guid.NewGuid();
         var resId2 = Guid.NewGuid();
         var inventory = BuildInventory(availableQuantity: 100)
-            .Apply(new StockReserved(Guid.NewGuid(), resId1, Quantity: 10, Now))
-            .Apply(new StockReserved(Guid.NewGuid(), resId2, Quantity: 20, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), resId1, DefaultSku, DefaultWarehouseId, Quantity: 10, Now))
+            .Apply(new StockReserved(Guid.NewGuid(), resId2, DefaultSku, DefaultWarehouseId, Quantity: 20, Now));
 
         var result = inventory.Apply(
-            new ReservationReleased(resId1, Quantity: 10, Reason: "cancelled", Now));
+            new ReservationReleased(resId1, DefaultSku, DefaultWarehouseId, Quantity: 10, Reason: "cancelled", Now));
 
         result.Reservations.ShouldNotContainKey(resId1);
         result.Reservations.ShouldContainKey(resId2);
@@ -298,7 +298,7 @@ public class ProductInventoryApplyTests
     public void Apply_StockReceived_Increments_AvailableQuantity()
     {
         var inventory = BuildInventory(availableQuantity: 50);
-        var @event = new StockReceived(Quantity: 75, Source: "Supplier-A", Now);
+        var @event = new StockReceived(DefaultSku, DefaultWarehouseId, "Supplier-A", null, Quantity: 75, Now);
 
         var result = inventory.Apply(@event);
 
@@ -313,9 +313,9 @@ public class ProductInventoryApplyTests
     {
         var reservationId = Guid.NewGuid();
         var inventory = BuildInventory()
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 10, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 10, Now));
 
-        var result = inventory.Apply(new StockReceived(Quantity: 50, Source: "Supplier-B", Now));
+        var result = inventory.Apply(new StockReceived(DefaultSku, DefaultWarehouseId, "Supplier-B", null, Quantity: 50, Now));
 
         result.Reservations.ShouldContainKey(reservationId);
         result.Reservations[reservationId].ShouldBe(10);
@@ -329,12 +329,12 @@ public class ProductInventoryApplyTests
     {
         var reservationId = Guid.NewGuid();
         var inventory = BuildInventory()
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 20, Now))
-            .Apply(new ReservationCommitted(reservationId, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 20, Now))
+            .Apply(new ReservationCommitted(reservationId, DefaultSku, DefaultWarehouseId, Now));
 
         var committed = inventory.CommittedAllocations[reservationId];
 
-        var result = inventory.Apply(new StockReceived(Quantity: 30, Source: "Transfer", Now));
+        var result = inventory.Apply(new StockReceived(DefaultSku, DefaultWarehouseId, "Transfer", null, Quantity: 30, Now));
 
         result.CommittedAllocations[reservationId].ShouldBe(committed);
     }
@@ -348,9 +348,9 @@ public class ProductInventoryApplyTests
         var reservationId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
         var inventory = BuildInventory()
-            .Apply(new StockReserved(orderId, reservationId, Quantity: 5, Now));
+            .Apply(new StockReserved(orderId, reservationId, DefaultSku, DefaultWarehouseId, Quantity: 5, Now));
 
-        var result = inventory.Apply(new StockReceived(Quantity: 10, Source: "Warehouse", Now));
+        var result = inventory.Apply(new StockReceived(DefaultSku, DefaultWarehouseId, "Warehouse", null, Quantity: 10, Now));
 
         result.ReservationOrderIds[reservationId].ShouldBe(orderId);
     }
@@ -366,7 +366,7 @@ public class ProductInventoryApplyTests
     public void Apply_StockRestocked_Increments_AvailableQuantity()
     {
         var inventory = BuildInventory(availableQuantity: 20);
-        var @event = new StockRestocked(Guid.NewGuid(), Quantity: 30, Now);
+        var @event = new StockRestocked(DefaultSku, DefaultWarehouseId, Guid.NewGuid(), Quantity: 30, Now);
 
         var result = inventory.Apply(@event);
 
@@ -381,9 +381,9 @@ public class ProductInventoryApplyTests
     {
         var reservationId = Guid.NewGuid();
         var inventory = BuildInventory()
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 10, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 10, Now));
 
-        var result = inventory.Apply(new StockRestocked(Guid.NewGuid(), Quantity: 25, Now));
+        var result = inventory.Apply(new StockRestocked(DefaultSku, DefaultWarehouseId, Guid.NewGuid(), Quantity: 25, Now));
 
         result.Reservations.ShouldContainKey(reservationId);
         result.Reservations[reservationId].ShouldBe(10);
@@ -397,12 +397,12 @@ public class ProductInventoryApplyTests
     {
         var reservationId = Guid.NewGuid();
         var inventory = BuildInventory()
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 15, Now))
-            .Apply(new ReservationCommitted(reservationId, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 15, Now))
+            .Apply(new ReservationCommitted(reservationId, DefaultSku, DefaultWarehouseId, Now));
 
         var committed = inventory.CommittedAllocations[reservationId];
 
-        var result = inventory.Apply(new StockRestocked(Guid.NewGuid(), Quantity: 50, Now));
+        var result = inventory.Apply(new StockRestocked(DefaultSku, DefaultWarehouseId, Guid.NewGuid(), Quantity: 50, Now));
 
         result.CommittedAllocations[reservationId].ShouldBe(committed);
     }
@@ -415,12 +415,12 @@ public class ProductInventoryApplyTests
     {
         var reservationId = Guid.NewGuid();
         var inventory = BuildInventory(availableQuantity: 100)
-            .Apply(new StockReserved(Guid.NewGuid(), reservationId, Quantity: 10, Now));
+            .Apply(new StockReserved(Guid.NewGuid(), reservationId, DefaultSku, DefaultWarehouseId, Quantity: 10, Now));
 
         var reservedBefore   = inventory.ReservedQuantity;
         var committedBefore  = inventory.CommittedQuantity;
 
-        var result = inventory.Apply(new StockRestocked(Guid.NewGuid(), Quantity: 50, Now));
+        var result = inventory.Apply(new StockRestocked(DefaultSku, DefaultWarehouseId, Guid.NewGuid(), Quantity: 50, Now));
 
         result.ReservedQuantity.ShouldBe(reservedBefore);
         result.CommittedQuantity.ShouldBe(committedBefore);

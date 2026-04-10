@@ -5,6 +5,8 @@ namespace Inventory.Management;
 /// </summary>
 public sealed record ReservationReleased(
     Guid ReservationId,
+    string Sku,
+    string WarehouseId,
     int Quantity,
     string Reason,
     DateTimeOffset ReleasedAt);

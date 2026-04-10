@@ -45,7 +45,7 @@ public static class ReservationCommitRequestedHandler
 
         var quantity = inventory.Reservations[message.ReservationId];
 
-        var domainEvent = new ReservationCommitted(message.ReservationId, committedAt);
+        var domainEvent = new ReservationCommitted(message.ReservationId, inventory.Sku, inventory.WarehouseId, committedAt);
 
         session.Events.Append(inventory.Id, domainEvent);
 

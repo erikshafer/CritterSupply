@@ -5,4 +5,6 @@ namespace Inventory.Management;
 /// </summary>
 public sealed record ReservationCommitted(
     Guid ReservationId,
+    string Sku,
+    string WarehouseId,
     DateTimeOffset CommittedAt);

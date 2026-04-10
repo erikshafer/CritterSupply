@@ -14,7 +14,7 @@ public sealed record ReserveStock(
     Guid ReservationId,
     int Quantity)
 {
-    public Guid InventoryId => ProductInventory.CombinedGuid(Sku, WarehouseId);
+    public Guid InventoryId => InventoryStreamId.Compute(Sku, WarehouseId);
 
     public class ReserveStockValidator : AbstractValidator<ReserveStock>
     {
@@ -71,6 +71,8 @@ public static class ReserveStockHandler
         var domainEvent = new StockReserved(
             command.OrderId,
             command.ReservationId,
+            command.Sku,
+            command.WarehouseId,
             command.Quantity,
             reservedAt);
 

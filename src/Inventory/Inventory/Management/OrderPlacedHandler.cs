@@ -4,6 +4,11 @@ using Wolverine;
 namespace Inventory.Management;
 
 /// <summary>
+/// MIGRATION BRIDGE: Dual-publish compatibility handler for Phase 1.
+/// The WH-01 hardcode is intentionally preserved during migration Phase 1.
+/// Remove after Orders saga sends FulfillmentRequested before reservation (M42.x S4).
+/// See ADR 0060, Section 1 for the complete routing integration migration plan.
+///
 /// Wolverine handler for OrderPlaced integration events from Orders BC.
 /// Reacts to new orders by initiating inventory reservations for each line item.
 /// </summary>
