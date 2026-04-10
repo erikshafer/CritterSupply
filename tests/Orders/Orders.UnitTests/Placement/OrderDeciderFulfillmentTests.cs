@@ -244,7 +244,9 @@ public class OrderDeciderFulfillmentTests
         var order = BuildOrder(OrderStatus.Fulfilling);
 
         var decision = OrderDecider.HandleBackorderCreated(order,
-            new FulfillmentContracts.BackorderCreated(order.Id, Guid.NewGuid(), "No stock", DateTimeOffset.UtcNow));
+            new FulfillmentContracts.BackorderCreated(order.Id, Guid.NewGuid(), "No stock",
+                [new FulfillmentContracts.BackorderedItem("DOG-FOOD-40LB", "NJ-FC", 1)],
+                DateTimeOffset.UtcNow));
 
         decision.Status.ShouldBe(OrderStatus.Backordered);
     }

@@ -65,13 +65,26 @@ public static class ReceiveStockHandler
 
         session.Events.Append(inventory.Id, domainEvent);
 
+        var newAvailableQuantity = inventory.AvailableQuantity + command.Quantity;
+
         var outgoing = new OutgoingMessages();
         outgoing.Add(new Messages.Contracts.Inventory.StockReplenished(
             inventory.Sku,
             inventory.WarehouseId,
             command.Quantity,
-            inventory.AvailableQuantity + command.Quantity,
+            newAvailableQuantity,
             receivedAt));
+
+        // BackorderPolicy: if this SKU has pending backorders, notify Fulfillment
+        var backorderMessages = BackorderPolicy.CheckAndPublish(inventory, newAvailableQuantity);
+        if (backorderMessages is not null)
+        {
+            session.Events.Append(inventory.Id,
+                new BackorderCleared(inventory.Sku, inventory.WarehouseId, receivedAt));
+
+            foreach (var msg in backorderMessages)
+                outgoing.Add(msg);
+        }
 
         return outgoing;
     }

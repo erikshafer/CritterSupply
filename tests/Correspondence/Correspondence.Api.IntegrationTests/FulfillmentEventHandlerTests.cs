@@ -119,6 +119,7 @@ public sealed class FulfillmentEventHandlerTests : IAsyncLifetime
             orderId,
             shipmentId,
             Reason: "All fulfillment centers out of stock for SKU DOG-BOWL-001",
+            Items: [new BackorderedItem("DOG-BOWL-001", "NJ-FC", 1)],
             CreatedAt: DateTimeOffset.UtcNow
         );
 
@@ -146,6 +147,7 @@ public sealed class FulfillmentEventHandlerTests : IAsyncLifetime
             orderId,
             shipmentId,
             Reason: "No stock available",
+            Items: [new BackorderedItem("CAT-FOOD-001", "NJ-FC", 2)],
             CreatedAt: DateTimeOffset.UtcNow
         );
 
