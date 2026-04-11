@@ -60,17 +60,17 @@ These slices establish the core remastered model. All P0 slices must be implemen
 
 | # | Slice Name | Command / Trigger | Events | View / Read Model | Aggregate | BC | Priority |
 |---|---|---|---|---|---|---|---|
-| 25 | Request inter-warehouse transfer | `RequestTransfer` (HTTP) | `TransferRequested`, `StockTransferredOut` (source) | `WarehouseSkuDetailView` (both FCs) | InventoryTransfer + ProductInventory | Inventory | P2 |
-| 26 | Ship transfer | `ShipTransfer` (HTTP) | `TransferShipped` | `WarehouseSkuDetailView` (in-transit) | InventoryTransfer | Inventory | P2 |
-| 27 | Receive transfer | `ReceiveTransfer` (HTTP) | `TransferReceived` (transfer), `TransferReceived` (destination ProductInventory) | `WarehouseSkuDetailView`, `StockAvailabilityView` | InventoryTransfer + ProductInventory | Inventory | P2 |
-| 28 | Cancel transfer (pre-ship) | `CancelTransfer` (HTTP) | `TransferCancelled`, compensation: `StockTransferredOut` reversed | `WarehouseSkuDetailView` (source restored) | InventoryTransfer + ProductInventory | Inventory | P2 |
-| 29 | Short transfer receipt | `ReceiveTransfer` (qty < shipped) | `TransferShortReceived`, `StockDiscrepancyFound` | `AlertFeedView` | InventoryTransfer + ProductInventory | Inventory | P2 |
-| 30 | Replenishment trigger | *(inline policy on low-stock + backorder)* | `ReplenishmentTriggered` | `LowStockAlertView` | ProductInventory | Inventory | P2 |
-| 31 | Network inventory summary | *(async projection)* | All ProductInventory events | `NetworkInventorySummaryView` | — | Inventory | P2 |
-| 32 | Backorder impact dashboard | *(async projection)* | `BackorderRegistered`, `BackorderCleared` + StockAvailabilityView | `BackorderImpactView` | — | Inventory | P2 |
-| 33 | Stock quarantine | `QuarantineStock` (HTTP) | `StockQuarantined`, `InventoryAdjusted` (negative) | `WarehouseSkuDetailView` | ProductInventory | Inventory | P2 |
-| 34 | Quarantine release (resalable) | `ReleaseQuarantine` (HTTP) | `QuarantineReleased`, `InventoryAdjusted` (positive) | `WarehouseSkuDetailView` | ProductInventory | Inventory | P2 |
-| 35 | Quarantine disposal | `DisposeQuarantine` (HTTP) | `QuarantineDisposed`, `StockWrittenOff` | `WarehouseSkuDetailView` | ProductInventory | Inventory | P2 |
+| 25 | Request inter-warehouse transfer | `RequestTransfer` (HTTP) | `TransferRequested`, `StockTransferredOut` (source) | `WarehouseSkuDetailView` (both FCs) | InventoryTransfer + ProductInventory | Inventory | P2 ✅ |
+| 26 | Ship transfer | `ShipTransfer` (HTTP) | `TransferShipped` | `WarehouseSkuDetailView` (in-transit) | InventoryTransfer | Inventory | P2 ✅ |
+| 27 | Receive transfer | `ReceiveTransfer` (HTTP) | `TransferReceived` (transfer), `TransferReceived` (destination ProductInventory) | `WarehouseSkuDetailView`, `StockAvailabilityView` | InventoryTransfer + ProductInventory | Inventory | P2 ✅ |
+| 28 | Cancel transfer (pre-ship) | `CancelTransfer` (HTTP) | `TransferCancelled`, compensation: `StockTransferredOut` reversed | `WarehouseSkuDetailView` (source restored) | InventoryTransfer + ProductInventory | Inventory | P2 ✅ |
+| 29 | Short transfer receipt | `ReceiveTransfer` (qty < shipped) | `TransferShortReceived`, `StockDiscrepancyFound` | `AlertFeedView` | InventoryTransfer + ProductInventory | Inventory | P2 ✅ |
+| 30 | Replenishment trigger | *(inline policy on low-stock + backorder)* | `ReplenishmentTriggered` | `LowStockAlertView` | ProductInventory | Inventory | P2 ✅ |
+| 31 | Network inventory summary | *(async projection)* | All ProductInventory events | `NetworkInventorySummaryView` | — | Inventory | P2 ✅ |
+| 32 | Backorder impact dashboard | *(async projection)* | `BackorderRegistered`, `BackorderCleared` + StockAvailabilityView | `BackorderImpactView` | — | Inventory | P2 ✅ |
+| 33 | Stock quarantine | `QuarantineStock` (HTTP) | `StockQuarantined`, `InventoryAdjusted` (negative) | `WarehouseSkuDetailView` | ProductInventory | Inventory | P2 ✅ |
+| 34 | Quarantine release (resalable) | `ReleaseQuarantine` (HTTP) | `QuarantineReleased`, `InventoryAdjusted` (positive) | `WarehouseSkuDetailView` | ProductInventory | Inventory | P2 ✅ |
+| 35 | Quarantine disposal | `DisposeQuarantine` (HTTP) | `QuarantineDisposed`, `StockWrittenOff` | `WarehouseSkuDetailView` | ProductInventory | Inventory | P2 ✅ |
 
 ---
 
