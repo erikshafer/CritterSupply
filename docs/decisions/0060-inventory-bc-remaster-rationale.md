@@ -234,3 +234,79 @@ Continue using `CombinedGuid()` with MD5 since it works and existing data uses i
 **Rejected because:** ADR 0016 established UUID v5 as the standard. MD5 has known collision risks
 and is deprecated for cryptographic use. The Listings BC pattern provides a reference
 implementation. Clean slate migration is acceptable for CritterSupply.
+
+---
+
+## Remaster Completion — S4 Close-Out
+
+**Date:** 2026-04-11
+
+This addendum records the final state of the Inventory BC Remaster after four implementation
+sessions (S1–S4). The remaster is now feature-complete for P0, P1, and P2 slices.
+
+### What Shipped Across S1–S4
+
+#### S1 (M42.1): P0 Foundation
+UUID v5 stream IDs (`InventoryStreamId.Compute()`), `StockAvailabilityView` inline
+multi-stream projection, `StockReservationRequested` handler, enriched domain events
+(Sku + WarehouseId on all events), `LowStockPolicy`, `OrderPlacedHandler` dual-publish
+bridge. **83 unit + 54 integration tests.**
+
+#### S2 (M42.2): P1 Failure Modes
+`StockPicked`/`StockShipped` physical tracking, `StockDiscrepancyFound` (ShortPick/ZeroPick),
+`ReservationExpired` with scheduled timeouts, `BackorderRegistered`/`BackorderCleared` cycle,
+`CycleCount` workflow (`CycleCountInitiated`/`CycleCountCompleted`),
+`DamageRecorded`/`StockWrittenOff`. **100 unit + 83 integration tests.**
+
+#### S3 (M42.3): P2 Transfers/Quarantine
+`InventoryTransfer` aggregate (`Guid.CreateVersion7()`), 5-state transfer lifecycle
+(Requested → Shipped → Received, with Cancel + ShortReceive),
+`StockQuarantined`/`QuarantineReleased`/`QuarantineDisposed`, `ReplenishmentPolicy`,
+3 new async projections (`AlertFeedView`, `NetworkInventorySummaryView`,
+`BackorderImpactView`), `.MoveToErrorQueue()` failure policy.
+**120 unit + 96 integration tests.**
+
+#### S4 (M42.4): Close-Out
+`WarehouseSkuDetailView` projection (inline, all event coverage including transfers +
+quarantine), `StockDiscrepancyDetected` integration event publication,
+`DeadLetterQueueLogSink` background service, `StockAvailabilityView` regression tests
+(quarantine exclusion, in-transit non-double-counting), `AlertFeedView` rebuild test.
+**141 unit + 106 integration tests.**
+
+### What Was Deferred to P3+ and Why
+
+| Slice | Item | Reason |
+|---|---|---|
+| 12 | `OrderPlacedHandler` retirement | BLOCKED on coordinated Orders + Fulfillment update — Orders still routes `OrderPlaced` to Inventory via local queue |
+| 36 | Bin-level tracking | Requires WMS hardware integration |
+| 37 | Configurable per-SKU thresholds | Requires admin UI workflow |
+| 38 | Demand forecasting | Requires ML/statistical modeling |
+| 39 | FC capacity exposure | Delivered in S4 stretch — `FulfillmentCenterCapacityView` inline projection + HTTP endpoint |
+| 40 | Lot/batch tracking | Requires regulatory/compliance scoping |
+| 41 | Expiration date tracking | Requires regulatory/compliance scoping |
+| 42 | Vendor returns | Requires regulatory/compliance scoping |
+
+### Final Aggregate Shape
+
+**`ProductInventory`:**
+- Fields: `AvailableQuantity`, `Reservations`, `CommittedAllocations`, `PickedAllocations`,
+  `ReservationOrderIds`, `QuarantinedQuantity`, `HasPendingBackorders`
+- Computed: `TotalOnHand = Available + Reserved + Committed + Picked`
+
+**`InventoryTransfer`:**
+- `TransferId` (`Guid.CreateVersion7()`)
+- `Status`: Requested → Shipped → Received → Cancelled → ShortReceived
+- Fields: `Sku`, `SourceWarehouseId`, `DestinationWarehouseId`, `Quantity`, `ReceivedQuantity`
+
+### Retired Contracts
+
+- `OrderPlacedHandler` retirement still pending (Slice 12 blocked on coordinated
+  Orders + Fulfillment update)
+- `CombinedGuid` marked `[Obsolete]` — UUID v5 via `InventoryStreamId.Compute()` is the standard
+
+### Session Retrospectives
+
+- [S1 Retrospective](../planning/milestones/inventory-remaster-s1-retrospective.md)
+- [S2 Retrospective](../planning/milestones/inventory-remaster-s2-retrospective.md)
+- [S3 Retrospective](../planning/milestones/inventory-remaster-s3-retrospective.md)
+- [S4 Retrospective](../planning/milestones/inventory-remaster-s4-retrospective.md)

@@ -60,6 +60,14 @@ builder.Services.AddMarten(opts =>
 
         // BackorderImpactView — backorder tracking dashboard (Slice 32).
         opts.Projections.Add<BackorderImpactViewProjection>(ProjectionLifecycle.Async);
+
+        // WarehouseSkuDetailView — per-warehouse/SKU detail view (S4 carryover).
+        // Inline: mirrors ProductInventory aggregate state with breakdown into quantity buckets.
+        opts.Projections.Add<WarehouseSkuDetailViewProjection>(ProjectionLifecycle.Inline);
+
+        // FulfillmentCenterCapacityView — per-warehouse capacity utilization (Slice 39).
+        // Inline: routing engine needs current capacity data; same rationale as StockAvailabilityView.
+        opts.Projections.Add<FulfillmentCenterCapacityViewProjection>(ProjectionLifecycle.Inline);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()
@@ -69,6 +77,9 @@ builder.Services.AddMarten(opts =>
     });
 
 builder.Services.AddResourceSetupOnStartup();
+
+// Register DLQ log sink (S4 carryover — minimal observation, not full monitoring)
+builder.Services.AddHostedService<Inventory.DeadLetterQueueLogSink>();
 
 builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(opts =>
 {
