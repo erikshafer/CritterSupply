@@ -23,12 +23,16 @@ public class StockAvailabilityViewProjection : MultiStreamProjection<StockAvaila
         Identity<InventoryAdjusted>(e => e.Sku);
         Identity<StockShipped>(e => e.Sku);
         Identity<ReservationExpired>(e => e.Sku);
+        Identity<StockTransferredOut>(e => e.Sku);
+        Identity<StockTransferredIn>(e => e.Sku);
         // LowStockThresholdBreached does not affect available quantity — no Identity needed
         // StockPicked does not change available quantity (Committed → Picked) — no view update
         // StockDiscrepancyFound is audit-only — no view update
         // BackorderRegistered/BackorderCleared do not affect available quantity
         // CycleCountInitiated/CycleCountCompleted are audit-only — adjustments via InventoryAdjusted
         // DamageRecorded/StockWrittenOff are audit-only — adjustments via InventoryAdjusted
+        // StockQuarantined/QuarantineReleased/QuarantineDisposed — availability changes via InventoryAdjusted
+        // ReplenishmentTriggered — audit-only
     }
 
     public void Apply(StockAvailabilityView view, InventoryInitialized e)
@@ -92,6 +96,24 @@ public class StockAvailabilityViewProjection : MultiStreamProjection<StockAvaila
     /// ReservationExpired returns stock to the available pool (same as ReservationReleased).
     /// </summary>
     public void Apply(StockAvailabilityView view, ReservationExpired e)
+    {
+        var current = GetWarehouseQuantity(view, e.WarehouseId);
+        SetWarehouse(view, e.WarehouseId, current + e.Quantity);
+    }
+
+    /// <summary>
+    /// StockTransferredOut deducts available stock at the source warehouse for a transfer.
+    /// </summary>
+    public void Apply(StockAvailabilityView view, StockTransferredOut e)
+    {
+        var current = GetWarehouseQuantity(view, e.WarehouseId);
+        SetWarehouse(view, e.WarehouseId, current - e.Quantity);
+    }
+
+    /// <summary>
+    /// StockTransferredIn adds stock at the destination warehouse from a transfer.
+    /// </summary>
+    public void Apply(StockAvailabilityView view, StockTransferredIn e)
     {
         var current = GetWarehouseQuantity(view, e.WarehouseId);
         SetWarehouse(view, e.WarehouseId, current + e.Quantity);

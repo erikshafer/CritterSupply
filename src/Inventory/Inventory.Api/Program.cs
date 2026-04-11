@@ -43,10 +43,23 @@ builder.Services.AddMarten(opts =>
         // Register ProductInventory aggregate for event sourcing
         opts.Projections.Snapshot<ProductInventory>(SnapshotLifecycle.Inline);
 
+        // Register InventoryTransfer aggregate for event sourcing (Slices 25–29)
+        opts.Projections.Snapshot<InventoryTransfer>(SnapshotLifecycle.Inline);
+
         // StockAvailabilityView — multi-stream projection keyed by SKU.
         // Inline because the routing engine is on the critical checkout path;
         // stale data leads to double-booking.
         opts.Projections.Add<StockAvailabilityViewProjection>(ProjectionLifecycle.Inline);
+
+        // AlertFeedView — event-per-document projection for operational alerts.
+        // Async because the alert feed is not on the critical checkout path.
+        opts.Projections.Add<AlertFeedViewProjection>(ProjectionLifecycle.Async);
+
+        // NetworkInventorySummaryView — network-wide per-SKU dashboard (Slice 31).
+        opts.Projections.Add<NetworkInventorySummaryViewProjection>(ProjectionLifecycle.Async);
+
+        // BackorderImpactView — backorder tracking dashboard (Slice 32).
+        opts.Projections.Add<BackorderImpactViewProjection>(ProjectionLifecycle.Async);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()
@@ -75,7 +88,7 @@ builder.Host.UseWolverine(opts =>
     opts.OnException<ConcurrencyException>()
         .RetryOnce()
         .Then.RetryWithCooldown(100.Milliseconds(), 250.Milliseconds())
-        .Then.Discard();
+        .Then.MoveToErrorQueue();
 
     opts.UseFluentValidation();
 

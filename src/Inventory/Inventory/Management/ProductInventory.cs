@@ -16,6 +16,7 @@ public sealed record ProductInventory(
     Dictionary<Guid, Guid> ReservationOrderIds,
     Dictionary<Guid, int> PickedAllocations,
     bool HasPendingBackorders,
+    int QuarantinedQuantity,
     DateTimeOffset InitializedAt)
 {
     public int ReservedQuantity => Reservations.Values.Sum();
@@ -33,6 +34,7 @@ public sealed record ProductInventory(
             new Dictionary<Guid, Guid>(),
             new Dictionary<Guid, int>(),
             false,
+            0,
             @event.InitializedAt);
 
     /// <summary>
@@ -189,4 +191,44 @@ public sealed record ProductInventory(
 
     public ProductInventory Apply(DamageRecorded @event) => this;
     public ProductInventory Apply(StockWrittenOff @event) => this;
+
+    // ---------------------------------------------------------------------------
+    // S3 — Transfer and quarantine tracking
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// StockTransferredOut: deducts available quantity when stock is allocated
+    /// for an outgoing inter-warehouse transfer.
+    /// </summary>
+    public ProductInventory Apply(StockTransferredOut @event) =>
+        this with { AvailableQuantity = AvailableQuantity - @event.Quantity };
+
+    /// <summary>
+    /// StockTransferredIn: adds quantity when stock arrives from an inbound transfer.
+    /// </summary>
+    public ProductInventory Apply(StockTransferredIn @event) =>
+        this with { AvailableQuantity = AvailableQuantity + @event.Quantity };
+
+    /// <summary>
+    /// StockQuarantined: tracks quarantined quantity. Actual available decrement is via InventoryAdjusted.
+    /// </summary>
+    public ProductInventory Apply(StockQuarantined @event) =>
+        this with { QuarantinedQuantity = QuarantinedQuantity + @event.Quantity };
+
+    /// <summary>
+    /// QuarantineReleased: restores quarantined quantity. Actual available increment is via InventoryAdjusted.
+    /// </summary>
+    public ProductInventory Apply(QuarantineReleased @event) =>
+        this with { QuarantinedQuantity = QuarantinedQuantity - @event.Quantity };
+
+    /// <summary>
+    /// QuarantineDisposed: removes from quarantine permanently. Write-off via StockWrittenOff.
+    /// </summary>
+    public ProductInventory Apply(QuarantineDisposed @event) =>
+        this with { QuarantinedQuantity = QuarantinedQuantity - @event.Quantity };
+
+    /// <summary>
+    /// ReplenishmentTriggered: audit event only — no state change on the aggregate.
+    /// </summary>
+    public ProductInventory Apply(ReplenishmentTriggered @event) => this;
 }

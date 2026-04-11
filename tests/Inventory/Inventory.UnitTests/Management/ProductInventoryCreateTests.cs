@@ -304,6 +304,7 @@ public class ProductInventoryCreateTests
             ReservationOrderIds: new Dictionary<Guid, Guid>(),
             PickedAllocations: new Dictionary<Guid, int>(),
             HasPendingBackorders: false,
+            QuarantinedQuantity: 0,
             InitializedAt: DefaultInitializedAt);
 
         inventory.ReservedQuantity.ShouldBe(40);  // 10 + 25 + 5
@@ -329,6 +330,7 @@ public class ProductInventoryCreateTests
             ReservationOrderIds: new Dictionary<Guid, Guid>(),
             PickedAllocations: new Dictionary<Guid, int>(),
             HasPendingBackorders: false,
+            QuarantinedQuantity: 0,
             InitializedAt: DefaultInitializedAt);
 
         inventory.CommittedQuantity.ShouldBe(20);  // 8 + 12
@@ -351,6 +353,7 @@ public class ProductInventoryCreateTests
             ReservationOrderIds: new Dictionary<Guid, Guid>(),
             PickedAllocations: new Dictionary<Guid, int>(),
             HasPendingBackorders: false,
+            QuarantinedQuantity: 0,
             InitializedAt: DefaultInitializedAt);
 
         // 50 available + 15 reserved + 10 committed = 75

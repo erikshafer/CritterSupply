@@ -12,5 +12,8 @@ public enum DiscrepancyType
     ZeroPick,
 
     /// <summary>Cycle count revealed a mismatch between system and physical counts.</summary>
-    CycleCount
+    CycleCount,
+
+    /// <summary>Transfer receipt quantity was less than the shipped quantity.</summary>
+    ShortTransfer
 }
