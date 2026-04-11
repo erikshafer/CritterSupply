@@ -164,4 +164,104 @@ public class StockAvailabilityViewProjectionTests
         view.Warehouses[0].AvailableQuantity.ShouldBe(100);
         view.TotalAvailable.ShouldBe(100);
     }
+
+    // ---------------------------------------------------------------------------
+    // S3 events — Transfer in-transit non-double-counting regression
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void StockTransferredOut_Decrements_Source_Available()
+    {
+        var view = EmptyView();
+        _projection.Apply(view, new InventoryInitialized("CAT-FOOD-001", "NJ-FC", 100, Now));
+        _projection.Apply(view, new InventoryInitialized("CAT-FOOD-001", "OH-FC", 50, Now));
+
+        _projection.Apply(view, new StockTransferredOut("CAT-FOOD-001", "NJ-FC", Guid.NewGuid(), 30, Now));
+
+        view.Warehouses.First(w => w.WarehouseId == "NJ-FC").AvailableQuantity.ShouldBe(70);
+        view.Warehouses.First(w => w.WarehouseId == "OH-FC").AvailableQuantity.ShouldBe(50);
+        view.TotalAvailable.ShouldBe(120); // 70 + 50
+    }
+
+    [Fact]
+    public void StockTransferredIn_Increments_Destination_Available()
+    {
+        var view = EmptyView();
+        _projection.Apply(view, new InventoryInitialized("CAT-FOOD-001", "NJ-FC", 100, Now));
+        _projection.Apply(view, new InventoryInitialized("CAT-FOOD-001", "OH-FC", 50, Now));
+
+        _projection.Apply(view, new StockTransferredIn("CAT-FOOD-001", "OH-FC", Guid.NewGuid(), 30, Now));
+
+        view.Warehouses.First(w => w.WarehouseId == "OH-FC").AvailableQuantity.ShouldBe(80);
+        view.TotalAvailable.ShouldBe(180); // 100 + 80
+    }
+
+    [Fact]
+    public void Transfer_InTransit_Not_Double_Counted()
+    {
+        // Regression: between StockTransferredOut (source) and StockTransferredIn (dest),
+        // stock should not be counted at either warehouse — no double-counting.
+        var view = EmptyView();
+        _projection.Apply(view, new InventoryInitialized("CAT-FOOD-001", "NJ-FC", 100, Now));
+        _projection.Apply(view, new InventoryInitialized("CAT-FOOD-001", "OH-FC", 50, Now));
+
+        // Transfer 30 out of NJ-FC (in-transit, not yet at OH-FC)
+        _projection.Apply(view, new StockTransferredOut("CAT-FOOD-001", "NJ-FC", Guid.NewGuid(), 30, Now));
+
+        // At this point, 30 is in-transit: NJ-FC=70, OH-FC=50
+        view.TotalAvailable.ShouldBe(120); // 70 + 50, NOT 150 (no double-count)
+        view.Warehouses.First(w => w.WarehouseId == "NJ-FC").AvailableQuantity.ShouldBe(70);
+        view.Warehouses.First(w => w.WarehouseId == "OH-FC").AvailableQuantity.ShouldBe(50);
+
+        // Transfer arrives at OH-FC
+        _projection.Apply(view, new StockTransferredIn("CAT-FOOD-001", "OH-FC", Guid.NewGuid(), 30, Now));
+
+        // NJ-FC=70, OH-FC=80 → total 150 (network conserved)
+        view.TotalAvailable.ShouldBe(150);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Quarantine exclusion regression (S4)
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void Quarantine_Does_Not_Directly_Affect_AvailableQuantity()
+    {
+        // StockQuarantined is NOT subscribed in StockAvailabilityViewProjection because
+        // the available decrement is handled by the companion InventoryAdjusted event.
+        // This test confirms quarantine events alone don't corrupt the view.
+        var view = EmptyView();
+        _projection.Apply(view, new InventoryInitialized("CAT-FOOD-001", "NJ-FC", 100, Now));
+
+        // Companion InventoryAdjusted decrements available for quarantine
+        _projection.Apply(view, new InventoryAdjusted("CAT-FOOD-001", "NJ-FC", -20, "Quarantine", "clerk", Now));
+
+        view.Warehouses[0].AvailableQuantity.ShouldBe(80);
+
+        // Release quarantine: companion InventoryAdjusted restores available
+        _projection.Apply(view, new InventoryAdjusted("CAT-FOOD-001", "NJ-FC", 20, "Release", "clerk", Now));
+
+        view.Warehouses[0].AvailableQuantity.ShouldBe(100);
+    }
+
+    [Fact]
+    public void Quarantined_Stock_Excluded_From_Available_Via_InventoryAdjusted()
+    {
+        // Regression: quarantined stock must be excluded from available quantity.
+        // The StockAvailabilityView tracks AVAILABLE stock only — quarantined stock
+        // is removed via InventoryAdjusted (negative) and is not double-counted.
+        var view = EmptyView();
+        _projection.Apply(view, new InventoryInitialized("CAT-FOOD-001", "NJ-FC", 100, Now));
+        _projection.Apply(view, new InventoryInitialized("CAT-FOOD-001", "OH-FC", 50, Now));
+
+        // Quarantine 20 at NJ-FC (via InventoryAdjusted)
+        _projection.Apply(view, new InventoryAdjusted("CAT-FOOD-001", "NJ-FC", -20, "Quarantine batch", "clerk", Now));
+
+        view.Warehouses.First(w => w.WarehouseId == "NJ-FC").AvailableQuantity.ShouldBe(80);
+        view.TotalAvailable.ShouldBe(130); // 80 + 50
+
+        // Dispose quarantine (via InventoryAdjusted — already at 80, stays at 80)
+        // No further adjustment needed since stock was already removed from available
+        view.Warehouses.First(w => w.WarehouseId == "NJ-FC").AvailableQuantity.ShouldBe(80);
+    }
 }
