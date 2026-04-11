@@ -49,6 +49,7 @@ public class TestFixture : IAsyncLifetime
                 services.AddAuthorization(opts =>
                 {
                     opts.AddPolicy("WarehouseClerk", policy => policy.RequireAssertion(_ => true));
+                    opts.AddPolicy("OperationsManager", policy => policy.RequireAssertion(_ => true));
                 });
 
                 // Disable external Wolverine transports for testing

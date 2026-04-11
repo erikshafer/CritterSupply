@@ -47,6 +47,10 @@ builder.Services.AddMarten(opts =>
         // Inline because the routing engine is on the critical checkout path;
         // stale data leads to double-booking.
         opts.Projections.Add<StockAvailabilityViewProjection>(ProjectionLifecycle.Inline);
+
+        // AlertFeedView — event-per-document projection for operational alerts.
+        // Async because the alert feed is not on the critical checkout path.
+        opts.Projections.Add<AlertFeedViewProjection>(ProjectionLifecycle.Async);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()
@@ -75,7 +79,7 @@ builder.Host.UseWolverine(opts =>
     opts.OnException<ConcurrencyException>()
         .RetryOnce()
         .Then.RetryWithCooldown(100.Milliseconds(), 250.Milliseconds())
-        .Then.Discard();
+        .Then.MoveToErrorQueue();
 
     opts.UseFluentValidation();
 
