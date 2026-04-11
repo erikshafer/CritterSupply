@@ -48,13 +48,20 @@ public static class ItemPickedHandler
         if (message.Quantity == 0)
         {
             // Zero pick — complete bin miss. No StockPicked appended (nothing was physically removed).
-            session.Events.Append(inventory.Id,
-                new StockDiscrepancyFound(
-                    inventory.Sku, inventory.WarehouseId,
-                    committedQty, 0,
-                    DiscrepancyType.ZeroPick,
-                    "Complete bin miss — zero items found",
-                    DateTimeOffset.UtcNow));
+            var discrepancy = new StockDiscrepancyFound(
+                inventory.Sku, inventory.WarehouseId,
+                committedQty, 0,
+                DiscrepancyType.ZeroPick,
+                "Complete bin miss — zero items found",
+                DateTimeOffset.UtcNow);
+
+            session.Events.Append(inventory.Id, discrepancy);
+
+            outgoing.Add(new Messages.Contracts.Inventory.StockDiscrepancyDetected(
+                discrepancy.Sku, discrepancy.WarehouseId,
+                discrepancy.ExpectedQuantity, discrepancy.ActualQuantity,
+                discrepancy.DiscrepancyType.ToString(), discrepancy.Description,
+                discrepancy.DetectedAt));
 
             return outgoing;
         }
@@ -69,13 +76,20 @@ public static class ItemPickedHandler
         // Short pick detection — picker found fewer items than committed
         if (message.Quantity < committedQty)
         {
-            session.Events.Append(inventory.Id,
-                new StockDiscrepancyFound(
-                    inventory.Sku, inventory.WarehouseId,
-                    committedQty, message.Quantity,
-                    DiscrepancyType.ShortPick,
-                    "Short pick detected during order fulfillment",
-                    DateTimeOffset.UtcNow));
+            var discrepancy = new StockDiscrepancyFound(
+                inventory.Sku, inventory.WarehouseId,
+                committedQty, message.Quantity,
+                DiscrepancyType.ShortPick,
+                "Short pick detected during order fulfillment",
+                DateTimeOffset.UtcNow);
+
+            session.Events.Append(inventory.Id, discrepancy);
+
+            outgoing.Add(new Messages.Contracts.Inventory.StockDiscrepancyDetected(
+                discrepancy.Sku, discrepancy.WarehouseId,
+                discrepancy.ExpectedQuantity, discrepancy.ActualQuantity,
+                discrepancy.DiscrepancyType.ToString(), discrepancy.Description,
+                discrepancy.DetectedAt));
         }
 
         return outgoing;
