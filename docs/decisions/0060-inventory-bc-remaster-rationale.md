@@ -281,7 +281,7 @@ quarantine), `StockDiscrepancyDetected` integration event publication,
 | 36 | Bin-level tracking | Requires WMS hardware integration |
 | 37 | Configurable per-SKU thresholds | Requires admin UI workflow |
 | 38 | Demand forecasting | Requires ML/statistical modeling |
-| 39 | FC capacity exposure | No external dependency but not completed in S4 time budget |
+| 39 | FC capacity exposure | Delivered in S4 stretch — `FulfillmentCenterCapacityView` inline projection + HTTP endpoint |
 | 40 | Lot/batch tracking | Requires regulatory/compliance scoping |
 | 41 | Expiration date tracking | Requires regulatory/compliance scoping |
 | 42 | Vendor returns | Requires regulatory/compliance scoping |

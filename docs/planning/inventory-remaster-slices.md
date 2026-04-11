@@ -83,7 +83,7 @@ These slices require dedicated sub-sessions or external system integration.
 | 36 | Bin-level tracking (Gap #7) | Deferred — requires WMS hardware integration (RF scanners, bin management) | Inventory | P3 |
 | 37 | Configurable per-SKU thresholds | Deferred — requires admin UI workflow + threshold management UI | Inventory | P3 |
 | 38 | Demand forecasting | Deferred — requires ML/statistical modeling for reorder point calculation | Inventory | P3 |
-| 39 | FC capacity data exposure (Gap #9) | Deferred — not completed in S4 time budget; no external dependency | Inventory | P3 |
+| 39 | FC capacity data exposure (Gap #9) | `FulfillmentCenterCapacityView` inline projection + HTTP endpoint — delivered in S4 stretch | Inventory | P3 ✅ |
 | 40 | Lot/batch tracking | Deferred — requires regulatory/compliance scoping (regulated pet food/medication) | Inventory | P3+ |
 | 41 | Expiration date tracking | Deferred — requires regulatory/compliance scoping (perishable pet food FEFO) | Inventory | P3+ |
 | 42 | Vendor returns (defective stock to supplier) | Deferred — requires regulatory/compliance scoping (outbound return-to-supplier lifecycle) | Inventory | P3+ |

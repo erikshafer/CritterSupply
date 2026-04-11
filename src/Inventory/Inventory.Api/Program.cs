@@ -64,6 +64,10 @@ builder.Services.AddMarten(opts =>
         // WarehouseSkuDetailView — per-warehouse/SKU detail view (S4 carryover).
         // Inline: mirrors ProductInventory aggregate state with breakdown into quantity buckets.
         opts.Projections.Add<WarehouseSkuDetailViewProjection>(ProjectionLifecycle.Inline);
+
+        // FulfillmentCenterCapacityView — per-warehouse capacity utilization (Slice 39).
+        // Inline: routing engine needs current capacity data; same rationale as StockAvailabilityView.
+        opts.Projections.Add<FulfillmentCenterCapacityViewProjection>(ProjectionLifecycle.Inline);
     })
     .AddAsyncDaemon(DaemonMode.Solo)
     .UseLightweightSessions()

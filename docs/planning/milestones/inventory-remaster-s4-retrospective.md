@@ -19,7 +19,7 @@
 | **Track 3: Slice 12 retirement** | ⛔ BLOCKED | Orders still routes `OrderPlaced` to Inventory; requires coordinated update. |
 | **Track 3: ADR-0060 close-out** | ✅ | Remaster completion addendum appended to ADR. |
 | **Track 3: Slices doc update** | ✅ | All P0/P1/P2 slices marked ✅; P3+ deferral reasons documented. |
-| **Track 4: Slice 39 (stretch)** | ⏩ Deferred | Deferred to dedicated session — not completed in S4 time budget. |
+| **Track 4: Slice 39 (stretch)** | ✅ | `FulfillmentCenterCapacityView` inline multi-stream projection + `GET /api/inventory/fc-capacity/{warehouseId}` endpoint. |
 
 ---
 
@@ -27,17 +27,19 @@
 
 | Suite | S3 Count | S4 Count | Delta |
 |---|---|---|---|
-| Inventory Unit | 120 | 141 | +21 |
-| Inventory Integration | 96 | 106 | +10 |
+| Inventory Unit | 120 | 151 | +31 |
+| Inventory Integration | 96 | 109 | +13 |
 | Orders Unit | 144 | 144 | 0 |
 | Orders Integration | 55 | 55 | 0 |
-| **Total** | **415** | **446** | **+31** |
+| **Total** | **415** | **459** | **+44** |
 
 ### New Test Files
 - `WarehouseSkuDetailViewProjectionTests.cs` — 14 unit tests (all P0/P1/P2 Apply methods, transfer lifecycle, quarantine round-trips)
 - `StockAvailabilityViewProjectionTests.cs` (additions) — 6 new tests (transfer in-transit non-double-counting, quarantine exclusion regression)
+- `FulfillmentCenterCapacityViewProjectionTests.cs` — 10 unit tests (multi-SKU accumulation, reserve/pick/ship/transfer/quarantine buckets)
 - `AlertFeedViewTests.cs` — 5 integration tests (discrepancy scripted sequence, low stock threshold, short/zero/full pick verification)
 - `WarehouseSkuDetailViewTests.cs` — 5 integration tests (init, transfer lifecycle, quarantine round-trip, quarantine dispose, reserve-commit-pick-ship)
+- `FcCapacityTests.cs` — 3 integration tests (unknown warehouse, multi-SKU aggregation, reservation reflection)
 
 ---
 
@@ -66,6 +68,12 @@ Orders BC still publishes `OrderPlaced` to Inventory via local Wolverine queue. 
 (b) Orders stops routing `OrderPlaced` to Inventory.
 Both changes are beyond single-BC scope.
 
+### 5. FulfillmentCenterCapacityView as Inline MultiStreamProjection
+Keyed by warehouse ID (string), aggregates capacity across all SKUs. Inline chosen (same
+rationale as `StockAvailabilityView`) because the routing engine is on the critical checkout
+path and stale capacity data leads to overloaded warehouses. The view covers 15 event types
+across all `ProductInventory` operations.
+
 ---
 
 ## Deferred Items
@@ -73,10 +81,9 @@ Both changes are beyond single-BC scope.
 | Item | Reason | Priority |
 |---|---|---|
 | Slice 12 — `OrderPlacedHandler` retirement | Blocked on coordinated Orders + Fulfillment update | Phase 2 |
-| Slice 39 — FC capacity exposure | Not completed in S4 time budget; no external dependency | P3 |
 | DLQ alerting/monitoring pipeline | Operations BC concern — log sink is the handoff point | Operations BC |
 | Frontend wiring | Backoffice Blazor dashboard — separate BC session | Backoffice BC |
-| P3+ slices 36–42 | See inventory-remaster-slices.md for per-slice deferral reasons | P3+ |
+| P3+ slices 36–38, 40–42 | See inventory-remaster-slices.md for per-slice deferral reasons | P3+ |
 
 ---
 
@@ -90,9 +97,9 @@ Both changes are beyond single-BC scope.
 
 ## Remaster Summary
 
-Total across S1–S4: **35 P0+P1+P2 slices delivered**. 2 aggregates (`ProductInventory`
-remastered, `InventoryTransfer` new). 7 P3+ slices deferred. **141 unit tests, 106 integration
-tests** (total: 247 Inventory tests). Orders suites unchanged at 199. Build clean with 0 errors,
+Total across S1–S4: **36 P0+P1+P2+P3 slices delivered** (35 P0–P2 + Slice 39 stretch). 2 aggregates (`ProductInventory`
+remastered, `InventoryTransfer` new). 6 P3+ slices deferred. **151 unit tests, 109 integration
+tests** (total: 260 Inventory tests). Orders suites unchanged at 199. Build clean with 0 errors,
 0 Inventory warnings.
 
 ### Session Retrospectives
