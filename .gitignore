@@ -438,3 +438,8 @@ claude_desktop_config.json
 # *.feature.cs files are auto-generated from *.feature files during build
 # Keep source .feature files, ignore generated codebehind
 *.feature.cs
+
+# ==============================================================================
+# Claude
+# ==============================================================================
+.claude/settings.local.json
