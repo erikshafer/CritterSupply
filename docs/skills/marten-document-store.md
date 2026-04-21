@@ -13,6 +13,7 @@ Practical patterns for using Marten as a document database (not event sourcing) 
 3. [Session Usage: IDocumentSession vs IQuerySession](#3-session-usage-idocumentsession-vs-iquerysession)
 4. [Basic CRUD Patterns](#4-basic-crud-patterns)
 5. [Querying with LINQ](#5-querying-with-linq)
+   - [5.5 Streaming JSON Responses (Wolverine 5.32+)](#55-streaming-json-responses-wolverine-532)
 6. [Compiled Queries](#6-compiled-queries)
 7. [Batched Queries](#7-batched-queries)
 8. [Projections as Documents](#8-projections-as-documents)
@@ -552,6 +553,75 @@ query.Where(p => p.Category == "Dogs");
 
 ---
 
+## 5.5 Streaming JSON Responses (Wolverine 5.32+)
+
+`Marten.AspNetCore` ships three `IResult` implementations that stream raw Marten JSON directly from Postgres to the HTTP response body, bypassing the .NET deserialize/serialize round-trip. They implement `IEndpointMetadataProvider` so OpenAPI metadata is generated correctly. The only required addition is `using Marten.AspNetCore;` on the endpoint file — no Wolverine configuration changes needed.
+
+### Type Overview
+
+| Type | Query Source | 200 Response | Not Found | Empty Collection |
+|------|-------------|-------------|-----------|-----------------|
+| `StreamOne<T>` | `IQueryable<T>` (single doc) | Document JSON | 404 | 404 |
+| `StreamMany<T>` | `IQueryable<T>` (multiple docs) | JSON array | — | 200 with `[]` |
+| `StreamAggregate<T>` | Event stream via `FetchLatest` | Aggregate JSON | 404 | 404 |
+
+`StreamOne<T>` and `StreamMany<T>` are for document store queries — the patterns in this skill. `StreamAggregate<T>` is for event-sourced aggregates; see `marten-event-sourcing.md` §8 for the full treatment.
+
+**Key behavioral difference:** `StreamMany<T>` returns `[]` (HTTP 200) for an empty result set — it never returns 404. `StreamOne<T>` returns 404 when no document matches.
+
+### `StreamOne<T>` — Single Document
+
+```csharp
+using Marten.AspNetCore;
+
+[WolverineGet("/api/products/{sku}")]
+public static StreamOne<Product> Handle(string sku, IQuerySession session)
+    => new(session.Query<Product>().Where(p => p.Id == sku));
+```
+
+Returns 200 + JSON on hit, 404 on miss. Marten pipes the raw JSONB bytes from Postgres directly to the HTTP response stream — no C# object allocation for the document.
+
+### `StreamMany<T>` — Document List
+
+```csharp
+[WolverineGet("/api/products")]
+public static StreamMany<Product> Handle(string category, IQuerySession session)
+    => new(session.Query<Product>()
+               .Where(p => p.Category == category && p.Status == ProductStatus.Active));
+```
+
+Always returns HTTP 200. An empty result produces `[]`, not a 404.
+
+### Overriding Status Code and Content Type
+
+Both types expose init-only `OnFoundStatus` and `ContentType` properties:
+
+```csharp
+// Non-standard 2xx or explicit content-type negotiation
+new StreamOne<CurrentPriceView>(query) { OnFoundStatus = 200, ContentType = "application/json" }
+```
+
+### When to Prefer Streaming over Returning `T`
+
+- Response documents are large (projection read models, full catalog pages)
+- List endpoints returning `IReadOnlyList<T>` with many items — eliminates the `.ToListAsync()` allocation and the `System.Text.Json` serialize pass
+- Tight latency budgets where the deserialize-then-reserialize hop is measurable
+- Fine-grained control over status code or Content-Type is required
+
+### When NOT to Use Streaming
+
+- The endpoint transforms or enriches the document before returning it (you need the C# object)
+- The endpoint composes data from multiple sources
+- Alba integration tests using `ReadAsJson<T>()` — streamed responses require different assertion patterns
+
+### Contrast with Compiled Queries (§6)
+
+These two optimizations are orthogonal. Compiled queries (§6) cache LINQ-to-SQL translation, removing parse overhead on hot paths. Streaming removes the deserialize/serialize allocation for the HTTP response body. You can combine them: pass the `IQueryable<T>` result of a compiled query directly into `StreamMany<T>`. Streaming alone does not eliminate LINQ translation overhead — for truly hot-path list endpoints, use both.
+
+**Natural fits in CritterSupply:** Pricing (`CurrentPriceView` by SKU), Orders (`OrderSummary` customer list), Product Catalog (`Product` detail and list endpoints).
+
+---
+
 ## 6. Compiled Queries
 
 **Why compiled queries matter:** Marten's LINQ provider translates C# expression trees to SQL on every query execution. This is computationally expensive. Compiled queries cache the SQL translation, making repeated query execution 5-10x cheaper.
@@ -824,11 +894,11 @@ public static async Task<IReadOnlyList<OrderSummary>> Handle(
     return await client.GetCustomerOrders(customerId, ct);
 }
 
-// Orders BC exposes projection via HTTP endpoint
+// Orders BC exposes projection via HTTP endpoint (traditional pattern)
 [WolverineGet("/api/orders/customer/{customerId}")]
 public static async Task<IReadOnlyList<OrderSummary>> Handle(
     Guid customerId,
-    IQuerySession session,  // Queries OrderSummary documents
+    IQuerySession session,
     CancellationToken ct)
 {
     return await session.Query<OrderSummary>()
@@ -836,6 +906,19 @@ public static async Task<IReadOnlyList<OrderSummary>> Handle(
         .ToListAsync(ct);
 }
 ```
+
+When the endpoint does nothing but return the projection documents, the streaming pattern eliminates the `.ToListAsync()` allocation and the `System.Text.Json` serialize pass:
+
+```csharp
+using Marten.AspNetCore;
+
+// Orders BC — streaming pattern (no deserialization, no re-serialization)
+[WolverineGet("/api/orders/customer/{customerId}")]
+public static StreamMany<OrderSummary> Handle(Guid customerId, IQuerySession session)
+    => new(session.Query<OrderSummary>().Where(o => o.CustomerId == customerId));
+```
+
+**When to use each:** Use the streaming pattern when the endpoint is a direct read — no transformation, enrichment, or composition. Use the traditional `Task<IReadOnlyList<T>>` pattern when the handler needs to shape, filter, or merge the data before returning. See `marten-document-store.md §5.5` for the full `StreamMany<T>` / `StreamOne<T>` reference.
 
 **This is the bridge:** Product Catalog is being migrated to event sourcing, but the patterns here — querying documents, indexing, compiled queries — outlive that migration because projections are documents.
 
@@ -1481,6 +1564,7 @@ public sealed class ListProductsTests : IAsyncLifetime
 8. **Batched queries reduce round trips** — BFF composition queries benefit most
 9. **Seed data breaks tests** — Tests seed their own data; never seed in `Program.cs` during test runs
 10. **Async enumerable for large datasets** — Stream results without loading everything into memory
+11. **Stream large responses directly** — `StreamOne<T>` / `StreamMany<T>` from `Marten.AspNetCore` eliminate the deserialize/serialize round-trip for pass-through HTTP endpoints (Wolverine 5.32+)
 
 ---
 
