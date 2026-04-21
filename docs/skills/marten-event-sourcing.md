@@ -736,6 +736,7 @@ var cartYesterday = await session.Events.AggregateStreamAsync<Cart>(
 | High write throughput | `Async` | Analytics projections (future) |
 | Temporal queries | `Live` | Admin audit tools |
 | Testing | `Inline` or `Live` | Integration tests |
+| HTTP GET of single aggregate — no transformation | `StreamAggregate<T>` (read-side pass-through, Wolverine 5.32+) | Cart, Return, Checkout detail endpoints |
 
 ---
 
@@ -937,6 +938,45 @@ public static (CreationResponse, IStartStream) Handle(InitializeCart cmd)
 | `[AggregateHandler]` | Class-level (less common) |
 
 **ID Convention:** Wolverine looks for `command.{AggregateType}Id` or `command.Id`. Use `[WriteAggregate(nameof(cmd.FieldName))]` for custom mapping.
+
+### Read-Side Pattern: Streaming Aggregate State with `StreamAggregate<T>` ⭐ *Wolverine 5.32+*
+
+For HTTP GET endpoints that return the current state of an event-sourced aggregate without post-processing, `Marten.AspNetCore` provides `StreamAggregate<T>` — an `IResult` that streams the raw JSONB aggregate snapshot directly from Postgres to the HTTP response, skipping .NET deserialization entirely.
+
+**Constructor:**
+```csharp
+new StreamAggregate<T>(IDocumentSession session, Guid id)
+new StreamAggregate<T>(IDocumentSession session, string id)
+```
+
+**Required:** `using Marten.AspNetCore;` on the endpoint file.
+
+**Example:**
+
+```csharp
+using Marten.AspNetCore;
+
+[WolverineGet("/api/returns/{returnId}")]
+public static StreamAggregate<Return> Handle(Guid returnId, IDocumentSession session)
+    => new(session, returnId);
+```
+
+Returns HTTP 200 + aggregate JSON on hit, HTTP 404 if no stream exists for the ID. Accepts both `Guid` and `string` stream IDs. Supports `OnFoundStatus` and `ContentType` init-only overrides for non-standard response requirements.
+
+**How it works:** `StreamAggregate<T>` calls Marten's `FetchLatest` internally, which rebuilds aggregate state from the event stream (using the inline snapshot if present) and streams the resulting JSON. It is suitable for single-stream projections — not a substitute for `MultiStreamProjection<TDoc, TId>`.
+
+**`StreamAggregate<T>` vs `[ReadAggregate]`:**
+
+| | `[ReadAggregate]` | `StreamAggregate<T>` |
+|--|-------------------|---------------------|
+| **What you get** | Hydrated C# object | Raw JSON piped to response |
+| **Use when** | Endpoint transforms, enriches, or shapes the response | Endpoint is a direct read — no transformation needed |
+| **Allocation** | Deserializes into .NET type | Zero .NET allocation for the document |
+| **Composability** | Can combine with other handler logic | Terminal — cannot post-process |
+
+**Decision rule:** Use `[ReadAggregate]` when the endpoint applies any logic to the aggregate before returning. Use `StreamAggregate<T>` when it is a direct read with no transformation.
+
+**Natural fits in CritterSupply:** `GET /api/carts/{cartId}`, `GET /api/returns/{returnId}`, `GET /api/checkouts/{checkoutId}` — all are single-aggregate reads that today use `session.LoadAsync<T>()` + return `T`.
 
 ---
 
