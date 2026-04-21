@@ -47,7 +47,7 @@
 | **Previous Completion** | M40.0 — Dynamic Consistency Boundary: Promotions BC (2026-04-06) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-08 (M42.0 event modeling session complete)*
+*Last Updated: 2026-04-20 (docs-only skills refresh: Marten streaming JSON — StreamOne/StreamMany/StreamAggregate added to marten-document-store.md, marten-event-sourcing.md, wolverine-message-handlers.md, bff-realtime-patterns.md)*
 
 ---
 

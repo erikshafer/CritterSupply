@@ -287,6 +287,10 @@ public sealed record CheckoutView(
     IReadOnlyList<string> ValidationErrors);
 ```
 
+### Streaming Projection Read Models
+
+BFF endpoints that expose upstream projection read models as pass-through reads (no transformation, no composition) are prime candidates for `StreamMany<T>` and `StreamOne<T>` from `Marten.AspNetCore`. These types stream raw Marten JSON directly from Postgres to the HTTP response, eliminating the deserialize/serialize allocation that `Task<IReadOnlyList<T>>` endpoints incur. The same applies to endpoints in domain BCs that BFF clients call via `IHttpClientFactory` — streaming at the source removes one round-trip of JSON work for every BFF fan-out. Use the traditional return type when the endpoint shapes or composes data; use streaming when it's a direct read. See `marten-document-store.md §5.5` for the full reference.
+
 ---
 
 ## Cross-BC Query Orchestration
