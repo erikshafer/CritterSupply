@@ -14,6 +14,7 @@ Patterns and practices for building message handlers and HTTP endpoints with Wol
 6. [Handler Return Patterns](#handler-return-patterns)
    - [Pattern 7: HTTP Endpoint with Integration Messages](#pattern-7-http-endpoint-with-integration-messages--m361-addition) ⭐ *M36.1 Addition*
    - [Pattern 8: HTTP Endpoint with Events and Integration Messages](#pattern-8-http-endpoint-with-events-and-integration-messages--m390-addition) ⭐ *M39.0 Addition*
+   - [Pattern 9: Streaming JSON Directly from Marten](#pattern-9-streaming-json-directly-from-marten--wolverine-532) ⭐ *Wolverine 5.32+*
 7. [Railway Programming in Handlers](#railway-programming-in-handlers)
 8. [HTTP Endpoints](#http-endpoints)
 9. [Handler Discovery](#handler-discovery)
@@ -719,6 +720,22 @@ public static (IResult, Events, OutgoingMessages) Handle(
 
 This pattern eliminates the two-phase gap that existed when `SaveChangesAsync()` was called before returning `OutgoingMessages` — if the process failed between save and return, the event was committed but the integration message never reached the outbox. See `src/Orders/Orders/Checkout/CompleteCheckout.cs` for the canonical example.
 
+### Pattern 9: Streaming JSON Directly from Marten ⭐ *Wolverine 5.32+*
+
+`Marten.AspNetCore` supplies three `IResult` return types that stream raw Marten JSON from Postgres to the HTTP response with no .NET deserialize/serialize round-trip. All three implement `IEndpointMetadataProvider` for OpenAPI metadata. Add `using Marten.AspNetCore;` to the endpoint file — no Wolverine configuration changes required.
+
+| Type | Use With | Behavior |
+|------|----------|----------|
+| `StreamOne<T>` | Document query | 200 on hit, 404 on miss |
+| `StreamMany<T>` | Document list query | Always 200; `[]` on empty |
+| `StreamAggregate<T>` | Event-sourced aggregate by ID | 200 on hit, 404 on miss |
+
+Use these when the endpoint is a direct read with no transformation. If the handler shapes, enriches, or composes the response, return `T` or `IReadOnlyList<T>` instead.
+
+**Full reference:**
+- `StreamOne<T>` and `StreamMany<T>` — see `marten-document-store.md §5.5`
+- `StreamAggregate<T>` — see `marten-event-sourcing.md` §8 Read-Side Pattern
+
 ### Summary Table
 
 | Scenario | Return Type | Stream Creation | Example |
@@ -730,6 +747,9 @@ This pattern eliminates the two-phase gap that existed when `SaveChangesAsync()`
 | HTTP response + integration messages | `(IResult, OutgoingMessages)` | N/A | RegisterMarketplace |
 | HTTP response + events + integration | `(IResult, Events, OutgoingMessages)` | N/A — `[WriteAggregate]` | CompleteCheckout |
 | Multi-transport dispatch | `IEnumerable<object>` | N/A | DescriptionChangeApproved |
+| Stream single document read | `StreamOne<T>` | N/A — document query | `GET /api/products/{sku}` |
+| Stream document list read | `StreamMany<T>` | N/A — document query | `GET /api/orders/customer/{id}` |
+| Stream event-stream read | `StreamAggregate<T>` | N/A — event stream read | `GET /api/returns/{returnId}` |
 
 ---
 
