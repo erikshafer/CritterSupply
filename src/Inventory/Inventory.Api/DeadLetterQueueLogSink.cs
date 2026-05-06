@@ -71,10 +71,10 @@ public sealed class DeadLetterQueueLogSink : BackgroundService
         await using var cmd = conn.CreateCommand();
 
         // Query Wolverine's dead letter envelope table for entries since last check.
-        // Table structure: wolverine stores dead letters with id, message_type, explanation, etc.
-        // The table name follows Wolverine's schema convention.
+        // Schema: id (uuid), message_type (text), exception_type (text),
+        //         exception_message (text), source (text), sent_at (timestamptz), …
         cmd.CommandText = """
-            SELECT id, message_type, explanation, source, sent_at
+            SELECT id, message_type, exception_type, exception_message, source, sent_at
             FROM inventory.wolverine_dead_letters
             WHERE sent_at > @cutoff
             ORDER BY sent_at DESC
@@ -91,13 +91,14 @@ public sealed class DeadLetterQueueLogSink : BackgroundService
             {
                 var envelopeId = reader.GetGuid(0);
                 var messageType = reader.IsDBNull(1) ? "unknown" : reader.GetString(1);
-                var explanation = reader.IsDBNull(2) ? "no explanation" : reader.GetString(2);
-                var source = reader.IsDBNull(3) ? "unknown" : reader.GetString(3);
+                var exceptionType = reader.IsDBNull(2) ? "unknown" : reader.GetString(2);
+                var exceptionMessage = reader.IsDBNull(3) ? "no message" : reader.GetString(3);
+                var source = reader.IsDBNull(4) ? "unknown" : reader.GetString(4);
 
                 _logger.LogWarning(
                     "Dead letter envelope detected — EnvelopeId: {EnvelopeId}, MessageType: {MessageType}, " +
-                    "Source: {Source}, Explanation: {Explanation}",
-                    envelopeId, messageType, source, explanation);
+                    "Source: {Source}, ExceptionType: {ExceptionType}, ExceptionMessage: {ExceptionMessage}",
+                    envelopeId, messageType, source, exceptionType, exceptionMessage);
 
                 count++;
             }

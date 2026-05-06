@@ -134,21 +134,32 @@ public sealed class ReservationExpiryTests : IAsyncLifetime
     }
 
     // ---------------------------------------------------------------------------
-    // Slice 17: Concurrent Reservation Conflict — Gap #13
+    // Slice 17 — Concurrent Reservation Conflict (Gap #13 — resolved in M43.1)
     // ---------------------------------------------------------------------------
 
     [Fact]
-    public async Task ConcurrentReservations_LastUnitContention_SecondReservationFails()
+    public async Task ConcurrentReservations_LastUnitContention_NoSilentDrop()
     {
-        // This test verifies that concurrent reservations for the last available units
-        // are handled safely. Due to ConcurrencyException + RetryOnce + Discard policy,
-        // one of the two may be silently dropped.
+        // Verifies that two concurrent reservations for the last available units
+        // are handled safely AND that the contention does not produce a silent
+        // drop via Wolverine's concurrency-exception policy chain.
         //
-        // Gap #13 finding: if the retry succeeds (because there's still stock after
-        // the first reservation), both will succeed. If the retry fails (insufficient
-        // stock), the message is discarded — the order may not receive a ReservationFailed.
+        // Gap #13 (resolved in M43.1): the original policy ended in `.Discard()`,
+        // which meant a ConcurrencyException after retry exhaustion would silently
+        // delete the message. The current policy
+        // (RetryOnce → RetryWithCooldown → MoveToErrorQueue) routes exhausted
+        // messages to `inventory.wolverine_dead_letters` instead.
         //
-        // This test documents the current behavior.
+        // What this test asserts:
+        //   • Aggregate invariant: never over-reserve (ReservedQuantity ≤ stock).
+        //   • At least one reservation succeeded.
+        //   • For typical 2-way contention (resolved by either RetryOnce or by
+        //     the inline insufficient-stock check) NO envelope reaches the DLQ —
+        //     i.e. the policy chain absorbs transient races without escalation.
+        //
+        // The deterministic proof that exhausted retries DO land in DLQ
+        // (rather than being silently dropped) lives in
+        // `Reliability/ConcurrencyExhaustionDlqTests`.
 
         var sku = "CONCURRENT-001";
         var warehouseId = "NJ-FC";
@@ -160,34 +171,59 @@ public sealed class ReservationExpiryTests : IAsyncLifetime
         var reservationId1 = Guid.NewGuid();
         var reservationId2 = Guid.NewGuid();
 
-        // Fire two reservations for exactly available stock
+        var cutoff = DateTimeOffset.UtcNow.AddSeconds(-1);
+
+        // Fire two reservations for exactly the available stock concurrently.
         var task1 = _fixture.ExecuteAndWaitAsync(
             new StockReservationRequested(orderId1, sku, warehouseId, reservationId1, 10));
         var task2 = _fixture.ExecuteAndWaitAsync(
             new StockReservationRequested(orderId2, sku, warehouseId, reservationId2, 10));
 
-        // Allow both to complete — one may fail silently due to Discard policy
         await Task.WhenAll(task1, task2);
 
-        await using var session = _fixture.GetDocumentSession();
-        var inv = await session.LoadAsync<ProductInventory>(inventoryId);
+        await using (var session = _fixture.GetDocumentSession())
+        {
+            var inv = await session.LoadAsync<ProductInventory>(inventoryId);
+            inv.ShouldNotBeNull();
 
-        inv.ShouldNotBeNull();
+            // Aggregate invariant: never over-reserve.
+            inv.ReservedQuantity.ShouldBeGreaterThan(0);
+            inv.ReservedQuantity.ShouldBeLessThanOrEqualTo(10);
+        }
 
-        // At least one reservation must have succeeded
-        var totalReserved = inv.ReservedQuantity;
-        totalReserved.ShouldBeGreaterThan(0);
+        // No-silent-drop invariant: the deterministic Reliability test proves
+        // exhausted retries land in DLQ. Here we additionally guard that this
+        // *normal* 2-way race does not escalate to DLQ — i.e. the retry budget
+        // (RetryOnce → RetryWithCooldown(100ms,250ms)) absorbs the race.
+        var deadLetteredCount = await CountDeadLettersForReservationAsync(cutoff);
+        deadLetteredCount.ShouldBe(
+            0,
+            $"Two-way reservation contention should be absorbed by the retry chain, " +
+            $"not escalated to DLQ. dead-lettered={deadLetteredCount}");
+    }
 
-        // With only 10 units, the maximum successful reservation is 10
-        totalReserved.ShouldBeLessThanOrEqualTo(10);
-
-        // Document Gap #13 finding:
-        // If totalReserved == 10 and only 1 reservation exists, the second was
-        // either rejected by the Before() validation (insufficient stock) or
-        // silently discarded after ConcurrencyException retry exhaustion.
-        //
-        // Current policy: ConcurrencyException → RetryOnce → RetryWithCooldown → Discard
-        // The Discard policy means the second order never receives ReservationFailed.
-        // TODO: Consider changing to .MoveToDeadLetterQueue() for visibility.
+    private async Task<int> CountDeadLettersForReservationAsync(DateTimeOffset cutoff)
+    {
+        var store = _fixture.GetDocumentStore();
+        try
+        {
+            await using var session = store.LightweightSession();
+            var conn = session.Connection!;
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                SELECT COUNT(*)
+                FROM inventory.wolverine_dead_letters
+                WHERE message_type LIKE '%StockReservationRequested%'
+                  AND sent_at > @cutoff
+                """;
+            cmd.Parameters.AddWithValue("cutoff", cutoff);
+            var result = await cmd.ExecuteScalarAsync();
+            return Convert.ToInt32(result ?? 0);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01")
+        {
+            // Table not yet created by Wolverine — no dead letters means none.
+            return 0;
+        }
     }
 }
