@@ -122,6 +122,12 @@ builder.Host.UseWolverine(opts =>
     opts.ListenToRabbitQueue("orders-returns-events")
         .ProcessInline();
 
+    // M43.0 — Slice 12: listen for Inventory BC reservation outcomes
+    // (ReservationConfirmed, ReservationFailed) driven by the routing-aware
+    // Fulfillment → Inventory flow that replaced the legacy OrderPlacedHandler.
+    opts.ListenToRabbitQueue("orders-inventory-events")
+        .ProcessInline();
+
     // Publish OrderPlaced to storefront-notifications queue
     opts.PublishMessage<Messages.Contracts.Orders.OrderPlaced>()
         .ToRabbitQueue("storefront-notifications");

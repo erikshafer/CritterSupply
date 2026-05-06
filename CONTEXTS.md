@@ -83,7 +83,7 @@ Manages physical order fulfillment — warehouse routing, pick, pack, ship, carr
 | Communicates with | Direction | Notes |
 |---|---|---|
 | Orders | ↔ bidirectional | Receives fulfillment requests; publishes `ShipmentHandedToCarrier`, `TrackingNumberAssigned`, `DeliveryAttemptFailed`, `ShipmentDelivered`, `ReturnToSenderInitiated`, `ReshipmentCreated`, `BackorderCreated`, `FulfillmentCancelled`, `OrderSplitIntoShipments` |
-| Inventory | ↔ bidirectional | Queries stock availability for routing; publishes `ItemPicked` for bin reconciliation, stock adjustment on carrier handoff |
+| Inventory | ↔ bidirectional | Publishes `StockReservationRequested` (routing-informed) and queries `StockAvailabilityView` for routing decisions; publishes `ItemPicked` for bin reconciliation, stock adjustment on carrier handoff |
 | Returns | ↔ bidirectional | Receives approved returns; publishes when return shipment arrives |
 | Correspondence | → publishes | Publishes `ReturnToSenderInitiated` for customer delivery failure notification |
 

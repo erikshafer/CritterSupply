@@ -3,6 +3,7 @@ using Fulfillment.WorkOrders;
 using Marten;
 using Messages.Contracts.Common;
 using Shouldly;
+using Wolverine.Tracking;
 using IntegrationContracts = Messages.Contracts.Fulfillment;
 
 namespace Fulfillment.Api.IntegrationTests.Shipments;
@@ -32,7 +33,8 @@ public class FulfillmentRequestedHandlerTests : IAsyncLifetime
     private static IntegrationContracts.FulfillmentRequested BuildFulfillmentRequested(
         Guid orderId,
         Guid? customerId = null,
-        string stateProvince = "CO") =>
+        string stateProvince = "CO",
+        IReadOnlyList<IntegrationContracts.FulfillmentLineItem>? lineItems = null) =>
         new(
             orderId,
             customerId ?? Guid.NewGuid(),
@@ -44,7 +46,7 @@ public class FulfillmentRequestedHandlerTests : IAsyncLifetime
                 PostalCode = "80202",
                 Country = "USA"
             },
-            new List<IntegrationContracts.FulfillmentLineItem> { new("SKU-UUID5-001", 3) },
+            lineItems?.ToList() ?? new List<IntegrationContracts.FulfillmentLineItem> { new("SKU-UUID5-001", 3) },
             "Standard",
             DateTimeOffset.UtcNow);
 
@@ -162,5 +164,64 @@ public class FulfillmentRequestedHandlerTests : IAsyncLifetime
         statusView.OrderId.ShouldBe(orderId);
         statusView.Status.ShouldBe("Assigned");
         statusView.StatusHistory.Count.ShouldBeGreaterThanOrEqualTo(2);
+    }
+
+    // ============================================================
+    // M43.0 — Slice 12: drives Inventory's routing-aware reservation flow
+    // ============================================================
+
+    /// <summary>
+    /// Slice 12: handler emits one StockReservationRequested per line item at the
+    /// routing-engine-selected FC. Replaces the legacy Inventory OrderPlacedHandler path.
+    /// </summary>
+    [Fact]
+    public async Task FulfillmentRequested_Emits_StockReservationRequested_PerLineItem_At_AssignedFc()
+    {
+        var orderId = Guid.NewGuid();
+        var message = BuildFulfillmentRequested(
+            orderId,
+            stateProvince: "NJ", // routes to NJ-FC
+            lineItems: new[]
+            {
+                new IntegrationContracts.FulfillmentLineItem("SKU-RES-A", 2),
+                new IntegrationContracts.FulfillmentLineItem("SKU-RES-B", 5)
+            });
+
+        var tracked = await _fixture.ExecuteAndWaitAsync(message);
+
+        var reservationRequests = tracked.Sent
+            .MessagesOf<IntegrationContracts.StockReservationRequested>()
+            .ToList();
+
+        reservationRequests.Count.ShouldBe(2);
+        reservationRequests.ShouldAllBe(r => r.OrderId == orderId);
+        reservationRequests.ShouldAllBe(r => r.WarehouseId == "NJ-FC");
+
+        var byKey = reservationRequests.ToDictionary(r => r.Sku);
+        byKey["SKU-RES-A"].Quantity.ShouldBe(2);
+        byKey["SKU-RES-B"].Quantity.ShouldBe(5);
+
+        // Each request gets a unique, non-empty ReservationId
+        var ids = reservationRequests.Select(r => r.ReservationId).ToList();
+        ids.ShouldAllBe(id => id != Guid.Empty);
+        ids.Distinct().Count().ShouldBe(ids.Count);
+    }
+
+    /// <summary>
+    /// Slice 12 idempotency: when the existing-stream guard fires (duplicate
+    /// FulfillmentRequested), the handler must NOT re-emit StockReservationRequested.
+    /// </summary>
+    [Fact]
+    public async Task FulfillmentRequested_Duplicate_Does_Not_ReEmit_StockReservationRequested()
+    {
+        var orderId = Guid.NewGuid();
+        var message = BuildFulfillmentRequested(orderId);
+
+        await _fixture.ExecuteAndWaitAsync(message);
+        var trackedSecond = await _fixture.ExecuteAndWaitAsync(message);
+
+        trackedSecond.Sent
+            .MessagesOf<IntegrationContracts.StockReservationRequested>()
+            .ShouldBeEmpty();
     }
 }

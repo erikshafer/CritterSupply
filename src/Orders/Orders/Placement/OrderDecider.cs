@@ -43,7 +43,8 @@ public static class OrderDecider
         var totalAmount = subtotal + command.ShippingCost;
 
         // Track how many distinct SKUs expect an individual reservation response.
-        // Inventory BC creates one reservation per distinct SKU in OrderPlacedHandler.
+        // Fulfillment BC's FulfillmentRequestedHandler emits one StockReservationRequested
+        // per distinct SKU at the routing-engine-selected warehouse (M43.0 — Slice 12).
         var expectedReservationCount = command.LineItems
             .Select(li => li.Sku)
             .Distinct()

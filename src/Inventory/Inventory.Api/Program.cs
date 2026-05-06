@@ -103,9 +103,29 @@ builder.Host.UseWolverine(opts =>
 
     opts.UseFluentValidation();
 
+    // Configure RabbitMQ for integration messaging
+    var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");
+    opts.UseRabbitMq(rabbit =>
+    {
+        rabbit.HostName = rabbitConfig["hostname"] ?? "localhost";
+        rabbit.VirtualHost = rabbitConfig["virtualhost"] ?? "/";
+        rabbit.Port = rabbitConfig.GetValue<int?>("port") ?? 5672;
+        rabbit.UserName = rabbitConfig["username"] ?? "guest";
+        rabbit.Password = rabbitConfig["password"] ?? "guest";
+    }).AutoProvision();
+
     // RabbitMQ subscription: Fulfillment → Inventory (routing-aware reservations)
     opts.ListenToRabbitQueue("inventory-fulfillment-events")
         .UseDurableInbox();
+
+    // M43.0 — Slice 12: publish reservation outcomes to Orders BC.
+    // Both Confirmed and Failed flow on the same queue; Orders' OrderSaga
+    // routes each by message type. Mirrors orders-fulfillment-events and
+    // orders-returns-events idioms.
+    opts.PublishMessage<Messages.Contracts.Inventory.ReservationConfirmed>()
+        .ToRabbitQueue("orders-inventory-events");
+    opts.PublishMessage<Messages.Contracts.Inventory.ReservationFailed>()
+        .ToRabbitQueue("orders-inventory-events");
 });
 
 builder.Services.AddEndpointsApiExplorer();

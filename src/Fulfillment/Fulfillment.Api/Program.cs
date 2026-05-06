@@ -109,6 +109,12 @@ builder.Host.UseWolverine(opts =>
     // Listen for FulfillmentRequested from Orders BC
     opts.ListenToRabbitQueue("fulfillment-requests").ProcessInline();
 
+    // M43.0 — Slice 12: drive Inventory's routing-aware reservation flow.
+    // FulfillmentRequestedHandler emits one StockReservationRequested per line item
+    // at the routing-engine-selected warehouse. Inventory listens on this queue.
+    opts.PublishMessage<Messages.Contracts.Fulfillment.StockReservationRequested>()
+        .ToRabbitQueue("inventory-fulfillment-events");
+
     // Publish fulfillment integration messages to Orders BC
     opts.PublishMessage<Messages.Contracts.Fulfillment.ShipmentHandedToCarrier>()
         .ToRabbitQueue("orders-fulfillment-events");
