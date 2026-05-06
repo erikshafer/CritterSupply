@@ -1,3 +1,4 @@
+using Inventory;
 using JasperFx;
 using JasperFx.CommandLine;
 using Marten;
@@ -96,7 +97,7 @@ public sealed class ConcurrencyExhaustionDlqTests : IAsyncLifetime
             var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
 
             // Publish (not Invoke) so retries run through Wolverine's local queue
-            // pipeline and the policy chain — invoke would surface the exception inline
+            // pipeline and the policy chain — Invoke would surface the exception inline
             // on the first attempt and bypass MoveToErrorQueue.
             await bus.PublishAsync(new ConcurrencyExhaustionProbe(probeId));
         }
@@ -110,6 +111,94 @@ public sealed class ConcurrencyExhaustionDlqTests : IAsyncLifetime
         envelope.MessageType.ShouldContain(nameof(ConcurrencyExhaustionProbe));
         envelope.ExceptionType.ShouldContain(nameof(ConcurrencyException));
         envelope.ExceptionMessage.ShouldNotBeNullOrEmpty();
+    }
+
+    /// <summary>
+    /// Regression test for the <see cref="DeadLetterQueueLogSink"/>'s SQL.
+    ///
+    /// In M43.1 we discovered the sink had been silently failing for months —
+    /// it queried `explanation` and `source` columns that don't exist in
+    /// Wolverine's actual `wolverine_dead_letters` schema. The broad
+    /// `catch (Exception)` swallowed the resulting `PostgresException 42703`
+    /// and only logged it at warning level, so no test or healthcheck flagged it.
+    ///
+    /// This test runs the sink's exact <see cref="DeadLetterQueueLogSink.PollSql"/>
+    /// against a freshly-bootstrapped Wolverine schema (the previous test seeded
+    /// at least one envelope) and asserts it executes without a column-mismatch
+    /// error. Any future schema drift or accidental column rename will fail here
+    /// instead of silently breaking observability.
+    /// </summary>
+    [Fact]
+    public async Task DeadLetterQueueLogSink_PollSql_MatchesWolverineSchema()
+    {
+        // Ensure at least one envelope exists so we exercise the row-read path
+        // (column type mismatches surface only when a row is read, not just on parse).
+        await using (var scope = _host.Services.CreateAsyncScope())
+        {
+            var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
+            await bus.PublishAsync(new ConcurrencyExhaustionProbe(Guid.NewGuid()));
+        }
+
+        // Wait up to 15s for the envelope to be persisted.
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        var rowCount = 0;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                rowCount = await ExecutePollSqlAsync();
+                if (rowCount > 0) break;
+            }
+            catch (PostgresException ex) when (ex.SqlState == "42P01")
+            {
+                // Table not created yet — keep polling.
+            }
+            await Task.Delay(150);
+        }
+
+        // The SQL must execute cleanly AND read at least one row from the seeded envelope.
+        // A column-mismatch (SqlState 42703) would have thrown out of ExecutePollSqlAsync
+        // and failed the test instead of being silently swallowed.
+        rowCount.ShouldBeGreaterThan(0,
+            "DeadLetterQueueLogSink.PollSql must run cleanly against the Wolverine schema and return seeded envelopes");
+    }
+
+    private async Task<int> ExecutePollSqlAsync()
+    {
+        var store = _host.Services.GetRequiredService<IDocumentStore>();
+        await using var session = store.LightweightSession();
+        var conn = session.Connection!;
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = DeadLetterQueueLogSink.PollSql;
+        cmd.Parameters.AddWithValue("cutoff", DateTimeOffset.UtcNow.AddHours(-1));
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+
+        // Resolve column ordinals by name so this regression test isn't coupled
+        // to the SELECT-list order in PollSql — the contract under test is the
+        // *column set*, not the projection ordering.
+        var idOrdinal = reader.GetOrdinal("id");
+        var messageTypeOrdinal = reader.GetOrdinal("message_type");
+        var exceptionTypeOrdinal = reader.GetOrdinal("exception_type");
+        var exceptionMessageOrdinal = reader.GetOrdinal("exception_message");
+        var sourceOrdinal = reader.GetOrdinal("source");
+        var sentAtOrdinal = reader.GetOrdinal("sent_at");
+
+        var count = 0;
+        while (await reader.ReadAsync())
+        {
+            // Touch every column so a column rename or type drift surfaces here
+            // (not silently in production where the sink swallows broad exceptions).
+            _ = reader.GetGuid(idOrdinal);
+            _ = reader.IsDBNull(messageTypeOrdinal) ? "" : reader.GetString(messageTypeOrdinal);
+            _ = reader.IsDBNull(exceptionTypeOrdinal) ? "" : reader.GetString(exceptionTypeOrdinal);
+            _ = reader.IsDBNull(exceptionMessageOrdinal) ? "" : reader.GetString(exceptionMessageOrdinal);
+            _ = reader.IsDBNull(sourceOrdinal) ? "" : reader.GetString(sourceOrdinal);
+            _ = reader.GetDateTime(sentAtOrdinal);
+            count++;
+        }
+        return count;
     }
 
     private async Task<DeadLetterRow?> PollForDeadLetterAsync(DateTimeOffset cutoff, TimeSpan timeout)

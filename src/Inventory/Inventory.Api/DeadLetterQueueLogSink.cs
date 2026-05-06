@@ -26,6 +26,24 @@ public sealed class DeadLetterQueueLogSink : BackgroundService
         _logger = logger;
     }
 
+    /// <summary>
+    /// SQL used to read recent dead letter envelopes. Exposed for regression
+    /// testing — the column names here must stay aligned with Wolverine's
+    /// actual `wolverine_dead_letters` schema. M43.1 fixed a months-old
+    /// silent-bug where this query referenced columns (`explanation`, `source`)
+    /// that didn't exist; PostgresException 42703 was caught by the broad
+    /// `catch (Exception)` below and only logged at warning level, so the bug
+    /// was invisible. Any future schema drift is now caught by
+    /// `Reliability/DeadLetterQueueLogSinkSqlTests`.
+    /// </summary>
+    public const string PollSql = """
+        SELECT id, message_type, exception_type, exception_message, source, sent_at
+        FROM inventory.wolverine_dead_letters
+        WHERE sent_at > @cutoff
+        ORDER BY sent_at DESC
+        LIMIT 50
+        """;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // Allow the application to fully start before polling
@@ -71,15 +89,8 @@ public sealed class DeadLetterQueueLogSink : BackgroundService
         await using var cmd = conn.CreateCommand();
 
         // Query Wolverine's dead letter envelope table for entries since last check.
-        // Schema: id (uuid), message_type (text), exception_type (text),
-        //         exception_message (text), source (text), sent_at (timestamptz), …
-        cmd.CommandText = """
-            SELECT id, message_type, exception_type, exception_message, source, sent_at
-            FROM inventory.wolverine_dead_letters
-            WHERE sent_at > @cutoff
-            ORDER BY sent_at DESC
-            LIMIT 50
-            """;
+        // SQL lives in `PollSql` so its schema can be regression-tested.
+        cmd.CommandText = PollSql;
         cmd.Parameters.AddWithValue("cutoff", cutoff);
 
         try

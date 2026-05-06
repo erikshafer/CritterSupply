@@ -140,26 +140,22 @@ public sealed class ReservationExpiryTests : IAsyncLifetime
     [Fact]
     public async Task ConcurrentReservations_LastUnitContention_NoSilentDrop()
     {
-        // Verifies that two concurrent reservations for the last available units
-        // are handled safely AND that the contention does not produce a silent
-        // drop via Wolverine's concurrency-exception policy chain.
+        // Verifies the aggregate-level invariant when two reservations contend
+        // for the last available units: the system must not over-reserve, and
+        // at least one reservation must succeed.
         //
-        // Gap #13 (resolved in M43.1): the original policy ended in `.Discard()`,
-        // which meant a ConcurrencyException after retry exhaustion would silently
-        // delete the message. The current policy
-        // (RetryOnce → RetryWithCooldown → MoveToErrorQueue) routes exhausted
-        // messages to `inventory.wolverine_dead_letters` instead.
+        // SCOPE NOTE: this test exercises the real `StockReservationRequestedHandler`
+        // through `IMessageContext.InvokeAsync` (see TestFixture.ExecuteAndWaitAsync),
+        // which serializes execution and surfaces handler exceptions inline. It
+        // therefore does NOT engage Wolverine's `OnException<ConcurrencyException>`
+        // policy chain — that path is exclusive to the background local-queue
+        // executor (PublishAsync / message receipt over a transport).
         //
-        // What this test asserts:
-        //   • Aggregate invariant: never over-reserve (ReservedQuantity ≤ stock).
-        //   • At least one reservation succeeded.
-        //   • For typical 2-way contention (resolved by either RetryOnce or by
-        //     the inline insufficient-stock check) NO envelope reaches the DLQ —
-        //     i.e. the policy chain absorbs transient races without escalation.
-        //
-        // The deterministic proof that exhausted retries DO land in DLQ
-        // (rather than being silently dropped) lives in
-        // `Reliability/ConcurrencyExhaustionDlqTests`.
+        // The deterministic proof that exhausted retries land in
+        // `inventory.wolverine_dead_letters` (Gap #13 — resolved in M43.1)
+        // therefore lives in `Reliability/ConcurrencyExhaustionDlqTests`.
+        // This test only asserts what the Invoke path actually exercises:
+        // the aggregate's no-over-reservation invariant under contention.
 
         var sku = "CONCURRENT-001";
         var warehouseId = "NJ-FC";
@@ -171,8 +167,6 @@ public sealed class ReservationExpiryTests : IAsyncLifetime
         var reservationId1 = Guid.NewGuid();
         var reservationId2 = Guid.NewGuid();
 
-        var cutoff = DateTimeOffset.UtcNow.AddSeconds(-1);
-
         // Fire two reservations for exactly the available stock concurrently.
         var task1 = _fixture.ExecuteAndWaitAsync(
             new StockReservationRequested(orderId1, sku, warehouseId, reservationId1, 10));
@@ -181,49 +175,13 @@ public sealed class ReservationExpiryTests : IAsyncLifetime
 
         await Task.WhenAll(task1, task2);
 
-        await using (var session = _fixture.GetDocumentSession())
-        {
-            var inv = await session.LoadAsync<ProductInventory>(inventoryId);
-            inv.ShouldNotBeNull();
+        await using var session = _fixture.GetDocumentSession();
+        var inv = await session.LoadAsync<ProductInventory>(inventoryId);
 
-            // Aggregate invariant: never over-reserve.
-            inv.ReservedQuantity.ShouldBeGreaterThan(0);
-            inv.ReservedQuantity.ShouldBeLessThanOrEqualTo(10);
-        }
+        inv.ShouldNotBeNull();
 
-        // No-silent-drop invariant: the deterministic Reliability test proves
-        // exhausted retries land in DLQ. Here we additionally guard that this
-        // *normal* 2-way race does not escalate to DLQ — i.e. the retry budget
-        // (RetryOnce → RetryWithCooldown(100ms,250ms)) absorbs the race.
-        var deadLetteredCount = await CountDeadLettersForReservationAsync(cutoff);
-        deadLetteredCount.ShouldBe(
-            0,
-            $"Two-way reservation contention should be absorbed by the retry chain, " +
-            $"not escalated to DLQ. dead-lettered={deadLetteredCount}");
-    }
-
-    private async Task<int> CountDeadLettersForReservationAsync(DateTimeOffset cutoff)
-    {
-        var store = _fixture.GetDocumentStore();
-        try
-        {
-            await using var session = store.LightweightSession();
-            var conn = session.Connection!;
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                SELECT COUNT(*)
-                FROM inventory.wolverine_dead_letters
-                WHERE message_type LIKE '%StockReservationRequested%'
-                  AND sent_at > @cutoff
-                """;
-            cmd.Parameters.AddWithValue("cutoff", cutoff);
-            var result = await cmd.ExecuteScalarAsync();
-            return Convert.ToInt32(result ?? 0);
-        }
-        catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P01")
-        {
-            // Table not yet created by Wolverine — no dead letters means none.
-            return 0;
-        }
+        // Aggregate invariant: at least one succeeded; never over-reserved.
+        inv.ReservedQuantity.ShouldBeGreaterThan(0);
+        inv.ReservedQuantity.ShouldBeLessThanOrEqualTo(10);
     }
 }
