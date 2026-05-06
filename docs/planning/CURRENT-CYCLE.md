@@ -41,49 +41,118 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M42.0 — Inventory BC Remaster: Event Modeling Session |
-| **Status** | ✅ **COMPLETE** |
-| **Recent Completion** | M41.0 — Fulfillment BC Remaster: complete (S1–S5), 39 slices, 5 sessions (2026-04-07) |
-| **Previous Completion** | M40.0 — Dynamic Consistency Boundary: Promotions BC (2026-04-06) |
+| **Current Milestone** | None — M42.4 closed; next TBD |
+| **Status** | 🟢 **Idle** (between milestones since 2026-04-11) |
+| **Recent Completion** | M42.x — Inventory BC Remaster: event modeling + S1–S4 implementation (2026-04-08 → 2026-04-11) |
+| **Previous Completion** | M41.0 — Fulfillment BC Remaster: complete (S1–S5), 39 slices, 5 sessions (2026-04-07) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-04-20 (docs-only skills refresh: Marten streaming JSON — StreamOne/StreamMany/StreamAggregate added to marten-document-store.md, marten-event-sourcing.md, wolverine-message-handlers.md, bff-realtime-patterns.md)*
+*Last Updated: 2026-05-06 (state-of-repo refresh — see `docs/research/state-of-repo-2026-05.md`; previous activity was a docs-only skills refresh on 2026-04-20)*
 
 ---
 
 ## Active Milestone
 
-### M42.0: Inventory BC Remaster — Event Modeling Session
+_No active milestone. M42.4 closed 2026-04-11. The only repo activity since was a
+docs-only Marten streaming-JSON skills refresh on 2026-04-20. See
+[`docs/research/state-of-repo-2026-05.md`](../research/state-of-repo-2026-05.md)
+for a full state-of-repo report and candidate next milestones, and the
+[Roadmap](#roadmap) below for the standing options._
 
-**Status:** ✅ **Complete** (2026-04-08)
+## Recent Completions
+
+### ✅ M42.x: Inventory BC Remaster — Event Modeling + S1–S4 (2026-04-08 → 2026-04-11)
+
+**Status:** ✅ **Complete** — 1 event modeling session (M42.0) + 4 implementation
+sessions (M42.1 → M42.4). 35 of 42 slices delivered (P0 + P1 + P2 + Slice 39
+stretch); 6 P3+ slices and Slice 12 explicitly deferred.
+**Goal:** Apply the gap register from the Fulfillment Remaster event modeling
+to remaster the Inventory BC against current Critter Stack idioms — UUID v5
+stream identity, inline routing-engine projections, structured domain events
+enriched with Sku + WarehouseId, and a fully-modeled transfer + quarantine
+lifecycle.
+
+**Key Deliverables:**
+- **M42.0 (Event Modeling):** Five-phase event modeling session. 9 gaps
+  resolved (2 deferred to P3). 42 slices modeled. 55 scenarios across 4 feature
+  files written from scratch. 2 aggregates: `ProductInventory` (remastered) +
+  `InventoryTransfer` (new). ADR 0060 written.
+- **M42.1 (S1 — Foundation):** UUID v5 stream IDs via
+  `InventoryStreamId.Compute(sku, warehouseId)`; `CombinedGuid` marked
+  `[Obsolete]`; `StockAvailabilityView` inline `MultiStreamProjection<…, string>`
+  keyed by SKU; `StockReservationRequested` handler on
+  `inventory-fulfillment-events` queue; all domain events enriched with
+  `Sku` + `WarehouseId`; `LowStockPolicy` (threshold = 10);
+  `OrderPlacedHandler` preserved as a dual-publish bridge.
+  Inventory: 83 unit + 54 integration tests.
+- **M42.2 (S2 — Operational depth):** `ProductInventory` gains
+  `PickedAllocations` dictionary + `HasPendingBackorders` flag. `TotalOnHand =
+  Available + Reserved + Committed + Picked`. 14 new domain events (StockPicked,
+  StockShipped, StockDiscrepancyFound, ReservationExpired, BackorderRegistered/
+  Cleared, CycleCountInitiated/Completed, DamageRecorded, StockWrittenOff +
+  `DiscrepancyType` enum). Gap #13 (concurrency-exhaustion silent discard)
+  documented for follow-up. Inventory: 100 unit + 83 integration.
+- **M42.3 (S3 — Transfers + quarantine):** New `InventoryTransfer` aggregate
+  with `Guid.CreateVersion7()` IDs. `ProductInventory` gains
+  `QuarantinedQuantity`. 11 new domain events (TransferRequested/Shipped/
+  Received/Cancelled, TransferShortReceived, StockTransferredOut/In,
+  StockQuarantined, QuarantineReleased/Disposed, ReplenishmentTriggered).
+  Inline `ReplenishmentPolicy`. 3 new async projections (AlertFeedView,
+  NetworkInventorySummaryView, BackorderImpactView). Inventory: 120 unit + 96
+  integration.
+- **M42.4 (S4 — Close-out + read-model completeness):** `WarehouseSkuDetailView`
+  inline `MultiStreamProjection` (UUID v5 keyed). `FulfillmentCenterCapacityView`
+  inline projection (warehouseId-keyed). `StockDiscrepancyDetected` integration
+  event via `OutgoingMessages`. `DeadLetterQueueLogSink` `BackgroundService`
+  polling `wolverine_dead_letters`. ADR 0060 close-out addendum.
+  Inventory: 151 unit + 109 integration tests.
+
+**DoD:** Build clean (0 errors, 0 Inventory warnings; 4 pre-existing
+solution-wide warnings, unchanged from S3 baseline). Orders test suites
+unchanged at 144 unit + 55 integration. Total Inventory tests across S1–S4: 260.
+
+**ADR:** [0060 — Inventory BC Remaster Rationale](../decisions/0060-inventory-bc-remaster-rationale.md)
 **Charter:** [Inventory Gap Register](./milestones/fulfillment-remaster-event-modeling-retrospective.md)
             (9 gaps identified during Fulfillment Remaster event modeling, severity-rated)
 **Skill:** `docs/skills/bc-remaster.md`
-**ADR:** [0060 — Inventory BC Remaster Rationale](../decisions/0060-inventory-bc-remaster-rationale.md)
-**Retrospective:** [Inventory Remaster Event Modeling Retrospective](./milestones/inventory-remaster-event-modeling-retrospective.md)
-
-Full five-phase event modeling session completed. All 9 gaps resolved (2 deferred to P3).
-42 slices (12 P0, 12 P1, 11 P2, 7 P3). 55 scenarios across 4 feature files created from scratch.
-2 aggregates: `ProductInventory` (remastered) + `InventoryTransfer` (new).
+**Retrospectives:** [Event Modeling](./milestones/inventory-remaster-event-modeling-retrospective.md) · [S1](./milestones/inventory-remaster-s1-retrospective.md) · [S2](./milestones/inventory-remaster-s2-retrospective.md) · [S3](./milestones/inventory-remaster-s3-retrospective.md) · [S4](./milestones/inventory-remaster-s4-retrospective.md)
 
 **Key Decisions:**
-- `OrderPlacedHandler` retired; replaced by Fulfillment-initiated `StockReservationRequested`
-- `StockAvailabilityView` inline multi-stream projection for routing queries
-- `StockReceived`/`StockRestocked`/`TransferReceived` confirmed as 3 distinct events
-- `ItemPicked` + `ShipmentHandedToCarrier` integration from Fulfillment for physical tracking
-- UUID v5 stream IDs (clean slate migration)
-- Backorder tracking: subscribe to `BackorderCreated`, publish `BackorderStockAvailable`
+- `OrderPlacedHandler` retired from the architecture; replaced by
+  Fulfillment-initiated `StockReservationRequested`. Implementation is
+  preserved as a dual-publish bridge until Slice 12 unblocks.
+- `StockAvailabilityView` + `WarehouseSkuDetailView` +
+  `FulfillmentCenterCapacityView` all inline (operational/routing path).
+- AlertFeedView / NetworkInventorySummaryView / BackorderImpactView async
+  (analytics path; inline-vs-async test fragility documented in agent memory).
+- `StockReceived` / `StockRestocked` / `TransferReceived` confirmed as 3
+  distinct events.
+- `ItemPicked` + `ShipmentHandedToCarrier` integration from Fulfillment for
+  physical tracking (S2 contracts).
+- UUID v5 stream IDs (clean slate migration via `InventoryStreamId.Compute`).
+- Backorder tracking: subscribe to `BackorderCreated`, publish
+  `BackorderStockAvailable`.
 
-**Artifacts:**
-- Slice table: `docs/planning/inventory-remaster-slices.md`
-- Feature files: `docs/features/inventory/` (4 files, 55 scenarios)
-- ADR 0060: `docs/decisions/0060-inventory-bc-remaster-rationale.md`
-- Retrospective: `docs/planning/milestones/inventory-remaster-event-modeling-retrospective.md`
-- CONTEXTS.md: Inventory entry updated
+**Inherited by next milestone:**
+1. **Slice 12 — `OrderPlacedHandler` retirement** ⛔ BLOCKED — coordinated
+   Orders + Fulfillment + Inventory change required (see
+   `inventory-remaster-s4-retrospective.md` §4).
+2. **Gap #13 — concurrency-exhaustion silent discard** — `ConcurrencyException`
+   retry chain currently ends in `Discard`; should end in `MoveToErrorQueue()`
+   now that the DLQ log sink exists.
+3. **DLQ alerting/monitoring pipeline** — handed off to a future Operations BC.
+4. **Inventory P3+ slices 36–38, 40–42** — cross-BC dashboards + advanced
+   FC routing; deferral reasons documented in
+   `docs/planning/inventory-remaster-slices.md`.
+5. **Backoffice frontend wiring** — separate BC session.
 
-**Next:** M42.1+ — Inventory BC Remaster implementation sessions (S1–S5)
+### ✅ Skills Refresh: Marten Streaming JSON (2026-04-20, docs only)
 
-## Recent Completions
+**Status:** ✅ **Complete** — 4 skill files updated; no code or test changes.
+**Scope:** Added `StreamOne` / `StreamMany` / `StreamAggregate` guidance to
+`marten-document-store.md`, `marten-event-sourcing.md`,
+`wolverine-message-handlers.md`, and cross-referenced from
+`bff-realtime-patterns.md`.
 
 ### ✅ M41.0: Fulfillment BC Remaster (2026-04-07)
 
@@ -1373,19 +1442,46 @@ all consumer BCs.
 
 ### Next Milestones
 
-> ⚠️ **Updated 2026-04-06:** M40.0 complete. Next milestone TBD — decisions pending with Erik.
+> ⚠️ **Updated 2026-05-06:** M42.x (Inventory BC Remaster) complete since
+> 2026-04-11. No active milestone. The April arc (M37.0 → M42.4) was a long
+> stretch of correctness, idiom, and observability work — no new BCs and no
+> net-new user-facing features. See
+> [`docs/research/state-of-repo-2026-05.md`](../research/state-of-repo-2026-05.md)
+> for a full state-of-repo report and tiered candidate list.
 
-- **M37.0 through M40.0 (complete):** The Catalog–Listings–Marketplaces arc (M37.0–M38.1), the Critter Stack idiom refresh (M39.0), and the Dynamic Consistency Boundary introduction (M40.0) are finished. All 18 BCs are now at current Critter Stack idiom standards with a working DCB reference implementation in Promotions.
+- **M37.0 → M42.4 (complete):** The Catalog–Listings–Marketplaces arc
+  (M37.0–M38.1), the Critter Stack idiom refresh (M39.0), the Dynamic
+  Consistency Boundary introduction (M40.0), the Fulfillment BC Remaster
+  (M41.0), and the Inventory BC Remaster (M42.x) are finished. All 18 BCs
+  are at current Critter Stack idiom standards.
 
-- **Next milestone (TBD):** Priorities under consideration include:
-  - Product Variants — ProductFamily aggregate, variant-aware listings
-  - Search BC — Full-text product search, faceted navigation
-  - Test reliability — Returns cross-BC saga tests, Vendor Portal cold-start flakes
-  - eBay orphaned draft cleanup mechanism
+- **Next milestone (TBD):** Highest-leverage candidates, in roughly the
+  order proposed in the state-of-repo report:
+  - **Tier 1 — Finish what we started:**
+    - **Slice 12 — `OrderPlacedHandler` retirement** (the only ⛔ on the board).
+      Coordinated Orders + Fulfillment + Inventory change.
+    - **Inventory gap #13** — replace silent `Discard` with `MoveToErrorQueue()`
+      now that the DLQ log sink exists.
+    - **eBay orphaned draft cleanup** — finishes the lifecycle started in M38.1.
+  - **Tier 2 — Test reliability:** Vendor Portal cold-start flakes, Returns
+    cross-BC saga tests (re-evaluate against latest Wolverine 5.x),
+    inline-vs-async projection audit.
+  - **Tier 3 — New product capability:** Product Variants (`ProductFamily`
+    aggregate, variant-aware listings); Search BC; Recommendations + ML pilot
+    (research already published in
+    `docs/research/event-sourcing-analytics-ml-opportunities.md`).
+  - **Tier 4 — Pattern depth:** second DCB example in a different BC;
+    Operations Dashboard / DLQ alerting (greenfield BC).
+
+  A natural bundle for the next milestone is **"M43.0: Reliability + Slice 12"**
+  — combining Tier 1 Slice 12, gap #13, and Tier 2 reliability work in the
+  spirit of M39.0's idiom refresh. If a greenfield product arc is preferred,
+  **Tier 3 G (Product Variants)** is the richest next step.
 
 ### Future BCs (Priority Roadmap)
 
-> All existing BCs are implemented and idiomatic as of M40.0. Next new BC work is greenfield.
+> All existing BCs are implemented and idiomatic as of M42.x. Next new BC
+> work is greenfield.
 
 **High Priority:**
 - 🟡 **Product Variants** — ProductFamily aggregate, variant-aware listings
@@ -1402,7 +1498,7 @@ all consumer BCs.
 
 See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specifications.
 
-*Roadmap Last Updated: 2026-04-06 (M40.0 complete; next milestone TBD)*
+*Roadmap Last Updated: 2026-05-06 (M42.x complete; next milestone TBD — see state-of-repo report)*
 
 ---
 
@@ -1419,6 +1515,6 @@ See [CONTEXTS.md — Future Considerations](../../CONTEXTS.md) for full specific
 
 ---
 
-*Document Last Updated: 2026-04-06*
-*Active Milestone: None — M40.0 closed; next TBD*
+*Document Last Updated: 2026-05-06*
+*Active Milestone: None — M42.4 closed 2026-04-11; next TBD (see [state-of-repo report](../research/state-of-repo-2026-05.md))*
 *Update Policy: At milestone start, milestone end, and significant task changes*
