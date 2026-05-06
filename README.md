@@ -54,6 +54,13 @@ A non-exhaustive list of the patterns, paradigms, and principles demonstrated in
 - E2E Testing with Playwright
 - Component Testing with bUnit
 
+> **Recent activity:** The **Fulfillment** and **Inventory** bounded contexts were
+> re-mastered in April 2026 against a current Critter Stack idiom baseline —
+> WorkOrder + Shipment split, transfer + quarantine lifecycle, UUID v5 stream
+> identity, and inline routing-engine projections. See
+> [`docs/research/state-of-repo-2026-05.md`](./docs/research/state-of-repo-2026-05.md)
+> for a full state-of-repo report.
+
 ## 🤖 AI-assisted Development <a id='1.3'></a>
 
 This project is built with Claude as a collaborative coding partner. Beyond just generating code, it's an exercise in teaching AI tools to think in event-driven patterns and leverage the Critter Stack idiomatically—helping to improve the guidance these tools can offer the broader community.
