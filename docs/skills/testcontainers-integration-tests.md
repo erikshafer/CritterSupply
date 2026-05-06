@@ -1326,6 +1326,39 @@ builder.Services.AddDbContext<MyDbContext>((sp, options) =>
 
 **Reference:** [M34.0 Session 1 Retrospective — Learning 1](../../docs/planning/milestones/m34-0-session-1-retrospective.md)
 
+### ❌ Async-Projection Daemon Highwater Drift Across Tests ⭐ *M44.0 Addition*
+
+**Symptom:** Tests pass individually but fail in suite runs, or fail on first cold-container run and pass on retry. Reads of an async-projected view return stale or empty data even though the producing event was just appended.
+
+**Why this happens:** Marten's async daemon tracks a per-projection "highwater mark" — the highest event sequence number it has projected. The mark is stored in Marten's metadata tables, **not** in the document tables that `store.Advanced.Clean.DeleteAllDocumentsAsync()` clears. So after `DeleteAllDocumentsAsync()` between tests:
+
+1. Documents (including the projection's view rows) are gone.
+2. The daemon's highwater mark is still ahead of the new test's events.
+3. The daemon sees `LastEventSequence < highwater` and silently does nothing.
+4. The next read returns the empty-after-clean state — no exception, no warning.
+
+**Diagnostic recipe:**
+
+1. **Confirm the projection is async.** Grep `Projections.Add<...>(ProjectionLifecycle.Async)` in the BC's `Program.cs`.
+2. **Confirm shared fixture pattern.** Look for `IClassFixture` / `[Collection]` + `CleanAllDocumentsAsync()`.
+3. **Verify by adding `await store.WaitForNonStaleProjectionDataAsync(TimeSpan.FromSeconds(10))`** after the trigger event in the failing test. If the test now passes, you've confirmed the diagnosis.
+
+**Fixes (in preference order):**
+
+1. **Convert the projection to inline.** Best for projections read in tests; eliminates the failure mode entirely. See `docs/research/projection-lifecycle-audit-2026-05.md` for the inline-by-default rule.
+2. **Use `WaitForNonStaleProjectionDataAsync` in tests** when async is operationally required.
+3. **Also call `DeleteAllEventDataAsync()` in the cleanup helper** so the highwater has nothing to be ahead of:
+   ```csharp
+   public async Task CleanAllDataAsync()
+   {
+       var store = GetDocumentStore();
+       await store.Advanced.Clean.DeleteAllDocumentsAsync();
+       await store.Advanced.Clean.DeleteAllEventDataAsync();
+   }
+   ```
+
+**Reference:** `docs/planning/milestones/m44-0-test-reliability-retrospective.md` — Session 1 root-cause analysis.
+
 ## CI/CD Considerations
 
 ### GitHub Actions

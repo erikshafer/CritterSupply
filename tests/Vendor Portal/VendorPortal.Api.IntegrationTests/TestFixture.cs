@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using JasperFx.CommandLine;
 using Marten;
+using Marten.Events;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Testcontainers.PostgreSql;
@@ -58,6 +59,13 @@ public sealed class TestFixture : IAsyncLifetime
                 services.DisableAllExternalWolverineTransports();
             });
         });
+
+        // M44.0 hardening: explicitly gate on schema migration completion before any
+        // test runs. Marten serializes this internally via advisory locks, but pinning
+        // it to the fixture's hot path means tests never observe a partially-migrated
+        // schema. See docs/planning/milestones/m44-0-test-reliability-retrospective.md.
+        var store = GetDocumentStore();
+        await store.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
     }
 
     public async Task DisposeAsync()
@@ -92,11 +100,39 @@ public sealed class TestFixture : IAsyncLifetime
     /// <summary>
     /// Deletes all Marten documents. Call at the start of each test that needs a clean slate.
     /// </summary>
+    /// <remarks>
+    /// Prefer <see cref="CleanAllDataAsync"/> for any test fixture that may grow async
+    /// projections. Documents-only cleanup leaves event data intact, which can starve
+    /// async daemons and cause silent stale-read flakes — see M44.0 retrospective.
+    /// </remarks>
     public async Task CleanAllDocumentsAsync()
     {
         var store = GetDocumentStore();
         await store.Advanced.Clean.DeleteAllDocumentsAsync();
     }
+
+    /// <summary>
+    /// Deletes all Marten documents <em>and</em> event-store data. Use this in any test
+    /// that touches the event stream or that runs in a fixture shared with async-projection
+    /// integration tests, to keep the projection-daemon highwater mark from drifting ahead
+    /// of the per-test events. See M44.0 Session 1 retrospective for the failure mode.
+    /// </summary>
+    public async Task CleanAllDataAsync()
+    {
+        var store = GetDocumentStore();
+        await store.Advanced.Clean.DeleteAllDocumentsAsync();
+        await store.Advanced.Clean.DeleteAllEventDataAsync();
+    }
+
+    /// <summary>
+    /// Wait for any registered async projections to catch up to the latest event sequence.
+    /// Defensive helper — currently vacuous because Vendor Portal registers no async
+    /// projections, but inserted into the fixture so future async views can be safely
+    /// asserted with one call instead of every test re-discovering the highwater-mark
+    /// gotcha. See <c>docs/skills/event-sourcing-projections.md</c> "Anti-Pattern #5".
+    /// </summary>
+    public Task WaitForNonStaleProjectionDataAsync(TimeSpan? timeout = null)
+        => GetDocumentStore().WaitForNonStaleProjectionDataAsync(timeout ?? TimeSpan.FromSeconds(15));
 
     /// <summary>
     /// Sends a message directly through Wolverine and waits for all cascaded work to finish.
