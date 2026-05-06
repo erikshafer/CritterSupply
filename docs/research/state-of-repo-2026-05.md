@@ -138,7 +138,7 @@ further discovery.
 
 ### Tier 1 — Finish what we started
 
-**A. Unblock Slice 12 (`OrderPlacedHandler` retirement).** Three-BC coordinated change:
+**A. Unblock Slice 12 (`OrderPlacedHandler` retirement).** ✅ **COMPLETE.** Three-BC coordinated change:
    1. Fulfillment registers a route for and emits `StockReservationRequested` upon
       receiving `FulfillmentRequested`.
    2. Orders stops routing `OrderPlaced` to Inventory.
@@ -147,15 +147,23 @@ further discovery.
      The architectural decision is already in ADR 0060; this is execution.
    - **Size:** small-medium (≈1 session, possibly with a follow-up cleanup PR).
 
-**B. Address concurrency-exhaustion gap #13 (Inventory).** Replace the silent
+**B. Address concurrency-exhaustion gap #13 (Inventory).** ✅ **COMPLETE (M43.1).** Replace the silent
    `Discard` policy on `ConcurrencyException` with `MoveToErrorQueue()` once retry
    chain exhausts, and add an integration test covering the exhaustion path.
    - **Why now:** Documented gap from S2; the DLQ sink from S4 is already there
      to surface the failures.
 
-**C. eBay orphaned draft cleanup.** A scheduled background sweep using the
-   `CheckSubmissionStatusAsync` already wired in M38.1.
+**C. eBay orphaned draft cleanup.** ✅ **COMPLETE (2026-05-06).** A scheduled
+   background sweep using the `CheckSubmissionStatusAsync` already wired in M38.1.
    - **Why now:** Detection has shipped; this finishes the lifecycle.
+   - **What shipped:** `IMarketplaceAdapter.DeleteOrphanedDraftAsync` (eBay calls
+     `DELETE /sell/inventory/v1/offer/{offerId}`, treating 404 as success);
+     `EbayMarketplaceAdapter.SubmitListingAsync` now reports the orphaned offerId
+     via the new `SubmissionResult.OrphanedExternalSubmissionId`;
+     `ListingApprovedHandler` persists an `OrphanedEbayDraft` Marten document
+     when an orphan is detected; `SweepOrphanedEbayDraftsHandler` runs every 24h
+     (kicked off at startup by `OrphanedEbayDraftSweepStartupService`,
+     reschedules itself after each pass — same pattern as `CheckWalmartFeedStatusHandler`).
 
 ### Tier 2 — Test / reliability hardening (low-risk, high-trust)
 

@@ -118,6 +118,23 @@ public static class ListingApprovedHandler
         // Submit to marketplace adapter
         var result = await adapter.SubmitListingAsync(submission);
 
+        // If a multi-step adapter flow created a resource on the platform but a
+        // later step failed (today: eBay create-offer succeeded, publish-offer failed),
+        // persist the orphan so the background sweep can clean it up.
+        if (!string.IsNullOrEmpty(result.OrphanedExternalSubmissionId))
+        {
+            session.Store(new OrphanedEbayDraft
+            {
+                Id = result.OrphanedExternalSubmissionId,
+                ListingId = message.ListingId,
+                Sku = message.Sku,
+                ChannelCode = message.ChannelCode,
+                DetectedAt = now,
+                CleanupAttempts = 0,
+                IsCleaned = false
+            });
+        }
+
         if (result.IsSuccess)
         {
             // Walmart: feed-based async submission — schedule a status poll instead of publishing activated immediately

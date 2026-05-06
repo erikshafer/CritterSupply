@@ -1,5 +1,6 @@
 using Marten;
 using Marketplaces.Adapters;
+using Marketplaces.Api.Listings;
 using Marketplaces.CategoryMappings;
 using Marketplaces.Credentials;
 using Marketplaces.Marketplaces;
@@ -51,6 +52,11 @@ builder.Services.AddMarten(opts =>
 
     // ProductSummaryView ACL — product data from Product Catalog BC, keyed by SKU (D-2a)
     opts.Schema.For<ProductSummaryView>().Identity(x => x.Id);
+
+    // Orphaned eBay draft tracking — populated by ListingApprovedHandler when
+    // EbayMarketplaceAdapter.SubmitListingAsync's publish step fails after create succeeded.
+    // Cleaned up by SweepOrphanedEbayDraftsHandler. See ADR 0055 (Q5 deferred to M38.1+).
+    opts.Schema.For<OrphanedEbayDraft>().Identity(x => x.Id);
 })
     .UseLightweightSessions()
     .IntegrateWithWolverine();
@@ -200,6 +206,10 @@ builder.Host.UseWolverine(opts =>
 
 // Wolverine HTTP
 builder.Services.AddWolverineHttp();
+
+// Background sweep that schedules the recurring eBay orphaned-draft cleanup
+// (Tier 1 C in docs/research/state-of-repo-2026-05.md).
+builder.Services.AddHostedService<OrphanedEbayDraftSweepStartupService>();
 
 // Add Swagger/OpenAPI support
 builder.Services.AddEndpointsApiExplorer();

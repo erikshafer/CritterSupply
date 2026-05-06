@@ -267,6 +267,14 @@ public sealed class AmazonMarketplaceAdapter : IMarketplaceAdapter
     }
 
     /// <summary>
+    /// Amazon SP-API uses a single PUT submission flow — there is no two-step
+    /// flow that can leave orphaned draft resources behind. This is a no-op.
+    /// </summary>
+    public Task<bool> DeleteOrphanedDraftAsync(
+        string externalSubmissionId,
+        CancellationToken ct = default) => Task.FromResult(true);
+
+    /// <summary>
     /// Obtains an LWA access token, using cached token if still valid.
     /// LWA tokens typically have a 1-hour TTL; we refresh 5 minutes before expiry.
     /// </summary>

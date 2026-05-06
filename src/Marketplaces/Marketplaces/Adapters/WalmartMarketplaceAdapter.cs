@@ -251,6 +251,14 @@ public sealed class WalmartMarketplaceAdapter : IMarketplaceAdapter
     }
 
     /// <summary>
+    /// Walmart Marketplace API uses a single feed-based submission flow — there is no
+    /// two-step flow that can leave orphaned draft resources behind. This is a no-op.
+    /// </summary>
+    public Task<bool> DeleteOrphanedDraftAsync(
+        string externalSubmissionId,
+        CancellationToken ct = default) => Task.FromResult(true);
+
+    /// <summary>
     /// Obtains an OAuth access token via client credentials grant, using cached token if still valid.
     /// Walmart tokens typically have a 15-minute TTL; we refresh 5 minutes before expiry.
     /// </summary>

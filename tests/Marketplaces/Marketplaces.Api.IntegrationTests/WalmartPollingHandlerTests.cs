@@ -142,6 +142,8 @@ public sealed class WalmartPollingHandlerTests
             Task.FromResult(new SubmissionStatus(externalSubmissionId, isLive, isFailed, failureReason));
         public Task<bool> DeactivateListingAsync(string externalListingId, CancellationToken ct = default) =>
             Task.FromResult(false);
+        public Task<bool> DeleteOrphanedDraftAsync(string externalSubmissionId, CancellationToken ct = default) =>
+            Task.FromResult(true);
     }
 
     /// <summary>
