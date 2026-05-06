@@ -41,23 +41,48 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | None — M42.4 closed; next TBD |
-| **Status** | 🟢 **Idle** (between milestones since 2026-04-11) |
+| **Current Milestone** | M43.0 — Slice 12 (`OrderPlacedHandler`) Retirement (1A from `state-of-repo-2026-05`) |
+| **Status** | 🟢 **In progress** — D1–D5 implementation complete; QA review + retrospective remaining |
 | **Recent Completion** | M42.x — Inventory BC Remaster: event modeling + S1–S4 implementation (2026-04-08 → 2026-04-11) |
 | **Previous Completion** | M41.0 — Fulfillment BC Remaster: complete (S1–S5), 39 slices, 5 sessions (2026-04-07) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-05-06 (state-of-repo refresh — see `docs/research/state-of-repo-2026-05.md`; previous activity was a docs-only skills refresh on 2026-04-20)*
+*Last Updated: 2026-05-06 (M43.0 in progress — Slice 12 retirement; see `docs/planning/milestones/m43-0-plan.md`)*
 
 ---
 
 ## Active Milestone
 
-_No active milestone. M42.4 closed 2026-04-11. The only repo activity since was a
-docs-only Marten streaming-JSON skills refresh on 2026-04-20. See
-[`docs/research/state-of-repo-2026-05.md`](../research/state-of-repo-2026-05.md)
-for a full state-of-repo report and candidate next milestones, and the
-[Roadmap](#roadmap) below for the standing options._
+### 🚧 M43.0 — Slice 12 (`OrderPlacedHandler`) Retirement
+
+**Status:** 🟢 In progress (single-session). Plan committed; D1–D5 implementation
+complete; QA review + retrospective remaining.
+
+**Source:** Top-tier item **1A** from
+[`docs/research/state-of-repo-2026-05.md`](../research/state-of-repo-2026-05.md) §4.
+Carryover from `inventory-remaster-s4-retrospective.md` §4 — the only ⛔ on the
+Inventory remaster scoreboard.
+
+**Goal:** Retire the legacy `Inventory.OrderPlacedHandler` (hardcoded `WH-01`)
+and finish wiring the routing-aware `Fulfillment → StockReservationRequested →
+Inventory → ReservationConfirmed/Failed → Orders` flow over RabbitMQ.
+
+**Three-BC coordinated change:**
+- Fulfillment emits one `StockReservationRequested` per line item from
+  `FulfillmentRequestedHandler`; `Fulfillment.Api` publishes to
+  `inventory-fulfillment-events`.
+- Inventory's `StockReservationRequestedHandler` is now idempotent on
+  duplicate `ReservationId` and emits `ReservationFailed` on insufficient
+  stock or unknown SKU; `Inventory.Api` publishes both `ReservationConfirmed`
+  and `ReservationFailed` to `orders-inventory-events`.
+- Orders subscribes to `orders-inventory-events`.
+- Legacy `Inventory.OrderPlacedHandler` and `OrderPlacedFlowTests` deleted.
+- Test coverage extended on all three BCs; build clean (351 vs 358 baseline
+  warnings; 0 errors); Inventory 109+151, Fulfillment 80+40, Orders 55+144 all
+  green.
+
+**Out of scope (next session):** item **1B** — concurrency-exhaustion gap #13
+(`ConcurrencyException → Discard` silent message drops).
 
 ## Recent Completions
 
@@ -65,7 +90,7 @@ for a full state-of-repo report and candidate next milestones, and the
 
 **Status:** ✅ **Complete** — 1 event modeling session (M42.0) + 4 implementation
 sessions (M42.1 → M42.4). 35 of 42 slices delivered (P0 + P1 + P2 + Slice 39
-stretch); 6 P3+ slices and Slice 12 explicitly deferred.
+stretch); 6 P3+ slices and Slice 12 explicitly deferred (resolved in M43.0).
 **Goal:** Apply the gap register from the Fulfillment Remaster event modeling
 to remaster the Inventory BC against current Critter Stack idioms — UUID v5
 stream identity, inline routing-engine projections, structured domain events
@@ -134,12 +159,11 @@ unchanged at 144 unit + 55 integration. Total Inventory tests across S1–S4: 26
   `BackorderStockAvailable`.
 
 **Inherited by next milestone:**
-1. **Slice 12 — `OrderPlacedHandler` retirement** ⛔ BLOCKED — coordinated
-   Orders + Fulfillment + Inventory change required (see
-   `inventory-remaster-s4-retrospective.md` §4).
+1. **Slice 12 — `OrderPlacedHandler` retirement** ✅ Resolved in M43.0
+   (this milestone).
 2. **Gap #13 — concurrency-exhaustion silent discard** — `ConcurrencyException`
    retry chain currently ends in `Discard`; should end in `MoveToErrorQueue()`
-   now that the DLQ log sink exists.
+   now that the DLQ log sink exists. **Scheduled as item 1B (next session).**
 3. **DLQ alerting/monitoring pipeline** — handed off to a future Operations BC.
 4. **Inventory P3+ slices 36–38, 40–42** — cross-BC dashboards + advanced
    FC routing; deferral reasons documented in

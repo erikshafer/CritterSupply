@@ -107,18 +107,15 @@ Feature: Routing Integration
   # MIGRATION: OrderPlacedHandler REMOVAL
   # ============================================================
 
-  Scenario: Migration Phase 1 — both paths active (dual-publish bridge)
-    Given the legacy OrderPlacedHandler is still active
-    And the new StockReservationRequested handler is also active
-    When an OrderPlaced event arrives from Orders BC
-    Then the legacy handler creates reservations at WH-01 (existing behavior)
-    And new routing-informed reservations can also be triggered by Fulfillment
-    And both paths publish ReservationConfirmed/Failed to Orders (same contract)
+  # Migration Phase 1 (dual-publish bridge) was removed in M43.0.
+  # OrderPlaced is no longer routed to Inventory in any environment;
+  # all reservations now flow through Fulfillment-initiated
+  # StockReservationRequested with a routing-informed WarehouseId.
 
   Scenario: Migration Phase 2 — legacy handler removed
-    Given the Orders saga now sends FulfillmentRequested before reservation
-    And Fulfillment's routing engine is active and queries Inventory availability
-    When the OrderPlacedHandler is removed from Inventory
-    Then Inventory no longer subscribes to OrderPlaced
+    Given the Orders saga sends FulfillmentRequested before reservation
+    And Fulfillment's routing engine queries Inventory availability
+    When OrderPlaced arrives from Orders BC
+    Then Inventory does not subscribe to OrderPlaced
     And all reservations flow through StockReservationRequested with routing-informed WarehouseId
-    And the RabbitMQ queue for OrderPlaced in Inventory can be decommissioned
+    And the legacy in-process OrderPlacedHandler has been deleted from Inventory

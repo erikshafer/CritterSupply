@@ -112,8 +112,8 @@ sequenceDiagram
     participant Payments as Payments BC
 
     Note over Orders: Scenario 1: Payment failed AFTER inventory reserved
-    Orders->>Inventory: OrderPlaced → ReserveStock
     Orders->>Payments: OrderPlaced → AuthorizePayment
+    Note over Orders: Fulfillment receives FulfillmentRequested\nand fans out StockReservationRequested\nper line item to Inventory (M43.0)
     Inventory->>Orders: ReservationConfirmed ✅
     Payments->>Orders: PaymentFailed ❌
 
@@ -123,8 +123,8 @@ sequenceDiagram
     Note over Orders: Status = PaymentFailed → saga terminal (MarkCompleted via no awaited refund)
 
     Note over Orders: Scenario 2: Inventory failed AFTER payment captured
-    Orders->>Inventory: OrderPlaced → ReserveStock
     Orders->>Payments: OrderPlaced → AuthorizePayment
+    Note over Orders: Fulfillment fans out StockReservationRequested\nper line item to Inventory (M43.0)
     Payments->>Orders: PaymentCaptured ✅
     Inventory->>Orders: ReservationFailed ❌
 
@@ -169,12 +169,11 @@ sequenceDiagram
 
 | Event | Queue | Subscribers |
 |-------|-------|-------------|
-| `Orders.OrderPlaced` | `storefront-notifications` (RabbitMQ) | Customer Experience (for real-time UI) |
-| `Orders.OrderPlaced` | Local Wolverine queue ⚠️ | Inventory BC + Payments BC |
+| `Orders.OrderPlaced` | `storefront-notifications` (RabbitMQ) | Customer Experience (for real-time UI) and Payments BC (authorize) |
 | `Orders.OrderCancelled` | Local queue ⚠️ | Downstream notification |
 | `Orders.ReservationCommitRequested` | Local queue ⚠️ | Inventory BC |
 | `Orders.ReservationReleaseRequested` | Local queue ⚠️ | Inventory BC |
-| `Orders.FulfillmentRequested` | Local queue ⚠️ | Fulfillment BC |
+| `Orders.FulfillmentRequested` | `fulfillment-requests` (RabbitMQ) | Fulfillment BC (which then fans out `StockReservationRequested` to Inventory) |
 | `Payments.RefundRequested` | Local queue ⚠️ | Payments BC (for cancellation / OutOfStock compensation) |
 
 #### Received
@@ -228,13 +227,13 @@ The endpoint pre-validates the state before publishing `CancelOrder` to the saga
 ```mermaid
 flowchart TD
     Shopping[Shopping BC :5236] -->|CheckoutInitiated| Orders[Orders BC :5231]
-    Orders -->|OrderPlaced| Inventory[Inventory BC :5233]
-    Orders -->|OrderPlaced| Payments[Payments BC :5232]
     Orders -->|FulfillmentRequested| Fulfillment[Fulfillment BC :5234]
+    Fulfillment -->|StockReservationRequested\nper SKU @ routing-assigned FC| Inventory[Inventory BC :5233]
+    Orders -->|OrderPlaced via RabbitMQ| Payments[Payments BC :5232]
     Orders -->|OrderPlaced via RabbitMQ| CE[Customer Experience :5237]
     Orders -->|RefundRequested| Payments
     CI[Customer Identity :5235] -->|AddressSnapshot| Orders
-    Inventory -->|Reservation events| Orders
+    Inventory -->|Reservation events\norders-inventory-events| Orders
     Payments -->|Payment events + RefundCompleted| Orders
     Fulfillment -->|Shipment events| Orders
 ```
@@ -330,7 +329,7 @@ sequenceDiagram
     participant Inventory as Inventory BC
     participant Payments as Payments BC
 
-    Orders->>Inventory: OrderPlaced → ReserveStock
+    Orders->>Inventory: FulfillmentRequested → StockReservationRequested (via Fulfillment)
     Orders->>Payments: OrderPlaced → AuthorizePayment
 
     Payments->>Orders: PaymentFailed ❌

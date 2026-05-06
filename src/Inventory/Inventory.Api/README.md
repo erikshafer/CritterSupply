@@ -33,8 +33,8 @@ Inventory owns stock quantities across warehouses using three distinct pools: **
 stateDiagram-v2
     [*] --> Available : InventoryInitialized / StockReceived
 
-    Available --> Reserved : OrderPlaced → StockReserved ✅
-    Available --> Available : OrderPlaced → ReservationFailed ❌ (insufficient stock)
+    Available --> Reserved : StockReservationRequested → StockReserved ✅
+    Available --> Available : StockReservationRequested → ReservationFailed ❌ (insufficient stock)
 
     Reserved --> Available : Payment failed → ReservationReleased ✅ compensation event
     Reserved --> Available : Saga timeout → ReservationExpired ⚠️ not yet implemented
@@ -55,8 +55,8 @@ stateDiagram-v2
         — never pruned today.
     end note
     note right of Available
-        ⚠️ Race condition: two concurrent OrderPlaced
-        events may both see Available >= 1 for the last unit.
+        ⚠️ Race condition: two concurrent StockReservationRequested
+        messages may both see Available >= 1 for the last unit.
         No optimistic concurrency control today.
         (See Off-Path Scenario 1: Last-Unit Race Condition below)
     end note
@@ -67,17 +67,19 @@ stateDiagram-v2
 ```mermaid
 sequenceDiagram
     participant Orders as Orders BC
+    participant Ful as Fulfillment BC
     participant Inv as Inventory BC
     participant Marten as Marten Event Store
 
-    Orders->>Inv: OrderPlaced (line items)
-    Inv->>Inv: Group items by SKU
-    loop For each SKU
+    Orders->>Ful: FulfillmentRequested
+    Ful->>Ful: Routing engine selects FC
+    loop For each line item
+        Ful->>Inv: StockReservationRequested {sku, fc, reservationId}
         Inv->>Marten: Load ProductInventory
         alt Sufficient stock
             Inv->>Marten: Append StockReserved
             Inv->>Orders: ReservationConfirmed
-        else Insufficient stock
+        else Insufficient stock / unknown SKU
             Inv->>Orders: ReservationFailed
         end
     end
@@ -111,7 +113,7 @@ sequenceDiagram
 |---------|---------|---------|
 | `InitializeInventory` | `InitializeInventoryHandler` | Admin adds new SKU to a warehouse |
 | `ReceiveStock` | `ReceiveStockHandler` | New shipment arrives at warehouse |
-| `ReserveStock` | `ReserveStockHandler` | Triggered by `OrderPlaced` (per SKU) |
+| `ReserveStock` | `ReserveStockHandler` | Internal HTTP/admin command (the integration trigger is now `Fulfillment.StockReservationRequested`) |
 | `CommitReservation` | `ReservationCommitRequestedHandler` | Orders sends commit after payment captured |
 | `ReleaseReservation` | `ReservationReleaseRequestedHandler` | Orders sends release after payment failure |
 
@@ -141,7 +143,7 @@ sequenceDiagram
 
 | Event | Handler |
 |-------|---------|
-| `Orders.OrderPlaced` | `OrderPlacedHandler` — creates `ReserveStock` commands per SKU |
+| `Fulfillment.StockReservationRequested` | `StockReservationRequestedHandler` — reserves at the routing-informed `WarehouseId`; idempotent on duplicate `ReservationId`; publishes `ReservationConfirmed` or `ReservationFailed` |
 | `Orders.ReservationCommitRequested` | `ReservationCommitRequestedHandler` |
 | `Orders.ReservationReleaseRequested` | `ReservationReleaseRequestedHandler` |
 
@@ -149,8 +151,9 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    Orders[Orders BC :5231] -->|OrderPlaced\nCommitRequested\nReleaseRequested\nlocal queue| Inv[Inventory BC :5233]
-    Inv -->|ReservationConfirmed\nReservationFailed\nReservationCommitted\nReservationReleased| Orders
+    Ful[Fulfillment BC :5234] -->|StockReservationRequested\n(per SKU @ routing-assigned FC)| Inv[Inventory BC :5233]
+    Orders[Orders BC :5231] -->|CommitRequested\nReleaseRequested\nlocal queue| Inv
+    Inv -->|ReservationConfirmed\nReservationFailed\nReservationCommitted\nReservationReleased\norders-inventory-events| Orders
 ```
 
 ## Implementation Status
@@ -163,9 +166,9 @@ flowchart LR
 | Compensation flow (release on payment failure) | ✅ Complete |
 | Stock initialization + receive stock | ✅ Complete |
 | Integration tests (6 passing) | ✅ Complete |
-| Warehouse routing | ⚠️ Hardcoded `WH-01` |
-| RabbitMQ integration | ❌ Local queues only |
-| Idempotency (duplicate `OrderPlaced`) | ❌ Not implemented |
+| Warehouse routing | ✅ Routing-informed (Fulfillment selects FC per shipment) |
+| RabbitMQ integration | ✅ `inventory-fulfillment-events` (in), `orders-inventory-events` (out) |
+| Idempotency (duplicate `StockReservationRequested`) | ✅ Implemented (M43.0) |
 | Reservation timeout / auto-release | ❌ Not implemented |
 | Concurrency load tests | ❌ Not done |
 | Low stock alerts (`InventoryLow` events) | ❌ Not implemented |
@@ -197,8 +200,8 @@ sequenceDiagram
     Note over Inv: ProductInventory for SKU "DOG-FOOD-5KG" has AvailableQty = 1
 
     par Simultaneous reservations
-        OrderA->>Inv: OrderPlaced → ReserveStock {sku, qty:1, reservationId: A}
-        OrderB->>Inv: OrderPlaced → ReserveStock {sku, qty:1, reservationId: B}
+        OrderA->>Inv: StockReservationRequested {sku, fc, qty:1, reservationId: A}
+        OrderB->>Inv: StockReservationRequested {sku, fc, qty:1, reservationId: B}
     end
 
     Note over Inv: Handler A loads aggregate: Available=1 ✅ sufficient
@@ -224,7 +227,7 @@ sequenceDiagram
     participant Orders as Orders BC
     participant Inv as Inventory BC
 
-    Orders->>Inv: OrderPlaced → StockReserved {reservationId: X, qty: 2}
+    Orders->>Inv: StockReservationRequested → StockReserved {reservationId: X, qty: 2}
     Note over Inv: AvailableQty -= 2, Reserved[X] = 2
 
     Note over Customer: Customer abandons checkout mid-way
@@ -346,7 +349,7 @@ sequenceDiagram
 | Gap | Impact | Planned Cycle |
 |-----|--------|---------------|
 | Local queues — messages lost on restart | Reservation events lost; orders stuck | Cycle 19 |
-| No idempotency — duplicate `OrderPlaced` over-reserves | Inventory leakage | Cycle 20 |
+| No idempotency — duplicate `StockReservationRequested` over-reserves | Inventory leakage | ✅ Resolved (M43.0) |
 | Reservations never expire | Abandoned orders lock stock forever | Cycle 21 |
 | Warehouse hardcoded to `WH-01` | Cannot support multiple warehouses | Cycle 22 |
 | No low stock alerts | Cannot trigger reordering or "limited stock" badges | Cycle 22 |
