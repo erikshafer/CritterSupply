@@ -691,7 +691,17 @@ builder.Services.AddMarten(opts =>
 - ❌ Requires daemon — additional infrastructure to monitor
 - ❌ More complex — need to handle projection rebuild, failures
 
-**Not yet used in CritterSupply** — all current projections are inline for strong consistency. Async projections planned for analytics (Cycle 29+).
+**Used in CritterSupply for** the three Inventory cross-warehouse views (`AlertFeedView`, `NetworkInventorySummaryView`, `BackorderImpactView`) introduced in M42.3. All other ~27 projections are inline. See `docs/research/projection-lifecycle-audit-2026-05.md` for the full audit and the operational rationale per row.
+
+#### Inline-by-default rule (M44.0)
+
+> **Pick `Inline` by default for any projection that will be read in integration tests with shared TestContainers fixtures.** Pick `Async` only when one of the following applies:
+>
+> 1. The projection fans out across many streams per event (e.g., per-warehouse evaluation for every stock event).
+> 2. Per-event work is measured in hundreds of milliseconds (e.g., multi-stream joins).
+> 3. The downstream consumer's freshness SLA is measured in seconds-to-minutes, not real-time.
+>
+> If you choose `Async`, leave a one-line comment at the registration site explaining which of the three rules applies, and ensure the BC's integration tests use `WaitForNonStaleProjectionDataAsync` rather than write-then-immediately-read patterns. Mixing `DeleteAllDocumentsAsync()` with async projections in shared fixtures is the canonical foot-gun: the daemon's highwater mark does not reset, so the next test's events are not projected.
 
 ### 4. Live Aggregation (On-Demand)
 

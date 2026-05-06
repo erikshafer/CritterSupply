@@ -138,7 +138,7 @@ further discovery.
 
 ### Tier 1 — Finish what we started
 
-**A. Unblock Slice 12 (`OrderPlacedHandler` retirement).** Three-BC coordinated change:
+**A. Unblock Slice 12 (`OrderPlacedHandler` retirement).** ✅ **COMPLETE.** Three-BC coordinated change:
    1. Fulfillment registers a route for and emits `StockReservationRequested` upon
       receiving `FulfillmentRequested`.
    2. Orders stops routing `OrderPlaced` to Inventory.
@@ -147,32 +147,61 @@ further discovery.
      The architectural decision is already in ADR 0060; this is execution.
    - **Size:** small-medium (≈1 session, possibly with a follow-up cleanup PR).
 
-**B. Address concurrency-exhaustion gap #13 (Inventory).** Replace the silent
+**B. Address concurrency-exhaustion gap #13 (Inventory).** ✅ **COMPLETE (M43.1).** Replace the silent
    `Discard` policy on `ConcurrencyException` with `MoveToErrorQueue()` once retry
    chain exhausts, and add an integration test covering the exhaustion path.
    - **Why now:** Documented gap from S2; the DLQ sink from S4 is already there
      to surface the failures.
 
-**C. eBay orphaned draft cleanup.** A scheduled background sweep using the
-   `CheckSubmissionStatusAsync` already wired in M38.1.
+**C. eBay orphaned draft cleanup.** ✅ **COMPLETE (2026-05-06).** A scheduled
+   background sweep using the `CheckSubmissionStatusAsync` already wired in M38.1.
    - **Why now:** Detection has shipped; this finishes the lifecycle.
+   - **What shipped:** `IMarketplaceAdapter.DeleteOrphanedDraftAsync` (eBay calls
+     `DELETE /sell/inventory/v1/offer/{offerId}`, treating 404 as success);
+     `EbayMarketplaceAdapter.SubmitListingAsync` now reports the orphaned offerId
+     via the new `SubmissionResult.OrphanedExternalSubmissionId`;
+     `ListingApprovedHandler` persists an `OrphanedEbayDraft` Marten document
+     when an orphan is detected; `SweepOrphanedEbayDraftsHandler` runs every 24h
+     (kicked off at startup by `OrphanedEbayDraftSweepStartupService`,
+     reschedules itself after each pass — same pattern as `CheckWalmartFeedStatusHandler`).
 
 ### Tier 2 — Test / reliability hardening (low-risk, high-trust)
+
+> **Status (M44.0, 2026-05-06):** Bundled into the M44.0 milestone — see
+> `docs/planning/milestones/m44-0-test-reliability-retrospective.md` for the
+> rolling retrospective. F is **complete**; D is **fixture-hardened** with
+> empirical cold-start verification deferred to a Docker-enabled CI run; E is
+> **researched** with both Path A (Wolverine bump) and Path B (direct-Store
+> setup helper) execution recipes documented for the next session.
 
 **D. Vendor Portal cold-start flakes.** Diagnose why 56/86 fail on first
    container run but pass on retry — likely Marten schema/migration ordering or
    missing `WaitForNonStaleProjectionDataAsync`. Pure reliability work, no
-   product change.
+   product change. *M44.0 finding: Vendor Portal currently registers no
+   projections, so daemon-highwater drift is not the active root cause; the
+   fixture has been hardened defensively (`ApplyAllConfiguredChangesToDatabaseAsync`
+   gate, event-data cleanup, `WaitForNonStaleProjectionDataAsync` helper,
+   regression-guard test) and a real-CI cold-start re-measurement is the next
+   step.*
 
 **E. Returns cross-BC saga tests (6 skipped).** Re-evaluate against the latest
    Wolverine 5.x point release; if still blocked, document a TestContainers-based
-   workaround instead of waiting on Wolverine 6.x.
+   workaround instead of waiting on Wolverine 6.x. *M44.0 status: Wolverine
+   pinned at 5.29.0; both paths (version bump or direct-`Store()` setup
+   bypassing `InvokeAsync(CheckoutCompleted)`) sketched in the M44.0
+   retrospective; verification deferred to a Docker-enabled session.*
 
 **F. Inline-vs-async projection inventory pass.** Several memories from this
    repo flag that **async projections are unreliable in shared test fixtures**
    (the daemon's highwater mark doesn't reset across `DeleteAllDocumentsAsync`).
    A short audit to convert remaining test-fragile async projections to inline
-   (where the operational SLA permits) would reduce flake risk.
+   (where the operational SLA permits) would reduce flake risk. *M44.0 result:
+   complete. Audit covers all 30 projections across 13 BCs in
+   `docs/research/projection-lifecycle-audit-2026-05.md`. Only 3 are async (all
+   Inventory cross-warehouse views, all operationally-required-async). Zero
+   conversions needed — codebase already follows "inline by default."
+   Convention codified in `marten-event-sourcing.md` and
+   `event-sourcing-projections.md`.*
 
 ### Tier 3 — Net-new product capability (greenfield)
 

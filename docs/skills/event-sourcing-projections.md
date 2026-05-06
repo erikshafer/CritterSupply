@@ -514,6 +514,14 @@ public async Task SetPrice_UpdatesCurrentPriceView()
 **Problem:** Async projection registered but daemon not started.
 **Fix:** Always call `.AddAsyncDaemon()` when using async projections.
 
+### ⚠️ Anti-Pattern #5: Async Projection + Shared TestContainers Fixture + `DeleteAllDocumentsAsync`
+
+**Problem:** Test fixture cleans state between tests via `store.Advanced.Clean.DeleteAllDocumentsAsync()`, but the async daemon's highwater mark is not part of "documents" — it survives the cleanup. The next test appends new events; the daemon thinks they are already projected (highwater is ahead) and silently does nothing. Reads return stale or empty data.
+
+**Fix (preferred):** Pick `Inline` for any projection read in tests with shared fixtures. See the "inline-by-default" rule in `marten-event-sourcing.md` and the full audit in `docs/research/projection-lifecycle-audit-2026-05.md`.
+
+**Fix (when async is operationally required):** In tests, call `await store.WaitForNonStaleProjectionDataAsync(TimeSpan.FromSeconds(N))` after the trigger event and before the read assertion. Also call `DeleteAllEventDataAsync()` alongside `DeleteAllDocumentsAsync()` so the highwater has nothing to be ahead of.
+
 ---
 
 ## Production Lessons Learned

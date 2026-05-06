@@ -19,11 +19,20 @@ public sealed record ListingSubmission(
 /// Result of submitting a listing to a marketplace adapter.
 /// <see cref="ExternalSubmissionId"/> carries the platform correlation ID
 /// (spike finding #1: feedId, offerId, processing ID).
+/// <para>
+/// <see cref="OrphanedExternalSubmissionId"/> is populated only when a multi-step
+/// submission flow partially succeeded — i.e. an external resource was created on
+/// the marketplace platform before a later step failed, leaving a stale draft that
+/// must be cleaned up later. Today only eBay's create-offer / publish-offer flow
+/// can produce this (orphaned UNPUBLISHED offer); see
+/// <c>SweepOrphanedEbayDraftsHandler</c> for the cleanup mechanism.
+/// </para>
 /// </summary>
 public sealed record SubmissionResult(
     bool IsSuccess,
     string? ExternalSubmissionId,
-    string? ErrorMessage = null);
+    string? ErrorMessage = null,
+    string? OrphanedExternalSubmissionId = null);
 
 /// <summary>
 /// Status of a previously submitted listing on a marketplace platform.
@@ -60,5 +69,25 @@ public interface IMarketplaceAdapter
 
     Task<bool> DeactivateListingAsync(
         string externalListingId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Deletes an orphaned draft resource on the marketplace platform that was
+    /// created during a partial submission flow (e.g. eBay create-offer succeeded
+    /// but the subsequent publish-offer failed, leaving an UNPUBLISHED offer).
+    /// <para>
+    /// Adapters whose submission flow cannot produce orphaned drafts (Amazon, Walmart,
+    /// stubs) should treat this as a no-op and return <c>true</c>. Implementations that
+    /// can produce orphans (eBay) should call the appropriate platform DELETE endpoint
+    /// and treat "already gone" responses (HTTP 404) as success — the cleanup goal is
+    /// idempotent removal.
+    /// </para>
+    /// </summary>
+    /// <param name="externalSubmissionId">
+    /// The orphan identifier originally captured in
+    /// <see cref="SubmissionResult.OrphanedExternalSubmissionId"/>.
+    /// </param>
+    Task<bool> DeleteOrphanedDraftAsync(
+        string externalSubmissionId,
         CancellationToken ct = default);
 }

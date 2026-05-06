@@ -118,6 +118,28 @@ public sealed class EbayMarketplaceAdapterTests : IDisposable
         result.ExternalSubmissionId.ShouldBeNull();
         result.ErrorMessage.ShouldNotBeNullOrEmpty();
         result.ErrorMessage.ShouldContain("publish");
+
+        // Orphan tracking: create succeeded so the offer exists on eBay's side and
+        // must be cleaned up by the background sweep (Tier 1 C).
+        result.OrphanedExternalSubmissionId.ShouldBe("ebay-OFFER-CREATED-OK");
+    }
+
+    [Fact]
+    public async Task SubmitListing_DoesNotReportOrphan_WhenCreateOfferFails()
+    {
+        // Arrange — OAuth token (successful auth)
+        EnqueueTokenResponse();
+
+        // Create offer fails — no orphan resource was created on eBay's side
+        _httpHandler.EnqueueResponse(HttpStatusCode.BadRequest,
+            new { errors = new[] { new { errorId = 25001, message = "Invalid SKU" } } });
+
+        // Act
+        var result = await _adapter.SubmitListingAsync(CreateTestSubmission());
+
+        // Assert — failure with no orphan to clean up
+        result.IsSuccess.ShouldBeFalse();
+        result.OrphanedExternalSubmissionId.ShouldBeNull();
     }
 
     [Fact]
@@ -350,6 +372,70 @@ public sealed class EbayMarketplaceAdapterTests : IDisposable
         withdrawRequest.Headers.Authorization!.Parameter.ShouldBe("test-ebay-deactivate-token");
         withdrawRequest.Headers.TryGetValues("X-EBAY-C-MARKETPLACE-ID", out var marketplaceIds).ShouldBeTrue();
         marketplaceIds!.First().ShouldBe("EBAY_US");
+    }
+
+    [Fact]
+    public async Task DeleteOrphanedDraft_ReturnsTrue_WhenApiSucceeds()
+    {
+        // Arrange — OAuth token + DELETE returns 204 No Content
+        EnqueueTokenResponse();
+        _httpHandler.EnqueueResponse(HttpStatusCode.NoContent);
+
+        // Act
+        var result = await _adapter.DeleteOrphanedDraftAsync("ebay-OFFER-ORPHAN-001");
+
+        // Assert
+        result.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task DeleteOrphanedDraft_ReturnsTrue_WhenOfferAlreadyGone()
+    {
+        // 404 is treated as success — the goal is idempotent removal, and a
+        // missing offer means another sweep already cleaned it up (or the human
+        // operator deleted it via the eBay seller console).
+        EnqueueTokenResponse();
+        _httpHandler.EnqueueResponse(HttpStatusCode.NotFound,
+            new { errors = new[] { new { errorId = 25710, message = "Offer not found" } } });
+
+        var result = await _adapter.DeleteOrphanedDraftAsync("ebay-OFFER-ALREADY-GONE");
+
+        result.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task DeleteOrphanedDraft_ReturnsFalse_WhenApiReturnsServerError()
+    {
+        EnqueueTokenResponse();
+        _httpHandler.EnqueueResponse(HttpStatusCode.InternalServerError,
+            new { errors = new[] { new { errorId = 99999, message = "Internal error" } } });
+
+        var result = await _adapter.DeleteOrphanedDraftAsync("ebay-OFFER-FAIL-001");
+
+        // Returning false signals "retry next sweep pass"
+        result.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DeleteOrphanedDraft_BuildsCorrectRequest()
+    {
+        EnqueueTokenResponse();
+        _httpHandler.EnqueueResponse(HttpStatusCode.NoContent);
+
+        await _adapter.DeleteOrphanedDraftAsync("ebay-OFFER-DEL-CHECK");
+
+        // Token + DELETE
+        _httpHandler.SentRequests.Count.ShouldBe(2);
+        var deleteRequest = _httpHandler.SentRequests[1];
+
+        deleteRequest.Method.ShouldBe(HttpMethod.Delete);
+        deleteRequest.RequestUri!.ToString().ShouldContain("/sell/inventory/v1/offer/");
+        deleteRequest.RequestUri!.ToString().ShouldContain("OFFER-DEL-CHECK");
+        // ebay- prefix stripped from URL
+        deleteRequest.RequestUri!.ToString().ShouldNotContain("ebay-");
+
+        deleteRequest.Headers.Authorization!.Scheme.ShouldBe("Bearer");
+        deleteRequest.Headers.GetValues("X-EBAY-C-MARKETPLACE-ID").ShouldContain("EBAY_US");
     }
 
     private void EnqueueTokenResponse()

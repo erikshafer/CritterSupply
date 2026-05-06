@@ -35,4 +35,8 @@ public sealed class StubAmazonAdapter : IMarketplaceAdapter
         await Task.Delay(100, ct);
         return true;
     }
+
+    public Task<bool> DeleteOrphanedDraftAsync(
+        string externalSubmissionId,
+        CancellationToken ct = default) => Task.FromResult(true);
 }

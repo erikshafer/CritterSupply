@@ -128,13 +128,17 @@ public sealed class EbayMarketplaceAdapter : IMarketplaceAdapter
 
             var publishError = await publishResponse.Content.ReadAsStringAsync(ct);
             _logger.LogWarning(
-                "eBay publish offer failed: SKU={Sku}, OfferId={OfferId}, StatusCode={StatusCode}, Body={Body}",
+                "eBay publish offer failed: SKU={Sku}, OfferId={OfferId}, StatusCode={StatusCode}, Body={Body}. " +
+                "Offer was created but publish failed — orphaned UNPUBLISHED draft will be cleaned up by the background sweep.",
                 submission.Sku, offerId, (int)publishResponse.StatusCode, publishError);
 
+            // Surface the orphaned offerId so the handler can persist it for the
+            // background sweep to delete. The submission still failed overall.
             return new SubmissionResult(
                 IsSuccess: false,
                 ExternalSubmissionId: null,
-                ErrorMessage: $"eBay publish offer returned {(int)publishResponse.StatusCode}: {publishError}");
+                ErrorMessage: $"eBay publish offer returned {(int)publishResponse.StatusCode}: {publishError}",
+                OrphanedExternalSubmissionId: $"ebay-{offerId}");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -287,6 +291,77 @@ public sealed class EbayMarketplaceAdapter : IMarketplaceAdapter
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Failed to withdraw eBay offer: OfferId={OfferId}", offerId);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Deletes an orphaned eBay draft offer left over when create-offer succeeded
+    /// but publish-offer failed. Calls <c>DELETE /sell/inventory/v1/offer/{offerId}</c>.
+    /// HTTP 204 (success) and 404 (already gone) are both treated as success — the
+    /// goal is idempotent removal. Other non-success responses return <c>false</c>
+    /// so the sweep handler will retry on the next pass.
+    /// </summary>
+    public async Task<bool> DeleteOrphanedDraftAsync(
+        string externalSubmissionId,
+        CancellationToken ct = default)
+    {
+        // Strip the "ebay-" prefix to get the raw offer ID.
+        var offerId = externalSubmissionId.StartsWith("ebay-", StringComparison.OrdinalIgnoreCase)
+            ? externalSubmissionId["ebay-".Length..]
+            : externalSubmissionId;
+
+        try
+        {
+            var accessToken = await GetAccessTokenAsync(ct);
+            var marketplaceId = await _vault.GetSecretAsync("ebay/marketplace-id", ct);
+
+            var client = _httpClientFactory.CreateClient("EbayApi");
+
+            // eBay deleteOffer — DELETE /sell/inventory/v1/offer/{offerId}
+            // Reference: https://developer.ebay.com/api-docs/sell/inventory/resources/offer/methods/deleteOffer
+            // deleteOffer is the correct call for unpublished/draft offers (vs. withdraw,
+            // which is for published listings — see DeactivateListingAsync).
+            var deleteUrl = $"{OfferBaseUrl}/{Uri.EscapeDataString(offerId)}";
+
+            using var request = new HttpRequestMessage(HttpMethod.Delete, deleteUrl);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Headers.Add("X-EBAY-C-MARKETPLACE-ID", marketplaceId);
+
+            _logger.LogInformation(
+                "Deleting orphaned eBay draft offer: OfferId={OfferId}, Marketplace={MarketplaceId}",
+                offerId, marketplaceId);
+
+            using var response = await client.SendAsync(request, ct);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation(
+                    "Orphaned eBay draft offer deleted: OfferId={OfferId}",
+                    offerId);
+                return true;
+            }
+
+            // 404 = offer already gone (deleted out-of-band, or the previous sweep
+            // attempt actually succeeded and we just didn't see the response). Idempotent.
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _logger.LogInformation(
+                    "Orphaned eBay draft offer already gone (404): OfferId={OfferId} — treating as cleaned",
+                    offerId);
+                return true;
+            }
+
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            _logger.LogWarning(
+                "eBay delete orphaned offer failed: OfferId={OfferId}, StatusCode={StatusCode}, Body={Body}",
+                offerId, (int)response.StatusCode, errorBody);
+            return false;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to delete orphaned eBay offer: OfferId={OfferId}", offerId);
             return false;
         }
     }
