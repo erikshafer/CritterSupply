@@ -49,6 +49,12 @@
 
 ## Gap #13 Resolution: ConcurrencyException + `.Discard()` Policy
 
+> ✅ **Resolved in M43.1** (2026-05-06). The policy now terminates in
+> `MoveToErrorQueue()` and is covered by a deterministic integration test in
+> `tests/Inventory/Inventory.Api.IntegrationTests/Reliability/ConcurrencyExhaustionDlqTests.cs`.
+> See [`m43-1-plan.md`](./m43-1-plan.md). The original S2 findings (below) are
+> preserved for historical context.
+
 ### Findings
 
 The concurrent reservation test (Slice 17) confirms:
@@ -62,7 +68,7 @@ The concurrent reservation test (Slice 17) confirms:
 
 2. The second order **never receives `ReservationFailed`** — it's simply dropped.
 
-### Current Policy (unchanged in this session)
+### Original S2 Policy
 
 ```csharp
 opts.OnException<ConcurrencyException>()
@@ -88,6 +94,24 @@ risk vector is flash sales where availability drops between the routing query an
 the reservation command.
 
 **Decision: Defer `.MoveToDeadLetterQueue()` to S3** — document as known limitation.
+
+### M43.1 Update — what shipped
+
+- Production policy in `src/Inventory/Inventory.Api/Program.cs` terminates in
+  `.MoveToErrorQueue()`, with a code comment naming Gap #13 and pointing at this
+  retrospective and `m43-1-plan.md`.
+- New deterministic test
+  `Reliability/ConcurrencyExhaustionDlqTests.ConcurrencyException_RetriesExhaust_EnvelopeMovesToDeadLetterQueue`
+  proves the policy chain ends in `inventory.wolverine_dead_letters` (not in a
+  silent discard).
+- Existing race test renamed to `ConcurrentReservations_LastUnitContention_NoSilentDrop`;
+  obsolete `Discard`/TODO comments removed; assertions updated to enforce the
+  no-DLQ-escalation invariant for routine 2-way contention (the deterministic
+  exhaustion proof now lives in the dedicated reliability test).
+- Latent column-name bug in `DeadLetterQueueLogSink` (queried `explanation`/`source`
+  against the actual `exception_type`/`exception_message`/`source` schema) fixed
+  while the new test surfaced it. The sink now logs `ExceptionType` and
+  `ExceptionMessage` per envelope.
 
 ---
 
@@ -145,7 +169,7 @@ the reservation command.
 
 ## Deferred Items
 
-- **Gap #13 `.MoveToDeadLetterQueue()`** — deferred to S3 (see resolution above)
+- **Gap #13 `.MoveToDeadLetterQueue()`** — ✅ resolved in M43.1 (see resolution above)
 - **AlertFeedView integration event for StockDiscrepancyFound** — marked TODO in
   ItemPickedHandler; deferred to S3 when AlertFeedView projection is built
 - **HTTP endpoint wiring for CycleCount, RecordDamage, WriteOffStock** — handlers

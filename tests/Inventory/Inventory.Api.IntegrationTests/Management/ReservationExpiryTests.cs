@@ -134,21 +134,28 @@ public sealed class ReservationExpiryTests : IAsyncLifetime
     }
 
     // ---------------------------------------------------------------------------
-    // Slice 17: Concurrent Reservation Conflict — Gap #13
+    // Slice 17 — Concurrent Reservation Conflict (Gap #13 — resolved in M43.1)
     // ---------------------------------------------------------------------------
 
     [Fact]
-    public async Task ConcurrentReservations_LastUnitContention_SecondReservationFails()
+    public async Task ConcurrentReservations_LastUnitContention_NoSilentDrop()
     {
-        // This test verifies that concurrent reservations for the last available units
-        // are handled safely. Due to ConcurrencyException + RetryOnce + Discard policy,
-        // one of the two may be silently dropped.
+        // Verifies the aggregate-level invariant when two reservations contend
+        // for the last available units: the system must not over-reserve, and
+        // at least one reservation must succeed.
         //
-        // Gap #13 finding: if the retry succeeds (because there's still stock after
-        // the first reservation), both will succeed. If the retry fails (insufficient
-        // stock), the message is discarded — the order may not receive a ReservationFailed.
+        // SCOPE NOTE: this test exercises the real `StockReservationRequestedHandler`
+        // through `IMessageContext.InvokeAsync` (see TestFixture.ExecuteAndWaitAsync),
+        // which serializes execution and surfaces handler exceptions inline. It
+        // therefore does NOT engage Wolverine's `OnException<ConcurrencyException>`
+        // policy chain — that path is exclusive to the background local-queue
+        // executor (PublishAsync / message receipt over a transport).
         //
-        // This test documents the current behavior.
+        // The deterministic proof that exhausted retries land in
+        // `inventory.wolverine_dead_letters` (Gap #13 — resolved in M43.1)
+        // therefore lives in `Reliability/ConcurrencyExhaustionDlqTests`.
+        // This test only asserts what the Invoke path actually exercises:
+        // the aggregate's no-over-reservation invariant under contention.
 
         var sku = "CONCURRENT-001";
         var warehouseId = "NJ-FC";
@@ -160,13 +167,12 @@ public sealed class ReservationExpiryTests : IAsyncLifetime
         var reservationId1 = Guid.NewGuid();
         var reservationId2 = Guid.NewGuid();
 
-        // Fire two reservations for exactly available stock
+        // Fire two reservations for exactly the available stock concurrently.
         var task1 = _fixture.ExecuteAndWaitAsync(
             new StockReservationRequested(orderId1, sku, warehouseId, reservationId1, 10));
         var task2 = _fixture.ExecuteAndWaitAsync(
             new StockReservationRequested(orderId2, sku, warehouseId, reservationId2, 10));
 
-        // Allow both to complete — one may fail silently due to Discard policy
         await Task.WhenAll(task1, task2);
 
         await using var session = _fixture.GetDocumentSession();
@@ -174,20 +180,8 @@ public sealed class ReservationExpiryTests : IAsyncLifetime
 
         inv.ShouldNotBeNull();
 
-        // At least one reservation must have succeeded
-        var totalReserved = inv.ReservedQuantity;
-        totalReserved.ShouldBeGreaterThan(0);
-
-        // With only 10 units, the maximum successful reservation is 10
-        totalReserved.ShouldBeLessThanOrEqualTo(10);
-
-        // Document Gap #13 finding:
-        // If totalReserved == 10 and only 1 reservation exists, the second was
-        // either rejected by the Before() validation (insufficient stock) or
-        // silently discarded after ConcurrencyException retry exhaustion.
-        //
-        // Current policy: ConcurrencyException → RetryOnce → RetryWithCooldown → Discard
-        // The Discard policy means the second order never receives ReservationFailed.
-        // TODO: Consider changing to .MoveToDeadLetterQueue() for visibility.
+        // Aggregate invariant: at least one succeeded; never over-reserved.
+        inv.ReservedQuantity.ShouldBeGreaterThan(0);
+        inv.ReservedQuantity.ShouldBeLessThanOrEqualTo(10);
     }
 }

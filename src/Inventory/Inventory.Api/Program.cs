@@ -96,6 +96,13 @@ builder.Host.UseWolverine(opts =>
     opts.Policies.UseDurableLocalQueues();
     opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
 
+    // Gap #13 (resolved in M43.1) — exhausted ConcurrencyException retries must
+    // NEVER be silently dropped. Original S2 policy ended in `.Discard()`, which
+    // hid contention failures during flash-sale traffic. Terminating in
+    // `MoveToErrorQueue()` writes the envelope to `inventory.wolverine_dead_letters`
+    // where `DeadLetterQueueLogSink` (M42.4) surfaces it to Operations.
+    // See `docs/planning/milestones/m43-1-plan.md` and
+    // `docs/planning/milestones/inventory-remaster-s2-retrospective.md` "Gap #13".
     opts.OnException<ConcurrencyException>()
         .RetryOnce()
         .Then.RetryWithCooldown(100.Milliseconds(), 250.Milliseconds())
