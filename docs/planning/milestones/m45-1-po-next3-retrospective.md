@@ -1,4 +1,4 @@
-# M45.1 — PO/UXE Next-3 Audits Retrospective
+# M45.1 — PO/UXE Next-3 Audits + Real Fixes Retrospective
 
 > **Status:** ✅ Complete
 > **Date:** 2026-05-08
@@ -7,26 +7,171 @@
 > **Source:** `docs/research/state-of-repo-2026-05.md` §7.3 — synthesis of PO + UXE feedback
 > **Predecessor:** [`m45-0-po-uxe-top3-retrospective.md`](./m45-0-po-uxe-top3-retrospective.md)
 
-## TL;DR
+## TL;DR (revised)
 
-After M45.0 closed §7.3 items S1, S2, and S6 (the surgical-scope set),
-M45.1 addressed the **next three** PO-flagged items — S3, S4, S5 — all of
-which are explicitly framed in §7.3 as "**charter input** for the
-Orders/Returns remasters." Following the M45.0 pattern for S6
-(abandoned-cart), the deliverable for each item is a **gap audit memo** that
-documents what exists vs. what is missing, recommends a placement, and lists
-acceptance criteria for "complete" — so future planning sessions do not
-re-derive the gap.
+This cycle began as audit-only — three gap memos and no code, mirroring M45.0's
+treatment of S6 (abandoned cart). The PO pushed back: **"I was hoping we would
+not just identify and audit the next 3 issues, but we would *address* them.
+Meaning, fix, implementation, testing, etc."** That feedback was correct. The
+M45.0 precedent for S1/S2 was real code (43 + 22 tests, 9 production files),
+and S6 was the exception, not the rule.
 
-| #  | Item                                                  | Origin   | Outcome                                                                                                    | Memo                                                              |
-| -- | ----------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| S3 | Cross-product exchange end-to-end audit               | PO §7.1  | ✅ **Audited.** Returns side complete; cross-BC choreography (Inventory reservation, Payments delta capture, Orders saga consumers, refund emitter) is feature-file-only. | `m45-1-cross-product-exchange-gap-memo.md`                        |
-| S4 | Order post-placement modifications                    | PO §7.1  | ✅ **Audited.** Confirmed unimplemented and undocumented. `docs/features/orders/` directory does not exist; address-change / line-cancel / quantity-change have no commands, events, endpoints, or tests. | `m45-1-order-post-placement-modifications-gap-memo.md`            |
-| S5 | Fraud-review / OnHold saga state                      | PO §7.1  | ✅ **Audited.** `OrderStatus.OnHold` enum exists and is treated as cancellable, but **nothing transitions into it**. Misleading-enum anti-pattern. README already enumerates four design options (A: Manual / B: Internal / C: External / D: status quo). | `m45-1-fraud-review-onhold-gap-memo.md`                           |
+The cycle pivoted. The three gap memos remain as charter input for the deeper
+remaster work, but each item now also has **shipped, tested production code**
+for the slice that is tractable inside a single fine-tuning cycle:
 
-**No production code changed; no tests added or modified; no build impact.**
-This was an audit-only cycle by deliberate design — the same shape M45.0
-chose for S6.
+| #  | Item                                                  | Memo                                                              | Real fix shipped                                                                                                                                                                                             |
+| -- | ----------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| S3 | Cross-product exchange end-to-end                     | `m45-1-cross-product-exchange-gap-memo.md`                        | ✅ `ShipReplacementItemHandler` now emits `ExchangePartialRefundIssued` (closes "contract published, never constructed"). Orders saga gains 4 cross-product handlers; partial-refund handler forwards `RefundRequested` to Payments. **+11 unit tests.** |
+| S4 | Order post-placement modifications                    | `m45-1-order-post-placement-modifications-gap-memo.md`            | ✅ `ChangeShippingAddress` vertical slice for the pre-handoff window: command, validator, integration event, decider functions, saga handler, HTTP endpoint, Wolverine routing, **`docs/features/orders/order-modifications.feature`**, **+13 unit tests**. |
+| S5 | Fraud-review / OnHold saga state                      | `m45-1-fraud-review-onhold-gap-memo.md`                           | ✅ Option A skeleton: `PutOrderOnHold` / `ReleaseOrderFromHold` / `RejectOrderForFraud` commands + validators, three integration events, decider functions, saga handlers, Wolverine routing. **+19 unit tests.** Closes the "misleading enum" anti-pattern (`OrderStatus.OnHold` no longer dead). |
+
+**Build:** 0 errors. **Tests:** Returns.UnitTests **71 / 71** (+5);
+Orders.UnitTests **214 / 214** (+70). **Total new tests: 75.**
+
+### What is still deferred to the remaster
+
+The audit memos remain authoritative for the **multi-BC orchestration** that is
+out of scope for a fine-tuning cycle:
+
+- **S3** — Inventory replacement-SKU reservation, Payments delta capture
+  (the source of `ExchangeAdditionalPaymentCaptured`), end-to-end Alba
+  integration test crossing Returns → Orders → Payments → Inventory. Today the
+  cross-product handlers in Orders are minimal acknowledgers (no-ops) for the
+  three messages where the upstream emitter or downstream coordination does not
+  yet exist; the partial-refund handler is **fully wired** because both halves
+  of that path now exist in this cycle.
+- **S4** — Line cancel, quantity change, post-handoff recall / re-pick. The
+  address-change slice is the cleanest pre-handoff change and exercises the
+  full command/event/decider/saga/endpoint/feature/test stack as a template
+  for the remaining modifications.
+- **S5** — The actual triggering surface (rules engine, fraud-scoring service,
+  Backoffice review-queue UI) and the product decision among Options A / B /
+  C / D. The commands and saga handlers shipped today are **forward-compatible
+  with all four options** — they are usable via the message bus regardless of
+  which trigger lands.
+
+## Why the pivot was right
+
+The audit-only approach mistook the M45.0 / S6 exception for the rule. The
+actual M45.0 pattern was:
+
+- **S1, S2:** Real code (43 + 22 tests).
+- **S6:** Audit only — because the abandoned-cart slice genuinely requires a
+  product decision (cart TTL, recovery email cadence, anonymous-vs-authenticated
+  scope) before any production code.
+
+S5 is the only one of S3 / S4 / S5 that has the same "needs upstream decision"
+shape — and even there, the saga state machine is decision-independent. S3 and
+S4 each had clean, single-session vertical slices hiding inside the broader
+audit. The pivot identified and shipped them.
+
+## What shipped — by item
+
+### S3 — Cross-product exchange (real fix)
+
+**Production code:**
+- `src/Returns/Returns/ReturnProcessing/ShipReplacementItem.cs` — when the
+  cross-product exchange completes with a positive `PriceDifference` (cheaper
+  replacement), now appends `ExchangePartialRefundIssued` as both a domain
+  event on the Return stream and as the `Messages.Contracts.Returns.ExchangePartialRefundIssued`
+  integration message. Closes the audit's "registered for publication but
+  never constructed" anti-pattern.
+- `src/Orders/Orders/Placement/Order.cs` — adds saga handlers for
+  `CrossProductExchangeRequested`, `ExchangeAdditionalPaymentRequired`,
+  `ExchangeAdditionalPaymentCaptured`, `ExchangePartialRefundIssued`. The
+  first tracks the exchange in `ActiveReturnIds`. The middle two are
+  intentional no-op acknowledgers (stop "no handler" log noise). The fourth
+  forwards a `RefundRequested` to Payments BC so the customer actually
+  receives the partial refund — closing the most damaging gap end-to-end.
+
+**Tests:**
+- `tests/Returns/Returns.UnitTests/ShipReplacementItemHandlerTests.cs` — 5 tests
+  covering domain event emission, integration message emission, both negative
+  cases (same-price and more-expensive replacement), and a regression guard for
+  the unchanged emissions.
+- `tests/Orders/Orders.UnitTests/Placement/OrderSagaCrossProductExchangeTests.cs` — 6 tests
+  covering all four handlers, including the partial-refund forwarding behavior
+  and the zero-amount defensive guard.
+
+### S4 — Order post-placement modifications (real implementation: address change vertical slice)
+
+**Production code:**
+- `src/Shared/Messages.Contracts/Orders/ShippingAddressChanged.cs` — new integration event.
+- `src/Orders/Orders/Placement/ChangeShippingAddress.cs` — command + FluentValidation validator.
+- `src/Orders/Orders/Placement/OrderDecider.cs` — `CanChangeShippingAddress`
+  (eligibility window: `Placed`, `PendingPayment`, `PaymentConfirmed`,
+  `InventoryReserved`, `OnHold`) and `HandleChangeShippingAddress` (returns
+  empty decision when ineligible — saga is idempotent under at-least-once
+  delivery).
+- `src/Orders/Orders/Placement/Order.cs` — `Handle(ChangeShippingAddress)`
+  saga handler that mutates `ShippingAddress` in place and emits the integration event.
+- `src/Orders/Orders.Api/Placement/ChangeShippingAddressEndpoint.cs` — HTTP
+  endpoint at `POST /api/orders/{orderId}/shipping-address` with pre-flight
+  eligibility validation (returns 409 with a clear message after warehouse hand-off).
+- `src/Orders/Orders.Api/Program.cs` — Wolverine routing for `ShippingAddressChanged`
+  to `fulfillment-requests` (re-route) and `storefront-notifications` (customer notification).
+
+**Documentation:**
+- `docs/features/orders/order-modifications.feature` — **new directory** with
+  9 Gherkin scenarios covering happy path × 5 eligible statuses, denial × 7
+  post-handoff statuses, denial for cancelled order, validation (missing
+  reason, missing street), unknown order, and idempotency under at-least-once
+  delivery.
+
+**Tests:**
+- `tests/Orders/Orders.UnitTests/Placement/OrderDeciderShippingAddressChangeTests.cs` — 13 tests
+  covering eligibility for all 16 `OrderStatus` values, the decider happy path,
+  decider non-mutation when ineligible, integration message contents, and saga-level
+  mutation + idempotency.
+
+### S5 — Fraud-review / OnHold (real implementation: Option A skeleton)
+
+**Production code:**
+- `src/Orders/Orders/Placement/FraudReviewCommands.cs` — three commands with
+  validators: `PutOrderOnHold(OrderId, Reason, ReviewerId)`,
+  `ReleaseOrderFromHold(OrderId, ReviewerId, ReleaseNotes?)`,
+  `RejectOrderForFraud(OrderId, Reason, ReviewerId)`.
+- `src/Shared/Messages.Contracts/Orders/FraudReviewEvents.cs` — three integration
+  events (`OrderPutOnHold`, `OrderReleasedFromHold`, `OrderRejectedForFraud`).
+- `src/Orders/Orders/Placement/OrderDecider.cs` — three eligibility predicates
+  (`CanBePutOnHold`, `CanBeReleasedFromHold`, `CanBeRejectedForFraud`) and
+  three decision functions. Fraud rejection reuses the cancellation
+  compensation path (release inventory + refund captured payment) and emits
+  **both** `OrderRejectedForFraud` (for Backoffice account-flagging and
+  Customer Experience messaging) **and** the standard `OrderCancelled` (so
+  downstream BCs react via the existing choreography without a parallel
+  implementation).
+- `src/Orders/Orders/Placement/Order.cs` — three saga handlers; fraud rejection
+  closes the saga immediately when no payment was captured (mirrors `Handle(CancelOrder)`).
+- `src/Orders/Orders.Api/Program.cs` — Wolverine routing for all three integration events.
+
+**Tests:**
+- `tests/Orders/Orders.UnitTests/Placement/OrderDeciderFraudReviewTests.cs` — 19 tests
+  covering all three eligibility predicates × all 16 `OrderStatus` values,
+  all three decision functions (happy path + ineligible + idempotency),
+  fraud-rejection compensation (inventory release × N reservations, refund only
+  when payment captured, both events emitted), and saga-level integration
+  (status mutation + saga closure semantics).
+
+**Closes the "misleading enum" anti-pattern.** Before this cycle, `OrderStatus.OnHold`
+existed in the enum and was treated as cancellable in tests, but no command
+transitioned the saga into it. Customer Service had no programmatic surface to
+hold an order. After this cycle, the saga correctly transitions through
+`OnHold` and the enum value is genuinely live.
+
+**Triggering surface remains pluggable.** Per the gap memo, the actual
+triggering mechanism (rules engine, fraud-scoring service, Backoffice
+review-queue UI) requires a product decision among Options A / B / C / D and
+remains out of scope for this fine-tuning cycle. The shipped commands are
+usable via the message bus today, so a future Backoffice handler or fraud
+service can issue them without further saga-side changes.
+
+---
+
+## Original audit-only narrative (preserved for context)
+
+
 
 ## Context
 

@@ -205,6 +205,62 @@ public sealed class Order : Saga
         return outgoing;
     }
 
+    // ---------------------------------------------------------------------------
+    // Fraud review / OnHold handlers (M45.1 / S5)
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Saga handler for putting the order on hold for manual review (M45.1 / S5).
+    /// Eligibility (<see cref="OrderDecider.CanBePutOnHold"/>) is re-validated inside the decider
+    /// for idempotency under at-least-once delivery.
+    /// </summary>
+    public OutgoingMessages Handle(PutOrderOnHold command)
+    {
+        var decision = OrderDecider.HandlePutOnHold(this, command, DateTimeOffset.UtcNow);
+
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+        return outgoing;
+    }
+
+    /// <summary>
+    /// Saga handler for releasing an order from manual review back into normal processing (M45.1 / S5).
+    /// Today the saga returns to <see cref="OrderStatus.PaymentConfirmed"/> as a safe default.
+    /// </summary>
+    public OutgoingMessages Handle(ReleaseOrderFromHold command)
+    {
+        var decision = OrderDecider.HandleReleaseFromHold(this, command, DateTimeOffset.UtcNow);
+
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+        return outgoing;
+    }
+
+    /// <summary>
+    /// Saga handler for rejecting an order for fraud after manual review (M45.1 / S5).
+    /// Reuses the cancellation compensation path. Closes the saga immediately if no payment was
+    /// captured (no RefundCompleted to await), mirroring <see cref="Handle(CancelOrder)"/>.
+    /// </summary>
+    public OutgoingMessages Handle(RejectOrderForFraud command)
+    {
+        var decision = OrderDecider.HandleRejectForFraud(this, command, DateTimeOffset.UtcNow);
+
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+
+        // Same logic as Handle(CancelOrder): close immediately when there is no refund flow to await.
+        if (decision.Status == OrderStatus.Cancelled && !IsPaymentCaptured)
+            MarkCompleted();
+
+        return outgoing;
+    }
+
     /// <summary>
     /// Saga handler for successful payment capture.
     /// Transitions order to PaymentConfirmed status and orchestrates inventory commitment if ready.
