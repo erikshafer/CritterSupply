@@ -30,10 +30,15 @@ public sealed class MultiShipmentViewProjection : MultiStreamProjection<MultiShi
 {
     public MultiShipmentViewProjection()
     {
+        // All four events now carry OrderId directly — projection no longer
+        // needs to fall back to Guid.Empty (which previously bucketed every
+        // tracking/delivery/reshipment update across all orders into a single
+        // "Empty" view document — see fulfillment-remaster-s3-retrospective.md
+        // gaps #2 and #3, and the M45.0 retrospective).
         Identity<FulfillmentRequested>(e => e.OrderId);
-        Identity<TrackingNumberAssigned>(_ => Guid.Empty); // Simplified — does not carry OrderId directly
-        Identity<ShipmentDelivered>(_ => Guid.Empty); // Simplified — does not carry OrderId directly
-        Identity<ReshipmentCreated>(_ => Guid.Empty); // Simplified — does not carry OrderId directly
+        Identity<TrackingNumberAssigned>(e => e.OrderId);
+        Identity<ShipmentDelivered>(e => e.OrderId);
+        Identity<ReshipmentCreated>(e => e.OrderId);
     }
 
     public MultiShipmentView Create(FulfillmentRequested @event) =>
@@ -52,6 +57,10 @@ public sealed class MultiShipmentViewProjection : MultiStreamProjection<MultiShi
 
     public void Apply(TrackingNumberAssigned @event, MultiShipmentView view)
     {
+        // Update the canonical (non-reshipment) entry first when its tracking
+        // number is still unassigned; otherwise the most recent reshipment
+        // entry that's still missing tracking. Either way, scope is bounded
+        // to this view's OrderId since the projection is now properly keyed.
         var entry = view.Shipments.FirstOrDefault(s => s.TrackingNumber == null);
         if (entry != null)
         {
@@ -62,7 +71,7 @@ public sealed class MultiShipmentViewProjection : MultiStreamProjection<MultiShi
 
     public void Apply(ShipmentDelivered _, MultiShipmentView view)
     {
-        // Update the latest non-delivered entry
+        // Update the latest non-delivered entry within this order's view.
         var entry = view.Shipments.FirstOrDefault(s => s.Status != "Delivered");
         if (entry != null)
         {

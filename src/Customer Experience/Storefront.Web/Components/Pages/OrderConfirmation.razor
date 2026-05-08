@@ -231,14 +231,36 @@ else
                 case "shipment-status-changed":
                     // Handles ShipmentStatusChanged events routed via Wolverine SignalR transport.
                     // Properties arrive in camelCase — see order-status-changed comment above.
-                    _currentStatus = "Shipped";
-                    if (eventData.TryGetProperty("trackingNumber", out var trackingSignalR))
+                    // 20+ shipment notification handlers (Backordered, HandedToCarrier, Delivered,
+                    // LostInTransit, ReturnToSender, DeliveryAttemptFailed, etc.) all flow through
+                    // this single discriminator; the NewStatus payload tells us which one.
+                    if (eventData.TryGetProperty("newStatus", out var shipNewStatus))
                     {
-                        _latestUpdate = $"Order shipped! Tracking: {trackingSignalR.GetString()}";
+                        var statusValue = shipNewStatus.GetString() ?? "Shipped";
+                        _currentStatus = MapShipmentStatus(statusValue);
+                        eventData.TryGetProperty("trackingNumber", out var trackingSignalR);
+                        var trackingNumber = trackingSignalR.ValueKind == JsonValueKind.String ? trackingSignalR.GetString() : null;
+                        _latestUpdate = BuildShipmentMessage(statusValue, trackingNumber);
                     }
                     else
                     {
+                        _currentStatus = "Shipped";
                         _latestUpdate = "Order has been shipped";
+                    }
+                    StateHasChanged();
+                    break;
+
+                case "return-status-changed":
+                    // Handles ReturnStatusChanged events. Returns notification handlers
+                    // (ReturnRequested/Approved/Denied/Received/Completed/Rejected/Expired/ToSender)
+                    // all flow through this discriminator; NewStatus distinguishes them.
+                    if (eventData.TryGetProperty("newStatus", out var returnStatus))
+                    {
+                        var statusValue = returnStatus.GetString() ?? "Returned";
+                        _currentStatus = $"Return: {statusValue}";
+                        eventData.TryGetProperty("details", out var detailsElement);
+                        var details = detailsElement.ValueKind == JsonValueKind.String ? detailsElement.GetString() : null;
+                        _latestUpdate = BuildReturnMessage(statusValue, details);
                     }
                     StateHasChanged();
                     break;
@@ -275,9 +297,15 @@ else
     {
         "Placed" => Color.Info,
         "Payment Confirmed" => Color.Success,
+        "Preparing for Shipment" => Color.Info,
         "Shipped" => Color.Primary,
+        "Out for Delivery" => Color.Primary,
         "Delivered" => Color.Success,
         "Delivery Failed" => Color.Error,
+        "Backordered" => Color.Warning,
+        "Lost in Transit" => Color.Error,
+        "Returning to Sender" => Color.Warning,
+        var s when s.StartsWith("Return:") => Color.Warning,
         _ => Color.Default
     };
 
@@ -286,10 +314,80 @@ else
         "Placed" => "Order Received",
         "PaymentAuthorized" or "Payment Confirmed" => "Payment Confirmed",
         "InventoryReserved" => "Preparing Your Order",
+        "Preparing for Shipment" => "Preparing for Shipment",
         "Shipped" => "Shipped",
+        "Out for Delivery" => "Out for Delivery",
         "Delivered" => "Delivered",
         "Delivery Failed" => "Delivery Issue",
+        "Backordered" => "Backordered",
+        "Lost in Transit" => "Lost in Transit",
+        "Returning to Sender" => "Returning to Sender",
+        var s when s.StartsWith("Return:") => s,
         _ => "Processing"  // Safe consumer fallback for any unexpected domain status
+    };
+
+    /// <summary>
+    /// Maps the raw <c>NewStatus</c> from <c>ShipmentStatusChanged</c> SignalR events
+    /// to a customer-friendly status label. Covers the full set of shipment notification
+    /// handlers wired in <c>Storefront/Notifications/</c>.
+    /// </summary>
+    internal static string MapShipmentStatus(string newStatus) => newStatus switch
+    {
+        "Backordered" => "Backordered",
+        "HandedToCarrier" or "InTransit" => "Shipped",
+        "OutForDelivery" => "Out for Delivery",
+        "Delivered" => "Delivered",
+        "DeliveryAttemptFailed" => "Delivery Failed",
+        "LostInTransit" => "Lost in Transit",
+        "ReturnToSenderInitiated" => "Returning to Sender",
+        "TrackingNumberAssigned" => "Preparing for Shipment",
+        _ => newStatus  // pass-through preserves any new statuses without UI changes
+    };
+
+    /// <summary>
+    /// Builds the customer-facing message line for a shipment status change.
+    /// </summary>
+    internal static string BuildShipmentMessage(string newStatus, string? trackingNumber) => newStatus switch
+    {
+        "Backordered" => "This item is currently backordered — we'll notify you with an updated shipping estimate as soon as stock is available.",
+        "HandedToCarrier" or "InTransit" =>
+            string.IsNullOrEmpty(trackingNumber)
+                ? "Your order is on its way to the carrier."
+                : $"Your order is in transit. Tracking: {trackingNumber}",
+        "TrackingNumberAssigned" =>
+            string.IsNullOrEmpty(trackingNumber)
+                ? "A tracking number has been assigned to your order."
+                : $"Tracking number assigned: {trackingNumber}",
+        "OutForDelivery" => "Your order is out for delivery today.",
+        "Delivered" => "Order delivered successfully.",
+        "DeliveryAttemptFailed" => "A delivery attempt was unsuccessful — the carrier will retry.",
+        "LostInTransit" => "We've detected an issue with this shipment and have opened a carrier trace. Our team will follow up shortly.",
+        "ReturnToSenderInitiated" => "The carrier is returning this shipment to our warehouse. We'll arrange a reshipment and contact you with details.",
+        _ => string.IsNullOrEmpty(trackingNumber)
+            ? $"Shipment update: {newStatus}"
+            : $"Shipment update: {newStatus} (Tracking: {trackingNumber})"
+    };
+
+    /// <summary>
+    /// Builds the customer-facing message line for a return status change.
+    /// Mirrors the 8 Returns notification handlers in <c>Storefront/Notifications/</c>.
+    /// </summary>
+    internal static string BuildReturnMessage(string newStatus, string? details) => newStatus switch
+    {
+        "Requested" => "We've received your return request and are reviewing it.",
+        "Approved" => "Your return has been approved — please ship the item back using the instructions provided.",
+        "Denied" => string.IsNullOrEmpty(details)
+            ? "Your return request was denied. Please contact support for more information."
+            : $"Your return request was denied: {details}",
+        "Received" => "We've received your returned item and are inspecting it.",
+        "Completed" => "Your return has been completed and your refund processed.",
+        "Rejected" => string.IsNullOrEmpty(details)
+            ? "Your returned item failed inspection. Please contact support."
+            : $"Your returned item failed inspection: {details}",
+        "Expired" => "Your return window has expired. Please contact support if you need assistance.",
+        _ => string.IsNullOrEmpty(details)
+            ? $"Return update: {newStatus}"
+            : $"Return update: {newStatus} — {details}"
     };
 
     public async ValueTask DisposeAsync()
