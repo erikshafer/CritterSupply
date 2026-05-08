@@ -4,6 +4,7 @@ using Bunit.TestDoubles;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Storefront.Web.Components.Pages;
+using Storefront.Web.RealTime;
 
 namespace Storefront.Web.Tests.Components.Pages;
 
@@ -58,7 +59,7 @@ public sealed class OrderConfirmationTests : BunitTestBase
     public void MapShipmentStatus_KnownStatuses_MapToCustomerFriendlyLabel(
         string newStatus, string expected)
     {
-        OrderConfirmation.MapShipmentStatus(newStatus).ShouldBe(expected);
+        StorefrontStatusMapper.MapShipmentStatus(newStatus).ShouldBe(expected);
     }
 
     [Theory]
@@ -69,7 +70,7 @@ public sealed class OrderConfirmationTests : BunitTestBase
     {
         // Pass-through preserves any new statuses the notification handlers
         // start emitting before the UI is updated to label them.
-        OrderConfirmation.MapShipmentStatus(newStatus).ShouldBe(newStatus);
+        StorefrontStatusMapper.MapShipmentStatus(newStatus).ShouldBe(newStatus);
     }
 
     // =========================================================================
@@ -79,7 +80,7 @@ public sealed class OrderConfirmationTests : BunitTestBase
     [Fact]
     public void BuildShipmentMessage_HandedToCarrier_WithTracking_IncludesTrackingNumber()
     {
-        var msg = OrderConfirmation.BuildShipmentMessage("HandedToCarrier", "1Z999AA10123456784");
+        var msg = StorefrontStatusMapper.BuildShipmentMessage("HandedToCarrier", "1Z999AA10123456784");
         msg.ShouldContain("1Z999AA10123456784");
         msg.ShouldContain("transit");
     }
@@ -87,7 +88,7 @@ public sealed class OrderConfirmationTests : BunitTestBase
     [Fact]
     public void BuildShipmentMessage_HandedToCarrier_WithoutTracking_GracefullyOmitsIt()
     {
-        var msg = OrderConfirmation.BuildShipmentMessage("HandedToCarrier", null);
+        var msg = StorefrontStatusMapper.BuildShipmentMessage("HandedToCarrier", null);
         msg.ShouldNotBeNullOrWhiteSpace();
         msg.ShouldNotContain("Tracking:");
     }
@@ -95,21 +96,21 @@ public sealed class OrderConfirmationTests : BunitTestBase
     [Fact]
     public void BuildShipmentMessage_InTransit_WithEmptyStringTracking_TreatedAsMissing()
     {
-        var msg = OrderConfirmation.BuildShipmentMessage("InTransit", "");
+        var msg = StorefrontStatusMapper.BuildShipmentMessage("InTransit", "");
         msg.ShouldNotContain("Tracking:");
     }
 
     [Fact]
     public void BuildShipmentMessage_TrackingNumberAssigned_WithTracking_IncludesIt()
     {
-        var msg = OrderConfirmation.BuildShipmentMessage("TrackingNumberAssigned", "1ZABC");
+        var msg = StorefrontStatusMapper.BuildShipmentMessage("TrackingNumberAssigned", "1ZABC");
         msg.ShouldContain("1ZABC");
     }
 
     [Fact]
     public void BuildShipmentMessage_TrackingNumberAssigned_WithoutTracking_FriendlyFallback()
     {
-        var msg = OrderConfirmation.BuildShipmentMessage("TrackingNumberAssigned", null);
+        var msg = StorefrontStatusMapper.BuildShipmentMessage("TrackingNumberAssigned", null);
         msg.ShouldNotBeNullOrWhiteSpace();
         msg.ShouldContain("tracking number", Case.Insensitive);
     }
@@ -119,8 +120,8 @@ public sealed class OrderConfirmationTests : BunitTestBase
     {
         // Backordered is pre-shipping — there is no tracking number and the
         // copy must remain customer-friendly even if a stray value is sent.
-        var withTracking = OrderConfirmation.BuildShipmentMessage("Backordered", "IGNORED");
-        var withoutTracking = OrderConfirmation.BuildShipmentMessage("Backordered", null);
+        var withTracking = StorefrontStatusMapper.BuildShipmentMessage("Backordered", "IGNORED");
+        var withoutTracking = StorefrontStatusMapper.BuildShipmentMessage("Backordered", null);
 
         withTracking.ShouldBe(withoutTracking);
         withTracking.ShouldContain("backordered", Case.Insensitive);
@@ -135,21 +136,21 @@ public sealed class OrderConfirmationTests : BunitTestBase
     [InlineData("ReturnToSenderInitiated", "returning")]
     public void BuildShipmentMessage_KnownStatus_HasMeaningfulCopy(string newStatus, string fragment)
     {
-        var msg = OrderConfirmation.BuildShipmentMessage(newStatus, null);
+        var msg = StorefrontStatusMapper.BuildShipmentMessage(newStatus, null);
         msg.ShouldContain(fragment, Case.Insensitive);
     }
 
     [Fact]
     public void BuildShipmentMessage_UnknownStatus_WithoutTracking_FallsBackToStatusName()
     {
-        var msg = OrderConfirmation.BuildShipmentMessage("MysteryEvent", null);
+        var msg = StorefrontStatusMapper.BuildShipmentMessage("MysteryEvent", null);
         msg.ShouldContain("MysteryEvent");
     }
 
     [Fact]
     public void BuildShipmentMessage_UnknownStatus_WithTracking_IncludesBoth()
     {
-        var msg = OrderConfirmation.BuildShipmentMessage("MysteryEvent", "1ZXYZ");
+        var msg = StorefrontStatusMapper.BuildShipmentMessage("MysteryEvent", "1ZXYZ");
         msg.ShouldContain("MysteryEvent");
         msg.ShouldContain("1ZXYZ");
     }
@@ -167,14 +168,14 @@ public sealed class OrderConfirmationTests : BunitTestBase
     public void BuildReturnMessage_KnownStatus_NoDetails_HasMeaningfulCopy(
         string newStatus, string fragment)
     {
-        var msg = OrderConfirmation.BuildReturnMessage(newStatus, null);
+        var msg = StorefrontStatusMapper.BuildReturnMessage(newStatus, null);
         msg.ShouldContain(fragment, Case.Insensitive);
     }
 
     [Fact]
     public void BuildReturnMessage_Denied_WithDetails_IncludesDetails()
     {
-        var msg = OrderConfirmation.BuildReturnMessage("Denied", "Outside 30-day window");
+        var msg = StorefrontStatusMapper.BuildReturnMessage("Denied", "Outside 30-day window");
         msg.ShouldContain("denied", Case.Insensitive);
         msg.ShouldContain("Outside 30-day window");
     }
@@ -182,7 +183,7 @@ public sealed class OrderConfirmationTests : BunitTestBase
     [Fact]
     public void BuildReturnMessage_Denied_WithoutDetails_GracefullyOmitsThem()
     {
-        var msg = OrderConfirmation.BuildReturnMessage("Denied", null);
+        var msg = StorefrontStatusMapper.BuildReturnMessage("Denied", null);
         msg.ShouldContain("denied", Case.Insensitive);
         msg.ShouldContain("contact support", Case.Insensitive);
     }
@@ -190,14 +191,14 @@ public sealed class OrderConfirmationTests : BunitTestBase
     [Fact]
     public void BuildReturnMessage_Rejected_WithDetails_IncludesDetails()
     {
-        var msg = OrderConfirmation.BuildReturnMessage("Rejected", "Item damaged on arrival");
+        var msg = StorefrontStatusMapper.BuildReturnMessage("Rejected", "Item damaged on arrival");
         msg.ShouldContain("Item damaged on arrival");
     }
 
     [Fact]
     public void BuildReturnMessage_Rejected_WithoutDetails_GracefullyOmitsThem()
     {
-        var msg = OrderConfirmation.BuildReturnMessage("Rejected", null);
+        var msg = StorefrontStatusMapper.BuildReturnMessage("Rejected", null);
         msg.ShouldNotBeNullOrWhiteSpace();
         msg.ShouldContain("inspection", Case.Insensitive);
     }
@@ -205,14 +206,14 @@ public sealed class OrderConfirmationTests : BunitTestBase
     [Fact]
     public void BuildReturnMessage_UnknownStatus_WithoutDetails_FallsBackToStatusName()
     {
-        var msg = OrderConfirmation.BuildReturnMessage("MysteryReturn", null);
+        var msg = StorefrontStatusMapper.BuildReturnMessage("MysteryReturn", null);
         msg.ShouldContain("MysteryReturn");
     }
 
     [Fact]
     public void BuildReturnMessage_UnknownStatus_WithDetails_IncludesBoth()
     {
-        var msg = OrderConfirmation.BuildReturnMessage("MysteryReturn", "extra context");
+        var msg = StorefrontStatusMapper.BuildReturnMessage("MysteryReturn", "extra context");
         msg.ShouldContain("MysteryReturn");
         msg.ShouldContain("extra context");
     }
