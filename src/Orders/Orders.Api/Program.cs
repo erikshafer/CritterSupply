@@ -131,6 +131,14 @@ builder.Host.UseWolverine(opts =>
     // Publish OrderPlaced to storefront-notifications queue
     opts.PublishMessage<Messages.Contracts.Orders.OrderPlaced>()
         .ToRabbitQueue("storefront-notifications");
+
+    // M45.1 / S4 — publish ShippingAddressChanged for downstream re-routing & customer notification.
+    // Fulfillment BC may consume this to re-route in-flight fulfillment requests; Customer Experience
+    // surfaces the confirmation. Routed to the existing fulfillment + storefront fan-out queues.
+    opts.PublishMessage<Messages.Contracts.Orders.ShippingAddressChanged>()
+        .ToRabbitQueue("fulfillment-requests");
+    opts.PublishMessage<Messages.Contracts.Orders.ShippingAddressChanged>()
+        .ToRabbitQueue("storefront-notifications");
 });
 
 builder.Services.AddEndpointsApiExplorer();

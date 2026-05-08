@@ -184,6 +184,28 @@ public sealed class Order : Saga
     }
 
     /// <summary>
+    /// Saga handler for shipping-address change (M45.1 / S4).
+    /// Eligibility window is enforced by the HTTP endpoint via <see cref="OrderDecider.CanChangeShippingAddress"/>;
+    /// the saga re-validates and silently ignores ineligible deliveries (idempotency under
+    /// at-least-once delivery — for example a late retry after the order has shipped).
+    /// Mutates <see cref="ShippingAddress"/> in place and emits <c>ShippingAddressChanged</c>
+    /// for downstream consumers (Fulfillment re-route, Customer Experience confirmation).
+    /// </summary>
+    public OutgoingMessages Handle(ChangeShippingAddress command)
+    {
+        var decision = OrderDecider.HandleChangeShippingAddress(this, command, DateTimeOffset.UtcNow);
+
+        if (decision.NewShippingAddress is not null)
+        {
+            ShippingAddress = decision.NewShippingAddress;
+        }
+
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+        return outgoing;
+    }
+
+    /// <summary>
     /// Saga handler for successful payment capture.
     /// Transitions order to PaymentConfirmed status and orchestrates inventory commitment if ready.
     /// **Validates: Requirement 1.2 - Order proceeds after payment confirmation**

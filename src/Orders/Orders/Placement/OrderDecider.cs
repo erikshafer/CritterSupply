@@ -102,6 +102,21 @@ public static class OrderDecider
             or OrderStatus.PaymentFailed);
 
     /// <summary>
+    /// Returns true if the order is in a state that allows the shipping address to be changed.
+    /// Allowed pre-handoff: <c>Placed</c>, <c>PendingPayment</c>, <c>PaymentConfirmed</c>,
+    /// <c>InventoryReserved</c>, <c>OnHold</c>. Once the order reaches <c>InventoryCommitted</c>
+    /// (Fulfillment is picking) or any later status, an address change requires a coordinated
+    /// recall / re-pick that is deferred to the Orders remaster — see
+    /// <c>docs/planning/milestones/m45-1-order-post-placement-modifications-gap-memo.md</c>.
+    /// </summary>
+    public static bool CanChangeShippingAddress(OrderStatus status) =>
+        status is OrderStatus.Placed
+            or OrderStatus.PendingPayment
+            or OrderStatus.PaymentConfirmed
+            or OrderStatus.InventoryReserved
+            or OrderStatus.OnHold;
+
+    /// <summary>
     /// Decides how to handle an order cancellation request.
     /// Pure function - returns new state and compensation messages.
     /// Guard conditions (cannot cancel after Shipped) are validated via CanBeCancelled().
@@ -597,6 +612,48 @@ public static class OrderDecider
     {
         return new OrderDecision { ShipmentCount = message.ShipmentCount };
     }
+
+    /// <summary>
+    /// Decides how to handle a shipping-address change request (M45.1 / S4).
+    /// Pure function — the saga validates the eligibility window via
+    /// <see cref="CanChangeShippingAddress"/> before reaching this method, but the decider
+    /// returns no messages when the status is ineligible so it remains safe under
+    /// at-least-once delivery.
+    /// </summary>
+    public static OrderDecision HandleChangeShippingAddress(
+        Order current,
+        ChangeShippingAddress command,
+        DateTimeOffset timestamp)
+    {
+        if (!CanChangeShippingAddress(current.Status))
+        {
+            return new OrderDecision();
+        }
+
+        var integrationAddress = new IntegrationMessages.ShippingAddress(
+            command.NewShippingAddress.Street,
+            command.NewShippingAddress.Street2,
+            command.NewShippingAddress.City,
+            command.NewShippingAddress.State,
+            command.NewShippingAddress.PostalCode,
+            command.NewShippingAddress.Country);
+
+        var messages = new List<object>
+        {
+            new IntegrationMessages.ShippingAddressChanged(
+                current.Id,
+                current.CustomerId,
+                integrationAddress,
+                command.Reason,
+                timestamp)
+        };
+
+        return new OrderDecision
+        {
+            NewShippingAddress = command.NewShippingAddress,
+            Messages = messages
+        };
+    }
 }
 
 /// <summary>
@@ -616,4 +673,10 @@ public sealed record OrderDecision
     public string? TrackingNumber { get; init; }
     public Guid? ActiveReshipmentShipmentId { get; init; }
     public int? ShipmentCount { get; init; }
+
+    /// <summary>
+    /// New shipping address to apply to the saga (M45.1 / S4).
+    /// Set by <see cref="OrderDecider.HandleChangeShippingAddress"/> when the change is allowed.
+    /// </summary>
+    public ShippingAddress? NewShippingAddress { get; init; }
 }
