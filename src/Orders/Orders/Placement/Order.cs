@@ -184,6 +184,84 @@ public sealed class Order : Saga
     }
 
     /// <summary>
+    /// Saga handler for shipping-address change (M45.1 / S4).
+    /// Eligibility window is enforced by the HTTP endpoint via <see cref="OrderDecider.CanChangeShippingAddress"/>;
+    /// the saga re-validates and silently ignores ineligible deliveries (idempotency under
+    /// at-least-once delivery — for example a late retry after the order has shipped).
+    /// Mutates <see cref="ShippingAddress"/> in place and emits <c>ShippingAddressChanged</c>
+    /// for downstream consumers (Fulfillment re-route, Customer Experience confirmation).
+    /// </summary>
+    public OutgoingMessages Handle(ChangeShippingAddress command)
+    {
+        var decision = OrderDecider.HandleChangeShippingAddress(this, command, DateTimeOffset.UtcNow);
+
+        if (decision.NewShippingAddress is not null)
+        {
+            ShippingAddress = decision.NewShippingAddress;
+        }
+
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+        return outgoing;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Fraud review / OnHold handlers (M45.1 / S5)
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Saga handler for putting the order on hold for manual review (M45.1 / S5).
+    /// Eligibility (<see cref="OrderDecider.CanBePutOnHold"/>) is re-validated inside the decider
+    /// for idempotency under at-least-once delivery.
+    /// </summary>
+    public OutgoingMessages Handle(PutOrderOnHold command)
+    {
+        var decision = OrderDecider.HandlePutOnHold(this, command, DateTimeOffset.UtcNow);
+
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+        return outgoing;
+    }
+
+    /// <summary>
+    /// Saga handler for releasing an order from manual review back into normal processing (M45.1 / S5).
+    /// Today the saga returns to <see cref="OrderStatus.PaymentConfirmed"/> as a safe default.
+    /// </summary>
+    public OutgoingMessages Handle(ReleaseOrderFromHold command)
+    {
+        var decision = OrderDecider.HandleReleaseFromHold(this, command, DateTimeOffset.UtcNow);
+
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+        return outgoing;
+    }
+
+    /// <summary>
+    /// Saga handler for rejecting an order for fraud after manual review (M45.1 / S5).
+    /// Reuses the cancellation compensation path. Closes the saga immediately if no payment was
+    /// captured (no RefundCompleted to await), mirroring <see cref="Handle(CancelOrder)"/>.
+    /// </summary>
+    public OutgoingMessages Handle(RejectOrderForFraud command)
+    {
+        var decision = OrderDecider.HandleRejectForFraud(this, command, DateTimeOffset.UtcNow);
+
+        if (decision.Status.HasValue) Status = decision.Status.Value;
+
+        var outgoing = new OutgoingMessages();
+        foreach (var msg in decision.Messages) outgoing.Add(msg);
+
+        // Same logic as Handle(CancelOrder): close immediately when there is no refund flow to await.
+        if (decision.Status == OrderStatus.Cancelled && !IsPaymentCaptured)
+            MarkCompleted();
+
+        return outgoing;
+    }
+
+    /// <summary>
     /// Saga handler for successful payment capture.
     /// Transitions order to PaymentConfirmed status and orchestrates inventory commitment if ready.
     /// **Validates: Requirement 1.2 - Order proceeds after payment confirmation**
@@ -592,5 +670,92 @@ public sealed class Order : Saga
             Status = OrderStatus.Closed;
             MarkCompleted();
         }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Cross-product exchange acknowledgement handlers (M45.1 / S3)
+    // ---------------------------------------------------------------------------
+    // The Returns BC publishes four cross-product exchange integration messages to the
+    // `orders-returns-events` queue (registered in Returns.Api/Program.cs). Without these
+    // handlers, Wolverine logs "no handler" on every delivery. Today these handlers are
+    // intentionally minimal acknowledgers — they keep the saga in its current state
+    // because the full cross-BC orchestration (Inventory replacement reservation, Payments
+    // delta capture, refund issuance) is deferred to the Returns + Orders remaster per
+    // docs/planning/milestones/m45-1-cross-product-exchange-gap-memo.md.
+    //
+    // What these handlers DO today:
+    //   - Add the exchange ReturnId to ActiveReturnIds so the saga doesn't close prematurely
+    //     while the cross-product flow is in progress (mirrors ReturnRequested behavior).
+    //   - For ExchangePartialRefundIssued: forward a RefundRequested to Payments BC so the
+    //     customer actually receives the refund. This was the most damaging gap because the
+    //     Returns BC now emits the integration event (per the ShipReplacementItem fix) but
+    //     no one was wired to act on it.
+    //
+    // What they explicitly DO NOT do (deferred to the remaster):
+    //   - Issue a CapturePayment to Payments for ExchangeAdditionalPaymentRequired. The
+    //     full slice needs a payment-method reference, idempotency key, and a saga-state
+    //     branch for "exchange in flight" — that is remaster scope.
+    //   - Reserve replacement inventory.
+    //   - Drive any compensation when ExchangeAdditionalPaymentCaptured arrives.
+
+    /// <summary>
+    /// Acknowledges a cross-product exchange initiation from Returns BC.
+    /// Adds the exchange to active returns so the saga stays open while the exchange is
+    /// in flight. Full orchestration (inventory + payment delta) is deferred — see
+    /// docs/planning/milestones/m45-1-cross-product-exchange-gap-memo.md.
+    /// </summary>
+    public void Handle(Messages.Contracts.Returns.CrossProductExchangeRequested message)
+    {
+        var activeReturns = ActiveReturnIds.ToList();
+        if (!activeReturns.Contains(message.ReturnId))
+        {
+            activeReturns.Add(message.ReturnId);
+            ActiveReturnIds = activeReturns.AsReadOnly();
+        }
+    }
+
+    /// <summary>
+    /// Acknowledges that the customer owes additional payment for a more-expensive replacement.
+    /// Today this is a no-op acknowledger (stops the Wolverine "no handler" log noise). The
+    /// Payments BC capture wiring is deferred to the Returns + Orders remaster — see
+    /// docs/planning/milestones/m45-1-cross-product-exchange-gap-memo.md.
+    /// </summary>
+    public void Handle(Messages.Contracts.Returns.ExchangeAdditionalPaymentRequired message)
+    {
+        // Intentional acknowledger. The actual capture will be wired in the remaster.
+    }
+
+    /// <summary>
+    /// Acknowledges that the customer's additional payment was captured by Payments BC.
+    /// Today this is a no-op acknowledger because the upstream emitter does not exist yet.
+    /// Filed for completeness so the saga is forward-compatible with the Payments wiring.
+    /// </summary>
+    public void Handle(Messages.Contracts.Returns.ExchangeAdditionalPaymentCaptured message)
+    {
+        // Intentional acknowledger. Full saga branch for "exchange in flight" is remaster scope.
+    }
+
+    /// <summary>
+    /// Handles partial refund owed to the customer for a cheaper replacement on a cross-product
+    /// exchange. Forwards a RefundRequested to Payments BC so the refund actually reaches the
+    /// customer. This closes the most damaging gap in the cross-product flow — the Returns BC
+    /// now emits ExchangePartialRefundIssued (per the M45.1 ShipReplacementItem fix) but
+    /// previously nothing acted on it.
+    /// </summary>
+    public OutgoingMessages Handle(Messages.Contracts.Returns.ExchangePartialRefundIssued message)
+    {
+        var outgoing = new OutgoingMessages();
+
+        // Defensive guard: only request refund if amount is positive.
+        if (message.RefundAmount > 0m)
+        {
+            outgoing.Add(new Messages.Contracts.Payments.RefundRequested(
+                Id,
+                message.RefundAmount,
+                $"Cross-product exchange partial refund (return {message.ReturnId})",
+                DateTimeOffset.UtcNow));
+        }
+
+        return outgoing;
     }
 }

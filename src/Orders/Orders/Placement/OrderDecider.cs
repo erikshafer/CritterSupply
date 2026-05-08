@@ -102,6 +102,53 @@ public static class OrderDecider
             or OrderStatus.PaymentFailed);
 
     /// <summary>
+    /// Returns true if the order is in a state that allows the shipping address to be changed.
+    /// Allowed pre-handoff: <c>Placed</c>, <c>PendingPayment</c>, <c>PaymentConfirmed</c>,
+    /// <c>InventoryReserved</c>, <c>OnHold</c>. Once the order reaches <c>InventoryCommitted</c>
+    /// (Fulfillment is picking) or any later status, an address change requires a coordinated
+    /// recall / re-pick that is deferred to the Orders remaster — see
+    /// <c>docs/planning/milestones/m45-1-order-post-placement-modifications-gap-memo.md</c>.
+    /// </summary>
+    public static bool CanChangeShippingAddress(OrderStatus status) =>
+        status is OrderStatus.Placed
+            or OrderStatus.PendingPayment
+            or OrderStatus.PaymentConfirmed
+            or OrderStatus.InventoryReserved
+            or OrderStatus.OnHold;
+
+    /// <summary>
+    /// Returns true if the order is in a state that allows being put on hold for manual review (M45.1 / S5).
+    /// Allowed pre-fulfillment: <c>Placed</c>, <c>PendingPayment</c>, <c>PaymentConfirmed</c>, <c>InventoryReserved</c>.
+    /// Disallowed once the order reaches <c>InventoryCommitted</c> (warehouse picking) or any later/terminal status —
+    /// holding mid-pick requires Fulfillment-side coordination that is deferred to the Orders remaster
+    /// (see <c>docs/planning/milestones/m45-1-fraud-review-onhold-gap-memo.md</c>).
+    /// Already-on-hold orders return false (idempotent — use <see cref="ReleaseOrderFromHold"/> first).
+    /// </summary>
+    public static bool CanBePutOnHold(OrderStatus status) =>
+        status is OrderStatus.Placed
+            or OrderStatus.PendingPayment
+            or OrderStatus.PaymentConfirmed
+            or OrderStatus.InventoryReserved;
+
+    /// <summary>
+    /// Returns true if the order is currently on hold and can be released back into normal processing.
+    /// </summary>
+    public static bool CanBeReleasedFromHold(OrderStatus status) =>
+        status is OrderStatus.OnHold;
+
+    /// <summary>
+    /// Returns true if the order is in a state where it can be rejected for fraud.
+    /// Eligible: any pre-fulfillment status plus <c>OnHold</c>. Disallowed once shipping has begun
+    /// or the order is already in a terminal state.
+    /// </summary>
+    public static bool CanBeRejectedForFraud(OrderStatus status) =>
+        status is OrderStatus.Placed
+            or OrderStatus.PendingPayment
+            or OrderStatus.PaymentConfirmed
+            or OrderStatus.InventoryReserved
+            or OrderStatus.OnHold;
+
+    /// <summary>
     /// Decides how to handle an order cancellation request.
     /// Pure function - returns new state and compensation messages.
     /// Guard conditions (cannot cancel after Shipped) are validated via CanBeCancelled().
@@ -597,6 +644,171 @@ public static class OrderDecider
     {
         return new OrderDecision { ShipmentCount = message.ShipmentCount };
     }
+
+    /// <summary>
+    /// Decides how to handle a shipping-address change request (M45.1 / S4).
+    /// Pure function — the saga validates the eligibility window via
+    /// <see cref="CanChangeShippingAddress"/> before reaching this method, but the decider
+    /// returns no messages when the status is ineligible so it remains safe under
+    /// at-least-once delivery.
+    /// </summary>
+    public static OrderDecision HandleChangeShippingAddress(
+        Order current,
+        ChangeShippingAddress command,
+        DateTimeOffset timestamp)
+    {
+        if (!CanChangeShippingAddress(current.Status))
+        {
+            return new OrderDecision();
+        }
+
+        var integrationAddress = new IntegrationMessages.ShippingAddress(
+            command.NewShippingAddress.Street,
+            command.NewShippingAddress.Street2,
+            command.NewShippingAddress.City,
+            command.NewShippingAddress.State,
+            command.NewShippingAddress.PostalCode,
+            command.NewShippingAddress.Country);
+
+        var messages = new List<object>
+        {
+            new IntegrationMessages.ShippingAddressChanged(
+                current.Id,
+                current.CustomerId,
+                integrationAddress,
+                command.Reason,
+                timestamp)
+        };
+
+        return new OrderDecision
+        {
+            NewShippingAddress = command.NewShippingAddress,
+            Messages = messages
+        };
+    }
+
+    /// <summary>
+    /// Decides how to handle a put-on-hold request for manual review (M45.1 / S5).
+    /// Pure function — silently returns an empty decision when the order is in an ineligible
+    /// status, so the saga remains safe under at-least-once delivery.
+    /// </summary>
+    public static OrderDecision HandlePutOnHold(
+        Order current,
+        PutOrderOnHold command,
+        DateTimeOffset timestamp)
+    {
+        if (!CanBePutOnHold(current.Status))
+        {
+            return new OrderDecision();
+        }
+
+        return new OrderDecision
+        {
+            Status = OrderStatus.OnHold,
+            Messages =
+            [
+                new IntegrationMessages.OrderPutOnHold(
+                    current.Id,
+                    current.CustomerId,
+                    command.Reason,
+                    command.ReviewerId,
+                    timestamp)
+            ]
+        };
+    }
+
+    /// <summary>
+    /// Decides how to handle releasing an order from hold back into normal processing (M45.1 / S5).
+    /// Today the saga returns to <see cref="OrderStatus.PaymentConfirmed"/> as a safe default —
+    /// the saga continues from there using its existing per-SKU reservation tracking. Restoring
+    /// the exact pre-hold status (e.g., InventoryReserved) requires snapshotting it on the saga,
+    /// which is deferred to the Orders remaster.
+    /// </summary>
+    public static OrderDecision HandleReleaseFromHold(
+        Order current,
+        ReleaseOrderFromHold command,
+        DateTimeOffset timestamp)
+    {
+        if (!CanBeReleasedFromHold(current.Status))
+        {
+            return new OrderDecision();
+        }
+
+        return new OrderDecision
+        {
+            Status = OrderStatus.PaymentConfirmed,
+            Messages =
+            [
+                new IntegrationMessages.OrderReleasedFromHold(
+                    current.Id,
+                    current.CustomerId,
+                    command.ReviewerId,
+                    command.ReleaseNotes,
+                    timestamp)
+            ]
+        };
+    }
+
+    /// <summary>
+    /// Decides how to handle rejecting an order for fraud after manual review (M45.1 / S5).
+    /// Reuses the cancellation compensation path (release inventory, refund captured payment)
+    /// and emits both <c>OrderRejectedForFraud</c> (for Customer Experience messaging and
+    /// Backoffice account-flagging) and <c>OrderCancelled</c> (so downstream BCs react via the
+    /// existing cancellation choreography without a parallel implementation).
+    /// </summary>
+    public static OrderDecision HandleRejectForFraud(
+        Order current,
+        RejectOrderForFraud command,
+        DateTimeOffset timestamp)
+    {
+        if (!CanBeRejectedForFraud(current.Status))
+        {
+            return new OrderDecision();
+        }
+
+        var messages = new List<object>();
+
+        // Compensation: release all reserved inventory.
+        foreach (var reservationId in current.ReservationIds.Keys)
+        {
+            messages.Add(new IntegrationMessages.ReservationReleaseRequested(
+                current.Id,
+                reservationId,
+                $"Order rejected for fraud: {command.Reason}",
+                timestamp));
+        }
+
+        // Compensation: refund captured payment.
+        if (current.IsPaymentCaptured)
+        {
+            messages.Add(new Messages.Contracts.Payments.RefundRequested(
+                current.Id,
+                current.TotalAmount,
+                $"Order rejected for fraud: {command.Reason}",
+                timestamp));
+        }
+
+        // Domain-specific event for Customer Experience messaging + Backoffice account flagging.
+        messages.Add(new IntegrationMessages.OrderRejectedForFraud(
+            current.Id,
+            current.CustomerId,
+            command.Reason,
+            command.ReviewerId,
+            timestamp));
+
+        // Standard cancellation event so downstream BCs react via the existing choreography.
+        messages.Add(new IntegrationMessages.OrderCancelled(
+            current.Id,
+            current.CustomerId,
+            $"Fraud rejection: {command.Reason}",
+            timestamp));
+
+        return new OrderDecision
+        {
+            Status = OrderStatus.Cancelled,
+            Messages = messages
+        };
+    }
 }
 
 /// <summary>
@@ -616,4 +828,10 @@ public sealed record OrderDecision
     public string? TrackingNumber { get; init; }
     public Guid? ActiveReshipmentShipmentId { get; init; }
     public int? ShipmentCount { get; init; }
+
+    /// <summary>
+    /// New shipping address to apply to the saga (M45.1 / S4).
+    /// Set by <see cref="OrderDecider.HandleChangeShippingAddress"/> when the change is allowed.
+    /// </summary>
+    public ShippingAddress? NewShippingAddress { get; init; }
 }

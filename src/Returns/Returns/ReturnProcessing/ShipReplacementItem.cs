@@ -65,6 +65,11 @@ public static class ShipReplacementItemHandler
         var events = new Events();
         var outgoing = new OutgoingMessages();
 
+        // Cross-product exchange where the replacement is cheaper than the original means
+        // the customer is owed a partial refund. PriceDifference is positive in that direction
+        // (set by ApproveExchangeHandler: priceDifference = originalTotal - replacementTotal).
+        var partialRefundAmount = aggregate.PriceDifference > 0 ? aggregate.PriceDifference : null;
+
         // Append replacement shipped event
         events.Add(new ExchangeReplacementShipped(
             ReturnId: command.ReturnId,
@@ -75,8 +80,19 @@ public static class ShipReplacementItemHandler
         // Append exchange completed event (customer receives replacement, workflow complete)
         events.Add(new ExchangeCompleted(
             ReturnId: command.ReturnId,
-            PriceDifferenceRefund: aggregate.PriceDifference > 0 ? aggregate.PriceDifference : null,
+            PriceDifferenceRefund: partialRefundAmount,
             CompletedAt: now));
+
+        // Append partial refund issued domain event when there is a refund owed.
+        // Mirrors the ExchangeAdditionalPaymentRequired domain event already emitted by
+        // ApproveExchangeHandler when the replacement costs more.
+        if (partialRefundAmount.HasValue)
+        {
+            events.Add(new ExchangePartialRefundIssued(
+                ReturnId: command.ReturnId,
+                RefundAmount: partialRefundAmount.Value,
+                IssuedAt: now));
+        }
 
         // Publish replacement shipped integration event
         outgoing.Add(new Messages.Contracts.Returns.ExchangeReplacementShipped(
@@ -92,8 +108,21 @@ public static class ShipReplacementItemHandler
             ReturnId: command.ReturnId,
             OrderId: aggregate.OrderId,
             CustomerId: aggregate.CustomerId,
-            PriceDifferenceRefund: aggregate.PriceDifference > 0 ? aggregate.PriceDifference : null,
+            PriceDifferenceRefund: partialRefundAmount,
             CompletedAt: now));
+
+        // Publish partial refund integration event so Payments BC can actually issue the refund and
+        // Storefront can surface it. Closes the M45.1 / S3 "contract registered for publication but
+        // never constructed" anti-pattern. Only emitted when there is an actual refund owed.
+        if (partialRefundAmount.HasValue)
+        {
+            outgoing.Add(new Messages.Contracts.Returns.ExchangePartialRefundIssued(
+                ReturnId: command.ReturnId,
+                OrderId: aggregate.OrderId,
+                CustomerId: aggregate.CustomerId,
+                RefundAmount: partialRefundAmount.Value,
+                IssuedAt: now));
+        }
 
         return (events, outgoing);
     }

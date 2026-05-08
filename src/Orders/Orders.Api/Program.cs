@@ -131,6 +131,25 @@ builder.Host.UseWolverine(opts =>
     // Publish OrderPlaced to storefront-notifications queue
     opts.PublishMessage<Messages.Contracts.Orders.OrderPlaced>()
         .ToRabbitQueue("storefront-notifications");
+
+    // M45.1 / S4 — publish ShippingAddressChanged for downstream re-routing & customer notification.
+    // Fulfillment BC may consume this to re-route in-flight fulfillment requests; Customer Experience
+    // surfaces the confirmation. Routed to the existing fulfillment + storefront fan-out queues.
+    opts.PublishMessage<Messages.Contracts.Orders.ShippingAddressChanged>()
+        .ToRabbitQueue("fulfillment-requests");
+    opts.PublishMessage<Messages.Contracts.Orders.ShippingAddressChanged>()
+        .ToRabbitQueue("storefront-notifications");
+
+    // M45.1 / S5 — publish fraud-review / OnHold integration events. Today these have only one
+    // intended consumer family (Backoffice review queue + Customer Experience messaging), both of
+    // which subscribe via storefront-notifications today. The Backoffice subscription is wired
+    // when the review-queue UI lands per docs/planning/milestones/m45-1-fraud-review-onhold-gap-memo.md.
+    opts.PublishMessage<Messages.Contracts.Orders.OrderPutOnHold>()
+        .ToRabbitQueue("storefront-notifications");
+    opts.PublishMessage<Messages.Contracts.Orders.OrderReleasedFromHold>()
+        .ToRabbitQueue("storefront-notifications");
+    opts.PublishMessage<Messages.Contracts.Orders.OrderRejectedForFraud>()
+        .ToRabbitQueue("storefront-notifications");
 });
 
 builder.Services.AddEndpointsApiExplorer();
