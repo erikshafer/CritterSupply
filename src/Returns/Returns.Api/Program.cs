@@ -100,6 +100,19 @@ builder.Host.UseWolverine(opts =>
     opts.ListenToRabbitQueue("returns-fulfillment-events")
         .ProcessInline();
 
+    // M47.0 / Slice 1 — Inbound: Listen for replacement-reservation
+    // outcomes from Inventory BC (cross-product exchange flow).
+    // See ADR 0061 and docs/planning/milestones/m47-0-plan.md.
+    opts.ListenToRabbitQueue("returns-inventory-events")
+        .UseDurableInbox();
+
+    // M47.0 / Slice 1 — Outbound: request replacement-SKU reservation
+    // from Inventory BC when ApproveExchange runs the cross-product
+    // branch. Routed to the same `inventory-returns-events` queue that
+    // Inventory listens on.
+    opts.PublishMessage<Messages.Contracts.Inventory.ReserveReplacementForExchange>()
+        .ToRabbitQueue("inventory-returns-events");
+
     // === Outbound: Orders BC ===
     // Orders saga needs: ReturnRequested, ReturnCompleted, ReturnDenied, ReturnRejected, ReturnExpired
     opts.PublishMessage<Messages.Contracts.Returns.ReturnRequested>()

@@ -67,6 +67,7 @@ Tracks per-warehouse stock levels and manages the reservation lifecycle (soft ho
 |---|---|---|
 | Orders | ↔ bidirectional | Receives `ReservationCommitRequested`, `ReservationReleaseRequested`; publishes `ReservationConfirmed`, `ReservationFailed`, `ReservationCommitted`, `ReservationReleased` |
 | Fulfillment | ↔ bidirectional | Receives `StockReservationRequested` (routing-informed), `ItemPicked` (bin reconciliation), `ShipmentHandedToCarrier` (TotalOnHand decrement), `BackorderCreated`; publishes `BackorderStockAvailable`; exposes `StockAvailabilityView` via HTTP query |
+| Returns | ↔ bidirectional | Receives `ReserveReplacementForExchange` for cross-product exchange replacement holds (M47.0); publishes `ReplacementReserved` / `ReplacementReservationFailed` |
 | Backoffice | ← queried by | Stock levels, adjustments, low-stock alerts, cycle counts |
 | Vendor Portal | → publishes | `InventoryAdjusted`, `LowStockDetected`, `StockReplenished` for vendor dashboard |
 
@@ -102,6 +103,7 @@ Manages return and exchange workflows — eligibility checks, inspection, refund
 | Orders | → publishes | Approval, denial, completion, and expiry outcomes |
 | Fulfillment | ↔ bidirectional | Expects return receipt; publishes approval for reverse logistics |
 | Payments | ↔ bidirectional | Requests refunds; receives completion confirmation |
+| Inventory | ↔ bidirectional | Requests replacement-SKU hold for cross-product exchanges (M47.0); receives reservation success/failure |
 
 **Constraint:** Cross-product exchanges supported (M35.0) with price difference handling — additional payment for more expensive replacements, partial refund for cheaper ones. Same-SKU exchanges also supported. 30-day eligibility window post-delivery.
 

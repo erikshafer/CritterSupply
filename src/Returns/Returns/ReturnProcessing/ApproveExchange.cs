@@ -128,6 +128,20 @@ public static class ApproveExchangeHandler
                 ReplacementUnitPrice: aggregate.ExchangeRequest.ReplacementUnitPrice,
                 Quantity: aggregate.ExchangeRequest.ReplacementQuantity,
                 RequestedAt: now));
+
+            // M47.0 / Slice 1 — request a hold on the replacement SKU
+            // from the Inventory BC. Returns subscribes to the reply on
+            // the `returns-inventory-events` queue; on
+            // ReplacementReservationFailed the exchange is denied with
+            // reason "Replacement out of stock". See ADR 0061.
+            outgoing.Add(new Messages.Contracts.Inventory.ReserveReplacementForExchange(
+                ReturnId: command.ReturnId,
+                OrderId: aggregate.OrderId,
+                CustomerId: aggregate.CustomerId,
+                ReplacementSku: aggregate.ExchangeRequest.ReplacementSku,
+                WarehouseId: ReturnsExchangeDefaults.ReplacementWarehouseId,
+                Quantity: aggregate.ExchangeRequest.ReplacementQuantity,
+                RequestedAt: now));
         }
 
         // If replacement costs more, append additional payment required event

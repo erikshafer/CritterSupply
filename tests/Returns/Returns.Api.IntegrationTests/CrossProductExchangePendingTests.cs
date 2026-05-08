@@ -64,22 +64,6 @@ public sealed class CrossProductExchangePendingTests
     }
 
     [Fact(Skip =
-        "Pending — no Inventory replacement-reservation path. The " +
-        "'And the replacement is in stock' / 'And the replacement item " +
-        "is out of stock' Gherkin guards have no enforcement code; " +
-        "Returns approves blind. See " + GapMemo +
-        " 'What is missing' row #1.")]
-    public void Out_Of_Stock_Replacement_Denies_Exchange()
-    {
-        // Implementation deferred until: Orders saga consumes
-        // CrossProductExchangeRequested and issues a
-        // ReserveReplacementForExchange command to Inventory; Inventory
-        // emits ReplacementReserved or ReplacementUnavailable; the saga
-        // forwards the outcome back to Returns, which approves or
-        // denies accordingly.
-    }
-
-    [Fact(Skip =
         "Pending — no refund-of-additional-payment compensation path " +
         "when inspection rejects the original item. The " +
         "'And the $25.00 additional payment is refunded to the customer' " +
