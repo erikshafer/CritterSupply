@@ -81,7 +81,7 @@ public class ShipmentTests
     {
         var shipment = BuildAssignedShipment()
             .Apply(new ShippingLabelGenerated("UPS", "Ground", 10m, null, DateTimeOffset.UtcNow))
-            .Apply(new TrackingNumberAssigned("1Z999AA1", "UPS", DateTimeOffset.UtcNow));
+            .Apply(new TrackingNumberAssigned(Guid.NewGuid(), "1Z999AA1", "UPS", DateTimeOffset.UtcNow));
         shipment.TrackingNumber.ShouldBe("1Z999AA1");
     }
 
@@ -115,7 +115,7 @@ public class ShipmentTests
     public void Apply_ShipmentDelivered_Sets_Terminal_Status()
     {
         var shipment = BuildAssignedShipment()
-            .Apply(new ShipmentDelivered(DateTimeOffset.UtcNow, "John Doe"));
+            .Apply(new ShipmentDelivered(Guid.NewGuid(), DateTimeOffset.UtcNow, "John Doe"));
         shipment.Status.ShouldBe(ShipmentStatus.Delivered);
         shipment.IsTerminal.ShouldBeTrue();
     }

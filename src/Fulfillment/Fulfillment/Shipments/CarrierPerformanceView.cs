@@ -26,11 +26,17 @@ public sealed class CarrierPerformanceViewProjection : MultiStreamProjection<Car
 {
     public CarrierPerformanceViewProjection()
     {
+        // GhostShipmentDetected and CarrierClaimResolved now carry Carrier
+        // directly — projection no longer falls back to "Unknown" (which
+        // previously bucketed every ghost detection and every claim resolution
+        // across all carriers into a single "Unknown" view document).
+        // See fulfillment-remaster-s3-retrospective.md gap #4 and the M45.0
+        // retrospective for the full history.
         Identity<ShipmentHandedToCarrier>(e => e.Carrier);
-        Identity<GhostShipmentDetected>(_ => "Unknown");
+        Identity<GhostShipmentDetected>(e => e.Carrier);
         Identity<ShipmentLostInTransit>(e => e.Carrier);
         Identity<CarrierClaimFiled>(e => e.Carrier);
-        Identity<CarrierClaimResolved>(_ => "Unknown"); // Will be resolved from the stream
+        Identity<CarrierClaimResolved>(e => e.Carrier);
         Identity<RateDisputeRaised>(e => e.Carrier);
         Identity<CarrierPickupMissed>(e => e.Carrier);
     }

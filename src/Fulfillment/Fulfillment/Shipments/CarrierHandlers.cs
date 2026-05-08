@@ -132,7 +132,7 @@ public static class GenerateShippingLabelHandler
                 now);
 
             var trackingAssigned = new TrackingNumberAssigned(
-                result.TrackingNumber, command.Carrier, now);
+                shipment.OrderId, result.TrackingNumber, command.Carrier, now);
 
             session.Events.Append(command.ShipmentId, labelGenerated, trackingAssigned);
 
@@ -313,7 +313,7 @@ public static class CarrierWebhookHandler
                 break;
 
             case "DELIVERED":
-                var deliveredEvent = new ShipmentDelivered(payload.Timestamp, null);
+                var deliveredEvent = new ShipmentDelivered(shipment.OrderId, payload.Timestamp, null);
                 session.Events.Append(shipmentId, deliveredEvent);
 
                 // Publish ShipmentDelivered integration event

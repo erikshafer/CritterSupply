@@ -15,8 +15,18 @@ public sealed record ShippingLabelGenerated(
     string? LabelZpl,
     DateTimeOffset GeneratedAt);
 
-/// <summary>Domain event when a tracking number is assigned to the shipment.</summary>
+/// <summary>
+/// Domain event when a tracking number is assigned to the shipment.
+/// <para>
+/// <c>OrderId</c> is denormalized onto the event so that read models keyed by
+/// <c>OrderId</c> (e.g. <see cref="MultiShipmentView"/>) can resolve the parent
+/// order without having to join back through the shipment stream. The Shipment
+/// stream id is a one-way UUID v5 hash of <c>OrderId</c>, so it cannot be
+/// recovered from stream metadata alone.
+/// </para>
+/// </summary>
 public sealed record TrackingNumberAssigned(
+    Guid OrderId,
     string TrackingNumber,
     string Carrier,
     DateTimeOffset AssignedAt);
@@ -118,8 +128,17 @@ public sealed record ShippingLabelVoided(
     string Reason,
     DateTimeOffset VoidedAt);
 
-/// <summary>Domain event when a ghost shipment is detected (no scan 24h after handoff).</summary>
+/// <summary>
+/// Domain event when a ghost shipment is detected (no scan 24h after handoff).
+/// <para>
+/// <c>Carrier</c> is denormalized onto the event so that <see cref="CarrierPerformanceView"/>
+/// (keyed by carrier name) can attribute ghost-shipment counts correctly. Without this
+/// field the projection would have to bucket every ghost detection under
+/// <c>"Unknown"</c>, hiding per-carrier reliability signal.
+/// </para>
+/// </summary>
 public sealed record GhostShipmentDetected(
+    string Carrier,
     string TrackingNumber,
     TimeSpan TimeSinceHandoff,
     DateTimeOffset DetectedAt);
@@ -139,8 +158,16 @@ public sealed record CarrierTraceOpened(
 
 // --- P2 Events ---
 
-/// <summary>Domain event when a reshipment is created for a lost, returned, or disputed shipment.</summary>
+/// <summary>
+/// Domain event when a reshipment is created for a lost, returned, or disputed shipment.
+/// <para>
+/// <c>OrderId</c> is denormalized so that <see cref="MultiShipmentView"/> can attach
+/// the new shipment entry to the correct parent order — see <see cref="TrackingNumberAssigned"/>
+/// for the full rationale.
+/// </para>
+/// </summary>
 public sealed record ReshipmentCreated(
+    Guid OrderId,
     Guid NewShipmentId,
     Guid OriginalShipmentId,
     string Reason,
@@ -161,8 +188,16 @@ public sealed record CarrierClaimFiled(
     string? TrackingNumber,
     DateTimeOffset FiledAt);
 
-/// <summary>Domain event when a carrier claim is resolved.</summary>
+/// <summary>
+/// Domain event when a carrier claim is resolved.
+/// <para>
+/// <c>Carrier</c> is denormalized so that <see cref="CarrierPerformanceView"/> (keyed
+/// by carrier name) can decrement the matching open-claims counter on the right
+/// carrier instead of falling back to <c>"Unknown"</c>.
+/// </para>
+/// </summary>
 public sealed record CarrierClaimResolved(
+    string Carrier,
     string Resolution,
     decimal? AmountUSD,
     DateTimeOffset ResolvedAt);

@@ -41,12 +41,24 @@ public static class ResolveCarrierClaimHandler
         return WolverineContinue.NoProblems;
     }
 
+    public static Task<Shipment?> LoadAsync(
+        ResolveCarrierClaim command,
+        IDocumentSession session,
+        CancellationToken ct) =>
+        session.LoadAsync<Shipment>(command.ShipmentId, ct);
+
     public static void Handle(
         ResolveCarrierClaim command,
+        Shipment shipment,
         IDocumentSession session)
     {
+        // Carrier is denormalized onto CarrierClaimResolved so CarrierPerformanceView
+        // (keyed by carrier name) can decrement the right open-claims counter.
+        // Filing required ShipmentHandedToCarrier (which sets shipment.Carrier),
+        // so non-null carrier is guaranteed by the Before guard above.
         session.Events.Append(command.ShipmentId,
             new CarrierClaimResolved(
+                shipment.Carrier ?? "Unknown",
                 command.Resolution,
                 command.AmountUSD,
                 DateTimeOffset.UtcNow));

@@ -35,6 +35,7 @@ public static class CheckForGhostShipmentHandler
 
         session.Events.Append(command.ShipmentId,
             new GhostShipmentDetected(
+                shipment.Carrier ?? "Unknown",
                 shipment.TrackingNumber ?? "unknown",
                 timeSinceHandoff,
                 DateTimeOffset.UtcNow));

@@ -61,7 +61,7 @@ public static class CreateReshipmentHandler
 
         // 1. Append ReshipmentCreated to the ORIGINAL stream
         var reshipmentCreated = new ReshipmentCreated(
-            newShipmentId, command.OriginalShipmentId, command.Reason, now);
+            shipment.OrderId, newShipmentId, command.OriginalShipmentId, command.Reason, now);
         session.Events.Append(command.OriginalShipmentId, reshipmentCreated);
 
         // 2. Create the NEW Shipment stream with FulfillmentRequested

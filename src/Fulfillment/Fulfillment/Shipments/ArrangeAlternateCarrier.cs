@@ -76,7 +76,7 @@ public static class ArrangeAlternateCarrierHandler
 
         session.Events.Append(command.ShipmentId,
             new ShippingLabelGenerated(command.NewCarrier, command.NewService, 0m, null, now),
-            new TrackingNumberAssigned(trackingNumber, command.NewCarrier, now));
+            new TrackingNumberAssigned(shipment.OrderId, trackingNumber, command.NewCarrier, now));
 
         // Publish TrackingNumberAssigned with updated tracking for Orders saga
         await bus.PublishAsync(new IntegrationMessages.TrackingNumberAssigned(

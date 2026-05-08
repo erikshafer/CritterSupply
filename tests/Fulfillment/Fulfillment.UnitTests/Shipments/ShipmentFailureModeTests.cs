@@ -21,7 +21,7 @@ public class ShipmentFailureModeTests
     private static Shipment BuildLabeledShipment() =>
         BuildAssignedShipment()
             .Apply(new ShippingLabelGenerated("UPS", "Ground", 10m, null, DateTimeOffset.UtcNow))
-            .Apply(new TrackingNumberAssigned("1Z999AA1", "UPS", DateTimeOffset.UtcNow));
+            .Apply(new TrackingNumberAssigned(Guid.NewGuid(), "1Z999AA1", "UPS", DateTimeOffset.UtcNow));
 
     [Fact]
     public void Apply_ShipmentRerouted_Resets_To_Assigned()
@@ -61,7 +61,7 @@ public class ShipmentFailureModeTests
     {
         var shipment = BuildAssignedShipment()
             .Apply(new ShipmentHandedToCarrier("UPS", "1Z", DateTimeOffset.UtcNow))
-            .Apply(new GhostShipmentDetected("1Z", TimeSpan.FromHours(25), DateTimeOffset.UtcNow));
+            .Apply(new GhostShipmentDetected("UPS", "1Z", TimeSpan.FromHours(25), DateTimeOffset.UtcNow));
         shipment.Status.ShouldBe(ShipmentStatus.GhostShipmentInvestigation);
     }
 
@@ -70,7 +70,7 @@ public class ShipmentFailureModeTests
     {
         var shipment = BuildAssignedShipment()
             .Apply(new ShipmentHandedToCarrier("UPS", "1Z", DateTimeOffset.UtcNow))
-            .Apply(new GhostShipmentDetected("1Z", TimeSpan.FromHours(25), DateTimeOffset.UtcNow))
+            .Apply(new GhostShipmentDetected("UPS", "1Z", TimeSpan.FromHours(25), DateTimeOffset.UtcNow))
             .Apply(new ShipmentInTransit("Hub", "Edison, NJ", DateTimeOffset.UtcNow));
         shipment.Status.ShouldBe(ShipmentStatus.InTransit);
     }
