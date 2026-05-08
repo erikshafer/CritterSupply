@@ -445,11 +445,67 @@ their own sections so future readers can identify priorities by author.
 
 ### 7.1 Product Owner sign-off
 
-*See §7.1 below — populated after PO consultation on 2026-05-08.*
+**PO sign-off — 2026-05-08**
+
+- **Tier 3 ordering (G → H → I) — keep, with one caveat.**
+  - **G Product Variants stays #1.** Without a `ProductFamily` aggregate, customers cannot pick size / color / flavor — the catalog is functionally incomplete and every downstream surface (Listings, Marketplaces feeds, cart line semantics) papers over it. This is the single highest customer-visible deficit in the product today.
+  - **H Search #2, I Recommendations #3 — order is correct.** Search is a primary discovery channel for intent-driven shoppers; Recommendations needs *both* a variant-aware catalog and meaningful behavioral history to avoid embarrassing suggestions. Caveat: do not start I before G ships, or recommendations will fire on the wrong granularity (parent product instead of variant).
+
+- **Next remaster target: Orders first, Returns second — not a greenfield BC.**
+  - **Orders** is the customer's commitment moment; the saga predates UUID v5 stream identity, `[BoundaryModel]`, and current Critter idioms, and it carries the most operational risk (payment ↔ inventory ↔ fulfillment coordination). Highest reliability ROI per session.
+  - **Returns** should follow immediately and absorb **Tier 4 J (DCB second example)** — cross-product exchange (`docs/features/returns/cross-product-exchange.feature`) is *exactly* the multi-aggregate atomic decision DCB was built for (Return + Inventory reservation + Payment delta). Two birds, one EM session.
+  - **G Product Variants is a parallel product arc, not a remaster substitute** — schedule it on its own track; don't let it displace Orders.
+
+- **Documented-vs-implemented gaps I want engineering to confirm before we claim "complete":**
+  - **Cross-product exchange (Returns):** feature file is rich (partial refund, additional-payment-required, expiration), but Returns is pre-DCB — verify the *atomic* "approve exchange + reserve replacement + capture delta" path actually exists end-to-end, or mark it as design-only.
+  - **Store Credit** is listed as planned, yet Returns scenarios route refunds to original tender only. Real eComm needs a store-credit fallback for expired-window / goodwill / failed-card refunds. Either ship the BC or document the gap explicitly.
+  - **Order post-placement modifications** (address change before ship, line cancellation before pick) — no feature file found; likely silently unimplemented.
+  - **Abandoned-cart recovery trigger** — Shopping events exist; confirm Correspondence actually consumes them.
+  - **Fraud-review / OnHold saga state** on Orders — absent and worth scoping into the Orders remaster charter.
+
+- **Carryover-debt re-prioritization (§3.3) from a customer-impact lens:**
+  - **Bump #3 (MultiShipmentView + CarrierPerformanceView identity resolution) up.** Split-shipment "where is my order?" is a top-five support contact driver in real eComm; this is currently the most customer-visible unresolved item.
+  - **#7 DLQ alerting** matters because today a stuck reservation or payment is invisible until a customer complains — keep on deck once Operations Dashboard (Tier 4 K) is scoped.
+  - **#2 Returns saga tests** — couple to the Returns remaster above; don't burn a standalone session unblocking 5.29.0 if a remaster will rewrite the surface anyway.
+  - **eBay orphaned-draft sweep (#4) was the right Marketplaces win** — next Marketplaces gap I'd flag is vendor-facing visibility into Amazon/Walmart *listing rejection reasons*, but that belongs in a separate Vendor Portal cycle, not §3.3.
 
 ### 7.2 UX Engineer sign-off
 
-*See §7.2 below — populated after UXE consultation on 2026-05-08.*
+**UXE sign-off — 2026-05-08**
+
+Consulted post-M44.0. Bullets below capture user-facing risk that the report does not currently surface; none block the §4 ordering, but two warrant inline notes.
+
+- **Storefront / Vendor Portal shipped-flow polish (not a blocker, worth a "fine-tune" pass):**
+  - `Storefront.Web` checkout + cart + order-confirmation flows have working happy paths and SignalR reconnect modal, but error/empty-state coverage is uneven (e.g. cart-empty, address-add failure, payment-decline microcopy still default exception strings). Recommend a single-session a11y + empty-state sweep alongside the next remaster pick.
+  - `VendorPortal.Web` MainLayout already exposes a `role="status"` Live/Reconnecting/Disconnected indicator — good — but the change-request flows (`ChangeRequests.razor`, `SubmitChangeRequest.razor`) lack skeleton loading and have no optimistic-submit feedback. Low effort, high perceived-quality win.
+
+- **SignalR coverage gap — flag this explicitly as "documented vs implemented" drift.** `Storefront/Notifications/` registers **20 handlers** (full Returns lifecycle, Backorder, ReservationConfirmed, PaymentAuthorized, TrackingNumberAssigned, ShipmentHandedToCarrier, ShipmentLostInTransit, ReturnToSenderInitiated, DeliveryAttemptFailed, etc.), but the UI dispatcher in `OrderConfirmation.razor` switches on only 7 event types and `Cart.razor` / `InteractiveAppBar.razor` only on `cart-updated`. Backend events fire and the hub broadcasts them; no UI subscribes. Returns and backorder customers see *zero* real-time feedback today. Suggest adding this as a Tier 2 carryover item ("Storefront UI ↔ notification-handler reconciliation") — it is exactly the implemented-but-invisible class the user asked us to flag.
+
+- **Tier 3 G — Product Variants.** Riskiest UX surfaces are (a) variant-aware PDP (swatch/selector pattern, URL strategy, schema.org `ProductGroup`), (b) cart deduplication & line-item identity when variants change mid-session, and (c) Vendor Portal bulk variant authoring. Strongly recommend a **UX research + Event Modeling joint session** (read-model columns first, JTBD interviews with two vendors) before any `ProductFamily` aggregate work — otherwise the aggregate boundary will be drawn around storage, not shopper mental model.
+
+- **Tier 4 K — Operations Dashboard.** MVP should be **read-only DLQ + projection-health, no replay action**. Operators need observability before agency; replay is a destructive action that requires audit, RBAC, and confirmation flows that aren't designed yet. Ship v1 read-only behind Backoffice Identity, instrument which envelopes operators inspect, then design replay v2 from real usage.
+
+- **Vendor Portal cold-start (§3.3 #5).** Test-only signal — manual dev/staging click-through shows no perceived instability; first-page paint and hub-connect status are healthy. Treat the 56/86 figure as a fixture/CI artifact, not a user-facing reliability problem.
+
+### 7.3 Synthesis — actionable changes the principal architect derived from §7.1 / §7.2
+
+These are *new* items the next session should consider; they were surfaced by
+PO/UXE consultation and were **not** in the original 2026-05-06 report. Filed
+here for traceability rather than re-edited into §3.3 / §4 (so the diff stays
+auditable):
+
+| # | Owner-flagged item | Source | Suggested home |
+|---|---------------------|--------|----------------|
+| S1 | **Storefront UI ↔ notification-handler reconciliation** — 20 handlers, ~7 UI cases. Returns + backorder customers get no real-time feedback today. | UXE §7.2 | New §3.3 carryover candidate; small-medium scope |
+| S2 | **Re-prioritize MultiShipmentView / CarrierPerformanceView (currently §3.3 #3) upward** — top-5 support driver in real eComm. | PO §7.1 | Re-rank in §3.3 |
+| S3 | **Cross-product exchange end-to-end audit** — verify the atomic "approve exchange + reserve replacement + capture delta" path actually exists vs is feature-file-only. | PO §7.1 | Pre-work for Returns remaster (couples to Tier 4 J) |
+| S4 | **Order post-placement modifications** (address change, line cancel) — no feature file; likely silently unimplemented. | PO §7.1 | Charter input for Orders remaster |
+| S5 | **Fraud-review / OnHold saga state on Orders** — absent. | PO §7.1 | Charter input for Orders remaster |
+| S6 | **Abandoned-cart recovery** — confirm Correspondence consumes Shopping events. | PO §7.1 | Quick verification slice |
+| S7 | **Store Credit BC** — Returns currently refund-to-original-tender only; document gap or schedule. | PO §7.1 | Future-BC roadmap, not this cycle |
+| S8 | **Storefront/Vendor Portal a11y + empty-state sweep** — single-session polish pass. | UXE §7.2 | Optional Tier 2 add-on |
+| S9 | **Operations Dashboard MVP shape decision** — read-only first, replay v2 later. | UXE §7.2 | Constrains Tier 4 K scope |
+| S10 | **Vendor Portal cold-start signal is test-only, not user-perceived** — treat §3.3 #5 verification as fixture/CI work, not UX reliability work. | UXE §7.2 | Reframes §3.3 #5 |
 
 ---
 
