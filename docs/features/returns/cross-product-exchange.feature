@@ -81,10 +81,11 @@ Feature: Cross-Product Exchange
   # Denial Scenarios
   # ─────────────────────────────────────────────
 
-  @pending
-  # Pending: no Inventory replacement-reservation path; "in stock" /
-  # "out of stock" guards have no enforcement code — see
-  # m45-1-cross-product-exchange-gap-memo.md "What is missing" row #1.
+  # Closed in M47.0 / Slice 1 — Inventory replacement reservation
+  # choreography is now end-to-end implementable. See ADR 0061 and
+  # docs/planning/milestones/m47-0-plan.md. The Returns BC subscribes
+  # to Inventory's ReplacementReservationFailed reply and transitions
+  # the exchange to Denied with the customer-facing wording below.
   Scenario: Cross-product exchange denied — replacement out of stock
     When the customer requests an exchange for "Pet Bed (Large)" with SKU "PET-BED-L"
     And the replacement item is out of stock

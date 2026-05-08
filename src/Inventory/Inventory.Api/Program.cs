@@ -125,6 +125,12 @@ builder.Host.UseWolverine(opts =>
     opts.ListenToRabbitQueue("inventory-fulfillment-events")
         .UseDurableInbox();
 
+    // M47.0 / Slice 1 — Returns → Inventory (cross-product exchange
+    // replacement reservations). See ADR 0061 and
+    // docs/planning/milestones/m47-0-plan.md.
+    opts.ListenToRabbitQueue("inventory-returns-events")
+        .UseDurableInbox();
+
     // M43.0 — Slice 12: publish reservation outcomes to Orders BC.
     // Both Confirmed and Failed flow on the same queue; Orders' OrderSaga
     // routes each by message type. Mirrors orders-fulfillment-events and
@@ -133,6 +139,15 @@ builder.Host.UseWolverine(opts =>
         .ToRabbitQueue("orders-inventory-events");
     opts.PublishMessage<Messages.Contracts.Inventory.ReservationFailed>()
         .ToRabbitQueue("orders-inventory-events");
+
+    // M47.0 / Slice 1 — Inventory → Returns (cross-product exchange
+    // replacement reservation outcomes). Both success and failure flow
+    // on the same queue; Returns' ReplacementReservationOutcomeHandler
+    // routes each by message type.
+    opts.PublishMessage<Messages.Contracts.Inventory.ReplacementReserved>()
+        .ToRabbitQueue("returns-inventory-events");
+    opts.PublishMessage<Messages.Contracts.Inventory.ReplacementReservationFailed>()
+        .ToRabbitQueue("returns-inventory-events");
 });
 
 builder.Services.AddEndpointsApiExplorer();
