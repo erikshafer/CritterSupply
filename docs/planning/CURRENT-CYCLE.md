@@ -41,50 +41,100 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M43.0 — Slice 12 (`OrderPlacedHandler`) Retirement (1A from `state-of-repo-2026-05`) |
-| **Status** | 🟢 **In progress** — D1–D5 implementation complete; QA review + retrospective remaining |
-| **Recent Completion** | M42.x — Inventory BC Remaster: event modeling + S1–S4 implementation (2026-04-08 → 2026-04-11) |
-| **Previous Completion** | M41.0 — Fulfillment BC Remaster: complete (S1–S5), 39 slices, 5 sessions (2026-04-07) |
+| **Current Milestone** | M46.0 — Reliability Workshop Follow-Through (J/D/H/A) |
+| **Status** | 🟢 **In progress** — J/D/H/A implementation complete; retrospective being written |
+| **Recent Completion** | M45.1 — Cross-product exchange Returns-side + 4-handler saga additions; gap memo (2026-05-08) |
+| **Previous Completion** | M44.0 — Vendor Portal test fixture hardening + projection lifecycle audit (2026-05-06) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-05-06 (M43.0 in progress — Slice 12 retirement; see `docs/planning/milestones/m43-0-plan.md`)*
+*Last Updated: 2026-05-08 (M46.0 in progress — see `docs/planning/milestones/m46-0-retrospective.md`)*
 
 ---
 
 ## Active Milestone
 
-### 🚧 M43.0 — Slice 12 (`OrderPlacedHandler`) Retirement
+### 🚧 M46.0 — Reliability Workshop Follow-Through (J → D → H → A)
 
-**Status:** 🟢 In progress (single-session). Plan committed; D1–D5 implementation
-complete; QA review + retrospective remaining.
+**Status:** 🟢 In progress (single session). All four workshop priorities
+implemented and validated; retrospective committed.
 
-**Source:** Top-tier item **1A** from
-[`docs/research/state-of-repo-2026-05.md`](../research/state-of-repo-2026-05.md) §4.
-Carryover from `inventory-remaster-s4-retrospective.md` §4 — the only ⛔ on the
-Inventory remaster scoreboard.
+**Source:** Workshop part 2 in
+[`docs/research/state-of-repo-2026-05.md`](../research/state-of-repo-2026-05.md)
+§7.4. The PO/UXE/FE/QA/PA group voted four follow-through items above the line:
 
-**Goal:** Retire the legacy `Inventory.OrderPlacedHandler` (hardcoded `WH-01`)
-and finish wiring the routing-aware `Fulfillment → StockReservationRequested →
-Inventory → ReservationConfirmed/Failed → Orders` flow over RabbitMQ.
+- **J** — Stop trusting `tracked.Sent.MessagesOf<T>()` for unrouted integration
+  messages (false-confidence test pattern that has shipped two regressions).
+- **D** — Surface DLQ to a human (no operator-facing window into
+  `wolverine_dead_letters` accumulation).
+- **H** — Promote `OrderConfirmation` SignalR helpers into a shared status
+  mapper (route `Cart` and `InteractiveAppBar` through it).
+- **A** — Cross-product exchange honesty pass (mark unimplementable Gherkin
+  scenarios `@pending` and add skipped Alba placeholders linked to the gap
+  memo).
 
-**Three-BC coordinated change:**
-- Fulfillment emits one `StockReservationRequested` per line item from
-  `FulfillmentRequestedHandler`; `Fulfillment.Api` publishes to
-  `inventory-fulfillment-events`.
-- Inventory's `StockReservationRequestedHandler` is now idempotent on
-  duplicate `ReservationId` and emits `ReservationFailed` on insufficient
-  stock or unknown SKU; `Inventory.Api` publishes both `ReservationConfirmed`
-  and `ReservationFailed` to `orders-inventory-events`.
-- Orders subscribes to `orders-inventory-events`.
-- Legacy `Inventory.OrderPlacedHandler` and `OrderPlacedFlowTests` deleted.
-- Test coverage extended on all three BCs; build clean (351 vs 358 baseline
-  warnings; 0 errors); Inventory 109+151, Fulfillment 80+40, Orders 55+144 all
-  green.
+**Outcomes:**
+- `IntegrationMessageAssertions` helper in `CritterSupply.TestUtilities` with
+  explicit failure diagnostics; new skill doc
+  `docs/skills/integration-message-test-assertions.md` documenting the
+  pattern + 22-call audit.
+- `GET /api/backoffice/operations/dead-letters/summary` (read-only,
+  `[Authorize(Policy="OperationsManager")]`); 18-schema default with config
+  override; identifier allow-list against schema-name injection; 4 integration
+  tests green; 99/99 Backoffice integration suite still green.
+- `Storefront.Web.RealTime.StorefrontStatusMapper` + `StorefrontEventReader`
+  module; OrderConfirmation/Cart/InteractiveAppBar all routed through it;
+  43 existing pure-function tests preserved + 6 new reader tests; Storefront
+  unit suite stable (5 unrelated pre-existing failures in `OrderHistoryTests`
+  remain on baseline — out of scope).
+- `cross-product-exchange.feature` honesty pass: 5 of 9 scenarios tagged
+  `@pending` with inline pointers to
+  `m45-1-cross-product-exchange-gap-memo.md`; 5 skipped Alba placeholders
+  in `Returns.Api.IntegrationTests/CrossProductExchangePendingTests` with
+  Skip reasons that name the missing capability.
+- Full solution: 0 errors.
 
-**Out of scope (next session):** item **1B** — concurrency-exhaustion gap #13
-(`ConcurrencyException → Discard` silent message drops).
+**Retrospective:** `docs/planning/milestones/m46-0-retrospective.md`.
+
+**Out of scope (next session):** items **B**, **C**, **E**, **F**, **G**, **I**
+from `state-of-repo-2026-05.md` §7.4 (the below-the-line set the workshop
+explicitly deferred).
 
 ## Recent Completions
+
+### ✅ M45.1: Cross-Product Exchange (Returns-side) + Order Saga Handlers (2026-05-08)
+
+Source: `state-of-repo-2026-05.md` §7.1 / §7.3 items S3, S4, S5. Returns BC
+gained the cross-product exchange aggregate state machine, 9 Gherkin
+scenarios, and Returns-side integration tests. Order saga gained 7 new
+handlers (ChangeShippingAddress, PutOrderOnHold/ReleaseOrderFromHold/
+RejectOrderForFraud, plus 4 cross-product-exchange consumers). Cross-BC
+choreography (Inventory replacement reservation, Payments delta capture)
+documented as deferred in
+`docs/planning/milestones/m45-1-cross-product-exchange-gap-memo.md`.
+
+### ✅ M44.0: Vendor Portal Test Fixture Hardening + Projection Lifecycle Audit (2026-05-06)
+
+`VendorPortal.Api.IntegrationTests.TestFixture` gained `CleanAllDataAsync`
+(documents + events), `WaitForNonStaleProjectionDataAsync`, and explicit
+schema migration in `InitializeAsync`. Cross-codebase projection-lifecycle
+audit produced `docs/research/projection-lifecycle-audit-2026-05.md`
+documenting "inline by default" as the de facto convention (only 3 of ~30
+projections are async, all in Inventory and operationally required).
+
+### ✅ M43.1: Concurrency-Exhaustion DLQ Gap #13 (2026-05-04)
+
+Inventory.Api's `OnException<ConcurrencyException>` policy now ends in
+`MoveToErrorQueue` instead of `Discard`. Deterministic DLQ proof via
+test-only `ConcurrencyExhaustionProbe` + `IWolverineExtension` for handler
+discovery. `DeadLetterQueueLogSink` schema fixed (was querying nonexistent
+`explanation` column).
+
+### ✅ M43.0: Slice 12 (`OrderPlacedHandler`) Retirement (2026-05-04)
+
+Three-BC coordinated change retiring the legacy `Inventory.OrderPlacedHandler`
+(hardcoded `WH-01`) and wiring routing-aware `Fulfillment →
+StockReservationRequested → Inventory → ReservationConfirmed/Failed → Orders`
+over RabbitMQ. Inventory 109+151, Fulfillment 80+40, Orders 55+144 all green.
 
 ### ✅ M42.x: Inventory BC Remaster — Event Modeling + S1–S4 (2026-04-08 → 2026-04-11)
 

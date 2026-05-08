@@ -4,6 +4,7 @@ using Backoffice.Clients;
 using JasperFx.CommandLine;
 using Marten;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -29,6 +30,16 @@ public class BackofficeTestFixture : IAsyncLifetime
     private string? _connectionString;
 
     public IAlbaHost Host { get; private set; } = null!;
+
+    /// <summary>
+    /// Connection string for the Postgres test container. Exposed so tests
+    /// that need to write to schemas Marten doesn't manage (e.g., manually
+    /// seeded <c>wolverine_dead_letters</c> rows for operations-health
+    /// endpoint tests) can open a sibling connection that targets the same
+    /// random-port test container.
+    /// </summary>
+    public string ConnectionString => _connectionString
+        ?? throw new InvalidOperationException("Test fixture has not started the Postgres container yet.");
 
     // Stub clients for testing
     public StubCustomerIdentityClient CustomerIdentityClient { get; private set; } = null!;
@@ -59,6 +70,18 @@ public class BackofficeTestFixture : IAsyncLifetime
 
         Host = await AlbaHost.For<Program>(builder =>
         {
+            // Override the configured "postgres" connection string so any
+            // endpoint that opens a fresh NpgsqlConnection (e.g.,
+            // GetDeadLetterSummary) targets the same random-port test
+            // container Marten is configured against.
+            builder.ConfigureAppConfiguration((_, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["ConnectionStrings:postgres"] = _connectionString,
+                });
+            });
+
             builder.ConfigureServices(services =>
             {
                 // Configure Marten with the test container connection string

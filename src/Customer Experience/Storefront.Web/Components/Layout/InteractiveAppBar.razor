@@ -1,6 +1,7 @@
 @using System.Text.Json
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
+@using Storefront.Web.RealTime
 @inject IJSRuntime JS
 @inject IConfiguration Configuration
 @inject NavigationManager Navigation
@@ -130,19 +131,16 @@
     [JSInvokable]
     public async Task OnSseEvent(JsonElement eventData)
     {
-        // Parse event type
-        if (eventData.TryGetProperty("eventType", out var eventType))
+        // Routes the cart badge count through the shared event reader so
+        // a future producer-side rename of `itemCount` (or addition of
+        // alternative payload shapes) is fixed in one place — see M46.0/H.
+        if (StorefrontEventReader.GetEventType(eventData) == "cart-updated")
         {
-            var eventTypeName = eventType.GetString();
-
-            if (eventTypeName == "cart-updated")
+            var newCount = StorefrontEventReader.GetInt32(eventData, "itemCount");
+            if (newCount.HasValue)
             {
-                // Extract itemCount from event data
-                if (eventData.TryGetProperty("itemCount", out var itemCount))
-                {
-                    _cartItemCount = itemCount.GetInt32();
-                    await InvokeAsync(StateHasChanged);
-                }
+                _cartItemCount = newCount.Value;
+                await InvokeAsync(StateHasChanged);
             }
         }
     }

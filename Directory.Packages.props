@@ -11,6 +11,7 @@
     <PackageVersion Include="Reqnroll.xUnit" Version="3.3.4" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.1.7" />
     <PackageVersion Include="Marten" Version="8.29.2" />
+    <PackageVersion Include="WolverineFx" Version="5.29.0" />
     <PackageVersion Include="WolverineFx.Http.FluentValidation" Version="5.29.0" />
     <PackageVersion Include="WolverineFx.Http.Marten" Version="5.29.0" />
     <PackageVersion Include="WolverineFx.RabbitMQ" Version="5.29.0" />

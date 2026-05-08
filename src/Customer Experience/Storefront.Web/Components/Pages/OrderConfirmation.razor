@@ -1,6 +1,7 @@
 @page "/order-confirmation/{OrderId:guid}"
 @using System.Text.Json
 @using Microsoft.AspNetCore.Components.Authorization
+@using Storefront.Web.RealTime
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JS
 @inject IConfiguration Configuration
@@ -196,100 +197,89 @@ else
     {
         Console.WriteLine($"SSE event received: {eventData}");
 
-        // Parse event type
-        if (eventData.TryGetProperty("eventType", out var eventType))
+        var eventTypeName = StorefrontEventReader.GetEventType(eventData);
+        if (eventTypeName is null)
         {
-            var eventTypeName = eventType.GetString();
+            return;
+        }
 
-            switch (eventTypeName)
-            {
-                case "order-placed":
-                    _currentStatus = "Placed";
-                    _latestUpdate = "Order placed successfully";
-                    StateHasChanged();
-                    break;
+        switch (eventTypeName)
+        {
+            case "order-placed":
+                _currentStatus = "Placed";
+                _latestUpdate = "Order placed successfully";
+                StateHasChanged();
+                break;
 
-                case "order-status-changed":
-                    // Handles OrderStatusChanged events routed via Wolverine SignalR transport.
-                    // SignalR serializes with camelCase (System.Text.Json web defaults), and
-                    // signalr-client.js spreads cloudEvent.data before invoking OnSseEvent —
-                    // so property names arrive here in camelCase.
-                    if (eventData.TryGetProperty("newStatus", out var newStatus))
-                    {
-                        _currentStatus = newStatus.GetString() ?? _currentStatus;
-                        _latestUpdate = $"Order status updated to {_currentStatus}";
-                    }
-                    StateHasChanged();
-                    break;
+            case "order-status-changed":
+                // Handles OrderStatusChanged events routed via Wolverine SignalR transport.
+                var orderNewStatus = StorefrontEventReader.GetString(eventData, "newStatus");
+                if (orderNewStatus is not null)
+                {
+                    _currentStatus = orderNewStatus;
+                    _latestUpdate = $"Order status updated to {_currentStatus}";
+                }
+                StateHasChanged();
+                break;
 
-                case "payment-confirmed":
-                    _currentStatus = "Payment Confirmed";
-                    _latestUpdate = "Payment processed successfully";
-                    StateHasChanged();
-                    break;
+            case "payment-confirmed":
+                _currentStatus = "Payment Confirmed";
+                _latestUpdate = "Payment processed successfully";
+                StateHasChanged();
+                break;
 
-                case "shipment-status-changed":
-                    // Handles ShipmentStatusChanged events routed via Wolverine SignalR transport.
-                    // Properties arrive in camelCase — see order-status-changed comment above.
-                    // 20+ shipment notification handlers (Backordered, HandedToCarrier, Delivered,
-                    // LostInTransit, ReturnToSender, DeliveryAttemptFailed, etc.) all flow through
-                    // this single discriminator; the NewStatus payload tells us which one.
-                    if (eventData.TryGetProperty("newStatus", out var shipNewStatus))
-                    {
-                        var statusValue = shipNewStatus.GetString() ?? "Shipped";
-                        _currentStatus = MapShipmentStatus(statusValue);
-                        eventData.TryGetProperty("trackingNumber", out var trackingSignalR);
-                        var trackingNumber = trackingSignalR.ValueKind == JsonValueKind.String ? trackingSignalR.GetString() : null;
-                        _latestUpdate = BuildShipmentMessage(statusValue, trackingNumber);
-                    }
-                    else
-                    {
-                        _currentStatus = "Shipped";
-                        _latestUpdate = "Order has been shipped";
-                    }
-                    StateHasChanged();
-                    break;
-
-                case "return-status-changed":
-                    // Handles ReturnStatusChanged events. Returns notification handlers
-                    // (ReturnRequested/Approved/Denied/Received/Completed/Rejected/Expired/ToSender)
-                    // all flow through this discriminator; NewStatus distinguishes them.
-                    if (eventData.TryGetProperty("newStatus", out var returnStatus))
-                    {
-                        var statusValue = returnStatus.GetString() ?? "Returned";
-                        _currentStatus = $"Return: {statusValue}";
-                        eventData.TryGetProperty("details", out var detailsElement);
-                        var details = detailsElement.ValueKind == JsonValueKind.String ? detailsElement.GetString() : null;
-                        _latestUpdate = BuildReturnMessage(statusValue, details);
-                    }
-                    StateHasChanged();
-                    break;
-
-                case "shipment-dispatched":
+            case "shipment-status-changed":
+                // 20+ shipment notification handlers (Backordered, HandedToCarrier,
+                // Delivered, LostInTransit, ReturnToSender, DeliveryAttemptFailed, etc.)
+                // all flow through this discriminator; NewStatus tells us which.
+                var shipNewStatus = StorefrontEventReader.GetString(eventData, "newStatus");
+                if (shipNewStatus is not null)
+                {
+                    _currentStatus = StorefrontStatusMapper.MapShipmentStatus(shipNewStatus);
+                    var trackingNumber = StorefrontEventReader.GetString(eventData, "trackingNumber");
+                    _latestUpdate = StorefrontStatusMapper.BuildShipmentMessage(shipNewStatus, trackingNumber);
+                }
+                else
+                {
                     _currentStatus = "Shipped";
-                    if (eventData.TryGetProperty("trackingNumber", out var tracking))
-                    {
-                        _latestUpdate = $"Order shipped! Tracking: {tracking.GetString()}";
-                    }
-                    else
-                    {
-                        _latestUpdate = "Order has been shipped";
-                    }
-                    StateHasChanged();
-                    break;
+                    _latestUpdate = "Order has been shipped";
+                }
+                StateHasChanged();
+                break;
 
-                case "shipment-delivered":
-                    _currentStatus = "Delivered";
-                    _latestUpdate = "Order delivered successfully";
-                    StateHasChanged();
-                    break;
+            case "return-status-changed":
+                // 8 Returns notification handlers all flow through this
+                // discriminator; NewStatus distinguishes them.
+                var returnStatus = StorefrontEventReader.GetString(eventData, "newStatus");
+                if (returnStatus is not null)
+                {
+                    _currentStatus = $"Return: {returnStatus}";
+                    var details = StorefrontEventReader.GetString(eventData, "details");
+                    _latestUpdate = StorefrontStatusMapper.BuildReturnMessage(returnStatus, details);
+                }
+                StateHasChanged();
+                break;
 
-                case "shipment-delivery-failed":
-                    _currentStatus = "Delivery Failed";
-                    _latestUpdate = "Your delivery was unsuccessful — our team has been notified. Please check your order for next steps.";
-                    StateHasChanged();
-                    break;
-            }
+            case "shipment-dispatched":
+                _currentStatus = "Shipped";
+                var dispatchTracking = StorefrontEventReader.GetString(eventData, "trackingNumber");
+                _latestUpdate = string.IsNullOrEmpty(dispatchTracking)
+                    ? "Order has been shipped"
+                    : $"Order shipped! Tracking: {dispatchTracking}";
+                StateHasChanged();
+                break;
+
+            case "shipment-delivered":
+                _currentStatus = "Delivered";
+                _latestUpdate = "Order delivered successfully";
+                StateHasChanged();
+                break;
+
+            case "shipment-delivery-failed":
+                _currentStatus = "Delivery Failed";
+                _latestUpdate = "Your delivery was unsuccessful — our team has been notified. Please check your order for next steps.";
+                StateHasChanged();
+                break;
         }
     }
 
@@ -324,70 +314,6 @@ else
         "Returning to Sender" => "Returning to Sender",
         var s when s.StartsWith("Return:") => s,
         _ => "Processing"  // Safe consumer fallback for any unexpected domain status
-    };
-
-    /// <summary>
-    /// Maps the raw <c>NewStatus</c> from <c>ShipmentStatusChanged</c> SignalR events
-    /// to a customer-friendly status label. Covers the full set of shipment notification
-    /// handlers wired in <c>Storefront/Notifications/</c>.
-    /// </summary>
-    internal static string MapShipmentStatus(string newStatus) => newStatus switch
-    {
-        "Backordered" => "Backordered",
-        "HandedToCarrier" or "InTransit" => "Shipped",
-        "OutForDelivery" => "Out for Delivery",
-        "Delivered" => "Delivered",
-        "DeliveryAttemptFailed" => "Delivery Failed",
-        "LostInTransit" => "Lost in Transit",
-        "ReturnToSenderInitiated" => "Returning to Sender",
-        "TrackingNumberAssigned" => "Preparing for Shipment",
-        _ => newStatus  // pass-through preserves any new statuses without UI changes
-    };
-
-    /// <summary>
-    /// Builds the customer-facing message line for a shipment status change.
-    /// </summary>
-    internal static string BuildShipmentMessage(string newStatus, string? trackingNumber) => newStatus switch
-    {
-        "Backordered" => "This item is currently backordered — we'll notify you with an updated shipping estimate as soon as stock is available.",
-        "HandedToCarrier" or "InTransit" =>
-            string.IsNullOrEmpty(trackingNumber)
-                ? "Your order is on its way to the carrier."
-                : $"Your order is in transit. Tracking: {trackingNumber}",
-        "TrackingNumberAssigned" =>
-            string.IsNullOrEmpty(trackingNumber)
-                ? "A tracking number has been assigned to your order."
-                : $"Tracking number assigned: {trackingNumber}",
-        "OutForDelivery" => "Your order is out for delivery today.",
-        "Delivered" => "Order delivered successfully.",
-        "DeliveryAttemptFailed" => "A delivery attempt was unsuccessful — the carrier will retry.",
-        "LostInTransit" => "We've detected an issue with this shipment and have opened a carrier trace. Our team will follow up shortly.",
-        "ReturnToSenderInitiated" => "The carrier is returning this shipment to our warehouse. We'll arrange a reshipment and contact you with details.",
-        _ => string.IsNullOrEmpty(trackingNumber)
-            ? $"Shipment update: {newStatus}"
-            : $"Shipment update: {newStatus} (Tracking: {trackingNumber})"
-    };
-
-    /// <summary>
-    /// Builds the customer-facing message line for a return status change.
-    /// Mirrors the 8 Returns notification handlers in <c>Storefront/Notifications/</c>.
-    /// </summary>
-    internal static string BuildReturnMessage(string newStatus, string? details) => newStatus switch
-    {
-        "Requested" => "We've received your return request and are reviewing it.",
-        "Approved" => "Your return has been approved — please ship the item back using the instructions provided.",
-        "Denied" => string.IsNullOrEmpty(details)
-            ? "Your return request was denied. Please contact support for more information."
-            : $"Your return request was denied: {details}",
-        "Received" => "We've received your returned item and are inspecting it.",
-        "Completed" => "Your return has been completed and your refund processed.",
-        "Rejected" => string.IsNullOrEmpty(details)
-            ? "Your returned item failed inspection. Please contact support."
-            : $"Your returned item failed inspection: {details}",
-        "Expired" => "Your return window has expired. Please contact support if you need assistance.",
-        _ => string.IsNullOrEmpty(details)
-            ? $"Return update: {newStatus}"
-            : $"Return update: {newStatus} — {details}"
     };
 
     public async ValueTask DisposeAsync()

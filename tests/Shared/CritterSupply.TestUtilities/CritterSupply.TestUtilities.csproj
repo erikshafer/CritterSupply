@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <PackageReference Include="Alba" />
+    <PackageReference Include="WolverineFx" />
+    <PackageReference Include="Shouldly" />
   </ItemGroup>
 
 </Project>

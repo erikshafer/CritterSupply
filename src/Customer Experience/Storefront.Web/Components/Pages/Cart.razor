@@ -3,6 +3,7 @@
 @using System.Text.Json
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using Storefront.Web.RealTime
 @inject IHttpClientFactory HttpClientFactory
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
@@ -230,17 +231,14 @@ else
     {
         Console.WriteLine($"SignalR event received: {eventData}");
 
-        // Parse event type
-        if (eventData.TryGetProperty("eventType", out var eventType))
+        // Reload cart for all cart-related events. Goes through the shared
+        // event reader (M46.0/H) so that any future cart event added by the
+        // BFF — line-item-added, item-removed, etc. — drops in here without
+        // re-implementing the camelCase property-extraction dance.
+        if (StorefrontEventReader.GetEventType(eventData) == "cart-updated")
         {
-            var eventTypeName = eventType.GetString();
-
-            // Reload cart for all cart-related events
-            if (eventTypeName == "cart-updated")
-            {
-                await LoadCart();
-                StateHasChanged();
-            }
+            await LoadCart();
+            StateHasChanged();
         }
     }
 
