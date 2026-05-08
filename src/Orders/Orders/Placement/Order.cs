@@ -593,4 +593,91 @@ public sealed class Order : Saga
             MarkCompleted();
         }
     }
+
+    // ---------------------------------------------------------------------------
+    // Cross-product exchange acknowledgement handlers (M45.1 / S3)
+    // ---------------------------------------------------------------------------
+    // The Returns BC publishes four cross-product exchange integration messages to the
+    // `orders-returns-events` queue (registered in Returns.Api/Program.cs). Without these
+    // handlers, Wolverine logs "no handler" on every delivery. Today these handlers are
+    // intentionally minimal acknowledgers — they keep the saga in its current state
+    // because the full cross-BC orchestration (Inventory replacement reservation, Payments
+    // delta capture, refund issuance) is deferred to the Returns + Orders remaster per
+    // docs/planning/milestones/m45-1-cross-product-exchange-gap-memo.md.
+    //
+    // What these handlers DO today:
+    //   - Add the exchange ReturnId to ActiveReturnIds so the saga doesn't close prematurely
+    //     while the cross-product flow is in progress (mirrors ReturnRequested behavior).
+    //   - For ExchangePartialRefundIssued: forward a RefundRequested to Payments BC so the
+    //     customer actually receives the refund. This was the most damaging gap because the
+    //     Returns BC now emits the integration event (per the ShipReplacementItem fix) but
+    //     no one was wired to act on it.
+    //
+    // What they explicitly DO NOT do (deferred to the remaster):
+    //   - Issue a CapturePayment to Payments for ExchangeAdditionalPaymentRequired. The
+    //     full slice needs a payment-method reference, idempotency key, and a saga-state
+    //     branch for "exchange in flight" — that is remaster scope.
+    //   - Reserve replacement inventory.
+    //   - Drive any compensation when ExchangeAdditionalPaymentCaptured arrives.
+
+    /// <summary>
+    /// Acknowledges a cross-product exchange initiation from Returns BC.
+    /// Adds the exchange to active returns so the saga stays open while the exchange is
+    /// in flight. Full orchestration (inventory + payment delta) is deferred — see
+    /// docs/planning/milestones/m45-1-cross-product-exchange-gap-memo.md.
+    /// </summary>
+    public void Handle(Messages.Contracts.Returns.CrossProductExchangeRequested message)
+    {
+        var activeReturns = ActiveReturnIds.ToList();
+        if (!activeReturns.Contains(message.ReturnId))
+        {
+            activeReturns.Add(message.ReturnId);
+            ActiveReturnIds = activeReturns.AsReadOnly();
+        }
+    }
+
+    /// <summary>
+    /// Acknowledges that the customer owes additional payment for a more-expensive replacement.
+    /// Today this is a no-op acknowledger (stops the Wolverine "no handler" log noise). The
+    /// Payments BC capture wiring is deferred to the Returns + Orders remaster — see
+    /// docs/planning/milestones/m45-1-cross-product-exchange-gap-memo.md.
+    /// </summary>
+    public void Handle(Messages.Contracts.Returns.ExchangeAdditionalPaymentRequired message)
+    {
+        // Intentional acknowledger. The actual capture will be wired in the remaster.
+    }
+
+    /// <summary>
+    /// Acknowledges that the customer's additional payment was captured by Payments BC.
+    /// Today this is a no-op acknowledger because the upstream emitter does not exist yet.
+    /// Filed for completeness so the saga is forward-compatible with the Payments wiring.
+    /// </summary>
+    public void Handle(Messages.Contracts.Returns.ExchangeAdditionalPaymentCaptured message)
+    {
+        // Intentional acknowledger. Full saga branch for "exchange in flight" is remaster scope.
+    }
+
+    /// <summary>
+    /// Handles partial refund owed to the customer for a cheaper replacement on a cross-product
+    /// exchange. Forwards a RefundRequested to Payments BC so the refund actually reaches the
+    /// customer. This closes the most damaging gap in the cross-product flow — the Returns BC
+    /// now emits ExchangePartialRefundIssued (per the M45.1 ShipReplacementItem fix) but
+    /// previously nothing acted on it.
+    /// </summary>
+    public OutgoingMessages Handle(Messages.Contracts.Returns.ExchangePartialRefundIssued message)
+    {
+        var outgoing = new OutgoingMessages();
+
+        // Defensive guard: only request refund if amount is positive.
+        if (message.RefundAmount > 0m)
+        {
+            outgoing.Add(new Messages.Contracts.Payments.RefundRequested(
+                Id,
+                message.RefundAmount,
+                $"Cross-product exchange partial refund (return {message.ReturnId})",
+                DateTimeOffset.UtcNow));
+        }
+
+        return outgoing;
+    }
 }
