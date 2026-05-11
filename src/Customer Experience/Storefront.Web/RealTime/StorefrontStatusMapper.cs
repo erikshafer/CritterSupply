@@ -102,6 +102,52 @@ public static class StorefrontStatusMapper
             ? $"Return update: {newStatus}"
             : $"Return update: {newStatus} — {details}",
     };
+
+    /// <summary>
+    /// Builds the customer-facing message line for a cross-product-exchange
+    /// payment update — either the additional-payment delta capture on a
+    /// more-expensive replacement (M47.0 / Slice 2 path 1) or the
+    /// partial refund of the price difference on a cheaper replacement
+    /// (M47.0 / Slice 2 path 2). Surfaces the <see cref="paymentReference"/>
+    /// verbatim so the customer can quote it to support.
+    ///
+    /// <para>
+    /// <paramref name="paymentKind"/> is <c>"Capture"</c> or <c>"Refund"</c>;
+    /// any other value falls back to a generic update line so producer-side
+    /// drift does not crash the UI. <paramref name="currency"/> is an ISO
+    /// 4217 alpha-3 code and is rendered alongside the amount; we
+    /// deliberately do NOT pull a <see cref="System.Globalization.CultureInfo"/>
+    /// from it because <see cref="System.Globalization.RegionInfo"/>
+    /// throws on unknown codes — the ISO code itself is always safe to
+    /// display, and treats every currency uniformly. Empty
+    /// <paramref name="paymentReference"/> is tolerated and the reference
+    /// clause is dropped.
+    /// </para>
+    /// </summary>
+    public static string BuildExchangePaymentMessage(
+        string paymentKind,
+        decimal amount,
+        string currency,
+        string? paymentReference)
+    {
+        var safeCurrency = string.IsNullOrWhiteSpace(currency) ? "" : currency.Trim().ToUpperInvariant();
+        var amountClause = string.IsNullOrEmpty(safeCurrency)
+            ? amount.ToString("0.00")
+            : $"{amount:0.00} {safeCurrency}";
+
+        return paymentKind switch
+        {
+            "Capture" => string.IsNullOrEmpty(paymentReference)
+                ? $"We charged the {amountClause} difference for your replacement."
+                : $"We charged the {amountClause} difference for your replacement. Reference: {paymentReference}",
+            "Refund" => string.IsNullOrEmpty(paymentReference)
+                ? $"We refunded the {amountClause} difference to your original payment method."
+                : $"We refunded the {amountClause} difference to your original payment method. Transaction: {paymentReference}",
+            _ => string.IsNullOrEmpty(paymentReference)
+                ? $"Exchange payment update: {amountClause}"
+                : $"Exchange payment update: {amountClause} (Ref: {paymentReference})",
+        };
+    }
 }
 
 /// <summary>
@@ -148,6 +194,22 @@ public static class StorefrontEventReader
             return null;
         }
         return prop.ValueKind == JsonValueKind.Number && prop.TryGetInt32(out var value)
+            ? value
+            : null;
+    }
+
+    /// <summary>
+    /// Reads a decimal property by name, or returns <c>null</c>.
+    /// Used for monetary values delivered via SignalR (e.g.
+    /// <c>ReturnExchangePaymentChanged.Amount</c>).
+    /// </summary>
+    public static decimal? GetDecimal(JsonElement eventData, string propertyName)
+    {
+        if (!eventData.TryGetProperty(propertyName, out var prop))
+        {
+            return null;
+        }
+        return prop.ValueKind == JsonValueKind.Number && prop.TryGetDecimal(out var value)
             ? value
             : null;
     }
