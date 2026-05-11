@@ -17,6 +17,7 @@ using Wolverine.FluentValidation;
 using Wolverine.Http;
 using Wolverine.Http.FluentValidation;
 using Wolverine.Marten;
+using Wolverine.RabbitMQ;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,6 +71,43 @@ builder.Host.UseWolverine(opts =>
         .Then.Discard();
 
     opts.UseFluentValidation();
+
+    // ---------------------------------------------------------------
+    // RabbitMQ wiring (M47.0 / Slice 2 — Payments BC's first RabbitMQ
+    // surface). See ADR 0062.
+    //
+    // Inbound:
+    //   - payments-returns-events: ExchangeAdditionalPaymentRequired
+    //     (drives CaptureExchangeDeltaHandler) and
+    //     ExchangePartialRefundRequested (drives
+    //     IssueExchangePartialRefundHandler).
+    //
+    // Outbound:
+    //   - returns-payments-events: ExchangeDeltaCaptured /
+    //     ExchangeDeltaCaptureFailed (replies to the capture request)
+    //     and ExchangePartialRefundIssued (reply to the refund request).
+    //     A single shared queue mirrors the Inventory ↔ Returns
+    //     pattern from Slice 1; Returns routes each by message type.
+    // ---------------------------------------------------------------
+    var rabbitConfig = builder.Configuration.GetSection("RabbitMQ");
+    opts.UseRabbitMq(rabbit =>
+    {
+        rabbit.HostName = rabbitConfig["hostname"] ?? "localhost";
+        rabbit.VirtualHost = rabbitConfig["virtualhost"] ?? "/";
+        rabbit.Port = rabbitConfig.GetValue<int?>("port") ?? 5672;
+        rabbit.UserName = rabbitConfig["username"] ?? "guest";
+        rabbit.Password = rabbitConfig["password"] ?? "guest";
+    }).AutoProvision();
+
+    opts.ListenToRabbitQueue("payments-returns-events")
+        .UseDurableInbox();
+
+    opts.PublishMessage<Messages.Contracts.Payments.ExchangeDeltaCaptured>()
+        .ToRabbitQueue("returns-payments-events");
+    opts.PublishMessage<Messages.Contracts.Payments.ExchangeDeltaCaptureFailed>()
+        .ToRabbitQueue("returns-payments-events");
+    opts.PublishMessage<Messages.Contracts.Payments.ExchangePartialRefundIssued>()
+        .ToRabbitQueue("returns-payments-events");
 });
 
 builder.Services.AddEndpointsApiExplorer();

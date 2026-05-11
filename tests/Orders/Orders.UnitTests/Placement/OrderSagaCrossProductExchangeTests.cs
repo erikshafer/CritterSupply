@@ -1,25 +1,25 @@
 using Messages.Contracts.Returns;
 using Orders.Placement;
-using PaymentContracts = Messages.Contracts.Payments;
 
 namespace Orders.UnitTests.Placement;
 
 /// <summary>
 /// Unit tests for the Order saga's cross-product exchange acknowledgement handlers
-/// added in M45.1 / S3. The Returns BC publishes four cross-product exchange
-/// integration messages to the <c>orders-returns-events</c> queue; without these
-/// handlers, Wolverine logs "no handler" on every delivery (audit finding).
+/// added in M45.1 / S3 and updated in M47.0 / S2 (per ADR 0062). The Returns BC
+/// publishes four cross-product exchange integration messages to the
+/// <c>orders-returns-events</c> queue; without these handlers, Wolverine logs
+/// "no handler" on every delivery (audit finding).
 ///
 /// Today the four handlers are intentionally minimal:
 /// <list type="bullet">
 ///   <item><c>CrossProductExchangeRequested</c>: tracks the exchange in <c>ActiveReturnIds</c>.</item>
 ///   <item><c>ExchangeAdditionalPaymentRequired</c>: no-op acknowledger.</item>
 ///   <item><c>ExchangeAdditionalPaymentCaptured</c>: no-op acknowledger.</item>
-///   <item><c>ExchangePartialRefundIssued</c>: forwards a <c>RefundRequested</c> to Payments.</item>
+///   <item><c>ExchangePartialRefundIssued</c>: no-op acknowledger (M47.0 / S2 — Payments
+///         BC owns the actual refund via the Returns ↔ Payments choreography in
+///         ADR 0062; forwarding a <c>RefundRequested</c> here would double-refund).</item>
 /// </list>
-/// Full cross-BC orchestration (Inventory replacement reservation, Payments delta capture,
-/// "exchange in flight" saga state) is deferred to the Returns + Orders remaster per
-/// <c>docs/planning/milestones/m45-1-cross-product-exchange-gap-memo.md</c>.
+/// Full saga-state branching for "exchange in flight" remains deferred to Slice 3.
 /// </summary>
 public class OrderSagaCrossProductExchangeTests
 {
@@ -125,50 +125,42 @@ public class OrderSagaCrossProductExchangeTests
             ReturnId: Guid.NewGuid(),
             OrderId: order.Id,
             CustomerId: order.CustomerId,
+            PaymentId: Guid.NewGuid(),
             AmountCaptured: 25.00m,
+            Currency: "USD",
+            PaymentReference: "txn_test_capture",
             CapturedAt: DateTimeOffset.UtcNow));
 
         order.Status.ShouldBe(statusBefore);
     }
 
     // ---------------------------------------------------------------------------
-    // Handle(ExchangePartialRefundIssued) — forwards to Payments BC
+    // Handle(ExchangePartialRefundIssued) — M47.0 / S2: now a no-op acknowledger.
+    // Payments BC owns the partial refund directly via the Returns ↔ Payments
+    // choreography (see ADR 0062). Forwarding a RefundRequested here would
+    // double-refund the customer.
     // ---------------------------------------------------------------------------
 
     [Fact]
-    public void ExchangePartialRefundIssued_Forwards_RefundRequested_To_Payments()
+    public void ExchangePartialRefundIssued_Does_Not_Forward_RefundRequested()
     {
-        // Closes the most damaging gap from the M45.1 / S3 audit: previously this integration
-        // event had no consumer, so the customer never received their partial refund.
+        // Regression guard for the M47.0 / S2 fix: the Order saga must NOT
+        // forward a RefundRequested to Payments when this integration message
+        // arrives, because Payments BC has already issued the refund (that is
+        // why this message exists in the first place). See ADR 0062.
         var order = BuildDeliveredOrder();
+        var statusBefore = order.Status;
 
-        var outgoing = order.Handle(new ExchangePartialRefundIssued(
+        order.Handle(new ExchangePartialRefundIssued(
             ReturnId: Guid.NewGuid(),
             OrderId: order.Id,
             CustomerId: order.CustomerId,
+            OriginalPaymentId: Guid.NewGuid(),
             RefundAmount: 20.00m,
+            Currency: "USD",
+            TransactionId: "ref_test_refund",
             IssuedAt: DateTimeOffset.UtcNow));
 
-        var refund = outgoing.OfType<PaymentContracts.RefundRequested>().SingleOrDefault();
-        refund.ShouldNotBeNull();
-        refund.OrderId.ShouldBe(order.Id);
-        refund.Amount.ShouldBe(20.00m);
-        refund.Reason.ShouldContain("Cross-product exchange partial refund");
-    }
-
-    [Fact]
-    public void ExchangePartialRefundIssued_With_Zero_Amount_Does_Not_Forward_Refund()
-    {
-        // Defensive guard: only request refund if amount > 0.
-        var order = BuildDeliveredOrder();
-
-        var outgoing = order.Handle(new ExchangePartialRefundIssued(
-            ReturnId: Guid.NewGuid(),
-            OrderId: order.Id,
-            CustomerId: order.CustomerId,
-            RefundAmount: 0m,
-            IssuedAt: DateTimeOffset.UtcNow));
-
-        outgoing.OfType<PaymentContracts.RefundRequested>().ShouldBeEmpty();
+        order.Status.ShouldBe(statusBefore);
     }
 }

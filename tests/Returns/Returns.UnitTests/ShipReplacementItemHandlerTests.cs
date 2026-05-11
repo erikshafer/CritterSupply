@@ -1,17 +1,22 @@
 using Returns.ReturnProcessing;
-using IntegrationContracts = Messages.Contracts.Returns;
+using PaymentsContracts = Messages.Contracts.Payments;
+using ReturnsContracts = Messages.Contracts.Returns;
 
 namespace Returns.UnitTests;
 
 /// <summary>
-/// Unit tests for <see cref="ShipReplacementItemHandler"/> covering the M45.1 / S3 fix
-/// to emit <see cref="ExchangePartialRefundIssued"/> (both as a domain event on the
-/// Return stream and as an integration message to Payments / Orders / Storefront)
-/// when a cross-product exchange completes with a cheaper replacement.
+/// Unit tests for <see cref="ShipReplacementItemHandler"/>.
 ///
-/// Closes the M45.1 audit finding that <c>Messages.Contracts.Returns.ExchangePartialRefundIssued</c>
-/// was registered for publication in <c>Returns.Api/Program.cs</c> but never constructed
-/// anywhere in the codebase.
+/// <para>
+/// Updated in M47.0 / Slice 2 (per ADR 0062): the handler no longer constructs the
+/// <see cref="ExchangePartialRefundIssued"/> domain event nor the public
+/// <see cref="ReturnsContracts.ExchangePartialRefundIssued"/> integration message
+/// directly — those are now appended / republished by
+/// <c>Returns.Integration.ExchangePartialRefundIssuedHandler</c> when the Payments BC
+/// replies that the refund has actually been issued. ShipReplacementItem instead
+/// publishes an <see cref="PaymentsContracts.ExchangePartialRefundRequested"/> to
+/// trigger Payments' refund handler.
+/// </para>
 /// </summary>
 public sealed class ShipReplacementItemHandlerTests
 {
@@ -45,85 +50,76 @@ public sealed class ShipReplacementItemHandlerTests
         new(ReturnId, "SHIP-123", "TRACK-456");
 
     [Fact]
-    public void Handle_with_cheaper_replacement_emits_ExchangePartialRefundIssued_domain_event()
+    public void Handle_with_cheaper_replacement_publishes_ExchangePartialRefundRequested_to_Payments()
     {
-        // Arrange: replacement is $20 cheaper, so customer is owed a $20 refund.
+        // M47.0 / S2: the refund is now driven by Payments BC. ShipReplacementItem
+        // publishes a request; the actual refund and the public ExchangePartialRefundIssued
+        // are emitted by Payments + the Returns integration handler when Payments replies.
         var aggregate = BuildExchangeReadyForShipping(originalPrice: 50.00m, replacementPrice: 30.00m);
 
-        // Act
-        var (events, _) = ShipReplacementItemHandler.Handle(BuildCommand(), aggregate);
-
-        // Assert: the new domain event is appended to the stream alongside ExchangeReplacementShipped + ExchangeCompleted.
-        var refundEvent = events.OfType<ExchangePartialRefundIssued>().SingleOrDefault();
-        refundEvent.ShouldNotBeNull();
-        refundEvent.ReturnId.ShouldBe(ReturnId);
-        refundEvent.RefundAmount.ShouldBe(20.00m);
-    }
-
-    [Fact]
-    public void Handle_with_cheaper_replacement_emits_integration_ExchangePartialRefundIssued()
-    {
-        // Arrange
-        var aggregate = BuildExchangeReadyForShipping(originalPrice: 50.00m, replacementPrice: 30.00m);
-
-        // Act
         var (_, outgoing) = ShipReplacementItemHandler.Handle(BuildCommand(), aggregate);
 
-        // Assert: the integration contract is published with the order + customer envelope so
-        // Payments BC and Storefront receive enough context to act / display.
-        var msg = outgoing.OfType<IntegrationContracts.ExchangePartialRefundIssued>().SingleOrDefault();
-        msg.ShouldNotBeNull();
-        msg.ReturnId.ShouldBe(ReturnId);
-        msg.OrderId.ShouldBe(OrderId);
-        msg.CustomerId.ShouldBe(CustomerId);
-        msg.RefundAmount.ShouldBe(20.00m);
+        var request = outgoing.OfType<PaymentsContracts.ExchangePartialRefundRequested>().SingleOrDefault();
+        request.ShouldNotBeNull();
+        request.ReturnId.ShouldBe(ReturnId);
+        request.OrderId.ShouldBe(OrderId);
+        request.CustomerId.ShouldBe(CustomerId);
+        request.RefundAmount.ShouldBe(20.00m);
     }
 
     [Fact]
-    public void Handle_with_same_price_replacement_does_NOT_emit_ExchangePartialRefundIssued()
+    public void Handle_with_cheaper_replacement_does_NOT_emit_partial_refund_domain_event()
     {
-        // Arrange: same-price replacement → no refund owed.
-        var aggregate = BuildExchangeReadyForShipping(originalPrice: 50.00m, replacementPrice: 50.00m);
+        // Regression guard for the M47.0 / S2 refactor: the domain event for the issued refund
+        // must come from the Payments reply path, not from ShipReplacementItem. Otherwise the
+        // Return aggregate would record the refund before Payments has actually moved the money.
+        var aggregate = BuildExchangeReadyForShipping(originalPrice: 50.00m, replacementPrice: 30.00m);
 
-        // Act
         var (events, outgoing) = ShipReplacementItemHandler.Handle(BuildCommand(), aggregate);
 
-        // Assert: no partial refund domain or integration event.
         events.OfType<ExchangePartialRefundIssued>().ShouldBeEmpty();
-        outgoing.OfType<IntegrationContracts.ExchangePartialRefundIssued>().ShouldBeEmpty();
+        outgoing.OfType<ReturnsContracts.ExchangePartialRefundIssued>().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Handle_with_same_price_replacement_does_NOT_request_partial_refund()
+    {
+        // Same-price replacement → no refund owed → no Payments request emitted.
+        var aggregate = BuildExchangeReadyForShipping(originalPrice: 50.00m, replacementPrice: 50.00m);
+
+        var (events, outgoing) = ShipReplacementItemHandler.Handle(BuildCommand(), aggregate);
+
+        outgoing.OfType<PaymentsContracts.ExchangePartialRefundRequested>().ShouldBeEmpty();
+        events.OfType<ExchangePartialRefundIssued>().ShouldBeEmpty();
 
         // Sanity: ExchangeCompleted still fires with no refund.
         events.OfType<ExchangeCompleted>().Single().PriceDifferenceRefund.ShouldBeNull();
     }
 
     [Fact]
-    public void Handle_with_more_expensive_replacement_does_NOT_emit_ExchangePartialRefundIssued()
+    public void Handle_with_more_expensive_replacement_does_NOT_request_partial_refund()
     {
-        // Arrange: replacement costs more, customer was charged via ExchangeAdditionalPaymentRequired
-        // earlier in the workflow — no refund at completion.
+        // Replacement costs more → customer was charged via the delta-capture path
+        // earlier in the workflow → no refund at completion.
         var aggregate = BuildExchangeReadyForShipping(originalPrice: 50.00m, replacementPrice: 75.00m);
 
-        // Act
         var (events, outgoing) = ShipReplacementItemHandler.Handle(BuildCommand(), aggregate);
 
-        // Assert
+        outgoing.OfType<PaymentsContracts.ExchangePartialRefundRequested>().ShouldBeEmpty();
         events.OfType<ExchangePartialRefundIssued>().ShouldBeEmpty();
-        outgoing.OfType<IntegrationContracts.ExchangePartialRefundIssued>().ShouldBeEmpty();
     }
 
     [Fact]
     public void Handle_always_emits_ExchangeReplacementShipped_and_ExchangeCompleted()
     {
-        // Arrange (any aggregate)
+        // Pre-existing emissions remain unchanged (regression guard for the M47.0 / S2 refactor).
         var aggregate = BuildExchangeReadyForShipping(originalPrice: 50.00m, replacementPrice: 50.00m);
 
-        // Act
         var (events, outgoing) = ShipReplacementItemHandler.Handle(BuildCommand(), aggregate);
 
-        // Assert: pre-existing emissions remain unchanged (regression guard for the M45.1 edit).
         events.OfType<ExchangeReplacementShipped>().Count().ShouldBe(1);
         events.OfType<ExchangeCompleted>().Count().ShouldBe(1);
-        outgoing.OfType<IntegrationContracts.ExchangeReplacementShipped>().Count().ShouldBe(1);
-        outgoing.OfType<IntegrationContracts.ExchangeCompleted>().Count().ShouldBe(1);
+        outgoing.OfType<ReturnsContracts.ExchangeReplacementShipped>().Count().ShouldBe(1);
+        outgoing.OfType<ReturnsContracts.ExchangeCompleted>().Count().ShouldBe(1);
     }
 }

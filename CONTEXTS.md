@@ -52,6 +52,7 @@ Owns financial transaction lifecycle — authorization, capture, failure handlin
 | Communicates with | Direction | Notes |
 |---|---|---|
 | Orders | ↔ bidirectional | Receives payment/refund requests; publishes results |
+| Returns | ↔ bidirectional | Receives `Returns.ExchangeAdditionalPaymentRequired` (cross-product exchange delta capture, M47.0/S2) and `Payments.ExchangePartialRefundRequested` (cheaper-replacement partial refund); publishes `Payments.ExchangeDeltaCaptured` / `Payments.ExchangeDeltaCaptureFailed` / `Payments.ExchangePartialRefundIssued`. See [ADR 0062](docs/decisions/0062-cross-product-exchange-payments-choreography.md) |
 
 **Key decisions:** Strategy pattern (`IPaymentGateway`) supports multiple providers. Stripe is implemented; PayPal researched ([ADR 0010](docs/decisions/0010-stripe-payment-gateway-integration.md)).
 
@@ -102,7 +103,7 @@ Manages return and exchange workflows — eligibility checks, inspection, refund
 |---|---|---|
 | Orders | → publishes | Approval, denial, completion, and expiry outcomes |
 | Fulfillment | ↔ bidirectional | Expects return receipt; publishes approval for reverse logistics |
-| Payments | ↔ bidirectional | Requests refunds; receives completion confirmation |
+| Payments | ↔ bidirectional | Requests refunds and cross-product-exchange delta captures; receives delta-capture / partial-refund / failure replies. Cross-product exchange path: see [ADR 0062](docs/decisions/0062-cross-product-exchange-payments-choreography.md) (M47.0/S2) |
 | Inventory | ↔ bidirectional | Requests replacement-SKU hold for cross-product exchanges (M47.0); receives reservation success/failure |
 
 **Constraint:** Cross-product exchanges supported (M35.0) with price difference handling — additional payment for more expensive replacements, partial refund for cheaper ones. Same-SKU exchanges also supported. 30-day eligibility window post-delivery.

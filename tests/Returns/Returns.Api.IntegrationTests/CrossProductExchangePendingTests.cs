@@ -36,34 +36,6 @@ public sealed class CrossProductExchangePendingTests
         "docs/planning/milestones/m45-1-cross-product-exchange-gap-memo.md";
 
     [Fact(Skip =
-        "Pending — ExchangePartialRefundIssued integration message is " +
-        "defined and routed for publication but never constructed. No " +
-        "Payments handler issues the delta refund. See " + GapMemo +
-        " 'What is missing' row #5.")]
-    public void Cheaper_Replacement_Issues_Partial_Refund()
-    {
-        // Implementation deferred until: Payments BC subscribes to
-        // ExchangeApproved (or equivalent) for cheaper replacements and
-        // emits ExchangePartialRefundIssued, with the Returns aggregate
-        // applying it to mark the exchange completed.
-    }
-
-    [Fact(Skip =
-        "Pending — no Payments subscriber for " +
-        "ExchangeAdditionalPaymentRequired and no emitter of " +
-        "ExchangeAdditionalPaymentCaptured. The 'And the additional " +
-        "payment is captured' Gherkin step has no implementing code path. See " +
-        GapMemo + " 'What is missing' rows #3–4.")]
-    public void More_Expensive_Replacement_Captures_Additional_Payment()
-    {
-        // Implementation deferred until: Payments BC handles
-        // ExchangeAdditionalPaymentRequired by issuing a
-        // CapturePayment for the delta and emits
-        // ExchangeAdditionalPaymentCaptured back; Returns aggregate
-        // applies it and proceeds to ship the replacement.
-    }
-
-    [Fact(Skip =
         "Pending — no refund-of-additional-payment compensation path " +
         "when inspection rejects the original item. The " +
         "'And the $25.00 additional payment is refunded to the customer' " +
@@ -81,7 +53,10 @@ public sealed class CrossProductExchangePendingTests
         "additional-payment capture-failure compensation path. The " +
         "'Then the exchange is cancelled' Gherkin step has no " +
         "implementing code. See " + GapMemo +
-        " 'What is missing' row #6.")]
+        " 'What is missing' row #6. M47.0 / Slice 2 lands the " +
+        "Returns.Integration.ExchangeDeltaCaptureFailedHandler stub " +
+        "(structured warning log only); Slice 4 will turn it into the " +
+        "customer-visible cancellation path this test asserts.")]
     public void Payment_Capture_Failure_Cancels_Exchange()
     {
         // Implementation deferred until: Payments BC emits

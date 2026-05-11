@@ -41,10 +41,8 @@ Feature: Cross-Product Exchange
     And the exchange is marked completed
     And no refund or additional charge is issued
 
-  @pending
-  # Pending: ExchangePartialRefundIssued integration message is defined and
-  # routed for publication, but never constructed by any handler — see
-  # m45-1-cross-product-exchange-gap-memo.md "What is missing" row #5.
+  # Closed in M47.0 / Slice 2 — Returns ↔ Payments choreography lands the
+  # partial refund. See ADR 0062 and docs/planning/milestones/m47-0-plan.md.
   Scenario: Cross-product exchange with cheaper replacement — partial refund issued
     When the customer requests an exchange for "Pet Mat (Small)" with SKU "PET-MAT-S" priced at $30.00
     And the replacement item is in stock
@@ -58,18 +56,21 @@ Feature: Cross-Product Exchange
     And a $20.00 partial refund is issued to the original payment method
     And the exchange is marked completed
 
-  @pending
-  # Pending: no Payments subscriber to ExchangeAdditionalPaymentRequired and
-  # no emitter of ExchangeAdditionalPaymentCaptured — see
-  # m45-1-cross-product-exchange-gap-memo.md "What is missing" rows #3–4.
-  Scenario: Cross-product exchange with more expensive replacement — additional payment required
+  # Closed in M47.0 / Slice 2 — Returns ↔ Payments choreography lands the
+  # delta capture. See ADR 0062 and docs/planning/milestones/m47-0-plan.md.
+  #
+  # Deviation from the original M35.0 / S4 spec: there is no in-flow
+  # "customer provides payment" interstitial — the customer's existing
+  # payment method (the one used for the original order) is reused for
+  # the upcharge capture. PO sign-off is pending; see ADR 0062 §Deviation
+  # for the rationale.
+  Scenario: Cross-product exchange with more expensive replacement — additional payment captured
     When the customer requests an exchange for "Pet Carrier (XL Premium)" with SKU "PET-CAR-XLP" priced at $75.00
     And the replacement item is in stock
     And the replacement costs $25.00 more than the original
     Then the exchange is approved with additional payment required
-    And the customer is notified that $25.00 additional payment is needed
-    When the customer provides payment for the $25.00 difference
-    Then the additional payment is captured
+    And the $25.00 upcharge is captured against the original payment method
+    And the customer is notified that the $25.00 upcharge has been billed
     And the customer is notified to ship the original item by 30 days from now
     When the customer ships the original item
     And the warehouse receives and inspects the item
