@@ -51,11 +51,13 @@ public static class ReleaseExchangeReservationHandler
         // prior release / the ExpireReservation timer. No-op silently;
         // the Returns BC's compensation path is allowed to race.
         if (inventory is null) return outgoing;
-        if (!inventory.Reservations.ContainsKey(message.ReservationId)) return outgoing;
+        if (!inventory.Reservations.TryGetValue(message.ReservationId, out var quantity)) return outgoing;
+        // Defensive: if the two reservation dictionaries are out of sync (should
+        // never happen — both are populated together — but keeps the handler
+        // crash-free and the message replayable rather than poisoned).
+        if (!inventory.ReservationOrderIds.TryGetValue(message.ReservationId, out var orderId)) return outgoing;
 
         var releasedAt = DateTimeOffset.UtcNow;
-        var quantity = inventory.Reservations[message.ReservationId];
-        var orderId = inventory.ReservationOrderIds[message.ReservationId];
 
         var domainEvent = new ReservationReleased(
             message.ReservationId,
