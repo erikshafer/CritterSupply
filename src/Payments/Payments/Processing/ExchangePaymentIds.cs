@@ -25,7 +25,8 @@ public static class ExchangePaymentIds
 {
     /// <summary>
     /// Fixed namespace for derived delta-capture payment ids. Generated
-    /// once and immortalized here. Changing it would orphan every existing
+    /// once via <c>Guid.NewGuid()</c> on 2026-05-11 (M47.0 / Slice 2)
+    /// and immortalized here. Changing it would orphan every existing
     /// delta-capture stream — treat as constant.
     /// </summary>
     private static readonly Guid DeltaCaptureNamespace =

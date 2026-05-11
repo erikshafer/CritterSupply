@@ -48,6 +48,15 @@ public static class ExchangePartialRefundIssuedHandler
         // Payments side's `PaymentRefunded.ReturnId` lookup in
         // `IssueExchangePartialRefundHandler`). This was reported by QA against the
         // first M47.0 / S2 PSA-cut and is the fix.
+        //
+        // Full-stream fetch is acceptable here: Return aggregates are bounded
+        // (~10-30 events for the full lifecycle including approval, receipt,
+        // inspection, replacement shipment) and `FetchForWriting` above already
+        // hydrated the same stream, so the second fetch is materially served
+        // from Marten's identity map / unit-of-work rather than re-reading
+        // every event row from Postgres. If Return streams ever grow
+        // unbounded (subscription-style returns, multi-year retention),
+        // revisit with `session.Events.QueryAllRawEvents().Where(...).AnyAsync()`.
         var existingEvents = await session.Events.FetchStreamAsync(message.ReturnId, token: ct);
         var alreadyApplied = existingEvents
             .Any(e => e.Data is ExchangePartialRefundIssued);

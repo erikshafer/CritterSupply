@@ -41,6 +41,24 @@ namespace Payments.Processing;
 public static class CaptureExchangeDeltaHandler
 {
     /// <summary>
+    /// Fallback currency used on the no-original-payment failure path
+    /// (the only flow where the handler cannot derive a real currency
+    /// from a captured original <see cref="Payment"/>). The Payments BC
+    /// is single-currency in M47.0; once a multi-currency story exists
+    /// (currently out of scope), this should move to configuration.
+    /// </summary>
+    private const string FallbackCurrency = "USD";
+
+    /// <summary>
+    /// Synthetic payment-method token used for the no-original-payment
+    /// failure path so the failed <see cref="Payment"/> stream is
+    /// well-formed (a non-empty token is required by
+    /// <see cref="PaymentInitiated"/>). Never reaches a real gateway —
+    /// the failure event is appended in the same call.
+    /// </summary>
+    private const string UnknownPaymentToken = "tok_unknown";
+
+    /// <summary>
     /// Loads the (possibly existing) delta-capture Payment so the handler
     /// can detect duplicate deliveries before calling the gateway.
     /// </summary>
@@ -125,8 +143,8 @@ public static class CaptureExchangeDeltaHandler
                 message.OrderId,
                 message.CustomerId,
                 message.AmountDue,
-                "USD",
-                "tok_unknown",
+                FallbackCurrency,
+                UnknownPaymentToken,
                 now);
 
             const string reason = "No captured original payment found for this order; cannot reuse a payment method for the exchange delta capture.";
@@ -137,7 +155,7 @@ public static class CaptureExchangeDeltaHandler
                 ReturnId: message.ReturnId,
                 OrderId: message.OrderId,
                 AmountDue: message.AmountDue,
-                Currency: "USD",
+                Currency: FallbackCurrency,
                 Reason: reason,
                 IsRetriable: false,
                 FailedAt: now));
