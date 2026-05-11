@@ -1,46 +1,73 @@
+using Marten;
 using Microsoft.Extensions.Logging;
+using Returns.ReturnProcessing;
+using Wolverine;
+using InventoryMessages = Messages.Contracts.Inventory;
 using PaymentsMessages = Messages.Contracts.Payments;
+using ReturnsMessages = Messages.Contracts.Returns;
 
 namespace Returns.Integration;
 
 /// <summary>
-/// Stub consumer for <see cref="PaymentsMessages.ExchangeDeltaCaptureFailed"/>
-/// (M47.0 / Slice 2). Slice 4 will turn this into the
-/// "exchange cancelled" customer-visible path per the pending Gherkin
-/// scenario "Additional payment capture fails — exchange cancelled" in
-/// <c>docs/features/returns/cross-product-exchange.feature</c>.
+/// M47.0 / Slice 4 — consumer for
+/// <see cref="PaymentsMessages.ExchangeDeltaCaptureFailed"/> that closes
+/// the customer-facing cancellation path the M47.0 / Slice 2 stub
+/// deferred. Implements the
+/// "Additional payment capture fails — exchange cancelled" Gherkin scenario
+/// in <c>docs/features/returns/cross-product-exchange.feature</c>.
 ///
 /// <para>
-/// In the interim, the handler emits a structured warning so a stranded
-/// exchange (replacement reservation held by Inventory + customer
-/// notified of an upcharge that never landed) is discoverable in
-/// operational logs and dashboards. Per the UX Engineer's M47.0 / Slice 2
-/// review, silent no-op was rejected as a UX-acceptable interim state.
+/// Behaviour:
+/// <list type="number">
+///   <item>Loads the <see cref="Return"/> aggregate. If the aggregate is
+///     missing, not a cross-product exchange, has already captured the
+///     delta, or is no longer in the <see cref="ReturnStatus.Approved"/>
+///     state, the handler is a no-op (idempotent under at-least-once).</item>
+///   <item>Appends the <see cref="ExchangeCancelled"/> domain event,
+///     transitioning the aggregate to <see cref="ReturnStatus.Cancelled"/>
+///     (terminal).</item>
+///   <item>Publishes the public
+///     <see cref="ReturnsMessages.ExchangeCancelled"/> integration message
+///     (Storefront / Orders / Backoffice fan-out).</item>
+///   <item>If the Slice 1 replacement reservation was confirmed
+///     (<see cref="Return.ReplacementInventoryId"/> non-null), publishes
+///     <see cref="InventoryMessages.ReleaseReservation"/> to release the
+///     held stock so it returns to the available pool immediately rather
+///     than waiting for the ExpireReservation timer.</item>
+/// </list>
 /// </para>
 ///
 /// <para>
-/// This is intentionally NOT a no-op acknowledger like the M45.1 Orders
-/// saga acknowledgers — those existed to suppress Wolverine "no handler"
-/// noise on contracts that had no real consumer. Here the consumer
-/// exists; what's deferred is the customer-facing transition.
+/// The customer-facing copy is the verbatim Gherkin string. The Reason
+/// field is a stable machine-pivotable code.
+/// </para>
+///
+/// <para>
+/// A structured warning log line is still emitted so operators have the
+/// same dashboard-pivotable signal the Slice 2 stub provided.
 /// </para>
 /// </summary>
 public static class ExchangeDeltaCaptureFailedHandler
 {
-    public static Task Handle(
+    /// <summary>Stable machine-pivotable cancellation reason code.</summary>
+    public const string CancellationReason = "PaymentCaptureFailed";
+
+    /// <summary>Customer-facing copy from the Gherkin spec, verbatim.</summary>
+    public const string CancellationMessage =
+        "Payment for price difference could not be processed. Exchange cancelled.";
+
+    public static async Task Handle(
         PaymentsMessages.ExchangeDeltaCaptureFailed message,
+        IDocumentSession session,
+        IMessageBus bus,
         ILogger<ExchangeDeltaCaptureFailedLog> logger,
         CancellationToken ct)
     {
-        // Structured fields kept first-class so log aggregators / dashboards
-        // can pivot on them. ReturnId + OrderId are the natural keys an
-        // operator needs to manually unblock the exchange in Slice 4's
-        // absence (deny the return + release the inventory hold).
+        // Operational signal — preserved from the Slice 2 stub so dashboards
+        // and log aggregators continue to pivot on the same fields.
         logger.LogWarning(
             "Cross-product exchange delta capture failed for ReturnId={ReturnId} OrderId={OrderId} " +
-            "AmountDue={AmountDue} {Currency} Reason={Reason} IsRetriable={IsRetriable}. " +
-            "Customer-visible cancellation is deferred to M47.0 / Slice 4 — manual ops " +
-            "intervention required to deny the exchange and release the inventory reservation.",
+            "AmountDue={AmountDue} {Currency} Reason={Reason} IsRetriable={IsRetriable}.",
             message.ReturnId,
             message.OrderId,
             message.AmountDue,
@@ -48,7 +75,52 @@ public static class ExchangeDeltaCaptureFailedHandler
             message.Reason,
             message.IsRetriable);
 
-        return Task.CompletedTask;
+        var stream = await session.Events.FetchForWriting<Return>(message.ReturnId, ct);
+        var aggregate = stream.Aggregate;
+
+        // Idempotency / safety guards. Mirrors the Slice 2
+        // ExchangeDeltaCapturedHandler shape: silently no-op on
+        // redelivery or on an aggregate state where the cancellation
+        // would be incorrect.
+        if (aggregate is null) return;
+        if (!aggregate.IsCrossProductExchange) return;
+        if (aggregate.AdditionalPaymentCaptured) return; // capture succeeded — failure must be stale
+        if (aggregate.Status != ReturnStatus.Approved) return; // already moved past Approved (cancelled / progressed elsewhere)
+
+        var cancelledAt = message.FailedAt;
+
+        var domainEvent = new ExchangeCancelled(
+            ReturnId: message.ReturnId,
+            Reason: CancellationReason,
+            Message: CancellationMessage,
+            CancelledAt: cancelledAt);
+
+        stream.AppendOne(domainEvent);
+
+        // Public fan-out — Storefront notifies the customer with the
+        // verbatim Gherkin copy via the BuildReturnMessage("Cancelled", …)
+        // mapper helper.
+        await bus.PublishAsync(new ReturnsMessages.ExchangeCancelled(
+            ReturnId: message.ReturnId,
+            OrderId: aggregate.OrderId,
+            CustomerId: aggregate.CustomerId,
+            Reason: CancellationReason,
+            Message: CancellationMessage,
+            CancelledAt: cancelledAt));
+
+        // Release the Slice 1 replacement-stock reservation. Skipped when
+        // the InventoryId was never recorded (e.g. the
+        // ReplacementReserved reply lost the race, or the test seeded the
+        // aggregate without going through ApproveExchange — in that case
+        // ExpireReservation will eventually clean up). ReturnId is the
+        // ReservationId per ADR 0061.
+        if (aggregate.ReplacementInventoryId is { } inventoryId)
+        {
+            await bus.PublishAsync(new InventoryMessages.ReleaseExchangeReservation(
+                InventoryId: inventoryId,
+                ReservationId: message.ReturnId,
+                Reason: CancellationReason));
+        }
     }
 }
 

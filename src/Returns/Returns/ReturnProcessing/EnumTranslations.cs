@@ -28,6 +28,7 @@ public static class EnumTranslations
             ReturnStatus.Completed => "Return processed — refund issued",
             ReturnStatus.Rejected => "Return rejected",
             ReturnStatus.Expired => "Return expired",
+            ReturnStatus.Cancelled => "Exchange cancelled",
             _ => status.ToString()
         };
     }

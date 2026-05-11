@@ -12,5 +12,10 @@ public enum ReturnStatus
     ExchangeShipping, // Exchange-specific: replacement item is being shipped
     Completed,
     Rejected,
-    Expired
+    Expired,
+    // M47.0 / Slice 4 — terminal status for a cross-product exchange that
+    // was approved but could not be fulfilled because the additional-payment
+    // delta capture failed downstream in Payments. Distinct from Denied
+    // (up-front rejection at request time) and Rejected (failed inspection).
+    Cancelled
 }

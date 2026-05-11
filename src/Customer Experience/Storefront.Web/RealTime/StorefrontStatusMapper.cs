@@ -98,6 +98,13 @@ public static class StorefrontStatusMapper
             ? "Your returned item failed inspection. Please contact support."
             : $"Your returned item failed inspection: {details}",
         "Expired" => "Your return window has expired. Please contact support if you need assistance.",
+        // M47.0 / Slice 4 — cross-product exchange cancelled (payment-capture
+        // failure). The producer (Returns ExchangeCancelledHandler) carries
+        // the verbatim PO-approved Gherkin copy on the message; if it ever
+        // arrives empty we fall back to a safe generic line.
+        "Cancelled" => string.IsNullOrEmpty(details)
+            ? "Your exchange has been cancelled. Please contact support for more information."
+            : details,
         _ => string.IsNullOrEmpty(details)
             ? $"Return update: {newStatus}"
             : $"Return update: {newStatus} — {details}",

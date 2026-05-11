@@ -115,10 +115,14 @@ Feature: Cross-Product Exchange
     And no replacement is shipped
     And no refund is issued
 
-  @pending
-  # Pending: no refund-of-additional-payment compensation path on
-  # inspection rejection — see m45-1-cross-product-exchange-gap-memo.md
-  # "What is missing" row #7.
+  # Closed in M47.0 / Slice 4 — Returns ↔ Payments compensation path
+  # refunds the captured additional-payment delta when inspection rejects
+  # a cross-product exchange. The Returns BC's SubmitInspection handler
+  # publishes Payments.RefundExchangeDeltaRequested when
+  # IsCrossProductExchange && AdditionalPaymentCaptured; the Payments BC's
+  # RefundExchangeDeltaHandler refunds against the deterministic
+  # delta-Payment stream and replies via the existing
+  # ExchangePartialRefundIssued contract (Storefront already renders it).
   Scenario: Cross-product exchange with additional payment rejected — refund payment difference
     When the customer requests an exchange for "Pet Carrier (XL Premium)" with SKU "PET-CAR-XLP" priced at $75.00
     And the replacement costs $25.00 more than the original
@@ -143,10 +147,12 @@ Feature: Cross-Product Exchange
     Then the exchange expires
     And the customer is notified: "Exchange expired — original item was not shipped within 30 days."
 
-  @pending
-  # Pending: no ExchangeCancelled command/event for the additional-payment
-  # capture-failure compensation path — see
-  # m45-1-cross-product-exchange-gap-memo.md "What is missing" row #6.
+  # Closed in M47.0 / Slice 4 — Returns ↔ Payments compensation path
+  # transitions the Return to the new terminal Cancelled status when the
+  # additional-payment capture fails. The Returns BC's
+  # ExchangeDeltaCaptureFailedHandler appends ExchangeCancelled, publishes
+  # Returns.ExchangeCancelled (Storefront notification), and releases the
+  # held replacement reservation in Inventory.
   Scenario: Additional payment capture fails — exchange cancelled
     When the customer requests an exchange for "Pet Carrier (XL Premium)" with SKU "PET-CAR-XLP" priced at $75.00
     And the replacement costs $25.00 more than the original

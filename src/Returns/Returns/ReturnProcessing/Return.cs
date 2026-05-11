@@ -28,6 +28,7 @@ public sealed record Return(
     decimal? AdditionalPaymentAmount,
     bool AdditionalPaymentCaptured,
     string? PaymentReference,
+    Guid? ReplacementInventoryId,
     DateTimeOffset RequestedAt,
     DateTimeOffset? ApprovedAt,
     DateTimeOffset? DeniedAt,
@@ -39,7 +40,8 @@ public sealed record Return(
 {
     // Terminal states — no further transitions allowed
     public bool IsTerminal => Status is ReturnStatus.Denied
-        or ReturnStatus.Completed or ReturnStatus.Rejected or ReturnStatus.Expired;
+        or ReturnStatus.Completed or ReturnStatus.Rejected or ReturnStatus.Expired
+        or ReturnStatus.Cancelled;
 
     public static Return Create(ReturnRequested @event)
     {
@@ -67,6 +69,7 @@ public sealed record Return(
             AdditionalPaymentAmount: null,
             AdditionalPaymentCaptured: false,
             PaymentReference: null,
+            ReplacementInventoryId: null,
             RequestedAt: @event.RequestedAt,
             ApprovedAt: null,
             DeniedAt: null,
@@ -215,6 +218,24 @@ public sealed record Return(
     public Return Apply(ExchangePartialRefundIssued e) => this with
     {
         FinalRefundAmount = e.RefundAmount
+    };
+
+    /// <summary>M47.0 / Slice 4 — see <see cref="ReplacementReservationConfirmed"/>.</summary>
+    public Return Apply(ReplacementReservationConfirmed e) => this with
+    {
+        ReplacementInventoryId = e.InventoryId
+    };
+
+    /// <summary>
+    /// M47.0 / Slice 4 — cancellation due to downstream payment-capture failure
+    /// for a cross-product exchange. Terminal.
+    /// </summary>
+    public Return Apply(ExchangeCancelled e) => this with
+    {
+        Status = ReturnStatus.Cancelled,
+        DenialReason = e.Reason,
+        DenialMessage = e.Message,
+        CompletedAt = e.CancelledAt
     };
 
     /// <summary>

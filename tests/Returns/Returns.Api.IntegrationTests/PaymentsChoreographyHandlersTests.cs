@@ -248,21 +248,101 @@ public sealed class PaymentsChoreographyHandlersTests : IAsyncLifetime
     }
 
     // -----------------------------------------------------------------
-    // ExchangeDeltaCaptureFailedHandler — log-only stub
+    // ExchangeDeltaCaptureFailedHandler — Slice 4 cancellation path
     // -----------------------------------------------------------------
 
     [Fact]
-    public async Task ExchangeDeltaCaptureFailedHandler_does_not_mutate_state()
+    public async Task ExchangeDeltaCaptureFailedHandler_transitions_return_to_Cancelled_and_publishes_cancellation()
+    {
+        var (returnId, orderId, customerId) = await CreateApprovedMoreExpensiveExchange();
+
+        var failedAt = DateTimeOffset.UtcNow;
+        var message = new PaymentsMessages.ExchangeDeltaCaptureFailed(
+            ReturnId: returnId,
+            OrderId: orderId,
+            AmountDue: 25m,
+            Currency: "USD",
+            Reason: "card_declined",
+            IsRetriable: false,
+            FailedAt: failedAt);
+
+        var tracked = await _fixture.ExecuteAndWaitAsync(message);
+
+        // Assert: ExchangeCancelled domain event appended; aggregate is terminal Cancelled.
+        using var session = _fixture.GetDocumentSession();
+        var events = await session.Events.FetchStreamAsync(returnId);
+        var cancellations = events.Select(e => e.Data).OfType<ExchangeCancelled>().ToList();
+        cancellations.Count.ShouldBe(1);
+        cancellations[0].Reason.ShouldBe(ExchangeDeltaCaptureFailedHandler.CancellationReason);
+        cancellations[0].Message.ShouldBe(ExchangeDeltaCaptureFailedHandler.CancellationMessage);
+
+        var after = await session.Events.AggregateStreamAsync<Return>(returnId);
+        after.ShouldNotBeNull();
+        after.Status.ShouldBe(ReturnStatus.Cancelled);
+        after.IsTerminal.ShouldBeTrue();
+        after.AdditionalPaymentCaptured.ShouldBeFalse();
+
+        // Public ExchangeCancelled fan-out (orders + storefront — 2 envelopes per Program.cs).
+        var cancelledMessages = tracked.Sent
+            .MessagesOf<ReturnsMessages.ExchangeCancelled>().ToList();
+        cancelledMessages.Count.ShouldBe(2);
+        cancelledMessages[0].ReturnId.ShouldBe(returnId);
+        cancelledMessages[0].OrderId.ShouldBe(orderId);
+        cancelledMessages[0].CustomerId.ShouldBe(customerId);
+        cancelledMessages[0].Reason.ShouldBe(ExchangeDeltaCaptureFailedHandler.CancellationReason);
+        cancelledMessages[0].Message.ShouldBe(ExchangeDeltaCaptureFailedHandler.CancellationMessage);
+        cancelledMessages[0].CancelledAt.ShouldBe(failedAt);
+
+        typeof(ExchangeDeltaCaptureFailedLog).ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task ExchangeDeltaCaptureFailedHandler_releases_held_replacement_reservation_when_known()
+    {
+        var (returnId, orderId, customerId) = await CreateApprovedMoreExpensiveExchange();
+
+        // Slice 1 happy-path: a replacement reservation reply was received and
+        // recorded on the aggregate. Mimic that here so the handler has an
+        // InventoryId to publish a release for.
+        var inventoryId = Guid.NewGuid();
+        await _fixture.ExecuteAndWaitAsync(new Messages.Contracts.Inventory.ReplacementReserved(
+            ReturnId: returnId,
+            OrderId: orderId,
+            InventoryId: inventoryId,
+            Sku: "PET-BED-L",
+            WarehouseId: ReturnsExchangeDefaults.ReplacementWarehouseId,
+            Quantity: 1,
+            ReservedAt: DateTimeOffset.UtcNow));
+
+        // Confirm the InventoryId was captured on the aggregate before driving the failure.
+        using (var inspect = _fixture.GetDocumentSession())
+        {
+            var snapshot = await inspect.Events.AggregateStreamAsync<Return>(returnId);
+            snapshot!.ReplacementInventoryId.ShouldBe(inventoryId);
+        }
+
+        var message = new PaymentsMessages.ExchangeDeltaCaptureFailed(
+            ReturnId: returnId,
+            OrderId: orderId,
+            AmountDue: 25m,
+            Currency: "USD",
+            Reason: "insufficient_funds",
+            IsRetriable: false,
+            FailedAt: DateTimeOffset.UtcNow);
+
+        var tracked = await _fixture.ExecuteAndWaitAsync(message);
+
+        var release = tracked.Sent
+            .SingleMessage<Messages.Contracts.Inventory.ReleaseExchangeReservation>();
+        release.InventoryId.ShouldBe(inventoryId);
+        release.ReservationId.ShouldBe(returnId); // ADR 0061 — ReturnId is the ReservationId
+        release.Reason.ShouldBe(ExchangeDeltaCaptureFailedHandler.CancellationReason);
+    }
+
+    [Fact]
+    public async Task ExchangeDeltaCaptureFailedHandler_idempotent_on_redelivery()
     {
         var (returnId, orderId, _) = await CreateApprovedMoreExpensiveExchange();
-
-        // Capture aggregate snapshot BEFORE the failure delivery so we can
-        // diff afterwards. Slice 2 contract: no Return state mutation.
-        Return? before;
-        using (var beforeSession = _fixture.GetDocumentSession())
-        {
-            before = await beforeSession.Events.AggregateStreamAsync<Return>(returnId);
-        }
 
         var message = new PaymentsMessages.ExchangeDeltaCaptureFailed(
             ReturnId: returnId,
@@ -273,23 +353,16 @@ public sealed class PaymentsChoreographyHandlersTests : IAsyncLifetime
             IsRetriable: false,
             FailedAt: DateTimeOffset.UtcNow);
 
-        var tracked = await _fixture.ExecuteAndWaitAsync(message);
+        var first = await _fixture.ExecuteAndWaitAsync(message);
+        var second = await _fixture.ExecuteAndWaitAsync(message);
 
-        // Assert: no events appended, no public re-emit.
+        // Domain event appended exactly once; aggregate stays Cancelled.
         using var session = _fixture.GetDocumentSession();
-        var after = await session.Events.AggregateStreamAsync<Return>(returnId);
-        after.ShouldNotBeNull();
-        after.Status.ShouldBe(before!.Status);
-        after.AdditionalPaymentCaptured.ShouldBeFalse();
-        after.AdditionalPaymentAmount.ShouldBe(before.AdditionalPaymentAmount);
-        after.IsTerminal.ShouldBeFalse();
+        var events = await session.Events.FetchStreamAsync(returnId);
+        events.Count(e => e.Data is ExchangeCancelled).ShouldBe(1);
 
-        tracked.Sent.MessagesOf<ReturnsMessages.ExchangeAdditionalPaymentCaptured>().ShouldBeEmpty();
-
-        // Note: log-warning capture (the original test #11) is skipped —
-        // the Returns test fixture does not yet wire a FakeLogger. The
-        // class-level marker ExchangeDeltaCaptureFailedLog is exercised
-        // implicitly because the handler ran without exception.
-        typeof(ExchangeDeltaCaptureFailedLog).ShouldNotBeNull();
+        // Public re-emit only on the first delivery (per Slice 2 idempotency contract).
+        first.Sent.MessagesOf<ReturnsMessages.ExchangeCancelled>().Count().ShouldBe(2);
+        second.Sent.MessagesOf<ReturnsMessages.ExchangeCancelled>().ShouldBeEmpty();
     }
 }

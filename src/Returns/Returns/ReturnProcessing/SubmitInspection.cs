@@ -101,6 +101,36 @@ public static class SubmitInspectionHandler
                 FailureReason: "Item condition does not qualify for exchange. Return rejected.",
                 RejectedAt: now));
 
+            // M47.0 / Slice 4 — if this is a cross-product exchange that
+            // already captured an additional-payment delta (more-expensive
+            // replacement), refund the captured delta. Closes the
+            // "Cross-product exchange with additional payment rejected —
+            // refund payment difference" Gherkin scenario.
+            if (aggregate.IsCrossProductExchange
+                && aggregate.AdditionalPaymentCaptured
+                && aggregate.AdditionalPaymentAmount is { } amountToRefund
+                && amountToRefund > 0)
+            {
+                outgoing.Add(new Messages.Contracts.Payments.RefundExchangeDeltaRequested(
+                    ReturnId: command.ReturnId,
+                    OrderId: aggregate.OrderId,
+                    CustomerId: aggregate.CustomerId,
+                    RefundAmount: amountToRefund,
+                    RequestedAt: now));
+            }
+
+            // M47.0 / Slice 4 — release the held replacement reservation
+            // (Slice 1) when present. The Inventory side is fully
+            // idempotent against missing reservations.
+            if (aggregate.IsCrossProductExchange
+                && aggregate.ReplacementInventoryId is { } inventoryId)
+            {
+                outgoing.Add(new Messages.Contracts.Inventory.ReleaseExchangeReservation(
+                    InventoryId: inventoryId,
+                    ReservationId: command.ReturnId,
+                    Reason: "ExchangeInspectionRejected"));
+            }
+
             return (events, outgoing);
         }
 
