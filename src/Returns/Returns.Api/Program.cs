@@ -113,6 +113,28 @@ builder.Host.UseWolverine(opts =>
     opts.PublishMessage<Messages.Contracts.Inventory.ReserveReplacementForExchange>()
         .ToRabbitQueue("inventory-returns-events");
 
+    // M47.0 / Slice 2 — Returns ↔ Payments cross-product exchange delta
+    // capture + partial refund. See ADR 0062 and
+    // docs/planning/milestones/m47-0-plan.md.
+    //
+    // Inbound: Payments replies (capture success/failure, refund issued)
+    // ride a shared `returns-payments-events` queue. The handlers in
+    // Returns.Integration route each by message type.
+    opts.ListenToRabbitQueue("returns-payments-events")
+        .UseDurableInbox();
+
+    // Outbound: capture-delta request rides the existing
+    // ExchangeAdditionalPaymentRequired contract (already constructed
+    // by ApproveExchangeHandler). Route an additional copy to the new
+    // `payments-returns-events` queue so Payments receives the request.
+    opts.PublishMessage<Messages.Contracts.Returns.ExchangeAdditionalPaymentRequired>()
+        .ToRabbitQueue("payments-returns-events");
+
+    // Outbound: partial-refund request — new contract emitted by
+    // ShipReplacementItemHandler when the replacement is cheaper.
+    opts.PublishMessage<Messages.Contracts.Payments.ExchangePartialRefundRequested>()
+        .ToRabbitQueue("payments-returns-events");
+
     // === Outbound: Orders BC ===
     // Orders saga needs: ReturnRequested, ReturnCompleted, ReturnDenied, ReturnRejected, ReturnExpired
     opts.PublishMessage<Messages.Contracts.Returns.ReturnRequested>()

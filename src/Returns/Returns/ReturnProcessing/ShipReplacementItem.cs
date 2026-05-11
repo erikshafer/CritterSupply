@@ -83,17 +83,6 @@ public static class ShipReplacementItemHandler
             PriceDifferenceRefund: partialRefundAmount,
             CompletedAt: now));
 
-        // Append partial refund issued domain event when there is a refund owed.
-        // Mirrors the ExchangeAdditionalPaymentRequired domain event already emitted by
-        // ApproveExchangeHandler when the replacement costs more.
-        if (partialRefundAmount.HasValue)
-        {
-            events.Add(new ExchangePartialRefundIssued(
-                ReturnId: command.ReturnId,
-                RefundAmount: partialRefundAmount.Value,
-                IssuedAt: now));
-        }
-
         // Publish replacement shipped integration event
         outgoing.Add(new Messages.Contracts.Returns.ExchangeReplacementShipped(
             ReturnId: command.ReturnId,
@@ -103,7 +92,7 @@ public static class ShipReplacementItemHandler
             TrackingNumber: command.TrackingNumber,
             ShippedAt: now));
 
-        // Publish exchange completed integration event (Orders BC issues price difference refund)
+        // Publish exchange completed integration event
         outgoing.Add(new Messages.Contracts.Returns.ExchangeCompleted(
             ReturnId: command.ReturnId,
             OrderId: aggregate.OrderId,
@@ -111,17 +100,21 @@ public static class ShipReplacementItemHandler
             PriceDifferenceRefund: partialRefundAmount,
             CompletedAt: now));
 
-        // Publish partial refund integration event so Payments BC can actually issue the refund and
-        // Storefront can surface it. Closes the M45.1 / S3 "contract registered for publication but
-        // never constructed" anti-pattern. Only emitted when there is an actual refund owed.
+        // M47.0 / Slice 2 — When the cross-product replacement is cheaper, ask Payments
+        // to actually issue the partial refund against the original payment method. The
+        // ExchangePartialRefundIssued domain event + public integration message are NO
+        // LONGER appended here — they are now appended/published by
+        // Returns.Integration.ExchangePartialRefundIssuedHandler when Payments replies
+        // with Messages.Contracts.Payments.ExchangePartialRefundIssued. This closes the
+        // M45.1 "constructed but no money moved" gap (memo row #5). See ADR 0062.
         if (partialRefundAmount.HasValue)
         {
-            outgoing.Add(new Messages.Contracts.Returns.ExchangePartialRefundIssued(
+            outgoing.Add(new Messages.Contracts.Payments.ExchangePartialRefundRequested(
                 ReturnId: command.ReturnId,
                 OrderId: aggregate.OrderId,
                 CustomerId: aggregate.CustomerId,
                 RefundAmount: partialRefundAmount.Value,
-                IssuedAt: now));
+                RequestedAt: now));
         }
 
         return (events, outgoing);

@@ -736,26 +736,27 @@ public sealed class Order : Saga
     }
 
     /// <summary>
-    /// Handles partial refund owed to the customer for a cheaper replacement on a cross-product
-    /// exchange. Forwards a RefundRequested to Payments BC so the refund actually reaches the
-    /// customer. This closes the most damaging gap in the cross-product flow — the Returns BC
-    /// now emits ExchangePartialRefundIssued (per the M45.1 ShipReplacementItem fix) but
-    /// previously nothing acted on it.
+    /// Acknowledges that the customer's partial refund for a cheaper cross-product
+    /// replacement has been issued by Payments BC (M47.0 / Slice 2 — see ADR 0062).
+    ///
+    /// <para>
+    /// In M45.1 / S3 this handler forwarded a <see cref="Messages.Contracts.Payments.RefundRequested"/>
+    /// to Payments because the M45.1 placeholder publication chain bypassed Payments
+    /// entirely. As of M47.0 / Slice 2 the partial refund is driven directly by
+    /// the Returns ↔ Payments choreography (Returns publishes
+    /// <c>Messages.Contracts.Payments.ExchangePartialRefundRequested</c>; Payments
+    /// refunds and replies). Forwarding a <c>RefundRequested</c> here would now
+    /// result in a double refund, so the saga is a no-op acknowledger only.
+    /// </para>
+    ///
+    /// <para>
+    /// Returns no <c>OutgoingMessages</c> because the saga has nothing to send;
+    /// the public integration message stays on the saga's subscription so Wolverine
+    /// does not log "no handler".
+    /// </para>
     /// </summary>
-    public OutgoingMessages Handle(Messages.Contracts.Returns.ExchangePartialRefundIssued message)
+    public void Handle(Messages.Contracts.Returns.ExchangePartialRefundIssued message)
     {
-        var outgoing = new OutgoingMessages();
-
-        // Defensive guard: only request refund if amount is positive.
-        if (message.RefundAmount > 0m)
-        {
-            outgoing.Add(new Messages.Contracts.Payments.RefundRequested(
-                Id,
-                message.RefundAmount,
-                $"Cross-product exchange partial refund (return {message.ReturnId})",
-                DateTimeOffset.UtcNow));
-        }
-
-        return outgoing;
+        // Intentional no-op acknowledger. Payments owns the refund as of M47.0 / S2.
     }
 }
