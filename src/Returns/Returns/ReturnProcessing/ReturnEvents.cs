@@ -189,3 +189,30 @@ public sealed record ExchangePartialRefundIssued(
     Guid ReturnId,
     decimal RefundAmount,
     DateTimeOffset IssuedAt);
+
+/// <summary>
+/// M47.0 / Slice 4 — records the Inventory BC's confirmation of a
+/// replacement-stock reservation so that subsequent compensation paths
+/// (cancellation on payment-capture failure, rejection on inspection
+/// failure with captured delta) can release the held stock without
+/// re-deriving the Inventory stream id from inside the Returns BC.
+/// </summary>
+public sealed record ReplacementReservationConfirmed(
+    Guid ReturnId,
+    Guid InventoryId,
+    string Sku,
+    string WarehouseId,
+    int Quantity,
+    DateTimeOffset ReservedAt);
+
+/// <summary>
+/// M47.0 / Slice 4 — cross-product exchange cancelled because the
+/// additional-payment delta capture failed downstream in the Payments BC.
+/// Terminal: the Return transitions to <see cref="ReturnStatus.Cancelled"/>
+/// and the held replacement reservation in Inventory is released.
+/// </summary>
+public sealed record ExchangeCancelled(
+    Guid ReturnId,
+    string Reason,
+    string Message,
+    DateTimeOffset CancelledAt);

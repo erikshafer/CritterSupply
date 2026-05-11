@@ -135,6 +135,21 @@ builder.Host.UseWolverine(opts =>
     opts.PublishMessage<Messages.Contracts.Payments.ExchangePartialRefundRequested>()
         .ToRabbitQueue("payments-returns-events");
 
+    // M47.0 / Slice 4 — Outbound: refund-the-captured-delta request.
+    // Emitted by SubmitInspectionHandler when an inspection rejects a
+    // cross-product exchange that already captured the additional-payment
+    // delta. Payments side replies via the existing
+    // ExchangePartialRefundIssued contract on `returns-payments-events`.
+    opts.PublishMessage<Messages.Contracts.Payments.RefundExchangeDeltaRequested>()
+        .ToRabbitQueue("payments-returns-events");
+
+    // M47.0 / Slice 4 — Outbound: release the held replacement reservation
+    // when an exchange is cancelled (payment-capture failure) or rejected
+    // (inspection failure with captured delta). Inventory side handler
+    // is fully idempotent against missing reservations.
+    opts.PublishMessage<Messages.Contracts.Inventory.ReleaseExchangeReservation>()
+        .ToRabbitQueue("inventory-returns-events");
+
     // === Outbound: Orders BC ===
     // Orders saga needs: ReturnRequested, ReturnCompleted, ReturnDenied, ReturnRejected, ReturnExpired
     opts.PublishMessage<Messages.Contracts.Returns.ReturnRequested>()
@@ -158,6 +173,10 @@ builder.Host.UseWolverine(opts =>
     opts.PublishMessage<Messages.Contracts.Returns.ExchangeAdditionalPaymentCaptured>()
         .ToRabbitQueue("orders-returns-events");
     opts.PublishMessage<Messages.Contracts.Returns.ExchangePartialRefundIssued>()
+        .ToRabbitQueue("orders-returns-events");
+    // M47.0 / Slice 4 — exchange cancellation propagated so Orders saga
+    // knows the Return is in a terminal "did not happen" state.
+    opts.PublishMessage<Messages.Contracts.Returns.ExchangeCancelled>()
         .ToRabbitQueue("orders-returns-events");
 
     // === Outbound: Customer Experience BC (Storefront) ===
@@ -185,6 +204,9 @@ builder.Host.UseWolverine(opts =>
     opts.PublishMessage<Messages.Contracts.Returns.ExchangeAdditionalPaymentCaptured>()
         .ToRabbitQueue("storefront-returns-events");
     opts.PublishMessage<Messages.Contracts.Returns.ExchangePartialRefundIssued>()
+        .ToRabbitQueue("storefront-returns-events");
+    // M47.0 / Slice 4 — customer-visible cancellation notification.
+    opts.PublishMessage<Messages.Contracts.Returns.ExchangeCancelled>()
         .ToRabbitQueue("storefront-returns-events");
 
     // === Outbound: Backoffice BC (M33.0 Session 2) ===

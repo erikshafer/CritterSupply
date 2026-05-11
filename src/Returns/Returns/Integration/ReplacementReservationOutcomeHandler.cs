@@ -46,16 +46,32 @@ public static class ReplacementReservationOutcomeHandler
     public const string OutOfStockReason = "ReplacementOutOfStock";
 
     public static async Task Handle(
-        Messages.Contracts.Inventory.ReplacementReserved _,
+        Messages.Contracts.Inventory.ReplacementReserved message,
+        IDocumentSession session,
         CancellationToken ct)
     {
-        // No-op for Slice 1. The Approved status already covers
-        // "approved with a reservation in flight"; surfacing a separate
-        // "Reserved" sub-state is deferred to Slice 4. Marker handler
-        // exists so Wolverine does not log "no handler" on every
-        // delivery and so the Returns assembly is the single point at
-        // which the reply contract is consumed.
-        await Task.CompletedTask;
+        // M47.0 / Slice 4 — capture the InventoryId on the Return aggregate
+        // so subsequent compensation paths (cancellation on payment-capture
+        // failure, rejection on inspection failure with captured delta) can
+        // release the held stock without re-deriving the Inventory stream
+        // id from inside the Returns BC.
+        //
+        // Idempotent: only appends the first time. At-least-once redelivery
+        // re-finds the existing record and no-ops.
+        var stream = await session.Events.FetchForWriting<Return>(message.ReturnId, ct);
+        var aggregate = stream.Aggregate;
+
+        if (aggregate is null) return;
+        if (!aggregate.IsCrossProductExchange) return;
+        if (aggregate.ReplacementInventoryId is not null) return;
+
+        stream.AppendOne(new ReplacementReservationConfirmed(
+            ReturnId: message.ReturnId,
+            InventoryId: message.InventoryId,
+            Sku: message.Sku,
+            WarehouseId: message.WarehouseId,
+            Quantity: message.Quantity,
+            ReservedAt: message.ReservedAt));
     }
 
     public static async Task Handle(
