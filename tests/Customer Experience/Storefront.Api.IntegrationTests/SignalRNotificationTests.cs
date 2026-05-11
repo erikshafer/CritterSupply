@@ -418,4 +418,40 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
         message.ShouldBeAssignableTo<IStorefrontWebSocketMessage>();
         message.CustomerId.ShouldNotBe(Guid.Empty);
     }
+
+    // ===== M47.0 / Slice 4 — ExchangeCancelledHandler =====
+
+    [Fact]
+    public void ExchangeCancelled_Handler_ReturnsCustomerScopedReturnStatusChanged()
+    {
+        var returnId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var cancelledAt = DateTimeOffset.UtcNow;
+        const string verbatimGherkinCopy =
+            "Payment for price difference could not be processed. Exchange cancelled.";
+
+        var input = new Messages.Contracts.Returns.ExchangeCancelled(
+            ReturnId: returnId,
+            OrderId: orderId,
+            CustomerId: customerId,
+            Reason: "PaymentCaptureFailed",
+            Message: verbatimGherkinCopy,
+            CancelledAt: cancelledAt);
+
+        var result = ExchangeCancelledHandler.Handle(input);
+
+        result.ShouldNotBeNull();
+        // Group isolation — must never broadcast.
+        result.Locator.ToString()!.ShouldContain($"customer:{customerId}");
+        // Payload assertions — Storefront.Web maps "Cancelled" to the
+        // friendly "Exchange Cancelled" label; the handler emits the raw
+        // domain status string and lets the mapper render it.
+        result.Message.ReturnId.ShouldBe(returnId);
+        result.Message.OrderId.ShouldBe(orderId);
+        result.Message.CustomerId.ShouldBe(customerId);
+        result.Message.NewStatus.ShouldBe("Cancelled");
+        result.Message.Details.ShouldBe(verbatimGherkinCopy);
+        result.Message.OccurredAt.ShouldBe(cancelledAt);
+    }
 }

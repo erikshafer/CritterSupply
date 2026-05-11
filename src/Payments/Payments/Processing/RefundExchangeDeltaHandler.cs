@@ -57,10 +57,12 @@ public static class RefundExchangeDeltaHandler
         var deltaPayment = await session.LoadAsync<Payment>(deltaPaymentId, cancellationToken);
 
         if (deltaPayment is null) return outgoing;
-        if (deltaPayment.Status != PaymentStatus.Captured) return outgoing;
 
-        // Idempotency check — has a refund for this ReturnId already been
-        // applied to the delta-payment stream?
+        // Idempotency check first — a fully-refunded delta payment will have
+        // Status == Refunded (Apply(PaymentRefunded) flips it once
+        // TotalRefunded >= Amount). At-least-once redelivery must still
+        // re-emit the reply so a Returns redelivery loss does not strand
+        // the exchange (matches Slice 2 IssueExchangePartialRefundHandler).
         var existingEvents = await session.Events.FetchStreamAsync(deltaPaymentId, token: cancellationToken);
         var alreadyRefunded = existingEvents
             .Select(e => e.Data)
@@ -79,6 +81,8 @@ public static class RefundExchangeDeltaHandler
                 IssuedAt: alreadyRefunded.RefundedAt));
             return outgoing;
         }
+
+        if (deltaPayment.Status != PaymentStatus.Captured) return outgoing;
 
         var gatewayResult = await gateway.RefundAsync(
             deltaPayment.TransactionId ?? string.Empty,
