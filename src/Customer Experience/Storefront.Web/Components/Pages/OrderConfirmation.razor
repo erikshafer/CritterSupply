@@ -71,6 +71,32 @@ else
                     </MudItem>
                 </MudGrid>
 
+                @if (_timeline.Count > 0)
+                {
+                    <MudDivider Class="my-4" />
+
+                    <MudText Typo="Typo.h6" Class="mb-2">Order Activity</MudText>
+                    <MudTimeline TimelineOrientation="TimelineOrientation.Vertical"
+                                 TimelinePosition="TimelinePosition.Left"
+                                 data-testid="order-activity-timeline">
+                        @foreach (var entry in _timeline)
+                        {
+                            <MudTimelineItem Color="@entry.Color"
+                                             Size="Size.Small"
+                                             data-testid="order-activity-entry">
+                                <ItemContent>
+                                    <MudText Typo="Typo.body2" data-testid="order-activity-message">
+                                        @entry.Message
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" data-testid="order-activity-timestamp">
+                                        @entry.OccurredAt.LocalDateTime.ToString("MMM dd, yyyy h:mm:ss tt")
+                                    </MudText>
+                                </ItemContent>
+                            </MudTimelineItem>
+                        }
+                    </MudTimeline>
+                }
+
                 <MudDivider Class="my-4" />
 
                 <MudText Typo="Typo.h6" Class="mb-2">What's Next?</MudText>
@@ -110,6 +136,26 @@ else
     private string? _latestUpdate = null;
     private DotNetObjectReference<OrderConfirmation>? _dotNetHelper;
     private Guid? _customerId;
+
+    /// <summary>
+    /// In-session activity log rendered as a MudTimeline. Each entry is
+    /// appended whenever a SignalR event is processed by
+    /// <see cref="OnSseEvent"/>. M47.0 / Slice 5 — caps the Slice 3
+    /// carry-forward; persistence across page refreshes is deliberately
+    /// out of scope (see M47.0 closeout note).
+    /// </summary>
+    private readonly List<TimelineEntry> _timeline = [];
+
+    private sealed record TimelineEntry(string Status, string Message, Color Color, DateTimeOffset OccurredAt);
+
+    private void AppendTimeline(string status, string? message)
+    {
+        if (string.IsNullOrEmpty(message))
+        {
+            return;
+        }
+        _timeline.Add(new TimelineEntry(status, message, GetStatusColor(status), DateTimeOffset.UtcNow));
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -208,6 +254,7 @@ else
             case "order-placed":
                 _currentStatus = "Placed";
                 _latestUpdate = "Order placed successfully";
+                AppendTimeline(_currentStatus, _latestUpdate);
                 StateHasChanged();
                 break;
 
@@ -218,6 +265,7 @@ else
                 {
                     _currentStatus = orderNewStatus;
                     _latestUpdate = $"Order status updated to {_currentStatus}";
+                    AppendTimeline(_currentStatus, _latestUpdate);
                 }
                 StateHasChanged();
                 break;
@@ -225,6 +273,7 @@ else
             case "payment-confirmed":
                 _currentStatus = "Payment Confirmed";
                 _latestUpdate = "Payment processed successfully";
+                AppendTimeline(_currentStatus, _latestUpdate);
                 StateHasChanged();
                 break;
 
@@ -244,6 +293,7 @@ else
                     _currentStatus = "Shipped";
                     _latestUpdate = "Order has been shipped";
                 }
+                AppendTimeline(_currentStatus, _latestUpdate);
                 StateHasChanged();
                 break;
 
@@ -256,6 +306,7 @@ else
                     _currentStatus = $"Return: {returnStatus}";
                     var details = StorefrontEventReader.GetString(eventData, "details");
                     _latestUpdate = StorefrontStatusMapper.BuildReturnMessage(returnStatus, details);
+                    AppendTimeline(_currentStatus, _latestUpdate);
                 }
                 StateHasChanged();
                 break;
@@ -271,6 +322,7 @@ else
                 _currentStatus = "Exchange Payment Updated";
                 _latestUpdate = StorefrontStatusMapper.BuildExchangePaymentMessage(
                     paymentKind, amount, currency, paymentReference);
+                AppendTimeline(_currentStatus, _latestUpdate);
                 StateHasChanged();
                 break;
 
@@ -280,18 +332,21 @@ else
                 _latestUpdate = string.IsNullOrEmpty(dispatchTracking)
                     ? "Order has been shipped"
                     : $"Order shipped! Tracking: {dispatchTracking}";
+                AppendTimeline(_currentStatus, _latestUpdate);
                 StateHasChanged();
                 break;
 
             case "shipment-delivered":
                 _currentStatus = "Delivered";
                 _latestUpdate = "Order delivered successfully";
+                AppendTimeline(_currentStatus, _latestUpdate);
                 StateHasChanged();
                 break;
 
             case "shipment-delivery-failed":
                 _currentStatus = "Delivery Failed";
                 _latestUpdate = "Your delivery was unsuccessful — our team has been notified. Please check your order for next steps.";
+                AppendTimeline(_currentStatus, _latestUpdate);
                 StateHasChanged();
                 break;
         }

@@ -1,7 +1,8 @@
 # M47.0 — Cross-Product Exchange End-to-End
 
-> **Status:** In progress (Slice 1)
+> **Status:** ✅ Complete (5 slices). See [`m47-0-closeout.md`](./m47-0-closeout.md).
 > **Date opened:** 2026-05-08
+> **Date closed:** 2026-05-11
 > **Source:** `docs/planning/milestones/m45-1-cross-product-exchange-gap-memo.md`
 > **Carryover from:** M46.0 retrospective ("What we explicitly did not do")
 
