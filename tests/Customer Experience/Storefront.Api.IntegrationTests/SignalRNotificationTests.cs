@@ -318,4 +318,104 @@ public class SignalRNotificationTests(TestFixture fixture) : IClassFixture<TestF
         // Assert
         result.ShouldBeNull();
     }
+
+    // ===== M47.0 / Slice 3 — cross-product-exchange payment SignalR handlers =====
+
+    [Fact]
+    public void ExchangeAdditionalPaymentCaptured_Handler_ReturnsGroupScopedExchangePaymentMessage()
+    {
+        // Arrange — more-expensive replacement, delta of $25.00 captured.
+        var customerId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var returnId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        var capturedAt = DateTimeOffset.UtcNow;
+
+        var message = new Messages.Contracts.Returns.ExchangeAdditionalPaymentCaptured(
+            returnId,
+            orderId,
+            customerId,
+            paymentId,
+            AmountCaptured: 25.00m,
+            Currency: "USD",
+            PaymentReference: "ch_test_capture_abc123",
+            capturedAt);
+
+        // Act — handler is a pure static, so call it directly. (See class-level
+        // doc comment on why we don't go through Wolverine in tests.)
+        var result = ExchangeAdditionalPaymentCapturedHandler.Handle(message);
+
+        // Assert — customer isolation + every structured field round-trips intact.
+        result.ShouldNotBeNull();
+        result.Locator.ToString()!.ShouldContain($"customer:{customerId}");
+        result.Message.PaymentKind.ShouldBe("Capture");
+        result.Message.ReturnId.ShouldBe(returnId);
+        result.Message.OrderId.ShouldBe(orderId);
+        result.Message.CustomerId.ShouldBe(customerId);
+        result.Message.PaymentId.ShouldBe(paymentId);
+        result.Message.Amount.ShouldBe(25.00m);
+        result.Message.Currency.ShouldBe("USD");
+        result.Message.PaymentReference.ShouldBe("ch_test_capture_abc123");
+        result.Message.OccurredAt.ShouldBe(capturedAt);
+    }
+
+    [Fact]
+    public void ExchangePartialRefundIssued_Handler_ReturnsGroupScopedExchangePaymentMessage()
+    {
+        // Arrange — cheaper replacement, $15.00 refunded against the original payment.
+        var customerId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var returnId = Guid.NewGuid();
+        var originalPaymentId = Guid.NewGuid();
+        var issuedAt = DateTimeOffset.UtcNow;
+
+        var message = new Messages.Contracts.Returns.ExchangePartialRefundIssued(
+            returnId,
+            orderId,
+            customerId,
+            originalPaymentId,
+            RefundAmount: 15.00m,
+            Currency: "EUR",
+            TransactionId: "re_test_refund_xyz789",
+            issuedAt);
+
+        // Act
+        var result = ExchangePartialRefundIssuedHandler.Handle(message);
+
+        // Assert — customer isolation + every structured field round-trips.
+        // Note: TransactionId on the integration message maps to PaymentReference
+        // on the SignalR shape (single typed event over a single discriminator
+        // for both flows — see ReturnExchangePaymentChanged xmldoc).
+        result.ShouldNotBeNull();
+        result.Locator.ToString()!.ShouldContain($"customer:{customerId}");
+        result.Message.PaymentKind.ShouldBe("Refund");
+        result.Message.ReturnId.ShouldBe(returnId);
+        result.Message.OrderId.ShouldBe(orderId);
+        result.Message.CustomerId.ShouldBe(customerId);
+        result.Message.PaymentId.ShouldBe(originalPaymentId);
+        result.Message.Amount.ShouldBe(15.00m);
+        result.Message.Currency.ShouldBe("EUR");
+        result.Message.PaymentReference.ShouldBe("re_test_refund_xyz789");
+        result.Message.OccurredAt.ShouldBe(issuedAt);
+    }
+
+    [Fact]
+    public void ReturnExchangePaymentChanged_Message_ImplementsSignalRMarkerInterface()
+    {
+        // Regression guard — if the marker interface is dropped from the
+        // record, Wolverine's SignalR transport will silently skip routing.
+        var message = new ReturnExchangePaymentChanged(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Capture",
+            Guid.NewGuid(),
+            10m,
+            "USD",
+            "ch_test",
+            DateTimeOffset.UtcNow);
+
+        message.ShouldBeAssignableTo<IStorefrontWebSocketMessage>();
+        message.CustomerId.ShouldNotBe(Guid.Empty);
+    }
 }
