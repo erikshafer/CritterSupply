@@ -1,6 +1,9 @@
 using JasperFx.CommandLine;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Payments.Api.IntegrationTests.Processing;
+using Payments.Processing;
 using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.Tracking;
@@ -22,6 +25,15 @@ public class TestFixture : IAsyncLifetime
     private string? _connectionString;
 
     public IAlbaHost Host { get; private set; } = null!;
+
+    /// <summary>
+    /// Counting wrapper around the real <see cref="StubPaymentGateway"/>
+    /// installed in place of the production <see cref="IPaymentGateway"/>
+    /// registration, so M47.0 / Slice 2 idempotency tests can assert on
+    /// gateway-call counts without altering production code. Reset between
+    /// tests in <see cref="ResetGatewayCountersAsync"/>.
+    /// </summary>
+    public CountingPaymentGateway PaymentGateway { get; } = new();
 
     public async Task InitializeAsync()
     {
@@ -54,6 +66,14 @@ public class TestFixture : IAsyncLifetime
 
                 // Disable external Wolverine transports for testing
                 services.DisableAllExternalWolverineTransports();
+
+                // Replace the production StubPaymentGateway registration
+                // with the counting wrapper so idempotency tests can assert
+                // gateway-call counts. The wrapper still delegates to the
+                // real StubPaymentGateway, so token-driven success/decline/
+                // timeout behaviour is preserved.
+                services.RemoveAll<IPaymentGateway>();
+                services.AddSingleton<IPaymentGateway>(PaymentGateway);
             });
         });
     }
@@ -106,6 +126,8 @@ public class TestFixture : IAsyncLifetime
     {
         var store = GetDocumentStore();
         await store.Advanced.Clean.DeleteAllDocumentsAsync();
+        await store.Advanced.Clean.DeleteAllEventDataAsync();
+        PaymentGateway.Reset();
     }
 
     /// <summary>

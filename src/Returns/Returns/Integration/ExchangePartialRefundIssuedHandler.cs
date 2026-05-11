@@ -38,7 +38,20 @@ public static class ExchangePartialRefundIssuedHandler
 
         if (aggregate is null) return;
         if (!aggregate.IsCrossProductExchange) return;
-        if (aggregate.FinalRefundAmount is not null) return; // already applied
+
+        // Idempotency on a Slice 2-specific signal. We can't use
+        // `aggregate.FinalRefundAmount` because `ShipReplacementItemHandler` already
+        // sets it via `ExchangeCompleted.PriceDifferenceRefund` as a precondition of
+        // this choreography — every cheaper-replacement exchange enters this handler
+        // with a non-null FinalRefundAmount. Instead, scan the Return event stream
+        // for an existing `ExchangePartialRefundIssued` domain event (mirrors the
+        // Payments side's `PaymentRefunded.ReturnId` lookup in
+        // `IssueExchangePartialRefundHandler`). This was reported by QA against the
+        // first M47.0 / S2 PSA-cut and is the fix.
+        var existingEvents = await session.Events.FetchStreamAsync(message.ReturnId, token: ct);
+        var alreadyApplied = existingEvents
+            .Any(e => e.Data is ExchangePartialRefundIssued);
+        if (alreadyApplied) return;
 
         var domainEvent = new ExchangePartialRefundIssued(
             ReturnId: message.ReturnId,
