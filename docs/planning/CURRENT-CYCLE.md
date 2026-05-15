@@ -41,21 +41,58 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M46.0 — Reliability Workshop Follow-Through (J/D/H/A) |
-| **Status** | 🟢 **In progress** — J/D/H/A implementation complete; retrospective being written |
-| **Recent Completion** | M45.1 — Cross-product exchange Returns-side + 4-handler saga additions; gap memo (2026-05-08) |
-| **Previous Completion** | M44.0 — Vendor Portal test fixture hardening + projection lifecycle audit (2026-05-06) |
+| **Current Milestone** | M48.0 — CritterSupply Business Architecture Extraction |
+| **Status** | 🟢 **In progress** — S1 (BC inventory + scaffolding) complete; S2–S6 ahead |
+| **Recent Completion** | M47.0 — Cross-product exchange end-to-end (Returns ↔ Inventory ↔ Payments ↔ Storefront), closed 5/5 slices (2026-05-?) |
+| **Previous Completion** | M46.0 — Reliability Workshop Follow-Through (J/D/H/A) (2026-05-08) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-05-08 (M46.0 in progress — see `docs/planning/milestones/m46-0-retrospective.md`)*
+*Last Updated: 2026-05-15 (M48.0 S1 complete — see `docs/planning/milestones/m48-0-session-1-retrospective.md`)*
 
 ---
 
 ## Active Milestone
 
-### 🚧 M46.0 — Reliability Workshop Follow-Through (J → D → H → A)
+### 🚧 M48.0 — CritterSupply Business Architecture Extraction
 
-**Status:** 🟢 In progress (single session). All four workshop priorities
+**Status:** 🟢 In progress. Session 1 (BC inventory + scaffolding) complete.
+Sessions S2–S6 ahead.
+
+**Source:** External request — produce a descriptive, source-cited record of
+CritterSupply's business architecture under `docs/extraction/`. Plan in
+[`docs/planning/milestones/m48-0-plan.md`](milestones/m48-0-plan.md).
+
+**Scope (recap):**
+
+- 18 BC dossiers (one per implemented BC)
+- Workflow traces per cross-BC business workflow (S4)
+- Structural observations across the system (S5)
+- Synthesis brief tying catalog + workflows + observations together (S6)
+- Purely descriptive — no recommendations, no comparisons, no judgment
+
+**S1 outcomes (this session):**
+
+- Folder scaffold: `docs/extraction/`, `docs/extraction/bcs/`,
+  `docs/extraction/workflows/` created.
+- `docs/extraction/README.md` — overview, status table (18 BC rows + 5
+  cross-cutting placeholders), ground rules, index.
+- 18 stub dossiers under `docs/extraction/bcs/` covering every implemented
+  BC at stub depth (purpose paragraph + aggregates / commands / domain
+  events / projections / integration events / HTTP-API surface line /
+  frontend surface line or N/A / identity-auth posture line or N/A / prior
+  event modeling / ADRs / source citations).
+- Build at session open and close: 0 errors, 359 warnings (identical; no
+  code changed).
+
+**Retrospective:** `docs/planning/milestones/m48-0-session-1-retrospective.md`.
+
+**Next session (S2):** Commerce-core deep dive — deepen 9 stubs (Shopping,
+Orders, Payments, Inventory, Fulfillment, Returns, Customer Identity,
+Customer Experience, Product Catalog) to dossier depth.
+
+### Previously Active — M46.0 — Reliability Workshop Follow-Through (J → D → H → A)
+
+**Status:** ✅ Closed (single session). All four workshop priorities
 implemented and validated; retrospective committed.
 
 **Source:** Workshop part 2 in
@@ -95,11 +132,26 @@ implemented and validated; retrospective committed.
 
 **Retrospective:** `docs/planning/milestones/m46-0-retrospective.md`.
 
-**Out of scope (next session):** items **B**, **C**, **E**, **F**, **G**, **I**
+**Out of scope:** items **B**, **C**, **E**, **F**, **G**, **I**
 from `state-of-repo-2026-05.md` §7.4 (the below-the-line set the workshop
 explicitly deferred).
 
 ## Recent Completions
+
+### ✅ M47.0: Cross-Product Exchange End-to-End (2026-05)
+
+Five slices closed all `@pending` Gherkin scenarios in
+`cross-product-exchange.feature`. S1 — Returns ↔ Inventory replacement
+reservation choreography. S2 — Returns ↔ Payments delta-capture / partial-
+refund choreography on a deterministic UUID-v5 `Payment` stream id. S3 —
+Order saga consumes the four cross-product exchange events. S4 —
+Compensation paths (capture failure → `ExchangeCancelled` + reservation
+release; inspection rejection with captured delta → refund + release).
+S5 — `OrderConfirmation.razor` in-session activity timeline driven by
+SignalR events. Deferred to M48: persisted return-history (Storefront BFF
+projection + history endpoint), Backoffice timeline, E2E Reqnroll trace
+across Returns → Inventory → Payments → Storefront. See
+`docs/planning/milestones/m47-0-closeout.md`.
 
 ### ✅ M45.1: Cross-Product Exchange (Returns-side) + Order Saga Handlers (2026-05-08)
 
