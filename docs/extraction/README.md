@@ -18,15 +18,15 @@
 
 | Artifact | Session | Status |
 |---|---|---|
-| [Shopping](./bcs/shopping.md) | S1 | S1 stub |
-| [Orders](./bcs/orders.md) | S1 | S1 stub |
-| [Payments](./bcs/payments.md) | S1 | S1 stub |
-| [Inventory](./bcs/inventory.md) | S1 | S1 stub |
-| [Fulfillment](./bcs/fulfillment.md) | S1 | S1 stub |
-| [Returns](./bcs/returns.md) | S1 | S1 stub |
-| [Customer Identity](./bcs/customer-identity.md) | S1 | S1 stub |
-| [Customer Experience](./bcs/customer-experience.md) | S1 | S1 stub |
-| [Product Catalog](./bcs/product-catalog.md) | S1 | S1 stub |
+| [Shopping](./bcs/shopping.md) | S2 | S2 full |
+| [Orders](./bcs/orders.md) | S2 | S2 full |
+| [Payments](./bcs/payments.md) | S2 | S2 full |
+| [Inventory](./bcs/inventory.md) | S2 | S2 full |
+| [Fulfillment](./bcs/fulfillment.md) | S1 | S1 stub (S2 promotion deferred) |
+| [Returns](./bcs/returns.md) | S1 | S1 stub (S2 promotion deferred) |
+| [Customer Identity](./bcs/customer-identity.md) | S2 | S2 full |
+| [Customer Experience](./bcs/customer-experience.md) | S2 | S2 full |
+| [Product Catalog](./bcs/product-catalog.md) | S2 | S2 full |
 | [Listings](./bcs/listings.md) | S1 | S1 stub |
 | [Marketplaces](./bcs/marketplaces.md) | S1 | S1 stub |
 | [Vendor Identity](./bcs/vendor-identity.md) | S1 | S1 stub |
@@ -36,7 +36,7 @@
 | [Backoffice Identity](./bcs/backoffice-identity.md) | S1 | S1 stub |
 | [Backoffice](./bcs/backoffice.md) | S1 | S1 stub |
 | [Promotions](./bcs/promotions.md) | S1 | S1 stub |
-| Commerce-core deep dive (9 BCs) | S2 | Pending S2 |
+| Commerce-core deep dive (9 BCs) | S2 | 7 of 9 promoted (Fulfillment + Returns deferred) |
 | Channels / vendor / admin deep dive (9 BCs) | S3 | Pending S3 |
 | Cross-BC workflow traces | S4 | Pending S4 |
 | Structural observations | S5 | Pending S5 |
