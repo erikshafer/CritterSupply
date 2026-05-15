@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M48.0 — CritterSupply Business Architecture Extraction |
-| **Status** | 🟢 **In progress** — S1 complete; S2 partial (7 of 9 commerce-core dossiers promoted; Fulfillment + Returns deferred); S3–S6 ahead |
+| **Status** | 🟢 **In progress** — S1 complete; S2 complete (all 9 commerce-core dossiers at full depth, closed across S2 + S2b); S3–S6 ahead |
 | **Recent Completion** | M47.0 — Cross-product exchange end-to-end (Returns ↔ Inventory ↔ Payments ↔ Storefront), closed 5/5 slices (2026-05-?) |
 | **Previous Completion** | M46.0 — Reliability Workshop Follow-Through (J/D/H/A) (2026-05-08) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-05-15 (M48.0 S2 partial — see `docs/planning/milestones/m48-0-session-2-retrospective.md`)*
+*Last Updated: 2026-05-15 (M48.0 S2b complete — see `docs/planning/milestones/m48-0-session-2b-retrospective.md`)*
 
 ---
 
@@ -55,7 +55,7 @@
 
 ### 🚧 M48.0 — CritterSupply Business Architecture Extraction
 
-**Status:** 🟢 In progress. Session 1 (BC inventory + scaffolding) complete. Session 2 (commerce-core deep dive) partially complete — 7 of 9 dossiers promoted to S2 — full depth; Fulfillment and Returns dossiers deferred to a follow-up session.
+**Status:** 🟢 In progress. Sessions 1 + 2 + 2b complete — all 9 commerce-core dossiers (Shopping, Customer Identity, Customer Experience, Product Catalog, Orders, Payments, Inventory, Fulfillment, Returns) at full S2 depth in place. Session 3 (channels / vendor / admin deep dive — 9 BCs) is next.
 
 **Source:** External request — produce a descriptive, source-cited record of
 CritterSupply's business architecture under `docs/extraction/`. Plan in
@@ -83,15 +83,14 @@ CritterSupply's business architecture under `docs/extraction/`. Plan in
 - Build at session open and close: 0 errors, 359 warnings (identical; no
   code changed).
 
-**Retrospective:** `docs/planning/milestones/m48-0-session-1-retrospective.md` (S1) and `docs/planning/milestones/m48-0-session-2-retrospective.md` (S2 partial).
+**Retrospective:** `docs/planning/milestones/m48-0-session-1-retrospective.md` (S1), `docs/planning/milestones/m48-0-session-2-retrospective.md` (S2 — 7 of 9), `docs/planning/milestones/m48-0-session-2b-retrospective.md` (S2b — closeout for Fulfillment + Returns).
 
-**S2 outcomes (this session):**
+**S2 outcomes (cumulative across S2 + S2b):**
 
-- 7 of 9 commerce-core stub dossiers promoted to S2 — full depth in place: Shopping, Customer Identity (Variant B), Customer Experience (Variant C), Product Catalog, Orders (saga orchestrator), Payments, Inventory (27 events sub-grouped by aggregate × lifecycle phase).
-- Fulfillment (S2h) and Returns (S2i) dossiers deferred — Fulfillment source enumeration completed and recorded in the retrospective for follow-up; Returns not started.
-- Build at session open and close: 0 errors, 359 warnings (identical; no code changed).
+- All 9 commerce-core stub dossiers promoted to S2 — full depth in place: Shopping, Customer Identity (Variant B), Customer Experience (Variant C), Product Catalog, Orders (saga orchestrator), Payments, Inventory (29 events sub-grouped), Fulfillment (55 in-domain events sub-grouped, 31 commands), Returns (cross-product-exchange orchestrator, 10 lifecycle states).
+- Build at session-set open and close: 0 errors. No code changed.
 
-**Next session:** Complete S2 by promoting the deferred Fulfillment and Returns dossiers, then proceed to S3 (channels / vendor / admin deep dive — 9 BCs).
+**Next session:** S3 — Channels / vendor / admin deep dive (9 BCs: Listings, Marketplaces, Vendor Identity, Vendor Portal, Pricing, Correspondence, Backoffice Identity, Backoffice, Promotions).
 
 ### Previously Active — M46.0 — Reliability Workshop Follow-Through (J → D → H → A)
 

@@ -22,8 +22,8 @@
 | [Orders](./bcs/orders.md) | S2 | S2 full |
 | [Payments](./bcs/payments.md) | S2 | S2 full |
 | [Inventory](./bcs/inventory.md) | S2 | S2 full |
-| [Fulfillment](./bcs/fulfillment.md) | S1 | S1 stub (S2 promotion deferred) |
-| [Returns](./bcs/returns.md) | S1 | S1 stub (S2 promotion deferred) |
+| [Fulfillment](./bcs/fulfillment.md) | S2 | S2 full |
+| [Returns](./bcs/returns.md) | S2 | S2 full |
 | [Customer Identity](./bcs/customer-identity.md) | S2 | S2 full |
 | [Customer Experience](./bcs/customer-experience.md) | S2 | S2 full |
 | [Product Catalog](./bcs/product-catalog.md) | S2 | S2 full |
@@ -36,7 +36,7 @@
 | [Backoffice Identity](./bcs/backoffice-identity.md) | S1 | S1 stub |
 | [Backoffice](./bcs/backoffice.md) | S1 | S1 stub |
 | [Promotions](./bcs/promotions.md) | S1 | S1 stub |
-| Commerce-core deep dive (9 BCs) | S2 | 7 of 9 promoted (Fulfillment + Returns deferred) |
+| Commerce-core deep dive (9 BCs) | S2 | S2 full (all 9 dossiers complete) |
 | Channels / vendor / admin deep dive (9 BCs) | S3 | Pending S3 |
 | Cross-BC workflow traces | S4 | Pending S4 |
 | Structural observations | S5 | Pending S5 |
