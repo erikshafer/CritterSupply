@@ -1,6 +1,6 @@
 # CritterSupply Business Architecture Extraction
 
-> **Status:** 🟡 In progress (M48.0)
+> **Status:** 🟡 In progress (M48.0 — all 18 BC dossiers at S2-full depth; S4–S6 ahead)
 > **Milestone:** [M48.0](../planning/milestones/m48-0-plan.md)
 
 ## What this is
@@ -32,12 +32,12 @@
 | [Vendor Identity](./bcs/vendor-identity.md) | S3 | S2 full |
 | [Vendor Portal](./bcs/vendor-portal.md) | S3 | S2 full |
 | [Backoffice Identity](./bcs/backoffice-identity.md) | S3 | S2 full |
-| [Backoffice](./bcs/backoffice.md) | S1 | S1 stub (deferred to S3b) |
-| [Pricing](./bcs/pricing.md) | S1 | S1 stub (deferred to S3b) |
-| [Promotions](./bcs/promotions.md) | S1 | S1 stub (deferred to S3b) |
-| [Correspondence](./bcs/correspondence.md) | S1 | S1 stub (deferred to S3b) |
+| [Backoffice](./bcs/backoffice.md) | S3b | S2 full |
+| [Pricing](./bcs/pricing.md) | S3b | S2 full |
+| [Promotions](./bcs/promotions.md) | S3b | S2 full |
+| [Correspondence](./bcs/correspondence.md) | S3b | S2 full |
 | Commerce-core deep dive (9 BCs) | S2 | S2 full (all 9 dossiers complete) |
-| Channels / vendor / admin deep dive (9 BCs) | S3 | **5 of 9 dossiers complete; 4 deferred to S3b** |
+| Channels / vendor / admin deep dive (9 BCs) | S3 + S3b | S2 full (all 9 dossiers complete across S3 + S3b) |
 | Cross-BC workflow traces | S4 | Pending S4 |
 | Structural observations | S5 | Pending S5 |
 | Synthesis brief | S6 | Pending S6 |

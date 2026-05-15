@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M48.0 — CritterSupply Business Architecture Extraction |
-| **Status** | 🟢 **In progress** — S1 complete; S2 complete (all 9 commerce-core dossiers at full depth, closed across S2 + S2b); **S3 partial — 5 of 9 channel/vendor/admin dossiers complete; 4 deferred to S3b**; S4–S6 ahead |
+| **Status** | 🟢 **In progress** — S1 + S2 (with S2b) + S3 (with S3b) complete — **all 18 BC dossiers at S2-full depth in place**; S4–S6 ahead |
 | **Recent Completion** | M47.0 — Cross-product exchange end-to-end (Returns ↔ Inventory ↔ Payments ↔ Storefront), closed 5/5 slices (2026-05-?) |
 | **Previous Completion** | M46.0 — Reliability Workshop Follow-Through (J/D/H/A) (2026-05-08) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-05-15 (M48.0 S3 partial — see `docs/planning/milestones/m48-0-session-3-retrospective.md`)*
+*Last Updated: 2026-05-15 (M48.0 S3b complete — see `docs/planning/milestones/m48-0-session-3b-retrospective.md`)*
 
 ---
 
@@ -90,14 +90,14 @@ CritterSupply's business architecture under `docs/extraction/`. Plan in
 - All 9 commerce-core stub dossiers promoted to S2 — full depth in place: Shopping, Customer Identity (Variant B), Customer Experience (Variant C), Product Catalog, Orders (saga orchestrator), Payments, Inventory (29 events sub-grouped), Fulfillment (55 in-domain events sub-grouped, 31 commands), Returns (cross-product-exchange orchestrator, 10 lifecycle states).
 - Build at session-set open and close: 0 errors. No code changed.
 
-**Next session:** S3b — Channels / vendor / admin closeout (4 deferred BCs: Backoffice, Pricing, Promotions, Correspondence) → then S4 cross-BC workflow tracing.
+**Next session:** S4 — cross-BC workflow tracing.
 
-**S3 outcomes (partial — 5 of 9):**
+**S3b outcomes (closeout — 4 deferred dossiers promoted in place):**
 
-- 5 of 9 channel/vendor/admin stub dossiers promoted to S2 — full depth in place: Listings (Variant A; ACL projection), Marketplaces (Variant D — Marten document store; external adapters), Vendor Identity (Variant B — JWT issuer), Vendor Portal (Variant D + Blazor WASM frontend), Backoffice Identity (Variant B — JWT issuer + 7-role RBAC).
-- 4 dossiers deferred to S3b: Backoffice (Variant C-hybrid — heaviest in S3), Pricing (Variant A — DCB), Promotions (Variant A — two aggregates / two stream-ID strategies / DCB), Correspondence (Variant A — lightest).
-- Build at session open: 0 errors, 456 warnings (incremental). No code changed.
-- Material reconciliations and CONTEXTS.md drift items surfaced in the S3 retrospective for forward-noting to S5.
+- All 4 deferred channel/vendor/admin stub dossiers promoted to S2 — full depth in place: Backoffice (Variant C-hybrid; 369 lines; 1 ES aggregate `OrderNote` + BFF composition across 9 upstream BCs; 22 Razor pages; 6 projections; 24 inbound handlers; 5 SignalR message types; 7 routes-without-instantiator), Pricing (Variant A; 213 lines; 1 aggregate `ProductPrice`; UUID v5 stream IDs — **NOT v7 as S1 said**; **DCB claim refuted by source** — no DCB tags; 6 commands; 10 events with 4 declared-but-unemitted; 0 wired outbound integrations), Promotions (Variant A; 227 lines; 2 aggregates `Promotion`/`Coupon` with two distinct stream-ID strategies — UUID v7 + UUID v5; **DCB claim verified** — full DCB tag types + boundary query + concurrency-retry policy; 8 commands; 12 events with 5 declared-but-unemitted; 0 outbound contracts), Correspondence (Variant A; 187 lines; 1 aggregate `Message`; UUID v7; 1 command; 4 events; 12 inbound handlers across 4 BCs — **not 13 as S1 said**; provider abstractions stub-only).
+- **All 18 BC dossiers now at S2-full depth.** S3 closes; M48.0 advances to S4.
+- Build at session open: 0 errors. No code changed.
+- 12 additional CONTEXTS.md drift items + 13 routes-without-instantiator items + 9 declared-but-unemitted events surfaced for S5; 4 substantive workflow notes forwarded for S4.
 
 ### Previously Active — M46.0 — Reliability Workshop Follow-Through (J → D → H → A)
 
