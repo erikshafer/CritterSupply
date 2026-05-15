@@ -27,17 +27,17 @@
 | [Customer Identity](./bcs/customer-identity.md) | S2 | S2 full |
 | [Customer Experience](./bcs/customer-experience.md) | S2 | S2 full |
 | [Product Catalog](./bcs/product-catalog.md) | S2 | S2 full |
-| [Listings](./bcs/listings.md) | S1 | S1 stub |
-| [Marketplaces](./bcs/marketplaces.md) | S1 | S1 stub |
-| [Vendor Identity](./bcs/vendor-identity.md) | S1 | S1 stub |
-| [Vendor Portal](./bcs/vendor-portal.md) | S1 | S1 stub |
-| [Pricing](./bcs/pricing.md) | S1 | S1 stub |
-| [Correspondence](./bcs/correspondence.md) | S1 | S1 stub |
-| [Backoffice Identity](./bcs/backoffice-identity.md) | S1 | S1 stub |
-| [Backoffice](./bcs/backoffice.md) | S1 | S1 stub |
-| [Promotions](./bcs/promotions.md) | S1 | S1 stub |
+| [Listings](./bcs/listings.md) | S3 | S2 full |
+| [Marketplaces](./bcs/marketplaces.md) | S3 | S2 full |
+| [Vendor Identity](./bcs/vendor-identity.md) | S3 | S2 full |
+| [Vendor Portal](./bcs/vendor-portal.md) | S3 | S2 full |
+| [Backoffice Identity](./bcs/backoffice-identity.md) | S3 | S2 full |
+| [Backoffice](./bcs/backoffice.md) | S1 | S1 stub (deferred to S3b) |
+| [Pricing](./bcs/pricing.md) | S1 | S1 stub (deferred to S3b) |
+| [Promotions](./bcs/promotions.md) | S1 | S1 stub (deferred to S3b) |
+| [Correspondence](./bcs/correspondence.md) | S1 | S1 stub (deferred to S3b) |
 | Commerce-core deep dive (9 BCs) | S2 | S2 full (all 9 dossiers complete) |
-| Channels / vendor / admin deep dive (9 BCs) | S3 | Pending S3 |
+| Channels / vendor / admin deep dive (9 BCs) | S3 | **5 of 9 dossiers complete; 4 deferred to S3b** |
 | Cross-BC workflow traces | S4 | Pending S4 |
 | Structural observations | S5 | Pending S5 |
 | Synthesis brief | S6 | Pending S6 |

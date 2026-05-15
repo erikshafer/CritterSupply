@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M48.0 — CritterSupply Business Architecture Extraction |
-| **Status** | 🟢 **In progress** — S1 complete; S2 complete (all 9 commerce-core dossiers at full depth, closed across S2 + S2b); S3–S6 ahead |
+| **Status** | 🟢 **In progress** — S1 complete; S2 complete (all 9 commerce-core dossiers at full depth, closed across S2 + S2b); **S3 partial — 5 of 9 channel/vendor/admin dossiers complete; 4 deferred to S3b**; S4–S6 ahead |
 | **Recent Completion** | M47.0 — Cross-product exchange end-to-end (Returns ↔ Inventory ↔ Payments ↔ Storefront), closed 5/5 slices (2026-05-?) |
 | **Previous Completion** | M46.0 — Reliability Workshop Follow-Through (J/D/H/A) (2026-05-08) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-05-15 (M48.0 S2b complete — see `docs/planning/milestones/m48-0-session-2b-retrospective.md`)*
+*Last Updated: 2026-05-15 (M48.0 S3 partial — see `docs/planning/milestones/m48-0-session-3-retrospective.md`)*
 
 ---
 
@@ -90,7 +90,14 @@ CritterSupply's business architecture under `docs/extraction/`. Plan in
 - All 9 commerce-core stub dossiers promoted to S2 — full depth in place: Shopping, Customer Identity (Variant B), Customer Experience (Variant C), Product Catalog, Orders (saga orchestrator), Payments, Inventory (29 events sub-grouped), Fulfillment (55 in-domain events sub-grouped, 31 commands), Returns (cross-product-exchange orchestrator, 10 lifecycle states).
 - Build at session-set open and close: 0 errors. No code changed.
 
-**Next session:** S3 — Channels / vendor / admin deep dive (9 BCs: Listings, Marketplaces, Vendor Identity, Vendor Portal, Pricing, Correspondence, Backoffice Identity, Backoffice, Promotions).
+**Next session:** S3b — Channels / vendor / admin closeout (4 deferred BCs: Backoffice, Pricing, Promotions, Correspondence) → then S4 cross-BC workflow tracing.
+
+**S3 outcomes (partial — 5 of 9):**
+
+- 5 of 9 channel/vendor/admin stub dossiers promoted to S2 — full depth in place: Listings (Variant A; ACL projection), Marketplaces (Variant D — Marten document store; external adapters), Vendor Identity (Variant B — JWT issuer), Vendor Portal (Variant D + Blazor WASM frontend), Backoffice Identity (Variant B — JWT issuer + 7-role RBAC).
+- 4 dossiers deferred to S3b: Backoffice (Variant C-hybrid — heaviest in S3), Pricing (Variant A — DCB), Promotions (Variant A — two aggregates / two stream-ID strategies / DCB), Correspondence (Variant A — lightest).
+- Build at session open: 0 errors, 456 warnings (incremental). No code changed.
+- Material reconciliations and CONTEXTS.md drift items surfaced in the S3 retrospective for forward-noting to S5.
 
 ### Previously Active — M46.0 — Reliability Workshop Follow-Through (J → D → H → A)
 
