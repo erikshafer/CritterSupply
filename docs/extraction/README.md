@@ -1,6 +1,6 @@
 # CritterSupply Business Architecture Extraction
 
-> **Status:** 🟡 In progress (M48.0 — all 18 BC dossiers at S2-full depth; S4–S6 ahead)
+> **Status:** 🟡 In progress (M48.0 — all 18 BC dossiers at S2-full depth; 15 cross-BC workflows landed in S4; S5–S6 ahead)
 > **Milestone:** [M48.0](../planning/milestones/m48-0-plan.md)
 
 ## What this is
@@ -38,7 +38,7 @@
 | [Correspondence](./bcs/correspondence.md) | S3b | S2 full |
 | Commerce-core deep dive (9 BCs) | S2 | S2 full (all 9 dossiers complete) |
 | Channels / vendor / admin deep dive (9 BCs) | S3 + S3b | S2 full (all 9 dossiers complete across S3 + S3b) |
-| Cross-BC workflow traces | S4 | Pending S4 |
+| Cross-BC workflow traces | S4 | 15 of 15 workflows landed |
 | Structural observations | S5 | Pending S5 |
 | Synthesis brief | S6 | Pending S6 |
 
@@ -76,7 +76,43 @@
 
 ### Workflows
 
-(Populated in S4.)
+Cross-BC business workflows synthesised from the 18 S2-full BC dossiers. Each file describes one workflow — the actors, the trace across BCs, the projections, the compensation paths, the variants, the tests as behavioural evidence, the ADRs, and the declared-vs-implemented gaps.
+
+**Customer purchase & promotions**
+
+- [Cart to checkout](./workflows/cart-to-checkout.md) — Customer adds to cart through Shopping; checkout triggers Orders saga.
+- [Coupon and discount application](./workflows/coupon-and-discount-application.md) — Promotions evaluates coupons + automatic promotions; Pricing computes effective price.
+- [Coupon redemption recording](./workflows/coupon-redemption-recording.md) — Order placement records redemption with DCB-protected tagged streams on Promotions.
+
+**Order fulfillment**
+
+- [Order saga](./workflows/order-saga.md) — Orders orchestrates Payments → Inventory → Fulfillment → Customer Experience.
+- [Recall cascade](./workflows/recall-cascade.md) — Product Catalog recall fans out to Inventory holds, Orders pauses, Fulfillment intercepts.
+
+**Returns**
+
+- [Standard return + refund](./workflows/standard-return-refund.md) — Returns coordinates with Payments + Inventory for refund and restock.
+- [Cross-product exchange](./workflows/cross-product-exchange.md) — Returns choreographs Inventory reservation + Payments delta capture/refund for cross-product exchanges (M47.0).
+
+**Vendor lifecycle**
+
+- [Vendor onboarding](./workflows/vendor-onboarding.md) — Vendor Identity tenant + user lifecycle; Vendor Portal subscribes to 9 events.
+- [Vendor change request](./workflows/vendor-change-request.md) — Vendor Portal change-request state machine; cross-BC review is declared-not-wired.
+
+**Marketplace & channel**
+
+- [Marketplace listing submission](./workflows/marketplace-listing-submission.md) — Listings + Marketplaces submission to channel partners.
+
+**Operator (Backoffice)**
+
+- [Backoffice fan-in dashboards](./workflows/backoffice-fan-in-dashboards.md) — 7 upstream BCs feed 5 projections + 1 SignalR hub.
+- [Backoffice customer service](./workflows/backoffice-customer-service.md) — BFF composition + HTTP proxies; 4 endpoints currently blocked by mis-spelled policy strings.
+- [Backoffice operations health](./workflows/backoffice-operations-health.md) — Cross-schema dead-letter aggregator (M46.0/D).
+
+**Cross-cutting**
+
+- [Transactional communication](./workflows/transactional-communication.md) — Correspondence subscribes to 12 lifecycle events; queues `Message` streams; retries on `5 min` / `30 min` / `2 hr` schedule.
+- [Storefront real-time updates](./workflows/storefront-real-time-updates.md) — Customer Experience BFF pushes 5 typed message families over a single SignalR hub.
 
 ### Cross-cutting
 

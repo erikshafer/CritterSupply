@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M48.0 — CritterSupply Business Architecture Extraction |
-| **Status** | 🟢 **In progress** — S1 + S2 (with S2b) + S3 (with S3b) complete — **all 18 BC dossiers at S2-full depth in place**; S4–S6 ahead |
+| **Status** | 🟢 **In progress** — S1 + S2 (with S2b) + S3 (with S3b) + S4 complete — **all 18 BC dossiers at S2-full depth in place; 15 cross-BC workflow traces landed**; S5–S6 ahead |
 | **Recent Completion** | M47.0 — Cross-product exchange end-to-end (Returns ↔ Inventory ↔ Payments ↔ Storefront), closed 5/5 slices (2026-05-?) |
 | **Previous Completion** | M46.0 — Reliability Workshop Follow-Through (J/D/H/A) (2026-05-08) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-05-15 (M48.0 S3b complete — see `docs/planning/milestones/m48-0-session-3b-retrospective.md`)*
+*Last Updated: 2026-05-18 (M48.0 S4 complete — see `docs/planning/milestones/m48-0-session-4-retrospective.md`)*
 
 ---
 
@@ -83,14 +83,22 @@ CritterSupply's business architecture under `docs/extraction/`. Plan in
 - Build at session open and close: 0 errors, 359 warnings (identical; no
   code changed).
 
-**Retrospective:** `docs/planning/milestones/m48-0-session-1-retrospective.md` (S1), `docs/planning/milestones/m48-0-session-2-retrospective.md` (S2 — 7 of 9), `docs/planning/milestones/m48-0-session-2b-retrospective.md` (S2b — closeout for Fulfillment + Returns).
+**Retrospective:** `docs/planning/milestones/m48-0-session-1-retrospective.md` (S1), `docs/planning/milestones/m48-0-session-2-retrospective.md` (S2 — 7 of 9), `docs/planning/milestones/m48-0-session-2b-retrospective.md` (S2b — closeout for Fulfillment + Returns), `docs/planning/milestones/m48-0-session-3-retrospective.md` (S3 — 5 of 9 channels/vendor/admin), `docs/planning/milestones/m48-0-session-3b-retrospective.md` (S3b — 4 deferred channels/vendor/admin), `docs/planning/milestones/m48-0-session-4-retrospective.md` (S4 — 15 cross-BC workflows).
 
 **S2 outcomes (cumulative across S2 + S2b):**
 
 - All 9 commerce-core stub dossiers promoted to S2 — full depth in place: Shopping, Customer Identity (Variant B), Customer Experience (Variant C), Product Catalog, Orders (saga orchestrator), Payments, Inventory (29 events sub-grouped), Fulfillment (55 in-domain events sub-grouped, 31 commands), Returns (cross-product-exchange orchestrator, 10 lifecycle states).
 - Build at session-set open and close: 0 errors. No code changed.
 
-**Next session:** S4 — cross-BC workflow tracing.
+**Next session:** S5 — structural observations across the system (drawing on the 12 CONTEXTS.md drift items, 13 routes-without-instantiator items, and 9 declared-but-unemitted events surfaced across S3 + S3b plus the workflow-level gaps captured in S4).
+
+**S4 outcomes (cross-BC workflow tracing):**
+
+- 15 cross-BC workflow traces landed under `docs/extraction/workflows/`, one file per workflow, following the prompt's standard template (Status / Type / Initiating actor / BCs involved / Most recent material milestone — then Purpose, Actors and triggers, Trace, Projections, Compensation, Variants, BCs and roles, Tests, ADRs, Declared vs. implemented, Source citations).
+- Customer-purchase (4): `cart-to-checkout`, `coupon-and-discount-application`, `coupon-redemption-recording`, `order-saga`. Returns (2): `standard-return-refund`, `cross-product-exchange`. Marketplace (2): `marketplace-listing-submission`, `recall-cascade`. Vendor (2): `vendor-onboarding`, `vendor-change-request`. Operator (3): `backoffice-fan-in-dashboards`, `backoffice-customer-service`, `backoffice-operations-health`. Cross-cutting (2): `transactional-communication`, `storefront-real-time-updates`.
+- All claims source-cited to dossier sections under `docs/extraction/bcs/`; descriptive register only (no should/good/bad).
+- Build at session open and close: 0 errors. No code changed.
+- Workflow-level "Declared vs. implemented" gaps surfaced for S5 include: vendor activation (`VendorUserActivated` declared, no producer); 10 vendor change-request decision routes unproduced/unconsumed; 3 Backoffice SignalR types declared, no instantiator; `MessageSkipped` declared, no production emitter; SMS channel infrastructure stubbed; Backoffice's `IBackofficeIdentityClient` and `IFulfillmentClient` registered with no consumer; 4 Backoffice customer-service endpoint policies mis-spelled.
 
 **S3b outcomes (closeout — 4 deferred dossiers promoted in place):**
 
