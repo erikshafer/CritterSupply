@@ -1,6 +1,6 @@
 # CritterSupply Business Architecture Extraction
 
-> **Status:** 🟡 In progress (M48.0 — all 18 BC dossiers at S2-full depth; 15 cross-BC workflows landed in S4; S5–S6 ahead)
+> **Status:** 🟡 In progress (M48.0 — all 18 BC dossiers at S2-full depth; 15 cross-BC workflows landed in S4; observations brief landed in S5; S6 ahead)
 > **Milestone:** [M48.0](../planning/milestones/m48-0-plan.md)
 
 ## What this is
@@ -39,7 +39,7 @@
 | Commerce-core deep dive (9 BCs) | S2 | S2 full (all 9 dossiers complete) |
 | Channels / vendor / admin deep dive (9 BCs) | S3 + S3b | S2 full (all 9 dossiers complete across S3 + S3b) |
 | Cross-BC workflow traces | S4 | 15 of 15 workflows landed |
-| Structural observations | S5 | Pending S5 |
+| Structural observations | S5 | S5 complete — see [`observations.md`](./observations.md) |
 | Synthesis brief | S6 | Pending S6 |
 
 ## Ground rules
@@ -116,5 +116,5 @@ Cross-BC business workflows synthesised from the 18 S2-full BC dossiers. Each fi
 
 ### Cross-cutting
 
-- Structural observations (Pending S5)
+- [Structural observations](./observations.md) (S5 complete)
 - Synthesis brief (Pending S6)

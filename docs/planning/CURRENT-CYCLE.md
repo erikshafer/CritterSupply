@@ -42,12 +42,12 @@
 | Aspect | Status |
 |--------|--------|
 | **Current Milestone** | M48.0 — CritterSupply Business Architecture Extraction |
-| **Status** | 🟢 **In progress** — S1 + S2 (with S2b) + S3 (with S3b) + S4 complete — **all 18 BC dossiers at S2-full depth in place; 15 cross-BC workflow traces landed**; S5–S6 ahead |
+| **Status** | 🟢 **In progress** — S1 + S2 (with S2b) + S3 (with S3b) + S4 + S5 complete — **all 18 BC dossiers at S2-full depth in place; 15 cross-BC workflow traces landed; structural observations brief landed**; S6 ahead |
 | **Recent Completion** | M47.0 — Cross-product exchange end-to-end (Returns ↔ Inventory ↔ Payments ↔ Storefront), closed 5/5 slices (2026-05-?) |
 | **Previous Completion** | M46.0 — Reliability Workshop Follow-Through (J/D/H/A) (2026-05-08) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-05-18 (M48.0 S4 complete — see `docs/planning/milestones/m48-0-session-4-retrospective.md`)*
+*Last Updated: 2026-05-18 (M48.0 S5 complete — see `docs/planning/milestones/m48-0-session-5-retrospective.md`)*
 
 ---
 
@@ -83,14 +83,22 @@ CritterSupply's business architecture under `docs/extraction/`. Plan in
 - Build at session open and close: 0 errors, 359 warnings (identical; no
   code changed).
 
-**Retrospective:** `docs/planning/milestones/m48-0-session-1-retrospective.md` (S1), `docs/planning/milestones/m48-0-session-2-retrospective.md` (S2 — 7 of 9), `docs/planning/milestones/m48-0-session-2b-retrospective.md` (S2b — closeout for Fulfillment + Returns), `docs/planning/milestones/m48-0-session-3-retrospective.md` (S3 — 5 of 9 channels/vendor/admin), `docs/planning/milestones/m48-0-session-3b-retrospective.md` (S3b — 4 deferred channels/vendor/admin), `docs/planning/milestones/m48-0-session-4-retrospective.md` (S4 — 15 cross-BC workflows).
+**Retrospective:** `docs/planning/milestones/m48-0-session-1-retrospective.md` (S1), `docs/planning/milestones/m48-0-session-2-retrospective.md` (S2 — 7 of 9), `docs/planning/milestones/m48-0-session-2b-retrospective.md` (S2b — closeout for Fulfillment + Returns), `docs/planning/milestones/m48-0-session-3-retrospective.md` (S3 — 5 of 9 channels/vendor/admin), `docs/planning/milestones/m48-0-session-3b-retrospective.md` (S3b — 4 deferred channels/vendor/admin), `docs/planning/milestones/m48-0-session-4-retrospective.md` (S4 — 15 cross-BC workflows), `docs/planning/milestones/m48-0-session-5-retrospective.md` (S5 — structural observations brief).
 
 **S2 outcomes (cumulative across S2 + S2b):**
 
 - All 9 commerce-core stub dossiers promoted to S2 — full depth in place: Shopping, Customer Identity (Variant B), Customer Experience (Variant C), Product Catalog, Orders (saga orchestrator), Payments, Inventory (29 events sub-grouped), Fulfillment (55 in-domain events sub-grouped, 31 commands), Returns (cross-product-exchange orchestrator, 10 lifecycle states).
 - Build at session-set open and close: 0 errors. No code changed.
 
-**Next session:** S5 — structural observations across the system (drawing on the 12 CONTEXTS.md drift items, 13 routes-without-instantiator items, and 9 declared-but-unemitted events surfaced across S3 + S3b plus the workflow-level gaps captured in S4).
+**Next session:** S6 — synthesis brief (`docs/extraction/synthesis.md`); the milestone closer. Inputs: the 18 dossiers, the 15 workflow traces, and `docs/extraction/observations.md` (S5).
+
+**S5 outcomes (structural observations brief):**
+
+- `docs/extraction/observations.md` landed: 8 Parts (System composition / Integration topology / Identity and authorization / Shared concepts / Declared vs implemented / Documentation drift / ADR coverage / Test coverage), 30 sections per the M48 plan framework.
+- Organized by category, not by BC. Every observation source-cites a dossier section, a workflow file, or both.
+- Consolidates the drift / declared-not-wired / declared-but-unemitted register accumulated across S2 → S4 retros into pattern groups (Parts V and VI primarily) rather than enumerating each as a separate finding.
+- Build at session open and close: 0 errors. No code changed.
+- Descriptive-language grep guard clean (no `good|bad|awkward|elegant|should|nicely|ugly|better|worse|properly|unfortunately`); no `CritterBids` / `CritterCab` / project-level successor framing.
 
 **S4 outcomes (cross-BC workflow tracing):**
 
