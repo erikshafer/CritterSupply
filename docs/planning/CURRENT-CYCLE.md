@@ -41,79 +41,21 @@
 
 | Aspect | Status |
 |--------|--------|
-| **Current Milestone** | M48.0 — CritterSupply Business Architecture Extraction |
-| **Status** | 🟢 **In progress** — S1 + S2 (with S2b) + S3 (with S3b) + S4 + S5 complete — **all 18 BC dossiers at S2-full depth in place; 15 cross-BC workflow traces landed; structural observations brief landed**; S6 ahead |
-| **Recent Completion** | M47.0 — Cross-product exchange end-to-end (Returns ↔ Inventory ↔ Payments ↔ Storefront), closed 5/5 slices (2026-05-?) |
-| **Previous Completion** | M46.0 — Reliability Workshop Follow-Through (J/D/H/A) (2026-05-08) |
+| **Current Milestone** | *(none active — M48.0 closed 2026-05-18; next milestone TBD)* |
+| **Status** | ⚪ **No active milestone** — M48.0 closed cleanly across S1 + S2 (with S2b) + S3 (with S3b) + S4 + S5 + S6. See [`m48-0-closeout.md`](milestones/m48-0-closeout.md). |
+| **Recent Completion** | M48.0 — CritterSupply Business Architecture Extraction (`docs/extraction/`: 18 BC dossiers, 15 workflow traces, observations brief, synthesis brief), closed 2026-05-18 |
+| **Previous Completion** | M47.0 — Cross-product exchange end-to-end (Returns ↔ Inventory ↔ Payments ↔ Storefront), closed 5/5 slices (2026-05-?) |
 | **Active BCs** | 18 implemented (Listings + Marketplaces BCs added in M36.1) |
 
-*Last Updated: 2026-05-18 (M48.0 S5 complete — see `docs/planning/milestones/m48-0-session-5-retrospective.md`)*
+*Last Updated: 2026-05-18 (M48.0 S6 complete — see `docs/planning/milestones/m48-0-session-6-retrospective.md` and `docs/planning/milestones/m48-0-closeout.md`)*
 
 ---
 
 ## Active Milestone
 
-### 🚧 M48.0 — CritterSupply Business Architecture Extraction
+*(none — M48.0 closed 2026-05-18; the next milestone is TBD)*
 
-**Status:** 🟢 In progress. Sessions 1 + 2 + 2b complete — all 9 commerce-core dossiers (Shopping, Customer Identity, Customer Experience, Product Catalog, Orders, Payments, Inventory, Fulfillment, Returns) at full S2 depth in place. Session 3 (channels / vendor / admin deep dive — 9 BCs) is next.
-
-**Source:** External request — produce a descriptive, source-cited record of
-CritterSupply's business architecture under `docs/extraction/`. Plan in
-[`docs/planning/milestones/m48-0-plan.md`](milestones/m48-0-plan.md).
-
-**Scope (recap):**
-
-- 18 BC dossiers (one per implemented BC)
-- Workflow traces per cross-BC business workflow (S4)
-- Structural observations across the system (S5)
-- Synthesis brief tying catalog + workflows + observations together (S6)
-- Purely descriptive — no recommendations, no comparisons, no judgment
-
-**S1 outcomes (this session):**
-
-- Folder scaffold: `docs/extraction/`, `docs/extraction/bcs/`,
-  `docs/extraction/workflows/` created.
-- `docs/extraction/README.md` — overview, status table (18 BC rows + 5
-  cross-cutting placeholders), ground rules, index.
-- 18 stub dossiers under `docs/extraction/bcs/` covering every implemented
-  BC at stub depth (purpose paragraph + aggregates / commands / domain
-  events / projections / integration events / HTTP-API surface line /
-  frontend surface line or N/A / identity-auth posture line or N/A / prior
-  event modeling / ADRs / source citations).
-- Build at session open and close: 0 errors, 359 warnings (identical; no
-  code changed).
-
-**Retrospective:** `docs/planning/milestones/m48-0-session-1-retrospective.md` (S1), `docs/planning/milestones/m48-0-session-2-retrospective.md` (S2 — 7 of 9), `docs/planning/milestones/m48-0-session-2b-retrospective.md` (S2b — closeout for Fulfillment + Returns), `docs/planning/milestones/m48-0-session-3-retrospective.md` (S3 — 5 of 9 channels/vendor/admin), `docs/planning/milestones/m48-0-session-3b-retrospective.md` (S3b — 4 deferred channels/vendor/admin), `docs/planning/milestones/m48-0-session-4-retrospective.md` (S4 — 15 cross-BC workflows), `docs/planning/milestones/m48-0-session-5-retrospective.md` (S5 — structural observations brief).
-
-**S2 outcomes (cumulative across S2 + S2b):**
-
-- All 9 commerce-core stub dossiers promoted to S2 — full depth in place: Shopping, Customer Identity (Variant B), Customer Experience (Variant C), Product Catalog, Orders (saga orchestrator), Payments, Inventory (29 events sub-grouped), Fulfillment (55 in-domain events sub-grouped, 31 commands), Returns (cross-product-exchange orchestrator, 10 lifecycle states).
-- Build at session-set open and close: 0 errors. No code changed.
-
-**Next session:** S6 — synthesis brief (`docs/extraction/synthesis.md`); the milestone closer. Inputs: the 18 dossiers, the 15 workflow traces, and `docs/extraction/observations.md` (S5).
-
-**S5 outcomes (structural observations brief):**
-
-- `docs/extraction/observations.md` landed: 8 Parts (System composition / Integration topology / Identity and authorization / Shared concepts / Declared vs implemented / Documentation drift / ADR coverage / Test coverage), 30 sections per the M48 plan framework.
-- Organized by category, not by BC. Every observation source-cites a dossier section, a workflow file, or both.
-- Consolidates the drift / declared-not-wired / declared-but-unemitted register accumulated across S2 → S4 retros into pattern groups (Parts V and VI primarily) rather than enumerating each as a separate finding.
-- Build at session open and close: 0 errors. No code changed.
-- Descriptive-language grep guard clean (no `good|bad|awkward|elegant|should|nicely|ugly|better|worse|properly|unfortunately`); no `CritterBids` / `CritterCab` / project-level successor framing.
-
-**S4 outcomes (cross-BC workflow tracing):**
-
-- 15 cross-BC workflow traces landed under `docs/extraction/workflows/`, one file per workflow, following the prompt's standard template (Status / Type / Initiating actor / BCs involved / Most recent material milestone — then Purpose, Actors and triggers, Trace, Projections, Compensation, Variants, BCs and roles, Tests, ADRs, Declared vs. implemented, Source citations).
-- Customer-purchase (4): `cart-to-checkout`, `coupon-and-discount-application`, `coupon-redemption-recording`, `order-saga`. Returns (2): `standard-return-refund`, `cross-product-exchange`. Marketplace (2): `marketplace-listing-submission`, `recall-cascade`. Vendor (2): `vendor-onboarding`, `vendor-change-request`. Operator (3): `backoffice-fan-in-dashboards`, `backoffice-customer-service`, `backoffice-operations-health`. Cross-cutting (2): `transactional-communication`, `storefront-real-time-updates`.
-- All claims source-cited to dossier sections under `docs/extraction/bcs/`; descriptive register only (no should/good/bad).
-- Build at session open and close: 0 errors. No code changed.
-- Workflow-level "Declared vs. implemented" gaps surfaced for S5 include: vendor activation (`VendorUserActivated` declared, no producer); 10 vendor change-request decision routes unproduced/unconsumed; 3 Backoffice SignalR types declared, no instantiator; `MessageSkipped` declared, no production emitter; SMS channel infrastructure stubbed; Backoffice's `IBackofficeIdentityClient` and `IFulfillmentClient` registered with no consumer; 4 Backoffice customer-service endpoint policies mis-spelled.
-
-**S3b outcomes (closeout — 4 deferred dossiers promoted in place):**
-
-- All 4 deferred channel/vendor/admin stub dossiers promoted to S2 — full depth in place: Backoffice (Variant C-hybrid; 369 lines; 1 ES aggregate `OrderNote` + BFF composition across 9 upstream BCs; 22 Razor pages; 6 projections; 24 inbound handlers; 5 SignalR message types; 7 routes-without-instantiator), Pricing (Variant A; 213 lines; 1 aggregate `ProductPrice`; UUID v5 stream IDs — **NOT v7 as S1 said**; **DCB claim refuted by source** — no DCB tags; 6 commands; 10 events with 4 declared-but-unemitted; 0 wired outbound integrations), Promotions (Variant A; 227 lines; 2 aggregates `Promotion`/`Coupon` with two distinct stream-ID strategies — UUID v7 + UUID v5; **DCB claim verified** — full DCB tag types + boundary query + concurrency-retry policy; 8 commands; 12 events with 5 declared-but-unemitted; 0 outbound contracts), Correspondence (Variant A; 187 lines; 1 aggregate `Message`; UUID v7; 1 command; 4 events; 12 inbound handlers across 4 BCs — **not 13 as S1 said**; provider abstractions stub-only).
-- **All 18 BC dossiers now at S2-full depth.** S3 closes; M48.0 advances to S4.
-- Build at session open: 0 errors. No code changed.
-- 12 additional CONTEXTS.md drift items + 13 routes-without-instantiator items + 9 declared-but-unemitted events surfaced for S5; 4 substantive workflow notes forwarded for S4.
+The previously active milestone (M48.0 — CritterSupply Business Architecture Extraction) is now in the [Recent Completions](#recent-completions) section.
 
 ### Previously Active — M46.0 — Reliability Workshop Follow-Through (J → D → H → A)
 
@@ -162,6 +104,16 @@ from `state-of-repo-2026-05.md` §7.4 (the below-the-line set the workshop
 explicitly deferred).
 
 ## Recent Completions
+
+### ✅ M48.0: CritterSupply Business Architecture Extraction (2026-05-18)
+
+Source: External request — produce a descriptive, source-cited record of CritterSupply's business architecture under `docs/extraction/`. Plan in [`m48-0-plan.md`](milestones/m48-0-plan.md); closeout in [`m48-0-closeout.md`](milestones/m48-0-closeout.md).
+
+Eight working passes across six sessions (S1 + S2 + S2b + S3 + S3b + S4 + S5 + S6) landed the full extraction set under `docs/extraction/`: 18 BC dossiers at S2-full depth (one per implemented BC); 15 cross-BC workflow traces; an 8-Part / 30-section structural-observations brief organized by category; and a 12-section synthesis brief re-presenting the dossiers + workflows + observations as a unified picture. Every artifact is source-cited; no artifact contains evaluative language or sibling-project / successor framing (grep-guards clean across all 8 sessions). M48.0 is documentation-only — build identical at every session open and every session close (0 errors).
+
+Retrospectives: `m48-0-session-{1,2,2b,3,3b,4,5,6}-retrospective.md`.
+
+Deferred to future cycles (recorded in `m48-0-closeout.md` "What M48.0 explicitly did **not** do"): fixing the 12+ CONTEXTS.md drift items recorded in `observations.md` §23; fixing the 4 mis-spelled Backoffice customer-service policy strings recorded in `observations.md` §21; wiring or retiring the 25+ declared-not-wired routes recorded in `observations.md` §17, §20; the cross-product-exchange E2E Reqnroll trace deferred from M47.0; skill extraction; any prompt translation for downstream operations.
 
 ### ✅ M47.0: Cross-Product Exchange End-to-End (2026-05)
 
